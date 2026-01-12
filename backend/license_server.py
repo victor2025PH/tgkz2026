@@ -127,9 +127,14 @@ class LicenseServer:
         self.app.router.add_get('/api/products', self.handle_products)
         self.app.router.add_post('/api/payment/create', self.handle_create_payment)
         self.app.router.add_post('/api/payment/callback', self.handle_payment_callback)
+        self.app.router.add_get('/api/order/status', self.handle_order_status)
         
         # 公告 API
         self.app.router.add_get('/api/announcements', self.handle_announcements)
+        self.app.router.add_get('/api/announcements/popup', self.handle_announcements_popup)
+        
+        # 會員到期提醒 API
+        self.app.router.add_get('/api/user/expiry-check', self.handle_expiry_check)
         
         # 統計 API (公開)
         self.app.router.add_get('/api/stats', self.handle_stats)
@@ -159,6 +164,14 @@ class LicenseServer:
         
         # 訂單管理
         self.app.router.add_get('/api/admin/orders', self.handle_admin_orders)
+        self.app.router.add_post('/api/admin/orders/confirm', self.handle_admin_confirm_payment)
+        
+        # 收入報表
+        self.app.router.add_get('/api/admin/revenue-report', self.handle_admin_revenue_report)
+        self.app.router.add_get('/api/admin/user-analytics', self.handle_admin_user_analytics)
+        
+        # 即將過期用戶
+        self.app.router.add_get('/api/admin/expiring-users', self.handle_admin_expiring_users)
         
         # 邀請管理
         self.app.router.add_get('/api/admin/referrals', self.handle_admin_referrals)
@@ -720,6 +733,8 @@ class LicenseServer:
             product_id = data.get('product_id', '')
             payment_method = data.get('payment_method', 'usdt')
             machine_id = data.get('machine_id', '')
+            user_id = data.get('user_id', '')
+            coupon_code = data.get('coupon_code', '')
             
             # 解析產品 ID
             parts = product_id.split('_')
@@ -731,23 +746,83 @@ class LicenseServer:
                 return web.json_response({'success': False, 'message': '無效的產品'}, status=400)
             
             price = MEMBERSHIP_LEVELS[level]['prices'][duration]
+            original_price = price
+            discount_amount = 0
+            coupon_id = None
+            
+            # 處理優惠券
+            if coupon_code:
+                conn = self.db.get_connection()
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT * FROM coupons WHERE code = ? AND status = 'active'
+                    AND (expires_at IS NULL OR expires_at > datetime('now'))
+                    AND (max_uses IS NULL OR used_count < max_uses)
+                ''', (coupon_code.upper(),))
+                coupon = cursor.fetchone()
+                conn.close()
+                
+                if coupon:
+                    coupon = dict(coupon)
+                    if coupon['discount_type'] == 'percent':
+                        discount_amount = price * (coupon['discount_value'] / 100)
+                    else:
+                        discount_amount = min(coupon['discount_value'], price)
+                    
+                    if coupon['min_amount'] and price < coupon['min_amount']:
+                        discount_amount = 0
+                    else:
+                        coupon_id = coupon['id']
+                        price = max(0, price - discount_amount)
+            
             order_id = f"TGO{int(time.time())}{secrets.token_hex(4).upper()}"
+            
+            # 計算時長天數
+            duration_days = {'week': 7, 'month': 30, 'quarter': 90, 'year': 365, 'lifetime': 36500}[duration]
             
             # USDT 匯率
             usdt_rate = float(self.db.get_setting('usdt_rate', '7.2'))
             usdt_amount = round(price / usdt_rate, 2)
             usdt_address = self.db.get_setting('usdt_trc20_address', '')
             
+            # 獲取用戶信息
+            user = None
+            if user_id:
+                user = self.db.get_user(user_id=user_id)
+            elif machine_id:
+                user = self.db.get_user(machine_id=machine_id)
+            
+            # 創建訂單
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO orders (order_id, user_id, product_id, product_name, product_level, 
+                                   duration_type, duration_days, original_price, discount_amount, 
+                                   final_price, payment_method, coupon_id, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+            ''', (order_id, user['user_id'] if user else None, product_id,
+                  f"{MEMBERSHIP_LEVELS[level]['name']}{{'week': '周卡', 'month': '月卡', 'quarter': '季卡', 'year': '年卡', 'lifetime': '終身'}[duration]}",
+                  level, duration, duration_days, original_price, discount_amount, price, payment_method, coupon_id))
+            conn.commit()
+            conn.close()
+            
             response_data = {
                 'orderId': order_id,
                 'product': {
+                    'id': product_id,
                     'level': level,
                     'levelName': MEMBERSHIP_LEVELS[level]['name'],
+                    'levelIcon': MEMBERSHIP_LEVELS[level]['icon'],
                     'duration': duration,
+                    'durationDays': duration_days,
+                    'originalPrice': original_price,
                     'price': price
                 },
+                'discount': discount_amount,
                 'amount': price,
-                'currency': 'CNY'
+                'currency': 'CNY',
+                'status': 'pending',
+                'expiresIn': 1800  # 30分鐘有效
             }
             
             if payment_method == 'usdt':
@@ -755,7 +830,8 @@ class LicenseServer:
                     'amount': usdt_amount,
                     'network': 'TRC20',
                     'address': usdt_address,
-                    'rate': usdt_rate
+                    'rate': usdt_rate,
+                    'memo': order_id  # 可用作備註標識
                 }
             
             return web.json_response({
@@ -766,9 +842,231 @@ class LicenseServer:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
     async def handle_payment_callback(self, request: web.Request) -> web.Response:
-        """支付回調"""
-        # TODO: 實現實際的支付回調處理
-        return web.json_response({'success': True, 'message': '回調處理成功'})
+        """支付回調 - 處理支付成功後的訂單"""
+        try:
+            data = await request.json()
+            order_id = data.get('order_id', '')
+            tx_hash = data.get('tx_hash', '')  # 交易哈希
+            payment_amount = data.get('amount', 0)
+            callback_secret = data.get('secret', '')
+            
+            # 驗證回調密鑰 (防止偽造)
+            expected_secret = self.db.get_setting('payment_callback_secret', 'tgai-payment-2026')
+            if callback_secret != expected_secret:
+                return web.json_response({'success': False, 'message': '無效的回調'}, status=403)
+            
+            if not order_id:
+                return web.json_response({'success': False, 'message': '缺少訂單ID'}, status=400)
+            
+            # 查找訂單
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM orders WHERE order_id = ?', (order_id,))
+            order = cursor.fetchone()
+            
+            if not order:
+                conn.close()
+                return web.json_response({'success': False, 'message': '訂單不存在'}, status=404)
+            
+            order = dict(order)
+            
+            if order['status'] == 'paid':
+                conn.close()
+                return web.json_response({'success': True, 'message': '訂單已處理'})
+            
+            # 更新訂單狀態
+            cursor.execute('''
+                UPDATE orders SET status = 'paid', paid_at = CURRENT_TIMESTAMP, 
+                                 tx_hash = ?, paid_amount = ?
+                WHERE order_id = ?
+            ''', (tx_hash, payment_amount, order_id))
+            
+            # 更新優惠券使用次數
+            if order['coupon_id']:
+                cursor.execute('UPDATE coupons SET used_count = used_count + 1 WHERE id = ?', 
+                              (order['coupon_id'],))
+            
+            # 處理用戶會員升級
+            user_id = order['user_id']
+            if user_id:
+                user = self.db.get_user(user_id=user_id)
+                if user:
+                    # 計算新過期時間
+                    current_expires = user.get('expires_at')
+                    if current_expires:
+                        current_expires = datetime.fromisoformat(current_expires)
+                        if current_expires < datetime.now():
+                            current_expires = datetime.now()
+                    else:
+                        current_expires = datetime.now()
+                    
+                    duration_days = order['duration_days']
+                    is_lifetime = duration_days >= 36500
+                    new_expires = current_expires + timedelta(days=duration_days)
+                    
+                    # 更新用戶
+                    cursor.execute('''
+                        UPDATE users SET membership_level = ?, expires_at = ?, is_lifetime = ?,
+                                        total_spent = total_spent + ?
+                        WHERE user_id = ?
+                    ''', (order['product_level'], new_expires.isoformat(), 1 if is_lifetime else 0,
+                          order['final_price'], user_id))
+                    
+                    # 處理邀請獎勵
+                    if user.get('invited_by'):
+                        inviter = self.db.get_user(invite_code=user['invited_by'])
+                        if inviter:
+                            # 檢查是否首次付費
+                            cursor.execute('''
+                                SELECT COUNT(*) FROM orders WHERE user_id = ? AND status = 'paid'
+                            ''', (user_id,))
+                            paid_count = cursor.fetchone()[0]
+                            
+                            reward_type = 'first_payment' if paid_count <= 1 else 'repeat_payment'
+                            
+                            if reward_type == 'first_payment':
+                                # 首次付費獎勵
+                                first_rewards = REFERRAL_REWARDS['first_payment'].get(order['product_level'], {})
+                                inviter_days = first_rewards.get('inviter_days', 0)
+                                inviter_cash = first_rewards.get('inviter_cash', 0)
+                                
+                                if inviter_days > 0 or inviter_cash > 0:
+                                    # 更新邀請者
+                                    inviter_expires = inviter.get('expires_at')
+                                    if inviter_expires:
+                                        inviter_expires = datetime.fromisoformat(inviter_expires)
+                                        if inviter_expires < datetime.now():
+                                            inviter_expires = datetime.now()
+                                    else:
+                                        inviter_expires = datetime.now()
+                                    
+                                    new_inviter_expires = inviter_expires + timedelta(days=inviter_days)
+                                    
+                                    cursor.execute('''
+                                        UPDATE users SET expires_at = ?, 
+                                                        invite_earnings = invite_earnings + ?,
+                                                        balance = balance + ?
+                                        WHERE user_id = ?
+                                    ''', (new_inviter_expires.isoformat(), inviter_cash, inviter_cash, 
+                                          inviter['user_id']))
+                                    
+                                    # 記錄邀請獎勵
+                                    cursor.execute('''
+                                        INSERT INTO referrals (inviter_id, invitee_id, reward_type,
+                                                              inviter_reward_days, inviter_reward_cash, order_id, status)
+                                        VALUES (?, ?, ?, ?, ?, ?, 'completed')
+                                    ''', (inviter['user_id'], user_id, reward_type, inviter_days, inviter_cash, order_id))
+                            else:
+                                # 重複付費返傭
+                                commission_rate = REFERRAL_REWARDS['repeat_payment'].get('commission_rate', 0.1)
+                                commission = order['final_price'] * commission_rate
+                                
+                                cursor.execute('''
+                                    UPDATE users SET invite_earnings = invite_earnings + ?,
+                                                    balance = balance + ?
+                                    WHERE user_id = ?
+                                ''', (commission, commission, inviter['user_id']))
+                                
+                                cursor.execute('''
+                                    INSERT INTO referrals (inviter_id, invitee_id, reward_type,
+                                                          commission_amount, order_id, status)
+                                    VALUES (?, ?, ?, ?, ?, 'completed')
+                                ''', (inviter['user_id'], user_id, reward_type, commission, order_id))
+                    
+                    # 生成對應的卡密記錄
+                    license_key = f"TGAI-PAY-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}"
+                    cursor.execute('''
+                        INSERT INTO licenses (license_key, type_code, level, duration_type, duration_days,
+                                             price, status, used_by, used_at, machine_id, activated_at, 
+                                             expires_at, notes, created_by)
+                        VALUES (?, 'PAY', ?, ?, ?, ?, 'used', ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, ?, ?, 'system')
+                    ''', (license_key, order['product_level'], order['duration_type'], 
+                          order['duration_days'], order['final_price'], user_id, 
+                          user.get('machine_id'), new_expires.isoformat(), f"訂單: {order_id}"))
+                    
+                    cursor.execute('UPDATE orders SET license_key = ? WHERE order_id = ?', 
+                                  (license_key, order_id))
+            
+            conn.commit()
+            conn.close()
+            
+            return web.json_response({
+                'success': True,
+                'message': '支付成功，會員已激活',
+                'data': {
+                    'orderId': order_id,
+                    'licenseKey': license_key if user_id else None
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_order_status(self, request: web.Request) -> web.Response:
+        """查詢訂單狀態"""
+        try:
+            order_id = request.query.get('order_id', '')
+            if not order_id:
+                return web.json_response({'success': False, 'message': '缺少訂單ID'}, status=400)
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM orders WHERE order_id = ?', (order_id,))
+            order = cursor.fetchone()
+            conn.close()
+            
+            if not order:
+                return web.json_response({'success': False, 'message': '訂單不存在'}, status=404)
+            
+            order = dict(order)
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'orderId': order['order_id'],
+                    'status': order['status'],
+                    'productName': order['product_name'],
+                    'amount': order['final_price'],
+                    'paidAt': order['paid_at'],
+                    'licenseKey': order['license_key']
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_confirm_payment(self, request: web.Request) -> web.Response:
+        """管理員手動確認支付"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            data = await request.json()
+            order_id = data.get('order_id', '')
+            
+            if not order_id:
+                return web.json_response({'success': False, 'message': '缺少訂單ID'}, status=400)
+            
+            # 模擬支付回調
+            callback_data = {
+                'order_id': order_id,
+                'tx_hash': f"MANUAL-{admin['username']}-{int(time.time())}",
+                'amount': 0,
+                'secret': self.db.get_setting('payment_callback_secret', 'tgai-payment-2026')
+            }
+            
+            # 創建模擬請求
+            class MockRequest:
+                async def json(self):
+                    return callback_data
+            
+            result = await self.handle_payment_callback(MockRequest())
+            
+            self._log_admin_action(admin['username'], 'confirm_payment', 'order',
+                                  'order', order_id, f'Manual confirmation')
+            
+            return result
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
     
     async def handle_announcements(self, request: web.Request) -> web.Response:
         """獲取公告列表"""
@@ -789,6 +1087,108 @@ class LicenseServer:
             return web.json_response({
                 'success': True,
                 'data': announcements
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_announcements_popup(self, request: web.Request) -> web.Response:
+        """獲取需要彈窗顯示的公告"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM announcements 
+                WHERE status = 'published' AND is_popup = 1
+                AND (publish_at IS NULL OR publish_at <= datetime('now'))
+                AND (expire_at IS NULL OR expire_at > datetime('now'))
+                ORDER BY priority DESC, created_at DESC
+                LIMIT 5
+            ''')
+            announcements = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            
+            return web.json_response({
+                'success': True,
+                'data': announcements
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_expiry_check(self, request: web.Request) -> web.Response:
+        """檢查會員到期提醒"""
+        try:
+            auth_header = request.headers.get('Authorization', '')
+            if not auth_header.startswith('Bearer '):
+                return web.json_response({'success': False, 'message': '未授權'}, status=401)
+            
+            token = auth_header[7:]
+            payload = self._verify_token(token)
+            if not payload:
+                return web.json_response({'success': False, 'message': 'Token 無效'}, status=401)
+            
+            user = self.db.get_user(user_id=payload['user_id'])
+            if not user:
+                return web.json_response({'success': False, 'message': '用戶不存在'}, status=404)
+            
+            # 檢查是否需要提醒
+            expires_at = user.get('expires_at')
+            reminders = []
+            
+            if expires_at and not user.get('is_lifetime'):
+                expires_dt = datetime.fromisoformat(expires_at)
+                now = datetime.now()
+                days_left = (expires_dt - now).days
+                
+                if days_left <= 0:
+                    reminders.append({
+                        'type': 'expired',
+                        'title': '會員已過期',
+                        'message': '您的會員已過期，請續費以繼續使用完整功能。',
+                        'days': 0,
+                        'level': 'urgent'
+                    })
+                elif days_left <= 3:
+                    reminders.append({
+                        'type': 'expiring_soon',
+                        'title': '會員即將過期',
+                        'message': f'您的會員將在 {days_left} 天後過期，請及時續費。',
+                        'days': days_left,
+                        'level': 'warning'
+                    })
+                elif days_left <= 7:
+                    reminders.append({
+                        'type': 'expiring',
+                        'title': '會員到期提醒',
+                        'message': f'您的會員將在 {days_left} 天後過期。',
+                        'days': days_left,
+                        'level': 'info'
+                    })
+            
+            # 獲取推薦的升級產品
+            current_level = user.get('membership_level', 'bronze')
+            level_order = ['bronze', 'silver', 'gold', 'diamond', 'star', 'king']
+            current_idx = level_order.index(current_level) if current_level in level_order else 0
+            
+            upgrade_options = []
+            for level in level_order[current_idx + 1:]:
+                config = MEMBERSHIP_LEVELS[level]
+                upgrade_options.append({
+                    'level': level,
+                    'name': config['name'],
+                    'icon': config['icon'],
+                    'monthlyPrice': config['prices']['month']
+                })
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'reminders': reminders,
+                    'expiresAt': expires_at,
+                    'daysLeft': (datetime.fromisoformat(expires_at) - datetime.now()).days if expires_at else None,
+                    'isLifetime': user.get('is_lifetime'),
+                    'currentLevel': current_level,
+                    'upgradeOptions': upgrade_options[:3]  # 最多顯示3個升級選項
+                }
             })
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
@@ -1301,13 +1701,323 @@ class LicenseServer:
             return error_response
         
         try:
+            status = request.query.get('status')
+            limit = int(request.query.get('limit', 500))
+            
             conn = self.db.get_connection()
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM orders ORDER BY created_at DESC LIMIT 500')
+            
+            if status:
+                cursor.execute('SELECT * FROM orders WHERE status = ? ORDER BY created_at DESC LIMIT ?', 
+                              (status, limit))
+            else:
+                cursor.execute('SELECT * FROM orders ORDER BY created_at DESC LIMIT ?', (limit,))
+            
             orders = [dict(row) for row in cursor.fetchall()]
             conn.close()
             
             return web.json_response({'success': True, 'data': orders})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_revenue_report(self, request: web.Request) -> web.Response:
+        """收入報表"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            days = int(request.query.get('days', 30))
+            group_by = request.query.get('group_by', 'day')  # day, week, month
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # 按日期分組的收入
+            if group_by == 'day':
+                cursor.execute('''
+                    SELECT date(paid_at) as period, 
+                           COUNT(*) as order_count,
+                           SUM(final_price) as revenue,
+                           COUNT(DISTINCT user_id) as unique_users
+                    FROM orders 
+                    WHERE status = 'paid' AND paid_at >= date('now', ? || ' days')
+                    GROUP BY date(paid_at)
+                    ORDER BY period DESC
+                ''', (f'-{days}',))
+            elif group_by == 'week':
+                cursor.execute('''
+                    SELECT strftime('%Y-W%W', paid_at) as period,
+                           COUNT(*) as order_count,
+                           SUM(final_price) as revenue,
+                           COUNT(DISTINCT user_id) as unique_users
+                    FROM orders 
+                    WHERE status = 'paid' AND paid_at >= date('now', ? || ' days')
+                    GROUP BY strftime('%Y-W%W', paid_at)
+                    ORDER BY period DESC
+                ''', (f'-{days}',))
+            else:
+                cursor.execute('''
+                    SELECT strftime('%Y-%m', paid_at) as period,
+                           COUNT(*) as order_count,
+                           SUM(final_price) as revenue,
+                           COUNT(DISTINCT user_id) as unique_users
+                    FROM orders 
+                    WHERE status = 'paid' AND paid_at >= date('now', ? || ' days')
+                    GROUP BY strftime('%Y-%m', paid_at)
+                    ORDER BY period DESC
+                ''', (f'-{days}',))
+            
+            revenue_trend = [dict(row) for row in cursor.fetchall()]
+            
+            # 按等級的收入分布
+            cursor.execute('''
+                SELECT product_level, 
+                       COUNT(*) as order_count,
+                       SUM(final_price) as revenue
+                FROM orders 
+                WHERE status = 'paid' AND paid_at >= date('now', ? || ' days')
+                GROUP BY product_level
+                ORDER BY revenue DESC
+            ''', (f'-{days}',))
+            revenue_by_level = [dict(row) for row in cursor.fetchall()]
+            
+            # 按時長的收入分布
+            cursor.execute('''
+                SELECT duration_type, 
+                       COUNT(*) as order_count,
+                       SUM(final_price) as revenue
+                FROM orders 
+                WHERE status = 'paid' AND paid_at >= date('now', ? || ' days')
+                GROUP BY duration_type
+                ORDER BY revenue DESC
+            ''', (f'-{days}',))
+            revenue_by_duration = [dict(row) for row in cursor.fetchall()]
+            
+            # 總計
+            cursor.execute('''
+                SELECT COUNT(*) as total_orders,
+                       COALESCE(SUM(final_price), 0) as total_revenue,
+                       COUNT(DISTINCT user_id) as unique_buyers,
+                       COALESCE(AVG(final_price), 0) as avg_order_value
+                FROM orders 
+                WHERE status = 'paid' AND paid_at >= date('now', ? || ' days')
+            ''', (f'-{days}',))
+            summary = dict(cursor.fetchone())
+            
+            # 對比上一期
+            cursor.execute('''
+                SELECT COALESCE(SUM(final_price), 0) as prev_revenue
+                FROM orders 
+                WHERE status = 'paid' 
+                AND paid_at >= date('now', ? || ' days')
+                AND paid_at < date('now', ? || ' days')
+            ''', (f'-{days*2}', f'-{days}'))
+            prev = cursor.fetchone()
+            prev_revenue = prev['prev_revenue'] if prev else 0
+            
+            growth_rate = 0
+            if prev_revenue > 0:
+                growth_rate = ((summary['total_revenue'] - prev_revenue) / prev_revenue) * 100
+            
+            summary['growth_rate'] = round(growth_rate, 2)
+            summary['prev_revenue'] = prev_revenue
+            
+            conn.close()
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'summary': summary,
+                    'trend': revenue_trend,
+                    'byLevel': revenue_by_level,
+                    'byDuration': revenue_by_duration,
+                    'period': f'近{days}天'
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_user_analytics(self, request: web.Request) -> web.Response:
+        """用戶行為分析"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            days = int(request.query.get('days', 30))
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # 用戶增長趨勢
+            cursor.execute('''
+                SELECT date(created_at) as date, COUNT(*) as new_users
+                FROM users
+                WHERE created_at >= date('now', ? || ' days')
+                GROUP BY date(created_at)
+                ORDER BY date DESC
+            ''', (f'-{days}',))
+            user_growth = [dict(row) for row in cursor.fetchall()]
+            
+            # 活躍用戶趨勢
+            cursor.execute('''
+                SELECT date(last_active_at) as date, COUNT(*) as active_users
+                FROM users
+                WHERE last_active_at >= date('now', ? || ' days')
+                GROUP BY date(last_active_at)
+                ORDER BY date DESC
+            ''', (f'-{days}',))
+            active_trend = [dict(row) for row in cursor.fetchall()]
+            
+            # 留存率計算 (簡化版)
+            cursor.execute('''
+                SELECT 
+                    COUNT(CASE WHEN last_active_at >= date('now', '-1 day') THEN 1 END) as day1,
+                    COUNT(CASE WHEN last_active_at >= date('now', '-7 days') THEN 1 END) as day7,
+                    COUNT(CASE WHEN last_active_at >= date('now', '-30 days') THEN 1 END) as day30,
+                    COUNT(*) as total
+                FROM users
+                WHERE created_at >= date('now', '-30 days')
+            ''')
+            retention_raw = dict(cursor.fetchone())
+            total = retention_raw['total'] or 1
+            retention = {
+                'day1': round((retention_raw['day1'] / total) * 100, 2),
+                'day7': round((retention_raw['day7'] / total) * 100, 2),
+                'day30': round((retention_raw['day30'] / total) * 100, 2)
+            }
+            
+            # 付費轉化率
+            cursor.execute('''
+                SELECT 
+                    COUNT(*) as total_users,
+                    COUNT(CASE WHEN total_spent > 0 THEN 1 END) as paid_users,
+                    COUNT(CASE WHEN membership_level != 'bronze' THEN 1 END) as premium_users
+                FROM users
+            ''')
+            conversion_raw = dict(cursor.fetchone())
+            total_users = conversion_raw['total_users'] or 1
+            conversion = {
+                'totalUsers': conversion_raw['total_users'],
+                'paidUsers': conversion_raw['paid_users'],
+                'premiumUsers': conversion_raw['premium_users'],
+                'paidRate': round((conversion_raw['paid_users'] / total_users) * 100, 2),
+                'premiumRate': round((conversion_raw['premium_users'] / total_users) * 100, 2)
+            }
+            
+            # ARPU (每用戶平均收入)
+            cursor.execute('''
+                SELECT COALESCE(SUM(final_price), 0) as total_revenue
+                FROM orders WHERE status = 'paid'
+            ''')
+            total_revenue = cursor.fetchone()['total_revenue']
+            arpu = round(total_revenue / total_users, 2) if total_users > 0 else 0
+            
+            # ARPPU (付費用戶平均收入)
+            arppu = round(total_revenue / conversion_raw['paid_users'], 2) if conversion_raw['paid_users'] > 0 else 0
+            
+            # 用戶等級分布
+            cursor.execute('''
+                SELECT membership_level, COUNT(*) as count
+                FROM users
+                GROUP BY membership_level
+                ORDER BY count DESC
+            ''')
+            level_distribution = {row['membership_level']: row['count'] for row in cursor.fetchall()}
+            
+            # 邀請效果
+            cursor.execute('''
+                SELECT 
+                    COUNT(*) as total_referrals,
+                    COUNT(CASE WHEN reward_type = 'first_payment' THEN 1 END) as converted_referrals,
+                    COALESCE(SUM(inviter_reward_cash + commission_amount), 0) as total_rewards
+                FROM referrals
+                WHERE created_at >= date('now', ? || ' days')
+            ''', (f'-{days}',))
+            referral_stats = dict(cursor.fetchone())
+            
+            conn.close()
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'userGrowth': user_growth,
+                    'activeTrend': active_trend,
+                    'retention': retention,
+                    'conversion': conversion,
+                    'arpu': arpu,
+                    'arppu': arppu,
+                    'levelDistribution': level_distribution,
+                    'referralStats': referral_stats,
+                    'period': f'近{days}天'
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_expiring_users(self, request: web.Request) -> web.Response:
+        """獲取即將過期的用戶"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            days = int(request.query.get('days', 7))  # 默認7天內過期
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT u.*, 
+                       julianday(u.expires_at) - julianday('now') as days_left
+                FROM users u
+                WHERE u.is_lifetime = 0 
+                AND u.expires_at IS NOT NULL
+                AND u.expires_at > datetime('now')
+                AND u.expires_at <= datetime('now', ? || ' days')
+                AND u.is_banned = 0
+                ORDER BY u.expires_at ASC
+                LIMIT 100
+            ''', (f'+{days}',))
+            
+            users = []
+            for u in cursor.fetchall():
+                u = dict(u)
+                level_config = MEMBERSHIP_LEVELS.get(u['membership_level'] or 'bronze', MEMBERSHIP_LEVELS['bronze'])
+                users.append({
+                    'userId': u['user_id'],
+                    'email': u['email'],
+                    'nickname': u['nickname'],
+                    'level': u['membership_level'],
+                    'levelName': level_config['name'],
+                    'levelIcon': level_config['icon'],
+                    'expiresAt': u['expires_at'],
+                    'daysLeft': int(u['days_left']) if u['days_left'] else 0,
+                    'totalSpent': u['total_spent'] or 0,
+                    'lastActiveAt': u['last_active_at']
+                })
+            
+            # 統計
+            cursor.execute('''
+                SELECT 
+                    COUNT(CASE WHEN expires_at <= datetime('now', '+3 days') THEN 1 END) as in_3_days,
+                    COUNT(CASE WHEN expires_at <= datetime('now', '+7 days') THEN 1 END) as in_7_days,
+                    COUNT(CASE WHEN expires_at <= datetime('now', '+30 days') THEN 1 END) as in_30_days
+                FROM users
+                WHERE is_lifetime = 0 AND expires_at > datetime('now') AND is_banned = 0
+            ''')
+            stats = dict(cursor.fetchone())
+            
+            conn.close()
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'users': users,
+                    'stats': stats
+                }
+            })
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     

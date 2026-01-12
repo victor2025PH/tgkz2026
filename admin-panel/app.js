@@ -125,6 +125,8 @@ createApp({
             { id: 'users', name: '用戶管理', icon: '👥' },
             { id: 'licenses', name: '卡密管理', icon: '🎟️' },
             { id: 'orders', name: '訂單管理', icon: '💰' },
+            { id: 'revenue', name: '收入報表', icon: '💹' },
+            { id: 'analytics', name: '用戶分析', icon: '📈' },
             { id: 'referrals', name: '邀請管理', icon: '🎁' },
             { id: 'announcements', name: '公告管理', icon: '📢' },
             { id: 'logs', name: '操作日誌', icon: '📝' },
@@ -181,6 +183,27 @@ createApp({
         // 圖表數據
         const revenueTrend = ref([]);
         const levelDistribution = ref({});
+        
+        // 收入報表
+        const revenueReportDays = ref(30);
+        const revenueReport = ref({
+            summary: {},
+            trend: [],
+            byLevel: [],
+            byDuration: []
+        });
+        
+        // 用戶分析
+        const userAnalytics = ref({
+            userGrowth: [],
+            activeTrend: [],
+            retention: {},
+            conversion: {},
+            arpu: 0,
+            arppu: 0,
+            levelDistribution: {},
+            referralStats: {}
+        });
         
         // 設置
         const settings = ref({
@@ -270,6 +293,22 @@ createApp({
             const result = await apiRequest('/admin/announcements');
             if (result.success) {
                 announcements.value = result.data;
+            }
+        };
+        
+        const loadRevenueReport = async () => {
+            const result = await apiRequest(`/admin/revenue-report?days=${revenueReportDays.value}`);
+            if (result.success) {
+                revenueReport.value = result.data;
+                setTimeout(initRevenueCharts, 100);
+            }
+        };
+        
+        const loadUserAnalytics = async () => {
+            const result = await apiRequest('/admin/user-analytics?days=30');
+            if (result.success) {
+                userAnalytics.value = result.data;
+                setTimeout(initAnalyticsCharts, 100);
             }
         };
         
@@ -839,6 +878,161 @@ createApp({
             }
         };
         
+        // ============ 輔助函數 ============
+        
+        const getLevelName = (level) => {
+            const names = {
+                bronze: '⚔️ 青銅戰士',
+                silver: '🥈 白銀精英',
+                gold: '🥇 黃金大師',
+                diamond: '💎 鑽石王牌',
+                star: '🌟 星耀傳說',
+                king: '👑 榮耀王者'
+            };
+            return names[level] || level;
+        };
+        
+        const getDurationName = (duration) => {
+            const names = {
+                week: '周卡',
+                month: '月卡',
+                quarter: '季卡',
+                year: '年卡',
+                lifetime: '終身',
+                custom: '自定義'
+            };
+            return names[duration] || duration;
+        };
+        
+        // ============ 圖表初始化 ============
+        
+        let revenueTrendChart = null;
+        let revenueByLevelChart = null;
+        let userGrowthChart = null;
+        let userLevelChart = null;
+        
+        const initRevenueCharts = () => {
+            // 收入趨勢圖
+            const trendCtx = document.getElementById('revenueTrendChart');
+            if (trendCtx) {
+                if (revenueTrendChart) revenueTrendChart.destroy();
+                
+                const data = revenueReport.value.trend || [];
+                revenueTrendChart = new Chart(trendCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.map(d => d.period).reverse(),
+                        datasets: [{
+                            label: '收入 (¥)',
+                            data: data.map(d => d.revenue).reverse(),
+                            backgroundColor: 'rgba(34, 197, 94, 0.6)',
+                            borderColor: '#22C55E',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#9CA3AF' } },
+                            x: { grid: { display: false }, ticks: { color: '#9CA3AF' } }
+                        }
+                    }
+                });
+            }
+            
+            // 等級收入分布
+            const levelCtx = document.getElementById('revenueByLevelChart');
+            if (levelCtx) {
+                if (revenueByLevelChart) revenueByLevelChart.destroy();
+                
+                const data = revenueReport.value.byLevel || [];
+                const levelColors = {
+                    bronze: '#CD7F32', silver: '#C0C0C0', gold: '#FFD700',
+                    diamond: '#00CED1', star: '#9B59B6', king: '#FF6B6B'
+                };
+                
+                revenueByLevelChart = new Chart(levelCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: data.map(d => getLevelName(d.product_level)),
+                        datasets: [{
+                            data: data.map(d => d.revenue),
+                            backgroundColor: data.map(d => levelColors[d.product_level] || '#666')
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'right', labels: { color: '#9CA3AF' } }
+                        }
+                    }
+                });
+            }
+        };
+        
+        const initAnalyticsCharts = () => {
+            // 用戶增長圖
+            const growthCtx = document.getElementById('userGrowthChart');
+            if (growthCtx) {
+                if (userGrowthChart) userGrowthChart.destroy();
+                
+                const data = userAnalytics.value.userGrowth || [];
+                userGrowthChart = new Chart(growthCtx, {
+                    type: 'line',
+                    data: {
+                        labels: data.map(d => d.date?.slice(5)).reverse(),
+                        datasets: [{
+                            label: '新用戶',
+                            data: data.map(d => d.new_users).reverse(),
+                            borderColor: '#8B5CF6',
+                            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#9CA3AF' } },
+                            x: { grid: { display: false }, ticks: { color: '#9CA3AF' } }
+                        }
+                    }
+                });
+            }
+            
+            // 等級分布圖
+            const levelCtx = document.getElementById('userLevelChart');
+            if (levelCtx) {
+                if (userLevelChart) userLevelChart.destroy();
+                
+                const data = userAnalytics.value.levelDistribution || {};
+                const levelColors = {
+                    bronze: '#CD7F32', silver: '#C0C0C0', gold: '#FFD700',
+                    diamond: '#00CED1', star: '#9B59B6', king: '#FF6B6B'
+                };
+                
+                const labels = Object.keys(data);
+                userLevelChart = new Chart(levelCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels.map(l => getLevelName(l)),
+                        datasets: [{
+                            data: Object.values(data),
+                            backgroundColor: labels.map(l => levelColors[l] || '#666')
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'right', labels: { color: '#9CA3AF' } }
+                        }
+                    }
+                });
+            }
+        };
+        
         // ============ 頁面切換監聽 ============
         
         watch(currentPage, async (newPage) => {
@@ -848,6 +1042,8 @@ createApp({
             else if (newPage === 'users') await loadUsers();
             else if (newPage === 'licenses') await loadLicenses();
             else if (newPage === 'orders') await loadOrders();
+            else if (newPage === 'revenue') await loadRevenueReport();
+            else if (newPage === 'analytics') await loadUserAnalytics();
             else if (newPage === 'logs') await loadLogs();
             else if (newPage === 'referrals') await loadReferralStats();
             else if (newPage === 'announcements') await loadAnnouncements();
@@ -890,6 +1086,9 @@ createApp({
             announcements,
             settings,
             quotaConfig,
+            revenueReportDays,
+            revenueReport,
+            userAnalytics,
             showGenerateModal,
             showExtendModal,
             showAnnouncementModal,
@@ -945,6 +1144,12 @@ createApp({
             
             // 設置操作
             saveSettings,
+            
+            // 報表和分析
+            loadRevenueReport,
+            loadUserAnalytics,
+            getLevelName,
+            getDurationName,
             
             // 其他
             refreshData,

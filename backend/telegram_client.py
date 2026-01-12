@@ -61,6 +61,7 @@ from trie_keyword_matcher import TrieKeywordMatcher
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 from private_message_handler import private_message_handler
+from text_utils import sanitize_text, safe_get_name, safe_get_username, format_chat_info, format_user_info
 
 
 class TelegramClientManager:
@@ -1900,7 +1901,7 @@ class TelegramClientManager:
                 
                 # Get chat info
                 chat_id = message.chat.id if message.chat else None
-                chat_title = message.chat.title if message.chat else "Unknown"
+                chat_title = safe_get_name(message.chat, "Unknown") if message.chat else "Unknown"
                 chat_type = str(message.chat.type) if message.chat else "unknown"
                 message_text = message.text or message.caption or "(no text)"
                 
@@ -1978,7 +1979,7 @@ class TelegramClientManager:
                 # Log message content for debugging
                 if self.event_callback:
                     self.event_callback("log-entry", {
-                        "message": f"[監控] 消息內容: '{text[:100]}...' 來自: {user.username or user.first_name}",
+                        "message": f"[監控] 消息內容: '{sanitize_text(text[:100])}...' 來自: {safe_get_username(user) or safe_get_name(user, '未知')}",
                         "type": "info"
                     })
                 
@@ -2028,16 +2029,16 @@ class TelegramClientManager:
                         })
                     print(f"[TelegramClient] KEYWORD MATCHED: '{matched_keyword}'", file=sys.stderr)
                     
-                    # Capture lead
+                    # Capture lead - 使用安全的文本處理
                     lead_data = {
                         "user_id": str(user.id),
-                        "username": user.username,
-                        "first_name": user.first_name,
-                        "last_name": user.last_name,
+                        "username": safe_get_username(user),
+                        "first_name": sanitize_text(user.first_name) if user.first_name else "",
+                        "last_name": sanitize_text(user.last_name) if user.last_name else "",
                         "source_group": str(chat_id),
                         "source_group_url": group_url,
-                        "triggered_keyword": matched_keywords[0],
-                        "message_text": text,
+                        "triggered_keyword": sanitize_text(matched_keywords[0]) if matched_keywords else "",
+                        "message_text": sanitize_text(text),
                         "timestamp": message.date.isoformat() if message.date else None,
                         "account_phone": phone  # 監控帳號電話，用於 AI 自動聊天
                     }

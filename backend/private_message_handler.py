@@ -13,6 +13,7 @@ from database import db
 from ai_auto_chat import ai_auto_chat
 from auto_funnel_manager import auto_funnel
 from vector_memory import vector_memory
+from text_utils import sanitize_text, safe_get_name, safe_get_username
 
 
 class PrivateMessageHandler:
@@ -84,10 +85,10 @@ class PrivateMessageHandler:
                     return
                 
                 user_id = str(user.id)
-                username = user.username or ""
-                first_name = user.first_name or ""
-                last_name = user.last_name or ""
-                message_text = message.text or message.caption or ""
+                username = safe_get_username(user)
+                first_name = sanitize_text(user.first_name) if user.first_name else ""
+                last_name = sanitize_text(user.last_name) if user.last_name else ""
+                message_text = sanitize_text(message.text or message.caption or "")
                 
                 if not message_text:
                     return

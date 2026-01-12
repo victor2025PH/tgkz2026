@@ -20,6 +20,7 @@ from pyrogram.errors import (
     ChatAdminRequired, UserKicked, InviteRequestSent
 )
 from pyrogram.enums import ChatMemberStatus, ChatType
+from text_utils import sanitize_text, safe_get_name, format_chat_info
 
 
 class GroupJoinError:
@@ -216,8 +217,8 @@ class GroupJoinService:
                 
                 result['success'] = True
                 result['chat_id'] = chat.id
-                result['chat_title'] = chat.title
-                self.log(f"✓ 成功加入: {chat.title}")
+                result['chat_title'] = safe_get_name(chat, "未知群組")
+                self.log(f"✓ 成功加入: {result['chat_title']}")
                 
                 # 如果啟用自動驗證，監聽驗證消息
                 if auto_verify:
@@ -232,7 +233,7 @@ class GroupJoinService:
                 result['success'] = True
                 result['already_member'] = True
                 result['chat_id'] = chat.id
-                result['chat_title'] = chat.title
+                result['chat_title'] = safe_get_name(chat, "未知群組")
                 return result
                 
             except InviteRequestSent:
@@ -360,7 +361,7 @@ class GroupJoinService:
             if member.status in [ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.MEMBER]:
                 return True, {
                     'chat_id': chat.id,
-                    'chat_title': chat.title,
+                    'chat_title': safe_get_name(chat, "未知群組"),
                     'status': str(member.status)
                 }
         except Exception:

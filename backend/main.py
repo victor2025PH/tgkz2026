@@ -48,6 +48,7 @@ from cache_manager import init_cache_manager, get_cache_manager
 from fulltext_search import init_search_engine, get_search_engine
 from private_message_poller import private_message_poller
 from group_join_service import group_join_service, GroupJoinService
+from text_utils import safe_json_dumps, sanitize_text, sanitize_dict, format_chat_info, format_user_info
 from connection_monitor import connection_monitor
 from resource_discovery import resource_discovery, DiscoveredResource
 from group_search_service import group_search_service
@@ -1107,7 +1108,7 @@ class BackendService:
         
         # Log startup
         await db.add_log("Backend service started", "info")
-        print(json.dumps({
+        print(safe_json_dumps({
             "event": "log-entry",
             "payload": {
                 "id": int(datetime.now().timestamp() * 1000),
@@ -1194,7 +1195,12 @@ class BackendService:
         }
         if message_id:
             message["message_id"] = message_id
-        print(json.dumps(message), flush=True)
+        # 使用安全的 JSON 序列化，處理 emoji 和特殊字符
+        try:
+            print(safe_json_dumps(message), flush=True)
+        except Exception as e:
+            # 最後的備用方案：強制 ASCII 編碼
+            print(json.dumps(sanitize_dict(message), ensure_ascii=True, default=str), flush=True)
     
     def send_log(self, message: str, log_type: str = "info"):
         """Send a log entry event"""

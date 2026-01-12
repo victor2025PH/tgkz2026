@@ -64,10 +64,46 @@ createApp({
         const showGenerateModal = ref(false);
         const showExtendModal = ref(false);
         const showAnnouncementModal = ref(false);
+        const showUserModal = ref(false);
+        const showCouponModal = ref(false);
         const isLoading = ref(true);
         const isGenerating = ref(false);
         const lastUpdate = ref(null);
         const adminUser = ref(getCurrentUser());
+        
+        // 用戶詳情
+        const userDetail = ref(null);
+        
+        // 確認對話框
+        const confirmDialog = reactive({
+            show: false,
+            title: '',
+            message: '',
+            icon: '⚠️',
+            type: 'normal',
+            onConfirm: () => {}
+        });
+        
+        // 公告表單
+        const announcementForm = ref({
+            id: null,
+            title: '',
+            content: '',
+            type: 'info',
+            status: 'draft',
+            is_pinned: false,
+            is_popup: false
+        });
+        
+        // 優惠券表單
+        const couponForm = ref({
+            code: '',
+            discount_type: 'percent',
+            discount_value: 10,
+            min_amount: 0,
+            max_uses: 100,
+            expires_at: ''
+        });
         
         // Toast 通知
         const toast = reactive({
@@ -380,9 +416,36 @@ createApp({
         const viewUser = async (user) => {
             const result = await apiRequest(`/admin/users/${user.userId}`);
             if (result.success) {
-                // TODO: 顯示用戶詳情彈窗
-                alert(`用戶詳情:\n用戶ID: ${user.userId}\n郵箱: ${user.email || '未設置'}\n等級: ${user.levelName}\n邀請碼: ${user.inviteCode}`);
+                userDetail.value = result.data;
+                showUserModal.value = true;
+            } else {
+                showToast('獲取用戶詳情失敗', 'error');
             }
+        };
+        
+        // 獲取配額標籤
+        const getQuotaLabel = (key) => {
+            const labels = {
+                tg_accounts: 'TG帳號',
+                daily_messages: '日消息',
+                ai_calls: 'AI調用',
+                devices: '設備數',
+                groups: '群組數',
+                auto_reply_rules: '自動回覆',
+                scheduled_tasks: '定時任務',
+                data_retention_days: '數據保留天數'
+            };
+            return labels[key] || key;
+        };
+        
+        // 確認操作
+        const showConfirm = (title, message, onConfirm, type = 'normal', icon = '⚠️') => {
+            confirmDialog.title = title;
+            confirmDialog.message = message;
+            confirmDialog.icon = icon;
+            confirmDialog.type = type;
+            confirmDialog.onConfirm = onConfirm;
+            confirmDialog.show = true;
         };
         
         const extendUser = (user) => {
@@ -412,23 +475,31 @@ createApp({
         };
         
         const banUser = async (user) => {
-            if (!confirm(`確定要封禁用戶 ${user.email || user.userId} 嗎？`)) return;
-            
-            const result = await apiRequest(`/admin/users/${user.userId}/ban`, {
-                method: 'POST',
-                body: JSON.stringify({ is_banned: true, reason: '管理員封禁' })
-            });
-            
-            if (result.success) {
-                showToast('用戶已封禁', 'success');
-                await loadUsers();
-            } else {
-                showToast('操作失敗: ' + result.message, 'error');
-            }
+            const userId = user.userId || user.user_id;
+            showConfirm(
+                '封禁用戶',
+                `確定要封禁用戶 ${user.email || userId} 嗎？封禁後該用戶將無法使用服務。`,
+                async () => {
+                    const result = await apiRequest(`/admin/users/${userId}/ban`, {
+                        method: 'POST',
+                        body: JSON.stringify({ is_banned: true, reason: '管理員封禁' })
+                    });
+                    
+                    if (result.success) {
+                        showToast('用戶已封禁', 'success');
+                        await loadUsers();
+                    } else {
+                        showToast('操作失敗: ' + result.message, 'error');
+                    }
+                },
+                'danger',
+                '🚫'
+            );
         };
         
         const unbanUser = async (user) => {
-            const result = await apiRequest(`/admin/users/${user.userId}/ban`, {
+            const userId = user.userId || user.user_id;
+            const result = await apiRequest(`/admin/users/${userId}/ban`, {
                 method: 'POST',
                 body: JSON.stringify({ is_banned: false })
             });
@@ -449,20 +520,26 @@ createApp({
         };
         
         const disableLicense = async (key) => {
-            if (!confirm('確定要禁用此卡密嗎？')) return;
-            
-            const result = await apiRequest('/admin/licenses/disable', {
-                method: 'POST',
-                body: JSON.stringify({ license_key: key })
-            });
-            
-            if (result.success) {
-                showToast('卡密已禁用', 'success');
-                await loadLicenses();
-                await loadDashboard();
-            } else {
-                showToast('操作失敗: ' + result.message, 'error');
-            }
+            showConfirm(
+                '禁用卡密',
+                `確定要禁用卡密 ${key} 嗎？禁用後無法恢復。`,
+                async () => {
+                    const result = await apiRequest('/admin/licenses/disable', {
+                        method: 'POST',
+                        body: JSON.stringify({ license_key: key })
+                    });
+                    
+                    if (result.success) {
+                        showToast('卡密已禁用', 'success');
+                        await loadLicenses();
+                        await loadDashboard();
+                    } else {
+                        showToast('操作失敗: ' + result.message, 'error');
+                    }
+                },
+                'danger',
+                '⛔'
+            );
         };
         
         const exportLicenses = () => {
@@ -519,22 +596,106 @@ createApp({
         // ============ 公告操作 ============
         
         const editAnnouncement = (ann) => {
-            // TODO: 實現公告編輯
-            alert('編輯公告: ' + ann.title);
+            announcementForm.value = {
+                id: ann.id,
+                title: ann.title,
+                content: ann.content,
+                type: ann.announcement_type || 'info',
+                status: ann.status || 'draft',
+                is_pinned: !!ann.is_pinned,
+                is_popup: !!ann.is_popup
+            };
+            showAnnouncementModal.value = true;
         };
         
-        const deleteAnnouncement = async (id) => {
-            if (!confirm('確定要刪除此公告嗎？')) return;
+        const resetAnnouncementForm = () => {
+            announcementForm.value = {
+                id: null,
+                title: '',
+                content: '',
+                type: 'info',
+                status: 'draft',
+                is_pinned: false,
+                is_popup: false
+            };
+        };
+        
+        const saveAnnouncement = async () => {
+            const form = announcementForm.value;
+            if (!form.title || !form.content) {
+                showToast('標題和內容不能為空', 'error');
+                return;
+            }
             
-            const result = await apiRequest(`/admin/announcements/${id}/delete`, {
-                method: 'POST'
+            const endpoint = form.id 
+                ? `/admin/announcements/${form.id}/update`
+                : '/admin/announcements';
+            
+            const result = await apiRequest(endpoint, {
+                method: 'POST',
+                body: JSON.stringify({
+                    title: form.title,
+                    content: form.content,
+                    type: form.type,
+                    status: form.status,
+                    is_pinned: form.is_pinned,
+                    is_popup: form.is_popup
+                })
             });
             
             if (result.success) {
-                showToast('公告已刪除', 'success');
+                showToast(form.id ? '公告已更新' : '公告已發布', 'success');
+                showAnnouncementModal.value = false;
+                resetAnnouncementForm();
                 await loadAnnouncements();
             } else {
-                showToast('刪除失敗: ' + result.message, 'error');
+                showToast('操作失敗: ' + result.message, 'error');
+            }
+        };
+        
+        const deleteAnnouncement = async (id) => {
+            showConfirm(
+                '刪除公告',
+                '確定要刪除此公告嗎？此操作無法撤銷。',
+                async () => {
+                    const result = await apiRequest(`/admin/announcements/${id}/delete`, {
+                        method: 'POST'
+                    });
+                    
+                    if (result.success) {
+                        showToast('公告已刪除', 'success');
+                        await loadAnnouncements();
+                    } else {
+                        showToast('刪除失敗: ' + result.message, 'error');
+                    }
+                },
+                'danger',
+                '🗑️'
+            );
+        };
+        
+        // 優惠券操作
+        const createCoupon = async () => {
+            const form = couponForm.value;
+            
+            const result = await apiRequest('/admin/coupons', {
+                method: 'POST',
+                body: JSON.stringify(form)
+            });
+            
+            if (result.success) {
+                showToast('優惠券已創建: ' + (result.data?.code || ''), 'success');
+                showCouponModal.value = false;
+                couponForm.value = {
+                    code: '',
+                    discount_type: 'percent',
+                    discount_value: 10,
+                    min_amount: 0,
+                    max_uses: 100,
+                    expires_at: ''
+                };
+            } else {
+                showToast('創建失敗: ' + result.message, 'error');
             }
         };
         
@@ -703,6 +864,12 @@ createApp({
         
         // ============ 返回 ============
         
+        // 打開新建公告彈窗
+        const openNewAnnouncement = () => {
+            resetAnnouncementForm();
+            showAnnouncementModal.value = true;
+        };
+        
         return {
             // 狀態
             currentPage,
@@ -726,6 +893,8 @@ createApp({
             showGenerateModal,
             showExtendModal,
             showAnnouncementModal,
+            showUserModal,
+            showCouponModal,
             generateForm,
             extendForm,
             isLoading,
@@ -734,6 +903,12 @@ createApp({
             adminUser,
             toast,
             
+            // 新增狀態
+            userDetail,
+            confirmDialog,
+            announcementForm,
+            couponForm,
+            
             // 格式化方法
             formatDate,
             formatQuota,
@@ -741,6 +916,7 @@ createApp({
             getStatusClass,
             getStatusText,
             getActionClass,
+            getQuotaLabel,
             
             // 用戶操作
             viewUser,
@@ -756,8 +932,16 @@ createApp({
             generateLicenses,
             
             // 公告操作
+            openNewAnnouncement,
             editAnnouncement,
+            saveAnnouncement,
             deleteAnnouncement,
+            
+            // 優惠券操作
+            createCoupon,
+            
+            // 確認操作
+            showConfirm,
             
             // 設置操作
             saveSettings,

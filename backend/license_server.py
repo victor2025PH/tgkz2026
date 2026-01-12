@@ -51,6 +51,11 @@ class LicenseServer:
     
     def _setup_middlewares(self):
         """設置中間件"""
+        # 簡單的請求計數器用於限流
+        self._request_counts = {}
+        self._request_limit = 100  # 每分鐘最大請求數
+        self._request_window = 60  # 時間窗口（秒）
+        
         @web.middleware
         async def cors_middleware(request, handler):
             if request.method == 'OPTIONS':
@@ -64,7 +69,38 @@ class LicenseServer:
             response.headers['Access-Control-Allow-Origin'] = '*'
             return response
         
+        @web.middleware
+        async def rate_limit_middleware(request, handler):
+            """API 限流中間件"""
+            # 只對 API 路徑限流
+            if not request.path.startswith('/api/'):
+                return await handler(request)
+            
+            # 獲取客戶端標識
+            client_ip = self._get_client_ip(request)
+            current_time = int(time.time())
+            window_key = f"{client_ip}:{current_time // self._request_window}"
+            
+            # 清理過期的計數
+            expired_keys = [k for k in self._request_counts 
+                          if int(k.split(':')[1]) < current_time // self._request_window - 1]
+            for k in expired_keys:
+                del self._request_counts[k]
+            
+            # 檢查限流
+            count = self._request_counts.get(window_key, 0)
+            if count >= self._request_limit:
+                return web.json_response(
+                    {'success': False, 'message': '請求過於頻繁，請稍後再試'},
+                    status=429
+                )
+            
+            self._request_counts[window_key] = count + 1
+            
+            return await handler(request)
+        
         self.app.middlewares.append(cors_middleware)
+        self.app.middlewares.append(rate_limit_middleware)
     
     def _setup_routes(self):
         """設置路由"""
@@ -143,6 +179,18 @@ class LicenseServer:
         
         # 配額管理
         self.app.router.add_get('/api/admin/quotas', self.handle_admin_quotas)
+        
+        # 優惠券管理
+        self.app.router.add_get('/api/admin/coupons', self.handle_admin_coupons)
+        self.app.router.add_post('/api/admin/coupons', self.handle_admin_create_coupon)
+        self.app.router.add_post('/api/admin/coupons/{id}/disable', self.handle_admin_disable_coupon)
+        
+        # 數據庫備份
+        self.app.router.add_post('/api/admin/backup', self.handle_admin_backup)
+        
+        # 每日統計
+        self.app.router.add_get('/api/admin/daily-stats', self.handle_admin_daily_stats)
+        self.app.router.add_post('/api/admin/generate-daily-stats', self.handle_admin_generate_daily_stats)
         
         # 舊版兼容路由
         self.app.router.add_post('/api/admin/users/extend', self.handle_admin_extend_user_legacy)
@@ -767,21 +815,54 @@ class LicenseServer:
             data = await request.json()
             username = data.get('username', '')
             password = data.get('password', '')
+            client_ip = self._get_client_ip(request)
             
             if not username or not password:
                 return web.json_response({'success': False, 'message': '用戶名和密碼不能為空'}, status=400)
             
+            # 檢查登錄失敗次數（防暴力破解）
+            login_key = f"login_fail:{client_ip}:{username}"
+            fail_count = self._request_counts.get(login_key, 0)
+            
+            if fail_count >= 5:
+                self._log_admin_action(username, 'login_blocked', 'auth', 
+                                      details=f'Too many failed attempts', ip_address=client_ip)
+                return web.json_response({
+                    'success': False, 
+                    'message': '登錄失敗次數過多，請15分鐘後再試'
+                }, status=429)
+            
             admin = self.db.get_admin(username)
             if not admin:
+                self._request_counts[login_key] = fail_count + 1
+                self._log_admin_action(username, 'login_failed', 'auth',
+                                      details='User not found', ip_address=client_ip)
                 return web.json_response({'success': False, 'message': '用戶名或密碼錯誤'}, status=401)
             
             password_hash = hashlib.sha256(password.encode()).hexdigest()
             if password_hash != admin['password_hash']:
+                self._request_counts[login_key] = fail_count + 1
+                self._log_admin_action(username, 'login_failed', 'auth',
+                                      details='Wrong password', ip_address=client_ip)
                 return web.json_response({'success': False, 'message': '用戶名或密碼錯誤'}, status=401)
+            
+            # 登錄成功，清除失敗計數
+            if login_key in self._request_counts:
+                del self._request_counts[login_key]
             
             token = self._generate_admin_token(username)
             
-            self._log_admin_action(username, 'login', 'auth', ip_address=self._get_client_ip(request))
+            # 更新最後登錄時間
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE admins SET last_login_at = CURRENT_TIMESTAMP, last_login_ip = ?
+                WHERE username = ?
+            ''', (client_ip, username))
+            conn.commit()
+            conn.close()
+            
+            self._log_admin_action(username, 'login', 'auth', ip_address=client_ip)
             
             return web.json_response({
                 'success': True,
@@ -1485,6 +1566,197 @@ class LicenseServer:
             }
             
             return web.json_response({'success': True, 'data': quotas})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_coupons(self, request: web.Request) -> web.Response:
+        """獲取優惠券列表"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM coupons ORDER BY created_at DESC LIMIT 100')
+            coupons = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            
+            return web.json_response({'success': True, 'data': coupons})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_create_coupon(self, request: web.Request) -> web.Response:
+        """創建優惠券"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            data = await request.json()
+            code = data.get('code', '') or f"TGAI{secrets.token_hex(4).upper()}"
+            discount_type = data.get('discount_type', 'percent')
+            discount_value = float(data.get('discount_value', 10))
+            min_amount = float(data.get('min_amount', 0))
+            max_uses = int(data.get('max_uses', 100))
+            expires_at = data.get('expires_at')
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO coupons (code, discount_type, discount_value, min_amount, max_uses, expires_at, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (code.upper(), discount_type, discount_value, min_amount, max_uses, expires_at, admin['username']))
+            conn.commit()
+            coupon_id = cursor.lastrowid
+            conn.close()
+            
+            self._log_admin_action(admin['username'], 'create_coupon', 'coupon',
+                                  'coupon', str(coupon_id), f'code={code}')
+            
+            return web.json_response({
+                'success': True,
+                'message': '優惠券已創建',
+                'data': {'id': coupon_id, 'code': code.upper()}
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_disable_coupon(self, request: web.Request) -> web.Response:
+        """禁用優惠券"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            coupon_id = request.match_info['id']
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE coupons SET status = 'disabled' WHERE id = ?", (coupon_id,))
+            conn.commit()
+            conn.close()
+            
+            self._log_admin_action(admin['username'], 'disable_coupon', 'coupon', 'coupon', coupon_id)
+            
+            return web.json_response({'success': True, 'message': '優惠券已禁用'})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_backup(self, request: web.Request) -> web.Response:
+        """數據庫備份"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            import shutil
+            from pathlib import Path
+            
+            db_path = Path(self.db.db_path)
+            backup_dir = db_path.parent / 'backups'
+            backup_dir.mkdir(exist_ok=True)
+            
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_path = backup_dir / f"tgai_server_{timestamp}.db"
+            
+            shutil.copy2(db_path, backup_path)
+            
+            self._log_admin_action(admin['username'], 'backup_database', 'system',
+                                  details=f'backup_file={backup_path.name}')
+            
+            # 清理舊備份，只保留最近10個
+            backups = sorted(backup_dir.glob('*.db'), key=lambda x: x.stat().st_mtime, reverse=True)
+            for old_backup in backups[10:]:
+                old_backup.unlink()
+            
+            return web.json_response({
+                'success': True,
+                'message': f'數據庫已備份: {backup_path.name}',
+                'data': {'filename': backup_path.name}
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_daily_stats(self, request: web.Request) -> web.Response:
+        """獲取每日統計"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            days = int(request.query.get('days', 30))
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM stats_daily 
+                ORDER BY stat_date DESC 
+                LIMIT ?
+            ''', (days,))
+            stats = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            
+            return web.json_response({'success': True, 'data': stats})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_generate_daily_stats(self, request: web.Request) -> web.Response:
+        """生成當日統計"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            today = datetime.now().strftime('%Y-%m-%d')
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # 計算今日統計
+            cursor.execute("SELECT COUNT(*) FROM users WHERE date(created_at) = ?", (today,))
+            new_users = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM users WHERE last_active_at >= datetime('now', '-1 day')")
+            active_users = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM orders WHERE date(created_at) = ? AND status = 'paid'", (today,))
+            new_orders = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COALESCE(SUM(final_price), 0) FROM orders WHERE date(created_at) = ? AND status = 'paid'", (today,))
+            revenue = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM licenses WHERE date(used_at) = ?", (today,))
+            activated_licenses = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM referrals WHERE date(created_at) = ?", (today,))
+            new_referrals = cursor.fetchone()[0]
+            
+            # 插入或更新統計
+            cursor.execute('''
+                INSERT OR REPLACE INTO stats_daily 
+                (stat_date, new_users, active_users, new_orders, revenue, activated_licenses, new_referrals)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (today, new_users, active_users, new_orders, revenue, activated_licenses, new_referrals))
+            
+            conn.commit()
+            conn.close()
+            
+            self._log_admin_action(admin['username'], 'generate_daily_stats', 'stats', details=f'date={today}')
+            
+            return web.json_response({
+                'success': True,
+                'message': f'{today} 統計數據已生成',
+                'data': {
+                    'date': today,
+                    'new_users': new_users,
+                    'active_users': active_users,
+                    'new_orders': new_orders,
+                    'revenue': revenue,
+                    'activated_licenses': activated_licenses,
+                    'new_referrals': new_referrals
+                }
+            })
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     

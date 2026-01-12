@@ -457,6 +457,9 @@ class Database:
                 permissions TEXT,
                 is_active INTEGER DEFAULT 1,
                 last_login_at TIMESTAMP,
+                last_login_ip TEXT,
+                failed_login_count INTEGER DEFAULT 0,
+                locked_until TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )

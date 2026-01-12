@@ -560,7 +560,7 @@
                 <!-- ==================== 公告管理 ==================== -->
                 <div v-if="currentPage === 'announcements'">
                     <div class="flex justify-end mb-6">
-                        <button @click="showAnnouncementModal = true" 
+                        <button @click="openNewAnnouncement" 
                                 class="gradient-bg hover:opacity-90 px-6 py-2 rounded-lg font-medium transition-opacity">
                             ➕ 發布公告
                         </button>
@@ -831,6 +831,310 @@
                     <button @click="submitExtend" 
                             class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg font-medium transition-colors">
                         確認續費
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ==================== 用戶詳情彈窗 ==================== -->
+        <div v-if="showUserModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 overflow-y-auto py-8">
+            <div class="bg-gray-800 rounded-xl w-[800px] border border-gray-700 max-h-[90vh] overflow-y-auto">
+                <!-- 標題 -->
+                <div class="sticky top-0 bg-gray-800 border-b border-gray-700 p-6 flex justify-between items-center">
+                    <h3 class="text-xl font-bold flex items-center">
+                        <span class="text-2xl mr-2">👤</span>
+                        用戶詳情
+                    </h3>
+                    <button @click="showUserModal = false" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+                </div>
+                
+                <div class="p-6 space-y-6" v-if="userDetail">
+                    <!-- 基本信息 -->
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="bg-gray-700/50 rounded-lg p-4">
+                            <h4 class="text-sm text-gray-400 mb-3">基本信息</h4>
+                            <div class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">用戶ID</span>
+                                    <span class="font-mono">{{ userDetail.user?.user_id }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">郵箱</span>
+                                    <span>{{ userDetail.user?.email || '未設置' }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">暱稱</span>
+                                    <span>{{ userDetail.user?.nickname || '未設置' }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">機器碼</span>
+                                    <span class="font-mono text-xs">{{ (userDetail.user?.machine_id || '').slice(0, 20) }}...</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">註冊時間</span>
+                                    <span>{{ formatDate(userDetail.user?.created_at) }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">最後活動</span>
+                                    <span>{{ formatDate(userDetail.user?.last_active_at) || '-' }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gray-700/50 rounded-lg p-4">
+                            <h4 class="text-sm text-gray-400 mb-3">會員信息</h4>
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-400">會員等級</span>
+                                    <span :class="'rank-' + (userDetail.user?.membership_level || 'bronze')" class="font-medium">
+                                        {{ userDetail.user?.levelIcon }} {{ userDetail.user?.levelName }}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">到期時間</span>
+                                    <span :class="userDetail.user?.is_lifetime ? 'text-purple-400' : ''">
+                                        {{ userDetail.user?.is_lifetime ? '♾️ 終身' : formatDate(userDetail.user?.expires_at) }}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">邀請碼</span>
+                                    <span class="font-mono text-blue-400">{{ userDetail.user?.invite_code }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">邀請人數</span>
+                                    <span>{{ userDetail.user?.total_invites || 0 }} 人</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">邀請收益</span>
+                                    <span class="text-green-400">¥{{ userDetail.user?.invite_earnings || 0 }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">餘額</span>
+                                    <span class="text-yellow-400">¥{{ userDetail.user?.balance || 0 }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 消費信息 -->
+                    <div class="bg-gray-700/50 rounded-lg p-4">
+                        <h4 class="text-sm text-gray-400 mb-3">消費信息</h4>
+                        <div class="grid grid-cols-4 gap-4 text-center">
+                            <div>
+                                <p class="text-2xl font-bold text-green-400">¥{{ userDetail.user?.total_spent || 0 }}</p>
+                                <p class="text-gray-400 text-sm">累計消費</p>
+                            </div>
+                            <div>
+                                <p class="text-2xl font-bold text-blue-400">{{ userDetail.licenses?.length || 0 }}</p>
+                                <p class="text-gray-400 text-sm">使用卡密數</p>
+                            </div>
+                            <div>
+                                <p class="text-2xl font-bold text-purple-400">{{ userDetail.referrals?.length || 0 }}</p>
+                                <p class="text-gray-400 text-sm">邀請記錄</p>
+                            </div>
+                            <div>
+                                <p class="text-2xl font-bold" :class="userDetail.user?.is_banned ? 'text-red-400' : 'text-green-400'">
+                                    {{ userDetail.user?.is_banned ? '已封禁' : '正常' }}
+                                </p>
+                                <p class="text-gray-400 text-sm">帳號狀態</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 配額信息 -->
+                    <div class="bg-gray-700/50 rounded-lg p-4" v-if="userDetail.user?.quotas">
+                        <h4 class="text-sm text-gray-400 mb-3">當前等級配額</h4>
+                        <div class="grid grid-cols-4 gap-4 text-center text-sm">
+                            <div v-for="(value, key) in userDetail.user.quotas" :key="key" class="bg-gray-800 rounded p-2">
+                                <p class="text-lg font-bold">{{ formatQuota(value) }}</p>
+                                <p class="text-gray-400">{{ getQuotaLabel(key) }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 使用的卡密 -->
+                    <div class="bg-gray-700/50 rounded-lg p-4">
+                        <h4 class="text-sm text-gray-400 mb-3">使用的卡密</h4>
+                        <div v-if="userDetail.licenses?.length" class="space-y-2 max-h-40 overflow-y-auto">
+                            <div v-for="lic in userDetail.licenses" :key="lic.license_key" 
+                                 class="flex justify-between items-center bg-gray-800 rounded p-2 text-sm">
+                                <code class="text-blue-400">{{ lic.license_key }}</code>
+                                <span class="text-gray-400">{{ lic.level }} | {{ lic.duration_days }}天</span>
+                                <span class="text-gray-500">{{ formatDate(lic.used_at) }}</span>
+                            </div>
+                        </div>
+                        <p v-else class="text-gray-500 text-center py-4">暫無卡密記錄</p>
+                    </div>
+                </div>
+                
+                <!-- 操作按鈕 -->
+                <div class="sticky bottom-0 bg-gray-800 border-t border-gray-700 p-4 flex justify-end gap-3">
+                    <button @click="extendUser(userDetail.user)" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg">
+                        ⏰ 續費
+                    </button>
+                    <button v-if="!userDetail.user?.is_banned" @click="banUser(userDetail.user); showUserModal = false"
+                            class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg">
+                        🚫 封禁
+                    </button>
+                    <button v-else @click="unbanUser(userDetail.user); showUserModal = false"
+                            class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg">
+                        ✅ 解封
+                    </button>
+                    <button @click="showUserModal = false" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded-lg">
+                        關閉
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ==================== 發布公告彈窗 ==================== -->
+        <div v-if="showAnnouncementModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div class="bg-gray-800 rounded-xl p-6 w-[600px] border border-gray-700">
+                <h3 class="text-xl font-bold mb-6 flex items-center">
+                    <span class="text-2xl mr-2">📢</span>
+                    {{ announcementForm.id ? '編輯公告' : '發布公告' }}
+                </h3>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">標題</label>
+                        <input type="text" v-model="announcementForm.title" 
+                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500"
+                               placeholder="公告標題">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">內容</label>
+                        <textarea v-model="announcementForm.content" rows="5"
+                                  class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500"
+                                  placeholder="公告內容"></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">類型</label>
+                            <select v-model="announcementForm.type" 
+                                    class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500">
+                                <option value="info">📋 通知</option>
+                                <option value="update">🆕 更新</option>
+                                <option value="warning">⚠️ 警告</option>
+                                <option value="urgent">🚨 緊急</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">狀態</label>
+                            <select v-model="announcementForm.status" 
+                                    class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500">
+                                <option value="draft">草稿</option>
+                                <option value="published">發布</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" v-model="announcementForm.is_pinned" class="mr-2">
+                            <span class="text-gray-400">📌 置頂</span>
+                        </label>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" v-model="announcementForm.is_popup" class="mr-2">
+                            <span class="text-gray-400">💬 彈窗顯示</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end gap-4 mt-6">
+                    <button @click="showAnnouncementModal = false" 
+                            class="px-6 py-2 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors">
+                        取消
+                    </button>
+                    <button @click="saveAnnouncement" 
+                            class="gradient-bg hover:opacity-90 px-6 py-2 rounded-lg font-medium transition-opacity">
+                        {{ announcementForm.id ? '保存修改' : '發布公告' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ==================== 優惠券管理彈窗 ==================== -->
+        <div v-if="showCouponModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div class="bg-gray-800 rounded-xl p-6 w-[500px] border border-gray-700">
+                <h3 class="text-xl font-bold mb-6 flex items-center">
+                    <span class="text-2xl mr-2">🎫</span>
+                    創建優惠券
+                </h3>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">優惠券碼</label>
+                        <input type="text" v-model="couponForm.code" 
+                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500"
+                               placeholder="留空自動生成">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">折扣類型</label>
+                            <select v-model="couponForm.discount_type" 
+                                    class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500">
+                                <option value="percent">百分比折扣</option>
+                                <option value="fixed">固定金額</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">折扣值</label>
+                            <input type="number" v-model="couponForm.discount_value" 
+                                   class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500"
+                                   :placeholder="couponForm.discount_type === 'percent' ? '如: 10 (表示10%)' : '如: 20 (減20元)'">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">最低消費</label>
+                            <input type="number" v-model="couponForm.min_amount" 
+                                   class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500"
+                                   placeholder="0">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">最大使用次數</label>
+                            <input type="number" v-model="couponForm.max_uses" 
+                                   class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500"
+                                   placeholder="100">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">過期時間</label>
+                        <input type="datetime-local" v-model="couponForm.expires_at" 
+                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500">
+                    </div>
+                </div>
+                
+                <div class="flex justify-end gap-4 mt-6">
+                    <button @click="showCouponModal = false" 
+                            class="px-6 py-2 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors">
+                        取消
+                    </button>
+                    <button @click="createCoupon" 
+                            class="gradient-bg hover:opacity-90 px-6 py-2 rounded-lg font-medium transition-opacity">
+                        創建優惠券
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ==================== 確認對話框 ==================== -->
+        <div v-if="confirmDialog.show" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div class="bg-gray-800 rounded-xl p-6 w-[400px] border border-gray-700">
+                <h3 class="text-lg font-bold mb-4 flex items-center">
+                    <span class="text-2xl mr-2">{{ confirmDialog.icon }}</span>
+                    {{ confirmDialog.title }}
+                </h3>
+                <p class="text-gray-400 mb-6">{{ confirmDialog.message }}</p>
+                <div class="flex justify-end gap-4">
+                    <button @click="confirmDialog.show = false" 
+                            class="px-4 py-2 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors">
+                        取消
+                    </button>
+                    <button @click="confirmDialog.onConfirm(); confirmDialog.show = false" 
+                            :class="confirmDialog.type === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'gradient-bg hover:opacity-90'"
+                            class="px-4 py-2 rounded-lg font-medium transition-colors">
+                        確認
                     </button>
                 </div>
             </div>

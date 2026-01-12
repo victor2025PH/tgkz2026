@@ -793,6 +793,9 @@ class LicenseServer:
                 user = self.db.get_user(machine_id=machine_id)
             
             # 創建訂單
+            duration_names = {'week': '周卡', 'month': '月卡', 'quarter': '季卡', 'year': '年卡', 'lifetime': '終身'}
+            product_name = f"{MEMBERSHIP_LEVELS[level]['name']}{duration_names[duration]}"
+            
             conn = self.db.get_connection()
             cursor = conn.cursor()
             cursor.execute('''
@@ -801,7 +804,7 @@ class LicenseServer:
                                    final_price, payment_method, coupon_id, status)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
             ''', (order_id, user['user_id'] if user else None, product_id,
-                  f"{MEMBERSHIP_LEVELS[level]['name']}{{'week': '周卡', 'month': '月卡', 'quarter': '季卡', 'year': '年卡', 'lifetime': '終身'}[duration]}",
+                  product_name,
                   level, duration, duration_days, original_price, discount_amount, price, payment_method, coupon_id))
             conn.commit()
             conn.close()

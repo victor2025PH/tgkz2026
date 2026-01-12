@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Build outputs
+dist/
+build/
+release/
+*.exe
+*.dmg
+*.AppImage
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+config.env
+*.env
+
+# Data & Logs
+*.db
+*.sqlite
+*.log
+logs/
+data/
+backups/
+
+# Sessions (sensitive!)
+sessions/
+*.session
+*.session-journal
+
+# Secrets
+*.pem
+*.key
+credentials.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Angular
+.angular/
+
+# Temp
+*.tmp
+*.temp

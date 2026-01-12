@@ -1,0 +1,43 @@
+# TG-Matrix Backend Dependencies
+# Python 3.8+ required
+
+# Telegram API
+pyrogram>=2.0.106
+TgCrypto>=1.2.5; platform_system != "Windows" or python_version >= "3.8"
+# tgcrypto>=1.2.5  # 可选：用于加速加密（需要 C++ 编译器，如果安装失败可以跳过）
+
+# Database
+aiosqlite>=0.19.0
+
+# Excel file handling
+openpyxl>=3.1.2
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Async utilities
+aiofiles>=23.2.1
+
+# Cryptography
+cryptography>=41.0.0
+
+# Performance monitoring
+psutil>=5.9.0
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# HTTP client
+aiohttp>=3.9.0
+
+# NumPy (required for vector operations)
+numpy>=1.24.0
+
+# ==================== RAG System (Optional) ====================
+# 以下依賴是可選的，系統會自動降級使用基礎功能
+# 如果安裝失敗可以跳過
+
+# Vector database (optional - will fallback to SQLite)
+# chromadb>=0.4.0
+
+# Neural embeddings (optional - will fallback to simple hash embeddings)
+# sentence-transformers>=2.2.0

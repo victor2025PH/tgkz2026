@@ -1,0 +1,144 @@
+{
+  "name": "tg-ai-smartking",
+  "version": "1.0.3",
+  "description": "A modern dashboard to manage and automate Telegram marketing campaigns.",
+  "main": "electron.js",
+  "author": "Your Company",
+  "scripts": {
+    "start": "node scripts/check-build.js && node_modules\\.bin\\electron.cmd .",
+    "build": "ng build --configuration development",
+    "build:prod": "ng build --configuration production",
+    "start:build": "npm run build && npm start",
+    "start:dev": "node scripts/dev-mode.js",
+    "dev": "ng serve --port 3000",
+    "dev:electron": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron . --dev\"",
+    "package": "npm run build:prod && electron-builder",
+    "package:win": "npm run build:prod && electron-builder --win",
+    "package:win:safe": "node scripts/package-win-safe.js",
+    "package:mac": "npm run build:prod && electron-builder --mac",
+    "package:linux": "npm run build:prod && electron-builder --linux",
+    "package:all": "node scripts/package.js auto",
+    "build:backend": "node scripts/build-backend.js",
+    "create-icons": "node scripts/create-icons.js",
+    "create-icon-readme": "node scripts/create-placeholder-icon.js",
+    "clear-session": "node scripts/clear-session.js",
+    "dist": "npm run build:prod && electron-builder --config electron-builder.yml",
+    "dist:win": "npm run build:prod && electron-builder --config electron-builder.yml --win",
+    "dist:mac": "npm run build:prod && electron-builder --config electron-builder.yml --mac",
+    "dist:linux": "npm run build:prod && electron-builder --config electron-builder.yml --linux",
+    "dist:all": "npm run build:prod && electron-builder --config electron-builder.yml -mwl",
+    "pack": "npm run build:prod && electron-builder --config electron-builder.yml --dir",
+    "prebuild:dist": "node build-scripts/prepare-dist.js",
+    "clean:dist": "rimraf release dist-python build backend-exe build-python",
+    "build:backend-exe": "python build-scripts/build-backend-exe.py",
+    "dist:full": "node build-scripts/build-full.js",
+    "dist:full:win": "node build-scripts/build-full.js"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.0.4",
+    "@angular/cli": "^21.0.4",
+    "@angular/common": "^21.0.6",
+    "@angular/compiler": "^21.0.6",
+    "@angular/core": "^21.0.6",
+    "@angular/forms": "^21.0.6",
+    "@angular/platform-browser": "^21.0.6",
+    "@google/genai": "^1.34.0",
+    "concurrently": "^9.2.1",
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1",
+    "wait-on": "^9.0.3"
+  },
+  "build": {
+    "appId": "com.tgmatrix.app",
+    "productName": "TG-AI智控王",
+    "copyright": "Copyright © 2026",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron.js",
+      "preload.js",
+      "index.html",
+      "index.tsx",
+      "metadata.json",
+      "dist/**/*",
+      "default-config/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "backend-exe",
+        "to": "backend-exe",
+        "filter": [
+          "**/*",
+          "!**/sessions/**",
+          "!**/data/**",
+          "!**/logs/**"
+        ]
+      },
+      {
+        "from": "default-config",
+        "to": "default-config"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-Setup.${ext}",
+      "requestedExecutionLevel": "asInvoker",
+      "sign": null,
+      "signingHashAlgorithms": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "TG-AI智控王",
+      "runAfterFinish": false,
+      "menuCategory": false,
+      "include": null
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Network"
+    }
+  },
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "uuid": "^8.3.2"
+  }
+}

@@ -130,6 +130,7 @@ createApp({
             { id: 'referrals', name: '邀請管理', icon: '🎁' },
             { id: 'announcements', name: '公告管理', icon: '📢' },
             { id: 'logs', name: '操作日誌', icon: '📝' },
+            { id: 'admins', name: '管理員', icon: '👤' },
             { id: 'settings', name: '系統設置', icon: '⚙️' },
         ]);
         
@@ -171,6 +172,19 @@ createApp({
         
         // 日誌數據
         const logs = ref([]);
+        
+        // 管理員列表
+        const admins = ref([]);
+        const showAdminModal = ref(false);
+        const editingAdmin = ref(null);
+        const adminForm = ref({
+            username: '',
+            password: '',
+            name: '',
+            email: '',
+            role: 'admin',
+            permissions: []
+        });
         
         // 邀請統計
         const referralStats = ref({
@@ -227,6 +241,12 @@ createApp({
             old_password: '',
             new_password: '',
             confirm_password: ''
+        });
+        
+        // Telegram 配置
+        const telegramConfig = ref({
+            bot_token: '',
+            chat_id: ''
         });
         
         // 生成卡密表單
@@ -308,6 +328,96 @@ createApp({
             const result = await apiRequest('/admin/logs');
             if (result.success) {
                 logs.value = result.data;
+            }
+        };
+        
+        const loadAdmins = async () => {
+            const result = await apiRequest('/admin/admins');
+            if (result.success) {
+                admins.value = result.data;
+            }
+        };
+        
+        const openNewAdminModal = () => {
+            editingAdmin.value = null;
+            adminForm.value = {
+                username: '',
+                password: '',
+                name: '',
+                email: '',
+                role: 'admin',
+                permissions: []
+            };
+            showAdminModal.value = true;
+        };
+        
+        const editAdmin = (admin) => {
+            editingAdmin.value = admin;
+            adminForm.value = {
+                username: admin.username,
+                password: '',
+                name: admin.name || '',
+                email: admin.email || '',
+                role: admin.role || 'admin',
+                permissions: admin.permissions ? admin.permissions.split(',') : []
+            };
+            showAdminModal.value = true;
+        };
+        
+        const saveAdmin = async () => {
+            if (editingAdmin.value) {
+                // 更新
+                const data = { ...adminForm.value };
+                if (!data.password) delete data.password;
+                
+                const result = await apiRequest(`/admin/admins/${editingAdmin.value.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+                if (result.success) {
+                    showToast('管理員更新成功', 'success');
+                    showAdminModal.value = false;
+                    await loadAdmins();
+                }
+            } else {
+                // 創建
+                if (!adminForm.value.username || !adminForm.value.password) {
+                    showToast('用戶名和密碼必填', 'error');
+                    return;
+                }
+                
+                const result = await apiRequest('/admin/admins', {
+                    method: 'POST',
+                    body: JSON.stringify(adminForm.value)
+                });
+                if (result.success) {
+                    showToast('管理員創建成功', 'success');
+                    showAdminModal.value = false;
+                    await loadAdmins();
+                }
+            }
+        };
+        
+        const toggleAdminStatus = async (admin) => {
+            const result = await apiRequest(`/admin/admins/${admin.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ is_active: !admin.is_active })
+            });
+            if (result.success) {
+                showToast(admin.is_active ? '管理員已禁用' : '管理員已啟用', 'success');
+                await loadAdmins();
+            }
+        };
+        
+        const deleteAdmin = async (admin) => {
+            if (!confirm(`確定刪除管理員 ${admin.username}？`)) return;
+            
+            const result = await apiRequest(`/admin/admins/${admin.id}`, {
+                method: 'DELETE'
+            });
+            if (result.success) {
+                showToast('管理員已刪除', 'success');
+                await loadAdmins();
             }
         };
         
@@ -832,6 +942,25 @@ createApp({
             }
         };
         
+        const saveTelegramConfig = async () => {
+            const result = await apiRequest('/admin/telegram/config', {
+                method: 'POST',
+                body: JSON.stringify(telegramConfig.value)
+            });
+            if (result.success) {
+                showToast('Telegram 配置已保存', 'success');
+            }
+        };
+        
+        const testTelegram = async () => {
+            const result = await apiRequest('/admin/telegram/test', {
+                method: 'POST'
+            });
+            if (result.success) {
+                showToast('測試消息發送成功！', 'success');
+            }
+        };
+        
         const exportData = (type, status = '') => {
             let url = `${API_BASE}/admin/export/${type}?`;
             if (status) url += `status=${status}&`;
@@ -1139,6 +1268,7 @@ createApp({
             else if (newPage === 'revenue') await loadRevenueReport();
             else if (newPage === 'analytics') await loadUserAnalytics();
             else if (newPage === 'logs') await loadLogs();
+            else if (newPage === 'admins') await loadAdmins();
             else if (newPage === 'referrals') await loadReferralStats();
             else if (newPage === 'announcements') await loadAnnouncements();
             else if (newPage === 'settings') await loadSettings();
@@ -1180,6 +1310,16 @@ createApp({
             filteredOrders,
             confirmPayment,
             logs,
+            admins,
+            showAdminModal,
+            editingAdmin,
+            adminForm,
+            loadAdmins,
+            openNewAdminModal,
+            editAdmin,
+            saveAdmin,
+            toggleAdminStatus,
+            deleteAdmin,
             referralStats,
             announcements,
             settings,
@@ -1244,6 +1384,9 @@ createApp({
             saveSettings,
             passwordForm,
             changePassword,
+            telegramConfig,
+            saveTelegramConfig,
+            testTelegram,
             exportData,
             
             // 報表和分析

@@ -27,6 +27,13 @@ import jwt
 # 導入數據庫模塊
 from database import Database, MEMBERSHIP_LEVELS, REFERRAL_REWARDS
 
+# 導入 Telegram 通知模塊
+try:
+    from telegram_bot import notifier as tg_notifier, configure_telegram
+except ImportError:
+    tg_notifier = None
+    configure_telegram = None
+
 # ============ 配置 ============
 
 # JWT 密鑰
@@ -161,6 +168,11 @@ class LicenseServer:
         self.app.router.add_post('/api/admin/licenses/generate', self.handle_admin_generate)
         self.app.router.add_post('/api/admin/licenses/disable', self.handle_admin_disable)
         self.app.router.add_post('/api/admin/licenses/export', self.handle_admin_export_licenses)
+        self.app.router.add_post('/api/admin/licenses/batch-disable', self.handle_admin_batch_disable_licenses)
+        
+        # 批量用戶操作
+        self.app.router.add_post('/api/admin/users/batch-ban', self.handle_admin_batch_ban_users)
+        self.app.router.add_post('/api/admin/users/batch-extend', self.handle_admin_batch_extend_users)
         
         # 訂單管理
         self.app.router.add_get('/api/admin/orders', self.handle_admin_orders)
@@ -194,6 +206,16 @@ class LicenseServer:
         self.app.router.add_get('/api/admin/export/users', self.handle_admin_export_users)
         self.app.router.add_get('/api/admin/export/orders', self.handle_admin_export_orders)
         self.app.router.add_get('/api/admin/export/licenses', self.handle_admin_export_licenses)
+        
+        # Telegram 通知設置
+        self.app.router.add_post('/api/admin/telegram/config', self.handle_admin_telegram_config)
+        self.app.router.add_post('/api/admin/telegram/test', self.handle_admin_telegram_test)
+        
+        # 管理員管理
+        self.app.router.add_get('/api/admin/admins', self.handle_admin_list_admins)
+        self.app.router.add_post('/api/admin/admins', self.handle_admin_create_admin)
+        self.app.router.add_put('/api/admin/admins/{admin_id}', self.handle_admin_update_admin)
+        self.app.router.add_delete('/api/admin/admins/{admin_id}', self.handle_admin_delete_admin)
         
         # 操作日誌
         self.app.router.add_get('/api/admin/logs', self.handle_admin_logs)
@@ -1681,6 +1703,127 @@ class LicenseServer:
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
+    async def handle_admin_batch_disable_licenses(self, request: web.Request) -> web.Response:
+        """批量禁用卡密"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            data = await request.json()
+            license_keys = data.get('license_keys', [])
+            
+            if not license_keys:
+                return web.json_response({'success': False, 'message': '請選擇要禁用的卡密'}, status=400)
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            placeholders = ','.join(['?' for _ in license_keys])
+            cursor.execute(f"UPDATE licenses SET status = 'disabled' WHERE license_key IN ({placeholders})", 
+                          license_keys)
+            affected = cursor.rowcount
+            conn.commit()
+            conn.close()
+            
+            self._log_admin_action(admin['username'], 'batch_disable_licenses', 'license',
+                                  details=f'Disabled {affected} licenses')
+            
+            return web.json_response({
+                'success': True, 
+                'message': f'已禁用 {affected} 個卡密',
+                'count': affected
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_batch_ban_users(self, request: web.Request) -> web.Response:
+        """批量封禁用戶"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            data = await request.json()
+            user_ids = data.get('user_ids', [])
+            reason = data.get('reason', '批量封禁')
+            
+            if not user_ids:
+                return web.json_response({'success': False, 'message': '請選擇要封禁的用戶'}, status=400)
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            placeholders = ','.join(['?' for _ in user_ids])
+            cursor.execute(f"UPDATE users SET is_banned = 1, ban_reason = ? WHERE user_id IN ({placeholders})", 
+                          [reason] + user_ids)
+            affected = cursor.rowcount
+            conn.commit()
+            conn.close()
+            
+            self._log_admin_action(admin['username'], 'batch_ban_users', 'user',
+                                  details=f'Banned {affected} users: {reason}')
+            
+            return web.json_response({
+                'success': True, 
+                'message': f'已封禁 {affected} 個用戶',
+                'count': affected
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_batch_extend_users(self, request: web.Request) -> web.Response:
+        """批量延長用戶會員"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            data = await request.json()
+            user_ids = data.get('user_ids', [])
+            days = int(data.get('days', 0))
+            reason = data.get('reason', '批量續費')
+            
+            if not user_ids:
+                return web.json_response({'success': False, 'message': '請選擇用戶'}, status=400)
+            if days <= 0:
+                return web.json_response({'success': False, 'message': '請輸入有效天數'}, status=400)
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            affected = 0
+            for user_id in user_ids:
+                cursor.execute('SELECT expires_at FROM users WHERE user_id = ?', (user_id,))
+                user = cursor.fetchone()
+                if user:
+                    current_expires = user['expires_at']
+                    if current_expires:
+                        current_dt = datetime.fromisoformat(current_expires)
+                        if current_dt < datetime.now():
+                            current_dt = datetime.now()
+                    else:
+                        current_dt = datetime.now()
+                    
+                    new_expires = current_dt + timedelta(days=days)
+                    cursor.execute('UPDATE users SET expires_at = ? WHERE user_id = ?',
+                                  (new_expires.isoformat(), user_id))
+                    affected += 1
+            
+            conn.commit()
+            conn.close()
+            
+            self._log_admin_action(admin['username'], 'batch_extend_users', 'user',
+                                  details=f'Extended {affected} users by {days} days: {reason}')
+            
+            return web.json_response({
+                'success': True, 
+                'message': f'已為 {affected} 個用戶延長 {days} 天',
+                'count': affected
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
     async def handle_admin_export_licenses(self, request: web.Request) -> web.Response:
         """導出卡密"""
         authorized, error_response, admin = self._require_admin(request)
@@ -2433,6 +2576,251 @@ class LicenseServer:
                 content_type='text/csv',
                 headers={'Content-Disposition': 'attachment; filename="licenses_export.csv"'}
             )
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_telegram_config(self, request: web.Request) -> web.Response:
+        """配置 Telegram 通知"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            data = await request.json()
+            bot_token = data.get('bot_token', '')
+            chat_id = data.get('chat_id', '')
+            
+            # 保存設置
+            self.db.set_setting('telegram_bot_token', bot_token, admin['username'])
+            self.db.set_setting('telegram_chat_id', chat_id, admin['username'])
+            
+            # 配置通知器
+            if configure_telegram and bot_token and chat_id:
+                configure_telegram(bot_token, chat_id)
+            
+            self._log_admin_action(admin['username'], 'configure_telegram', 'settings')
+            
+            return web.json_response({'success': True, 'message': 'Telegram 配置已保存'})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_telegram_test(self, request: web.Request) -> web.Response:
+        """測試 Telegram 通知"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            if not tg_notifier:
+                return web.json_response({'success': False, 'message': 'Telegram 模塊未加載'}, status=500)
+            
+            # 從設置加載配置
+            bot_token = self.db.get_setting('telegram_bot_token', '')
+            chat_id = self.db.get_setting('telegram_chat_id', '')
+            
+            if not bot_token or not chat_id:
+                return web.json_response({'success': False, 'message': '請先配置 Bot Token 和 Chat ID'}, status=400)
+            
+            # 配置並測試
+            configure_telegram(bot_token, chat_id)
+            
+            # 發送測試消息
+            test_msg = f"""
+🔔 <b>TG-AI智控王 通知測試</b>
+
+✅ 連接成功！
+👤 測試者: {admin['username']}
+🕐 時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+            success = await tg_notifier.send_message(test_msg)
+            
+            if success:
+                return web.json_response({'success': True, 'message': '測試消息發送成功！請檢查 Telegram'})
+            else:
+                return web.json_response({'success': False, 'message': '發送失敗，請檢查配置'}, status=500)
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_list_admins(self, request: web.Request) -> web.Response:
+        """獲取管理員列表"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        # 只有超級管理員可以查看
+        if admin.get('role') != 'super_admin' and admin.get('username') != 'admin':
+            return web.json_response({'success': False, 'message': '權限不足'}, status=403)
+        
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, username, name, email, role, permissions, is_active, 
+                       last_login_at, created_at
+                FROM admins ORDER BY id
+            ''')
+            admins = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            
+            return web.json_response({'success': True, 'data': admins})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_create_admin(self, request: web.Request) -> web.Response:
+        """創建新管理員"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        if admin.get('role') != 'super_admin' and admin.get('username') != 'admin':
+            return web.json_response({'success': False, 'message': '權限不足'}, status=403)
+        
+        try:
+            data = await request.json()
+            username = data.get('username', '').strip()
+            password = data.get('password', '')
+            name = data.get('name', '')
+            email = data.get('email', '')
+            role = data.get('role', 'admin')
+            permissions = data.get('permissions', [])
+            
+            if not username or not password:
+                return web.json_response({'success': False, 'message': '用戶名和密碼必填'}, status=400)
+            
+            if len(password) < 6:
+                return web.json_response({'success': False, 'message': '密碼至少6位'}, status=400)
+            
+            # 檢查用戶名是否存在
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('SELECT id FROM admins WHERE username = ?', (username,))
+            if cursor.fetchone():
+                conn.close()
+                return web.json_response({'success': False, 'message': '用戶名已存在'}, status=400)
+            
+            password_hash = hashlib.sha256(password.encode()).hexdigest()
+            permissions_str = ','.join(permissions) if isinstance(permissions, list) else permissions
+            
+            cursor.execute('''
+                INSERT INTO admins (username, password_hash, name, email, role, permissions, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, 1)
+            ''', (username, password_hash, name, email, role, permissions_str))
+            conn.commit()
+            new_id = cursor.lastrowid
+            conn.close()
+            
+            self._log_admin_action(admin['username'], 'create_admin', 'admin',
+                                  target_id=str(new_id), details=f'Created admin: {username}')
+            
+            return web.json_response({
+                'success': True, 
+                'message': '管理員創建成功',
+                'data': {'id': new_id, 'username': username}
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_update_admin(self, request: web.Request) -> web.Response:
+        """更新管理員信息"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        if admin.get('role') != 'super_admin' and admin.get('username') != 'admin':
+            return web.json_response({'success': False, 'message': '權限不足'}, status=403)
+        
+        try:
+            admin_id = int(request.match_info['admin_id'])
+            data = await request.json()
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # 不能修改超級管理員
+            cursor.execute('SELECT username, role FROM admins WHERE id = ?', (admin_id,))
+            target = cursor.fetchone()
+            if not target:
+                conn.close()
+                return web.json_response({'success': False, 'message': '管理員不存在'}, status=404)
+            
+            if target['username'] == 'admin' and admin['username'] != 'admin':
+                conn.close()
+                return web.json_response({'success': False, 'message': '不能修改超級管理員'}, status=403)
+            
+            updates = []
+            params = []
+            
+            if 'name' in data:
+                updates.append('name = ?')
+                params.append(data['name'])
+            if 'email' in data:
+                updates.append('email = ?')
+                params.append(data['email'])
+            if 'role' in data and target['username'] != 'admin':
+                updates.append('role = ?')
+                params.append(data['role'])
+            if 'permissions' in data:
+                perms = data['permissions']
+                updates.append('permissions = ?')
+                params.append(','.join(perms) if isinstance(perms, list) else perms)
+            if 'is_active' in data and target['username'] != 'admin':
+                updates.append('is_active = ?')
+                params.append(1 if data['is_active'] else 0)
+            if 'password' in data and data['password']:
+                if len(data['password']) < 6:
+                    conn.close()
+                    return web.json_response({'success': False, 'message': '密碼至少6位'}, status=400)
+                updates.append('password_hash = ?')
+                params.append(hashlib.sha256(data['password'].encode()).hexdigest())
+            
+            if updates:
+                updates.append('updated_at = CURRENT_TIMESTAMP')
+                params.append(admin_id)
+                cursor.execute(f"UPDATE admins SET {', '.join(updates)} WHERE id = ?", params)
+                conn.commit()
+            
+            conn.close()
+            
+            self._log_admin_action(admin['username'], 'update_admin', 'admin',
+                                  target_id=str(admin_id), details=f'Updated: {list(data.keys())}')
+            
+            return web.json_response({'success': True, 'message': '管理員更新成功'})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_delete_admin(self, request: web.Request) -> web.Response:
+        """刪除管理員"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        if admin.get('role') != 'super_admin' and admin.get('username') != 'admin':
+            return web.json_response({'success': False, 'message': '權限不足'}, status=403)
+        
+        try:
+            admin_id = int(request.match_info['admin_id'])
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT username FROM admins WHERE id = ?', (admin_id,))
+            target = cursor.fetchone()
+            if not target:
+                conn.close()
+                return web.json_response({'success': False, 'message': '管理員不存在'}, status=404)
+            
+            if target['username'] == 'admin':
+                conn.close()
+                return web.json_response({'success': False, 'message': '不能刪除超級管理員'}, status=403)
+            
+            cursor.execute('DELETE FROM admins WHERE id = ?', (admin_id,))
+            conn.commit()
+            conn.close()
+            
+            self._log_admin_action(admin['username'], 'delete_admin', 'admin',
+                                  target_id=str(admin_id), details=f'Deleted: {target["username"]}')
+            
+            return web.json_response({'success': True, 'message': '管理員已刪除'})
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     

@@ -592,6 +592,161 @@
                     </div>
                 </div>
                 
+                <!-- ==================== 管理員管理 ==================== -->
+                <div v-if="currentPage === 'admins'">
+                    <div class="flex justify-end mb-6">
+                        <button @click="openNewAdminModal" 
+                                class="gradient-bg hover:opacity-90 px-6 py-2 rounded-lg font-medium transition-opacity">
+                            ➕ 添加管理員
+                        </button>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">用戶名</th>
+                                    <th class="text-left px-6 py-4 font-medium">姓名</th>
+                                    <th class="text-left px-6 py-4 font-medium">郵箱</th>
+                                    <th class="text-left px-6 py-4 font-medium">角色</th>
+                                    <th class="text-left px-6 py-4 font-medium">狀態</th>
+                                    <th class="text-left px-6 py-4 font-medium">最後登錄</th>
+                                    <th class="text-left px-6 py-4 font-medium">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="admin in admins" :key="admin.id"
+                                    class="border-t border-gray-700 table-row-hover transition-colors">
+                                    <td class="px-6 py-4 font-medium">
+                                        <span v-if="admin.username === 'admin'" class="text-yellow-400">👑 {{ admin.username }}</span>
+                                        <span v-else>{{ admin.username }}</span>
+                                    </td>
+                                    <td class="px-6 py-4">{{ admin.name || '-' }}</td>
+                                    <td class="px-6 py-4 text-gray-400">{{ admin.email || '-' }}</td>
+                                    <td class="px-6 py-4">
+                                        <span :class="{
+                                            'bg-yellow-600/30 text-yellow-400': admin.role === 'super_admin',
+                                            'bg-blue-600/30 text-blue-400': admin.role === 'admin',
+                                            'bg-gray-600/30 text-gray-400': admin.role === 'viewer'
+                                        }" class="px-2 py-1 rounded text-sm">
+                                            {{ admin.role === 'super_admin' ? '超級管理員' : admin.role === 'admin' ? '管理員' : '查看者' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span :class="admin.is_active ? 'text-green-400' : 'text-red-400'">
+                                            {{ admin.is_active ? '✓ 正常' : '✗ 禁用' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-400 text-sm">{{ formatDate(admin.last_login_at) || '從未' }}</td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex gap-2" v-if="admin.username !== 'admin'">
+                                            <button @click="editAdmin(admin)"
+                                                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition-colors">
+                                                編輯
+                                            </button>
+                                            <button @click="toggleAdminStatus(admin)"
+                                                    :class="admin.is_active ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'"
+                                                    class="px-3 py-1 rounded text-sm transition-colors">
+                                                {{ admin.is_active ? '禁用' : '啟用' }}
+                                            </button>
+                                            <button @click="deleteAdmin(admin)"
+                                                    class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition-colors">
+                                                刪除
+                                            </button>
+                                        </div>
+                                        <span v-else class="text-gray-500 text-sm">超級管理員</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 角色權限說明 -->
+                    <div class="mt-6 bg-gray-800 rounded-xl p-6">
+                        <h3 class="text-lg font-semibold mb-4">📋 角色權限說明</h3>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <h4 class="font-medium text-yellow-400 mb-2">👑 超級管理員</h4>
+                                <ul class="text-sm text-gray-400 space-y-1">
+                                    <li>• 所有權限</li>
+                                    <li>• 管理其他管理員</li>
+                                    <li>• 系統設置</li>
+                                </ul>
+                            </div>
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <h4 class="font-medium text-blue-400 mb-2">👤 管理員</h4>
+                                <ul class="text-sm text-gray-400 space-y-1">
+                                    <li>• 用戶管理</li>
+                                    <li>• 卡密管理</li>
+                                    <li>• 訂單管理</li>
+                                    <li>• 公告管理</li>
+                                </ul>
+                            </div>
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <h4 class="font-medium text-gray-400 mb-2">👁️ 查看者</h4>
+                                <ul class="text-sm text-gray-400 space-y-1">
+                                    <li>• 查看數據</li>
+                                    <li>• 無修改權限</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 管理員編輯彈窗 -->
+                <div v-if="showAdminModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 rounded-xl p-6 w-full max-w-md">
+                        <h3 class="text-xl font-bold mb-4">{{ editingAdmin ? '編輯管理員' : '添加管理員' }}</h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-1">用戶名 *</label>
+                                <input type="text" v-model="adminForm.username" 
+                                       :disabled="editingAdmin"
+                                       class="w-full bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                                       placeholder="登錄用戶名">
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-1">密碼 {{ editingAdmin ? '(留空不修改)' : '*' }}</label>
+                                <input type="password" v-model="adminForm.password"
+                                       class="w-full bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                                       placeholder="至少6位">
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-1">姓名</label>
+                                <input type="text" v-model="adminForm.name"
+                                       class="w-full bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                                       placeholder="顯示名稱">
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-1">郵箱</label>
+                                <input type="email" v-model="adminForm.email"
+                                       class="w-full bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                                       placeholder="email@example.com">
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-1">角色</label>
+                                <select v-model="adminForm.role"
+                                        class="w-full bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
+                                    <option value="admin">管理員</option>
+                                    <option value="viewer">查看者</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button @click="showAdminModal = false"
+                                    class="px-6 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg transition-colors">
+                                取消
+                            </button>
+                            <button @click="saveAdmin"
+                                    class="px-6 py-2 gradient-bg hover:opacity-90 rounded-lg transition-opacity">
+                                保存
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- ==================== 公告管理 ==================== -->
                 <div v-if="currentPage === 'announcements'">
                     <div class="flex justify-end mb-6">
@@ -874,6 +1029,39 @@
                                 class="mt-4 bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition-colors">
                             修改密碼
                         </button>
+                    </div>
+                    
+                    <!-- Telegram 通知設置 -->
+                    <div class="bg-gray-800 rounded-xl p-6 mb-6">
+                        <h3 class="text-lg font-semibold mb-4">📱 Telegram 通知設置</h3>
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-2">Bot Token</label>
+                                <input type="text" v-model="telegramConfig.bot_token"
+                                       class="w-full bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                                       placeholder="例: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz">
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-2">Chat ID</label>
+                                <input type="text" v-model="telegramConfig.chat_id"
+                                       class="w-full bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                                       placeholder="例: -1001234567890">
+                            </div>
+                        </div>
+                        <div class="flex gap-3">
+                            <button @click="saveTelegramConfig" 
+                                    class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition-colors">
+                                保存配置
+                            </button>
+                            <button @click="testTelegram" 
+                                    class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg transition-colors">
+                                發送測試
+                            </button>
+                        </div>
+                        <p class="text-gray-500 text-sm mt-3">
+                            💡 創建 Bot: 在 Telegram 搜索 @BotFather，發送 /newbot<br>
+                            💡 獲取 Chat ID: 將 Bot 加入群組，訪問 https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates
+                        </p>
                     </div>
                     
                     <!-- 數據導出區塊 -->

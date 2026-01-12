@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TG-Matrix 管理後台 - 登錄</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .glass { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen flex items-center justify-center">
+    <div id="app">
+        <div class="w-[400px]">
+            <!-- Logo -->
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold gradient-bg bg-clip-text text-transparent">TG-Matrix</h1>
+                <p class="text-gray-400 mt-2">管理後台 v2.0</p>
+            </div>
+            
+            <!-- 登錄卡片 -->
+            <div class="glass rounded-2xl p-8 border border-gray-700">
+                <h2 class="text-xl font-semibold text-white mb-6">🔐 管理員登錄</h2>
+                
+                <form @submit.prevent="handleLogin">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">用戶名</label>
+                            <input type="text" v-model="username" 
+                                   class="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                                   placeholder="請輸入用戶名" required>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">密碼</label>
+                            <input type="password" v-model="password" 
+                                   class="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                                   placeholder="請輸入密碼" required>
+                        </div>
+                        
+                        <div class="flex items-center justify-between text-sm">
+                            <label class="flex items-center text-gray-400 cursor-pointer">
+                                <input type="checkbox" v-model="rememberMe" class="mr-2">
+                                記住我
+                            </label>
+                        </div>
+                        
+                        <div v-if="error" class="bg-red-500/20 border border-red-500 rounded-lg p-3 text-red-400 text-sm">
+                            {{ error }}
+                        </div>
+                        
+                        <button type="submit" 
+                                :disabled="isLoading"
+                                class="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center">
+                            <span v-if="isLoading">
+                                <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </span>
+                            {{ isLoading ? '登錄中...' : '登錄' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- 版權信息 -->
+            <p class="text-center text-gray-500 text-sm mt-6">
+                © 2026 TG-Matrix. 王者榮耀風格會員系統.
+            </p>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+    <script>
+        const { createApp, ref } = Vue;
+        
+        createApp({
+            setup() {
+                const username = ref('');
+                const password = ref('');
+                const rememberMe = ref(false);
+                const isLoading = ref(false);
+                const error = ref('');
+                
+                const handleLogin = async () => {
+                    error.value = '';
+                    isLoading.value = true;
+                    
+                    try {
+                        const response = await fetch('/api/admin/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                username: username.value,
+                                password: password.value
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            // 保存 token
+                            const storage = rememberMe.value ? localStorage : sessionStorage;
+                            storage.setItem('admin_token', result.data.token);
+                            storage.setItem('admin_user', JSON.stringify(result.data.user));
+                            
+                            // 跳轉到管理後台
+                            window.location.href = '/';
+                        } else {
+                            error.value = result.message || '登錄失敗';
+                        }
+                    } catch (e) {
+                        error.value = '網絡錯誤，請稍後重試';
+                    } finally {
+                        isLoading.value = false;
+                    }
+                };
+                
+                return {
+                    username,
+                    password,
+                    rememberMe,
+                    isLoading,
+                    error,
+                    handleLogin
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

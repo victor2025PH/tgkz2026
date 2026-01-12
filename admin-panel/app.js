@@ -1,6 +1,6 @@
 /**
  * TG-Matrix 管理後台
- * Vue 3 應用 - 真實數據版本
+ * Vue 3 應用 - 真實數據版本 + 認證
  */
 
 const { createApp, ref, computed, onMounted, watch } = Vue;
@@ -8,16 +8,49 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
 // API 基礎URL
 const API_BASE = '/api';
 
-// 通用 API 請求函數
+// 獲取 token
+function getToken() {
+    return localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token');
+}
+
+// 獲取當前用戶
+function getCurrentUser() {
+    const userStr = localStorage.getItem('admin_user') || sessionStorage.getItem('admin_user');
+    try {
+        return userStr ? JSON.parse(userStr) : null;
+    } catch {
+        return null;
+    }
+}
+
+// 登出
+function logout() {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+    sessionStorage.removeItem('admin_token');
+    sessionStorage.removeItem('admin_user');
+    window.location.href = '/login.html';
+}
+
+// 通用 API 請求函數（帶認證）
 async function apiRequest(endpoint, options = {}) {
     try {
+        const token = getToken();
         const response = await fetch(`${API_BASE}${endpoint}`, {
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : '',
                 ...options.headers
             },
             ...options
         });
+        
+        // 如果返回 401，跳轉到登錄頁
+        if (response.status === 401) {
+            logout();
+            return { success: false, message: '登錄已過期' };
+        }
+        
         return await response.json();
     } catch (error) {
         console.error('API Error:', error);
@@ -30,8 +63,11 @@ createApp({
         // ============ 狀態 ============
         const currentPage = ref('dashboard');
         const showGenerateModal = ref(false);
+        const showExtendModal = ref(false);
         const isLoading = ref(true);
         const lastUpdate = ref(null);
+        const adminUser = ref(getCurrentUser());
+        const logs = ref([]);
         
         // 菜單項
         const menuItems = [
@@ -39,8 +75,16 @@ createApp({
             { id: 'users', name: '用戶管理', icon: '👥' },
             { id: 'licenses', name: '卡密管理', icon: '🎟️' },
             { id: 'orders', name: '訂單管理', icon: '💰' },
+            { id: 'logs', name: '操作日誌', icon: '📝' },
             { id: 'settings', name: '系統設置', icon: '⚙️' },
         ];
+        
+        // 續費表單
+        const extendForm = ref({
+            machineId: '',
+            days: 30,
+            level: ''
+        });
         
         // 統計數據
         const stats = ref({
@@ -153,6 +197,13 @@ createApp({
             }
         };
         
+        const loadLogs = async () => {
+            const result = await apiRequest('/admin/logs');
+            if (result.success) {
+                logs.value = result.data;
+            }
+        };
+        
         const refreshData = async () => {
             await loadDashboard();
             if (currentPage.value === 'users') await loadUsers();
@@ -232,7 +283,35 @@ createApp({
         };
         
         const extendUser = (user) => {
-            alert(`為用戶 ${user.email || user.machineId} 續費`);
+            extendForm.value.machineId = user.machineId;
+            extendForm.value.days = 30;
+            extendForm.value.level = user.level;
+            showExtendModal.value = true;
+        };
+        
+        const submitExtend = async () => {
+            const result = await apiRequest('/admin/users/extend', {
+                method: 'POST',
+                body: JSON.stringify({
+                    machine_id: extendForm.value.machineId,
+                    days: extendForm.value.days,
+                    level: extendForm.value.level || null
+                })
+            });
+            
+            if (result.success) {
+                showExtendModal.value = false;
+                alert(result.message);
+                await loadUsers();
+            } else {
+                alert('操作失敗: ' + result.message);
+            }
+        };
+        
+        const handleLogout = () => {
+            if (confirm('確定要登出嗎？')) {
+                logout();
+            }
         };
         
         const copyLicense = (key) => {
@@ -421,6 +500,7 @@ createApp({
             else if (newPage === 'users') await loadUsers();
             else if (newPage === 'licenses') await loadLicenses();
             else if (newPage === 'orders') await loadOrders();
+            else if (newPage === 'logs') await loadLogs();
             else if (newPage === 'settings') await loadSettings();
         });
         
@@ -443,24 +523,30 @@ createApp({
             licenseStats,
             filteredLicenses,
             orders,
+            logs,
             prices,
             paymentConfig,
             showGenerateModal,
+            showExtendModal,
             generateForm,
+            extendForm,
             isLoading,
             lastUpdate,
+            adminUser,
             getLevelDisplay,
             isExpired,
             getStatusClass,
             getStatusText,
             editUser,
             extendUser,
+            submitExtend,
             copyLicense,
             disableLicense,
             exportLicenses,
             generateLicenses,
             saveSettings,
-            refreshData
+            refreshData,
+            handleLogout
         };
     }
 }).mount('#app');

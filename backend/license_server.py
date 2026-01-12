@@ -25,8 +25,18 @@ from aiohttp import web
 import jwt
 
 # JWT 密鑰（生產環境應從環境變量讀取）
-JWT_SECRET = "tg-matrix-license-secret-2026"
+import os
+JWT_SECRET = os.environ.get("JWT_SECRET", "tg-matrix-license-secret-2026")
 JWT_ALGORITHM = "HS256"
+
+# 管理員配置（生產環境應從環境變量或數據庫讀取）
+ADMIN_USERS = {
+    "admin": {
+        "password_hash": hashlib.sha256("admin888".encode()).hexdigest(),  # 默認密碼
+        "role": "super_admin",
+        "name": "管理員"
+    }
+}
 
 # 數據庫路徑
 DB_PATH = Path(__file__).parent / "data" / "license_server.db"
@@ -397,7 +407,13 @@ class LicenseServer:
         self.app.router.add_post('/api/payment/callback', self.handle_payment_callback)
         self.app.router.add_get('/api/health', self.handle_health)
         
-        # 管理員 API
+        # 管理員認證 API
+        self.app.router.add_post('/api/admin/login', self.handle_admin_login)
+        self.app.router.add_post('/api/admin/logout', self.handle_admin_logout)
+        self.app.router.add_get('/api/admin/verify', self.handle_admin_verify)
+        self.app.router.add_post('/api/admin/change-password', self.handle_admin_change_password)
+        
+        # 管理員數據 API
         self.app.router.add_get('/api/admin/dashboard', self.handle_admin_dashboard)
         self.app.router.add_get('/api/admin/users', self.handle_admin_users)
         self.app.router.add_get('/api/admin/licenses', self.handle_admin_licenses)
@@ -406,6 +422,8 @@ class LicenseServer:
         self.app.router.add_post('/api/admin/licenses/disable', self.handle_admin_disable)
         self.app.router.add_post('/api/admin/settings/save', self.handle_admin_save_settings)
         self.app.router.add_get('/api/admin/settings', self.handle_admin_get_settings)
+        self.app.router.add_get('/api/admin/logs', self.handle_admin_logs)
+        self.app.router.add_post('/api/admin/users/extend', self.handle_admin_extend_user)
     
     def _generate_token(self, license_key: str, machine_id: str, expires_in: int = 86400) -> str:
         """生成 JWT token"""
@@ -701,7 +719,164 @@ class LicenseServer:
         """健康檢查"""
         return web.json_response({'status': 'ok', 'timestamp': datetime.now().isoformat()})
     
-    # ============ 管理員 API ============
+    # ============ 管理員認證 API ============
+    
+    def _generate_admin_token(self, username: str, expires_in: int = 86400 * 7) -> str:
+        """生成管理員 JWT token"""
+        payload = {
+            'username': username,
+            'type': 'admin',
+            'exp': datetime.utcnow() + timedelta(seconds=expires_in),
+            'iat': datetime.utcnow()
+        }
+        return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    
+    def _verify_admin_token(self, token: str) -> Optional[Dict]:
+        """驗證管理員 token"""
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            if payload.get('type') != 'admin':
+                return None
+            return payload
+        except jwt.ExpiredSignatureError:
+            return None
+        except jwt.InvalidTokenError:
+            return None
+    
+    def _get_admin_from_request(self, request: web.Request) -> Optional[Dict]:
+        """從請求中獲取管理員信息"""
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header[7:]
+            return self._verify_admin_token(token)
+        return None
+    
+    def _log_admin_action(self, username: str, action: str, details: str = ""):
+        """記錄管理員操作日誌"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # 確保日誌表存在
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS admin_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    details TEXT,
+                    ip_address TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('''
+                INSERT INTO admin_logs (username, action, details)
+                VALUES (?, ?, ?)
+            ''', (username, action, details))
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"記錄日誌失敗: {e}")
+    
+    async def handle_admin_login(self, request: web.Request) -> web.Response:
+        """管理員登錄"""
+        try:
+            data = await request.json()
+            username = data.get('username', '')
+            password = data.get('password', '')
+            
+            if not username or not password:
+                return web.json_response({'success': False, 'message': '用戶名和密碼不能為空'}, status=400)
+            
+            # 檢查用戶是否存在
+            admin = ADMIN_USERS.get(username)
+            if not admin:
+                return web.json_response({'success': False, 'message': '用戶名或密碼錯誤'}, status=401)
+            
+            # 驗證密碼
+            password_hash = hashlib.sha256(password.encode()).hexdigest()
+            if password_hash != admin['password_hash']:
+                return web.json_response({'success': False, 'message': '用戶名或密碼錯誤'}, status=401)
+            
+            # 生成 token
+            token = self._generate_admin_token(username)
+            
+            # 記錄登錄日誌
+            self._log_admin_action(username, 'login', f'IP: {self._get_client_ip(request)}')
+            
+            return web.json_response({
+                'success': True,
+                'message': '登錄成功',
+                'data': {
+                    'token': token,
+                    'user': {
+                        'username': username,
+                        'name': admin['name'],
+                        'role': admin['role']
+                    }
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_logout(self, request: web.Request) -> web.Response:
+        """管理員登出"""
+        admin = self._get_admin_from_request(request)
+        if admin:
+            self._log_admin_action(admin['username'], 'logout', '')
+        return web.json_response({'success': True, 'message': '已登出'})
+    
+    async def handle_admin_verify(self, request: web.Request) -> web.Response:
+        """驗證管理員 token"""
+        admin = self._get_admin_from_request(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': 'Token 無效或已過期'}, status=401)
+        
+        admin_info = ADMIN_USERS.get(admin['username'])
+        return web.json_response({
+            'success': True,
+            'data': {
+                'username': admin['username'],
+                'name': admin_info['name'] if admin_info else admin['username'],
+                'role': admin_info['role'] if admin_info else 'admin'
+            }
+        })
+    
+    async def handle_admin_change_password(self, request: web.Request) -> web.Response:
+        """修改管理員密碼"""
+        admin = self._get_admin_from_request(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        try:
+            data = await request.json()
+            old_password = data.get('old_password', '')
+            new_password = data.get('new_password', '')
+            
+            if not old_password or not new_password:
+                return web.json_response({'success': False, 'message': '密碼不能為空'}, status=400)
+            
+            if len(new_password) < 6:
+                return web.json_response({'success': False, 'message': '新密碼至少6位'}, status=400)
+            
+            # 驗證舊密碼
+            admin_info = ADMIN_USERS.get(admin['username'])
+            old_hash = hashlib.sha256(old_password.encode()).hexdigest()
+            if old_hash != admin_info['password_hash']:
+                return web.json_response({'success': False, 'message': '舊密碼錯誤'}, status=400)
+            
+            # 更新密碼（注意：這裡只是更新內存中的值，重啟後會重置）
+            # 生產環境應該保存到數據庫或配置文件
+            ADMIN_USERS[admin['username']]['password_hash'] = hashlib.sha256(new_password.encode()).hexdigest()
+            
+            self._log_admin_action(admin['username'], 'change_password', '')
+            
+            return web.json_response({'success': True, 'message': '密碼已修改'})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    # ============ 管理員數據 API ============
     
     async def handle_admin_dashboard(self, request: web.Request) -> web.Response:
         """管理儀表盤數據"""
@@ -971,10 +1146,131 @@ class LicenseServer:
                 'payment': {
                     'alipayAppId': '',
                     'wechatMchId': '',
-                    'usdtAddress': ''
+                    'usdtAddress': os.environ.get('USDT_TRC20_ADDRESS', '')
                 }
             }
             return web.json_response({'success': True, 'data': settings})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_logs(self, request: web.Request) -> web.Response:
+        """獲取操作日誌"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # 確保日誌表存在
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS admin_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    details TEXT,
+                    ip_address TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('SELECT * FROM admin_logs ORDER BY created_at DESC LIMIT 100')
+            
+            logs = []
+            for row in cursor.fetchall():
+                log = dict(row)
+                logs.append({
+                    'id': log['id'],
+                    'username': log['username'],
+                    'action': log['action'],
+                    'details': log['details'],
+                    'createdAt': log['created_at']
+                })
+            
+            conn.close()
+            
+            return web.json_response({'success': True, 'data': logs})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_extend_user(self, request: web.Request) -> web.Response:
+        """為用戶延長會員時間"""
+        admin = self._get_admin_from_request(request)
+        
+        try:
+            data = await request.json()
+            machine_id = data.get('machine_id', '')
+            days = int(data.get('days', 30))
+            level = data.get('level', None)  # 可選：同時升級等級
+            
+            if not machine_id:
+                return web.json_response({'success': False, 'message': '缺少機器碼'}, status=400)
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # 獲取用戶當前最新的卡密
+            cursor.execute('''
+                SELECT * FROM licenses 
+                WHERE machine_id = ? AND status = 'used'
+                ORDER BY expires_at DESC
+                LIMIT 1
+            ''', (machine_id,))
+            
+            license_row = cursor.fetchone()
+            
+            if license_row:
+                current_license = dict(license_row)
+                current_expires = datetime.fromisoformat(current_license['expires_at']) if current_license['expires_at'] else datetime.now()
+                
+                # 如果已過期，從現在開始計算
+                if current_expires < datetime.now():
+                    current_expires = datetime.now()
+                
+                new_expires = current_expires + timedelta(days=days)
+                
+                # 更新過期時間
+                cursor.execute('''
+                    UPDATE licenses SET expires_at = ?
+                    WHERE license_key = ?
+                ''', (new_expires.isoformat(), current_license['license_key']))
+                
+                # 如果需要升級等級
+                if level:
+                    cursor.execute('''
+                        UPDATE licenses SET level = ?
+                        WHERE license_key = ?
+                    ''', (level, current_license['license_key']))
+                    
+                    cursor.execute('''
+                        UPDATE users SET membership_level = ?
+                        WHERE machine_id = ?
+                    ''', (level, machine_id))
+            else:
+                # 沒有卡密記錄，直接創建一個
+                license_key = f"TGM-EXT-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}"
+                new_level = level or 'gold'
+                new_expires = datetime.now() + timedelta(days=days)
+                
+                cursor.execute('''
+                    INSERT INTO licenses (license_key, type_code, level, duration_days, status, machine_id, used_at, expires_at, notes)
+                    VALUES (?, ?, ?, ?, 'used', ?, ?, ?, ?)
+                ''', (license_key, 'EXT', new_level, days, machine_id, datetime.now().isoformat(), new_expires.isoformat(), '管理員手動續費'))
+                
+                # 更新用戶等級
+                cursor.execute('''
+                    UPDATE users SET membership_level = ?
+                    WHERE machine_id = ?
+                ''', (new_level, machine_id))
+            
+            conn.commit()
+            conn.close()
+            
+            # 記錄操作
+            if admin:
+                self._log_admin_action(admin['username'], 'extend_user', f'machine_id={machine_id}, days={days}')
+            
+            return web.json_response({
+                'success': True,
+                'message': f'已為用戶延長 {days} 天會員'
+            })
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     

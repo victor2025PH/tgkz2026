@@ -9,9 +9,12 @@ __pycache__/
 dist/
 build/
 release/
+build-python/
 *.exe
 *.dmg
 *.AppImage
+*.pkg
+*.pyz
 
 # IDE
 .vs/

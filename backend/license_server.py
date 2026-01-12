@@ -187,6 +187,14 @@ class LicenseServer:
         self.app.router.add_get('/api/admin/settings', self.handle_admin_get_settings)
         self.app.router.add_post('/api/admin/settings/save', self.handle_admin_save_settings)
         
+        # 管理員密碼修改
+        self.app.router.add_post('/api/admin/change-password', self.handle_admin_change_password)
+        
+        # 數據導出
+        self.app.router.add_get('/api/admin/export/users', self.handle_admin_export_users)
+        self.app.router.add_get('/api/admin/export/orders', self.handle_admin_export_orders)
+        self.app.router.add_get('/api/admin/export/licenses', self.handle_admin_export_licenses)
+        
         # 操作日誌
         self.app.router.add_get('/api/admin/logs', self.handle_admin_logs)
         
@@ -2244,6 +2252,187 @@ class LicenseServer:
                                   details=f'keys={list(data.keys())}')
             
             return web.json_response({'success': True, 'message': '設置已保存'})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_change_password(self, request: web.Request) -> web.Response:
+        """修改管理員密碼"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            data = await request.json()
+            old_password = data.get('old_password', '')
+            new_password = data.get('new_password', '')
+            confirm_password = data.get('confirm_password', '')
+            
+            if not old_password or not new_password:
+                return web.json_response({'success': False, 'message': '請輸入舊密碼和新密碼'}, status=400)
+            
+            if new_password != confirm_password:
+                return web.json_response({'success': False, 'message': '兩次輸入的密碼不一致'}, status=400)
+            
+            if len(new_password) < 6:
+                return web.json_response({'success': False, 'message': '密碼長度至少 6 位'}, status=400)
+            
+            # 驗證舊密碼
+            old_hash = hashlib.sha256(old_password.encode()).hexdigest()
+            if old_hash != admin['password_hash']:
+                return web.json_response({'success': False, 'message': '舊密碼錯誤'}, status=400)
+            
+            # 更新密碼
+            new_hash = hashlib.sha256(new_password.encode()).hexdigest()
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('UPDATE admins SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                          (new_hash, admin['id']))
+            conn.commit()
+            conn.close()
+            
+            self._log_admin_action(admin['username'], 'change_password', 'admin',
+                                  details='Password changed')
+            
+            return web.json_response({'success': True, 'message': '密碼修改成功'})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_export_users(self, request: web.Request) -> web.Response:
+        """導出用戶數據"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            level = request.query.get('level')
+            status = request.query.get('status')
+            
+            users = self.db.get_users(level=level, status=status, limit=10000)
+            
+            # 生成 CSV
+            import io
+            output = io.StringIO()
+            output.write('\ufeff')  # UTF-8 BOM
+            output.write('用戶ID,郵箱,暱稱,等級,過期時間,終身,消費總額,邀請人數,邀請收益,狀態,註冊時間,最後活躍\n')
+            
+            for u in users:
+                level_name = MEMBERSHIP_LEVELS.get(u['membership_level'] or 'bronze', {}).get('name', u['membership_level'])
+                output.write(f"{u['user_id']},{u['email'] or ''},{u['nickname'] or ''},{level_name},"
+                           f"{u['expires_at'] or ''},{u['is_lifetime']},{u['total_spent'] or 0},"
+                           f"{u['total_invites'] or 0},{u['invite_earnings'] or 0},"
+                           f"{'封禁' if u['is_banned'] else '正常'},{u['created_at']},{u['last_active_at'] or ''}\n")
+            
+            self._log_admin_action(admin['username'], 'export', 'users',
+                                  details=f'Exported {len(users)} users')
+            
+            return web.Response(
+                text=output.getvalue(),
+                content_type='text/csv',
+                headers={'Content-Disposition': 'attachment; filename="users_export.csv"'}
+            )
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_export_orders(self, request: web.Request) -> web.Response:
+        """導出訂單數據"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            status = request.query.get('status')
+            days = int(request.query.get('days', 30))
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            if status:
+                cursor.execute('''
+                    SELECT * FROM orders 
+                    WHERE status = ? AND created_at >= date('now', ? || ' days')
+                    ORDER BY created_at DESC
+                ''', (status, f'-{days}'))
+            else:
+                cursor.execute('''
+                    SELECT * FROM orders 
+                    WHERE created_at >= date('now', ? || ' days')
+                    ORDER BY created_at DESC
+                ''', (f'-{days}',))
+            
+            orders = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            
+            import io
+            output = io.StringIO()
+            output.write('\ufeff')
+            output.write('訂單號,用戶ID,產品,等級,時長,原價,折扣,實付,支付方式,狀態,創建時間,支付時間\n')
+            
+            for o in orders:
+                output.write(f"{o['order_id']},{o['user_id'] or ''},{o['product_name'] or ''},"
+                           f"{o['product_level']},{o['duration_type']},{o['original_price']},"
+                           f"{o['discount_amount'] or 0},{o['final_price']},{o['payment_method']},"
+                           f"{o['status']},{o['created_at']},{o['paid_at'] or ''}\n")
+            
+            self._log_admin_action(admin['username'], 'export', 'orders',
+                                  details=f'Exported {len(orders)} orders')
+            
+            return web.Response(
+                text=output.getvalue(),
+                content_type='text/csv',
+                headers={'Content-Disposition': 'attachment; filename="orders_export.csv"'}
+            )
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_export_licenses(self, request: web.Request) -> web.Response:
+        """導出卡密數據"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            status = request.query.get('status')
+            level = request.query.get('level')
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            query = 'SELECT * FROM licenses WHERE 1=1'
+            params = []
+            
+            if status:
+                query += ' AND status = ?'
+                params.append(status)
+            if level:
+                query += ' AND level = ?'
+                params.append(level)
+            
+            query += ' ORDER BY created_at DESC LIMIT 10000'
+            cursor.execute(query, params)
+            licenses = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            
+            import io
+            output = io.StringIO()
+            output.write('\ufeff')
+            output.write('卡密,等級,時長類型,天數,價格,狀態,使用者,激活時間,過期時間,批次,備註,創建時間\n')
+            
+            for lic in licenses:
+                level_name = MEMBERSHIP_LEVELS.get(lic['level'] or 'bronze', {}).get('name', lic['level'])
+                output.write(f"{lic['license_key']},{level_name},{lic['duration_type']},"
+                           f"{lic['duration_days']},{lic['price']},{lic['status']},"
+                           f"{lic['used_by'] or ''},{lic['activated_at'] or ''},"
+                           f"{lic['expires_at'] or ''},{lic['batch'] or ''},{lic['notes'] or ''},"
+                           f"{lic['created_at']}\n")
+            
+            self._log_admin_action(admin['username'], 'export', 'licenses',
+                                  details=f'Exported {len(licenses)} licenses')
+            
+            return web.Response(
+                text=output.getvalue(),
+                content_type='text/csv',
+                headers={'Content-Disposition': 'attachment; filename="licenses_export.csv"'}
+            )
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     

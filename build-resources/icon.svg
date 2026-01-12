@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradient background -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Cyan glow gradient -->
+    <linearGradient id="cyanGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22d3ee;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Blue accent gradient -->
+    <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Glow filter -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="246" fill="url(#bgGradient)" stroke="url(#cyanGradient)" stroke-width="4"/>
+  
+  <!-- Matrix grid pattern (background) -->
+  <g opacity="0.15" stroke="#22d3ee" stroke-width="1">
+    <line x1="50" y1="42.666666666666664" x2="462" y2="42.666666666666664"/><line x1="42.666666666666664" y1="50" x2="42.666666666666664" y2="462"/><line x1="50" y1="85.33333333333333" x2="462" y2="85.33333333333333"/><line x1="85.33333333333333" y1="50" x2="85.33333333333333" y2="462"/><line x1="50" y1="128" x2="462" y2="128"/><line x1="128" y1="50" x2="128" y2="462"/><line x1="50" y1="170.66666666666666" x2="462" y2="170.66666666666666"/><line x1="170.66666666666666" y1="50" x2="170.66666666666666" y2="462"/><line x1="50" y1="213.33333333333331" x2="462" y2="213.33333333333331"/><line x1="213.33333333333331" y1="50" x2="213.33333333333331" y2="462"/><line x1="50" y1="256" x2="462" y2="256"/><line x1="256" y1="50" x2="256" y2="462"/><line x1="50" y1="298.66666666666663" x2="462" y2="298.66666666666663"/><line x1="298.66666666666663" y1="50" x2="298.66666666666663" y2="462"/><line x1="50" y1="341.3333333333333" x2="462" y2="341.3333333333333"/><line x1="341.3333333333333" y1="50" x2="341.3333333333333" y2="462"/><line x1="50" y1="384" x2="462" y2="384"/><line x1="384" y1="50" x2="384" y2="462"/><line x1="50" y1="426.66666666666663" x2="462" y2="426.66666666666663"/><line x1="426.66666666666663" y1="50" x2="426.66666666666663" y2="462"/><line x1="50" y1="469.3333333333333" x2="462" y2="469.3333333333333"/><line x1="469.3333333333333" y1="50" x2="469.3333333333333" y2="462"/>
+  </g>
+  
+  <!-- TG Letters -->
+  <g filter="url(#glow)">
+    <!-- T letter -->
+    <path d="M 92.16 143.36 
+             L 245.76 143.36 
+             L 245.76 179.2
+             L 184.32 179.2
+             L 184.32 368.64
+             L 153.6 368.64
+             L 153.6 179.2
+             L 92.16 179.2
+             Z" 
+          fill="url(#cyanGradient)"/>
+    
+    <!-- G letter (stylized) -->
+    <path d="M 348.16 143.36
+             C 419.84 143.36 419.84 256 419.84 256
+             C 419.84 348.16 348.16 368.64 296.96 368.64
+             C 245.76 368.64 230.4 296.96 230.4 256
+             C 230.4 215.04 256 179.2 296.96 179.2
+             L 348.16 179.2
+             L 348.16 143.36
+             Z
+             M 266.24 256
+             C 266.24 317.44 276.48 332.8 307.2 332.8
+             C 358.4 332.8 384 307.2 384 256
+             L 332.8 256
+             L 332.8 281.6
+             L 384 281.6
+             C 384 230.4 358.4 215.04 307.2 215.04
+             C 276.48 215.04 266.24 230.4 266.24 256
+             Z"
+          fill="url(#blueGradient)"/>
+  </g>
+  
+  <!-- Data stream dots -->
+  <g fill="#22d3ee" opacity="0.6">
+    <circle cx="76.8" cy="256" r="4"/>
+    <circle cx="435.2" cy="256" r="4"/>
+    <circle cx="256" cy="76.8" r="4"/>
+    <circle cx="256" cy="435.2" r="4"/>
+  </g>
+  
+  <!-- Corner accents -->
+  <g stroke="url(#cyanGradient)" stroke-width="3" fill="none" opacity="0.8">
+    <path d="M 40.96 102.4 L 40.96 40.96 L 102.4 40.96"/>
+    <path d="M 409.6 40.96 L 471.04 40.96 L 471.04 102.4"/>
+    <path d="M 471.04 409.6 L 471.04 471.04 L 409.6 471.04"/>
+    <path d="M 102.4 471.04 L 40.96 471.04 L 40.96 409.6"/>
+  </g>
+</svg>

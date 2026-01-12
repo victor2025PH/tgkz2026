@@ -1,0 +1,5 @@
+{
+  "name": "TG-Matrix: AI Telegram Outreach",
+  "description": "A modern dashboard to manage and automate Telegram marketing campaigns. Configure monitoring of groups for keywords, capture potential leads, and use Gemini AI to generate personalized outreach messages.",
+  "requestFramePermissions": []
+}

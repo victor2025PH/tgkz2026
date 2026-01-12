@@ -1,0 +1,91 @@
+{
+  "version": "1.0.0",
+  "description": "TG-Matrix AI 默認配置 - 開箱即用",
+  
+  "primaryProvider": "local",
+  
+  "localAi": {
+    "provider": "ollama",
+    "endpoint": "http://localhost:11434",
+    "model": "qwen2:7b",
+    "autoDetect": true,
+    "timeout": 60000,
+    "maxTokens": 2048,
+    "temperature": 0.7,
+    "fallbackModels": [
+      "qwen2:7b",
+      "qwen:7b",
+      "llama3:8b",
+      "llama2:7b",
+      "mistral:7b",
+      "gemma:7b"
+    ],
+    "recommendedModels": {
+      "chinese": "qwen2:7b",
+      "english": "llama3:8b",
+      "fast": "mistral:7b",
+      "small": "gemma:2b"
+    }
+  },
+  
+  "cloudAi": {
+    "enabled": false,
+    "provider": "gemini",
+    "apiKey": "",
+    "model": "gemini-pro",
+    "endpoint": "",
+    "providers": {
+      "gemini": {
+        "name": "Google Gemini",
+        "models": ["gemini-pro", "gemini-pro-vision"],
+        "endpoint": "https://generativelanguage.googleapis.com/v1beta"
+      },
+      "openai": {
+        "name": "OpenAI",
+        "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
+        "endpoint": "https://api.openai.com/v1"
+      },
+      "claude": {
+        "name": "Anthropic Claude",
+        "models": ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"],
+        "endpoint": "https://api.anthropic.com/v1"
+      }
+    }
+  },
+  
+  "autoFallback": {
+    "enabled": true,
+    "fallbackProvider": "gemini",
+    "fallbackOnError": true,
+    "fallbackOnTimeout": true,
+    "maxRetries": 3,
+    "retryDelay": 1000
+  },
+  
+  "autoStart": {
+    "checkOllamaOnStartup": true,
+    "autoSelectBestModel": true,
+    "showSetupWizardIfNoAi": true,
+    "autoConnectOnStartup": true,
+    "silentFallback": false
+  },
+  
+  "chat": {
+    "enabled": true,
+    "mode": "semi",
+    "typingSpeed": 50,
+    "replyDelay": [2, 8],
+    "systemPrompt": "你是一個專業的客服助手，請用友好、專業的方式回覆用戶的問題。",
+    "maxHistoryLength": 20,
+    "autoGreeting": true,
+    "greetingMessage": "您好！有什麼可以幫助您的嗎？"
+  },
+  
+  "rag": {
+    "enabled": true,
+    "autoLearn": true,
+    "embeddingModel": "paraphrase-multilingual-MiniLM-L12-v2",
+    "maxResults": 5,
+    "minSimilarity": 0.5
+  }
+}

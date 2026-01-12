@@ -1,0 +1,113 @@
+# electron-builder 配置文件
+# TG-AI智控王 安裝程序打包配置（完整版 - 包含編譯後端）
+
+appId: com.tgai.smartking.app
+productName: TG-AI智控王
+copyright: Copyright © 2026 TG-AI智控王
+
+# 目錄配置
+directories:
+  output: release
+  buildResources: build-resources
+
+# 文件包含/排除規則
+files:
+  - "dist/**/*"
+  - "electron.js"
+  - "preload.js"
+  - "auto-ai-setup.js"
+  - "package.json"
+  - "default-config/**/*"
+  # 不包含 backend Python 源碼（使用編譯好的 exe）
+  - "!backend/**"
+  - "!**/*.log"
+  - "!**/node_modules/.cache"
+
+# 額外資源（不打包到 asar，保持可執行）
+extraResources:
+  # 優先使用編譯好的 exe 後端
+  - from: "backend-exe"
+    to: "backend-exe"
+    filter:
+      - "**/*"
+  # 默認配置
+  - from: "default-config"
+    to: "default-config"
+  # 備用：如果沒有 exe，包含 Python 源碼
+  - from: "backend"
+    to: "backend"
+    filter:
+      - "**/*.py"
+      - "!**/__pycache__"
+      - "!**/*.pyc"
+      - "!**/*.db"
+      - "!**/sessions/**"
+      - "!**/chroma_db/**"
+      - "!**/chroma_rag_db/**"
+
+# asar 配置
+asar: true
+asarUnpack:
+  - "**/*.node"
+
+# Windows 配置
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # icon: build-resources/icon.ico  # 暫時不使用圖標，使用默認圖標
+  artifactName: "${productName}-Setup-${version}.${ext}"
+
+# NSIS 安裝程序配置
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: TG-AI智控王
+  installerLanguages:
+    - zh_CN
+    - en_US
+  language: 2052
+
+# macOS 配置
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  # icon: build-resources/icon.icns  # 暫時不使用圖標，使用默認圖標
+  category: public.app-category.productivity
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+  window:
+    width: 540
+    height: 380
+
+# Linux 配置
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  # icon: build-resources/icons  # 暫時註釋，等圖標準備好後再啟用
+  category: Office
+  artifactName: "${productName}-${version}.${ext}"
+
+# 發布配置
+publish:
+  provider: generic
+  url: https://releases.tg-matrix.com
+
+# 構建後鉤子
+afterPack: ./build-scripts/after-pack.js

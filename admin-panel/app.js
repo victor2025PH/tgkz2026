@@ -166,6 +166,8 @@ createApp({
         
         // 訂單數據
         const orders = ref([]);
+        const orderSearch = ref('');
+        const orderStatusFilter = ref('');
         
         // 日誌數據
         const logs = ref([]);
@@ -220,6 +222,13 @@ createApp({
         // 配額配置
         const quotaConfig = ref({});
         
+        // 密碼修改表單
+        const passwordForm = ref({
+            old_password: '',
+            new_password: '',
+            confirm_password: ''
+        });
+        
         // 生成卡密表單
         const generateForm = ref({
             level: 'G',
@@ -269,9 +278,29 @@ createApp({
         };
         
         const loadOrders = async () => {
-            const result = await apiRequest('/admin/orders');
+            let url = '/admin/orders';
+            if (orderStatusFilter.value) {
+                url += `?status=${orderStatusFilter.value}`;
+            }
+            const result = await apiRequest(url);
             if (result.success) {
                 orders.value = result.data;
+            }
+        };
+        
+        const confirmPayment = async (orderId) => {
+            if (!confirm(`確認將訂單 ${orderId} 標記為已支付？\n這將為用戶激活會員！`)) {
+                return;
+            }
+            
+            const result = await apiRequest('/admin/orders/confirm', {
+                method: 'POST',
+                body: JSON.stringify({ order_id: orderId })
+            });
+            
+            if (result.success) {
+                showToast('支付確認成功，會員已激活', 'success');
+                await loadOrders();
             }
         };
         
@@ -388,6 +417,20 @@ createApp({
             
             if (licenseLevelFilter.value !== 'all') {
                 result = result.filter(l => l.level === licenseLevelFilter.value);
+            }
+            
+            return result;
+        });
+        
+        const filteredOrders = computed(() => {
+            let result = orders.value;
+            
+            if (orderSearch.value) {
+                const search = orderSearch.value.toLowerCase();
+                result = result.filter(o => 
+                    (o.order_id && o.order_id.toLowerCase().includes(search)) ||
+                    (o.user_id && o.user_id.toLowerCase().includes(search))
+                );
             }
             
             return result;
@@ -764,6 +807,57 @@ createApp({
             }
         };
         
+        const changePassword = async () => {
+            if (!passwordForm.value.old_password || !passwordForm.value.new_password) {
+                showToast('請輸入舊密碼和新密碼', 'error');
+                return;
+            }
+            if (passwordForm.value.new_password !== passwordForm.value.confirm_password) {
+                showToast('兩次輸入的密碼不一致', 'error');
+                return;
+            }
+            if (passwordForm.value.new_password.length < 6) {
+                showToast('密碼長度至少 6 位', 'error');
+                return;
+            }
+            
+            const result = await apiRequest('/admin/change-password', {
+                method: 'POST',
+                body: JSON.stringify(passwordForm.value)
+            });
+            
+            if (result.success) {
+                showToast('密碼修改成功', 'success');
+                passwordForm.value = { old_password: '', new_password: '', confirm_password: '' };
+            }
+        };
+        
+        const exportData = (type, status = '') => {
+            let url = `${API_BASE}/admin/export/${type}?`;
+            if (status) url += `status=${status}&`;
+            
+            const token = localStorage.getItem('admin_token');
+            
+            fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `${type}_export.csv`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(downloadUrl);
+                showToast(`${type} 數據導出成功`, 'success');
+            })
+            .catch(err => {
+                showToast('導出失敗: ' + err.message, 'error');
+            });
+        };
+        
         // ============ 其他 ============
         
         const handleLogout = () => {
@@ -1081,6 +1175,10 @@ createApp({
             licenseStats,
             filteredLicenses,
             orders,
+            orderSearch,
+            orderStatusFilter,
+            filteredOrders,
+            confirmPayment,
             logs,
             referralStats,
             announcements,
@@ -1144,6 +1242,9 @@ createApp({
             
             // 設置操作
             saveSettings,
+            passwordForm,
+            changePassword,
+            exportData,
             
             // 報表和分析
             loadRevenueReport,

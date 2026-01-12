@@ -391,36 +391,71 @@
                 
                 <!-- ==================== 訂單管理 ==================== -->
                 <div v-if="currentPage === 'orders'">
+                    <!-- 搜索和篩選 -->
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="flex gap-4">
+                            <input type="text" v-model="orderSearch" placeholder="搜索訂單號..."
+                                   class="bg-gray-700 rounded-lg px-4 py-2 w-64 focus:ring-2 focus:ring-blue-500">
+                            <select v-model="orderStatusFilter" @change="loadOrders"
+                                    class="bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
+                                <option value="">全部狀態</option>
+                                <option value="pending">待支付</option>
+                                <option value="paid">已支付</option>
+                                <option value="cancelled">已取消</option>
+                            </select>
+                        </div>
+                        <div class="text-gray-400">
+                            共 {{ filteredOrders.length }} 個訂單
+                        </div>
+                    </div>
+                    
                     <div class="bg-gray-800 rounded-xl overflow-hidden">
                         <table class="w-full">
                             <thead class="bg-gray-700">
                                 <tr>
                                     <th class="text-left px-6 py-4 font-medium">訂單號</th>
+                                    <th class="text-left px-6 py-4 font-medium">用戶</th>
                                     <th class="text-left px-6 py-4 font-medium">產品</th>
                                     <th class="text-left px-6 py-4 font-medium">金額</th>
-                                    <th class="text-left px-6 py-4 font-medium">支付方式</th>
                                     <th class="text-left px-6 py-4 font-medium">狀態</th>
-                                    <th class="text-left px-6 py-4 font-medium">創建時間</th>
+                                    <th class="text-left px-6 py-4 font-medium">時間</th>
+                                    <th class="text-left px-6 py-4 font-medium">操作</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="order in orders" :key="order.id" 
+                                <tr v-for="order in filteredOrders" :key="order.id" 
                                     class="border-t border-gray-700 table-row-hover transition-colors">
                                     <td class="px-6 py-4">
-                                        <code class="text-sm">{{ order.orderId || order.order_id }}</code>
+                                        <code class="text-sm text-blue-400">{{ order.orderId || order.order_id }}</code>
                                     </td>
+                                    <td class="px-6 py-4 text-sm text-gray-400">{{ order.user_id || '-' }}</td>
                                     <td class="px-6 py-4">{{ order.productName || order.product_name || '-' }}</td>
-                                    <td class="px-6 py-4 font-medium">¥{{ order.amount || order.final_price || 0 }}</td>
-                                    <td class="px-6 py-4">{{ order.paymentMethod || order.payment_method || '未知' }}</td>
                                     <td class="px-6 py-4">
-                                        <span :class="order.status === 'paid' ? 'bg-green-600/30 text-green-400' : 'bg-yellow-600/30 text-yellow-400'"
-                                              class="px-2 py-1 rounded text-sm">
-                                            {{ order.status === 'paid' ? '已支付' : '待支付' }}
+                                        <span class="font-medium text-green-400">¥{{ order.final_price || 0 }}</span>
+                                        <span v-if="order.discount_amount" class="text-xs text-gray-500 ml-1">
+                                            (-¥{{ order.discount_amount }})
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 text-gray-400 text-sm">{{ formatDate(order.createdAt || order.created_at) }}</td>
+                                    <td class="px-6 py-4">
+                                        <span :class="{
+                                            'bg-green-600/30 text-green-400': order.status === 'paid',
+                                            'bg-yellow-600/30 text-yellow-400': order.status === 'pending',
+                                            'bg-gray-600/30 text-gray-400': order.status === 'cancelled'
+                                        }" class="px-2 py-1 rounded text-sm">
+                                            {{ order.status === 'paid' ? '已支付' : order.status === 'pending' ? '待支付' : '已取消' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-400 text-sm">{{ formatDate(order.created_at) }}</td>
+                                    <td class="px-6 py-4">
+                                        <button v-if="order.status === 'pending'" 
+                                                @click="confirmPayment(order.order_id)"
+                                                class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm transition-colors">
+                                            確認支付
+                                        </button>
+                                        <span v-else class="text-gray-500 text-sm">-</span>
+                                    </td>
                                 </tr>
-                                <tr v-if="orders.length === 0">
+                                <tr v-if="filteredOrders.length === 0">
                                     <td colspan="6" class="px-6 py-12 text-center text-gray-500">
                                         暫無訂單數據
                                     </td>
@@ -811,6 +846,66 @@
                 
                 <!-- ==================== 系統設置 ==================== -->
                 <div v-if="currentPage === 'settings'">
+                    
+                    <!-- 修改密碼區塊 -->
+                    <div class="bg-gray-800 rounded-xl p-6 mb-6">
+                        <h3 class="text-lg font-semibold mb-4">🔐 修改管理員密碼</h3>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-2">舊密碼</label>
+                                <input type="password" v-model="passwordForm.old_password"
+                                       class="w-full bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                                       placeholder="輸入當前密碼">
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-2">新密碼</label>
+                                <input type="password" v-model="passwordForm.new_password"
+                                       class="w-full bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                                       placeholder="輸入新密碼 (至少6位)">
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-2">確認新密碼</label>
+                                <input type="password" v-model="passwordForm.confirm_password"
+                                       class="w-full bg-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                                       placeholder="再次輸入新密碼">
+                            </div>
+                        </div>
+                        <button @click="changePassword" 
+                                class="mt-4 bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition-colors">
+                            修改密碼
+                        </button>
+                    </div>
+                    
+                    <!-- 數據導出區塊 -->
+                    <div class="bg-gray-800 rounded-xl p-6 mb-6">
+                        <h3 class="text-lg font-semibold mb-4">📥 數據導出</h3>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <h4 class="font-medium mb-2">👥 用戶數據</h4>
+                                <p class="text-gray-400 text-sm mb-3">導出所有用戶信息</p>
+                                <button @click="exportData('users')" 
+                                        class="w-full bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors">
+                                    導出 CSV
+                                </button>
+                            </div>
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <h4 class="font-medium mb-2">💰 訂單數據</h4>
+                                <p class="text-gray-400 text-sm mb-3">導出近30天訂單</p>
+                                <button @click="exportData('orders')" 
+                                        class="w-full bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors">
+                                    導出 CSV
+                                </button>
+                            </div>
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <h4 class="font-medium mb-2">🎟️ 卡密數據</h4>
+                                <p class="text-gray-400 text-sm mb-3">導出未使用卡密</p>
+                                <button @click="exportData('licenses', 'unused')" 
+                                        class="w-full bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors">
+                                    導出 CSV
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                     <div class="grid grid-cols-2 gap-6">
                         <!-- 支付設置 -->
                         <div class="bg-gray-800 rounded-xl p-6">

@@ -1,0 +1,92 @@
+{
+  "version": "1.0.0",
+  "description": "TG-Matrix 系統默認設置",
+  
+  "app": {
+    "language": "zh",
+    "theme": "dark",
+    "autoStart": false,
+    "minimizeToTray": true,
+    "showNotifications": true,
+    "checkUpdates": true
+  },
+  
+  "telegram": {
+    "autoConnect": true,
+    "reconnectOnDisconnect": true,
+    "reconnectDelay": 5000,
+    "maxReconnectAttempts": 5,
+    "sessionTimeout": 86400000
+  },
+  
+  "messaging": {
+    "defaultDelay": {
+      "min": 30,
+      "max": 60
+    },
+    "rateLimit": {
+      "messagesPerMinute": 20,
+      "messagesPerHour": 100
+    },
+    "spintax": {
+      "enabled": true
+    },
+    "autoReply": {
+      "enabled": false,
+      "mode": "semi"
+    }
+  },
+  
+  "resourceDiscovery": {
+    "autoInitialize": true,
+    "defaultSearchType": "all",
+    "minMemberCount": 0,
+    "maxResultsPerSearch": 50,
+    "joinDelay": {
+      "min": 30,
+      "max": 60
+    }
+  },
+  
+  "monitoring": {
+    "enabled": true,
+    "pollingInterval": 5000,
+    "saveMessages": true,
+    "maxMessagesPerChat": 1000
+  },
+  
+  "alerts": {
+    "enabled": true,
+    "soundEnabled": true,
+    "desktopNotifications": true,
+    "emailNotifications": false
+  },
+  
+  "data": {
+    "autoBackup": false,
+    "backupInterval": 86400000,
+    "maxBackups": 7,
+    "cleanupOldData": true,
+    "dataRetentionDays": 90
+  },
+  
+  "security": {
+    "encryptSessions": true,
+    "autoLock": false,
+    "lockTimeout": 300000
+  },
+  
+  "performance": {
+    "maxConcurrentConnections": 5,
+    "cacheEnabled": true,
+    "cacheSize": 100,
+    "logLevel": "info"
+  },
+  
+  "firstRun": {
+    "showWelcome": true,
+    "showTutorial": true,
+    "autoDetectAi": true,
+    "skipAccountSetup": false
+  }
+}

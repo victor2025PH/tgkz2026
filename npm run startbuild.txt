@@ -1,0 +1,24 @@
+npm run startbuild
+npm start - 直接启动应用（如果已构建）
+npm run build - 只构建前端，不启动
+npm run dev - 开发模式（Angular 开发服务器，端口 3000）
+npm run start:dev   开发模式
+
+npm run start:build   強制重新構建
+
+npm run start:dev
+
+登錄地址	https://tgkz.usdt2026.cc/login.html
+用戶名	admin
+默認密碼	admin888
+--------------------------------------------------------------------------
+用户名
+ubuntu
+ssh ubuntu@165.154.233.78
+FtwpP3s2WiEU4Pv6
+--------------------------------------------------------------------------
+cd /home/ubuntu/telegram-ai-system
+代码上传到仓库
+git push origin main
+代码下载到服务器
+git pull origin main

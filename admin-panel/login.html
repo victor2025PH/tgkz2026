@@ -3,74 +3,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TG-Matrix 管理後台 - 登錄</title>
+    <title>TG-AI智控王 - 管理後台登錄</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Inter', sans-serif; }
         .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .glass { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); }
+        .gradient-text { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .glass { background: rgba(31, 41, 55, 0.8); backdrop-filter: blur(20px); }
+        .logo-glow { text-shadow: 0 0 20px rgba(102, 126, 234, 0.5), 0 0 40px rgba(118, 75, 162, 0.3); }
+        
+        /* 背景動畫 */
+        .bg-animated {
+            background: linear-gradient(-45deg, #1f2937, #111827, #1f1f3d, #1a1a2e);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+        }
+        
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        /* 浮動粒子 */
+        .particle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(139, 92, 246, 0.3);
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.5; }
+            50% { transform: translateY(-20px) rotate(180deg); opacity: 1; }
+        }
     </style>
 </head>
-<body class="bg-gray-900 min-h-screen flex items-center justify-center">
-    <div id="app">
-        <div class="w-[400px]">
+<body class="bg-animated min-h-screen flex items-center justify-center relative overflow-hidden">
+    <!-- 裝飾粒子 -->
+    <div class="particle" style="top: 10%; left: 10%; animation-delay: 0s;"></div>
+    <div class="particle" style="top: 20%; left: 80%; animation-delay: 1s; width: 15px; height: 15px;"></div>
+    <div class="particle" style="top: 60%; left: 15%; animation-delay: 2s;"></div>
+    <div class="particle" style="top: 70%; left: 70%; animation-delay: 3s; width: 8px; height: 8px;"></div>
+    <div class="particle" style="top: 40%; left: 90%; animation-delay: 4s;"></div>
+    <div class="particle" style="top: 80%; left: 40%; animation-delay: 5s; width: 12px; height: 12px;"></div>
+    
+    <div id="app" class="relative z-10">
+        <div class="w-[420px]">
             <!-- Logo -->
             <div class="text-center mb-8">
-                <h1 class="text-4xl font-bold gradient-bg bg-clip-text text-transparent">TG-Matrix</h1>
+                <div class="inline-flex items-center justify-center mb-4">
+                    <span class="text-6xl">🤖</span>
+                </div>
+                <h1 class="text-4xl font-bold gradient-text logo-glow">TG-AI智控王</h1>
                 <p class="text-gray-400 mt-2">管理後台 v2.0</p>
             </div>
             
             <!-- 登錄卡片 -->
-            <div class="glass rounded-2xl p-8 border border-gray-700">
-                <h2 class="text-xl font-semibold text-white mb-6">🔐 管理員登錄</h2>
+            <div class="glass rounded-2xl p-8 border border-gray-700 shadow-2xl">
+                <h2 class="text-xl font-semibold text-white mb-6 flex items-center">
+                    <span class="text-2xl mr-2">🔐</span>
+                    管理員登錄
+                </h2>
                 
                 <form @submit.prevent="handleLogin">
-                    <div class="space-y-4">
+                    <div class="space-y-5">
                         <div>
                             <label class="block text-sm text-gray-400 mb-2">用戶名</label>
-                            <input type="text" v-model="username" 
-                                   class="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
-                                   placeholder="請輸入用戶名" required>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">👤</span>
+                                <input type="text" v-model="username" 
+                                       class="w-full bg-gray-800/50 border border-gray-600 rounded-lg pl-12 pr-4 py-3 text-white focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                                       placeholder="請輸入用戶名" required>
+                            </div>
                         </div>
                         
                         <div>
                             <label class="block text-sm text-gray-400 mb-2">密碼</label>
-                            <input type="password" v-model="password" 
-                                   class="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
-                                   placeholder="請輸入密碼" required>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">🔑</span>
+                                <input :type="showPassword ? 'text' : 'password'" v-model="password" 
+                                       class="w-full bg-gray-800/50 border border-gray-600 rounded-lg pl-12 pr-12 py-3 text-white focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                                       placeholder="請輸入密碼" required>
+                                <button type="button" @click="showPassword = !showPassword"
+                                        class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
+                                    {{ showPassword ? '🙈' : '👁️' }}
+                                </button>
+                            </div>
                         </div>
                         
                         <div class="flex items-center justify-between text-sm">
-                            <label class="flex items-center text-gray-400 cursor-pointer">
-                                <input type="checkbox" v-model="rememberMe" class="mr-2">
+                            <label class="flex items-center text-gray-400 cursor-pointer hover:text-gray-300 transition-colors">
+                                <input type="checkbox" v-model="rememberMe" 
+                                       class="mr-2 rounded bg-gray-700 border-gray-600 text-purple-600 focus:ring-purple-500">
                                 記住我
                             </label>
                         </div>
                         
-                        <div v-if="error" class="bg-red-500/20 border border-red-500 rounded-lg p-3 text-red-400 text-sm">
+                        <div v-if="error" class="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm flex items-center">
+                            <span class="mr-2">⚠️</span>
                             {{ error }}
                         </div>
                         
                         <button type="submit" 
                                 :disabled="isLoading"
-                                class="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center">
-                            <span v-if="isLoading">
+                                class="w-full gradient-bg hover:opacity-90 disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center shadow-lg">
+                            <span v-if="isLoading" class="flex items-center">
                                 <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
+                                登錄中...
                             </span>
-                            {{ isLoading ? '登錄中...' : '登錄' }}
+                            <span v-else class="flex items-center">
+                                <span class="mr-2">🚀</span>
+                                登錄
+                            </span>
                         </button>
                     </div>
                 </form>
             </div>
             
             <!-- 版權信息 -->
-            <p class="text-center text-gray-500 text-sm mt-6">
-                © 2026 TG-Matrix. 王者榮耀風格會員系統.
-            </p>
+            <div class="text-center mt-8">
+                <p class="text-gray-500 text-sm">
+                    © 2026 TG-AI智控王. All Rights Reserved.
+                </p>
+                <p class="text-gray-600 text-xs mt-1">
+                    👑 王者榮耀風格會員系統
+                </p>
+            </div>
         </div>
     </div>
     
@@ -83,6 +148,7 @@
                 const username = ref('');
                 const password = ref('');
                 const rememberMe = ref(false);
+                const showPassword = ref(false);
                 const isLoading = ref(false);
                 const error = ref('');
                 
@@ -124,6 +190,7 @@
                     username,
                     password,
                     rememberMe,
+                    showPassword,
                     isLoading,
                     error,
                     handleLogin

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TG-Matrix 管理後台</title>
+    <title>TG-AI智控王 管理後台</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -11,13 +11,38 @@
     <style>
         * { font-family: 'Inter', sans-serif; }
         .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .gradient-text { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); }
+        .glass { background: rgba(31, 41, 55, 0.8); backdrop-filter: blur(10px); }
+        
+        /* 王者榮耀風格等級顏色 */
         .rank-bronze { color: #CD7F32; }
         .rank-silver { color: #C0C0C0; }
         .rank-gold { color: #FFD700; }
         .rank-diamond { color: #B9F2FF; }
         .rank-star { color: #9B59B6; }
         .rank-king { color: #FF6B6B; }
+        
+        .bg-bronze { background: linear-gradient(135deg, #CD7F32 0%, #8B4513 100%); }
+        .bg-silver { background: linear-gradient(135deg, #C0C0C0 0%, #808080 100%); }
+        .bg-gold { background: linear-gradient(135deg, #FFD700 0%, #DAA520 100%); }
+        .bg-diamond { background: linear-gradient(135deg, #B9F2FF 0%, #00CED1 100%); }
+        .bg-star { background: linear-gradient(135deg, #9B59B6 0%, #8E44AD 100%); }
+        .bg-king { background: linear-gradient(135deg, #FF6B6B 0%, #EE5A5A 100%); }
+        
+        /* Logo 動畫 */
+        .logo-glow {
+            text-shadow: 0 0 10px rgba(102, 126, 234, 0.5), 0 0 20px rgba(118, 75, 162, 0.3);
+        }
+        
+        /* 滾動條 */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        
+        /* 表格 hover */
+        .table-row-hover:hover { background: rgba(139, 92, 246, 0.1); }
     </style>
     <script>
         // 檢查登錄狀態
@@ -32,34 +57,45 @@
 <body class="bg-gray-900 text-white min-h-screen">
     <div id="app">
         <!-- 側邊欄 -->
-        <div class="fixed left-0 top-0 h-full w-64 bg-gray-800 border-r border-gray-700 z-50">
-            <div class="p-6">
-                <h1 class="text-2xl font-bold gradient-bg bg-clip-text text-transparent">TG-Matrix</h1>
-                <p class="text-gray-400 text-sm">管理後台 v1.0</p>
+        <div class="fixed left-0 top-0 h-full w-64 bg-gray-800 border-r border-gray-700 z-50 flex flex-col">
+            <!-- Logo -->
+            <div class="p-6 border-b border-gray-700">
+                <div class="flex items-center">
+                    <span class="text-3xl mr-2">🤖</span>
+                    <div>
+                        <h1 class="text-xl font-bold gradient-text logo-glow">TG-AI智控王</h1>
+                        <p class="text-gray-400 text-xs">管理後台 v2.0</p>
+                    </div>
+                </div>
             </div>
             
-            <nav class="mt-6">
+            <!-- 導航菜單 -->
+            <nav class="flex-1 overflow-y-auto py-4">
                 <a v-for="item in menuItems" :key="item.id" 
                    @click="currentPage = item.id"
                    :class="['flex items-center px-6 py-3 cursor-pointer transition-all',
-                           currentPage === item.id ? 'bg-purple-600/30 border-r-2 border-purple-500 text-white' : 'text-gray-400 hover:bg-gray-700/50']">
+                           currentPage === item.id ? 'bg-purple-600/30 border-r-2 border-purple-500 text-white' : 'text-gray-400 hover:bg-gray-700/50 hover:text-white']">
                     <span class="text-xl mr-3">{{ item.icon }}</span>
                     <span>{{ item.name }}</span>
+                    <span v-if="item.badge" class="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                        {{ item.badge }}
+                    </span>
                 </a>
             </nav>
             
-            <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700">
+            <!-- 用戶信息 -->
+            <div class="p-4 border-t border-gray-700">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center">
-                        <div class="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center">
-                            <span>👤</span>
+                        <div class="w-10 h-10 rounded-full gradient-bg flex items-center justify-center">
+                            <span class="text-lg">👤</span>
                         </div>
                         <div class="ml-3">
                             <p class="text-sm font-medium">{{ adminUser?.name || '管理員' }}</p>
-                            <p class="text-xs text-gray-400">{{ adminUser?.username || 'admin' }}</p>
+                            <p class="text-xs text-gray-400">{{ adminUser?.role === 'super_admin' ? '超級管理員' : '管理員' }}</p>
                         </div>
                     </div>
-                    <button @click="handleLogout" class="text-gray-400 hover:text-red-400 transition-colors" title="登出">
+                    <button @click="handleLogout" class="text-gray-400 hover:text-red-400 transition-colors p-2" title="登出">
                         🚪
                     </button>
                 </div>
@@ -67,316 +103,644 @@
         </div>
         
         <!-- 主內容區 -->
-        <div class="ml-64 p-8">
-            <!-- 儀表盤 -->
-            <div v-if="currentPage === 'dashboard'">
-                <h2 class="text-2xl font-bold mb-6">📊 儀表盤</h2>
-                
-                <!-- 統計卡片 -->
-                <div class="grid grid-cols-4 gap-6 mb-8">
-                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6">
-                        <p class="text-blue-100">總用戶數</p>
-                        <p class="text-3xl font-bold mt-2">{{ stats.totalUsers }}</p>
-                        <p class="text-blue-200 text-sm mt-1">+{{ stats.newUsersToday }} 今日新增</p>
-                    </div>
-                    <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-6">
-                        <p class="text-green-100">付費用戶</p>
-                        <p class="text-3xl font-bold mt-2">{{ stats.paidUsers }}</p>
-                        <p class="text-green-200 text-sm mt-1">轉化率 {{ stats.conversionRate }}%</p>
-                    </div>
-                    <div class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6">
-                        <p class="text-purple-100">總收入</p>
-                        <p class="text-3xl font-bold mt-2">¥{{ stats.totalRevenue }}</p>
-                        <p class="text-purple-200 text-sm mt-1">+¥{{ stats.revenueToday }} 今日</p>
-                    </div>
-                    <div class="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-6">
-                        <p class="text-orange-100">可用卡密</p>
-                        <p class="text-3xl font-bold mt-2">{{ stats.unusedLicenses }}</p>
-                        <p class="text-orange-200 text-sm mt-1">共 {{ stats.totalLicenses }} 張</p>
-                    </div>
-                </div>
-                
-                <!-- 圖表 -->
-                <div class="grid grid-cols-2 gap-6">
-                    <div class="bg-gray-800 rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">收入趨勢（近7天）</h3>
-                        <canvas id="revenueChart" height="200"></canvas>
-                    </div>
-                    <div class="bg-gray-800 rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">會員等級分布</h3>
-                        <canvas id="levelChart" height="200"></canvas>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 用戶管理 -->
-            <div v-if="currentPage === 'users'">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold">👥 用戶管理</h2>
-                    <div class="flex gap-4">
-                        <input type="text" v-model="userSearch" placeholder="搜索用戶..." 
-                               class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-500">
-                        <select v-model="userFilter" class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2">
-                            <option value="all">全部等級</option>
-                            <option value="bronze">⚔️ 青銅戰士</option>
-                            <option value="silver">🥈 白銀精英</option>
-                            <option value="gold">🥇 黃金大師</option>
-                            <option value="diamond">💎 鑽石王牌</option>
-                            <option value="star">🌟 星耀傳說</option>
-                            <option value="king">👑 榮耀王者</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="bg-gray-800 rounded-xl overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-gray-700">
-                            <tr>
-                                <th class="text-left px-6 py-4">用戶</th>
-                                <th class="text-left px-6 py-4">等級</th>
-                                <th class="text-left px-6 py-4">到期時間</th>
-                                <th class="text-left px-6 py-4">消費金額</th>
-                                <th class="text-left px-6 py-4">註冊時間</th>
-                                <th class="text-left px-6 py-4">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="user in filteredUsers" :key="user.id" class="border-t border-gray-700 hover:bg-gray-700/50">
-                                <td class="px-6 py-4">
-                                    <div class="flex items-center">
-                                        <div class="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center mr-3">
-                                            {{ user.email ? user.email[0].toUpperCase() : '?' }}
-                                        </div>
-                                        <div>
-                                            <p class="font-medium">{{ user.email || '未設置' }}</p>
-                                            <p class="text-sm text-gray-400">{{ user.machineId.slice(0,16) }}...</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <span :class="'rank-' + user.level">{{ getLevelDisplay(user.level) }}</span>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <span :class="isExpired(user.expiresAt) ? 'text-red-400' : 'text-green-400'">
-                                        {{ user.expiresAt || '永久' }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4">¥{{ user.totalSpent }}</td>
-                                <td class="px-6 py-4 text-gray-400">{{ user.createdAt }}</td>
-                                <td class="px-6 py-4">
-                                    <button @click="editUser(user)" class="text-blue-400 hover:text-blue-300 mr-3">編輯</button>
-                                    <button @click="extendUser(user)" class="text-green-400 hover:text-green-300">續費</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            <!-- 卡密管理 -->
-            <div v-if="currentPage === 'licenses'">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold">🎟️ 卡密管理</h2>
-                    <button @click="showGenerateModal = true" 
-                            class="bg-purple-600 hover:bg-purple-700 px-6 py-2 rounded-lg font-medium transition-colors">
-                        ➕ 生成卡密
-                    </button>
-                </div>
-                
-                <!-- 卡密統計 -->
-                <div class="grid grid-cols-5 gap-4 mb-6">
-                    <div v-for="(info, level) in licenseStats" :key="level" 
-                         class="bg-gray-800 rounded-xl p-4 text-center">
-                        <p class="text-2xl">{{ info.icon }}</p>
-                        <p class="font-medium mt-1">{{ info.name }}</p>
-                        <p class="text-2xl font-bold mt-2">{{ info.unused }}</p>
-                        <p class="text-sm text-gray-400">可用 / {{ info.total }}</p>
-                    </div>
-                </div>
-                
-                <!-- 卡密列表 -->
-                <div class="bg-gray-800 rounded-xl overflow-hidden">
-                    <div class="p-4 border-b border-gray-700 flex gap-4">
-                        <select v-model="licenseFilter" class="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
-                            <option value="all">全部狀態</option>
-                            <option value="unused">未使用</option>
-                            <option value="used">已使用</option>
-                            <option value="disabled">已禁用</option>
-                        </select>
-                        <button @click="exportLicenses" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg">
-                            📥 導出 CSV
+        <div class="ml-64 min-h-screen">
+            <!-- 頂部導航 -->
+            <div class="sticky top-0 z-40 bg-gray-900/80 backdrop-blur-sm border-b border-gray-700 px-8 py-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-semibold">
+                        {{ menuItems.find(m => m.id === currentPage)?.icon }}
+                        {{ menuItems.find(m => m.id === currentPage)?.name }}
+                    </h2>
+                    <div class="flex items-center gap-4">
+                        <span class="text-sm text-gray-400">
+                            最後更新: {{ lastUpdate || '加載中...' }}
+                        </span>
+                        <button @click="refreshData" 
+                                :disabled="isLoading"
+                                class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg text-sm transition-colors flex items-center">
+                            <span :class="{'animate-spin': isLoading}">🔄</span>
+                            <span class="ml-2">刷新</span>
                         </button>
                     </div>
+                </div>
+            </div>
+            
+            <div class="p-8">
+                <!-- ==================== 儀表盤 ==================== -->
+                <div v-if="currentPage === 'dashboard'">
+                    <!-- 統計卡片 -->
+                    <div class="grid grid-cols-4 gap-6 mb-8">
+                        <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-blue-100">總用戶數</p>
+                                    <p class="text-3xl font-bold mt-2">{{ stats.totalUsers.toLocaleString() }}</p>
+                                    <p class="text-blue-200 text-sm mt-1">+{{ stats.newUsersToday }} 今日新增</p>
+                                </div>
+                                <span class="text-5xl opacity-50">👥</span>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-6 shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-green-100">付費用戶</p>
+                                    <p class="text-3xl font-bold mt-2">{{ stats.paidUsers.toLocaleString() }}</p>
+                                    <p class="text-green-200 text-sm mt-1">轉化率 {{ stats.conversionRate }}%</p>
+                                </div>
+                                <span class="text-5xl opacity-50">💎</span>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-purple-100">總收入</p>
+                                    <p class="text-3xl font-bold mt-2">¥{{ stats.totalRevenue.toLocaleString() }}</p>
+                                    <p class="text-purple-200 text-sm mt-1">+¥{{ stats.revenueToday }} 今日</p>
+                                </div>
+                                <span class="text-5xl opacity-50">💰</span>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-6 shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-orange-100">可用卡密</p>
+                                    <p class="text-3xl font-bold mt-2">{{ stats.unusedLicenses.toLocaleString() }}</p>
+                                    <p class="text-orange-200 text-sm mt-1">共 {{ stats.totalLicenses }} 張</p>
+                                </div>
+                                <span class="text-5xl opacity-50">🎟️</span>
+                            </div>
+                        </div>
+                    </div>
                     
-                    <table class="w-full">
-                        <thead class="bg-gray-700">
-                            <tr>
-                                <th class="text-left px-6 py-4">卡密</th>
-                                <th class="text-left px-6 py-4">類型</th>
-                                <th class="text-left px-6 py-4">狀態</th>
-                                <th class="text-left px-6 py-4">創建時間</th>
-                                <th class="text-left px-6 py-4">使用時間</th>
-                                <th class="text-left px-6 py-4">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="license in filteredLicenses" :key="license.key" 
-                                class="border-t border-gray-700 hover:bg-gray-700/50">
-                                <td class="px-6 py-4 font-mono text-sm">{{ license.key }}</td>
-                                <td class="px-6 py-4">{{ license.typeName }}</td>
-                                <td class="px-6 py-4">
-                                    <span :class="getStatusClass(license.status)">{{ getStatusText(license.status) }}</span>
-                                </td>
-                                <td class="px-6 py-4 text-gray-400">{{ license.createdAt }}</td>
-                                <td class="px-6 py-4 text-gray-400">{{ license.usedAt || '-' }}</td>
-                                <td class="px-6 py-4">
-                                    <button v-if="license.status === 'unused'" 
-                                            @click="copyLicense(license.key)"
-                                            class="text-blue-400 hover:text-blue-300 mr-3">複製</button>
-                                    <button v-if="license.status === 'unused'"
-                                            @click="disableLicense(license.key)"
-                                            class="text-red-400 hover:text-red-300">禁用</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            <!-- 訂單管理 -->
-            <div v-if="currentPage === 'orders'">
-                <h2 class="text-2xl font-bold mb-6">💰 訂單管理</h2>
-                
-                <div class="bg-gray-800 rounded-xl overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-gray-700">
-                            <tr>
-                                <th class="text-left px-6 py-4">訂單號</th>
-                                <th class="text-left px-6 py-4">產品</th>
-                                <th class="text-left px-6 py-4">金額</th>
-                                <th class="text-left px-6 py-4">支付方式</th>
-                                <th class="text-left px-6 py-4">狀態</th>
-                                <th class="text-left px-6 py-4">創建時間</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="order in orders" :key="order.id" class="border-t border-gray-700 hover:bg-gray-700/50">
-                                <td class="px-6 py-4 font-mono text-sm">{{ order.orderId }}</td>
-                                <td class="px-6 py-4">{{ order.productName }}</td>
-                                <td class="px-6 py-4 font-medium">¥{{ order.amount }}</td>
-                                <td class="px-6 py-4">{{ order.paymentMethod }}</td>
-                                <td class="px-6 py-4">
-                                    <span :class="order.status === 'paid' ? 'text-green-400' : 'text-yellow-400'">
-                                        {{ order.status === 'paid' ? '已支付' : '待支付' }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 text-gray-400">{{ order.createdAt }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            <!-- 操作日誌 -->
-            <div v-if="currentPage === 'logs'">
-                <h2 class="text-2xl font-bold mb-6">📝 操作日誌</h2>
-                
-                <div class="bg-gray-800 rounded-xl overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-gray-700">
-                            <tr>
-                                <th class="text-left px-6 py-4">時間</th>
-                                <th class="text-left px-6 py-4">操作員</th>
-                                <th class="text-left px-6 py-4">操作</th>
-                                <th class="text-left px-6 py-4">詳情</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="log in logs" :key="log.id" class="border-t border-gray-700 hover:bg-gray-700/50">
-                                <td class="px-6 py-4 text-gray-400">{{ log.createdAt }}</td>
-                                <td class="px-6 py-4">{{ log.username }}</td>
-                                <td class="px-6 py-4">
-                                    <span class="px-2 py-1 rounded text-sm"
-                                          :class="{
-                                              'bg-green-600/30 text-green-400': log.action === 'login',
-                                              'bg-red-600/30 text-red-400': log.action === 'logout',
-                                              'bg-blue-600/30 text-blue-400': log.action === 'generate_licenses',
-                                              'bg-purple-600/30 text-purple-400': log.action === 'extend_user',
-                                              'bg-yellow-600/30 text-yellow-400': log.action === 'change_password'
-                                          }">
-                                        {{ log.action }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 text-gray-400 text-sm">{{ log.details || '-' }}</td>
-                            </tr>
-                            <tr v-if="logs.length === 0">
-                                <td colspan="4" class="px-6 py-8 text-center text-gray-500">暫無操作日誌</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            <!-- 系統設置 -->
-            <div v-if="currentPage === 'settings'">
-                <h2 class="text-2xl font-bold mb-6">⚙️ 系統設置</h2>
-                
-                <div class="grid grid-cols-2 gap-6">
-                    <!-- 價格設置 -->
+                    <!-- 圖表 -->
+                    <div class="grid grid-cols-2 gap-6 mb-8">
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">📈 收入趨勢（近7天）</h3>
+                            <canvas id="revenueChart" height="200"></canvas>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">👑 會員等級分布</h3>
+                            <canvas id="levelChart" height="200"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- 卡密分類統計 -->
                     <div class="bg-gray-800 rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">💰 價格設置</h3>
-                        <div class="space-y-4">
-                            <div v-for="(price, level) in prices" :key="level" class="flex items-center justify-between">
-                                <span>{{ price.name }} 月卡</span>
-                                <div class="flex items-center">
-                                    <span class="text-gray-400 mr-2">¥</span>
-                                    <input type="number" v-model="price.monthly" 
-                                           class="w-24 bg-gray-700 border border-gray-600 rounded px-3 py-1 text-right">
+                        <h3 class="text-lg font-semibold mb-4">🎫 卡密庫存</h3>
+                        <div class="grid grid-cols-5 gap-4">
+                            <div v-for="(info, level) in licenseStats" :key="level" 
+                                 :class="['rounded-xl p-4 text-center', 'bg-' + level]">
+                                <p class="text-3xl">{{ info.icon }}</p>
+                                <p class="font-medium mt-1 text-white">{{ info.name }}</p>
+                                <p class="text-3xl font-bold mt-2 text-white">{{ info.unused }}</p>
+                                <p class="text-sm text-white/70">可用 / {{ info.total }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ==================== 用戶管理 ==================== -->
+                <div v-if="currentPage === 'users'">
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="flex gap-4">
+                            <input type="text" v-model="userSearch" placeholder="搜索用戶..." 
+                                   class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-500 w-64">
+                            <select v-model="userFilter" class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2">
+                                <option value="all">全部等級</option>
+                                <option value="bronze">⚔️ 青銅戰士</option>
+                                <option value="silver">🥈 白銀精英</option>
+                                <option value="gold">🥇 黃金大師</option>
+                                <option value="diamond">💎 鑽石王牌</option>
+                                <option value="star">🌟 星耀傳說</option>
+                                <option value="king">👑 榮耀王者</option>
+                            </select>
+                        </div>
+                        <div class="text-sm text-gray-400">
+                            共 {{ filteredUsers.length }} 個用戶
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">用戶</th>
+                                    <th class="text-left px-6 py-4 font-medium">等級</th>
+                                    <th class="text-left px-6 py-4 font-medium">到期時間</th>
+                                    <th class="text-left px-6 py-4 font-medium">邀請數</th>
+                                    <th class="text-left px-6 py-4 font-medium">消費</th>
+                                    <th class="text-left px-6 py-4 font-medium">註冊時間</th>
+                                    <th class="text-left px-6 py-4 font-medium">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="user in filteredUsers" :key="user.id" 
+                                    class="border-t border-gray-700 table-row-hover transition-colors">
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center">
+                                            <div class="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center mr-3 text-lg">
+                                                {{ user.email ? user.email[0].toUpperCase() : '?' }}
+                                            </div>
+                                            <div>
+                                                <p class="font-medium">{{ user.email || user.nickname || '未設置' }}</p>
+                                                <p class="text-sm text-gray-400">{{ (user.machineId || '').slice(0,16) }}...</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span :class="'rank-' + user.level" class="font-medium">
+                                            {{ user.levelIcon }} {{ user.levelName }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span v-if="user.isLifetime" class="text-purple-400">♾️ 終身</span>
+                                        <span v-else :class="isExpired(user.expiresAt) ? 'text-red-400' : 'text-green-400'">
+                                            {{ formatDate(user.expiresAt) || '未激活' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span v-if="user.totalInvites > 0" class="text-blue-400">
+                                            {{ user.totalInvites }} 人
+                                        </span>
+                                        <span v-else class="text-gray-500">-</span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span v-if="user.totalSpent > 0" class="text-green-400">
+                                            ¥{{ user.totalSpent }}
+                                        </span>
+                                        <span v-else class="text-gray-500">-</span>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-400 text-sm">{{ formatDate(user.createdAt) }}</td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex gap-2">
+                                            <button @click="viewUser(user)" 
+                                                    class="text-blue-400 hover:text-blue-300 text-sm">詳情</button>
+                                            <button @click="extendUser(user)" 
+                                                    class="text-green-400 hover:text-green-300 text-sm">續費</button>
+                                            <button v-if="!user.isBanned" @click="banUser(user)" 
+                                                    class="text-red-400 hover:text-red-300 text-sm">封禁</button>
+                                            <button v-else @click="unbanUser(user)" 
+                                                    class="text-yellow-400 hover:text-yellow-300 text-sm">解封</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="filteredUsers.length === 0">
+                                    <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                                        暫無用戶數據
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- ==================== 卡密管理 ==================== -->
+                <div v-if="currentPage === 'licenses'">
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="flex gap-4">
+                            <select v-model="licenseFilter" class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2">
+                                <option value="all">全部狀態</option>
+                                <option value="unused">未使用</option>
+                                <option value="used">已使用</option>
+                                <option value="disabled">已禁用</option>
+                            </select>
+                            <select v-model="licenseLevelFilter" class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2">
+                                <option value="all">全部等級</option>
+                                <option value="silver">🥈 白銀精英</option>
+                                <option value="gold">🥇 黃金大師</option>
+                                <option value="diamond">💎 鑽石王牌</option>
+                                <option value="star">🌟 星耀傳說</option>
+                                <option value="king">👑 榮耀王者</option>
+                            </select>
+                        </div>
+                        <div class="flex gap-3">
+                            <button @click="exportLicenses" 
+                                    class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm transition-colors">
+                                📥 導出 CSV
+                            </button>
+                            <button @click="showGenerateModal = true" 
+                                    class="gradient-bg hover:opacity-90 px-6 py-2 rounded-lg font-medium transition-opacity">
+                                ➕ 生成卡密
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 卡密庫存概覽 -->
+                    <div class="grid grid-cols-5 gap-4 mb-6">
+                        <div v-for="(info, level) in licenseStats" :key="level" 
+                             class="bg-gray-800 rounded-xl p-4 text-center border border-gray-700">
+                            <p class="text-2xl">{{ info.icon }}</p>
+                            <p class="font-medium mt-1">{{ info.name }}</p>
+                            <p class="text-2xl font-bold mt-2 text-green-400">{{ info.unused }}</p>
+                            <p class="text-sm text-gray-400">可用 / {{ info.total }}</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 卡密列表 -->
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">卡密</th>
+                                    <th class="text-left px-6 py-4 font-medium">類型</th>
+                                    <th class="text-left px-6 py-4 font-medium">價格</th>
+                                    <th class="text-left px-6 py-4 font-medium">狀態</th>
+                                    <th class="text-left px-6 py-4 font-medium">創建時間</th>
+                                    <th class="text-left px-6 py-4 font-medium">使用時間</th>
+                                    <th class="text-left px-6 py-4 font-medium">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="license in filteredLicenses" :key="license.key" 
+                                    class="border-t border-gray-700 table-row-hover transition-colors">
+                                    <td class="px-6 py-4">
+                                        <code class="text-sm bg-gray-700 px-2 py-1 rounded">{{ license.key }}</code>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span :class="'rank-' + license.level">{{ license.typeName }}</span>
+                                    </td>
+                                    <td class="px-6 py-4">¥{{ license.price }}</td>
+                                    <td class="px-6 py-4">
+                                        <span :class="getStatusClass(license.status)" 
+                                              class="px-2 py-1 rounded text-sm">
+                                            {{ getStatusText(license.status) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-400 text-sm">{{ license.createdAt }}</td>
+                                    <td class="px-6 py-4 text-gray-400 text-sm">{{ license.usedAt || '-' }}</td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex gap-2">
+                                            <button v-if="license.status === 'unused'" 
+                                                    @click="copyLicense(license.key)"
+                                                    class="text-blue-400 hover:text-blue-300 text-sm">複製</button>
+                                            <button v-if="license.status === 'unused'"
+                                                    @click="disableLicense(license.key)"
+                                                    class="text-red-400 hover:text-red-300 text-sm">禁用</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="filteredLicenses.length === 0">
+                                    <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                                        暫無卡密數據
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- ==================== 訂單管理 ==================== -->
+                <div v-if="currentPage === 'orders'">
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">訂單號</th>
+                                    <th class="text-left px-6 py-4 font-medium">產品</th>
+                                    <th class="text-left px-6 py-4 font-medium">金額</th>
+                                    <th class="text-left px-6 py-4 font-medium">支付方式</th>
+                                    <th class="text-left px-6 py-4 font-medium">狀態</th>
+                                    <th class="text-left px-6 py-4 font-medium">創建時間</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="order in orders" :key="order.id" 
+                                    class="border-t border-gray-700 table-row-hover transition-colors">
+                                    <td class="px-6 py-4">
+                                        <code class="text-sm">{{ order.orderId || order.order_id }}</code>
+                                    </td>
+                                    <td class="px-6 py-4">{{ order.productName || order.product_name || '-' }}</td>
+                                    <td class="px-6 py-4 font-medium">¥{{ order.amount || order.final_price || 0 }}</td>
+                                    <td class="px-6 py-4">{{ order.paymentMethod || order.payment_method || '未知' }}</td>
+                                    <td class="px-6 py-4">
+                                        <span :class="order.status === 'paid' ? 'bg-green-600/30 text-green-400' : 'bg-yellow-600/30 text-yellow-400'"
+                                              class="px-2 py-1 rounded text-sm">
+                                            {{ order.status === 'paid' ? '已支付' : '待支付' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-400 text-sm">{{ formatDate(order.createdAt || order.created_at) }}</td>
+                                </tr>
+                                <tr v-if="orders.length === 0">
+                                    <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                                        暫無訂單數據
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- ==================== 邀請管理 ==================== -->
+                <div v-if="currentPage === 'referrals'">
+                    <!-- 邀請統計 -->
+                    <div class="grid grid-cols-3 gap-6 mb-6">
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-400">總邀請數</p>
+                                    <p class="text-3xl font-bold mt-2">{{ referralStats.totalReferrals || 0 }}</p>
+                                </div>
+                                <span class="text-4xl">👥</span>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-400">總獎勵發放</p>
+                                    <p class="text-3xl font-bold mt-2 text-green-400">¥{{ referralStats.totalEarnings || 0 }}</p>
+                                </div>
+                                <span class="text-4xl">💰</span>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-400">邀請達人</p>
+                                    <p class="text-3xl font-bold mt-2">{{ referralStats.leaderboard?.length || 0 }}</p>
+                                </div>
+                                <span class="text-4xl">🏆</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 邀請排行榜 -->
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">🏆 邀請排行榜</h3>
+                            <div class="space-y-3">
+                                <div v-for="(user, index) in referralStats.leaderboard" :key="user.user_id"
+                                     class="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
+                                    <div class="flex items-center">
+                                        <span class="text-2xl mr-3">{{ index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏅' }}</span>
+                                        <div>
+                                            <p class="font-medium">{{ user.nickname || user.email || '未知用戶' }}</p>
+                                            <p class="text-sm text-gray-400">邀請碼: {{ user.invite_code }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="font-bold text-blue-400">{{ user.total_invites }} 人</p>
+                                        <p class="text-sm text-green-400">¥{{ user.invite_earnings || 0 }}</p>
+                                    </div>
+                                </div>
+                                <div v-if="!referralStats.leaderboard?.length" class="text-center text-gray-500 py-8">
+                                    暫無邀請數據
                                 </div>
                             </div>
                         </div>
-                        <button class="mt-6 bg-purple-600 hover:bg-purple-700 px-6 py-2 rounded-lg w-full">
-                            保存價格
+                        
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">📋 獎勵規則</h3>
+                            <div class="space-y-4">
+                                <div class="p-4 bg-gray-700/50 rounded-lg">
+                                    <p class="font-medium text-blue-400">👋 邀請註冊獎勵</p>
+                                    <p class="text-sm text-gray-400 mt-1">邀請者獲得 3 天會員，被邀請者獲得 1 天會員</p>
+                                </div>
+                                <div class="p-4 bg-gray-700/50 rounded-lg">
+                                    <p class="font-medium text-green-400">💎 首次付費獎勵</p>
+                                    <div class="text-sm text-gray-400 mt-1 space-y-1">
+                                        <p>白銀: 7天 + ¥5</p>
+                                        <p>黃金: 15天 + ¥10</p>
+                                        <p>鑽石: 30天 + ¥20</p>
+                                        <p>星耀: 45天 + ¥40</p>
+                                        <p>王者: 60天 + ¥100</p>
+                                    </div>
+                                </div>
+                                <div class="p-4 bg-gray-700/50 rounded-lg">
+                                    <p class="font-medium text-purple-400">🔄 重複付費返傭</p>
+                                    <p class="text-sm text-gray-400 mt-1">被邀請者每次付費，邀請者獲得 10% 返傭</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ==================== 操作日誌 ==================== -->
+                <div v-if="currentPage === 'logs'">
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">時間</th>
+                                    <th class="text-left px-6 py-4 font-medium">操作員</th>
+                                    <th class="text-left px-6 py-4 font-medium">操作類型</th>
+                                    <th class="text-left px-6 py-4 font-medium">操作</th>
+                                    <th class="text-left px-6 py-4 font-medium">詳情</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="log in logs" :key="log.id" 
+                                    class="border-t border-gray-700 table-row-hover transition-colors">
+                                    <td class="px-6 py-4 text-gray-400 text-sm">{{ formatDate(log.createdAt || log.created_at) }}</td>
+                                    <td class="px-6 py-4 font-medium">{{ log.username }}</td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-2 py-1 rounded text-sm bg-gray-700">
+                                            {{ log.action_type || log.actionType || '-' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-2 py-1 rounded text-sm"
+                                              :class="getActionClass(log.action)">
+                                            {{ log.action }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-400 text-sm max-w-xs truncate">
+                                        {{ log.details || '-' }}
+                                    </td>
+                                </tr>
+                                <tr v-if="logs.length === 0">
+                                    <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                                        暫無操作日誌
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- ==================== 公告管理 ==================== -->
+                <div v-if="currentPage === 'announcements'">
+                    <div class="flex justify-end mb-6">
+                        <button @click="showAnnouncementModal = true" 
+                                class="gradient-bg hover:opacity-90 px-6 py-2 rounded-lg font-medium transition-opacity">
+                            ➕ 發布公告
                         </button>
                     </div>
                     
-                    <!-- 支付設置 -->
-                    <div class="bg-gray-800 rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">💳 支付設置</h3>
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-sm text-gray-400 mb-1">支付寶 AppID</label>
-                                <input type="text" v-model="paymentConfig.alipayAppId" 
-                                       class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2">
-                            </div>
-                            <div>
-                                <label class="block text-sm text-gray-400 mb-1">微信支付 MchID</label>
-                                <input type="text" v-model="paymentConfig.wechatMchId" 
-                                       class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2">
-                            </div>
-                            <div>
-                                <label class="block text-sm text-gray-400 mb-1">USDT TRC20 地址</label>
-                                <input type="text" v-model="paymentConfig.usdtAddress" 
-                                       class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2">
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">標題</th>
+                                    <th class="text-left px-6 py-4 font-medium">類型</th>
+                                    <th class="text-left px-6 py-4 font-medium">狀態</th>
+                                    <th class="text-left px-6 py-4 font-medium">置頂</th>
+                                    <th class="text-left px-6 py-4 font-medium">創建時間</th>
+                                    <th class="text-left px-6 py-4 font-medium">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="ann in announcements" :key="ann.id" 
+                                    class="border-t border-gray-700 table-row-hover transition-colors">
+                                    <td class="px-6 py-4 font-medium">{{ ann.title }}</td>
+                                    <td class="px-6 py-4">
+                                        <span :class="{
+                                            'bg-blue-600/30 text-blue-400': ann.announcement_type === 'info',
+                                            'bg-yellow-600/30 text-yellow-400': ann.announcement_type === 'warning',
+                                            'bg-red-600/30 text-red-400': ann.announcement_type === 'urgent',
+                                            'bg-green-600/30 text-green-400': ann.announcement_type === 'update'
+                                        }" class="px-2 py-1 rounded text-sm">
+                                            {{ ann.announcement_type }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span :class="ann.status === 'published' ? 'text-green-400' : 'text-gray-400'">
+                                            {{ ann.status === 'published' ? '已發布' : '草稿' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span v-if="ann.is_pinned" class="text-yellow-400">📌</span>
+                                        <span v-else class="text-gray-500">-</span>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-400 text-sm">{{ formatDate(ann.created_at) }}</td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex gap-2">
+                                            <button @click="editAnnouncement(ann)" 
+                                                    class="text-blue-400 hover:text-blue-300 text-sm">編輯</button>
+                                            <button @click="deleteAnnouncement(ann.id)" 
+                                                    class="text-red-400 hover:text-red-300 text-sm">刪除</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="announcements.length === 0">
+                                    <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                                        暫無公告
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- ==================== 系統設置 ==================== -->
+                <div v-if="currentPage === 'settings'">
+                    <div class="grid grid-cols-2 gap-6">
+                        <!-- 支付設置 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">💳 支付設置</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">USDT TRC20 地址</label>
+                                    <input type="text" v-model="settings.usdt_trc20_address" 
+                                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-purple-500"
+                                           placeholder="TRC20 錢包地址">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">USDT 匯率 (1 USDT = ? CNY)</label>
+                                    <input type="number" v-model="settings.usdt_rate" 
+                                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-purple-500"
+                                           placeholder="7.2">
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <label class="flex items-center cursor-pointer">
+                                        <input type="checkbox" v-model="settings.alipay_enabled" class="mr-2">
+                                        <span class="text-gray-400">支付寶</span>
+                                    </label>
+                                    <label class="flex items-center cursor-pointer">
+                                        <input type="checkbox" v-model="settings.wechat_enabled" class="mr-2">
+                                        <span class="text-gray-400">微信支付</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
-                        <button class="mt-6 bg-purple-600 hover:bg-purple-700 px-6 py-2 rounded-lg w-full">
-                            保存設置
+                        
+                        <!-- 系統設置 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">⚙️ 系統設置</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">試用天數</label>
+                                    <input type="number" v-model="settings.trial_days" 
+                                           class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-purple-500"
+                                           placeholder="3">
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <label class="flex items-center cursor-pointer">
+                                        <input type="checkbox" v-model="settings.registration_enabled" class="mr-2">
+                                        <span class="text-gray-400">開放註冊</span>
+                                    </label>
+                                    <label class="flex items-center cursor-pointer">
+                                        <input type="checkbox" v-model="settings.referral_enabled" class="mr-2">
+                                        <span class="text-gray-400">邀請獎勵</span>
+                                    </label>
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <label class="flex items-center cursor-pointer">
+                                        <input type="checkbox" v-model="settings.maintenance_mode" class="mr-2">
+                                        <span class="text-yellow-400">維護模式</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 flex justify-end">
+                        <button @click="saveSettings" 
+                                class="gradient-bg hover:opacity-90 px-8 py-3 rounded-lg font-medium transition-opacity">
+                            💾 保存設置
                         </button>
+                    </div>
+                    
+                    <!-- 配額配置 -->
+                    <div class="bg-gray-800 rounded-xl p-6 mt-6">
+                        <h3 class="text-lg font-semibold mb-4">📊 會員配額配置</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="text-gray-400">
+                                        <th class="text-left py-3">等級</th>
+                                        <th class="text-center py-3">TG帳號</th>
+                                        <th class="text-center py-3">日消息</th>
+                                        <th class="text-center py-3">AI調用</th>
+                                        <th class="text-center py-3">設備數</th>
+                                        <th class="text-center py-3">群組數</th>
+                                        <th class="text-center py-3">自動回覆</th>
+                                        <th class="text-center py-3">定時任務</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(config, level) in quotaConfig" :key="level" class="border-t border-gray-700">
+                                        <td class="py-3">
+                                            <span :class="'rank-' + level">{{ config.icon }} {{ config.name }}</span>
+                                        </td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas.tg_accounts) }}</td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas.daily_messages) }}</td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas.ai_calls) }}</td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas.devices) }}</td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas.groups) }}</td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas.auto_reply_rules) }}</td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas.scheduled_tasks) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- 生成卡密彈窗 -->
-        <div v-if="showGenerateModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div class="bg-gray-800 rounded-xl p-6 w-[500px]">
-                <h3 class="text-xl font-bold mb-6">🎟️ 批量生成卡密</h3>
+        <!-- ==================== 生成卡密彈窗 ==================== -->
+        <div v-if="showGenerateModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div class="bg-gray-800 rounded-xl p-6 w-[500px] border border-gray-700">
+                <h3 class="text-xl font-bold mb-6 flex items-center">
+                    <span class="text-2xl mr-2">🎟️</span>
+                    批量生成卡密
+                </h3>
                 
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm text-gray-400 mb-1">會員等級</label>
-                        <select v-model="generateForm.level" class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2">
+                        <label class="block text-sm text-gray-400 mb-2">會員等級</label>
+                        <select v-model="generateForm.level" 
+                                class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500">
                             <option value="B">🥈 白銀精英</option>
                             <option value="G">🥇 黃金大師</option>
                             <option value="D">💎 鑽石王牌</option>
@@ -385,53 +749,60 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm text-gray-400 mb-1">時長類型</label>
-                        <select v-model="generateForm.duration" class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2">
+                        <label class="block text-sm text-gray-400 mb-2">時長類型</label>
+                        <select v-model="generateForm.duration" 
+                                class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500">
                             <option value="1">周卡 (7天)</option>
                             <option value="2">月卡 (30天)</option>
                             <option value="3">季卡 (90天)</option>
                             <option value="Y">年卡 (365天)</option>
+                            <option value="L">終身</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm text-gray-400 mb-1">生成數量</label>
+                        <label class="block text-sm text-gray-400 mb-2">生成數量 (最多100個)</label>
                         <input type="number" v-model="generateForm.count" min="1" max="100"
-                               class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2">
+                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500">
                     </div>
                     <div>
-                        <label class="block text-sm text-gray-400 mb-1">批次備註</label>
-                        <input type="text" v-model="generateForm.notes" placeholder="可選"
-                               class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2">
+                        <label class="block text-sm text-gray-400 mb-2">批次備註 (可選)</label>
+                        <input type="text" v-model="generateForm.notes" placeholder="例如：活動贈送"
+                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500">
                     </div>
                 </div>
                 
                 <div class="flex justify-end gap-4 mt-6">
                     <button @click="showGenerateModal = false" 
-                            class="px-6 py-2 border border-gray-600 rounded-lg hover:bg-gray-700">
+                            class="px-6 py-2 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors">
                         取消
                     </button>
                     <button @click="generateLicenses" 
-                            class="bg-purple-600 hover:bg-purple-700 px-6 py-2 rounded-lg">
-                        生成
+                            :disabled="isGenerating"
+                            class="gradient-bg hover:opacity-90 px-6 py-2 rounded-lg font-medium transition-opacity disabled:opacity-50">
+                        {{ isGenerating ? '生成中...' : '生成卡密' }}
                     </button>
                 </div>
             </div>
         </div>
         
-        <!-- 續費彈窗 -->
-        <div v-if="showExtendModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div class="bg-gray-800 rounded-xl p-6 w-[450px]">
-                <h3 class="text-xl font-bold mb-6">⏰ 手動續費</h3>
+        <!-- ==================== 續費彈窗 ==================== -->
+        <div v-if="showExtendModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div class="bg-gray-800 rounded-xl p-6 w-[450px] border border-gray-700">
+                <h3 class="text-xl font-bold mb-6 flex items-center">
+                    <span class="text-2xl mr-2">⏰</span>
+                    手動續費
+                </h3>
                 
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm text-gray-400 mb-1">機器碼</label>
-                        <input type="text" v-model="extendForm.machineId" disabled
-                               class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-gray-400">
+                        <label class="block text-sm text-gray-400 mb-2">用戶</label>
+                        <input type="text" :value="extendForm.userDisplay" disabled
+                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-gray-400">
                     </div>
                     <div>
-                        <label class="block text-sm text-gray-400 mb-1">延長天數</label>
-                        <select v-model="extendForm.days" class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2">
+                        <label class="block text-sm text-gray-400 mb-2">延長天數</label>
+                        <select v-model="extendForm.days" 
+                                class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500">
                             <option :value="7">7 天（周卡）</option>
                             <option :value="30">30 天（月卡）</option>
                             <option :value="90">90 天（季卡）</option>
@@ -439,8 +810,9 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm text-gray-400 mb-1">升級等級（可選）</label>
-                        <select v-model="extendForm.level" class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2">
+                        <label class="block text-sm text-gray-400 mb-2">升級等級（可選）</label>
+                        <select v-model="extendForm.level" 
+                                class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500">
                             <option value="">保持原等級</option>
                             <option value="silver">🥈 白銀精英</option>
                             <option value="gold">🥇 黃金大師</option>
@@ -453,15 +825,22 @@
                 
                 <div class="flex justify-end gap-4 mt-6">
                     <button @click="showExtendModal = false" 
-                            class="px-6 py-2 border border-gray-600 rounded-lg hover:bg-gray-700">
+                            class="px-6 py-2 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors">
                         取消
                     </button>
                     <button @click="submitExtend" 
-                            class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg">
+                            class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg font-medium transition-colors">
                         確認續費
                     </button>
                 </div>
             </div>
+        </div>
+        
+        <!-- Toast 通知 -->
+        <div v-if="toast.show" 
+             :class="['fixed bottom-8 right-8 px-6 py-3 rounded-lg shadow-lg transition-all transform',
+                     toast.type === 'success' ? 'bg-green-600' : toast.type === 'error' ? 'bg-red-600' : 'bg-blue-600']">
+            {{ toast.message }}
         </div>
     </div>
     

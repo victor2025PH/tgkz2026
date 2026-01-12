@@ -404,10 +404,16 @@ export class MembershipService {
     email: string
   ): Promise<{ success: boolean; message: string }> {
     // 驗證卡密格式
-    // 格式: TGM-[類型]-[XXXX]-[XXXX]-[XXXX]
-    // 類型: B=白銀/G=黃金/D=鑽石/S=星耀/K=王者, 1=周/2=月/3=季/Y=年
-    const keyRegex = /^TGM-([BGDSK][123Y])-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i;
-    const match = licenseKey.toUpperCase().match(keyRegex);
+    // 新格式: TGAI-[類型]-[XXXX]-[XXXX]-[XXXX]
+    // 舊格式: TGM-[類型]-[XXXX]-[XXXX]-[XXXX]
+    // 類型: B=白銀/G=黃金/D=鑽石/S=星耀/K=王者, 1=周/2=月/3=季/Y=年/L=終身
+    const newKeyRegex = /^TGAI-([BGDSK][123YL]|EXT)-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i;
+    const oldKeyRegex = /^TGM-([BGDSK][123Y])-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i;
+    
+    let match = licenseKey.toUpperCase().match(newKeyRegex);
+    if (!match) {
+      match = licenseKey.toUpperCase().match(oldKeyRegex);
+    }
     
     if (!match) {
       return { success: false, message: '⚔️ 卡密格式不正確，請檢查後重試' };
@@ -415,7 +421,7 @@ export class MembershipService {
     
     const typeCode = match[1];
     const levelCode = typeCode[0];
-    const durationCode = typeCode[1];
+    const durationCode = typeCode[1] || '2';
     
     // 解析等級
     const levelMap: Record<string, MembershipLevel> = {
@@ -424,14 +430,17 @@ export class MembershipService {
       'D': 'diamond',  // 鑽石王牌
       'S': 'star',     // 星耀傳說
       'K': 'king',     // 榮耀王者
+      'E': 'gold',     // EXT 手動續費默認黃金
     };
     
     // 解析時長
     const durationMap: Record<string, number> = {
-      '1': 7,    // 周卡
-      '2': 30,   // 月卡
-      '3': 90,   // 季卡
-      'Y': 365,  // 年卡
+      '1': 7,     // 周卡
+      '2': 30,    // 月卡
+      '3': 90,    // 季卡
+      'Y': 365,   // 年卡
+      'L': 36500, // 終身
+      'X': 30,    // EXT 默認30天
     };
     
     const level = levelMap[levelCode] || 'silver';

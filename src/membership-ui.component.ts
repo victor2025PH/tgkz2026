@@ -34,7 +34,7 @@ import { ToastService } from './toast.service';
           <span class="text-lg font-bold text-white">{{ membershipService.levelName() }}</span>
         </div>
         
-        @if(membershipService.level() !== 'free') {
+        @if(membershipService.level() !== 'bronze') {
           <div class="text-sm text-slate-300 mb-3">
             @if(membershipService.daysRemaining() > 0) {
               <span>到期時間：{{ membershipService.membership()?.expiresAt | date:'yyyy-MM-dd' }}</span>
@@ -72,7 +72,7 @@ import { ToastService } from './toast.service';
         <div class="flex gap-2">
           <button (click)="openActivate()" 
                   class="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-sm py-2 rounded-lg hover:opacity-90">
-            {{ membershipService.level() === 'free' ? '激活會員' : '續費/升級' }}
+            {{ membershipService.level() === 'bronze' ? '激活會員' : '續費/升級' }}
           </button>
           <button (click)="showDetails = false" 
                   class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">
@@ -89,10 +89,12 @@ import { ToastService } from './toast.service';
       position: relative;
       display: inline-block;
     }
-    .membership-badge.free { background: linear-gradient(135deg, #374151, #1f2937); color: #9ca3af; }
-    .membership-badge.vip { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1f2937; }
-    .membership-badge.svip { background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; }
-    .membership-badge.mvp { background: linear-gradient(135deg, #f59e0b, #ef4444); color: white; }
+    .membership-badge.bronze { background: linear-gradient(135deg, #CD7F32, #8B4513); color: white; }
+    .membership-badge.silver { background: linear-gradient(135deg, #C0C0C0, #A8A8A8); color: #1f2937; }
+    .membership-badge.gold { background: linear-gradient(135deg, #FFD700, #FFA500); color: #1f2937; }
+    .membership-badge.diamond { background: linear-gradient(135deg, #B9F2FF, #87CEEB); color: #1f2937; }
+    .membership-badge.star { background: linear-gradient(135deg, #9B59B6, #8E44AD); color: white; }
+    .membership-badge.king { background: linear-gradient(135deg, #FF6B6B, #EE5A5A); color: white; }
   `]
 })
 export class MembershipBadgeComponent {
@@ -227,15 +229,15 @@ export class MembershipBadgeComponent {
                     </ul>
                     
                     <button class="w-full mt-4 py-2 rounded-lg font-medium transition-colors"
-                            [class.bg-gradient-to-r]="plan.level !== 'free'"
-                            [class.from-cyan-500]="plan.level !== 'free'"
-                            [class.to-blue-500]="plan.level !== 'free'"
-                            [class.text-white]="plan.level !== 'free'"
-                            [class.bg-slate-700]="plan.level === 'free'"
-                            [class.text-slate-400]="plan.level === 'free'"
-                            [disabled]="plan.level === 'free'"
+                            [class.bg-gradient-to-r]="plan.level !== 'bronze'"
+                            [class.from-cyan-500]="plan.level !== 'bronze'"
+                            [class.to-blue-500]="plan.level !== 'bronze'"
+                            [class.text-white]="plan.level !== 'bronze'"
+                            [class.bg-slate-700]="plan.level === 'bronze'"
+                            [class.text-slate-400]="plan.level === 'bronze'"
+                            [disabled]="plan.level === 'bronze'"
                             (click)="selectPlan(plan)">
-                      {{ plan.level === 'free' ? '當前方案' : (plan.level === membershipService.level() ? '續費' : '選擇') }}
+                      {{ plan.level === 'bronze' ? '當前方案' : (plan.level === membershipService.level() ? '續費' : '選擇') }}
                     </button>
                   </div>
                 }
@@ -268,7 +270,7 @@ export class MembershipBadgeComponent {
                     <label class="block text-sm text-slate-300 mb-1">卡密</label>
                     <input type="text" 
                            [(ngModel)]="licenseKey"
-                           placeholder="TGM-X-XXXX-XXXX-XXXX"
+                           placeholder="TGAI-XX-XXXX-XXXX-XXXX"
                            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none uppercase tracking-wider font-mono">
                   </div>
                   
@@ -290,10 +292,11 @@ export class MembershipBadgeComponent {
                 <div class="mt-6 p-4 bg-slate-700/50 rounded-lg">
                   <h4 class="font-medium text-white mb-2">📋 卡密格式說明</h4>
                   <ul class="text-sm text-slate-400 space-y-1">
-                    <li>• TGM-W-XXXX-XXXX-XXXX (周卡)</li>
-                    <li>• TGM-M-XXXX-XXXX-XXXX (月卡)</li>
-                    <li>• TGM-S-XXXX-XXXX-XXXX (SVIP 月卡)</li>
-                    <li>• TGM-P-XXXX-XXXX-XXXX (MVP 月卡)</li>
+                    <li>• TGAI-B2-XXXX-XXXX-XXXX (🥈 白銀月卡)</li>
+                    <li>• TGAI-G2-XXXX-XXXX-XXXX (🥇 黃金月卡)</li>
+                    <li>• TGAI-D2-XXXX-XXXX-XXXX (💎 鑽石月卡)</li>
+                    <li>• TGAI-S2-XXXX-XXXX-XXXX (🌟 星耀月卡)</li>
+                    <li>• TGAI-K2-XXXX-XXXX-XXXX (👑 王者月卡)</li>
                   </ul>
                 </div>
               </div>
@@ -340,19 +343,19 @@ export class MembershipBadgeComponent {
                   <ul class="space-y-2 text-sm text-slate-300">
                     <li class="flex items-center gap-2">
                       <span class="text-green-400">✓</span>
-                      邀請 1 人註冊：您獲得 3 天 VIP
+                      邀請 1 人註冊：您獲得 3 天會員
                     </li>
                     <li class="flex items-center gap-2">
                       <span class="text-green-400">✓</span>
-                      被邀請人獲得：7 天 VIP 體驗
+                      被邀請人獲得：1 天會員體驗
                     </li>
                     <li class="flex items-center gap-2">
                       <span class="text-green-400">✓</span>
-                      被邀請人付費：您獲得 20% 返現
+                      被邀請人首次付費：獲得豐厚獎勵
                     </li>
                     <li class="flex items-center gap-2">
                       <span class="text-green-400">✓</span>
-                      無上限累計，邀請越多獎勵越多
+                      被邀請人重複付費：10% 返傭
                     </li>
                   </ul>
                 </div>
@@ -406,7 +409,7 @@ export class MembershipDialogComponent {
   }
   
   selectPlan(plan: PricingPlan): void {
-    if (plan.level === 'free') return;
+    if (plan.level === 'bronze') return;
     this.activeTab.set('activate');
     this.toastService.info(`請購買 ${plan.name} 卡密後在此激活`);
   }
@@ -519,7 +522,8 @@ export class UpgradePromptComponent {
   get nextLevelName(): string {
     if (!this.suggestion?.nextLevel) return '';
     const names: Record<MembershipLevel, string> = {
-      free: '新星', vip: '銀星 VIP', svip: '金星 SVIP', mvp: '星王 MVP'
+      bronze: '青銅戰士', silver: '白銀精英', gold: '黃金大師', 
+      diamond: '鑽石王牌', star: '星耀傳說', king: '榮耀王者'
     };
     return names[this.suggestion.nextLevel];
   }

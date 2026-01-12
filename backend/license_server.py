@@ -1,389 +1,41 @@
 """
-TG-Matrix License Server API
-卡密在線驗證服務器
+TG-AI智控王 License Server API
+卡密在線驗證服務器 v2.0
 
 功能：
 - 卡密驗證和激活
 - 機器碼綁定
 - 心跳檢測
-- 防重複使用
-- 用量統計
+- 六級會員系統
+- 邀請獎勵系統
+- 配額管理
+- 管理後台 API
 """
 
 import json
 import hashlib
 import secrets
 import time
-import sqlite3
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List
-from dataclasses import dataclass, asdict
 import asyncio
-import aiohttp
 from aiohttp import web
 import jwt
 
-# JWT 密鑰（生產環境應從環境變量讀取）
-import os
-JWT_SECRET = os.environ.get("JWT_SECRET", "tg-matrix-license-secret-2026")
+# 導入數據庫模塊
+from database import Database, MEMBERSHIP_LEVELS, REFERRAL_REWARDS
+
+# ============ 配置 ============
+
+# JWT 密鑰
+JWT_SECRET = os.environ.get("JWT_SECRET", "tgai-license-secret-2026")
 JWT_ALGORITHM = "HS256"
 
-# 管理員配置（生產環境應從環境變量或數據庫讀取）
-ADMIN_USERS = {
-    "admin": {
-        "password_hash": hashlib.sha256("admin888".encode()).hexdigest(),  # 默認密碼
-        "role": "super_admin",
-        "name": "管理員"
-    }
-}
-
-# 數據庫路徑
-DB_PATH = Path(__file__).parent / "data" / "license_server.db"
-
-
-class LicenseDatabase:
-    """卡密數據庫管理"""
-    
-    def __init__(self, db_path: Path = DB_PATH):
-        self.db_path = db_path
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._init_db()
-    
-    def _init_db(self):
-        """初始化數據庫表"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        # 卡密表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS licenses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                license_key TEXT UNIQUE NOT NULL,
-                type_code TEXT NOT NULL,
-                level TEXT NOT NULL,
-                duration_days INTEGER NOT NULL,
-                price REAL DEFAULT 0,
-                status TEXT DEFAULT 'unused',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                used_at TIMESTAMP,
-                expires_at TIMESTAMP,
-                machine_id TEXT,
-                email TEXT,
-                batch_id TEXT,
-                notes TEXT
-            )
-        ''')
-        
-        # 激活記錄表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS activations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                license_key TEXT NOT NULL,
-                machine_id TEXT NOT NULL,
-                ip_address TEXT,
-                activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_heartbeat TIMESTAMP,
-                is_active INTEGER DEFAULT 1,
-                FOREIGN KEY (license_key) REFERENCES licenses(license_key)
-            )
-        ''')
-        
-        # 心跳記錄表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS heartbeats (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                license_key TEXT NOT NULL,
-                machine_id TEXT NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                usage_data TEXT,
-                FOREIGN KEY (license_key) REFERENCES licenses(license_key)
-            )
-        ''')
-        
-        # 用戶表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE,
-                machine_id TEXT,
-                invite_code TEXT UNIQUE,
-                invited_by TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_seen TIMESTAMP,
-                total_spent REAL DEFAULT 0,
-                membership_level TEXT DEFAULT 'free'
-            )
-        ''')
-        
-        # 支付記錄表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS payments (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                order_id TEXT UNIQUE NOT NULL,
-                user_email TEXT,
-                machine_id TEXT,
-                amount REAL NOT NULL,
-                currency TEXT DEFAULT 'CNY',
-                payment_method TEXT,
-                license_key TEXT,
-                status TEXT DEFAULT 'pending',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                paid_at TIMESTAMP,
-                gateway_response TEXT
-            )
-        ''')
-        
-        # 統計表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS stats_daily (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                date TEXT UNIQUE NOT NULL,
-                new_users INTEGER DEFAULT 0,
-                new_activations INTEGER DEFAULT 0,
-                new_payments INTEGER DEFAULT 0,
-                revenue REAL DEFAULT 0,
-                active_users INTEGER DEFAULT 0,
-                trial_to_paid INTEGER DEFAULT 0,
-                churn_count INTEGER DEFAULT 0
-            )
-        ''')
-        
-        conn.commit()
-        conn.close()
-    
-    def get_connection(self) -> sqlite3.Connection:
-        """獲取數據庫連接"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
-    
-    # ============ 卡密操作 ============
-    
-    def create_license(self, license_key: str, type_code: str, level: str, 
-                       duration_days: int, price: float = 0, 
-                       batch_id: str = "", notes: str = "") -> bool:
-        """創建卡密"""
-        try:
-            conn = self.get_connection()
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO licenses (license_key, type_code, level, duration_days, price, batch_id, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (license_key, type_code, level, duration_days, price, batch_id, notes))
-            conn.commit()
-            conn.close()
-            return True
-        except sqlite3.IntegrityError:
-            return False
-    
-    def validate_license(self, license_key: str) -> Tuple[bool, str, Optional[Dict]]:
-        """驗證卡密"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM licenses WHERE license_key = ?', (license_key,))
-        row = cursor.fetchone()
-        conn.close()
-        
-        if not row:
-            return False, "卡密不存在", None
-        
-        license_data = dict(row)
-        
-        if license_data['status'] == 'used':
-            return False, "卡密已被使用", license_data
-        
-        if license_data['status'] == 'disabled':
-            return False, "卡密已被禁用", license_data
-        
-        if license_data['status'] == 'expired':
-            return False, "卡密已過期", license_data
-        
-        return True, "卡密有效", license_data
-    
-    def activate_license(self, license_key: str, machine_id: str, 
-                        email: str = "", ip_address: str = "") -> Tuple[bool, str, Optional[Dict]]:
-        """激活卡密"""
-        valid, message, license_data = self.validate_license(license_key)
-        
-        if not valid:
-            return False, message, license_data
-        
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        now = datetime.now()
-        expires_at = now + timedelta(days=license_data['duration_days'])
-        
-        # 更新卡密狀態
-        cursor.execute('''
-            UPDATE licenses SET 
-                status = 'used',
-                used_at = ?,
-                expires_at = ?,
-                machine_id = ?,
-                email = ?
-            WHERE license_key = ?
-        ''', (now.isoformat(), expires_at.isoformat(), machine_id, email, license_key))
-        
-        # 記錄激活
-        cursor.execute('''
-            INSERT INTO activations (license_key, machine_id, ip_address)
-            VALUES (?, ?, ?)
-        ''', (license_key, machine_id, ip_address))
-        
-        # 更新或創建用戶
-        cursor.execute('SELECT * FROM users WHERE machine_id = ?', (machine_id,))
-        user = cursor.fetchone()
-        
-        if user:
-            cursor.execute('''
-                UPDATE users SET 
-                    email = COALESCE(?, email),
-                    last_seen = ?,
-                    total_spent = total_spent + ?,
-                    membership_level = ?
-                WHERE machine_id = ?
-            ''', (email, now.isoformat(), license_data['price'], license_data['level'], machine_id))
-        else:
-            invite_code = secrets.token_hex(4).upper()
-            cursor.execute('''
-                INSERT INTO users (email, machine_id, invite_code, membership_level)
-                VALUES (?, ?, ?, ?)
-            ''', (email, machine_id, invite_code, license_data['level']))
-        
-        # 更新統計
-        today = now.strftime('%Y-%m-%d')
-        cursor.execute('SELECT * FROM stats_daily WHERE date = ?', (today,))
-        if cursor.fetchone():
-            cursor.execute('''
-                UPDATE stats_daily SET 
-                    new_activations = new_activations + 1,
-                    revenue = revenue + ?
-                WHERE date = ?
-            ''', (license_data['price'], today))
-        else:
-            cursor.execute('''
-                INSERT INTO stats_daily (date, new_activations, revenue)
-                VALUES (?, 1, ?)
-            ''', (today, license_data['price']))
-        
-        conn.commit()
-        
-        # 獲取更新後的數據
-        cursor.execute('SELECT * FROM licenses WHERE license_key = ?', (license_key,))
-        updated_license = dict(cursor.fetchone())
-        
-        conn.close()
-        
-        return True, f"激活成功，有效期至 {expires_at.strftime('%Y-%m-%d')}", updated_license
-    
-    def check_heartbeat(self, license_key: str, machine_id: str, 
-                       usage_data: Dict = None) -> Tuple[bool, str, Optional[Dict]]:
-        """心跳檢測"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        # 獲取卡密信息
-        cursor.execute('SELECT * FROM licenses WHERE license_key = ?', (license_key,))
-        row = cursor.fetchone()
-        
-        if not row:
-            conn.close()
-            return False, "卡密不存在", None
-        
-        license_data = dict(row)
-        
-        # 檢查是否過期
-        if license_data['expires_at']:
-            expires_at = datetime.fromisoformat(license_data['expires_at'])
-            if datetime.now() > expires_at:
-                cursor.execute('UPDATE licenses SET status = ? WHERE license_key = ?', 
-                             ('expired', license_key))
-                conn.commit()
-                conn.close()
-                return False, "會員已過期", license_data
-        
-        # 檢查機器碼是否匹配
-        if license_data['machine_id'] and license_data['machine_id'] != machine_id:
-            conn.close()
-            return False, "機器碼不匹配", None
-        
-        # 記錄心跳
-        now = datetime.now()
-        cursor.execute('''
-            INSERT INTO heartbeats (license_key, machine_id, usage_data)
-            VALUES (?, ?, ?)
-        ''', (license_key, machine_id, json.dumps(usage_data) if usage_data else None))
-        
-        # 更新最後心跳時間
-        cursor.execute('''
-            UPDATE activations SET last_heartbeat = ?
-            WHERE license_key = ? AND machine_id = ?
-        ''', (now.isoformat(), license_key, machine_id))
-        
-        conn.commit()
-        conn.close()
-        
-        return True, "心跳成功", license_data
-    
-    # ============ 統計查詢 ============
-    
-    def get_stats(self, days: int = 30) -> Dict[str, Any]:
-        """獲取統計數據"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        # 總計
-        cursor.execute('SELECT COUNT(*) as total FROM licenses')
-        total_licenses = cursor.fetchone()['total']
-        
-        cursor.execute("SELECT COUNT(*) as total FROM licenses WHERE status = 'unused'")
-        unused_licenses = cursor.fetchone()['total']
-        
-        cursor.execute("SELECT COUNT(*) as total FROM licenses WHERE status = 'used'")
-        used_licenses = cursor.fetchone()['total']
-        
-        cursor.execute('SELECT COUNT(*) as total FROM users')
-        total_users = cursor.fetchone()['total']
-        
-        cursor.execute("SELECT COUNT(*) as total FROM users WHERE membership_level != 'free'")
-        paid_users = cursor.fetchone()['total']
-        
-        cursor.execute('SELECT SUM(price) as total FROM licenses WHERE status = ?', ('used',))
-        row = cursor.fetchone()
-        total_revenue = row['total'] or 0
-        
-        # 每日數據
-        start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
-        cursor.execute('''
-            SELECT * FROM stats_daily 
-            WHERE date >= ? 
-            ORDER BY date ASC
-        ''', (start_date,))
-        daily_stats = [dict(row) for row in cursor.fetchall()]
-        
-        # 會員等級分布
-        cursor.execute('''
-            SELECT membership_level, COUNT(*) as count 
-            FROM users 
-            GROUP BY membership_level
-        ''')
-        level_distribution = {row['membership_level']: row['count'] for row in cursor.fetchall()}
-        
-        conn.close()
-        
-        return {
-            'total_licenses': total_licenses,
-            'unused_licenses': unused_licenses,
-            'used_licenses': used_licenses,
-            'total_users': total_users,
-            'paid_users': paid_users,
-            'total_revenue': total_revenue,
-            'conversion_rate': (paid_users / total_users * 100) if total_users > 0 else 0,
-            'daily_stats': daily_stats,
-            'level_distribution': level_distribution
-        }
+# 服務器信息
+SERVER_NAME = "TG-AI智控王"
+SERVER_VERSION = "v2.0"
 
 
 class LicenseServer:
@@ -392,51 +44,126 @@ class LicenseServer:
     def __init__(self, host: str = '0.0.0.0', port: int = 8080):
         self.host = host
         self.port = port
-        self.db = LicenseDatabase()
+        self.db = Database()
         self.app = web.Application()
         self._setup_routes()
+        self._setup_middlewares()
+    
+    def _setup_middlewares(self):
+        """設置中間件"""
+        @web.middleware
+        async def cors_middleware(request, handler):
+            if request.method == 'OPTIONS':
+                return web.Response(headers={
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+                })
+            
+            response = await handler(request)
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            return response
+        
+        self.app.middlewares.append(cors_middleware)
     
     def _setup_routes(self):
         """設置路由"""
-        # 公開 API
+        # ============ 公開 API ============
+        self.app.router.add_get('/api/health', self.handle_health)
+        self.app.router.add_get('/api/info', self.handle_info)
+        
+        # 卡密 API
         self.app.router.add_post('/api/license/validate', self.handle_validate)
         self.app.router.add_post('/api/license/activate', self.handle_activate)
         self.app.router.add_post('/api/license/heartbeat', self.handle_heartbeat)
-        self.app.router.add_get('/api/stats', self.handle_stats)
+        self.app.router.add_get('/api/license/status', self.handle_license_status)
+        
+        # 用戶 API
+        self.app.router.add_post('/api/user/register', self.handle_user_register)
+        self.app.router.add_get('/api/user/profile', self.handle_user_profile)
+        self.app.router.add_get('/api/user/quota', self.handle_user_quota)
+        
+        # 邀請 API
+        self.app.router.add_get('/api/invite/info', self.handle_invite_info)
+        self.app.router.add_get('/api/invite/list', self.handle_invite_list)
+        
+        # 支付 API
+        self.app.router.add_get('/api/products', self.handle_products)
         self.app.router.add_post('/api/payment/create', self.handle_create_payment)
         self.app.router.add_post('/api/payment/callback', self.handle_payment_callback)
-        self.app.router.add_get('/api/health', self.handle_health)
         
-        # 管理員認證 API
+        # 公告 API
+        self.app.router.add_get('/api/announcements', self.handle_announcements)
+        
+        # 統計 API (公開)
+        self.app.router.add_get('/api/stats', self.handle_stats)
+        
+        # ============ 管理員 API ============
+        # 認證
         self.app.router.add_post('/api/admin/login', self.handle_admin_login)
         self.app.router.add_post('/api/admin/logout', self.handle_admin_logout)
         self.app.router.add_get('/api/admin/verify', self.handle_admin_verify)
         self.app.router.add_post('/api/admin/change-password', self.handle_admin_change_password)
         
-        # 管理員數據 API
+        # 儀表盤
         self.app.router.add_get('/api/admin/dashboard', self.handle_admin_dashboard)
+        
+        # 用戶管理
         self.app.router.add_get('/api/admin/users', self.handle_admin_users)
+        self.app.router.add_get('/api/admin/users/{user_id}', self.handle_admin_user_detail)
+        self.app.router.add_post('/api/admin/users/{user_id}/update', self.handle_admin_user_update)
+        self.app.router.add_post('/api/admin/users/{user_id}/extend', self.handle_admin_user_extend)
+        self.app.router.add_post('/api/admin/users/{user_id}/ban', self.handle_admin_user_ban)
+        
+        # 卡密管理
         self.app.router.add_get('/api/admin/licenses', self.handle_admin_licenses)
-        self.app.router.add_get('/api/admin/orders', self.handle_admin_orders)
         self.app.router.add_post('/api/admin/licenses/generate', self.handle_admin_generate)
         self.app.router.add_post('/api/admin/licenses/disable', self.handle_admin_disable)
-        self.app.router.add_post('/api/admin/settings/save', self.handle_admin_save_settings)
+        self.app.router.add_post('/api/admin/licenses/export', self.handle_admin_export_licenses)
+        
+        # 訂單管理
+        self.app.router.add_get('/api/admin/orders', self.handle_admin_orders)
+        
+        # 邀請管理
+        self.app.router.add_get('/api/admin/referrals', self.handle_admin_referrals)
+        self.app.router.add_get('/api/admin/referral-stats', self.handle_admin_referral_stats)
+        
+        # 公告管理
+        self.app.router.add_get('/api/admin/announcements', self.handle_admin_announcements)
+        self.app.router.add_post('/api/admin/announcements', self.handle_admin_create_announcement)
+        self.app.router.add_post('/api/admin/announcements/{id}/update', self.handle_admin_update_announcement)
+        self.app.router.add_post('/api/admin/announcements/{id}/delete', self.handle_admin_delete_announcement)
+        
+        # 系統設置
         self.app.router.add_get('/api/admin/settings', self.handle_admin_get_settings)
+        self.app.router.add_post('/api/admin/settings/save', self.handle_admin_save_settings)
+        
+        # 操作日誌
         self.app.router.add_get('/api/admin/logs', self.handle_admin_logs)
-        self.app.router.add_post('/api/admin/users/extend', self.handle_admin_extend_user)
+        
+        # 配額管理
+        self.app.router.add_get('/api/admin/quotas', self.handle_admin_quotas)
+        
+        # 舊版兼容路由
+        self.app.router.add_post('/api/admin/users/extend', self.handle_admin_extend_user_legacy)
     
-    def _generate_token(self, license_key: str, machine_id: str, expires_in: int = 86400) -> str:
-        """生成 JWT token"""
+    # ============ 工具方法 ============
+    
+    def _generate_token(self, user_id: str, machine_id: str, level: str = 'bronze',
+                       expires_in: int = 86400) -> str:
+        """生成用戶 JWT token"""
         payload = {
-            'license_key': license_key,
+            'user_id': user_id,
             'machine_id': machine_id,
+            'level': level,
+            'type': 'user',
             'exp': datetime.utcnow() + timedelta(seconds=expires_in),
             'iat': datetime.utcnow()
         }
         return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
     
     def _verify_token(self, token: str) -> Optional[Dict]:
-        """驗證 JWT token"""
+        """驗證用戶 token"""
         try:
             payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
             return payload
@@ -444,282 +171,6 @@ class LicenseServer:
             return None
         except jwt.InvalidTokenError:
             return None
-    
-    def _get_client_ip(self, request: web.Request) -> str:
-        """獲取客戶端 IP"""
-        forwarded = request.headers.get('X-Forwarded-For')
-        if forwarded:
-            return forwarded.split(',')[0].strip()
-        return request.remote or 'unknown'
-    
-    async def handle_validate(self, request: web.Request) -> web.Response:
-        """驗證卡密"""
-        try:
-            data = await request.json()
-            license_key = data.get('license_key', '').upper()
-            
-            if not license_key:
-                return web.json_response({'success': False, 'message': '缺少卡密'}, status=400)
-            
-            valid, message, license_data = self.db.validate_license(license_key)
-            
-            return web.json_response({
-                'success': valid,
-                'message': message,
-                'data': {
-                    'level': license_data.get('level') if license_data else None,
-                    'duration_days': license_data.get('duration_days') if license_data else None,
-                    'status': license_data.get('status') if license_data else None
-                } if license_data else None
-            })
-        except Exception as e:
-            return web.json_response({'success': False, 'message': str(e)}, status=500)
-    
-    async def handle_activate(self, request: web.Request) -> web.Response:
-        """激活卡密"""
-        try:
-            data = await request.json()
-            license_key = data.get('license_key', '').upper()
-            machine_id = data.get('machine_id', '')
-            email = data.get('email', '')
-            
-            if not license_key or not machine_id:
-                return web.json_response({'success': False, 'message': '缺少必要參數'}, status=400)
-            
-            ip_address = self._get_client_ip(request)
-            
-            success, message, license_data = self.db.activate_license(
-                license_key, machine_id, email, ip_address
-            )
-            
-            response_data = {
-                'success': success,
-                'message': message,
-            }
-            
-            if success and license_data:
-                # 生成 token
-                token = self._generate_token(license_key, machine_id)
-                response_data['data'] = {
-                    'token': token,
-                    'level': license_data.get('level'),
-                    'expires_at': license_data.get('expires_at'),
-                    'duration_days': license_data.get('duration_days')
-                }
-            
-            return web.json_response(response_data)
-        except Exception as e:
-            return web.json_response({'success': False, 'message': str(e)}, status=500)
-    
-    async def handle_heartbeat(self, request: web.Request) -> web.Response:
-        """心跳檢測"""
-        try:
-            data = await request.json()
-            license_key = data.get('license_key', '').upper()
-            machine_id = data.get('machine_id', '')
-            token = data.get('token', '')
-            usage_data = data.get('usage', {})
-            
-            # 優先使用 token 驗證
-            if token:
-                payload = self._verify_token(token)
-                if not payload:
-                    return web.json_response({'success': False, 'message': 'Token 無效或已過期'}, status=401)
-                license_key = payload.get('license_key')
-                machine_id = payload.get('machine_id')
-            
-            if not license_key or not machine_id:
-                return web.json_response({'success': False, 'message': '缺少必要參數'}, status=400)
-            
-            success, message, license_data = self.db.check_heartbeat(
-                license_key, machine_id, usage_data
-            )
-            
-            response_data = {
-                'success': success,
-                'message': message,
-            }
-            
-            if success and license_data:
-                # 刷新 token
-                new_token = self._generate_token(license_key, machine_id)
-                response_data['data'] = {
-                    'token': new_token,
-                    'level': license_data.get('level'),
-                    'expires_at': license_data.get('expires_at'),
-                    'status': license_data.get('status')
-                }
-            
-            return web.json_response(response_data)
-        except Exception as e:
-            return web.json_response({'success': False, 'message': str(e)}, status=500)
-    
-    async def handle_stats(self, request: web.Request) -> web.Response:
-        """獲取統計數據"""
-        try:
-            days = int(request.query.get('days', 30))
-            stats = self.db.get_stats(days)
-            return web.json_response({'success': True, 'data': stats})
-        except Exception as e:
-            return web.json_response({'success': False, 'message': str(e)}, status=500)
-    
-    async def handle_create_payment(self, request: web.Request) -> web.Response:
-        """創建支付訂單"""
-        try:
-            data = await request.json()
-            product_id = data.get('product_id', '')
-            email = data.get('email', '')
-            machine_id = data.get('machine_id', '')
-            payment_method = data.get('payment_method', 'alipay')  # alipay, wechat, stripe, usdt
-            
-            # 產品價格表
-            products = {
-                'vip_week': {'price': 49, 'level': 'vip', 'days': 7, 'name': 'VIP 周卡'},
-                'vip_month': {'price': 99, 'level': 'vip', 'days': 30, 'name': 'VIP 月卡'},
-                'vip_quarter': {'price': 249, 'level': 'vip', 'days': 90, 'name': 'VIP 季卡'},
-                'vip_year': {'price': 699, 'level': 'vip', 'days': 365, 'name': 'VIP 年卡'},
-                'svip_month': {'price': 299, 'level': 'svip', 'days': 30, 'name': 'SVIP 月卡'},
-                'svip_year': {'price': 1999, 'level': 'svip', 'days': 365, 'name': 'SVIP 年卡'},
-                'mvp_month': {'price': 999, 'level': 'mvp', 'days': 30, 'name': 'MVP 月卡'},
-                'mvp_year': {'price': 6999, 'level': 'mvp', 'days': 365, 'name': 'MVP 年卡'},
-            }
-            
-            if product_id not in products:
-                return web.json_response({'success': False, 'message': '無效的產品ID'}, status=400)
-            
-            product = products[product_id]
-            order_id = f"TGM{int(time.time())}{secrets.token_hex(4).upper()}"
-            
-            # USDT 匯率和計算
-            usdt_rate = 7.2  # 1 USDT = 7.2 CNY
-            usdt_amount = round(product['price'] / usdt_rate, 2)
-            
-            # 創建訂單
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO payments (order_id, user_email, machine_id, amount, payment_method)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (order_id, email, machine_id, product['price'], payment_method))
-            conn.commit()
-            conn.close()
-            
-            # 根據支付方式生成不同的支付鏈接
-            if payment_method == 'usdt':
-                # USDT TRC20 支付
-                # TODO: 集成實際的加密貨幣支付網關 (如 CoinPayments, NOWPayments 等)
-                usdt_address = "TYourTRC20WalletAddressHere"  # 替換為實際錢包地址
-                payment_url = f"https://pay.example.com/crypto?order_id={order_id}&amount={usdt_amount}&currency=USDT&network=TRC20&address={usdt_address}"
-            else:
-                # 傳統支付方式
-                payment_url = f"https://pay.example.com/checkout?order_id={order_id}"
-            
-            response_data = {
-                'order_id': order_id,
-                'product': product,
-                'payment_url': payment_url,
-                'amount': product['price'],
-                'currency': 'CNY'
-            }
-            
-            # USDT 額外信息
-            if payment_method == 'usdt':
-                response_data['usdt'] = {
-                    'amount': usdt_amount,
-                    'network': 'TRC20',
-                    'address': 'TYourTRC20WalletAddressHere',  # 替換為實際錢包地址
-                    'rate': usdt_rate
-                }
-            
-            return web.json_response({
-                'success': True,
-                'data': response_data
-            })
-        except Exception as e:
-            return web.json_response({'success': False, 'message': str(e)}, status=500)
-    
-    async def handle_payment_callback(self, request: web.Request) -> web.Response:
-        """支付回調"""
-        try:
-            data = await request.json()
-            order_id = data.get('order_id', '')
-            status = data.get('status', '')
-            gateway_response = data.get('gateway_response', {})
-            
-            # TODO: 驗證支付網關簽名
-            
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-            
-            # 獲取訂單
-            cursor.execute('SELECT * FROM payments WHERE order_id = ?', (order_id,))
-            order = cursor.fetchone()
-            
-            if not order:
-                conn.close()
-                return web.json_response({'success': False, 'message': '訂單不存在'}, status=404)
-            
-            order_data = dict(order)
-            
-            if status == 'success':
-                # 生成卡密
-                from license_generator import LicenseGenerator
-                generator = LicenseGenerator()
-                
-                # 根據金額確定類型
-                type_map = {
-                    49: 'W', 99: 'V', 249: 'Q', 699: 'Y',
-                    299: 'S', 1999: 'S', 999: 'P', 6999: 'P'
-                }
-                type_code = type_map.get(int(order_data['amount']), 'V')
-                
-                keys = generator.generate(type_code, 1, f"Payment-{order_id}")
-                license_key = keys[0] if keys else None
-                
-                # 更新訂單
-                cursor.execute('''
-                    UPDATE payments SET 
-                        status = 'paid',
-                        paid_at = ?,
-                        license_key = ?,
-                        gateway_response = ?
-                    WHERE order_id = ?
-                ''', (datetime.now().isoformat(), license_key, json.dumps(gateway_response), order_id))
-                
-                # 自動激活
-                if license_key and order_data['machine_id']:
-                    self.db.activate_license(
-                        license_key, 
-                        order_data['machine_id'],
-                        order_data['user_email']
-                    )
-                
-                conn.commit()
-                conn.close()
-                
-                return web.json_response({
-                    'success': True,
-                    'message': '支付成功',
-                    'data': {'license_key': license_key}
-                })
-            else:
-                cursor.execute('''
-                    UPDATE payments SET status = ?, gateway_response = ?
-                    WHERE order_id = ?
-                ''', (status, json.dumps(gateway_response), order_id))
-                conn.commit()
-                conn.close()
-                
-                return web.json_response({'success': False, 'message': '支付失敗'})
-                
-        except Exception as e:
-            return web.json_response({'success': False, 'message': str(e)}, status=500)
-    
-    async def handle_health(self, request: web.Request) -> web.Response:
-        """健康檢查"""
-        return web.json_response({'status': 'ok', 'timestamp': datetime.now().isoformat()})
-    
-    # ============ 管理員認證 API ============
     
     def _generate_admin_token(self, username: str, expires_in: int = 86400 * 7) -> str:
         """生成管理員 JWT token"""
@@ -751,33 +202,564 @@ class LicenseServer:
             return self._verify_admin_token(token)
         return None
     
-    def _log_admin_action(self, username: str, action: str, details: str = ""):
-        """記錄管理員操作日誌"""
+    def _require_admin(self, request: web.Request) -> Tuple[bool, Optional[web.Response], Optional[Dict]]:
+        """驗證管理員權限"""
+        admin = self._get_admin_from_request(request)
+        if not admin:
+            return False, web.json_response(
+                {'success': False, 'message': '未授權訪問'},
+                status=401
+            ), None
+        return True, None, admin
+    
+    def _get_client_ip(self, request: web.Request) -> str:
+        """獲取客戶端 IP"""
+        forwarded = request.headers.get('X-Forwarded-For')
+        if forwarded:
+            return forwarded.split(',')[0].strip()
+        return request.remote or 'unknown'
+    
+    def _log_admin_action(self, username: str, action: str, action_type: str = None,
+                         target_type: str = None, target_id: str = None,
+                         details: str = None, ip_address: str = None):
+        """記錄管理員操作"""
+        self.db.log_admin_action(username, action, action_type, target_type, 
+                                target_id, details, ip_address)
+    
+    # ============ 公開 API 處理器 ============
+    
+    async def handle_health(self, request: web.Request) -> web.Response:
+        """健康檢查"""
+        return web.json_response({
+            'status': 'ok',
+            'server': SERVER_NAME,
+            'version': SERVER_VERSION,
+            'timestamp': datetime.now().isoformat()
+        })
+    
+    async def handle_info(self, request: web.Request) -> web.Response:
+        """服務器信息"""
+        return web.json_response({
+            'success': True,
+            'data': {
+                'name': SERVER_NAME,
+                'version': SERVER_VERSION,
+                'levels': {k: {'name': v['name'], 'icon': v['icon'], 'color': v['color']} 
+                          for k, v in MEMBERSHIP_LEVELS.items()}
+            }
+        })
+    
+    async def handle_validate(self, request: web.Request) -> web.Response:
+        """驗證卡密"""
+        try:
+            data = await request.json()
+            license_key = data.get('license_key', '').upper()
+            
+            if not license_key:
+                return web.json_response({'success': False, 'message': '缺少卡密'}, status=400)
+            
+            valid, message, license_data = self.db.validate_license(license_key)
+            
+            response_data = {
+                'success': valid,
+                'message': message,
+            }
+            
+            if license_data:
+                level_config = MEMBERSHIP_LEVELS.get(license_data['level'], {})
+                response_data['data'] = {
+                    'level': license_data['level'],
+                    'levelName': level_config.get('name', license_data['level']),
+                    'levelIcon': level_config.get('icon', '🎫'),
+                    'durationDays': license_data['duration_days'],
+                    'durationType': license_data['duration_type'],
+                    'status': license_data['status']
+                }
+            
+            return web.json_response(response_data)
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_activate(self, request: web.Request) -> web.Response:
+        """激活卡密"""
+        try:
+            data = await request.json()
+            license_key = data.get('license_key', '').upper()
+            machine_id = data.get('machine_id', '')
+            device_id = data.get('device_id', '')
+            email = data.get('email', '')
+            invite_code = data.get('invite_code', '')
+            
+            if not license_key or not machine_id:
+                return web.json_response({'success': False, 'message': '缺少必要參數'}, status=400)
+            
+            ip_address = self._get_client_ip(request)
+            
+            # 先檢查是否有邀請碼需要處理
+            invited_by = None
+            if invite_code:
+                inviter = self.db.get_user(invite_code=invite_code)
+                if inviter:
+                    invited_by = invite_code
+            
+            # 檢查用戶是否存在
+            user = self.db.get_user(machine_id=machine_id)
+            if not user:
+                # 創建新用戶
+                user = self.db.create_user(machine_id=machine_id, email=email, invited_by=invited_by)
+            
+            user_id = user['user_id'] if user else None
+            
+            success, message, license_data = self.db.activate_license(
+                license_key, user_id, machine_id, device_id, ip_address
+            )
+            
+            response_data = {
+                'success': success,
+                'message': message,
+            }
+            
+            if success and license_data:
+                level_config = MEMBERSHIP_LEVELS.get(license_data['level'], {})
+                token = self._generate_token(user_id, machine_id, license_data['level'])
+                
+                response_data['data'] = {
+                    'token': token,
+                    'userId': user_id,
+                    'level': license_data['level'],
+                    'levelName': level_config.get('name', license_data['level']),
+                    'levelIcon': level_config.get('icon', '🎫'),
+                    'expiresAt': license_data.get('expires_at'),
+                    'quotas': level_config.get('quotas', {}),
+                    'features': level_config.get('features', [])
+                }
+            
+            return web.json_response(response_data)
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_heartbeat(self, request: web.Request) -> web.Response:
+        """心跳檢測"""
+        try:
+            data = await request.json()
+            token = data.get('token', '')
+            machine_id = data.get('machine_id', '')
+            usage_data = data.get('usage', {})
+            
+            # 驗證 token
+            if token:
+                payload = self._verify_token(token)
+                if not payload:
+                    return web.json_response({'success': False, 'message': 'Token 無效或已過期'}, status=401)
+                user_id = payload.get('user_id')
+                machine_id = payload.get('machine_id')
+            else:
+                if not machine_id:
+                    return web.json_response({'success': False, 'message': '缺少必要參數'}, status=400)
+                user = self.db.get_user(machine_id=machine_id)
+                user_id = user['user_id'] if user else None
+            
+            # 獲取用戶當前狀態
+            user = self.db.get_user(user_id=user_id) if user_id else self.db.get_user(machine_id=machine_id)
+            
+            if not user:
+                return web.json_response({'success': False, 'message': '用戶不存在'}, status=404)
+            
+            # 檢查會員是否過期
+            expires_at = user.get('expires_at')
+            is_expired = False
+            if expires_at:
+                if datetime.fromisoformat(expires_at) < datetime.now():
+                    is_expired = True
+            
+            # 更新最後活動時間
+            self.db.update_user(user['user_id'], last_active_at=datetime.now().isoformat())
+            
+            # 記錄心跳
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO heartbeats (user_id, machine_id, ip_address, usage_data)
+                VALUES (?, ?, ?, ?)
+            ''', (user['user_id'], machine_id, self._get_client_ip(request), json.dumps(usage_data)))
+            conn.commit()
+            conn.close()
+            
+            level = user['membership_level'] or 'bronze'
+            level_config = MEMBERSHIP_LEVELS.get(level, MEMBERSHIP_LEVELS['bronze'])
+            
+            # 生成新 token
+            new_token = self._generate_token(user['user_id'], machine_id, level)
+            
+            return web.json_response({
+                'success': not is_expired,
+                'message': '會員已過期' if is_expired else '心跳成功',
+                'data': {
+                    'token': new_token,
+                    'userId': user['user_id'],
+                    'level': level,
+                    'levelName': level_config.get('name'),
+                    'levelIcon': level_config.get('icon'),
+                    'expiresAt': expires_at,
+                    'isExpired': is_expired,
+                    'quotas': level_config.get('quotas', {}),
+                    'features': level_config.get('features', [])
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_license_status(self, request: web.Request) -> web.Response:
+        """查詢卡密狀態"""
+        try:
+            license_key = request.query.get('key', '').upper()
+            if not license_key:
+                return web.json_response({'success': False, 'message': '缺少卡密'}, status=400)
+            
+            valid, message, license_data = self.db.validate_license(license_key)
+            
+            if not license_data:
+                return web.json_response({'success': False, 'message': message})
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'status': license_data['status'],
+                    'level': license_data['level'],
+                    'durationDays': license_data['duration_days'],
+                    'createdAt': license_data['created_at'],
+                    'usedAt': license_data.get('used_at'),
+                    'expiresAt': license_data.get('expires_at')
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_user_register(self, request: web.Request) -> web.Response:
+        """用戶註冊"""
+        try:
+            data = await request.json()
+            machine_id = data.get('machine_id', '')
+            email = data.get('email', '')
+            invite_code = data.get('invite_code', '')
+            
+            if not machine_id:
+                return web.json_response({'success': False, 'message': '缺少機器碼'}, status=400)
+            
+            # 檢查是否已註冊
+            existing = self.db.get_user(machine_id=machine_id)
+            if existing:
+                return web.json_response({
+                    'success': True,
+                    'message': '用戶已存在',
+                    'data': {
+                        'userId': existing['user_id'],
+                        'inviteCode': existing['invite_code'],
+                        'level': existing['membership_level']
+                    }
+                })
+            
+            # 處理邀請碼
+            invited_by = None
+            if invite_code:
+                inviter = self.db.get_user(invite_code=invite_code)
+                if inviter:
+                    invited_by = invite_code
+            
+            # 創建用戶
+            user = self.db.create_user(machine_id=machine_id, email=email, invited_by=invited_by)
+            
+            if not user:
+                return web.json_response({'success': False, 'message': '註冊失敗'}, status=500)
+            
+            token = self._generate_token(user['user_id'], machine_id, 'bronze')
+            
+            return web.json_response({
+                'success': True,
+                'message': '註冊成功',
+                'data': {
+                    'token': token,
+                    'userId': user['user_id'],
+                    'inviteCode': user['invite_code'],
+                    'level': 'bronze',
+                    'levelName': '青銅戰士',
+                    'levelIcon': '⚔️'
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_user_profile(self, request: web.Request) -> web.Response:
+        """獲取用戶資料"""
+        try:
+            auth_header = request.headers.get('Authorization', '')
+            if not auth_header.startswith('Bearer '):
+                return web.json_response({'success': False, 'message': '未授權'}, status=401)
+            
+            token = auth_header[7:]
+            payload = self._verify_token(token)
+            if not payload:
+                return web.json_response({'success': False, 'message': 'Token 無效'}, status=401)
+            
+            user = self.db.get_user(user_id=payload['user_id'])
+            if not user:
+                return web.json_response({'success': False, 'message': '用戶不存在'}, status=404)
+            
+            level = user['membership_level'] or 'bronze'
+            level_config = MEMBERSHIP_LEVELS.get(level, MEMBERSHIP_LEVELS['bronze'])
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'userId': user['user_id'],
+                    'email': user['email'],
+                    'nickname': user['nickname'],
+                    'level': level,
+                    'levelName': level_config['name'],
+                    'levelIcon': level_config['icon'],
+                    'levelColor': level_config['color'],
+                    'expiresAt': user['expires_at'],
+                    'isLifetime': user['is_lifetime'],
+                    'inviteCode': user['invite_code'],
+                    'totalInvites': user['total_invites'],
+                    'inviteEarnings': user['invite_earnings'],
+                    'totalSpent': user['total_spent'],
+                    'balance': user['balance'],
+                    'createdAt': user['created_at'],
+                    'quotas': level_config['quotas'],
+                    'features': level_config['features']
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_user_quota(self, request: web.Request) -> web.Response:
+        """獲取用戶配額"""
+        try:
+            auth_header = request.headers.get('Authorization', '')
+            if not auth_header.startswith('Bearer '):
+                return web.json_response({'success': False, 'message': '未授權'}, status=401)
+            
+            token = auth_header[7:]
+            payload = self._verify_token(token)
+            if not payload:
+                return web.json_response({'success': False, 'message': 'Token 無效'}, status=401)
+            
+            user = self.db.get_user(user_id=payload['user_id'])
+            if not user:
+                return web.json_response({'success': False, 'message': '用戶不存在'}, status=404)
+            
+            level = user['membership_level'] or 'bronze'
+            level_config = MEMBERSHIP_LEVELS.get(level, MEMBERSHIP_LEVELS['bronze'])
+            quotas = level_config['quotas']
+            
+            # 獲取今日使用量
+            today = datetime.now().strftime('%Y-%m-%d')
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM user_quotas WHERE user_id = ? AND quota_date = ?
+            ''', (user['user_id'], today))
+            usage = cursor.fetchone()
+            conn.close()
+            
+            if usage:
+                usage = dict(usage)
+            else:
+                usage = {'messages_sent': 0, 'ai_calls_used': 0, 'tg_accounts_used': 0}
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'level': level,
+                    'quotas': quotas,
+                    'usage': {
+                        'messagesSent': usage.get('messages_sent', 0),
+                        'aiCallsUsed': usage.get('ai_calls_used', 0),
+                        'tgAccountsUsed': usage.get('tg_accounts_used', 0)
+                    },
+                    'remaining': {
+                        'dailyMessages': (quotas['daily_messages'] - usage.get('messages_sent', 0)) if quotas['daily_messages'] != -1 else -1,
+                        'aiCalls': (quotas['ai_calls'] - usage.get('ai_calls_used', 0)) if quotas['ai_calls'] != -1 else -1
+                    }
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_invite_info(self, request: web.Request) -> web.Response:
+        """獲取邀請信息"""
+        try:
+            auth_header = request.headers.get('Authorization', '')
+            if not auth_header.startswith('Bearer '):
+                return web.json_response({'success': False, 'message': '未授權'}, status=401)
+            
+            token = auth_header[7:]
+            payload = self._verify_token(token)
+            if not payload:
+                return web.json_response({'success': False, 'message': 'Token 無效'}, status=401)
+            
+            user = self.db.get_user(user_id=payload['user_id'])
+            if not user:
+                return web.json_response({'success': False, 'message': '用戶不存在'}, status=404)
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'inviteCode': user['invite_code'],
+                    'totalInvites': user['total_invites'],
+                    'inviteEarnings': user['invite_earnings'],
+                    'rewards': REFERRAL_REWARDS
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_invite_list(self, request: web.Request) -> web.Response:
+        """獲取邀請列表"""
+        try:
+            auth_header = request.headers.get('Authorization', '')
+            if not auth_header.startswith('Bearer '):
+                return web.json_response({'success': False, 'message': '未授權'}, status=401)
+            
+            token = auth_header[7:]
+            payload = self._verify_token(token)
+            if not payload:
+                return web.json_response({'success': False, 'message': 'Token 無效'}, status=401)
+            
+            referrals = self.db.get_referrals(inviter_id=payload['user_id'])
+            
+            return web.json_response({
+                'success': True,
+                'data': referrals
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_products(self, request: web.Request) -> web.Response:
+        """獲取產品列表"""
+        try:
+            products = []
+            for level, config in MEMBERSHIP_LEVELS.items():
+                if level == 'bronze':
+                    continue
+                for duration, price in config['prices'].items():
+                    if price > 0:
+                        products.append({
+                            'id': f"{level}_{duration}",
+                            'level': level,
+                            'levelName': config['name'],
+                            'levelIcon': config['icon'],
+                            'duration': duration,
+                            'durationName': {'week': '周卡', 'month': '月卡', 'quarter': '季卡', 
+                                           'year': '年卡', 'lifetime': '終身'}[duration],
+                            'price': price,
+                            'quotas': config['quotas'],
+                            'features': config['features']
+                        })
+            
+            return web.json_response({
+                'success': True,
+                'data': products
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_create_payment(self, request: web.Request) -> web.Response:
+        """創建支付訂單"""
+        try:
+            data = await request.json()
+            product_id = data.get('product_id', '')
+            payment_method = data.get('payment_method', 'usdt')
+            machine_id = data.get('machine_id', '')
+            
+            # 解析產品 ID
+            parts = product_id.split('_')
+            if len(parts) != 2:
+                return web.json_response({'success': False, 'message': '無效的產品ID'}, status=400)
+            
+            level, duration = parts
+            if level not in MEMBERSHIP_LEVELS or duration not in ['week', 'month', 'quarter', 'year', 'lifetime']:
+                return web.json_response({'success': False, 'message': '無效的產品'}, status=400)
+            
+            price = MEMBERSHIP_LEVELS[level]['prices'][duration]
+            order_id = f"TGO{int(time.time())}{secrets.token_hex(4).upper()}"
+            
+            # USDT 匯率
+            usdt_rate = float(self.db.get_setting('usdt_rate', '7.2'))
+            usdt_amount = round(price / usdt_rate, 2)
+            usdt_address = self.db.get_setting('usdt_trc20_address', '')
+            
+            response_data = {
+                'orderId': order_id,
+                'product': {
+                    'level': level,
+                    'levelName': MEMBERSHIP_LEVELS[level]['name'],
+                    'duration': duration,
+                    'price': price
+                },
+                'amount': price,
+                'currency': 'CNY'
+            }
+            
+            if payment_method == 'usdt':
+                response_data['usdt'] = {
+                    'amount': usdt_amount,
+                    'network': 'TRC20',
+                    'address': usdt_address,
+                    'rate': usdt_rate
+                }
+            
+            return web.json_response({
+                'success': True,
+                'data': response_data
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_payment_callback(self, request: web.Request) -> web.Response:
+        """支付回調"""
+        # TODO: 實現實際的支付回調處理
+        return web.json_response({'success': True, 'message': '回調處理成功'})
+    
+    async def handle_announcements(self, request: web.Request) -> web.Response:
+        """獲取公告列表"""
         try:
             conn = self.db.get_connection()
             cursor = conn.cursor()
-            
-            # 確保日誌表存在
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS admin_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT NOT NULL,
-                    action TEXT NOT NULL,
-                    details TEXT,
-                    ip_address TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
+                SELECT * FROM announcements 
+                WHERE status = 'published' 
+                AND (publish_at IS NULL OR publish_at <= datetime('now'))
+                AND (expire_at IS NULL OR expire_at > datetime('now'))
+                ORDER BY is_pinned DESC, priority DESC, created_at DESC
+                LIMIT 20
             ''')
-            
-            cursor.execute('''
-                INSERT INTO admin_logs (username, action, details)
-                VALUES (?, ?, ?)
-            ''', (username, action, details))
-            
-            conn.commit()
+            announcements = [dict(row) for row in cursor.fetchall()]
             conn.close()
+            
+            return web.json_response({
+                'success': True,
+                'data': announcements
+            })
         except Exception as e:
-            print(f"記錄日誌失敗: {e}")
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_stats(self, request: web.Request) -> web.Response:
+        """公開統計"""
+        try:
+            dashboard = self.db.get_dashboard_stats()
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'totalUsers': dashboard['stats']['totalUsers'],
+                    'paidUsers': dashboard['stats']['paidUsers']
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    # ============ 管理員 API 處理器 ============
     
     async def handle_admin_login(self, request: web.Request) -> web.Response:
         """管理員登錄"""
@@ -789,21 +771,17 @@ class LicenseServer:
             if not username or not password:
                 return web.json_response({'success': False, 'message': '用戶名和密碼不能為空'}, status=400)
             
-            # 檢查用戶是否存在
-            admin = ADMIN_USERS.get(username)
+            admin = self.db.get_admin(username)
             if not admin:
                 return web.json_response({'success': False, 'message': '用戶名或密碼錯誤'}, status=401)
             
-            # 驗證密碼
             password_hash = hashlib.sha256(password.encode()).hexdigest()
             if password_hash != admin['password_hash']:
                 return web.json_response({'success': False, 'message': '用戶名或密碼錯誤'}, status=401)
             
-            # 生成 token
             token = self._generate_admin_token(username)
             
-            # 記錄登錄日誌
-            self._log_admin_action(username, 'login', f'IP: {self._get_client_ip(request)}')
+            self._log_admin_action(username, 'login', 'auth', ip_address=self._get_client_ip(request))
             
             return web.json_response({
                 'success': True,
@@ -824,16 +802,16 @@ class LicenseServer:
         """管理員登出"""
         admin = self._get_admin_from_request(request)
         if admin:
-            self._log_admin_action(admin['username'], 'logout', '')
+            self._log_admin_action(admin['username'], 'logout', 'auth')
         return web.json_response({'success': True, 'message': '已登出'})
     
     async def handle_admin_verify(self, request: web.Request) -> web.Response:
         """驗證管理員 token"""
-        admin = self._get_admin_from_request(request)
-        if not admin:
-            return web.json_response({'success': False, 'message': 'Token 無效或已過期'}, status=401)
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
         
-        admin_info = ADMIN_USERS.get(admin['username'])
+        admin_info = self.db.get_admin(admin['username'])
         return web.json_response({
             'success': True,
             'data': {
@@ -845,9 +823,9 @@ class LicenseServer:
     
     async def handle_admin_change_password(self, request: web.Request) -> web.Response:
         """修改管理員密碼"""
-        admin = self._get_admin_from_request(request)
-        if not admin:
-            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
         
         try:
             data = await request.json()
@@ -860,251 +838,337 @@ class LicenseServer:
             if len(new_password) < 6:
                 return web.json_response({'success': False, 'message': '新密碼至少6位'}, status=400)
             
-            # 驗證舊密碼
-            admin_info = ADMIN_USERS.get(admin['username'])
+            admin_info = self.db.get_admin(admin['username'])
             old_hash = hashlib.sha256(old_password.encode()).hexdigest()
             if old_hash != admin_info['password_hash']:
                 return web.json_response({'success': False, 'message': '舊密碼錯誤'}, status=400)
             
-            # 更新密碼（注意：這裡只是更新內存中的值，重啟後會重置）
-            # 生產環境應該保存到數據庫或配置文件
-            ADMIN_USERS[admin['username']]['password_hash'] = hashlib.sha256(new_password.encode()).hexdigest()
+            # 更新密碼
+            new_hash = hashlib.sha256(new_password.encode()).hexdigest()
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('UPDATE admins SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE username = ?',
+                          (new_hash, admin['username']))
+            conn.commit()
+            conn.close()
             
-            self._log_admin_action(admin['username'], 'change_password', '')
+            self._log_admin_action(admin['username'], 'change_password', 'auth')
             
             return web.json_response({'success': True, 'message': '密碼已修改'})
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
-    # ============ 管理員數據 API ============
-    
     async def handle_admin_dashboard(self, request: web.Request) -> web.Response:
-        """管理儀表盤數據"""
+        """儀表盤數據"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
         try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
+            dashboard = self.db.get_dashboard_stats()
+            return web.json_response({
+                'success': True,
+                'data': dashboard
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_users(self, request: web.Request) -> web.Response:
+        """獲取用戶列表"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            level = request.query.get('level')
+            status = request.query.get('status')
+            limit = int(request.query.get('limit', 500))
+            offset = int(request.query.get('offset', 0))
             
-            # 總用戶數
-            cursor.execute('SELECT COUNT(*) as total FROM users')
-            total_users = cursor.fetchone()['total']
+            users_data = self.db.get_users(level=level, status=status, limit=limit, offset=offset)
             
-            # 今日新增用戶
-            today = datetime.now().strftime('%Y-%m-%d')
-            cursor.execute('SELECT COUNT(*) as total FROM users WHERE DATE(created_at) = ?', (today,))
-            new_users_today = cursor.fetchone()['total']
-            
-            # 付費用戶
-            cursor.execute("SELECT COUNT(*) as total FROM users WHERE membership_level != 'free' AND membership_level != 'bronze'")
-            paid_users = cursor.fetchone()['total']
-            
-            # 總收入
-            cursor.execute("SELECT COALESCE(SUM(price), 0) as total FROM licenses WHERE status = 'used'")
-            total_revenue = cursor.fetchone()['total']
-            
-            # 今日收入
-            cursor.execute("SELECT COALESCE(SUM(price), 0) as total FROM licenses WHERE status = 'used' AND DATE(used_at) = ?", (today,))
-            revenue_today = cursor.fetchone()['total']
-            
-            # 卡密統計
-            cursor.execute('SELECT COUNT(*) as total FROM licenses')
-            total_licenses = cursor.fetchone()['total']
-            
-            cursor.execute("SELECT COUNT(*) as total FROM licenses WHERE status = 'unused'")
-            unused_licenses = cursor.fetchone()['total']
-            
-            # 會員等級分布
-            cursor.execute('''
-                SELECT membership_level, COUNT(*) as count 
-                FROM users 
-                GROUP BY membership_level
-            ''')
-            level_distribution = {row['membership_level'] or 'bronze': row['count'] for row in cursor.fetchall()}
-            
-            # 近7天收入趨勢
-            revenue_trend = []
-            for i in range(6, -1, -1):
-                date = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
-                cursor.execute("SELECT COALESCE(SUM(price), 0) as total FROM licenses WHERE status = 'used' AND DATE(used_at) = ?", (date,))
-                revenue_trend.append({
-                    'date': date,
-                    'revenue': cursor.fetchone()['total']
+            users = []
+            for u in users_data:
+                level_config = MEMBERSHIP_LEVELS.get(u['membership_level'] or 'bronze', MEMBERSHIP_LEVELS['bronze'])
+                users.append({
+                    'id': u['id'],
+                    'userId': u['user_id'],
+                    'email': u['email'],
+                    'nickname': u['nickname'],
+                    'machineId': u['machine_id'],
+                    'level': u['membership_level'] or 'bronze',
+                    'levelName': level_config['name'],
+                    'levelIcon': level_config['icon'],
+                    'expiresAt': u['expires_at'],
+                    'isLifetime': u['is_lifetime'],
+                    'totalSpent': u['total_spent'] or 0,
+                    'inviteCode': u['invite_code'],
+                    'totalInvites': u['total_invites'],
+                    'inviteEarnings': u['invite_earnings'],
+                    'status': u['status'],
+                    'isBanned': u['is_banned'],
+                    'createdAt': u['created_at'],
+                    'lastActiveAt': u['last_active_at'],
+                    'referralCount': u.get('referral_count', 0)
                 })
             
-            # 卡密分類統計
-            license_stats = {}
-            levels = [('silver', '白銀精英', '🥈'), ('gold', '黃金大師', '🥇'), 
-                     ('diamond', '鑽石王牌', '💎'), ('star', '星耀傳說', '🌟'), ('king', '榮耀王者', '👑')]
-            for level, name, icon in levels:
-                cursor.execute("SELECT COUNT(*) as total FROM licenses WHERE level = ?", (level,))
-                total = cursor.fetchone()['total']
-                cursor.execute("SELECT COUNT(*) as total FROM licenses WHERE level = ? AND status = 'unused'", (level,))
-                unused = cursor.fetchone()['total']
-                license_stats[level] = {'name': name, 'icon': icon, 'total': total, 'unused': unused}
+            return web.json_response({'success': True, 'data': users})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_user_detail(self, request: web.Request) -> web.Response:
+        """獲取用戶詳情"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            user_id = request.match_info['user_id']
+            user = self.db.get_user(user_id=user_id)
+            
+            if not user:
+                return web.json_response({'success': False, 'message': '用戶不存在'}, status=404)
+            
+            level_config = MEMBERSHIP_LEVELS.get(user['membership_level'] or 'bronze', MEMBERSHIP_LEVELS['bronze'])
+            
+            # 獲取用戶的卡密記錄
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM licenses WHERE used_by = ? ORDER BY used_at DESC LIMIT 20
+            ''', (user_id,))
+            licenses = [dict(row) for row in cursor.fetchall()]
+            
+            # 獲取邀請記錄
+            referrals = self.db.get_referrals(inviter_id=user_id)
             
             conn.close()
             
             return web.json_response({
                 'success': True,
                 'data': {
-                    'stats': {
-                        'totalUsers': total_users,
-                        'newUsersToday': new_users_today,
-                        'paidUsers': paid_users,
-                        'conversionRate': round((paid_users / total_users * 100) if total_users > 0 else 0, 1),
-                        'totalRevenue': total_revenue,
-                        'revenueToday': revenue_today,
-                        'totalLicenses': total_licenses,
-                        'unusedLicenses': unused_licenses
+                    'user': {
+                        **user,
+                        'levelName': level_config['name'],
+                        'levelIcon': level_config['icon'],
+                        'quotas': level_config['quotas']
                     },
-                    'levelDistribution': level_distribution,
-                    'revenueTrend': revenue_trend,
-                    'licenseStats': license_stats
+                    'licenses': licenses,
+                    'referrals': referrals
                 }
             })
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
-    async def handle_admin_users(self, request: web.Request) -> web.Response:
-        """獲取所有用戶"""
+    async def handle_admin_user_update(self, request: web.Request) -> web.Response:
+        """更新用戶信息"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
         try:
+            user_id = request.match_info['user_id']
+            data = await request.json()
+            
+            allowed_fields = ['email', 'nickname', 'membership_level', 'expires_at', 'balance', 'status']
+            updates = {k: v for k, v in data.items() if k in allowed_fields}
+            
+            if updates:
+                success = self.db.update_user(user_id, **updates)
+                if success:
+                    self._log_admin_action(admin['username'], 'update_user', 'user', 
+                                          'user', user_id, json.dumps(updates))
+                    return web.json_response({'success': True, 'message': '更新成功'})
+            
+            return web.json_response({'success': False, 'message': '無有效更新'}, status=400)
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_user_extend(self, request: web.Request) -> web.Response:
+        """延長用戶會員"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            user_id = request.match_info['user_id']
+            data = await request.json()
+            days = int(data.get('days', 30))
+            level = data.get('level')
+            
+            user = self.db.get_user(user_id=user_id)
+            if not user:
+                return web.json_response({'success': False, 'message': '用戶不存在'}, status=404)
+            
+            # 計算新過期時間
+            current_expires = user.get('expires_at')
+            if current_expires:
+                current_expires = datetime.fromisoformat(current_expires)
+                if current_expires < datetime.now():
+                    current_expires = datetime.now()
+            else:
+                current_expires = datetime.now()
+            
+            new_expires = current_expires + timedelta(days=days)
+            
+            updates = {'expires_at': new_expires.isoformat()}
+            if level:
+                updates['membership_level'] = level
+            
+            self.db.update_user(user_id, **updates)
+            
+            # 創建續費卡密記錄
+            license_key = f"TGAI-EXT-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}"
             conn = self.db.get_connection()
             cursor = conn.cursor()
-            
             cursor.execute('''
-                SELECT u.*, 
-                    (SELECT MAX(expires_at) FROM licenses l WHERE l.machine_id = u.machine_id) as expires_at
-                FROM users u 
-                ORDER BY u.created_at DESC
-                LIMIT 500
-            ''')
-            
-            users = []
-            for row in cursor.fetchall():
-                user = dict(row)
-                users.append({
-                    'id': user['id'],
-                    'email': user['email'],
-                    'machineId': user['machine_id'],
-                    'level': user['membership_level'] or 'bronze',
-                    'expiresAt': user.get('expires_at'),
-                    'totalSpent': user['total_spent'] or 0,
-                    'createdAt': user['created_at'],
-                    'inviteCode': user['invite_code']
-                })
-            
+                INSERT INTO licenses (license_key, type_code, level, duration_type, duration_days, 
+                                     status, used_by, used_at, machine_id, activated_at, expires_at, notes, created_by)
+                VALUES (?, 'EXT', ?, 'custom', ?, 'used', ?, ?, ?, ?, ?, '管理員手動續費', ?)
+            ''', (license_key, level or user['membership_level'], days, user_id, 
+                  datetime.now().isoformat(), user['machine_id'], datetime.now().isoformat(),
+                  new_expires.isoformat(), admin['username']))
+            conn.commit()
             conn.close()
             
-            return web.json_response({'success': True, 'data': users})
+            self._log_admin_action(admin['username'], 'extend_user', 'user',
+                                  'user', user_id, f'days={days}, level={level}')
+            
+            return web.json_response({
+                'success': True,
+                'message': f'已為用戶延長 {days} 天會員',
+                'data': {'expiresAt': new_expires.isoformat()}
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_user_ban(self, request: web.Request) -> web.Response:
+        """封禁/解封用戶"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            user_id = request.match_info['user_id']
+            data = await request.json()
+            is_banned = data.get('is_banned', True)
+            ban_reason = data.get('reason', '')
+            
+            self.db.update_user(user_id, is_banned=1 if is_banned else 0, ban_reason=ban_reason)
+            
+            action = 'ban_user' if is_banned else 'unban_user'
+            self._log_admin_action(admin['username'], action, 'user', 'user', user_id, ban_reason)
+            
+            return web.json_response({
+                'success': True,
+                'message': '用戶已封禁' if is_banned else '用戶已解封'
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_extend_user_legacy(self, request: web.Request) -> web.Response:
+        """舊版延長用戶會員 (兼容)"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            data = await request.json()
+            machine_id = data.get('machine_id', '')
+            days = int(data.get('days', 30))
+            level = data.get('level')
+            
+            if not machine_id:
+                return web.json_response({'success': False, 'message': '缺少機器碼'}, status=400)
+            
+            user = self.db.get_user(machine_id=machine_id)
+            if not user:
+                return web.json_response({'success': False, 'message': '用戶不存在'}, status=404)
+            
+            # 重用新版邏輯
+            request.match_info['user_id'] = user['user_id']
+            return await self.handle_admin_user_extend(request)
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
     async def handle_admin_licenses(self, request: web.Request) -> web.Response:
-        """獲取所有卡密"""
+        """獲取卡密列表"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
         try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
+            status = request.query.get('status')
+            level = request.query.get('level')
+            limit = int(request.query.get('limit', 500))
             
-            cursor.execute('SELECT * FROM licenses ORDER BY created_at DESC LIMIT 1000')
+            licenses_data = self.db.get_licenses(status=status, level=level, limit=limit)
             
             licenses = []
-            level_names = {
-                'silver': '🥈 白銀月卡', 'gold': '🥇 黃金月卡',
-                'diamond': '💎 鑽石月卡', 'star': '🌟 星耀月卡', 'king': '👑 王者月卡'
-            }
-            
-            for row in cursor.fetchall():
-                lic = dict(row)
-                days = lic['duration_days']
-                duration_suffix = '周卡' if days == 7 else '月卡' if days == 30 else '季卡' if days == 90 else '年卡'
-                level_icon = {'silver': '🥈', 'gold': '🥇', 'diamond': '💎', 'star': '🌟', 'king': '👑'}.get(lic['level'], '🎫')
-                level_name = {'silver': '白銀', 'gold': '黃金', 'diamond': '鑽石', 'star': '星耀', 'king': '王者'}.get(lic['level'], lic['level'])
+            for lic in licenses_data:
+                level_config = MEMBERSHIP_LEVELS.get(lic['level'], {})
+                duration_name = {'week': '周卡', 'month': '月卡', 'quarter': '季卡', 
+                               'year': '年卡', 'lifetime': '終身', 'custom': '自定義'}.get(lic['duration_type'], lic['duration_type'])
                 
                 licenses.append({
                     'key': lic['license_key'],
-                    'typeName': f"{level_icon} {level_name}{duration_suffix}",
                     'level': lic['level'],
-                    'days': days,
+                    'levelName': level_config.get('name', lic['level']),
+                    'levelIcon': level_config.get('icon', '🎫'),
+                    'typeName': f"{level_config.get('icon', '🎫')} {level_config.get('name', lic['level'])}{duration_name}",
+                    'durationType': lic['duration_type'],
+                    'days': lic['duration_days'],
                     'price': lic['price'] or 0,
                     'status': lic['status'],
+                    'batchId': lic['batch_id'],
                     'createdAt': lic['created_at'][:10] if lic['created_at'] else '',
-                    'usedAt': lic['used_at'][:10] if lic['used_at'] else None
+                    'usedAt': lic['used_at'][:10] if lic['used_at'] else None,
+                    'usedBy': lic['used_by']
                 })
-            
-            conn.close()
             
             return web.json_response({'success': True, 'data': licenses})
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
-    async def handle_admin_orders(self, request: web.Request) -> web.Response:
-        """獲取所有訂單"""
-        try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-            
-            cursor.execute('SELECT * FROM payments ORDER BY created_at DESC LIMIT 500')
-            
-            orders = []
-            for row in cursor.fetchall():
-                order = dict(row)
-                orders.append({
-                    'id': order['id'],
-                    'orderId': order['order_id'],
-                    'productName': f"會員卡 ¥{order['amount']}",
-                    'amount': order['amount'],
-                    'paymentMethod': order['payment_method'] or '未知',
-                    'status': order['status'],
-                    'createdAt': order['created_at']
-                })
-            
-            conn.close()
-            
-            return web.json_response({'success': True, 'data': orders})
-        except Exception as e:
-            return web.json_response({'success': False, 'message': str(e)}, status=500)
-    
     async def handle_admin_generate(self, request: web.Request) -> web.Response:
         """生成卡密"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
         try:
             data = await request.json()
-            level_code = data.get('level', 'G')  # B, G, D, S, K
-            duration_code = data.get('duration', '2')  # 1, 2, 3, Y
-            count = min(int(data.get('count', 10)), 100)  # 最多100個
+            level_code = data.get('level', 'G')
+            duration_code = data.get('duration', '2')
+            count = min(int(data.get('count', 10)), 100)
             notes = data.get('notes', '')
             
-            # 等級映射
+            # 映射
             levels = {'B': 'silver', 'G': 'gold', 'D': 'diamond', 'S': 'star', 'K': 'king'}
-            durations = {'1': 7, '2': 30, '3': 90, 'Y': 365}
-            prices = {
-                'B': {'1': 15, '2': 49, '3': 129, 'Y': 399},
-                'G': {'1': 29, '2': 99, '3': 249, 'Y': 799},
-                'D': {'1': 59, '2': 199, '3': 499, 'Y': 1599},
-                'S': {'1': 119, '2': 399, '3': 999, 'Y': 2999},
-                'K': {'1': 299, '2': 999, '3': 2499, 'Y': 6999}
-            }
+            durations = {'1': 'week', '2': 'month', '3': 'quarter', 'Y': 'year', 'L': 'lifetime'}
             
             level = levels.get(level_code, 'gold')
-            days = durations.get(duration_code, 30)
-            price = prices.get(level_code, {}).get(duration_code, 99)
-            type_code = f"{level_code}{duration_code}"
-            batch_id = f"BATCH-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            duration = durations.get(duration_code, 'month')
             
-            generated = []
-            for _ in range(count):
-                key = f"TGM-{type_code}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}"
-                if self.db.create_license(key, type_code, level, days, price, batch_id, notes):
-                    generated.append(key)
+            keys = self.db.generate_licenses(level, duration, count, notes=notes, created_by=admin['username'])
+            
+            self._log_admin_action(admin['username'], 'generate_licenses', 'license',
+                                  details=f'level={level}, duration={duration}, count={len(keys)}')
             
             return web.json_response({
                 'success': True,
-                'message': f'成功生成 {len(generated)} 個卡密',
-                'data': {'keys': generated, 'batchId': batch_id}
+                'message': f'成功生成 {len(keys)} 個卡密',
+                'data': {'keys': keys, 'count': len(keys)}
             })
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
     async def handle_admin_disable(self, request: web.Request) -> web.Response:
         """禁用卡密"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
         try:
             data = await request.json()
             license_key = data.get('license_key', '')
@@ -1118,245 +1182,317 @@ class LicenseServer:
             conn.commit()
             conn.close()
             
+            self._log_admin_action(admin['username'], 'disable_license', 'license',
+                                  'license', license_key)
+            
             return web.json_response({'success': True, 'message': '卡密已禁用'})
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
-    async def handle_admin_save_settings(self, request: web.Request) -> web.Response:
-        """保存系統設置"""
+    async def handle_admin_export_licenses(self, request: web.Request) -> web.Response:
+        """導出卡密"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
         try:
             data = await request.json()
-            # TODO: 保存到配置文件或數據庫
-            return web.json_response({'success': True, 'message': '設置已保存'})
+            status = data.get('status', 'unused')
+            level = data.get('level')
+            
+            licenses = self.db.get_licenses(status=status, level=level, limit=10000)
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'licenses': [{'key': l['license_key'], 'level': l['level'], 
+                                 'duration': l['duration_type'], 'status': l['status']} 
+                                for l in licenses]
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_orders(self, request: web.Request) -> web.Response:
+        """獲取訂單列表"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM orders ORDER BY created_at DESC LIMIT 500')
+            orders = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            
+            return web.json_response({'success': True, 'data': orders})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_referrals(self, request: web.Request) -> web.Response:
+        """獲取邀請記錄"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            limit = int(request.query.get('limit', 200))
+            referrals = self.db.get_referrals(limit=limit)
+            
+            return web.json_response({'success': True, 'data': referrals})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_referral_stats(self, request: web.Request) -> web.Response:
+        """邀請統計"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # 總邀請數
+            cursor.execute('SELECT COUNT(*) as total FROM referrals')
+            total_referrals = cursor.fetchone()['total']
+            
+            # 總獎勵
+            cursor.execute('SELECT COALESCE(SUM(inviter_reward_cash + commission_amount), 0) as total FROM referrals')
+            total_earnings = cursor.fetchone()['total']
+            
+            # 邀請排行榜
+            cursor.execute('''
+                SELECT u.user_id, u.email, u.nickname, u.invite_code, u.total_invites, u.invite_earnings
+                FROM users u
+                WHERE u.total_invites > 0
+                ORDER BY u.total_invites DESC
+                LIMIT 20
+            ''')
+            leaderboard = [dict(row) for row in cursor.fetchall()]
+            
+            conn.close()
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'totalReferrals': total_referrals,
+                    'totalEarnings': total_earnings,
+                    'leaderboard': leaderboard,
+                    'rewards': REFERRAL_REWARDS
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_announcements(self, request: web.Request) -> web.Response:
+        """獲取公告列表 (管理)"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM announcements ORDER BY created_at DESC LIMIT 100')
+            announcements = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            
+            return web.json_response({'success': True, 'data': announcements})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_create_announcement(self, request: web.Request) -> web.Response:
+        """創建公告"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            data = await request.json()
+            title = data.get('title', '')
+            content = data.get('content', '')
+            announcement_type = data.get('type', 'info')
+            is_popup = data.get('is_popup', False)
+            is_pinned = data.get('is_pinned', False)
+            status = data.get('status', 'draft')
+            
+            if not title or not content:
+                return web.json_response({'success': False, 'message': '標題和內容不能為空'}, status=400)
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO announcements (title, content, announcement_type, is_popup, is_pinned, status, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (title, content, announcement_type, 1 if is_popup else 0, 1 if is_pinned else 0, status, admin['username']))
+            conn.commit()
+            announcement_id = cursor.lastrowid
+            conn.close()
+            
+            self._log_admin_action(admin['username'], 'create_announcement', 'announcement',
+                                  'announcement', str(announcement_id))
+            
+            return web.json_response({'success': True, 'message': '公告已創建', 'data': {'id': announcement_id}})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_update_announcement(self, request: web.Request) -> web.Response:
+        """更新公告"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            announcement_id = request.match_info['id']
+            data = await request.json()
+            
+            updates = []
+            values = []
+            for key in ['title', 'content', 'announcement_type', 'is_popup', 'is_pinned', 'status', 'publish_at', 'expire_at']:
+                if key in data:
+                    updates.append(f"{key} = ?")
+                    values.append(data[key])
+            
+            if updates:
+                updates.append("updated_at = CURRENT_TIMESTAMP")
+                values.append(announcement_id)
+                
+                conn = self.db.get_connection()
+                cursor = conn.cursor()
+                cursor.execute(f"UPDATE announcements SET {', '.join(updates)} WHERE id = ?", values)
+                conn.commit()
+                conn.close()
+                
+                self._log_admin_action(admin['username'], 'update_announcement', 'announcement',
+                                      'announcement', announcement_id)
+            
+            return web.json_response({'success': True, 'message': '公告已更新'})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_delete_announcement(self, request: web.Request) -> web.Response:
+        """刪除公告"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            announcement_id = request.match_info['id']
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM announcements WHERE id = ?', (announcement_id,))
+            conn.commit()
+            conn.close()
+            
+            self._log_admin_action(admin['username'], 'delete_announcement', 'announcement',
+                                  'announcement', announcement_id)
+            
+            return web.json_response({'success': True, 'message': '公告已刪除'})
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
     async def handle_admin_get_settings(self, request: web.Request) -> web.Response:
         """獲取系統設置"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
         try:
-            # TODO: 從配置文件或數據庫讀取
-            settings = {
-                'prices': {
-                    'silver': {'name': '🥈 白銀精英', 'monthly': 49},
-                    'gold': {'name': '🥇 黃金大師', 'monthly': 99},
-                    'diamond': {'name': '💎 鑽石王牌', 'monthly': 199},
-                    'star': {'name': '🌟 星耀傳說', 'monthly': 399},
-                    'king': {'name': '👑 榮耀王者', 'monthly': 999}
-                },
-                'payment': {
-                    'alipayAppId': '',
-                    'wechatMchId': '',
-                    'usdtAddress': os.environ.get('USDT_TRC20_ADDRESS', '')
-                }
+            settings = self.db.get_all_settings()
+            
+            # 格式化設置
+            formatted = {
+                'general': {},
+                'payment': {},
+                'membership': {},
+                'referral': {}
             }
-            return web.json_response({'success': True, 'data': settings})
+            
+            for key, value in settings.items():
+                category = value.get('category', 'general')
+                if category not in formatted:
+                    formatted[category] = {}
+                formatted[category][key] = value['value']
+            
+            # 添加價格配置
+            formatted['prices'] = {
+                level: {
+                    'name': config['name'],
+                    'icon': config['icon'],
+                    'prices': config['prices'],
+                    'quotas': config['quotas']
+                }
+                for level, config in MEMBERSHIP_LEVELS.items()
+            }
+            
+            return web.json_response({'success': True, 'data': formatted})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_save_settings(self, request: web.Request) -> web.Response:
+        """保存系統設置"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            data = await request.json()
+            
+            for key, value in data.items():
+                if isinstance(value, (dict, list)):
+                    value = json.dumps(value)
+                self.db.set_setting(key, str(value), admin['username'])
+            
+            self._log_admin_action(admin['username'], 'save_settings', 'settings',
+                                  details=f'keys={list(data.keys())}')
+            
+            return web.json_response({'success': True, 'message': '設置已保存'})
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
     async def handle_admin_logs(self, request: web.Request) -> web.Response:
         """獲取操作日誌"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
         try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-            
-            # 確保日誌表存在
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS admin_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT NOT NULL,
-                    action TEXT NOT NULL,
-                    details TEXT,
-                    ip_address TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            cursor.execute('SELECT * FROM admin_logs ORDER BY created_at DESC LIMIT 100')
-            
-            logs = []
-            for row in cursor.fetchall():
-                log = dict(row)
-                logs.append({
-                    'id': log['id'],
-                    'username': log['username'],
-                    'action': log['action'],
-                    'details': log['details'],
-                    'createdAt': log['created_at']
-                })
-            
-            conn.close()
+            limit = int(request.query.get('limit', 100))
+            logs = self.db.get_admin_logs(limit=limit)
             
             return web.json_response({'success': True, 'data': logs})
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
-    async def handle_admin_extend_user(self, request: web.Request) -> web.Response:
-        """為用戶延長會員時間"""
-        admin = self._get_admin_from_request(request)
+    async def handle_admin_quotas(self, request: web.Request) -> web.Response:
+        """獲取配額配置"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
         
         try:
-            data = await request.json()
-            machine_id = data.get('machine_id', '')
-            days = int(data.get('days', 30))
-            level = data.get('level', None)  # 可選：同時升級等級
+            quotas = {
+                level: {
+                    'name': config['name'],
+                    'icon': config['icon'],
+                    'quotas': config['quotas'],
+                    'features': config['features']
+                }
+                for level, config in MEMBERSHIP_LEVELS.items()
+            }
             
-            if not machine_id:
-                return web.json_response({'success': False, 'message': '缺少機器碼'}, status=400)
-            
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-            
-            # 獲取用戶當前最新的卡密
-            cursor.execute('''
-                SELECT * FROM licenses 
-                WHERE machine_id = ? AND status = 'used'
-                ORDER BY expires_at DESC
-                LIMIT 1
-            ''', (machine_id,))
-            
-            license_row = cursor.fetchone()
-            
-            if license_row:
-                current_license = dict(license_row)
-                current_expires = datetime.fromisoformat(current_license['expires_at']) if current_license['expires_at'] else datetime.now()
-                
-                # 如果已過期，從現在開始計算
-                if current_expires < datetime.now():
-                    current_expires = datetime.now()
-                
-                new_expires = current_expires + timedelta(days=days)
-                
-                # 更新過期時間
-                cursor.execute('''
-                    UPDATE licenses SET expires_at = ?
-                    WHERE license_key = ?
-                ''', (new_expires.isoformat(), current_license['license_key']))
-                
-                # 如果需要升級等級
-                if level:
-                    cursor.execute('''
-                        UPDATE licenses SET level = ?
-                        WHERE license_key = ?
-                    ''', (level, current_license['license_key']))
-                    
-                    cursor.execute('''
-                        UPDATE users SET membership_level = ?
-                        WHERE machine_id = ?
-                    ''', (level, machine_id))
-            else:
-                # 沒有卡密記錄，直接創建一個
-                license_key = f"TGM-EXT-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}"
-                new_level = level or 'gold'
-                new_expires = datetime.now() + timedelta(days=days)
-                
-                cursor.execute('''
-                    INSERT INTO licenses (license_key, type_code, level, duration_days, status, machine_id, used_at, expires_at, notes)
-                    VALUES (?, ?, ?, ?, 'used', ?, ?, ?, ?)
-                ''', (license_key, 'EXT', new_level, days, machine_id, datetime.now().isoformat(), new_expires.isoformat(), '管理員手動續費'))
-                
-                # 更新用戶等級
-                cursor.execute('''
-                    UPDATE users SET membership_level = ?
-                    WHERE machine_id = ?
-                ''', (new_level, machine_id))
-            
-            conn.commit()
-            conn.close()
-            
-            # 記錄操作
-            if admin:
-                self._log_admin_action(admin['username'], 'extend_user', f'machine_id={machine_id}, days={days}')
-            
-            return web.json_response({
-                'success': True,
-                'message': f'已為用戶延長 {days} 天會員'
-            })
+            return web.json_response({'success': True, 'data': quotas})
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
     def run(self):
         """啟動服務器"""
-        print(f"🚀 License Server starting on http://{self.host}:{self.port}")
+        print(f"🚀 {SERVER_NAME} License Server {SERVER_VERSION}")
+        print(f"📡 Starting on http://{self.host}:{self.port}")
         web.run_app(self.app, host=self.host, port=self.port)
-
-
-# ============ 客戶端 SDK ============
-
-class LicenseClient:
-    """卡密驗證客戶端"""
-    
-    def __init__(self, server_url: str = "http://localhost:8080"):
-        self.server_url = server_url.rstrip('/')
-        self._token: Optional[str] = None
-        self._license_key: Optional[str] = None
-        self._machine_id: Optional[str] = None
-    
-    async def validate(self, license_key: str) -> Tuple[bool, str, Optional[Dict]]:
-        """驗證卡密"""
-        async with aiohttp.ClientSession() as session:
-            try:
-                async with session.post(
-                    f"{self.server_url}/api/license/validate",
-                    json={'license_key': license_key}
-                ) as resp:
-                    result = await resp.json()
-                    return result.get('success', False), result.get('message', ''), result.get('data')
-            except Exception as e:
-                return False, f"連接服務器失敗: {e}", None
-    
-    async def activate(self, license_key: str, machine_id: str, 
-                      email: str = "") -> Tuple[bool, str, Optional[Dict]]:
-        """激活卡密"""
-        async with aiohttp.ClientSession() as session:
-            try:
-                async with session.post(
-                    f"{self.server_url}/api/license/activate",
-                    json={
-                        'license_key': license_key,
-                        'machine_id': machine_id,
-                        'email': email
-                    }
-                ) as resp:
-                    result = await resp.json()
-                    
-                    if result.get('success'):
-                        data = result.get('data', {})
-                        self._token = data.get('token')
-                        self._license_key = license_key
-                        self._machine_id = machine_id
-                    
-                    return result.get('success', False), result.get('message', ''), result.get('data')
-            except Exception as e:
-                return False, f"連接服務器失敗: {e}", None
-    
-    async def heartbeat(self, usage_data: Dict = None) -> Tuple[bool, str, Optional[Dict]]:
-        """心跳檢測"""
-        if not self._token and not (self._license_key and self._machine_id):
-            return False, "未激活", None
-        
-        async with aiohttp.ClientSession() as session:
-            try:
-                payload = {'usage': usage_data or {}}
-                
-                if self._token:
-                    payload['token'] = self._token
-                else:
-                    payload['license_key'] = self._license_key
-                    payload['machine_id'] = self._machine_id
-                
-                async with session.post(
-                    f"{self.server_url}/api/license/heartbeat",
-                    json=payload
-                ) as resp:
-                    result = await resp.json()
-                    
-                    if result.get('success'):
-                        data = result.get('data', {})
-                        self._token = data.get('token', self._token)
-                    
-                    return result.get('success', False), result.get('message', ''), result.get('data')
-            except Exception as e:
-                return False, f"連接服務器失敗: {e}", None
 
 
 # ============ 命令行 ============
@@ -1364,10 +1500,13 @@ class LicenseClient:
 def main():
     import argparse
     
-    parser = argparse.ArgumentParser(description='TG-Matrix License Server')
-    parser.add_argument('command', choices=['run', 'init', 'stats'], help='命令')
+    parser = argparse.ArgumentParser(description=f'{SERVER_NAME} License Server')
+    parser.add_argument('command', choices=['run', 'init', 'stats', 'generate'], help='命令')
     parser.add_argument('--host', default='0.0.0.0', help='綁定地址')
     parser.add_argument('--port', type=int, default=8080, help='端口')
+    parser.add_argument('--level', default='gold', help='卡密等級')
+    parser.add_argument('--duration', default='month', help='卡密時長')
+    parser.add_argument('--count', type=int, default=10, help='生成數量')
     
     args = parser.parse_args()
     
@@ -1375,19 +1514,23 @@ def main():
         server = LicenseServer(args.host, args.port)
         server.run()
     elif args.command == 'init':
-        db = LicenseDatabase()
-        print("✅ 數據庫初始化完成")
+        db = Database()
+        print(f"✅ {SERVER_NAME} 數據庫初始化完成")
     elif args.command == 'stats':
-        db = LicenseDatabase()
-        stats = db.get_stats()
-        print("\n📊 統計數據")
-        print(f"  總卡密: {stats['total_licenses']}")
-        print(f"  未使用: {stats['unused_licenses']}")
-        print(f"  已使用: {stats['used_licenses']}")
-        print(f"  總用戶: {stats['total_users']}")
-        print(f"  付費用戶: {stats['paid_users']}")
-        print(f"  轉化率: {stats['conversion_rate']:.1f}%")
-        print(f"  總收入: ¥{stats['total_revenue']:.2f}")
+        db = Database()
+        stats = db.get_dashboard_stats()
+        print(f"\n📊 {SERVER_NAME} 統計數據")
+        print(f"  總用戶: {stats['stats']['totalUsers']}")
+        print(f"  付費用戶: {stats['stats']['paidUsers']}")
+        print(f"  總卡密: {stats['stats']['totalLicenses']}")
+        print(f"  可用卡密: {stats['stats']['unusedLicenses']}")
+        print(f"  總收入: ¥{stats['stats']['totalRevenue']:.2f}")
+    elif args.command == 'generate':
+        db = Database()
+        keys = db.generate_licenses(args.level, args.duration, args.count)
+        print(f"\n🎫 成功生成 {len(keys)} 個 {args.level} {args.duration} 卡密：")
+        for key in keys:
+            print(f"  {key}")
 
 
 if __name__ == '__main__':

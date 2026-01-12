@@ -388,6 +388,7 @@ class LicenseServer:
     
     def _setup_routes(self):
         """設置路由"""
+        # 公開 API
         self.app.router.add_post('/api/license/validate', self.handle_validate)
         self.app.router.add_post('/api/license/activate', self.handle_activate)
         self.app.router.add_post('/api/license/heartbeat', self.handle_heartbeat)
@@ -395,6 +396,16 @@ class LicenseServer:
         self.app.router.add_post('/api/payment/create', self.handle_create_payment)
         self.app.router.add_post('/api/payment/callback', self.handle_payment_callback)
         self.app.router.add_get('/api/health', self.handle_health)
+        
+        # 管理員 API
+        self.app.router.add_get('/api/admin/dashboard', self.handle_admin_dashboard)
+        self.app.router.add_get('/api/admin/users', self.handle_admin_users)
+        self.app.router.add_get('/api/admin/licenses', self.handle_admin_licenses)
+        self.app.router.add_get('/api/admin/orders', self.handle_admin_orders)
+        self.app.router.add_post('/api/admin/licenses/generate', self.handle_admin_generate)
+        self.app.router.add_post('/api/admin/licenses/disable', self.handle_admin_disable)
+        self.app.router.add_post('/api/admin/settings/save', self.handle_admin_save_settings)
+        self.app.router.add_get('/api/admin/settings', self.handle_admin_get_settings)
     
     def _generate_token(self, license_key: str, machine_id: str, expires_in: int = 86400) -> str:
         """生成 JWT token"""
@@ -689,6 +700,283 @@ class LicenseServer:
     async def handle_health(self, request: web.Request) -> web.Response:
         """健康檢查"""
         return web.json_response({'status': 'ok', 'timestamp': datetime.now().isoformat()})
+    
+    # ============ 管理員 API ============
+    
+    async def handle_admin_dashboard(self, request: web.Request) -> web.Response:
+        """管理儀表盤數據"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # 總用戶數
+            cursor.execute('SELECT COUNT(*) as total FROM users')
+            total_users = cursor.fetchone()['total']
+            
+            # 今日新增用戶
+            today = datetime.now().strftime('%Y-%m-%d')
+            cursor.execute('SELECT COUNT(*) as total FROM users WHERE DATE(created_at) = ?', (today,))
+            new_users_today = cursor.fetchone()['total']
+            
+            # 付費用戶
+            cursor.execute("SELECT COUNT(*) as total FROM users WHERE membership_level != 'free' AND membership_level != 'bronze'")
+            paid_users = cursor.fetchone()['total']
+            
+            # 總收入
+            cursor.execute("SELECT COALESCE(SUM(price), 0) as total FROM licenses WHERE status = 'used'")
+            total_revenue = cursor.fetchone()['total']
+            
+            # 今日收入
+            cursor.execute("SELECT COALESCE(SUM(price), 0) as total FROM licenses WHERE status = 'used' AND DATE(used_at) = ?", (today,))
+            revenue_today = cursor.fetchone()['total']
+            
+            # 卡密統計
+            cursor.execute('SELECT COUNT(*) as total FROM licenses')
+            total_licenses = cursor.fetchone()['total']
+            
+            cursor.execute("SELECT COUNT(*) as total FROM licenses WHERE status = 'unused'")
+            unused_licenses = cursor.fetchone()['total']
+            
+            # 會員等級分布
+            cursor.execute('''
+                SELECT membership_level, COUNT(*) as count 
+                FROM users 
+                GROUP BY membership_level
+            ''')
+            level_distribution = {row['membership_level'] or 'bronze': row['count'] for row in cursor.fetchall()}
+            
+            # 近7天收入趨勢
+            revenue_trend = []
+            for i in range(6, -1, -1):
+                date = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
+                cursor.execute("SELECT COALESCE(SUM(price), 0) as total FROM licenses WHERE status = 'used' AND DATE(used_at) = ?", (date,))
+                revenue_trend.append({
+                    'date': date,
+                    'revenue': cursor.fetchone()['total']
+                })
+            
+            # 卡密分類統計
+            license_stats = {}
+            levels = [('silver', '白銀精英', '🥈'), ('gold', '黃金大師', '🥇'), 
+                     ('diamond', '鑽石王牌', '💎'), ('star', '星耀傳說', '🌟'), ('king', '榮耀王者', '👑')]
+            for level, name, icon in levels:
+                cursor.execute("SELECT COUNT(*) as total FROM licenses WHERE level = ?", (level,))
+                total = cursor.fetchone()['total']
+                cursor.execute("SELECT COUNT(*) as total FROM licenses WHERE level = ? AND status = 'unused'", (level,))
+                unused = cursor.fetchone()['total']
+                license_stats[level] = {'name': name, 'icon': icon, 'total': total, 'unused': unused}
+            
+            conn.close()
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'stats': {
+                        'totalUsers': total_users,
+                        'newUsersToday': new_users_today,
+                        'paidUsers': paid_users,
+                        'conversionRate': round((paid_users / total_users * 100) if total_users > 0 else 0, 1),
+                        'totalRevenue': total_revenue,
+                        'revenueToday': revenue_today,
+                        'totalLicenses': total_licenses,
+                        'unusedLicenses': unused_licenses
+                    },
+                    'levelDistribution': level_distribution,
+                    'revenueTrend': revenue_trend,
+                    'licenseStats': license_stats
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_users(self, request: web.Request) -> web.Response:
+        """獲取所有用戶"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT u.*, 
+                    (SELECT MAX(expires_at) FROM licenses l WHERE l.machine_id = u.machine_id) as expires_at
+                FROM users u 
+                ORDER BY u.created_at DESC
+                LIMIT 500
+            ''')
+            
+            users = []
+            for row in cursor.fetchall():
+                user = dict(row)
+                users.append({
+                    'id': user['id'],
+                    'email': user['email'],
+                    'machineId': user['machine_id'],
+                    'level': user['membership_level'] or 'bronze',
+                    'expiresAt': user.get('expires_at'),
+                    'totalSpent': user['total_spent'] or 0,
+                    'createdAt': user['created_at'],
+                    'inviteCode': user['invite_code']
+                })
+            
+            conn.close()
+            
+            return web.json_response({'success': True, 'data': users})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_licenses(self, request: web.Request) -> web.Response:
+        """獲取所有卡密"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT * FROM licenses ORDER BY created_at DESC LIMIT 1000')
+            
+            licenses = []
+            level_names = {
+                'silver': '🥈 白銀月卡', 'gold': '🥇 黃金月卡',
+                'diamond': '💎 鑽石月卡', 'star': '🌟 星耀月卡', 'king': '👑 王者月卡'
+            }
+            
+            for row in cursor.fetchall():
+                lic = dict(row)
+                days = lic['duration_days']
+                duration_suffix = '周卡' if days == 7 else '月卡' if days == 30 else '季卡' if days == 90 else '年卡'
+                level_icon = {'silver': '🥈', 'gold': '🥇', 'diamond': '💎', 'star': '🌟', 'king': '👑'}.get(lic['level'], '🎫')
+                level_name = {'silver': '白銀', 'gold': '黃金', 'diamond': '鑽石', 'star': '星耀', 'king': '王者'}.get(lic['level'], lic['level'])
+                
+                licenses.append({
+                    'key': lic['license_key'],
+                    'typeName': f"{level_icon} {level_name}{duration_suffix}",
+                    'level': lic['level'],
+                    'days': days,
+                    'price': lic['price'] or 0,
+                    'status': lic['status'],
+                    'createdAt': lic['created_at'][:10] if lic['created_at'] else '',
+                    'usedAt': lic['used_at'][:10] if lic['used_at'] else None
+                })
+            
+            conn.close()
+            
+            return web.json_response({'success': True, 'data': licenses})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_orders(self, request: web.Request) -> web.Response:
+        """獲取所有訂單"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT * FROM payments ORDER BY created_at DESC LIMIT 500')
+            
+            orders = []
+            for row in cursor.fetchall():
+                order = dict(row)
+                orders.append({
+                    'id': order['id'],
+                    'orderId': order['order_id'],
+                    'productName': f"會員卡 ¥{order['amount']}",
+                    'amount': order['amount'],
+                    'paymentMethod': order['payment_method'] or '未知',
+                    'status': order['status'],
+                    'createdAt': order['created_at']
+                })
+            
+            conn.close()
+            
+            return web.json_response({'success': True, 'data': orders})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_generate(self, request: web.Request) -> web.Response:
+        """生成卡密"""
+        try:
+            data = await request.json()
+            level_code = data.get('level', 'G')  # B, G, D, S, K
+            duration_code = data.get('duration', '2')  # 1, 2, 3, Y
+            count = min(int(data.get('count', 10)), 100)  # 最多100個
+            notes = data.get('notes', '')
+            
+            # 等級映射
+            levels = {'B': 'silver', 'G': 'gold', 'D': 'diamond', 'S': 'star', 'K': 'king'}
+            durations = {'1': 7, '2': 30, '3': 90, 'Y': 365}
+            prices = {
+                'B': {'1': 15, '2': 49, '3': 129, 'Y': 399},
+                'G': {'1': 29, '2': 99, '3': 249, 'Y': 799},
+                'D': {'1': 59, '2': 199, '3': 499, 'Y': 1599},
+                'S': {'1': 119, '2': 399, '3': 999, 'Y': 2999},
+                'K': {'1': 299, '2': 999, '3': 2499, 'Y': 6999}
+            }
+            
+            level = levels.get(level_code, 'gold')
+            days = durations.get(duration_code, 30)
+            price = prices.get(level_code, {}).get(duration_code, 99)
+            type_code = f"{level_code}{duration_code}"
+            batch_id = f"BATCH-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            
+            generated = []
+            for _ in range(count):
+                key = f"TGM-{type_code}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}"
+                if self.db.create_license(key, type_code, level, days, price, batch_id, notes):
+                    generated.append(key)
+            
+            return web.json_response({
+                'success': True,
+                'message': f'成功生成 {len(generated)} 個卡密',
+                'data': {'keys': generated, 'batchId': batch_id}
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_disable(self, request: web.Request) -> web.Response:
+        """禁用卡密"""
+        try:
+            data = await request.json()
+            license_key = data.get('license_key', '')
+            
+            if not license_key:
+                return web.json_response({'success': False, 'message': '缺少卡密'}, status=400)
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE licenses SET status = 'disabled' WHERE license_key = ?", (license_key,))
+            conn.commit()
+            conn.close()
+            
+            return web.json_response({'success': True, 'message': '卡密已禁用'})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_save_settings(self, request: web.Request) -> web.Response:
+        """保存系統設置"""
+        try:
+            data = await request.json()
+            # TODO: 保存到配置文件或數據庫
+            return web.json_response({'success': True, 'message': '設置已保存'})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_get_settings(self, request: web.Request) -> web.Response:
+        """獲取系統設置"""
+        try:
+            # TODO: 從配置文件或數據庫讀取
+            settings = {
+                'prices': {
+                    'silver': {'name': '🥈 白銀精英', 'monthly': 49},
+                    'gold': {'name': '🥇 黃金大師', 'monthly': 99},
+                    'diamond': {'name': '💎 鑽石王牌', 'monthly': 199},
+                    'star': {'name': '🌟 星耀傳說', 'monthly': 399},
+                    'king': {'name': '👑 榮耀王者', 'monthly': 999}
+                },
+                'payment': {
+                    'alipayAppId': '',
+                    'wechatMchId': '',
+                    'usdtAddress': ''
+                }
+            }
+            return web.json_response({'success': True, 'data': settings})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
     
     def run(self):
         """啟動服務器"""

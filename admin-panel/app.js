@@ -1,20 +1,37 @@
 /**
  * TG-Matrix 管理後台
- * Vue 3 應用
+ * Vue 3 應用 - 真實數據版本
  */
 
-const { createApp, ref, computed, onMounted } = Vue;
+const { createApp, ref, computed, onMounted, watch } = Vue;
 
-// API 基礎URL（根據實際部署修改）
-const API_BASE = window.location.hostname === 'localhost' 
-    ? 'http://localhost:8080' 
-    : '';
+// API 基礎URL
+const API_BASE = '/api';
+
+// 通用 API 請求函數
+async function apiRequest(endpoint, options = {}) {
+    try {
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            },
+            ...options
+        });
+        return await response.json();
+    } catch (error) {
+        console.error('API Error:', error);
+        return { success: false, message: error.message };
+    }
+}
 
 createApp({
     setup() {
         // ============ 狀態 ============
         const currentPage = ref('dashboard');
         const showGenerateModal = ref(false);
+        const isLoading = ref(true);
+        const lastUpdate = ref(null);
         
         // 菜單項
         const menuItems = [
@@ -27,53 +44,42 @@ createApp({
         
         // 統計數據
         const stats = ref({
-            totalUsers: 1256,
-            newUsersToday: 45,
-            paidUsers: 328,
-            conversionRate: 26.1,
-            totalRevenue: 156800,
-            revenueToday: 4580,
-            totalLicenses: 500,
-            unusedLicenses: 342
+            totalUsers: 0,
+            newUsersToday: 0,
+            paidUsers: 0,
+            conversionRate: 0,
+            totalRevenue: 0,
+            revenueToday: 0,
+            totalLicenses: 0,
+            unusedLicenses: 0
         });
         
         // 用戶數據
-        const users = ref([
-            { id: 1, email: 'user1@example.com', machineId: 'mid-abc123456789', level: 'king', expiresAt: '2026-12-31', totalSpent: 6999, createdAt: '2026-01-01' },
-            { id: 2, email: 'user2@example.com', machineId: 'mid-def456789012', level: 'diamond', expiresAt: '2026-06-15', totalSpent: 1599, createdAt: '2026-01-05' },
-            { id: 3, email: 'user3@example.com', machineId: 'mid-ghi789012345', level: 'gold', expiresAt: '2026-02-28', totalSpent: 799, createdAt: '2026-01-10' },
-            { id: 4, email: null, machineId: 'mid-jkl012345678', level: 'silver', expiresAt: '2026-02-15', totalSpent: 49, createdAt: '2026-01-12' },
-            { id: 5, email: 'free@example.com', machineId: 'mid-mno345678901', level: 'bronze', expiresAt: null, totalSpent: 0, createdAt: '2026-01-12' },
-        ]);
-        
+        const users = ref([]);
         const userSearch = ref('');
         const userFilter = ref('all');
         
         // 卡密數據
-        const licenses = ref([
-            { key: 'TGM-K2-ABCD-EFGH-IJKL', typeName: '👑 王者月卡', level: 'king', days: 30, price: 999, status: 'unused', createdAt: '2026-01-12', usedAt: null },
-            { key: 'TGM-D2-MNOP-QRST-UVWX', typeName: '💎 鑽石月卡', level: 'diamond', days: 30, price: 199, status: 'unused', createdAt: '2026-01-12', usedAt: null },
-            { key: 'TGM-G3-YZAB-CDEF-GHIJ', typeName: '🥇 黃金季卡', level: 'gold', days: 90, price: 249, status: 'used', createdAt: '2026-01-10', usedAt: '2026-01-11' },
-            { key: 'TGM-B2-KLMN-OPQR-STUV', typeName: '🥈 白銀月卡', level: 'silver', days: 30, price: 49, status: 'used', createdAt: '2026-01-08', usedAt: '2026-01-09' },
-        ]);
-        
+        const licenses = ref([]);
         const licenseFilter = ref('all');
         
         // 卡密統計
         const licenseStats = ref({
-            silver: { name: '白銀精英', icon: '🥈', total: 100, unused: 85 },
-            gold: { name: '黃金大師', icon: '🥇', total: 80, unused: 62 },
-            diamond: { name: '鑽石王牌', icon: '💎', total: 50, unused: 38 },
-            star: { name: '星耀傳說', icon: '🌟', total: 30, unused: 22 },
-            king: { name: '榮耀王者', icon: '👑', total: 20, unused: 15 },
+            silver: { name: '白銀精英', icon: '🥈', total: 0, unused: 0 },
+            gold: { name: '黃金大師', icon: '🥇', total: 0, unused: 0 },
+            diamond: { name: '鑽石王牌', icon: '💎', total: 0, unused: 0 },
+            star: { name: '星耀傳說', icon: '🌟', total: 0, unused: 0 },
+            king: { name: '榮耀王者', icon: '👑', total: 0, unused: 0 },
         });
         
         // 訂單數據
-        const orders = ref([
-            { id: 1, orderId: 'TGM1736648400ABCD', productName: '👑 王者年卡', amount: 6999, paymentMethod: '支付寶', status: 'paid', createdAt: '2026-01-12 10:00' },
-            { id: 2, orderId: 'TGM1736645000EFGH', productName: '💎 鑽石月卡', amount: 199, paymentMethod: '微信支付', status: 'paid', createdAt: '2026-01-12 09:30' },
-            { id: 3, orderId: 'TGM1736641600IJKL', productName: '🥇 黃金月卡', amount: 99, paymentMethod: 'USDT', status: 'pending', createdAt: '2026-01-12 09:00' },
-        ]);
+        const orders = ref([]);
+        
+        // 收入趨勢數據
+        const revenueTrend = ref([]);
+        
+        // 會員等級分布
+        const levelDistribution = ref({});
         
         // 價格設置
         const prices = ref({
@@ -98,6 +104,61 @@ createApp({
             count: 10,
             notes: ''
         });
+        
+        // ============ API 方法 ============
+        
+        const loadDashboard = async () => {
+            isLoading.value = true;
+            const result = await apiRequest('/admin/dashboard');
+            if (result.success) {
+                const data = result.data;
+                stats.value = data.stats;
+                licenseStats.value = data.licenseStats || licenseStats.value;
+                revenueTrend.value = data.revenueTrend || [];
+                levelDistribution.value = data.levelDistribution || {};
+                lastUpdate.value = new Date().toLocaleString();
+                
+                // 重新初始化圖表
+                setTimeout(initCharts, 100);
+            }
+            isLoading.value = false;
+        };
+        
+        const loadUsers = async () => {
+            const result = await apiRequest('/admin/users');
+            if (result.success) {
+                users.value = result.data;
+            }
+        };
+        
+        const loadLicenses = async () => {
+            const result = await apiRequest('/admin/licenses');
+            if (result.success) {
+                licenses.value = result.data;
+            }
+        };
+        
+        const loadOrders = async () => {
+            const result = await apiRequest('/admin/orders');
+            if (result.success) {
+                orders.value = result.data;
+            }
+        };
+        
+        const loadSettings = async () => {
+            const result = await apiRequest('/admin/settings');
+            if (result.success) {
+                prices.value = result.data.prices || prices.value;
+                paymentConfig.value = result.data.payment || paymentConfig.value;
+            }
+        };
+        
+        const refreshData = async () => {
+            await loadDashboard();
+            if (currentPage.value === 'users') await loadUsers();
+            if (currentPage.value === 'licenses') await loadLicenses();
+            if (currentPage.value === 'orders') await loadOrders();
+        };
         
         // ============ 計算屬性 ============
         const filteredUsers = computed(() => {
@@ -128,6 +189,7 @@ createApp({
         // ============ 方法 ============
         const getLevelDisplay = (level) => {
             const levels = {
+                free: '⚔️ 青銅戰士',
                 bronze: '⚔️ 青銅戰士',
                 silver: '🥈 白銀精英',
                 gold: '🥇 黃金大師',
@@ -158,7 +220,9 @@ createApp({
                 unused: '✅ 未使用',
                 used: '✓ 已使用',
                 disabled: '⛔ 已禁用',
-                expired: '⏰ 已過期'
+                expired: '⏰ 已過期',
+                pending: '⏳ 待支付',
+                paid: '✅ 已支付'
             };
             return texts[status] || status;
         };
@@ -176,11 +240,18 @@ createApp({
             alert('已複製卡密: ' + key);
         };
         
-        const disableLicense = (key) => {
+        const disableLicense = async (key) => {
             if (confirm('確定要禁用此卡密嗎？')) {
-                const license = licenses.value.find(l => l.key === key);
-                if (license) {
-                    license.status = 'disabled';
+                const result = await apiRequest('/admin/licenses/disable', {
+                    method: 'POST',
+                    body: JSON.stringify({ license_key: key })
+                });
+                
+                if (result.success) {
+                    alert('卡密已禁用');
+                    await loadLicenses();
+                } else {
+                    alert('操作失敗: ' + result.message);
                 }
             }
         };
@@ -192,60 +263,83 @@ createApp({
                 csv += `${l.key},${l.typeName},${l.status},${l.createdAt},${l.usedAt || ''}\n`;
             });
             
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = 'licenses.csv';
+            link.download = `licenses_${new Date().toISOString().slice(0,10)}.csv`;
             link.click();
         };
         
         const generateLicenses = async () => {
-            const typeCode = generateForm.value.level + generateForm.value.duration;
-            const count = generateForm.value.count;
+            const result = await apiRequest('/admin/licenses/generate', {
+                method: 'POST',
+                body: JSON.stringify({
+                    level: generateForm.value.level,
+                    duration: generateForm.value.duration,
+                    count: generateForm.value.count,
+                    notes: generateForm.value.notes
+                })
+            });
             
-            // 模擬生成
-            const levelNames = {
-                B: '🥈 白銀', G: '🥇 黃金', D: '💎 鑽石', S: '🌟 星耀', K: '👑 王者'
-            };
-            const durationNames = {
-                '1': '周卡', '2': '月卡', '3': '季卡', 'Y': '年卡'
-            };
-            
-            const typeName = levelNames[generateForm.value.level] + durationNames[generateForm.value.duration];
-            
-            for (let i = 0; i < count; i++) {
-                const key = `TGM-${typeCode}-${randomStr()}-${randomStr()}-${randomStr()}`;
-                licenses.value.unshift({
-                    key,
-                    typeName,
-                    level: generateForm.value.level.toLowerCase(),
-                    days: { '1': 7, '2': 30, '3': 90, 'Y': 365 }[generateForm.value.duration],
-                    status: 'unused',
-                    createdAt: new Date().toISOString().split('T')[0],
-                    usedAt: null
-                });
+            if (result.success) {
+                showGenerateModal.value = false;
+                alert(result.message);
+                
+                // 顯示生成的卡密
+                if (result.data && result.data.keys) {
+                    const keys = result.data.keys.join('\n');
+                    const showKeys = confirm('是否複製所有卡密到剪貼板？');
+                    if (showKeys) {
+                        navigator.clipboard.writeText(keys);
+                        alert('已複製 ' + result.data.keys.length + ' 個卡密到剪貼板');
+                    }
+                }
+                
+                await loadLicenses();
+                await loadDashboard();
+            } else {
+                alert('生成失敗: ' + result.message);
             }
-            
-            showGenerateModal.value = false;
-            alert(`成功生成 ${count} 個 ${typeName} 卡密！`);
         };
         
-        const randomStr = () => {
-            return Math.random().toString(36).substring(2, 6).toUpperCase();
+        const saveSettings = async () => {
+            const result = await apiRequest('/admin/settings/save', {
+                method: 'POST',
+                body: JSON.stringify({
+                    prices: prices.value,
+                    payment: paymentConfig.value
+                })
+            });
+            
+            if (result.success) {
+                alert('設置已保存');
+            } else {
+                alert('保存失敗: ' + result.message);
+            }
         };
         
         // ============ 圖表 ============
+        let revenueChart = null;
+        let levelChart = null;
+        
         const initCharts = () => {
+            // 銷毀舊圖表
+            if (revenueChart) revenueChart.destroy();
+            if (levelChart) levelChart.destroy();
+            
             // 收入趨勢圖
             const revenueCtx = document.getElementById('revenueChart');
             if (revenueCtx) {
-                new Chart(revenueCtx, {
+                const labels = revenueTrend.value.map(d => d.date.slice(5));
+                const data = revenueTrend.value.map(d => d.revenue);
+                
+                revenueChart = new Chart(revenueCtx, {
                     type: 'line',
                     data: {
-                        labels: ['1/6', '1/7', '1/8', '1/9', '1/10', '1/11', '1/12'],
+                        labels: labels.length ? labels : ['1/6', '1/7', '1/8', '1/9', '1/10', '1/11', '1/12'],
                         datasets: [{
                             label: '收入 (¥)',
-                            data: [3200, 4500, 3800, 5200, 4800, 6100, 4580],
+                            data: data.length ? data : [0, 0, 0, 0, 0, 0, 0],
                             borderColor: '#8B5CF6',
                             backgroundColor: 'rgba(139, 92, 246, 0.1)',
                             fill: true,
@@ -273,16 +367,39 @@ createApp({
             // 會員等級分布圖
             const levelCtx = document.getElementById('levelChart');
             if (levelCtx) {
-                new Chart(levelCtx, {
+                const levelNames = {
+                    free: '青銅戰士', bronze: '青銅戰士', silver: '白銀精英', 
+                    gold: '黃金大師', diamond: '鑽石王牌', star: '星耀傳說', king: '榮耀王者'
+                };
+                const levelColors = {
+                    free: '#CD7F32', bronze: '#CD7F32', silver: '#C0C0C0', 
+                    gold: '#FFD700', diamond: '#B9F2FF', star: '#9B59B6', king: '#FF6B6B'
+                };
+                
+                const labels = [];
+                const data = [];
+                const colors = [];
+                
+                for (const [level, count] of Object.entries(levelDistribution.value)) {
+                    labels.push(levelNames[level] || level);
+                    data.push(count);
+                    colors.push(levelColors[level] || '#666');
+                }
+                
+                // 如果沒有數據，顯示默認
+                if (labels.length === 0) {
+                    labels.push('暫無數據');
+                    data.push(1);
+                    colors.push('#666');
+                }
+                
+                levelChart = new Chart(levelCtx, {
                     type: 'doughnut',
                     data: {
-                        labels: ['青銅戰士', '白銀精英', '黃金大師', '鑽石王牌', '星耀傳說', '榮耀王者'],
+                        labels: labels,
                         datasets: [{
-                            data: [928, 180, 85, 42, 15, 6],
-                            backgroundColor: [
-                                '#CD7F32', '#C0C0C0', '#FFD700', 
-                                '#B9F2FF', '#9B59B6', '#FF6B6B'
-                            ]
+                            data: data,
+                            backgroundColor: colors
                         }]
                     },
                     options: {
@@ -298,10 +415,18 @@ createApp({
             }
         };
         
+        // ============ 頁面切換時加載數據 ============
+        watch(currentPage, async (newPage) => {
+            if (newPage === 'dashboard') await loadDashboard();
+            else if (newPage === 'users') await loadUsers();
+            else if (newPage === 'licenses') await loadLicenses();
+            else if (newPage === 'orders') await loadOrders();
+            else if (newPage === 'settings') await loadSettings();
+        });
+        
         // ============ 生命週期 ============
-        onMounted(() => {
-            // 延遲初始化圖表，等待 DOM 渲染
-            setTimeout(initCharts, 100);
+        onMounted(async () => {
+            await loadDashboard();
         });
         
         // ============ 返回 ============
@@ -322,6 +447,8 @@ createApp({
             paymentConfig,
             showGenerateModal,
             generateForm,
+            isLoading,
+            lastUpdate,
             getLevelDisplay,
             isExpired,
             getStatusClass,
@@ -331,7 +458,9 @@ createApp({
             copyLicense,
             disableLicense,
             exportLicenses,
-            generateLicenses
+            generateLicenses,
+            saveSettings,
+            refreshData
         };
     }
 }).mount('#app');

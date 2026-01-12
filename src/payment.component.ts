@@ -343,7 +343,7 @@ export class PaymentComponent implements OnDestroy {
     this.isProcessing.set(true);
     
     try {
-      const result = await this.licenseClient.createPayment(product.id, this.email, this.paymentMethod());
+      const result = await this.licenseClient.createPayment(product.id, this.paymentMethod());
       
       if (result.success && result.order) {
         this.currentOrder.set(result.order);
@@ -371,7 +371,7 @@ export class PaymentComponent implements OnDestroy {
     this.isChecking.set(true);
     
     try {
-      const result = await this.licenseClient.checkPaymentStatus(order.order_id);
+      const result = await this.licenseClient.checkPaymentStatus(order.orderId);
       
       if (result.paid) {
         this.stopCheckInterval();

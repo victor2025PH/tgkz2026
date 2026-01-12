@@ -45,6 +45,7 @@ export interface PaymentOrder {
   };
   amount: number;
   currency: string;
+  payment_url?: string;
   usdt?: {
     amount: number;
     network: string;
@@ -470,6 +471,29 @@ export class LicenseClientService implements OnDestroy {
       }
     } catch (error) {
       return { success: false, message: '創建訂單失敗，請稍後重試' };
+    }
+  }
+  
+  /**
+   * 檢查支付狀態
+   */
+  async checkPaymentStatus(orderId: string): Promise<{ success: boolean; paid: boolean; licenseKey?: string; message?: string }> {
+    if (!this.isServerConfigured()) {
+      return { success: false, paid: false, message: '服務器未配置' };
+    }
+    
+    try {
+      const response = await fetch(`${this.serverUrl()}/api/payment/status/${orderId}`);
+      const result = await response.json();
+      
+      return {
+        success: result.success,
+        paid: result.data?.status === 'paid',
+        licenseKey: result.data?.license_key,
+        message: result.message
+      };
+    } catch (error) {
+      return { success: false, paid: false, message: '查詢支付狀態失敗' };
     }
   }
   

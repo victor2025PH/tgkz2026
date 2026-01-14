@@ -139,15 +139,15 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
     name: '白銀精英',
     icon: '🥈',
     rank: 2,
-    monthlyPrice: 9.9,  // 調整為 USDT 價格
-    yearlyPrice: 99,
+    monthlyPrice: 4.99,  // USDT 價格
+    yearlyPrice: 49.9,
     quotas: {
       maxAccounts: 5,
-      dailyMessages: 50,
+      dailyMessages: 100,
       dailyAiCalls: 50,
       maxGroups: 10,
-      maxKeywordSets: 3,
-      dataRetentionDays: 15,
+      maxKeywordSets: 5,
+      dataRetentionDays: 30,
       platformApiQuota: 1,         // 1 個平台 API
       platformApiMaxAccounts: 3    // 可綁定 3 個帳號
     },
@@ -173,15 +173,15 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
     name: '黃金大師',
     icon: '🥇',
     rank: 3,
-    monthlyPrice: 29.9,  // 調整為 USDT 價格
-    yearlyPrice: 299,
+    monthlyPrice: 19.9,  // USDT 價格 - 主推產品
+    yearlyPrice: 199,
     quotas: {
       maxAccounts: 15,
-      dailyMessages: 200,
-      dailyAiCalls: 200,
-      maxGroups: 30,
-      maxKeywordSets: 10,
-      dataRetentionDays: 30,
+      dailyMessages: 500,
+      dailyAiCalls: 300,
+      maxGroups: 50,
+      maxKeywordSets: 20,
+      dataRetentionDays: 60,
       platformApiQuota: 3,         // 3 個平台 API
       platformApiMaxAccounts: 9    // 可綁定 9 個帳號
     },
@@ -207,15 +207,15 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
     name: '鑽石王牌',
     icon: '💎',
     rank: 4,
-    monthlyPrice: 99.9,  // 調整為 USDT 價格
-    yearlyPrice: 999,
+    monthlyPrice: 59.9,  // USDT 價格
+    yearlyPrice: 599,
     quotas: {
       maxAccounts: 50,
-      dailyMessages: 1000,
+      dailyMessages: 2000,
       dailyAiCalls: -1,
-      maxGroups: 100,
+      maxGroups: 200,
       maxKeywordSets: -1,
-      dataRetentionDays: 60,
+      dataRetentionDays: 90,
       platformApiQuota: 10,        // 10 個平台 API
       platformApiMaxAccounts: 30   // 可綁定 30 個帳號
     },
@@ -241,8 +241,8 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
     name: '星耀傳說',
     icon: '🌟',
     rank: 5,
-    monthlyPrice: 299,  // 調整為 USDT 價格
-    yearlyPrice: 2999,
+    monthlyPrice: 199,  // USDT 價格
+    yearlyPrice: 1999,
     quotas: {
       maxAccounts: 100,
       dailyMessages: -1,
@@ -275,8 +275,8 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
     name: '榮耀王者',
     icon: '👑',
     rank: 6,
-    monthlyPrice: 999,  // USDT 價格
-    yearlyPrice: 9999,
+    monthlyPrice: 599,  // USDT 價格
+    yearlyPrice: 5999,
     quotas: {
       maxAccounts: -1,  // 無限
       dailyMessages: -1,

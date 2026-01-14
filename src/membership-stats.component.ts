@@ -77,9 +77,9 @@ export interface StatsData {
           <div class="flex items-center justify-between">
             <div>
               <div class="text-sm text-green-300/80">總收入</div>
-              <div class="text-3xl font-bold text-white mt-1">¥{{ stats().total_revenue | number:'1.0-0' }}</div>
+              <div class="text-3xl font-bold text-white mt-1">{{ stats().total_revenue | number:'1.0-0' }} USDT</div>
               <div class="text-xs text-green-400 mt-1">
-                <span class="text-green-400">↑ ¥{{ todayRevenue() | number:'1.0-0' }}</span> 今日
+                <span class="text-green-400">↑ {{ todayRevenue() | number:'1.0-0' }} USDT</span> 今日
               </div>
             </div>
             <div class="text-4xl opacity-50">💰</div>
@@ -114,7 +114,7 @@ export interface StatsData {
               <div class="flex-1 flex flex-col items-center">
                 <div class="w-full bg-gradient-to-t from-cyan-500 to-cyan-400 rounded-t"
                      [style.height.%]="getBarHeight(day.revenue, maxRevenue())"
-                     [title]="day.date + ': ¥' + day.revenue"></div>
+                     [title]="day.date + ': ' + day.revenue + ' USDT'"></div>
               </div>
             }
           </div>
@@ -188,7 +188,7 @@ export interface StatsData {
                   <td class="py-3 text-right text-cyan-400">{{ day.new_users }}</td>
                   <td class="py-3 text-right text-purple-400">{{ day.new_activations }}</td>
                   <td class="py-3 text-right text-green-400">{{ day.new_payments }}</td>
-                  <td class="py-3 text-right text-green-400">¥{{ day.revenue | number:'1.0-0' }}</td>
+                  <td class="py-3 text-right text-green-400">{{ day.revenue | number:'1.0-0' }} USDT</td>
                   <td class="py-3 text-right text-slate-300">{{ day.active_users }}</td>
                   <td class="py-3 text-right text-emerald-400">{{ day.trial_to_paid }}</td>
                   <td class="py-3 text-right text-red-400">{{ day.churn_count }}</td>
@@ -201,7 +201,7 @@ export interface StatsData {
                 <td class="pt-3 text-right text-cyan-400">{{ totalNewUsers() }}</td>
                 <td class="pt-3 text-right text-purple-400">{{ totalActivations() }}</td>
                 <td class="pt-3 text-right text-green-400">{{ totalPayments() }}</td>
-                <td class="pt-3 text-right text-green-400">¥{{ totalRevenueFiltered() | number:'1.0-0' }}</td>
+                <td class="pt-3 text-right text-green-400">{{ totalRevenueFiltered() | number:'1.0-0' }} USDT</td>
                 <td class="pt-3 text-right text-slate-300">-</td>
                 <td class="pt-3 text-right text-emerald-400">{{ totalConversions() }}</td>
                 <td class="pt-3 text-right text-red-400">{{ totalChurn() }}</td>
@@ -216,14 +216,14 @@ export interface StatsData {
         <!-- ARPU -->
         <div class="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
           <div class="text-sm text-slate-400 mb-1">ARPU (每用戶平均收入)</div>
-          <div class="text-2xl font-bold text-white">¥{{ arpu() | number:'1.2-2' }}</div>
+          <div class="text-2xl font-bold text-white">{{ arpu() | number:'1.2-2' }} USDT</div>
           <div class="text-xs text-slate-500 mt-1">總收入 / 付費用戶數</div>
         </div>
         
         <!-- LTV -->
         <div class="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
           <div class="text-sm text-slate-400 mb-1">預估 LTV (用戶生命週期價值)</div>
-          <div class="text-2xl font-bold text-white">¥{{ ltv() | number:'1.2-2' }}</div>
+          <div class="text-2xl font-bold text-white">{{ ltv() | number:'1.2-2' }} USDT</div>
           <div class="text-xs text-slate-500 mt-1">ARPU × 平均訂閱月數</div>
         </div>
         
@@ -342,10 +342,12 @@ export class MembershipStatsComponent implements OnInit, OnDestroy {
     const total = Object.values(dist).reduce((a, b) => a + b, 0) || 1;
     
     const levels = [
-      { key: 'free', name: '新星', icon: '🌟', colorClass: 'bg-slate-500' },
-      { key: 'vip', name: '銀星 VIP', icon: '⭐', colorClass: 'bg-yellow-500' },
-      { key: 'svip', name: '金星 SVIP', icon: '🌙', colorClass: 'bg-purple-500' },
-      { key: 'mvp', name: '星王 MVP', icon: '👑', colorClass: 'bg-gradient-to-r from-yellow-500 to-orange-500' }
+      { key: 'bronze', name: '青銅戰士', icon: '⚔️', colorClass: 'bg-amber-700' },
+      { key: 'silver', name: '白銀精英', icon: '🥈', colorClass: 'bg-slate-400' },
+      { key: 'gold', name: '黃金大師', icon: '🥇', colorClass: 'bg-yellow-500' },
+      { key: 'diamond', name: '鑽石王牌', icon: '💎', colorClass: 'bg-cyan-500' },
+      { key: 'star', name: '星耀傳說', icon: '🌟', colorClass: 'bg-purple-500' },
+      { key: 'king', name: '榮耀王者', icon: '👑', colorClass: 'bg-gradient-to-r from-red-500 to-orange-500' }
     ];
     
     return levels.map(l => ({

@@ -1,5 +1,5 @@
 
-import { ChangeDetectionStrategy, Component, signal, WritableSignal, computed, inject, OnDestroy, effect, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal, WritableSignal, computed, inject, OnDestroy, effect, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TelegramAccount, KeywordConfig, MonitoredGroup, CapturedLead, LogEntry, GenerationState, MessageTemplate, LeadStatus, Interaction, OnlineStatus, AccountRole, Attachment, KeywordSet, AutomationCampaign, CampaignTrigger, CampaignAction, AccountStatus, QueueStatus, QueueMessage, Alert } from './models';
@@ -16,7 +16,6 @@ import { MembershipService } from './membership.service';
 import { MembershipDialogComponent, UpgradePromptComponent } from './membership-ui.component';
 import { LicenseClientService } from './license-client.service';
 import { PaymentComponent } from './payment.component';
-import { MembershipStatsComponent } from './membership-stats.component';
 import { SecurityService } from './security.service';
 import { GlobalErrorHandler } from './error-handler.service';
 import { LoadingService } from './loading.service';
@@ -30,9 +29,13 @@ import { AuthService } from './auth.service';
 import { LoginComponent } from './login.component';
 import { ProfileComponent } from './profile.component';
 import { MembershipCenterComponent } from './membership-center.component';
+import { QrLoginComponent } from './qr-login.component';
+import { AccountCardListComponent, Account } from './account-card-list.component';
+import { AddAccountPageComponent } from './add-account-page.component';
+import { ApiCredentialManagerComponent } from './api-credential-manager.component';
 
-// 更新視圖類型：合併 monitoring 和 alerts 為 runtime-logs
-type View = 'dashboard' | 'accounts' | 'resources' | 'automation' | 'leads' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-center' | 'runtime-logs' | 'settings' | 'analytics' | 'logs' | 'performance' | 'alerts' | 'profile' | 'membership-center';
+// 更新視圖類型：合併 monitoring 和 alerts 為 runtime-logs，添加 add-account 和 api-credentials
+type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'automation' | 'leads' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-center' | 'runtime-logs' | 'settings' | 'analytics' | 'logs' | 'performance' | 'alerts' | 'profile' | 'membership-center';
 type LeadDetailView = 'sendMessage' | 'history';
 type LeadsViewMode = 'kanban' | 'list';
 
@@ -41,7 +44,7 @@ type LeadsViewMode = 'kanban' | 'list';
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
-  imports: [CommonModule, FormsModule, PerformanceMonitorComponent, AnalyticsChartsComponent, ToastComponent, ProgressDialogComponent, MembershipDialogComponent, UpgradePromptComponent, PaymentComponent, MembershipStatsComponent, LoadingOverlayComponent, OnboardingComponent, LanguageSwitcherCompactComponent, LoginComponent, ProfileComponent, MembershipCenterComponent],
+  imports: [CommonModule, FormsModule, PerformanceMonitorComponent, AnalyticsChartsComponent, ToastComponent, ProgressDialogComponent, MembershipDialogComponent, UpgradePromptComponent, PaymentComponent, LoadingOverlayComponent, OnboardingComponent, LanguageSwitcherCompactComponent, LoginComponent, ProfileComponent, MembershipCenterComponent, QrLoginComponent, AccountCardListComponent, AddAccountPageComponent, ApiCredentialManagerComponent],
   providers: [AccountLoaderService, ToastService],
   styles: [`
     /* 錯誤引導高亮動畫 */
@@ -74,6 +77,13 @@ export class AppComponent implements OnDestroy, OnInit {
   i18n = inject(I18nService);
   authService = inject(AuthService);  // 新增：認證服務
   private document = inject(DOCUMENT);
+  private cdr = inject(ChangeDetectorRef);
+  
+  // 用於清理事件監聽
+  private membershipUpdateHandler: ((event: Event) => void) | null = null;
+  
+  // Math 對象供模板使用
+  Math = Math;
 
   // --- 認證狀態 ---
   isAuthenticated = computed(() => this.authService.isAuthenticated());
@@ -90,7 +100,110 @@ export class AppComponent implements OnDestroy, OnInit {
   
   // --- 子視圖狀態 ---
   runtimeLogsTab = signal<'analytics' | 'logs' | 'performance' | 'alerts'>('analytics');  // 合併監控和告警
-  aiCenterTab = signal<'config' | 'chat' | 'rag' | 'voice'>('config');
+  aiCenterTab = signal<'config' | 'chat' | 'rag' | 'voice' | 'memory'>('config');
+  
+  // --- Phase 5: System Management State ---
+  // Database Migration
+  migrationStatus = signal<{
+    currentVersion: number;
+    latestVersion: number;
+    appliedCount: number;
+    pendingCount: number;
+    appliedMigrations: Array<{version: number; description: string; appliedAt: string}>;
+    pendingMigrations: Array<{version: number; description: string}>;
+  }>({
+    currentVersion: 0,
+    latestVersion: 0,
+    appliedCount: 0,
+    pendingCount: 0,
+    appliedMigrations: [],
+    pendingMigrations: []
+  });
+  isLoadingMigration = signal(false);
+  isRunningMigration = signal(false);
+  
+  // Task Scheduler
+  schedulerStatus = signal<{
+    isRunning: boolean;
+    tasks: Array<{
+      name: string;
+      interval: number;
+      lastRun: string | null;
+      nextRun: string | null;
+      runCount: number;
+      status: 'running' | 'idle' | 'error';
+    }>;
+  }>({
+    isRunning: false,
+    tasks: []
+  });
+  schedulerTab = signal<'tasks' | 'history' | 'config'>('tasks');
+  
+  // Log File Management
+  logFiles = signal<Array<{
+    name: string;
+    size: number;
+    sizeFormatted: string;
+    modifiedAt: string;
+    isCompressed: boolean;
+  }>>([]);
+  logStats = signal<{
+    totalFiles: number;
+    totalSize: number;
+    totalSizeFormatted: string;
+    compressedFiles: number;
+    oldestFile: string | null;
+    newestFile: string | null;
+  }>({
+    totalFiles: 0,
+    totalSize: 0,
+    totalSizeFormatted: '0 B',
+    compressedFiles: 0,
+    oldestFile: null,
+    newestFile: null
+  });
+  isLoadingLogs = signal(false);
+  isRotatingLogs = signal(false);
+  selectedLogFile = signal<string | null>(null);
+  logFileContent = signal<string>('');
+  
+  // Resource Discovery Batch
+  showResourceBatchMenu = signal(false);
+  resourceBatchAction = signal<'approve' | 'reject' | 'priority' | 'delete' | null>(null);
+  
+  // Membership Dialog
+  showMembershipDialog = signal(false);
+  
+  // Settings Tab
+  settingsTab = signal<'general' | 'backup' | 'migration' | 'logs' | 'scheduler'>('general');
+  
+  // --- Vector Memory State ---
+  vectorMemoryStats = signal<{
+    totalMemories: number;
+    byType: {[key: string]: number};
+    totalUsers: number;
+    avgImportance: number;
+  }>({ totalMemories: 0, byType: {}, totalUsers: 0, avgImportance: 0 });
+  vectorMemorySearchQuery = '';
+  vectorMemorySearchResults = signal<Array<{
+    id: number;
+    userId: string;
+    content: string;
+    memoryType: string;
+    importance: number;
+    similarity: number;
+    createdAt: string;
+  }>>([]);
+  isSearchingMemory = signal(false);
+  isAddingMemory = signal(false);
+  showAddMemoryDialog = signal(false);
+  newMemory = { userId: '', content: '', type: 'conversation', importance: 0.5 };
+  selectedMemoryUserId = signal('');
+  memoryUserList = signal<string[]>([]);
+  
+  // --- Voice Clone State (Enhanced) ---
+  showVoiceRecordingDialog = signal(false);
+  voiceCloneTab = signal<'upload' | 'record' | 'manage'>('manage');
   
   // --- Message Sending State ---
   messageMode = signal<'manual' | 'ai' | 'template'>('manual');
@@ -125,6 +238,9 @@ export class AppComponent implements OnDestroy, OnInit {
   showWelcomeDialog = signal(false);
   welcomeStep = signal(1);  // 1=歡迎, 2=AI設置, 3=完成
   isDetectingOllama = signal(false);
+  
+  // --- QR 掃碼登入 ---
+  showQrLoginDialog = signal(false);
   ollamaDetected = signal(false);
   detectedOllamaModels = signal<string[]>([]);
   autoSelectedModel = signal('');
@@ -274,6 +390,30 @@ export class AppComponent implements OnDestroy, OnInit {
   resourceFilterStatus = signal<string>('');
   resourceFilterType = signal<string>('');
   
+  // 🔍 多渠道選擇（新增）
+  selectedSearchSources = signal<string[]>(['telegram', 'jiso']); // 默認選擇 Telegram 和 極搜
+  showBatchJoinMenu = signal(false);
+  
+  // 📨 批量操作（新增）
+  showBatchMessageDialog = signal(false);
+  showBatchInviteDialog = signal(false);
+  batchMessageContent = '';
+  batchMessageConfig = {
+    delayMin: 60,
+    delayMax: 120,
+    dailyLimit: 50,
+    smartAntiBlock: true
+  };
+  batchInviteConfig = {
+    selectedMemberIds: [] as string[],
+    selectAll: false,
+    delayMin: 120,
+    delayMax: 300,
+    perGroupLimit: 10,
+    smartAntiBlock: true
+  };
+  availableMembersForInvite = signal<Array<{id: string; name?: string; username?: string}>>([]);
+  
   // --- Discussion Watcher State ---
   discussionWatcherInitialized = signal(false);
   channelDiscussions = signal<Array<{
@@ -320,6 +460,8 @@ export class AppComponent implements OnDestroy, OnInit {
   selectedDiscussionId = signal<string>('');
   discoverChannelId = '';
   resourcesTab = signal<'resources' | 'discussions'>('resources');
+  isLoadingDiscussionMessages = signal(false);
+  discussionReplyText = signal('');
   
   // --- Voice Clone Configuration ---
   clonedVoices = signal<Array<{id: string; name: string; audioPath: string; promptText: string; createdAt: Date}>>([]);
@@ -398,6 +540,18 @@ export class AppComponent implements OnDestroy, OnInit {
   showAddTagDialog = signal(false);
   batchTagInput = signal('');
   showBatchTagSelector = signal(false);
+  showBatchRemoveTagSelector = signal(false);
+  
+  // Full-text search state
+  leadSearchQuery = signal('');
+  leadSearchResults: WritableSignal<CapturedLead[]> = signal([]);
+  isSearchingLeads = signal(false);
+  leadSearchTimeout: any = null;
+  
+  // Backup management state
+  backups: WritableSignal<any[]> = signal([]);
+  isCreatingBackup = signal(false);
+  isRestoringBackup = signal(false);
   
   // Computed: Selected leads count
   selectedLeadsCount = computed(() => this.selectedLeadIds().size);
@@ -892,6 +1046,16 @@ export class AppComponent implements OnDestroy, OnInit {
     });
   }
   
+  // 重新索引對話
+  reindexConversations() {
+    this.isReindexing.set(true);
+    this.ipcService.send('reindex-conversations', {
+      highValueOnly: true,
+      days: 30
+    });
+    this.toastService.info('開始重建索引...');
+  }
+  
   // 刷新 RAG 統計
   refreshRagStats() {
     this.ipcService.send('get-rag-stats', {});
@@ -935,6 +1099,65 @@ export class AppComponent implements OnDestroy, OnInit {
     this.showAddRagKnowledgeDialog.set(false);
   }
   
+  // ==================== Vector Memory Methods ====================
+  
+  // 搜索向量記憶
+  searchVectorMemory() {
+    if (!this.vectorMemorySearchQuery.trim()) return;
+    this.isSearchingMemory.set(true);
+    this.ipcService.send('search-vector-memories', {
+      userId: this.selectedMemoryUserId() || '',
+      query: this.vectorMemorySearchQuery,
+      limit: 10
+    });
+  }
+  
+  // 添加向量記憶
+  addVectorMemory() {
+    if (!this.newMemory.content.trim()) {
+      this.toastService.error('請填寫記憶內容');
+      return;
+    }
+    
+    this.isAddingMemory.set(true);
+    this.ipcService.send('add-vector-memory', {
+      userId: this.newMemory.userId || 'manual',
+      content: this.newMemory.content,
+      type: this.newMemory.type,
+      importance: this.newMemory.importance
+    });
+  }
+  
+  // 獲取記憶統計
+  refreshMemoryStats() {
+    this.ipcService.send('get-memory-stats', { userId: '' });
+  }
+  
+  // 刪除向量記憶
+  deleteVectorMemory(memoryId: number) {
+    this.ipcService.send('delete-vector-memory', { memoryId });
+  }
+  
+  // 獲取用戶列表
+  loadMemoryUserList() {
+    this.ipcService.send('get-memory-user-list', {});
+  }
+  
+  // 清理舊記憶
+  cleanupOldMemories() {
+    this.ipcService.send('cleanup-old-memories', { daysOld: 90 });
+  }
+  
+  // 合併相似記憶
+  mergeSimilarMemories() {
+    const userId = this.selectedMemoryUserId();
+    if (!userId) {
+      this.toastService.error('請先選擇用戶');
+      return;
+    }
+    this.ipcService.send('merge-similar-memories', { userId, threshold: 0.85 });
+  }
+  
   // ==================== Resource Discovery Methods ====================
   
   // 初始化資源發現系統
@@ -961,6 +1184,12 @@ export class AppComponent implements OnDestroy, OnInit {
       return;
     }
     
+    // 檢查是否選擇了搜索源
+    if (this.selectedSearchSources().length === 0) {
+      this.toastService.error('請至少選擇一個搜索渠道');
+      return;
+    }
+    
     // 確保系統已初始化
     if (!this.resourceDiscoveryInitialized()) {
       this.pendingSearchQuery = this.resourceSearchQuery.trim();  // 保存待搜索關鍵詞
@@ -975,6 +1204,9 @@ export class AppComponent implements OnDestroy, OnInit {
     if (this.searchReplaceMode()) {
       this.discoveredResources.set([]);
     }
+    
+    // 使用選中的搜索源
+    const sources = this.selectedSearchSources();
     
     // 檢查是否是多關鍵詞搜索（用逗號或分號分隔）
     const keywords = query.split(/[,;，；]/).map(k => k.trim()).filter(k => k.length > 0);
@@ -999,6 +1231,7 @@ export class AppComponent implements OnDestroy, OnInit {
       
       this.ipcService.send('search-resources', {
         query: query,
+        sources: this.selectedSearchSources(), // 傳遞選中的搜索源
         limit: 50,
         searchType: this.resourceSearchType(),
         minMembers: this.resourceMinMembers(),
@@ -1025,6 +1258,7 @@ export class AppComponent implements OnDestroy, OnInit {
       setTimeout(() => {
         this.ipcService.send('search-resources', {
           query: keyword,
+          sources: this.selectedSearchSources(), // 傳遞選中的搜索源
           limit: 30,
           searchType: this.resourceSearchType(),
           minMembers: this.resourceMinMembers()
@@ -1260,6 +1494,111 @@ export class AppComponent implements OnDestroy, OnInit {
   }
   
   // 批量加入選中資源
+  // 🔍 多渠道選擇方法（新增）
+  toggleSearchSource(source: string): void {
+    const current = this.selectedSearchSources();
+    if (current.includes(source)) {
+      this.selectedSearchSources.set(current.filter(s => s !== source));
+    } else {
+      this.selectedSearchSources.set([...current, source]);
+    }
+  }
+  
+  selectAllSearchSources(): void {
+    this.selectedSearchSources.set(['telegram', 'jiso', 'tgstat', 'local']);
+  }
+  
+  // 👥 進入群組（新增）
+  enterGroup(resource: any): void {
+    // 跳轉到成員提取頁面，使用群組搜索組件
+    this.changeView('resources');
+    // TODO: 觸發成員提取服務
+    this.toastService.info(`準備進入群組：${resource.title}`);
+  }
+  
+  batchEnterGroups(): void {
+    const ids = this.selectedResourceIds();
+    if (ids.length === 0) {
+      this.toastService.error('請先選擇群組');
+      return;
+    }
+    
+    const resources = this.discoveredResources().filter(r => ids.includes(r.id));
+    this.toastService.info(`準備進入 ${resources.length} 個群組查看成員`);
+    // TODO: 實現批量進入群組邏輯
+  }
+  
+  // 📨 批量群發（新增）
+  sendGroupMessage(resource: any): void {
+    this.selectedResourceIds.set([resource.id]);
+    this.showBatchMessageDialog.set(true);
+  }
+  
+  executeBatchMessage(): void {
+    const ids = this.selectedResourceIds();
+    if (ids.length === 0 || !this.batchMessageContent.trim()) {
+      this.toastService.error('請選擇群組並輸入消息內容');
+      return;
+    }
+    
+    const resources = this.discoveredResources().filter(r => ids.includes(r.id));
+    this.toastService.success(`開始向 ${resources.length} 個群組發送消息`);
+    this.showBatchMessageDialog.set(false);
+    // TODO: 調用批量發送 API
+  }
+  
+  // ➕ 批量拉群（新增）
+  inviteMembersToGroup(resource: any): void {
+    this.selectedResourceIds.set([resource.id]);
+    this.loadAvailableMembers();
+    this.showBatchInviteDialog.set(true);
+  }
+  
+  executeBatchInvite(): void {
+    const groupIds = this.selectedResourceIds();
+    const memberIds = this.batchInviteConfig.selectedMemberIds;
+    
+    if (groupIds.length === 0 || memberIds.length === 0) {
+      this.toastService.error('請選擇群組和成員');
+      return;
+    }
+    
+    this.toastService.success(`開始邀請 ${memberIds.length} 位成員加入 ${groupIds.length} 個群組`);
+    this.showBatchInviteDialog.set(false);
+    // TODO: 調用批量邀請 API
+  }
+  
+  loadAvailableMembers(): void {
+    // 從成員提取服務或數據庫加載可用成員
+    this.availableMembersForInvite.set([
+      { id: '1', name: '示例成員1', username: 'member1' },
+      { id: '2', name: '示例成員2', username: 'member2' }
+    ]);
+  }
+  
+  toggleSelectAllMembers(event: any): void {
+    const checked = event.target.checked;
+    if (checked) {
+      this.batchInviteConfig.selectedMemberIds = this.availableMembersForInvite().map(m => m.id);
+      this.batchInviteConfig.selectAll = true;
+    } else {
+      this.batchInviteConfig.selectedMemberIds = [];
+      this.batchInviteConfig.selectAll = false;
+    }
+  }
+  
+  toggleMemberSelection(memberId: string, event: any): void {
+    const checked = event.target.checked;
+    const current = this.batchInviteConfig.selectedMemberIds;
+    if (checked) {
+      this.batchInviteConfig.selectedMemberIds = [...current, memberId];
+    } else {
+      this.batchInviteConfig.selectedMemberIds = current.filter(id => id !== memberId);
+    }
+    this.batchInviteConfig.selectAll = 
+      this.batchInviteConfig.selectedMemberIds.length === this.availableMembersForInvite().length;
+  }
+  
   batchJoinSelected() {
     const ids = this.selectedResourceIds();
     if (ids.length === 0) {
@@ -1374,6 +1713,7 @@ export class AppComponent implements OnDestroy, OnInit {
   // 加載討論組消息
   loadDiscussionMessages(discussionId: string) {
     this.selectedDiscussionId.set(discussionId);
+    this.isLoadingDiscussionMessages.set(true);
     this.ipcService.send('get-discussion-messages', {
       discussionId: discussionId,
       limit: 50,
@@ -1382,8 +1722,8 @@ export class AppComponent implements OnDestroy, OnInit {
   }
   
   // 回復討論組消息
-  replyToDiscussion(discussionId: string, messageId: number, replyText: string) {
-    if (!replyText.trim()) {
+  replyToDiscussion(messageId: number, discussionId: string, replyText: string) {
+    if (!replyText || !replyText.trim()) {
       this.toastService.error('請輸入回復內容');
       return;
     }
@@ -1392,6 +1732,7 @@ export class AppComponent implements OnDestroy, OnInit {
       messageId: messageId,
       replyText: replyText.trim()
     });
+    this.discussionReplyText.set('');
   }
   
   // ==================== Knowledge Base Methods ====================
@@ -2112,8 +2453,17 @@ export class AppComponent implements OnDestroy, OnInit {
   // --- Kanban State ---
   leadStatuses: LeadStatus[] = ['New', 'Contacted', 'Replied', 'Follow-up', 'Closed-Won', 'Closed-Lost'];
   openLeadMenuId = signal<number | null>(null);
+  // Get leads to display (filtered by search if active)
+  displayLeads = computed(() => {
+    const searchQuery = this.leadSearchQuery().trim();
+    if (searchQuery && this.leadSearchResults().length > 0) {
+      return this.leadSearchResults();
+    }
+    return this.leads();
+  });
+  
   leadsByStatus = computed(() => {
-    const leads = this.leads();
+    const leads = this.displayLeads();
     const statusMap = new Map<LeadStatus, CapturedLead[]>();
     this.leadStatuses.forEach(status => statusMap.set(status, []));
     leads.forEach(lead => {
@@ -2138,6 +2488,80 @@ export class AppComponent implements OnDestroy, OnInit {
     today_new: 0,
     week_converted: 0
   });
+  
+  // --- Funnel Visualization (Phase 4) ---
+  funnelOverview = signal<{
+    stages: Array<{stage: string; name: string; count: number; color: string}>;
+    totalLeads: number;
+    convertedLeads: number;
+    averageConversionDays: number;
+    conversionRate: number;
+  }>({
+    stages: [],
+    totalLeads: 0,
+    convertedLeads: 0,
+    averageConversionDays: 0,
+    conversionRate: 0
+  });
+  showFunnelVisualization = signal(false);
+  isLoadingFunnel = signal(false);
+  selectedJourneyUserId = signal('');
+  userJourneyData = signal<{
+    userId: string;
+    stages: Array<{stage: string; timestamp: string; reason: string}>;
+    currentStage: string;
+    totalDays: number;
+    isConverted: boolean;
+  } | null>(null);
+  isLoadingJourney = signal(false);
+  leadsTab = signal<'kanban' | 'funnel' | 'journey'>('kanban');
+  
+  // --- Marketing Campaign (Phase 4) ---
+  marketingCampaigns = signal<Array<{
+    id: number;
+    name: string;
+    type: string;
+    status: string;
+    totalTargets: number;
+    successCount: number;
+    failedCount: number;
+    createdAt: string;
+    startedAt: string | null;
+    completedAt: string | null;
+  }>>([]);
+  marketingStats = signal<{
+    totalCampaigns: number;
+    running: number;
+    completed: number;
+    totalMessages: number;
+    totalInvites: number;
+    successRate: number;
+  }>({
+    totalCampaigns: 0,
+    running: 0,
+    completed: 0,
+    totalMessages: 0,
+    totalInvites: 0,
+    successRate: 0
+  });
+  showCreateCampaignDialog = signal(false);
+  newMarketingCampaign = { name: '', type: 'pm', targetGroup: '', messageTemplate: '' };
+  isLoadingMarketing = signal(false);
+  
+  // --- Account Warmup (Phase 4) ---
+  warmupDetails = signal<{[accountId: number]: {
+    enabled: boolean;
+    startDate: string | null;
+    stage: number;
+    stageName: string;
+    daysCompleted: number;
+    totalDays: number;
+    progressPercent: number;
+    dailyLimit: number;
+    allowedActions: string[];
+  }}>({});
+  showWarmupConfig = signal(false);
+  selectedWarmupAccountId = signal<number | null>(null);
   
   usersWithProfiles = signal<{
     users: any[],
@@ -2165,6 +2589,216 @@ export class AppComponent implements OnDestroy, OnInit {
   
   loadFunnelStats() {
     this.ipcService.send('get-funnel-stats', {});
+  }
+  
+  // ==================== Funnel Visualization Methods (Phase 4) ====================
+  
+  loadFunnelOverview() {
+    this.isLoadingFunnel.set(true);
+    this.ipcService.send('get-funnel-overview', {});
+  }
+  
+  loadUserJourney(userId: string) {
+    if (!userId) return;
+    this.isLoadingJourney.set(true);
+    this.selectedJourneyUserId.set(userId);
+    this.ipcService.send('get-user-journey', { userId });
+  }
+  
+  transitionFunnelStage(userId: string, newStage: string, reason?: string) {
+    this.ipcService.send('transition-funnel-stage', {
+      userId,
+      stage: newStage,
+      reason: reason || '手動轉換'
+    });
+  }
+  
+  // ==================== Marketing Campaign Methods (Phase 4) ====================
+  
+  loadMarketingStats() {
+    this.isLoadingMarketing.set(true);
+    this.ipcService.send('get-marketing-stats', {});
+  }
+  
+  loadMarketingCampaigns() {
+    this.ipcService.send('get-marketing-campaigns', {});
+  }
+  
+  createMarketingCampaign() {
+    if (!this.newMarketingCampaign.name.trim()) {
+      this.toastService.error('請輸入活動名稱');
+      return;
+    }
+    
+    this.ipcService.send('create-marketing-campaign', {
+      name: this.newMarketingCampaign.name,
+      type: this.newMarketingCampaign.type,
+      targetGroup: this.newMarketingCampaign.targetGroup,
+      messageTemplate: this.newMarketingCampaign.messageTemplate
+    });
+  }
+  
+  startMarketingCampaign(campaignId: number) {
+    this.ipcService.send('start-marketing-campaign', { campaignId });
+  }
+  
+  // ==================== Account Warmup Methods (Phase 4) ====================
+  
+  loadWarmupDetails(accountId: number) {
+    this.ipcService.send('get-warmup-progress', { accountId });
+  }
+  
+  loadAllWarmupDetails() {
+    const accounts = this.accounts();
+    accounts.forEach(account => {
+      if (account.id) {
+        this.loadWarmupDetails(account.id);
+      }
+    });
+  }
+  
+  toggleWarmup(accountId: number, enabled: boolean) {
+    this.ipcService.send('update-account', {
+      id: accountId,
+      warmupEnabled: enabled
+    });
+    this.toastService.info(enabled ? '已啟用預熱' : '已停用預熱');
+  }
+  
+  getWarmupStageColor(stage: number): string {
+    const colors: {[key: number]: string} = {
+      1: 'text-blue-400',
+      2: 'text-cyan-400',
+      3: 'text-yellow-400',
+      4: 'text-green-400'
+    };
+    return colors[stage] || 'text-slate-400';
+  }
+  
+  getWarmupStageIcon(stage: number): string {
+    const icons: {[key: number]: string} = {
+      1: '🔇',
+      2: '💬',
+      3: '📈',
+      4: '✅'
+    };
+    return icons[stage] || '❓';
+  }
+  
+  // ==================== Phase 5: System Management Methods ====================
+  
+  // --- Database Migration Methods ---
+  loadMigrationStatus() {
+    this.isLoadingMigration.set(true);
+    this.ipcService.send('migration-status', {});
+  }
+  
+  runMigration(targetVersion?: number) {
+    this.isRunningMigration.set(true);
+    this.ipcService.send('migrate', { targetVersion });
+  }
+  
+  rollbackMigration(targetVersion: number) {
+    if (!confirm(`確定要回滾到版本 ${targetVersion} 嗎？這可能會導致數據丟失！`)) return;
+    this.isRunningMigration.set(true);
+    this.ipcService.send('rollback-migration', { targetVersion });
+  }
+  
+  // --- Task Scheduler Methods ---
+  loadSchedulerStatus() {
+    this.ipcService.send('get-scheduler-status', {});
+  }
+  
+  startScheduler() {
+    this.ipcService.send('start-scheduler', {});
+  }
+  
+  stopScheduler() {
+    this.ipcService.send('stop-scheduler', {});
+  }
+  
+  runSchedulerTask(taskName: string) {
+    this.ipcService.send('run-scheduler-task', { taskName });
+  }
+  
+  updateSchedulerInterval(taskName: string, interval: number) {
+    this.ipcService.send('update-scheduler-interval', { taskName, interval });
+  }
+  
+  // --- Log File Management Methods ---
+  loadLogFiles() {
+    this.isLoadingLogs.set(true);
+    this.ipcService.send('list-log-files', {});
+  }
+  
+  loadLogStats() {
+    this.ipcService.send('get-log-stats', {});
+  }
+  
+  rotateLogs() {
+    this.isRotatingLogs.set(true);
+    this.ipcService.send('rotate-logs', {});
+  }
+  
+  viewLogFile(filename: string) {
+    this.selectedLogFile.set(filename);
+    this.ipcService.send('read-log-file', { filename });
+  }
+  
+  downloadLogFile(filename: string) {
+    this.ipcService.send('download-log-file', { filename });
+  }
+  
+  deleteLogFile(filename: string) {
+    if (!confirm(`確定要刪除日誌文件 ${filename} 嗎？`)) return;
+    this.ipcService.send('delete-log-file', { filename });
+  }
+  
+  // --- Resource Discovery Batch Methods (Phase 5 Enhanced) ---
+  hasSelectedResources(): boolean {
+    return this.selectedResourceIds().length > 0;
+  }
+  
+  selectedResourceCount(): number {
+    return this.selectedResourceIds().length;
+  }
+  
+  batchApproveResources() {
+    const ids = this.selectedResourceIds();
+    this.ipcService.send('batch-update-resources', { 
+      resourceIds: ids, 
+      status: 'approved' 
+    });
+    this.selectedResourceIds.set([]);
+    this.showResourceBatchMenu.set(false);
+  }
+  
+  batchRejectResources() {
+    const ids = this.selectedResourceIds();
+    this.ipcService.send('batch-update-resources', { 
+      resourceIds: ids, 
+      status: 'rejected' 
+    });
+    this.selectedResourceIds.set([]);
+    this.showResourceBatchMenu.set(false);
+  }
+  
+  batchSetResourcePriority(priority: 'high' | 'medium' | 'low') {
+    const ids = this.selectedResourceIds();
+    this.ipcService.send('batch-update-resources', { 
+      resourceIds: ids, 
+      priority 
+    });
+    this.selectedResourceIds.set([]);
+    this.showResourceBatchMenu.set(false);
+  }
+  
+  batchDeleteResources() {
+    if (!confirm(`確定要刪除 ${this.selectedResourceCount()} 個資源嗎？`)) return;
+    const ids = this.selectedResourceIds();
+    this.ipcService.send('batch-delete-resources', { resourceIds: ids });
+    this.selectedResourceIds.set([]);
+    this.showResourceBatchMenu.set(false);
   }
   
   loadUsersWithProfiles() {
@@ -2362,6 +2996,15 @@ export class AppComponent implements OnDestroy, OnInit {
     
     // Setup keyboard shortcuts
     this.setupKeyboardShortcuts();
+    
+    // 監聽會員狀態更新事件
+    this.membershipUpdateHandler = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log('[AppComponent] 收到會員狀態更新事件:', customEvent.detail);
+      // 強制觸發變更檢測以刷新側邊欄等 UI
+      this.cdr.detectChanges();
+    };
+    window.addEventListener('membership-updated', this.membershipUpdateHandler);
   }
   
   // 檢查是否首次運行
@@ -2521,6 +3164,11 @@ export class AppComponent implements OnDestroy, OnInit {
   }
 
   ngOnDestroy() {
+    // 清理會員狀態更新事件監聽
+    if (this.membershipUpdateHandler) {
+      window.removeEventListener('membership-updated', this.membershipUpdateHandler);
+    }
+    
     // Clean up listeners to prevent memory leaks
     this.ipcService.cleanup('log-entry');
     this.ipcService.cleanup('monitoring-status-changed');
@@ -3263,6 +3911,55 @@ export class AppComponent implements OnDestroy, OnInit {
         this.isSubmittingCampaign.set(false);
     });
     
+    // Search leads result
+    this.ipcService.on('search-leads-result', (data: { success: boolean, results?: any[], error?: string }) => {
+      this.isSearchingLeads.set(false);
+      if (data.success && data.results) {
+        this.leadSearchResults.set(data.results);
+        if (data.results.length === 0) {
+          this.toastService.info('未找到匹配的潜在客户');
+        }
+      } else {
+        this.toastService.error(data.error || '搜索失败');
+        this.leadSearchResults.set([]);
+      }
+    });
+    
+    // Backup management events
+    this.ipcService.on('backup-created', (data: { success: boolean, backupId?: string, error?: string }) => {
+      this.isCreatingBackup.set(false);
+      if (data.success) {
+        this.toastService.success('备份创建成功');
+        this.loadBackups();
+      } else {
+        this.toastService.error(data.error || '备份创建失败');
+      }
+    });
+    
+    this.ipcService.on('backups-list', (data: { success: boolean, backups?: any[], error?: string }) => {
+      if (data.success && data.backups) {
+        this.backups.set(data.backups);
+      }
+    });
+    
+    this.ipcService.on('backup-restored', (data: { success: boolean, error?: string }) => {
+      this.isRestoringBackup.set(false);
+      if (data.success) {
+        this.toastService.success('备份恢复成功，请刷新页面');
+      } else {
+        this.toastService.error(data.error || '备份恢复失败');
+      }
+    });
+    
+    this.ipcService.on('backup-deleted', (data: { success: boolean, error?: string }) => {
+      if (data.success) {
+        this.toastService.success('备份已删除');
+        this.loadBackups();
+      } else {
+        this.toastService.error(data.error || '删除备份失败');
+      }
+    });
+    
     this.ipcService.on('leads-updated', (data: {leads: any[]}) => {
         console.log('[Frontend] Received leads-updated:', data.leads?.length || 0);
         this.leads.set((data.leads || []).map((l: CapturedLead) => ({...l, timestamp: new Date(l.timestamp)})));
@@ -3274,6 +3971,252 @@ export class AppComponent implements OnDestroy, OnInit {
         if (!data.error) {
             this.funnelStats.set(data);
         }
+    });
+    
+    // Funnel Overview 事件 (Phase 4)
+    this.ipcService.on('funnel-overview', (data: any) => {
+      this.isLoadingFunnel.set(false);
+      if (data.success) {
+        this.funnelOverview.set({
+          stages: data.stages || [],
+          totalLeads: data.total_leads || 0,
+          convertedLeads: data.converted_leads || 0,
+          averageConversionDays: data.average_days || 0,
+          conversionRate: data.conversion_rate || 0
+        });
+      }
+    });
+    
+    // User Journey 事件 (Phase 4)
+    this.ipcService.on('user-journey', (data: any) => {
+      this.isLoadingJourney.set(false);
+      if (data.success && data.journey) {
+        this.userJourneyData.set({
+          userId: data.userId,
+          stages: data.journey.transitions || [],
+          currentStage: data.journey.current_stage || 'new',
+          totalDays: data.journey.total_days || 0,
+          isConverted: data.journey.is_converted || false
+        });
+      }
+    });
+    
+    // Funnel Stage Transitioned 事件 (Phase 4)
+    this.ipcService.on('funnel-stage-transitioned', (data: any) => {
+      if (data.success) {
+        this.toastService.success(`✅ 漏斗階段已更新: ${data.stage}`);
+        this.loadFunnelOverview();
+        this.loadFunnelStats();
+      } else {
+        this.toastService.error(`更新失敗: ${data.error}`);
+      }
+    });
+    
+    // Marketing Stats 事件 (Phase 4)
+    this.ipcService.on('marketing-stats', (data: any) => {
+      this.isLoadingMarketing.set(false);
+      if (data.success !== false) {
+        this.marketingStats.set({
+          totalCampaigns: data.total_campaigns || 0,
+          running: data.running || 0,
+          completed: data.completed || 0,
+          totalMessages: data.total_messages || 0,
+          totalInvites: data.total_invites || 0,
+          successRate: data.success_rate || 0
+        });
+      }
+    });
+    
+    // Marketing Campaigns 事件 (Phase 4)
+    this.ipcService.on('marketing-campaigns', (data: any) => {
+      if (data.success && data.campaigns) {
+        this.marketingCampaigns.set(data.campaigns);
+      }
+    });
+    
+    // Campaign Created 事件 (Phase 4)
+    this.ipcService.on('campaign-created', (data: any) => {
+      if (data.success) {
+        this.toastService.success('✅ 營銷活動已創建');
+        this.showCreateCampaignDialog.set(false);
+        this.newMarketingCampaign = { name: '', type: 'pm', targetGroup: '', messageTemplate: '' };
+        this.loadMarketingCampaigns();
+      } else {
+        this.toastService.error(`創建失敗: ${data.error}`);
+      }
+    });
+    
+    // Campaign Started/Complete 事件 (Phase 4)
+    this.ipcService.on('campaign-started', (data: any) => {
+      if (data.success) {
+        this.toastService.info('🚀 營銷活動已啟動');
+        this.loadMarketingCampaigns();
+      }
+    });
+    
+    this.ipcService.on('campaign-complete', (data: any) => {
+      if (data.success) {
+        this.toastService.success(`✅ 活動完成！成功: ${data.stats?.success || 0}, 失敗: ${data.stats?.failed || 0}`);
+        this.loadMarketingStats();
+        this.loadMarketingCampaigns();
+      }
+    });
+    
+    // Warmup Progress 事件 (Phase 4)
+    this.ipcService.on('warmup-progress', (data: any) => {
+      if (data.success && data.accountId) {
+        this.warmupDetails.update(details => ({
+          ...details,
+          [data.accountId]: {
+            enabled: data.enabled || false,
+            startDate: data.start_date || null,
+            stage: data.stage?.stage || 0,
+            stageName: data.stage?.stage_name || '',
+            daysCompleted: data.days_completed || 0,
+            totalDays: data.total_days || 14,
+            progressPercent: data.progress_percentage || 0,
+            dailyLimit: data.stage?.daily_limit || 0,
+            allowedActions: data.stage?.allowed_actions || []
+          }
+        }));
+      }
+    });
+    
+    // ==================== Phase 5: System Management Events ====================
+    
+    // Migration Events
+    this.ipcService.on('migration-status', (data: any) => {
+      this.isLoadingMigration.set(false);
+      if (!data.error) {
+        this.migrationStatus.set({
+          currentVersion: data.current_version || 0,
+          latestVersion: data.latest_version || 0,
+          appliedCount: data.applied_count || 0,
+          pendingCount: data.pending_count || 0,
+          appliedMigrations: data.applied_migrations || [],
+          pendingMigrations: data.pending_migrations || []
+        });
+      }
+    });
+    
+    this.ipcService.on('migration-completed', (data: any) => {
+      this.isRunningMigration.set(false);
+      if (data.error) {
+        this.toastService.error(`遷移失敗: ${data.error}`);
+      } else {
+        this.toastService.success('✅ 數據庫遷移完成');
+        this.loadMigrationStatus();
+      }
+    });
+    
+    this.ipcService.on('rollback-completed', (data: any) => {
+      this.isRunningMigration.set(false);
+      if (data.error) {
+        this.toastService.error(`回滾失敗: ${data.error}`);
+      } else {
+        this.toastService.success('✅ 數據庫回滾完成');
+        this.loadMigrationStatus();
+      }
+    });
+    
+    // Scheduler Events
+    this.ipcService.on('scheduler-status', (data: any) => {
+      if (data.success !== false) {
+        this.schedulerStatus.set({
+          isRunning: data.is_running || false,
+          tasks: data.tasks || []
+        });
+      }
+    });
+    
+    this.ipcService.on('scheduler-started', (data: any) => {
+      if (data.success) {
+        this.toastService.success('✅ 調度器已啟動');
+        this.loadSchedulerStatus();
+      }
+    });
+    
+    this.ipcService.on('scheduler-stopped', (data: any) => {
+      if (data.success) {
+        this.toastService.info('調度器已停止');
+        this.loadSchedulerStatus();
+      }
+    });
+    
+    this.ipcService.on('scheduler-task-result', (data: any) => {
+      if (data.success) {
+        this.toastService.success(`✅ 任務 ${data.taskName} 執行完成`);
+      } else {
+        this.toastService.error(`任務執行失敗: ${data.error}`);
+      }
+      this.loadSchedulerStatus();
+    });
+    
+    // Log File Events
+    this.ipcService.on('log-files', (data: any) => {
+      this.isLoadingLogs.set(false);
+      if (data.files) {
+        this.logFiles.set(data.files.map((f: any) => ({
+          name: f.name,
+          size: f.size,
+          sizeFormatted: this.formatFileSize(f.size),
+          modifiedAt: f.modified_at,
+          isCompressed: f.name.endsWith('.gz')
+        })));
+      }
+    });
+    
+    this.ipcService.on('log-stats', (data: any) => {
+      if (!data.error) {
+        this.logStats.set({
+          totalFiles: data.total_files || 0,
+          totalSize: data.total_size || 0,
+          totalSizeFormatted: this.formatFileSize(data.total_size || 0),
+          compressedFiles: data.compressed_files || 0,
+          oldestFile: data.oldest_file,
+          newestFile: data.newest_file
+        });
+      }
+    });
+    
+    this.ipcService.on('logs-rotated', (data: any) => {
+      this.isRotatingLogs.set(false);
+      if (data.success) {
+        this.toastService.success(`✅ 日誌輪轉完成，輪轉了 ${data.rotated_count || 0} 個文件`);
+        this.loadLogFiles();
+        this.loadLogStats();
+      } else {
+        this.toastService.error(`日誌輪轉失敗: ${data.error}`);
+      }
+    });
+    
+    this.ipcService.on('log-file-content', (data: any) => {
+      if (data.content) {
+        this.logFileContent.set(data.content);
+      }
+    });
+    
+    this.ipcService.on('log-file-deleted', (data: any) => {
+      if (data.success) {
+        this.toastService.success('✅ 日誌文件已刪除');
+        this.loadLogFiles();
+        this.loadLogStats();
+      }
+    });
+    
+    // Resource Batch Events
+    this.ipcService.on('resources-batch-updated', (data: any) => {
+      if (data.success) {
+        this.toastService.success(`✅ 已更新 ${data.count || 0} 個資源`);
+        this.loadResources();
+      }
+    });
+    
+    this.ipcService.on('resources-batch-deleted', (data: any) => {
+      if (data.success) {
+        this.toastService.success(`✅ 已刪除 ${data.count || 0} 個資源`);
+        this.loadResources();
+      }
     });
     
     // 用戶列表事件
@@ -3477,6 +4420,29 @@ export class AppComponent implements OnDestroy, OnInit {
         );
     });
     
+    // Alert rules events
+    this.ipcService.on('alert-rules-loaded', (data: { success: boolean, rules?: any[], error?: string }) => {
+      if (data.success && data.rules) {
+        this.alertRules.set(data.rules);
+      }
+    });
+    
+    this.ipcService.on('alert-rule-updated', (data: { success: boolean, error?: string }) => {
+      if (data.success) {
+        this.toastService.success('告警规则已更新');
+        this.loadAlertRules();
+      } else {
+        this.toastService.error(data.error || '更新失败');
+      }
+    });
+    
+    // Alert history events
+    this.ipcService.on('alert-history-loaded', (data: { success: boolean, history?: any[], error?: string }) => {
+      if (data.success && data.history) {
+        this.alertHistory.set(data.history);
+      }
+    });
+    
     this.ipcService.on('alerts-loaded', (data: { alerts: Alert[], count: number }) => {
       this.alerts.set(data.alerts);
     });
@@ -3579,6 +4545,83 @@ export class AppComponent implements OnDestroy, OnInit {
     this.ipcService.on('rag-feedback-recorded', (data: { success: boolean, knowledgeId?: number, error?: string }) => {
       if (!data.success) {
         this.toastService.error(`反饋記錄失敗: ${data.error}`);
+      }
+    });
+    
+    // Vector Memory Events (向量記憶事件)
+    this.ipcService.on('memories-searched', (data: { success: boolean, memories?: any[], error?: string }) => {
+      this.isSearchingMemory.set(false);
+      if (data.success && data.memories) {
+        this.vectorMemorySearchResults.set(data.memories.map(m => ({
+          id: m.id,
+          userId: m.user_id,
+          content: m.content,
+          memoryType: m.memory_type,
+          importance: m.importance,
+          similarity: m.similarity || 0,
+          createdAt: m.created_at
+        })));
+      } else if (data.error) {
+        this.toastService.error(`搜索失敗: ${data.error}`);
+      }
+    });
+    
+    this.ipcService.on('memory-added', (data: { success: boolean, memoryId?: number, error?: string }) => {
+      this.isAddingMemory.set(false);
+      if (data.success) {
+        this.toastService.success('✅ 記憶已添加');
+        this.newMemory = { userId: '', content: '', type: 'conversation', importance: 0.5 };
+        this.showAddMemoryDialog.set(false);
+        this.refreshMemoryStats();
+      } else {
+        this.toastService.error(`添加失敗: ${data.error}`);
+      }
+    });
+    
+    this.ipcService.on('memory-stats', (data: { success: boolean, totalMemories?: number, byType?: any, totalUsers?: number, avgImportance?: number, error?: string }) => {
+      if (data.success) {
+        this.vectorMemoryStats.set({
+          totalMemories: data.totalMemories || 0,
+          byType: data.byType || {},
+          totalUsers: data.totalUsers || 0,
+          avgImportance: data.avgImportance || 0
+        });
+      }
+    });
+    
+    this.ipcService.on('memory-user-list', (data: { success: boolean, users?: string[], error?: string }) => {
+      if (data.success && data.users) {
+        this.memoryUserList.set(data.users);
+      }
+    });
+    
+    this.ipcService.on('memory-deleted', (data: { success: boolean, memoryId?: number, error?: string }) => {
+      if (data.success) {
+        this.toastService.success('✅ 記憶已刪除');
+        this.vectorMemorySearchResults.update(results => 
+          results.filter(r => r.id !== data.memoryId)
+        );
+        this.refreshMemoryStats();
+      } else {
+        this.toastService.error(`刪除失敗: ${data.error}`);
+      }
+    });
+    
+    this.ipcService.on('memories-merged', (data: { success: boolean, mergedCount?: number, error?: string }) => {
+      if (data.success) {
+        this.toastService.success(`✅ 合併完成！合併了 ${data.mergedCount || 0} 條記憶`);
+        this.refreshMemoryStats();
+      } else {
+        this.toastService.error(`合併失敗: ${data.error}`);
+      }
+    });
+    
+    this.ipcService.on('old-memories-cleaned', (data: { success: boolean, deletedCount?: number, error?: string }) => {
+      if (data.success) {
+        this.toastService.success(`✅ 清理完成！刪除了 ${data.deletedCount || 0} 條舊記憶`);
+        this.refreshMemoryStats();
+      } else {
+        this.toastService.error(`清理失敗: ${data.error}`);
       }
     });
     
@@ -4172,8 +5215,12 @@ export class AppComponent implements OnDestroy, OnInit {
     });
     
     this.ipcService.on('discussion-messages', (data: { success: boolean, discussion_id?: string, messages?: any[], error?: string }) => {
+      this.isLoadingDiscussionMessages.set(false);
       if (data.success && data.messages) {
         this.discussionMessages.set(data.messages);
+      } else {
+        this.toastService.error(data.error || '加载消息失败');
+        this.discussionMessages.set([]);
       }
     });
     
@@ -4326,7 +5373,40 @@ export class AppComponent implements OnDestroy, OnInit {
 
   // --- View & Language ---
   setLanguage(lang: Language) { this.translationService.setLanguage(lang); }
-  changeView(view: View) { this.currentView.set(view); }
+  changeView(view: View) { 
+    // 检查视图访问权限
+    if (view === 'ads' && !this.membershipService.hasFeature('adBroadcast')) {
+      this.toastService.warning(`🥈 廣告發送功能需要 白銀精英 或以上會員，升級解鎖更多功能`);
+      window.dispatchEvent(new CustomEvent('open-membership-dialog'));
+      return;
+    }
+    if (view === 'multi-role' && !this.membershipService.hasFeature('multiRole')) {
+      this.toastService.warning(`💎 多角色協作功能需要 鑽石王牌 或以上會員，升級解鎖更多功能`);
+      window.dispatchEvent(new CustomEvent('open-membership-dialog'));
+      return;
+    }
+    if (view === 'user-tracking' && !this.membershipService.hasFeature('advancedAnalytics')) {
+      this.toastService.warning(`💎 用戶追蹤功能需要 鑽石王牌 或以上會員，升級解鎖更多功能`);
+      window.dispatchEvent(new CustomEvent('open-membership-dialog'));
+      return;
+    }
+    if (view === 'campaigns' && !this.membershipService.hasFeature('aiSalesFunnel')) {
+      this.toastService.warning(`💎 營銷活動功能需要 鑽石王牌 或以上會員，升級解鎖更多功能`);
+      window.dispatchEvent(new CustomEvent('open-membership-dialog'));
+      return;
+    }
+    this.currentView.set(view); 
+  }
+  
+  // 统一的批量操作权限检查辅助函数
+  private checkBatchOperationPermission(): boolean {
+    if (!this.membershipService.hasFeature('batchOperations')) {
+      this.toastService.warning(`🥇 批量操作功能需要 黃金大師 或以上會員，升級解鎖更多功能`);
+      window.dispatchEvent(new CustomEvent('open-membership-dialog'));
+      return false;
+    }
+    return true;
+  }
 
   // --- CORE LOGIC via IPC ---
   
@@ -4400,6 +5480,25 @@ export class AppComponent implements OnDestroy, OnInit {
     this.toastService.info('正在添加账户，请稍候...');
   }
 
+  /**
+   * 處理從添加帳戶頁面添加的帳戶
+   */
+  onAccountAdded(event: any): void {
+    console.log('[Frontend] Account added from add-account page:', event);
+    // 帳戶已經在後端添加並通過 accounts-updated 事件更新
+    // 這裡可以執行額外的操作，如切換回帳戶列表
+    this.toastService.success('帳戶添加成功！');
+    // 自動切換到帳戶列表視圖
+    this.changeView('accounts');
+  }
+
+  /**
+   * 導航到添加帳戶頁面
+   */
+  goToAddAccount(): void {
+    this.changeView('add-account');
+  }
+
   loginAccount(accountId: number) {
     console.log('[Frontend] loginAccount called with accountId:', accountId);
     const account = this.accounts().find(a => a.id === accountId);
@@ -4425,6 +5524,31 @@ export class AppComponent implements OnDestroy, OnInit {
     
     console.log('[Frontend] Sending login-account command to IPC');
     this.ipcService.send('login-account', accountId);
+  }
+
+  /**
+   * 登出帳戶
+   */
+  logoutAccount(accountId: number): void {
+    const account = this.accounts().find(a => a.id === accountId);
+    if (!account) {
+      this.toastService.error('帳戶未找到');
+      return;
+    }
+    
+    if (confirm(`確定要登出帳戶 ${account.phone} 嗎？`)) {
+      this.toastService.info('正在登出帳戶...');
+      this.ipcService.send('logout-account', accountId);
+    }
+  }
+
+  /**
+   * 編輯帳戶
+   */
+  editAccount(account: TelegramAccount): void {
+    // 可以打開編輯對話框或導航到編輯頁面
+    this.toastService.info(`編輯帳戶: ${account.phone}`);
+    // TODO: 實現編輯功能
   }
   
   submitLoginCode() {
@@ -4760,6 +5884,156 @@ export class AppComponent implements OnDestroy, OnInit {
     this.loadCampaignPerformanceStats(days);
   }
   
+  // Chart data functions for analytics page
+  capturesChartData(): TimeSeriesData | null {
+    const leads = this.filteredAnalyticsLeads();
+    const days = this.selectedDays();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const labels: string[] = [];
+    const data: number[] = [];
+    
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      const dateStr = date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+      labels.push(dateStr);
+      
+      const count = leads.filter(l => {
+        const leadDate = new Date(l.timestamp);
+        leadDate.setHours(0, 0, 0, 0);
+        return leadDate.getTime() === date.getTime();
+      }).length;
+      data.push(count);
+    }
+    
+    return {
+      labels,
+      datasets: [{
+        label: '捕获潜在客户',
+        data,
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        fill: true
+      }]
+    };
+  }
+  
+  conversionsChartData(): TimeSeriesData | null {
+    const leads = this.filteredAnalyticsLeads();
+    const days = this.selectedDays();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const labels: string[] = [];
+    const contactedData: number[] = [];
+    const repliedData: number[] = [];
+    
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      const dateStr = date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+      labels.push(dateStr);
+      
+      const dayLeads = leads.filter(l => {
+        const leadDate = new Date(l.timestamp);
+        leadDate.setHours(0, 0, 0, 0);
+        return leadDate.getTime() === date.getTime();
+      });
+      
+      contactedData.push(dayLeads.filter(l => l.status !== 'New').length);
+      repliedData.push(dayLeads.filter(l => ['Replied', 'Follow-up', 'Closed-Won', 'Closed-Lost'].includes(l.status)).length);
+    }
+    
+    return {
+      labels,
+      datasets: [{
+        label: '已联系',
+        data: contactedData,
+        borderColor: 'rgb(34, 197, 94)',
+        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+        fill: true
+      }, {
+        label: '已回复',
+        data: repliedData,
+        borderColor: 'rgb(168, 85, 247)',
+        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+        fill: true
+      }]
+    };
+  }
+  
+  messagesChartData(): TimeSeriesData | null {
+    // Use sending stats data if available
+    return this.sendingStatsData();
+  }
+  
+  funnelChartData(): TimeSeriesData | null {
+    const funnel = this.funnelStats();
+    if (!funnel || !funnel.stages || Object.keys(funnel.stages).length === 0) {
+      return null;
+    }
+    
+    const stages = this.funnelStages;
+    const labels = stages.map(s => s.name);
+    const data = stages.map(s => {
+      const stageData = funnel.stages[s.key];
+      return stageData ? stageData.count : 0;
+    });
+    
+    return {
+      labels,
+      datasets: [{
+        label: '漏斗数据',
+        data,
+        backgroundColor: [
+          'rgba(59, 130, 246, 0.8)',
+          'rgba(34, 197, 94, 0.8)',
+          'rgba(168, 85, 247, 0.8)',
+          'rgba(239, 68, 68, 0.8)',
+          'rgba(245, 158, 11, 0.8)',
+          'rgba(236, 72, 153, 0.8)',
+          'rgba(16, 185, 129, 0.8)',
+          'rgba(239, 68, 68, 0.8)'
+        ],
+        borderColor: [
+          'rgb(59, 130, 246)',
+          'rgb(34, 197, 94)',
+          'rgb(168, 85, 247)',
+          'rgb(239, 68, 68)',
+          'rgb(245, 158, 11)',
+          'rgb(236, 72, 153)',
+          'rgb(16, 185, 129)',
+          'rgb(239, 68, 68)'
+        ],
+        borderWidth: 1
+      }]
+    };
+  }
+  
+  // Alert management state
+  alertManagementTab = signal<'alerts' | 'rules' | 'history'>('alerts');
+  alertRules: WritableSignal<Array<{
+    id: number;
+    name: string;
+    alert_type: string;
+    condition: string;
+    level: string;
+    enabled: boolean;
+  }>> = signal([]);
+  alertHistory: WritableSignal<Array<{
+    id: number;
+    level: string;
+    message: string;
+    alert_type: string;
+    timestamp: string;
+    acknowledged: boolean;
+    resolved: boolean;
+    resolved_at?: string;
+  }>> = signal([]);
+  showAddAlertRuleDialog = signal(false);
+  
   // Alert methods
   loadAlerts(unresolvedOnly: boolean = false, level?: string) {
     this.ipcService.send('get-alerts', { limit: 50, unresolvedOnly, level });
@@ -4771,6 +6045,29 @@ export class AppComponent implements OnDestroy, OnInit {
   
   resolveAlert(alertId: number) {
     this.ipcService.send('resolve-alert', { alertId });
+  }
+  
+  loadAlertHistory(days: number = 30) {
+    this.ipcService.send('get-alert-history', { days });
+  }
+  
+  loadAlertRules() {
+    this.ipcService.send('get-alert-rules', {});
+  }
+  
+  toggleAlertRule(ruleId: number) {
+    this.ipcService.send('toggle-alert-rule', { ruleId });
+  }
+  
+  editAlertRule(rule: any) {
+    // TODO: Open edit dialog
+    this.showAddAlertRuleDialog.set(true);
+  }
+  
+  deleteAlertRule(ruleId: number) {
+    if (confirm('确定要删除此告警规则吗？')) {
+      this.ipcService.send('delete-alert-rule', { ruleId });
+    }
   }
   
   async showNotification(title: string, body: string, options?: NotificationOptions) {
@@ -4879,7 +6176,31 @@ export class AppComponent implements OnDestroy, OnInit {
   onExcelFileSelected() { this.accountLoaderService.loadAccountsFromExcel(); }
   onDownloadTemplate() { this.accountLoaderService.downloadExcelTemplate(); }
   reloadSessionsAndAccounts() { this.accountLoaderService.reloadSessionsAndAccounts(); }
-  exportLeads() { this.accountLoaderService.exportLeadsToExcel(this.leads()); }
+  
+  // QR 掃碼登入
+  openQrLogin() {
+    this.showQrLoginDialog.set(true);
+  }
+  
+  closeQrLogin() {
+    this.showQrLoginDialog.set(false);
+  }
+  
+  onQrLoginSuccess(data: any) {
+    this.showQrLoginDialog.set(false);
+    this.toastService.success(`帳號 ${data.phone || ''} 已成功添加！`);
+    // 重新載入帳號列表
+    this.reloadSessionsAndAccounts();
+  }
+  exportLeads() { 
+    // 检查数据导出权限
+    if (!this.membershipService.hasFeature('dataExport')) {
+      this.toastService.warning(`🥇 數據導出功能需要 黃金大師 或以上會員，升級解鎖更多功能`);
+      window.dispatchEvent(new CustomEvent('open-membership-dialog'));
+      return;
+    }
+    this.accountLoaderService.exportLeadsToExcel(this.leads()); 
+  }
   
   // Session file management
   importSession() { this.ipcService.send('import-session'); }
@@ -4994,6 +6315,14 @@ export class AppComponent implements OnDestroy, OnInit {
   }
 
   addKeywordSet() {
+      // 會員配額檢查 - 關鍵詞集數量限制
+      const quotas = this.membershipService.quotas();
+      if (quotas.maxKeywordSets !== -1 && this.keywordSets().length >= quotas.maxKeywordSets) {
+          this.toastService.warning(`${this.membershipService.levelIcon()} ${this.membershipService.levelName()} 最多支持 ${quotas.maxKeywordSets} 個關鍵詞集，升級解鎖更多`);
+          window.dispatchEvent(new CustomEvent('open-membership-dialog'));
+          return;
+      }
+      
       const form = this.newKeywordSet();
       const name = form.name.trim();
       if (name) {
@@ -5005,7 +6334,7 @@ export class AppComponent implements OnDestroy, OnInit {
           
           console.log('[Frontend] Sending add-keyword-set command:', name);
           this.ipcService.send('add-keyword-set', { name: name });
-          // 不要立即清空輸入框，等成功後再清空（由事件監聽器處理）
+          // 不要立即清空輸入框，等成功後再清空（由事件監聯器處理）
       } else {
           this.toastService.warning('請輸入關鍵詞集名稱', 3000);
       }
@@ -5619,6 +6948,13 @@ export class AppComponent implements OnDestroy, OnInit {
   
   // Batch update status
   batchUpdateLeadStatus(newStatus: LeadStatus) {
+    // 检查批量操作权限
+    if (!this.membershipService.hasFeature('batchOperations')) {
+      this.toastService.warning(`🥇 批量操作功能需要 黃金大師 或以上會員，升級解鎖更多功能`);
+      window.dispatchEvent(new CustomEvent('open-membership-dialog'));
+      return;
+    }
+    
     const leadIds = Array.from(this.selectedLeadIds());
     if (leadIds.length === 0) {
       this.toastService.warning('請先選擇 Lead');
@@ -5636,6 +6972,8 @@ export class AppComponent implements OnDestroy, OnInit {
   
   // Batch add tag
   batchAddTag(tag: string) {
+    if (!this.checkBatchOperationPermission()) return;
+    
     const leadIds = Array.from(this.selectedLeadIds());
     if (leadIds.length === 0) {
       this.toastService.warning('請先選擇 Lead');
@@ -5658,6 +6996,8 @@ export class AppComponent implements OnDestroy, OnInit {
   
   // Batch remove tag
   batchRemoveTag(tag: string) {
+    if (!this.checkBatchOperationPermission()) return;
+    
     const leadIds = Array.from(this.selectedLeadIds());
     if (leadIds.length === 0) {
       this.toastService.warning('請先選擇 Lead');
@@ -5674,6 +7014,8 @@ export class AppComponent implements OnDestroy, OnInit {
   
   // Batch add to DNC
   batchAddToDnc() {
+    if (!this.checkBatchOperationPermission()) return;
+    
     const leadIds = Array.from(this.selectedLeadIds());
     if (leadIds.length === 0) {
       this.toastService.warning('請先選擇 Lead');
@@ -5692,6 +7034,8 @@ export class AppComponent implements OnDestroy, OnInit {
   
   // Batch remove from DNC
   batchRemoveFromDnc() {
+    if (!this.checkBatchOperationPermission()) return;
+    
     const leadIds = Array.from(this.selectedLeadIds());
     if (leadIds.length === 0) {
       this.toastService.warning('請先選擇 Lead');
@@ -5706,6 +7050,8 @@ export class AppComponent implements OnDestroy, OnInit {
   
   // Batch update funnel stage
   batchUpdateFunnelStage(newStage: string) {
+    if (!this.checkBatchOperationPermission()) return;
+    
     const leadIds = Array.from(this.selectedLeadIds());
     if (leadIds.length === 0) {
       this.toastService.warning('請先選擇 Lead');
@@ -5723,6 +7069,8 @@ export class AppComponent implements OnDestroy, OnInit {
   
   // Batch delete leads
   batchDeleteLeads() {
+    if (!this.checkBatchOperationPermission()) return;
+    
     const leadIds = Array.from(this.selectedLeadIds());
     if (leadIds.length === 0) {
       this.toastService.warning('請先選擇 Lead');
@@ -5786,6 +7134,81 @@ export class AppComponent implements OnDestroy, OnInit {
     }
     
     this.ipcService.send('delete-tag', { name: tagName });
+  }
+  
+  // Full-text search for leads
+  onLeadSearchInput() {
+    // Debounce search
+    if (this.leadSearchTimeout) {
+      clearTimeout(this.leadSearchTimeout);
+    }
+    
+    const query = this.leadSearchQuery().trim();
+    if (!query || query.length < 2) {
+      this.leadSearchResults.set([]);
+      return;
+    }
+    
+    this.leadSearchTimeout = setTimeout(() => {
+      this.searchLeads();
+    }, 500);
+  }
+  
+  searchLeads() {
+    const query = this.leadSearchQuery().trim();
+    if (!query || query.length < 2) {
+      this.leadSearchResults.set([]);
+      return;
+    }
+    
+    this.isSearchingLeads.set(true);
+    this.ipcService.send('search-leads', {
+      query,
+      limit: 100
+    });
+  }
+  
+  clearLeadSearch() {
+    this.leadSearchQuery.set('');
+    this.leadSearchResults.set([]);
+    if (this.leadSearchTimeout) {
+      clearTimeout(this.leadSearchTimeout);
+      this.leadSearchTimeout = null;
+    }
+  }
+  
+  // Backup management functions
+  createBackup() {
+    this.isCreatingBackup.set(true);
+    this.ipcService.send('create-backup', {
+      name: `backup_${new Date().toISOString().replace(/[:.]/g, '-')}`,
+      description: 'Manual backup'
+    });
+  }
+  
+  loadBackups() {
+    this.ipcService.send('list-backups', {});
+  }
+  
+  restoreBackup(backupId: string) {
+    if (!confirm('确定要恢复此备份吗？当前数据将被覆盖！')) {
+      return;
+    }
+    
+    this.isRestoringBackup.set(true);
+    this.ipcService.send('restore-backup', {
+      backupId
+    });
+  }
+  
+  deleteBackup(backupId: string) {
+    if (!confirm('确定要删除此备份吗？此操作无法撤销！')) {
+      return;
+    }
+    
+    this.ipcService.send('delete-backup', {
+      backupId
+    });
   }
   
   // Handle batch operation result
@@ -5930,6 +7353,13 @@ export class AppComponent implements OnDestroy, OnInit {
   }
   
   createAdTemplate() {
+    // 检查广告发送权限
+    if (!this.membershipService.hasFeature('adBroadcast')) {
+      this.toastService.warning(`🥈 廣告發送功能需要 白銀精英 或以上會員，升級解鎖更多功能`);
+      window.dispatchEvent(new CustomEvent('open-membership-dialog'));
+      return;
+    }
+    
     const form = this.newAdTemplate();
     if (!form.name.trim()) {
       this.toastService.warning('請輸入模板名稱');
@@ -5969,6 +7399,13 @@ export class AppComponent implements OnDestroy, OnInit {
   }
   
   createAdSchedule() {
+    // 检查广告发送权限
+    if (!this.membershipService.hasFeature('adBroadcast')) {
+      this.toastService.warning(`🥈 廣告發送功能需要 白銀精英 或以上會員，升級解鎖更多功能`);
+      window.dispatchEvent(new CustomEvent('open-membership-dialog'));
+      return;
+    }
+    
     const form = this.newAdSchedule();
     if (!form.name.trim()) {
       this.toastService.warning('請輸入計劃名稱');
@@ -6347,6 +7784,13 @@ export class AppComponent implements OnDestroy, OnInit {
   }
   
   createCampaignFromForm() {
+    // 检查营销活动权限
+    if (!this.membershipService.hasFeature('aiSalesFunnel')) {
+      this.toastService.warning(`💎 營銷活動功能需要 鑽石王牌 或以上會員，升級解鎖更多功能`);
+      window.dispatchEvent(new CustomEvent('open-membership-dialog'));
+      return;
+    }
+    
     const form = this.campaignFormData();
     if (!form.name.trim()) {
       this.toastService.warning('請輸入活動名稱');

@@ -52,6 +52,9 @@ export interface Quotas {
   maxGroups: number;
   maxKeywordSets: number;
   dataRetentionDays: number;
+  // 平台 API 配額（新增）
+  platformApiQuota: number;        // 可使用的平台 API 數量
+  platformApiMaxAccounts: number;  // 每個平台 API 可綁定的帳號數
 }
 
 export interface FeatureAccess {
@@ -110,7 +113,9 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
       dailyAiCalls: 10,
       maxGroups: 3,
       maxKeywordSets: 1,
-      dataRetentionDays: 7
+      dataRetentionDays: 7,
+      platformApiQuota: 0,        // 免費版無平台 API，需自備
+      platformApiMaxAccounts: 0
     },
     features: {
       accountManagement: true,
@@ -134,15 +139,17 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
     name: '白銀精英',
     icon: '🥈',
     rank: 2,
-    monthlyPrice: 49,
-    yearlyPrice: 399,
+    monthlyPrice: 9.9,  // 調整為 USDT 價格
+    yearlyPrice: 99,
     quotas: {
       maxAccounts: 5,
-      dailyMessages: 100,
+      dailyMessages: 50,
       dailyAiCalls: 50,
       maxGroups: 10,
       maxKeywordSets: 3,
-      dataRetentionDays: 15
+      dataRetentionDays: 15,
+      platformApiQuota: 1,         // 1 個平台 API
+      platformApiMaxAccounts: 3    // 可綁定 3 個帳號
     },
     features: {
       accountManagement: true,
@@ -166,15 +173,17 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
     name: '黃金大師',
     icon: '🥇',
     rank: 3,
-    monthlyPrice: 99,
-    yearlyPrice: 799,
+    monthlyPrice: 29.9,  // 調整為 USDT 價格
+    yearlyPrice: 299,
     quotas: {
-      maxAccounts: 10,
-      dailyMessages: 300,
+      maxAccounts: 15,
+      dailyMessages: 200,
       dailyAiCalls: 200,
       maxGroups: 30,
       maxKeywordSets: 10,
-      dataRetentionDays: 30
+      dataRetentionDays: 30,
+      platformApiQuota: 3,         // 3 個平台 API
+      platformApiMaxAccounts: 9    // 可綁定 9 個帳號
     },
     features: {
       accountManagement: true,
@@ -198,15 +207,17 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
     name: '鑽石王牌',
     icon: '💎',
     rank: 4,
-    monthlyPrice: 199,
-    yearlyPrice: 1599,
+    monthlyPrice: 99.9,  // 調整為 USDT 價格
+    yearlyPrice: 999,
     quotas: {
-      maxAccounts: 20,
+      maxAccounts: 50,
       dailyMessages: 1000,
       dailyAiCalls: -1,
       maxGroups: 100,
       maxKeywordSets: -1,
-      dataRetentionDays: 60
+      dataRetentionDays: 60,
+      platformApiQuota: 10,        // 10 個平台 API
+      platformApiMaxAccounts: 30   // 可綁定 30 個帳號
     },
     features: {
       accountManagement: true,
@@ -230,15 +241,17 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
     name: '星耀傳說',
     icon: '🌟',
     rank: 5,
-    monthlyPrice: 399,
+    monthlyPrice: 299,  // 調整為 USDT 價格
     yearlyPrice: 2999,
     quotas: {
-      maxAccounts: 50,
+      maxAccounts: 100,
       dailyMessages: -1,
       dailyAiCalls: -1,
       maxGroups: -1,
       maxKeywordSets: -1,
-      dataRetentionDays: 180
+      dataRetentionDays: 180,
+      platformApiQuota: 30,        // 30 個平台 API
+      platformApiMaxAccounts: 90   // 可綁定 90 個帳號
     },
     features: {
       accountManagement: true,
@@ -262,15 +275,17 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
     name: '榮耀王者',
     icon: '👑',
     rank: 6,
-    monthlyPrice: 999,
-    yearlyPrice: 6999,
+    monthlyPrice: 999,  // USDT 價格
+    yearlyPrice: 9999,
     quotas: {
-      maxAccounts: -1,
+      maxAccounts: -1,  // 無限
       dailyMessages: -1,
       dailyAiCalls: -1,
       maxGroups: -1,
       maxKeywordSets: -1,
-      dataRetentionDays: 365
+      dataRetentionDays: 365,
+      platformApiQuota: -1,        // 無限平台 API（專屬池）
+      platformApiMaxAccounts: -1   // 無限帳號
     },
     features: {
       accountManagement: true,
@@ -310,10 +325,24 @@ export class MembershipService {
   membership = computed(() => this._membership());
   isLoading = computed(() => this._isLoading());
   
-  level = computed(() => this._membership()?.level || 'bronze');
-  levelName = computed(() => MEMBERSHIP_CONFIG[this.level()].name);
-  levelIcon = computed(() => MEMBERSHIP_CONFIG[this.level()].icon);
-  levelRank = computed(() => MEMBERSHIP_CONFIG[this.level()].rank);
+  level = computed(() => {
+    const rawLevel = this._membership()?.level || 'bronze';
+    // 確保返回有效的會員等級，處理舊版數據兼容
+    if (rawLevel in MEMBERSHIP_CONFIG) {
+      return rawLevel as MembershipLevel;
+    }
+    // 舊版等級映射
+    const legacyMap: Record<string, MembershipLevel> = {
+      'free': 'bronze',
+      'vip': 'silver',
+      'svip': 'diamond',
+      'mvp': 'king'
+    };
+    return legacyMap[rawLevel] || 'bronze';
+  });
+  levelName = computed(() => MEMBERSHIP_CONFIG[this.level()]?.name || '青銅戰士');
+  levelIcon = computed(() => MEMBERSHIP_CONFIG[this.level()]?.icon || '⚔️');
+  levelRank = computed(() => MEMBERSHIP_CONFIG[this.level()]?.rank || 1);
   
   isActive = computed(() => {
     const m = this._membership();
@@ -685,12 +714,12 @@ export class MembershipService {
         level: 'silver',
         name: '🥈 白銀精英',
         icon: '🥈',
-        monthlyPrice: 49,
-        yearlyPrice: 399,
+        monthlyPrice: 9.9,
+        yearlyPrice: 99,
         quotas: MEMBERSHIP_CONFIG.silver.quotas,
         features: [
           '5 個賬戶',
-          '每日 100 條消息',
+          '每日 50 條消息',
           '每日 50 次 AI',
           '10 個群組',
           '廣告發送'
@@ -700,12 +729,12 @@ export class MembershipService {
         level: 'gold',
         name: '🥇 黃金大師',
         icon: '🥇',
-        monthlyPrice: 99,
-        yearlyPrice: 799,
+        monthlyPrice: 29.9,
+        yearlyPrice: 299,
         quotas: MEMBERSHIP_CONFIG.gold.quotas,
         features: [
-          '10 個賬戶',
-          '每日 300 條消息',
+          '15 個賬戶',
+          '每日 200 條消息',
           '每日 200 次 AI',
           '30 個群組',
           '數據導出',
@@ -716,12 +745,12 @@ export class MembershipService {
         level: 'diamond',
         name: '💎 鑽石王牌',
         icon: '💎',
-        monthlyPrice: 199,
-        yearlyPrice: 1599,
+        monthlyPrice: 99.9,
+        yearlyPrice: 999,
         quotas: MEMBERSHIP_CONFIG.diamond.quotas,
         recommended: true,
         features: [
-          '20 個賬戶',
+          '50 個賬戶',
           '每日 1000 條消息',
           '無限 AI 調用',
           '100 個群組',
@@ -734,11 +763,11 @@ export class MembershipService {
         level: 'star',
         name: '🌟 星耀傳說',
         icon: '🌟',
-        monthlyPrice: 399,
+        monthlyPrice: 299,
         yearlyPrice: 2999,
         quotas: MEMBERSHIP_CONFIG.star.quotas,
         features: [
-          '50 個賬戶',
+          '100 個賬戶',
           '無限消息',
           '無限 AI',
           '無限群組',
@@ -752,7 +781,7 @@ export class MembershipService {
         name: '👑 榮耀王者',
         icon: '👑',
         monthlyPrice: 999,
-        yearlyPrice: 6999,
+        yearlyPrice: 9999,
         quotas: MEMBERSHIP_CONFIG.king.quotas,
         features: [
           '無限賬戶',

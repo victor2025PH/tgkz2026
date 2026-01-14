@@ -154,8 +154,8 @@
                             <div class="flex items-center justify-between">
                                 <div>
                                     <p class="text-purple-100">總收入</p>
-                                    <p class="text-3xl font-bold mt-2">¥{{ stats.totalRevenue.toLocaleString() }}</p>
-                                    <p class="text-purple-200 text-sm mt-1">+¥{{ stats.revenueToday }} 今日</p>
+                                    <p class="text-3xl font-bold mt-2">{{ stats.totalRevenue.toLocaleString() }} USDT</p>
+                                    <p class="text-purple-200 text-sm mt-1">+{{ stats.revenueToday }} USDT 今日</p>
                                 </div>
                                 <span class="text-5xl opacity-50">💰</span>
                             </div>
@@ -266,7 +266,7 @@
                                     </td>
                                     <td class="px-6 py-4">
                                         <span v-if="user.totalSpent > 0" class="text-green-400">
-                                            ¥{{ user.totalSpent }}
+                                            {{ user.totalSpent }} USDT
                                         </span>
                                         <span v-else class="text-gray-500">-</span>
                                     </td>
@@ -287,6 +287,89 @@
                                 <tr v-if="filteredUsers.length === 0">
                                     <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                                         暫無用戶數據
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- ==================== 即將到期用戶 ==================== -->
+                <div v-if="currentPage === 'expiring'">
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="flex gap-4 items-center">
+                            <span class="text-gray-400">即將在</span>
+                            <select v-model="expiringDays" @change="loadExpiringUsers" 
+                                    class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2">
+                                <option :value="3">3 天</option>
+                                <option :value="7">7 天</option>
+                                <option :value="14">14 天</option>
+                                <option :value="30">30 天</option>
+                            </select>
+                            <span class="text-gray-400">內到期</span>
+                        </div>
+                        <button @click="batchSendExpiryReminders" 
+                                :disabled="expiringUsers.length === 0"
+                                class="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 px-6 py-2 rounded-lg font-medium transition-colors">
+                            📨 批量發送提醒 ({{ expiringUsers.length }})
+                        </button>
+                    </div>
+                    
+                    <div v-if="expiringUsers.length === 0" class="bg-gray-800 rounded-xl p-12 text-center">
+                        <div class="text-6xl mb-4">🎉</div>
+                        <p class="text-xl text-gray-400">太棒了！沒有即將到期的用戶</p>
+                    </div>
+                    
+                    <div v-else class="bg-gray-800 rounded-xl overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">用戶</th>
+                                    <th class="text-left px-6 py-4 font-medium">等級</th>
+                                    <th class="text-left px-6 py-4 font-medium">到期時間</th>
+                                    <th class="text-left px-6 py-4 font-medium">剩餘天數</th>
+                                    <th class="text-left px-6 py-4 font-medium">消費金額</th>
+                                    <th class="text-left px-6 py-4 font-medium">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="user in expiringUsers" :key="user.user_id" 
+                                    class="border-t border-gray-700 table-row-hover">
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center">
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-orange-500 to-red-500 flex items-center justify-center mr-3">
+                                                {{ user.email ? user.email[0].toUpperCase() : '?' }}
+                                            </div>
+                                            <div>
+                                                <p class="font-medium">{{ user.email || '未設置' }}</p>
+                                                <p class="text-sm text-gray-400">{{ user.user_id }}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span :class="'rank-' + user.level" class="font-medium">
+                                            {{ user.level_icon }} {{ user.level_name }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-orange-400">
+                                        {{ formatDate(user.expires_at) }}
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-3 py-1 rounded-full text-sm"
+                                              :class="user.days_remaining <= 3 ? 'bg-red-500/20 text-red-400' : 'bg-orange-500/20 text-orange-400'">
+                                            {{ user.days_remaining }} 天
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-green-400">
+                                        {{ user.total_spent || 0 }} USDT
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex gap-2">
+                                            <button @click="sendExpiryReminder(user.user_id)" 
+                                                    class="text-orange-400 hover:text-orange-300 text-sm">發送提醒</button>
+                                            <button @click="extendUser(user)" 
+                                                    class="text-green-400 hover:text-green-300 text-sm">續費</button>
+                                        </div>
                                     </td>
                                 </tr>
                             </tbody>
@@ -359,7 +442,7 @@
                                     <td class="px-6 py-4">
                                         <span :class="'rank-' + license.level">{{ license.typeName }}</span>
                                     </td>
-                                    <td class="px-6 py-4">¥{{ license.price }}</td>
+                                    <td class="px-6 py-4">{{ license.price }} USDT</td>
                                     <td class="px-6 py-4">
                                         <span :class="getStatusClass(license.status)" 
                                               class="px-2 py-1 rounded text-sm">
@@ -431,9 +514,9 @@
                                     <td class="px-6 py-4 text-sm text-gray-400">{{ order.user_id || '-' }}</td>
                                     <td class="px-6 py-4">{{ order.productName || order.product_name || '-' }}</td>
                                     <td class="px-6 py-4">
-                                        <span class="font-medium text-green-400">¥{{ order.final_price || 0 }}</span>
+                                        <span class="font-medium text-green-400">{{ order.final_price || 0 }} USDT</span>
                                         <span v-if="order.discount_amount" class="text-xs text-gray-500 ml-1">
-                                            (-¥{{ order.discount_amount }})
+                                            (-{{ order.discount_amount }} USDT)
                                         </span>
                                     </td>
                                     <td class="px-6 py-4">
@@ -482,7 +565,7 @@
                             <div class="flex items-center justify-between">
                                 <div>
                                     <p class="text-gray-400">總獎勵發放</p>
-                                    <p class="text-3xl font-bold mt-2 text-green-400">¥{{ referralStats.totalEarnings || 0 }}</p>
+                                    <p class="text-3xl font-bold mt-2 text-green-400">{{ referralStats.totalEarnings || 0 }} USDT</p>
                                 </div>
                                 <span class="text-4xl">💰</span>
                             </div>
@@ -514,7 +597,7 @@
                                     </div>
                                     <div class="text-right">
                                         <p class="font-bold text-blue-400">{{ user.total_invites }} 人</p>
-                                        <p class="text-sm text-green-400">¥{{ user.invite_earnings || 0 }}</p>
+                                        <p class="text-sm text-green-400">{{ user.invite_earnings || 0 }} USDT</p>
                                     </div>
                                 </div>
                                 <div v-if="!referralStats.leaderboard?.length" class="text-center text-gray-500 py-8">
@@ -533,11 +616,11 @@
                                 <div class="p-4 bg-gray-700/50 rounded-lg">
                                     <p class="font-medium text-green-400">💎 首次付費獎勵</p>
                                     <div class="text-sm text-gray-400 mt-1 space-y-1">
-                                        <p>白銀: 7天 + ¥5</p>
-                                        <p>黃金: 15天 + ¥10</p>
-                                        <p>鑽石: 30天 + ¥20</p>
-                                        <p>星耀: 45天 + ¥40</p>
-                                        <p>王者: 60天 + ¥100</p>
+                                        <p>白銀: 7天 + 1 USDT</p>
+                                        <p>黃金: 15天 + 3 USDT</p>
+                                        <p>鑽石: 30天 + 10 USDT</p>
+                                        <p>星耀: 45天 + 30 USDT</p>
+                                        <p>王者: 60天 + 100 USDT</p>
                                     </div>
                                 </div>
                                 <div class="p-4 bg-gray-700/50 rounded-lg">
@@ -832,7 +915,7 @@
                     <div class="grid grid-cols-4 gap-6 mb-6">
                         <div class="bg-gray-800 rounded-xl p-6">
                             <p class="text-gray-400 text-sm">總收入</p>
-                            <p class="text-3xl font-bold mt-2 text-green-400">¥{{ (revenueReport.summary?.total_revenue || 0).toLocaleString() }}</p>
+                            <p class="text-3xl font-bold mt-2 text-green-400">{{ (revenueReport.summary?.total_revenue || 0).toLocaleString() }} USDT</p>
                             <p class="text-sm mt-1" :class="(revenueReport.summary?.growth_rate || 0) >= 0 ? 'text-green-400' : 'text-red-400'">
                                 {{ (revenueReport.summary?.growth_rate || 0) >= 0 ? '↑' : '↓' }} 
                                 {{ Math.abs(revenueReport.summary?.growth_rate || 0) }}% 較上期
@@ -850,7 +933,7 @@
                         </div>
                         <div class="bg-gray-800 rounded-xl p-6">
                             <p class="text-gray-400 text-sm">客單價</p>
-                            <p class="text-3xl font-bold mt-2 text-orange-400">¥{{ (revenueReport.summary?.avg_order_value || 0).toFixed(2) }}</p>
+                            <p class="text-3xl font-bold mt-2 text-orange-400">{{ (revenueReport.summary?.avg_order_value || 0).toFixed(2) }} USDT</p>
                             <p class="text-sm text-gray-500 mt-1">平均訂單金額</p>
                         </div>
                     </div>
@@ -884,7 +967,7 @@
                                         class="border-b border-gray-700/50">
                                         <td class="py-2">{{ getLevelName(item.product_level) }}</td>
                                         <td class="text-right py-2">{{ item.order_count }}</td>
-                                        <td class="text-right py-2 text-green-400">¥{{ item.revenue?.toLocaleString() }}</td>
+                                        <td class="text-right py-2 text-green-400">{{ item.revenue?.toLocaleString() }} USDT</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -904,7 +987,7 @@
                                         class="border-b border-gray-700/50">
                                         <td class="py-2">{{ getDurationName(item.duration_type) }}</td>
                                         <td class="text-right py-2">{{ item.order_count }}</td>
-                                        <td class="text-right py-2 text-green-400">¥{{ item.revenue?.toLocaleString() }}</td>
+                                        <td class="text-right py-2 text-green-400">{{ item.revenue?.toLocaleString() }} USDT</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -927,12 +1010,12 @@
                         </div>
                         <div class="bg-gray-800 rounded-xl p-4 text-center">
                             <p class="text-gray-400 text-sm">ARPU</p>
-                            <p class="text-2xl font-bold mt-1 text-blue-400">¥{{ userAnalytics.arpu || 0 }}</p>
+                            <p class="text-2xl font-bold mt-1 text-blue-400">{{ userAnalytics.arpu || 0 }} USDT</p>
                             <p class="text-xs text-gray-500">用戶平均收入</p>
                         </div>
                         <div class="bg-gray-800 rounded-xl p-4 text-center">
                             <p class="text-gray-400 text-sm">ARPPU</p>
-                            <p class="text-2xl font-bold mt-1 text-purple-400">¥{{ userAnalytics.arppu || 0 }}</p>
+                            <p class="text-2xl font-bold mt-1 text-purple-400">{{ userAnalytics.arppu || 0 }} USDT</p>
                             <p class="text-xs text-gray-500">付費用戶平均</p>
                         </div>
                         <div class="bg-gray-800 rounded-xl p-4 text-center">
@@ -992,10 +1075,264 @@
                                 <p class="text-gray-400 mt-1">轉化付費</p>
                             </div>
                             <div>
-                                <p class="text-4xl font-bold text-purple-400">¥{{ (userAnalytics.referralStats?.total_rewards || 0).toLocaleString() }}</p>
+                                <p class="text-4xl font-bold text-purple-400">{{ (userAnalytics.referralStats?.total_rewards || 0).toLocaleString() }} USDT</p>
                                 <p class="text-gray-400 mt-1">總獎勵發放</p>
                             </div>
                         </div>
+                    </div>
+                </div>
+                
+                <!-- ==================== 配額監控 ==================== -->
+                <div v-if="currentPage === 'quotas'">
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="flex gap-4">
+                            <select v-model="quotaFilter" class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2">
+                                <option value="all">全部用戶</option>
+                                <option value="exceeded">配額緊張 (≥90%)</option>
+                                <option value="bronze">⚔️ 青銅戰士</option>
+                                <option value="silver">🥈 白銀精英</option>
+                                <option value="gold">🥇 黃金大師</option>
+                                <option value="diamond">💎 鑽石王牌</option>
+                                <option value="star">🌟 星耀傳說</option>
+                                <option value="king">👑 榮耀王者</option>
+                            </select>
+                        </div>
+                        <button @click="loadQuotaStats" 
+                                class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors">
+                            🔄 刷新
+                        </button>
+                    </div>
+                    
+                    <!-- 配額統計概覽 -->
+                    <div class="grid grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-5 border border-gray-700">
+                            <p class="text-gray-400 text-sm">今日總消息</p>
+                            <p class="text-3xl font-bold mt-2 text-cyan-400">{{ quotaStats.reduce((sum, u) => sum + (u.messagesUsed || 0), 0).toLocaleString() }}</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-5 border border-gray-700">
+                            <p class="text-gray-400 text-sm">今日 AI 調用</p>
+                            <p class="text-3xl font-bold mt-2 text-purple-400">{{ quotaStats.reduce((sum, u) => sum + (u.aiUsed || 0), 0).toLocaleString() }}</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-5 border border-gray-700">
+                            <p class="text-gray-400 text-sm">配額緊張用戶</p>
+                            <p class="text-3xl font-bold mt-2 text-orange-400">{{ quotaStats.filter(u => u.messagesPercent >= 90 || u.aiPercent >= 90).length }}</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-5 border border-gray-700">
+                            <p class="text-gray-400 text-sm">活躍用戶</p>
+                            <p class="text-3xl font-bold mt-2 text-green-400">{{ quotaStats.filter(u => u.messagesUsed > 0 || u.aiUsed > 0).length }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">用戶</th>
+                                    <th class="text-left px-6 py-4 font-medium">等級</th>
+                                    <th class="text-left px-6 py-4 font-medium">消息用量</th>
+                                    <th class="text-left px-6 py-4 font-medium">AI 用量</th>
+                                    <th class="text-left px-6 py-4 font-medium">最後活動</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="user in filteredQuotaStats" :key="user.user_id" 
+                                    class="border-t border-gray-700 table-row-hover">
+                                    <td class="px-6 py-4">
+                                        <p class="font-medium">{{ user.email || user.user_id }}</p>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span :class="'rank-' + user.level">{{ user.level_icon }} {{ user.level_name }}</span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                                <div class="h-full rounded-full transition-all"
+                                                     :class="user.messagesPercent >= 90 ? 'bg-red-500' : user.messagesPercent >= 70 ? 'bg-orange-500' : 'bg-green-500'"
+                                                     :style="{width: Math.min(user.messagesPercent || 0, 100) + '%'}"></div>
+                                            </div>
+                                            <span class="text-sm">{{ user.messagesUsed || 0 }}/{{ user.messagesMax === -1 ? '∞' : user.messagesMax }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                                <div class="h-full rounded-full transition-all"
+                                                     :class="user.aiPercent >= 90 ? 'bg-red-500' : user.aiPercent >= 70 ? 'bg-orange-500' : 'bg-purple-500'"
+                                                     :style="{width: Math.min(user.aiPercent || 0, 100) + '%'}"></div>
+                                            </div>
+                                            <span class="text-sm">{{ user.aiUsed || 0 }}/{{ user.aiMax === -1 ? '∞' : user.aiMax }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-400 text-sm">{{ formatDate(user.last_active) }}</td>
+                                </tr>
+                                <tr v-if="filteredQuotaStats.length === 0">
+                                    <td colspan="5" class="px-6 py-12 text-center text-gray-500">暫無數據</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- ==================== 批量通知 ==================== -->
+                <div v-if="currentPage === 'notifications'">
+                    <div class="grid grid-cols-2 gap-6">
+                        <!-- 發送通知 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">📨 發送批量通知</h3>
+                            
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-gray-400 text-sm mb-2">目標用戶</label>
+                                    <select v-model="notificationForm.targetLevel" 
+                                            class="w-full bg-gray-700 rounded-lg px-4 py-2">
+                                        <option value="all">所有用戶</option>
+                                        <option value="bronze">⚔️ 青銅戰士</option>
+                                        <option value="silver">🥈 白銀精英</option>
+                                        <option value="gold">🥇 黃金大師</option>
+                                        <option value="diamond">💎 鑽石王牌</option>
+                                        <option value="star">🌟 星耀傳說</option>
+                                        <option value="king">👑 榮耀王者</option>
+                                        <option value="paid">所有付費用戶</option>
+                                        <option value="free">免費用戶</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="flex items-center gap-4">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" v-model="notificationForm.targetExpiring" 
+                                               class="rounded bg-gray-700 border-gray-600">
+                                        <span class="text-gray-300">僅限即將到期用戶</span>
+                                    </label>
+                                    <select v-if="notificationForm.targetExpiring" 
+                                            v-model="notificationForm.expiringDays"
+                                            class="bg-gray-700 rounded-lg px-3 py-1 text-sm">
+                                        <option :value="3">3 天內</option>
+                                        <option :value="7">7 天內</option>
+                                        <option :value="14">14 天內</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-gray-400 text-sm mb-2">通知類型</label>
+                                    <select v-model="notificationForm.type" 
+                                            class="w-full bg-gray-700 rounded-lg px-4 py-2">
+                                        <option value="info">ℹ️ 信息</option>
+                                        <option value="success">✅ 成功</option>
+                                        <option value="warning">⚠️ 警告</option>
+                                        <option value="promo">🎁 促銷</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-gray-400 text-sm mb-2">標題</label>
+                                    <input type="text" v-model="notificationForm.title" 
+                                           class="w-full bg-gray-700 rounded-lg px-4 py-2"
+                                           placeholder="通知標題">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-gray-400 text-sm mb-2">內容</label>
+                                    <textarea v-model="notificationForm.content" rows="4"
+                                              class="w-full bg-gray-700 rounded-lg px-4 py-2"
+                                              placeholder="通知內容..."></textarea>
+                                </div>
+                                
+                                <button @click="sendBatchNotification"
+                                        class="w-full gradient-bg hover:opacity-90 py-3 rounded-lg font-medium transition-opacity">
+                                    📤 發送通知
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- 通知歷史 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">📋 發送歷史</h3>
+                            
+                            <div v-if="notificationHistory.length === 0" class="text-center text-gray-500 py-8">
+                                暫無發送記錄
+                            </div>
+                            
+                            <div v-else class="space-y-3 max-h-96 overflow-y-auto">
+                                <div v-for="notif in notificationHistory" :key="notif.id" 
+                                     class="bg-gray-700/50 rounded-lg p-4">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <span class="font-medium">{{ notif.title }}</span>
+                                        <span class="text-xs text-gray-400">{{ formatDate(notif.created_at) }}</span>
+                                    </div>
+                                    <p class="text-sm text-gray-400 mb-2">{{ notif.content }}</p>
+                                    <div class="flex gap-3 text-xs">
+                                        <span class="text-blue-400">📨 {{ notif.sent_count }} 已發送</span>
+                                        <span class="text-gray-500">目標: {{ notif.target_level }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ==================== 設備管理 ==================== -->
+                <div v-if="currentPage === 'devices'">
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="flex gap-4">
+                            <select v-model="deviceFilter" class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2">
+                                <option value="all">全部設備</option>
+                                <option value="online">🟢 在線</option>
+                                <option value="offline">⚫ 離線</option>
+                            </select>
+                        </div>
+                        <div class="text-sm text-gray-400">
+                            共 {{ filteredDevices.length }} 個設備
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">設備</th>
+                                    <th class="text-left px-6 py-4 font-medium">用戶</th>
+                                    <th class="text-left px-6 py-4 font-medium">狀態</th>
+                                    <th class="text-left px-6 py-4 font-medium">最後活動</th>
+                                    <th class="text-left px-6 py-4 font-medium">IP 地址</th>
+                                    <th class="text-left px-6 py-4 font-medium">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="device in filteredDevices" :key="device.id" 
+                                    class="border-t border-gray-700 table-row-hover">
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center">
+                                            <span class="text-2xl mr-3">💻</span>
+                                            <div>
+                                                <p class="font-medium">{{ device.device_name || '未知設備' }}</p>
+                                                <p class="text-xs text-gray-500 font-mono">{{ device.machine_id?.slice(0, 16) }}...</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <p class="font-medium">{{ device.email || '未設置' }}</p>
+                                        <span :class="'rank-' + device.level" class="text-sm">{{ device.level_icon }} {{ device.level_name }}</span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span v-if="device.isOnline" class="px-3 py-1 rounded-full text-sm bg-green-500/20 text-green-400">
+                                            🟢 在線
+                                        </span>
+                                        <span v-else class="px-3 py-1 rounded-full text-sm bg-gray-500/20 text-gray-400">
+                                            ⚫ 離線
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-400 text-sm">{{ formatDate(device.last_active) }}</td>
+                                    <td class="px-6 py-4 text-gray-400 text-sm font-mono">{{ device.ip_address || '-' }}</td>
+                                    <td class="px-6 py-4">
+                                        <button @click="revokeDevice(device.id)" 
+                                                class="text-red-400 hover:text-red-300 text-sm">解綁</button>
+                                    </td>
+                                </tr>
+                                <tr v-if="filteredDevices.length === 0">
+                                    <td colspan="6" class="px-6 py-12 text-center text-gray-500">暫無設備數據</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
                 
@@ -1161,6 +1498,69 @@
                         </button>
                     </div>
                     
+                    <!-- 價格配置 -->
+                    <div class="bg-gray-800 rounded-xl p-6 mt-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold">💰 會員價格配置 (USDT)</h3>
+                            <button @click="savePrices" 
+                                    class="px-4 py-2 rounded-lg text-sm transition-colors"
+                                    :class="editingPrices ? 'bg-green-600 hover:bg-green-700' : 'bg-purple-600 hover:bg-purple-700'">
+                                {{ editingPrices ? '💾 保存價格' : '✏️ 編輯價格' }}
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="text-gray-400">
+                                        <th class="text-left py-3">等級</th>
+                                        <th class="text-center py-3">周卡</th>
+                                        <th class="text-center py-3">月卡</th>
+                                        <th class="text-center py-3">季卡</th>
+                                        <th class="text-center py-3">年卡</th>
+                                        <th class="text-center py-3">終身</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(config, level) in quotaConfig" :key="level" class="border-t border-gray-700">
+                                        <td class="py-3">
+                                            <span :class="'rank-' + level">{{ config.icon }} {{ config.name }}</span>
+                                        </td>
+                                        <template v-if="editingPrices && level !== 'bronze'">
+                                            <td class="text-center py-3">
+                                                <input type="number" step="0.1" v-model.number="config.prices.week" 
+                                                       class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-center text-sm">
+                                            </td>
+                                            <td class="text-center py-3">
+                                                <input type="number" step="0.1" v-model.number="config.prices.month" 
+                                                       class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-center text-sm">
+                                            </td>
+                                            <td class="text-center py-3">
+                                                <input type="number" step="0.1" v-model.number="config.prices.quarter" 
+                                                       class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-center text-sm">
+                                            </td>
+                                            <td class="text-center py-3">
+                                                <input type="number" step="0.1" v-model.number="config.prices.year" 
+                                                       class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-center text-sm">
+                                            </td>
+                                            <td class="text-center py-3">
+                                                <input type="number" step="0.1" v-model.number="config.prices.lifetime" 
+                                                       class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-center text-sm">
+                                            </td>
+                                        </template>
+                                        <template v-else>
+                                            <td class="text-center py-3 text-green-400">{{ config.prices?.week || 0 }}</td>
+                                            <td class="text-center py-3 text-green-400">{{ config.prices?.month || 0 }}</td>
+                                            <td class="text-center py-3 text-green-400">{{ config.prices?.quarter || 0 }}</td>
+                                            <td class="text-center py-3 text-green-400">{{ config.prices?.year || 0 }}</td>
+                                            <td class="text-center py-3 text-green-400">{{ config.prices?.lifetime || 0 }}</td>
+                                        </template>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-3">💡 修改價格後，新訂單將使用新價格。已生成的卡密價格不變。</p>
+                    </div>
+                    
                     <!-- 配額配置 -->
                     <div class="bg-gray-800 rounded-xl p-6 mt-6">
                         <h3 class="text-lg font-semibold mb-4">📊 會員配額配置</h3>
@@ -1176,6 +1576,7 @@
                                         <th class="text-center py-3">群組數</th>
                                         <th class="text-center py-3">自動回覆</th>
                                         <th class="text-center py-3">定時任務</th>
+                                        <th class="text-center py-3">平台API</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1183,13 +1584,14 @@
                                         <td class="py-3">
                                             <span :class="'rank-' + level">{{ config.icon }} {{ config.name }}</span>
                                         </td>
-                                        <td class="text-center py-3">{{ formatQuota(config.quotas.tg_accounts) }}</td>
-                                        <td class="text-center py-3">{{ formatQuota(config.quotas.daily_messages) }}</td>
-                                        <td class="text-center py-3">{{ formatQuota(config.quotas.ai_calls) }}</td>
-                                        <td class="text-center py-3">{{ formatQuota(config.quotas.devices) }}</td>
-                                        <td class="text-center py-3">{{ formatQuota(config.quotas.groups) }}</td>
-                                        <td class="text-center py-3">{{ formatQuota(config.quotas.auto_reply_rules) }}</td>
-                                        <td class="text-center py-3">{{ formatQuota(config.quotas.scheduled_tasks) }}</td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas?.tg_accounts) }}</td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas?.daily_messages) }}</td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas?.ai_calls) }}</td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas?.devices) }}</td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas?.groups) }}</td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas?.auto_reply_rules) }}</td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas?.scheduled_tasks) }}</td>
+                                        <td class="text-center py-3">{{ formatQuota(config.quotas?.platform_api_quota) }}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1377,11 +1779,11 @@
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-gray-400">邀請收益</span>
-                                    <span class="text-green-400">¥{{ userDetail.user?.invite_earnings || 0 }}</span>
+                                    <span class="text-green-400">{{ userDetail.user?.invite_earnings || 0 }} USDT</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-gray-400">餘額</span>
-                                    <span class="text-yellow-400">¥{{ userDetail.user?.balance || 0 }}</span>
+                                    <span class="text-yellow-400">{{ userDetail.user?.balance || 0 }} USDT</span>
                                 </div>
                             </div>
                         </div>
@@ -1392,7 +1794,7 @@
                         <h4 class="text-sm text-gray-400 mb-3">消費信息</h4>
                         <div class="grid grid-cols-4 gap-4 text-center">
                             <div>
-                                <p class="text-2xl font-bold text-green-400">¥{{ userDetail.user?.total_spent || 0 }}</p>
+                                <p class="text-2xl font-bold text-green-400">{{ userDetail.user?.total_spent || 0 }} USDT</p>
                                 <p class="text-gray-400 text-sm">累計消費</p>
                             </div>
                             <div>

@@ -14,9 +14,11 @@ TG-AI智控王 License Server API
 
 import json
 import hashlib
+import hmac
 import secrets
 import time
 import os
+import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List
@@ -125,6 +127,13 @@ class LicenseServer:
         self.app.router.add_post('/api/user/register', self.handle_user_register)
         self.app.router.add_get('/api/user/profile', self.handle_user_profile)
         self.app.router.add_get('/api/user/quota', self.handle_user_quota)
+        self.app.router.add_get('/api/user/activation-history', self.handle_activation_history)
+        self.app.router.add_get('/api/user/usage-stats', self.handle_user_usage_stats)
+        
+        # 用量同步 API（安全加固）
+        self.app.router.add_post('/api/usage/log', self.handle_usage_log)
+        self.app.router.add_get('/api/usage/sync', self.handle_usage_sync)
+        self.app.router.add_post('/api/token/refresh', self.handle_token_refresh)
         
         # 邀請 API
         self.app.router.add_get('/api/invite/info', self.handle_invite_info)
@@ -185,6 +194,18 @@ class LicenseServer:
         # 即將過期用戶
         self.app.router.add_get('/api/admin/expiring-users', self.handle_admin_expiring_users)
         
+        # 配額監控
+        self.app.router.add_get('/api/admin/quota-usage', self.handle_admin_quota_usage)
+        
+        # 批量通知
+        self.app.router.add_post('/api/admin/notifications/send', self.handle_admin_send_notification)
+        self.app.router.add_post('/api/admin/notifications/batch', self.handle_admin_batch_notification)
+        self.app.router.add_get('/api/admin/notifications/history', self.handle_admin_notification_history)
+        
+        # 設備管理
+        self.app.router.add_get('/api/admin/devices', self.handle_admin_devices)
+        self.app.router.add_post('/api/admin/devices/{device_id}/revoke', self.handle_admin_revoke_device)
+        
         # 邀請管理
         self.app.router.add_get('/api/admin/referrals', self.handle_admin_referrals)
         self.app.router.add_get('/api/admin/referral-stats', self.handle_admin_referral_stats)
@@ -198,7 +219,8 @@ class LicenseServer:
         # 系統設置
         self.app.router.add_get('/api/admin/settings', self.handle_admin_get_settings)
         self.app.router.add_post('/api/admin/settings/save', self.handle_admin_save_settings)
-        
+        self.app.router.add_post('/api/admin/prices/save', self.handle_admin_save_prices)
+
         # 管理員密碼修改
         self.app.router.add_post('/api/admin/change-password', self.handle_admin_change_password)
         
@@ -526,6 +548,310 @@ class LicenseServer:
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
+    # ============ 用量同步 API（安全加固）============
+    
+    async def handle_usage_log(self, request: web.Request) -> web.Response:
+        """記錄用量數據（帶簽名驗證）"""
+        try:
+            data = await request.json()
+            
+            # 驗證簽名
+            if not self._verify_request_signature(data, request):
+                return web.json_response({'success': False, 'message': '簽名驗證失敗'}, status=401)
+            
+            # 驗證 Token
+            token = data.get('token', '')
+            payload = self._verify_token(token)
+            if not payload:
+                return web.json_response({'success': False, 'message': 'Token 無效或已過期'}, status=401)
+            
+            user_id = payload.get('user_id')
+            machine_id = payload.get('machine_id')
+            
+            # 驗證設備綁定
+            if data.get('machine_id') != machine_id:
+                return web.json_response({'success': False, 'message': '設備不匹配'}, status=403)
+            
+            # 防重放攻擊：檢查 nonce
+            nonce = data.get('nonce', '')
+            timestamp = data.get('timestamp', 0)
+            if not self._verify_nonce(nonce, timestamp):
+                return web.json_response({'success': False, 'message': '請求已過期或重複'}, status=400)
+            
+            # 記錄用量
+            usage_type = data.get('type', 'message')  # message, ai, account, group, keyword_set
+            action = data.get('action', 'use')  # use, create, delete
+            count = data.get('count', 1)
+            
+            user = self.db.get_user(user_id=user_id)
+            if not user:
+                return web.json_response({'success': False, 'message': '用戶不存在'}, status=404)
+            
+            level = user.get('membership_level', 'bronze')
+            level_config = MEMBERSHIP_LEVELS.get(level, MEMBERSHIP_LEVELS['bronze'])
+            quotas = level_config.get('quotas', {})
+            
+            # 獲取今日用量
+            today = datetime.now().strftime('%Y-%m-%d')
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT messages_sent, ai_calls FROM user_quotas 
+                WHERE user_id = ? AND quota_date = ?
+            ''', (user_id, today))
+            quota_row = cursor.fetchone()
+            
+            if quota_row:
+                current_messages = quota_row[0] or 0
+                current_ai = quota_row[1] or 0
+            else:
+                current_messages = 0
+                current_ai = 0
+                cursor.execute('''
+                    INSERT INTO user_quotas (user_id, quota_date, messages_sent, ai_calls)
+                    VALUES (?, ?, 0, 0)
+                ''', (user_id, today))
+            
+            # 更新用量
+            exceeded = False
+            if usage_type == 'message':
+                max_messages = quotas.get('daily_messages', 50)
+                if max_messages != -1 and current_messages + count > max_messages:
+                    exceeded = True
+                else:
+                    cursor.execute('''
+                        UPDATE user_quotas SET messages_sent = messages_sent + ?
+                        WHERE user_id = ? AND quota_date = ?
+                    ''', (count, user_id, today))
+                    current_messages += count
+            elif usage_type == 'ai':
+                max_ai = quotas.get('ai_calls', 10)
+                if max_ai != -1 and current_ai + count > max_ai:
+                    exceeded = True
+                else:
+                    cursor.execute('''
+                        UPDATE user_quotas SET ai_calls = ai_calls + ?
+                        WHERE user_id = ? AND quota_date = ?
+                    ''', (count, user_id, today))
+                    current_ai += count
+            
+            # 記錄用量日誌
+            cursor.execute('''
+                INSERT INTO usage_logs (user_id, action_type, details, ip_address)
+                VALUES (?, ?, ?, ?)
+            ''', (user_id, usage_type, json.dumps({'action': action, 'count': count}), 
+                  self._get_client_ip(request)))
+            
+            conn.commit()
+            conn.close()
+            
+            # 返回剩餘配額
+            max_messages = quotas.get('daily_messages', 50)
+            max_ai = quotas.get('ai_calls', 10)
+            
+            return web.json_response({
+                'success': not exceeded,
+                'message': '配額已用完' if exceeded else '用量記錄成功',
+                'data': {
+                    'quotaExceeded': exceeded,
+                    'remaining': {
+                        'messages': max_messages - current_messages if max_messages != -1 else -1,
+                        'ai': max_ai - current_ai if max_ai != -1 else -1
+                    },
+                    'used': {
+                        'messages': current_messages,
+                        'ai': current_ai
+                    },
+                    'max': {
+                        'messages': max_messages,
+                        'ai': max_ai
+                    }
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_usage_sync(self, request: web.Request) -> web.Response:
+        """同步用量數據"""
+        try:
+            token = request.headers.get('Authorization', '').replace('Bearer ', '')
+            if not token:
+                return web.json_response({'success': False, 'message': '未授權'}, status=401)
+            
+            payload = self._verify_token(token)
+            if not payload:
+                return web.json_response({'success': False, 'message': 'Token 無效'}, status=401)
+            
+            user_id = payload.get('user_id')
+            user = self.db.get_user(user_id=user_id)
+            if not user:
+                return web.json_response({'success': False, 'message': '用戶不存在'}, status=404)
+            
+            level = user.get('membership_level', 'bronze')
+            level_config = MEMBERSHIP_LEVELS.get(level, MEMBERSHIP_LEVELS['bronze'])
+            quotas = level_config.get('quotas', {})
+            
+            # 獲取今日用量
+            today = datetime.now().strftime('%Y-%m-%d')
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT messages_sent, ai_calls FROM user_quotas 
+                WHERE user_id = ? AND quota_date = ?
+            ''', (user_id, today))
+            quota_row = cursor.fetchone()
+            conn.close()
+            
+            current_messages = quota_row[0] if quota_row else 0
+            current_ai = quota_row[1] if quota_row else 0
+            
+            max_messages = quotas.get('daily_messages', 50)
+            max_ai = quotas.get('ai_calls', 10)
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'date': today,
+                    'used': {
+                        'messages': current_messages,
+                        'ai': current_ai
+                    },
+                    'remaining': {
+                        'messages': max_messages - current_messages if max_messages != -1 else -1,
+                        'ai': max_ai - current_ai if max_ai != -1 else -1
+                    },
+                    'max': {
+                        'messages': max_messages,
+                        'ai': max_ai
+                    },
+                    'level': level,
+                    'expiresAt': user.get('expires_at')
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_token_refresh(self, request: web.Request) -> web.Response:
+        """刷新 Token（安全加固）"""
+        try:
+            data = await request.json()
+            
+            # 驗證簽名
+            if not self._verify_request_signature(data, request):
+                return web.json_response({'success': False, 'message': '簽名驗證失敗'}, status=401)
+            
+            old_token = data.get('token', '')
+            machine_id = data.get('machine_id', '')
+            device_fingerprint = data.get('device_fingerprint', '')
+            
+            # 驗證舊 Token（即使過期也可以刷新，但過期時間不能超過 7 天）
+            try:
+                payload = jwt.decode(old_token, JWT_SECRET, algorithms=[JWT_ALGORITHM], 
+                                    options={"verify_exp": False})
+            except jwt.InvalidTokenError:
+                return web.json_response({'success': False, 'message': 'Token 無效'}, status=401)
+            
+            # 檢查 Token 過期時間是否超過 7 天
+            exp_time = datetime.fromtimestamp(payload.get('exp', 0))
+            if datetime.now() - exp_time > timedelta(days=7):
+                return web.json_response({'success': False, 'message': 'Token 已過期超過7天，請重新登錄'}, status=401)
+            
+            user_id = payload.get('user_id')
+            stored_machine_id = payload.get('machine_id')
+            
+            # 驗證設備綁定
+            if machine_id != stored_machine_id:
+                return web.json_response({'success': False, 'message': '設備不匹配'}, status=403)
+            
+            user = self.db.get_user(user_id=user_id)
+            if not user:
+                return web.json_response({'success': False, 'message': '用戶不存在'}, status=404)
+            
+            # 檢查設備指紋（如果提供）
+            if device_fingerprint:
+                stored_fingerprint = user.get('device_fingerprint', '')
+                if stored_fingerprint and stored_fingerprint != device_fingerprint:
+                    # 設備指紋變化，記錄日誌
+                    conn = self.db.get_connection()
+                    cursor = conn.cursor()
+                    cursor.execute('''
+                        INSERT INTO usage_logs (user_id, action_type, details, ip_address)
+                        VALUES (?, ?, ?, ?)
+                    ''', (user_id, 'security_alert', 
+                          json.dumps({'type': 'fingerprint_change', 'old': stored_fingerprint[:20], 'new': device_fingerprint[:20]}),
+                          self._get_client_ip(request)))
+                    conn.commit()
+                    conn.close()
+                    
+                    return web.json_response({'success': False, 'message': '設備指紋不匹配，請重新激活'}, status=403)
+            
+            level = user.get('membership_level', 'bronze')
+            
+            # 生成新 Token（較短有效期：24小時）
+            new_token = self._generate_token(user_id, machine_id, level, expires_in=86400)
+            
+            # 更新最後活動時間
+            self.db.update_user(user_id, last_active_at=datetime.now().isoformat())
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'token': new_token,
+                    'expiresIn': 86400,
+                    'level': level
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    # ============ 安全工具方法 ============
+    
+    def _verify_request_signature(self, data: Dict, request: web.Request) -> bool:
+        """驗證請求簽名"""
+        signature = request.headers.get('X-Signature', '')
+        timestamp = data.get('timestamp', 0)
+        nonce = data.get('nonce', '')
+        
+        if not signature or not timestamp or not nonce:
+            return False
+        
+        # 檢查時間戳（5分鐘有效期）
+        if abs(time.time() - timestamp) > 300:
+            return False
+        
+        # 構建簽名字符串
+        sign_string = f"{timestamp}:{nonce}:{data.get('machine_id', '')}:{JWT_SECRET}"
+        expected_signature = hashlib.sha256(sign_string.encode()).hexdigest()
+        
+        return hmac.compare_digest(signature, expected_signature)
+    
+    def _verify_nonce(self, nonce: str, timestamp: int) -> bool:
+        """驗證 nonce 防重放"""
+        if not nonce or not timestamp:
+            return False
+        
+        # 檢查時間戳（5分鐘有效期）
+        if abs(time.time() - timestamp) > 300:
+            return False
+        
+        # 使用內存緩存存儲已使用的 nonce（生產環境應使用 Redis）
+        if not hasattr(self, '_used_nonces'):
+            self._used_nonces = {}
+        
+        # 清理過期的 nonce
+        current_time = time.time()
+        self._used_nonces = {k: v for k, v in self._used_nonces.items() if current_time - v < 600}
+        
+        # 檢查 nonce 是否已使用
+        if nonce in self._used_nonces:
+            return False
+        
+        # 記錄 nonce
+        self._used_nonces[nonce] = current_time
+        return True
+    
     async def handle_user_register(self, request: web.Request) -> web.Response:
         """用戶註冊"""
         try:
@@ -624,6 +950,52 @@ class LicenseServer:
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
+    async def handle_activation_history(self, request: web.Request) -> web.Response:
+        """獲取用戶激活記錄"""
+        try:
+            token = request.headers.get('Authorization', '').replace('Bearer ', '')
+            machine_id = request.query.get('machine_id', '')
+            
+            # 驗證 token 或 machine_id
+            user_id = None
+            if token:
+                payload = self._verify_token(token)
+                if payload:
+                    user_id = payload.get('user_id')
+                    machine_id = payload.get('machine_id', machine_id)
+            
+            if not user_id and not machine_id:
+                return web.json_response({'success': False, 'message': '未授權'}, status=401)
+            
+            # 獲取用戶信息
+            if user_id:
+                user = self.db.get_user(user_id=user_id)
+            else:
+                user = self.db.get_user(machine_id=machine_id)
+                if user:
+                    user_id = user['user_id']
+            
+            if not user:
+                return web.json_response({'success': False, 'message': '用戶不存在'}, status=404)
+            
+            # 獲取激活記錄
+            limit = int(request.query.get('limit', 50))
+            offset = int(request.query.get('offset', 0))
+            
+            activations = self.db.get_activation_history(
+                user_id=user_id,
+                machine_id=machine_id,
+                limit=limit,
+                offset=offset
+            )
+            
+            return web.json_response({
+                'success': True,
+                'data': activations
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
     async def handle_user_quota(self, request: web.Request) -> web.Response:
         """獲取用戶配額"""
         try:
@@ -672,6 +1044,91 @@ class LicenseServer:
                     'remaining': {
                         'dailyMessages': (quotas['daily_messages'] - usage.get('messages_sent', 0)) if quotas['daily_messages'] != -1 else -1,
                         'aiCalls': (quotas['ai_calls'] - usage.get('ai_calls_used', 0)) if quotas['ai_calls'] != -1 else -1
+                    }
+                }
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_user_usage_stats(self, request: web.Request) -> web.Response:
+        """獲取用戶使用統計（前端格式）"""
+        try:
+            token = request.headers.get('Authorization', '').replace('Bearer ', '')
+            machine_id = request.query.get('machine_id', '')
+            
+            # 驗證 token 或 machine_id
+            user_id = None
+            if token:
+                payload = self._verify_token(token)
+                if payload:
+                    user_id = payload.get('user_id')
+                    machine_id = payload.get('machine_id', machine_id)
+            
+            if not user_id and not machine_id:
+                return web.json_response({'success': False, 'message': '未授權'}, status=401)
+            
+            # 獲取用戶信息
+            if user_id:
+                user = self.db.get_user(user_id=user_id)
+            else:
+                user = self.db.get_user(machine_id=machine_id)
+                if user:
+                    user_id = user['user_id']
+            
+            if not user:
+                return web.json_response({'success': False, 'message': '用戶不存在'}, status=404)
+            
+            level = user.get('membership_level', 'bronze')
+            level_config = MEMBERSHIP_LEVELS.get(level, MEMBERSHIP_LEVELS['bronze'])
+            quotas = level_config.get('quotas', {})
+            
+            # 獲取今日使用量
+            today = datetime.now().strftime('%Y-%m-%d')
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT messages_sent, ai_calls_used, tg_accounts_used FROM user_quotas 
+                WHERE user_id = ? AND quota_date = ?
+            ''', (user_id, today))
+            usage_row = cursor.fetchone()
+            conn.close()
+            
+            if usage_row:
+                messages_used = usage_row[0] or 0
+                ai_used = usage_row[1] or 0
+                accounts_used = usage_row[2] or 0
+            else:
+                messages_used = 0
+                ai_used = 0
+                accounts_used = 0
+            
+            # 獲取配額限制（映射字段名稱）
+            messages_limit = quotas.get('daily_messages', 50)
+            ai_limit = quotas.get('ai_calls', 10)
+            accounts_limit = quotas.get('tg_accounts', 2)  # 後端使用 tg_accounts
+            
+            # 獲取存儲使用量（這裡暫時使用默認值，實際應該從數據庫獲取）
+            storage_used = 0  # TODO: 從數據庫獲取實際存儲使用量
+            storage_limit = 100  # TODO: 根據會員等級設置存儲限制
+            
+            return web.json_response({
+                'success': True,
+                'stats': {
+                    'aiCalls': {
+                        'used': ai_used,
+                        'limit': ai_limit if ai_limit != -1 else 999999
+                    },
+                    'messagesSent': {
+                        'used': messages_used,
+                        'limit': messages_limit if messages_limit != -1 else 999999
+                    },
+                    'accounts': {
+                        'used': accounts_used,
+                        'limit': accounts_limit if accounts_limit != -1 else 999999
+                    },
+                    'storage': {
+                        'used': storage_used,
+                        'limit': storage_limit
                     }
                 }
             })
@@ -1288,10 +1745,35 @@ class LicenseServer:
             # 更新最後登錄時間
             conn = self.db.get_connection()
             cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE admins SET last_login_at = CURRENT_TIMESTAMP, last_login_ip = ?
-                WHERE username = ?
-            ''', (client_ip, username))
+            try:
+                # 嘗試更新，如果字段不存在會拋出異常
+                cursor.execute('''
+                    UPDATE admins SET last_login_at = CURRENT_TIMESTAMP, last_login_ip = ?
+                    WHERE username = ?
+                ''', (client_ip, username))
+            except sqlite3.OperationalError as e:
+                if 'no such column: last_login_ip' in str(e):
+                    # 字段不存在，先添加字段
+                    try:
+                        cursor.execute('ALTER TABLE admins ADD COLUMN last_login_ip TEXT')
+                        conn.commit()
+                        # 重新執行更新
+                        cursor.execute('''
+                            UPDATE admins SET last_login_at = CURRENT_TIMESTAMP, last_login_ip = ?
+                            WHERE username = ?
+                        ''', (client_ip, username))
+                    except sqlite3.OperationalError:
+                        # 如果添加字段失敗（可能已存在），只更新 last_login_at
+                        cursor.execute('''
+                            UPDATE admins SET last_login_at = CURRENT_TIMESTAMP
+                            WHERE username = ?
+                        ''', (username,))
+                else:
+                    # 其他錯誤，只更新 last_login_at
+                    cursor.execute('''
+                        UPDATE admins SET last_login_at = CURRENT_TIMESTAMP
+                        WHERE username = ?
+                    ''', (username,))
             conn.commit()
             conn.close()
             
@@ -2167,11 +2649,291 @@ class LicenseServer:
             
             return web.json_response({
                 'success': True,
-                'data': {
-                    'users': users,
-                    'stats': stats
-                }
+                'data': users
             })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    # ============ 配額監控 API ============
+    
+    async def handle_admin_quota_usage(self, request: web.Request) -> web.Response:
+        """獲取用戶配額使用情況"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            today = datetime.now().strftime('%Y-%m-%d')
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT u.user_id, u.email, u.membership_level, u.last_active_at,
+                       COALESCE(q.messages_sent, 0) as messages_used,
+                       COALESCE(q.ai_calls, 0) as ai_used
+                FROM users u
+                LEFT JOIN user_quotas q ON u.user_id = q.user_id AND q.quota_date = ?
+                WHERE u.is_banned = 0
+                ORDER BY COALESCE(q.messages_sent, 0) + COALESCE(q.ai_calls, 0) DESC
+                LIMIT 200
+            ''', (today,))
+            
+            result = []
+            for row in cursor.fetchall():
+                row = dict(row)
+                level = row['membership_level'] or 'bronze'
+                level_config = MEMBERSHIP_LEVELS.get(level, MEMBERSHIP_LEVELS['bronze'])
+                quotas = level_config.get('quotas', {})
+                
+                messages_max = quotas.get('daily_messages', 50)
+                ai_max = quotas.get('ai_calls', 10)
+                
+                result.append({
+                    'user_id': row['user_id'],
+                    'email': row['email'],
+                    'level': level,
+                    'level_name': level_config['name'],
+                    'level_icon': level_config['icon'],
+                    'messagesUsed': row['messages_used'],
+                    'messagesMax': messages_max,
+                    'messagesPercent': (row['messages_used'] / messages_max * 100) if messages_max > 0 else 0,
+                    'aiUsed': row['ai_used'],
+                    'aiMax': ai_max,
+                    'aiPercent': (row['ai_used'] / ai_max * 100) if ai_max > 0 else 0,
+                    'last_active': row['last_active_at']
+                })
+            
+            conn.close()
+            return web.json_response({'success': True, 'data': result})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    # ============ 批量通知 API ============
+    
+    async def handle_admin_send_notification(self, request: web.Request) -> web.Response:
+        """發送通知給指定用戶"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            data = await request.json()
+            user_ids = data.get('user_ids', [])
+            title = data.get('title', '')
+            content = data.get('content', '')
+            notif_type = data.get('type', 'info')
+            
+            if not user_ids or not title or not content:
+                return web.json_response({'success': False, 'message': '缺少必要參數'}, status=400)
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # 創建通知記錄
+            cursor.execute('''
+                INSERT INTO notifications (title, content, type, target_users, sent_count, created_by)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (title, content, notif_type, json.dumps(user_ids), len(user_ids), admin['username']))
+            
+            # 為每個用戶創建通知
+            notif_id = cursor.lastrowid
+            for user_id in user_ids:
+                cursor.execute('''
+                    INSERT OR IGNORE INTO user_notifications (user_id, notification_id, is_read)
+                    VALUES (?, ?, 0)
+                ''', (user_id, notif_id))
+            
+            conn.commit()
+            conn.close()
+            
+            # 記錄操作日誌
+            self._log_admin_action(admin['username'], 'send_notification', 
+                                   f'發送通知給 {len(user_ids)} 個用戶: {title}')
+            
+            return web.json_response({'success': True, 'data': {'count': len(user_ids)}})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_batch_notification(self, request: web.Request) -> web.Response:
+        """批量發送通知（按等級或條件）"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            data = await request.json()
+            target_level = data.get('target_level', 'all')
+            target_expiring = data.get('target_expiring', False)
+            expiring_days = data.get('expiring_days', 7)
+            title = data.get('title', '')
+            content = data.get('content', '')
+            notif_type = data.get('type', 'info')
+            
+            if not title or not content:
+                return web.json_response({'success': False, 'message': '標題和內容必填'}, status=400)
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # 構建查詢條件
+            conditions = ['is_banned = 0']
+            params = []
+            
+            if target_level == 'paid':
+                conditions.append("membership_level != 'bronze'")
+            elif target_level == 'free':
+                conditions.append("membership_level = 'bronze'")
+            elif target_level != 'all':
+                conditions.append('membership_level = ?')
+                params.append(target_level)
+            
+            if target_expiring:
+                conditions.append(f"expires_at <= datetime('now', '+{expiring_days} days')")
+                conditions.append("expires_at > datetime('now')")
+                conditions.append("is_lifetime = 0")
+            
+            query = f"SELECT user_id FROM users WHERE {' AND '.join(conditions)}"
+            cursor.execute(query, params)
+            user_ids = [row['user_id'] for row in cursor.fetchall()]
+            
+            if not user_ids:
+                return web.json_response({'success': True, 'data': {'count': 0}, 'message': '沒有符合條件的用戶'})
+            
+            # 創建通知記錄
+            cursor.execute('''
+                INSERT INTO notifications (title, content, type, target_level, sent_count, created_by)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (title, content, notif_type, target_level, len(user_ids), admin['username']))
+            
+            notif_id = cursor.lastrowid
+            for user_id in user_ids:
+                cursor.execute('''
+                    INSERT OR IGNORE INTO user_notifications (user_id, notification_id, is_read)
+                    VALUES (?, ?, 0)
+                ''', (user_id, notif_id))
+            
+            conn.commit()
+            conn.close()
+            
+            self._log_admin_action(admin['username'], 'batch_notification', 
+                                   f'批量發送通知給 {len(user_ids)} 個用戶 (等級: {target_level}): {title}')
+            
+            return web.json_response({'success': True, 'data': {'count': len(user_ids)}})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_notification_history(self, request: web.Request) -> web.Response:
+        """獲取通知歷史"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT id, title, content, type, target_level, sent_count, created_by, created_at
+                FROM notifications
+                ORDER BY created_at DESC
+                LIMIT 50
+            ''')
+            
+            result = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            
+            return web.json_response({'success': True, 'data': result})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    # ============ 設備管理 API ============
+    
+    async def handle_admin_devices(self, request: web.Request) -> web.Response:
+        """獲取設備列表"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # 獲取所有設備（通過心跳記錄）
+            cursor.execute('''
+                SELECT h.id, h.user_id, h.machine_id, h.ip_address, h.created_at as last_heartbeat,
+                       u.email, u.membership_level,
+                       CASE WHEN h.created_at > datetime('now', '-5 minutes') THEN 1 ELSE 0 END as is_online
+                FROM heartbeats h
+                JOIN users u ON h.user_id = u.user_id
+                WHERE h.id IN (
+                    SELECT MAX(id) FROM heartbeats GROUP BY user_id, machine_id
+                )
+                ORDER BY h.created_at DESC
+                LIMIT 500
+            ''')
+            
+            result = []
+            for row in cursor.fetchall():
+                row = dict(row)
+                level = row['membership_level'] or 'bronze'
+                level_config = MEMBERSHIP_LEVELS.get(level, MEMBERSHIP_LEVELS['bronze'])
+                
+                result.append({
+                    'id': row['id'],
+                    'user_id': row['user_id'],
+                    'machine_id': row['machine_id'],
+                    'email': row['email'],
+                    'level': level,
+                    'level_name': level_config['name'],
+                    'level_icon': level_config['icon'],
+                    'ip_address': row['ip_address'],
+                    'last_active': row['last_heartbeat'],
+                    'isOnline': bool(row['is_online']),
+                    'device_name': f"設備 {row['machine_id'][:8] if row['machine_id'] else 'Unknown'}"
+                })
+            
+            conn.close()
+            return web.json_response({'success': True, 'data': result})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+    
+    async def handle_admin_revoke_device(self, request: web.Request) -> web.Response:
+        """解綁設備"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+        
+        try:
+            device_id = request.match_info.get('device_id')
+            
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # 獲取設備信息
+            cursor.execute('SELECT user_id, machine_id FROM heartbeats WHERE id = ?', (device_id,))
+            device = cursor.fetchone()
+            
+            if not device:
+                return web.json_response({'success': False, 'message': '設備不存在'}, status=404)
+            
+            device = dict(device)
+            
+            # 清除該設備的所有心跳記錄
+            cursor.execute('DELETE FROM heartbeats WHERE machine_id = ?', (device['machine_id'],))
+            
+            # 重置用戶的機器碼（如果需要）
+            cursor.execute('''
+                UPDATE users SET machine_id = NULL 
+                WHERE user_id = ? AND machine_id = ?
+            ''', (device['user_id'], device['machine_id']))
+            
+            conn.commit()
+            conn.close()
+            
+            self._log_admin_action(admin['username'], 'revoke_device', 
+                                   f'解綁設備: {device["machine_id"][:16]}... (用戶: {device["user_id"]})')
+            
+            return web.json_response({'success': True, 'message': '設備已解綁'})
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
@@ -2382,22 +3144,52 @@ class LicenseServer:
         authorized, error_response, admin = self._require_admin(request)
         if not authorized:
             return error_response
-        
+
         try:
             data = await request.json()
-            
+
             for key, value in data.items():
                 if isinstance(value, (dict, list)):
                     value = json.dumps(value)
                 self.db.set_setting(key, str(value), admin['username'])
-            
+
             self._log_admin_action(admin['username'], 'save_settings', 'settings',
                                   details=f'keys={list(data.keys())}')
-            
+
             return web.json_response({'success': True, 'message': '設置已保存'})
         except Exception as e:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
-    
+
+    async def handle_admin_save_prices(self, request: web.Request) -> web.Response:
+        """保存會員價格配置"""
+        authorized, error_response, admin = self._require_admin(request)
+        if not authorized:
+            return error_response
+
+        try:
+            data = await request.json()
+            prices = data.get('prices', {})
+            
+            if not prices:
+                return web.json_response({'success': False, 'message': '無價格數據'}, status=400)
+            
+            # 將價格配置保存到設置表中
+            self.db.set_setting('membership_prices', json.dumps(prices), admin['username'])
+            
+            # 更新內存中的價格配置（重啟後生效）
+            for level, level_prices in prices.items():
+                if level in MEMBERSHIP_LEVELS:
+                    for duration, price in level_prices.items():
+                        if duration in MEMBERSHIP_LEVELS[level]['prices']:
+                            MEMBERSHIP_LEVELS[level]['prices'][duration] = float(price)
+            
+            self._log_admin_action(admin['username'], 'save_prices', 'settings',
+                                  details=f'Updated prices for {list(prices.keys())}')
+            
+            return web.json_response({'success': True, 'message': '價格配置已保存'})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)}, status=500)
+
     async def handle_admin_change_password(self, request: web.Request) -> web.Response:
         """修改管理員密碼"""
         authorized, error_response, admin = self._require_admin(request)

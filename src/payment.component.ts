@@ -67,14 +67,12 @@ import { ToastService } from './toast.service';
                     }
                     
                     <div class="text-center">
-                      <div class="text-lg font-bold text-white">{{ product.name }}</div>
+                      <div class="text-lg font-bold text-white">{{ product.levelName }}</div>
+                      <div class="text-xs text-slate-400">{{ product.durationName }}</div>
                       <div class="mt-2">
-                        <span class="text-3xl font-bold text-cyan-400">¥{{ product.price }}</span>
+                        <span class="text-3xl font-bold text-emerald-400">{{ product.price }} USDT</span>
                       </div>
-                      <div class="text-sm text-slate-400 mt-1">{{ product.days }}天</div>
-                      @if(product.save) {
-                        <div class="text-xs text-green-400 mt-1">{{ product.save }}</div>
-                      }
+                      <div class="text-xs text-slate-500 mt-1">TRC20 網絡</div>
                     </div>
                   </div>
                 }
@@ -96,8 +94,9 @@ import { ToastService } from './toast.service';
             <!-- 步驟 2: 選擇支付方式 -->
             @if(step() === 'payment') {
               <div class="text-center mb-6">
-                <div class="text-lg text-slate-300">{{ selectedProduct()?.name }}</div>
-                <div class="text-4xl font-bold text-cyan-400 mt-2">¥{{ selectedProduct()?.price }}</div>
+                <div class="text-lg text-slate-300">{{ selectedProduct()?.levelName }} - {{ selectedProduct()?.durationName }}</div>
+                <div class="text-4xl font-bold text-emerald-400 mt-2">{{ selectedProduct()?.price }} USDT</div>
+                <div class="text-sm text-slate-500 mt-1">TRC20 網絡</div>
               </div>
               
               <div class="mb-4">
@@ -150,16 +149,23 @@ import { ToastService } from './toast.service';
                 </div>
                 
                 @if(paymentMethod() === 'usdt') {
-                  <div class="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                    <div class="flex items-center gap-2 text-emerald-400 text-sm mb-2">
+                  <div class="mt-3 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                    <div class="flex items-center gap-2 text-emerald-400 text-sm mb-3">
                       <span>💎</span>
-                      <span class="font-medium">USDT-TRC20 支付</span>
+                      <span class="font-medium">USDT-TRC20 支付（推薦）</span>
                     </div>
-                    <div class="text-xs text-slate-400">
-                      支持 TRC20 網絡，匯率: 1 USDT ≈ ¥7.2
+                    <div class="flex items-center gap-3 mb-3">
+                      <div class="flex-1 p-2 bg-slate-800 rounded-lg">
+                        <div class="text-xs text-slate-500 mb-1">支付金額</div>
+                        <div class="text-2xl font-bold text-emerald-400">{{ selectedProduct()?.price }} USDT</div>
+                      </div>
+                      <div class="flex-1 p-2 bg-slate-800 rounded-lg">
+                        <div class="text-xs text-slate-500 mb-1">網絡</div>
+                        <div class="text-lg font-bold text-cyan-400">TRC20</div>
+                      </div>
                     </div>
-                    <div class="text-lg font-bold text-emerald-400 mt-1">
-                      ≈ {{ getUsdtAmount() }} USDT
+                    <div class="text-xs text-orange-400 bg-orange-500/10 rounded-lg p-2">
+                      ⚠️ 僅支持 TRC20 網絡，其他網絡轉賬將無法到賬
                     </div>
                   </div>
                 }
@@ -193,25 +199,52 @@ import { ToastService } from './toast.service';
                 </div>
                 
                 @if(paymentMethod() === 'usdt') {
-                  <!-- USDT 支付信息 -->
-                  <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-4 text-left">
-                    <div class="text-center mb-3">
-                      <div class="text-2xl font-bold text-emerald-400">{{ getUsdtAmount() }} USDT</div>
-                      <div class="text-xs text-slate-400">TRC20 網絡</div>
+                  <!-- USDT TRC20 支付信息 -->
+                  <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-5 mb-4 text-left">
+                    <div class="text-center mb-4">
+                      <div class="text-3xl font-bold text-emerald-400">{{ selectedProduct()?.price }} USDT</div>
+                      <div class="text-sm text-slate-400 mt-1">TRC20 網絡（TRON）</div>
                     </div>
                     
-                    <div class="mb-3">
-                      <div class="text-xs text-slate-400 mb-1">收款地址</div>
-                      <div class="bg-slate-800 rounded-lg p-3 flex items-center justify-between">
-                        <code class="text-xs text-emerald-400 break-all">TYourTRC20WalletAddressHere</code>
-                        <button (click)="copyUsdtAddress()" class="text-cyan-400 hover:text-cyan-300 ml-2">
-                          📋
-                        </button>
+                    <div class="mb-4">
+                      <div class="text-xs text-slate-400 mb-2">收款地址（TRC20）</div>
+                      <div class="bg-slate-800 rounded-lg p-3">
+                        <div class="flex items-center justify-between gap-2">
+                          <code class="text-sm text-emerald-400 break-all font-mono">{{ USDT_CONFIG.walletAddress }}</code>
+                          <button (click)="copyUsdtAddress()" 
+                                  class="flex-shrink-0 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-lg text-sm transition-colors">
+                            📋 複製
+                          </button>
+                        </div>
                       </div>
                     </div>
                     
-                    <div class="text-xs text-orange-400 bg-orange-500/10 rounded-lg p-2">
-                      ⚠️ 請確保使用 TRC20 網絡轉賬，其他網絡可能導致資金丟失
+                    <div class="bg-slate-800/50 rounded-lg p-3 mb-4">
+                      <div class="flex items-start gap-3">
+                        <div class="text-2xl">📝</div>
+                        <div>
+                          <div class="text-sm text-white font-medium mb-1">轉賬步驟</div>
+                          <ol class="text-xs text-slate-400 space-y-1">
+                            <li>1. 打開您的加密貨幣錢包（如 Trust Wallet、TokenPocket）</li>
+                            <li>2. 選擇 USDT 資產，點擊「發送」</li>
+                            <li>3. 粘貼上方地址，選擇 <span class="text-emerald-400 font-medium">TRC20</span> 網絡</li>
+                            <li>4. 輸入金額 <span class="text-emerald-400 font-medium">{{ selectedProduct()?.price }} USDT</span></li>
+                            <li>5. 確認轉賬，等待區塊確認</li>
+                          </ol>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="text-xs text-orange-400 bg-orange-500/10 rounded-lg p-3 flex items-start gap-2">
+                      <span>⚠️</span>
+                      <div>
+                        <strong>重要提醒：</strong>
+                        <ul class="mt-1 space-y-0.5">
+                          <li>• 僅支持 <strong>TRC20</strong> 網絡，其他網絡轉賬將無法到賬</li>
+                          <li>• 請確保轉賬金額正確：<strong>{{ selectedProduct()?.price }} USDT</strong></li>
+                          <li>• 轉賬後通常 1-5 分鐘內到賬</li>
+                        </ul>
+                      </div>
                     </div>
                   </div>
                 }
@@ -284,8 +317,15 @@ export class PaymentComponent implements OnDestroy {
   
   products = this.licenseClient.products;
   selectedProduct = signal<typeof this.products[0] | null>(null);
-  paymentMethod = signal<'alipay' | 'wechat' | 'stripe' | 'usdt'>('alipay');
-  usdtRate = 7.2;  // USDT 兌人民幣匯率
+  paymentMethod = signal<'alipay' | 'wechat' | 'stripe' | 'usdt'>('usdt');  // 默認 USDT
+  
+  // USDT TRC20 配置
+  readonly USDT_CONFIG = {
+    network: 'TRC20',
+    // TODO: 替換為您的實際 USDT 收款地址
+    walletAddress: 'TYourTRC20WalletAddressHere',
+    minAmount: 1,  // 最低支付金額
+  };
   email = '';
   
   isProcessing = signal(false);
@@ -330,11 +370,7 @@ export class PaymentComponent implements OnDestroy {
     }
   }
   
-  getUsdtAmount(): string {
-    const product = this.selectedProduct();
-    if (!product) return '0';
-    return (product.price / this.usdtRate).toFixed(2);
-  }
+  // 價格已經是 USDT，不需要轉換
   
   async createOrder(): Promise<void> {
     const product = this.selectedProduct();
@@ -408,9 +444,8 @@ export class PaymentComponent implements OnDestroy {
   }
   
   copyUsdtAddress(): void {
-    const address = 'TYourTRC20WalletAddressHere';  // 替換為實際錢包地址
-    navigator.clipboard.writeText(address);
-    this.toastService.success('USDT 地址已複製');
+    navigator.clipboard.writeText(this.USDT_CONFIG.walletAddress);
+    this.toastService.success('USDT TRC20 地址已複製');
   }
   
   private startCheckInterval(): void {

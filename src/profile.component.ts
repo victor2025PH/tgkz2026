@@ -3,13 +3,14 @@
  * 用戶信息、卡密管理、設備管理、使用統計、邀請獎勵
  */
 
-import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, DeviceInfo, UsageStats } from './auth.service';
 import { DeviceService } from './device.service';
 import { I18nService } from './i18n.service';
 import { ToastService } from './toast.service';
+import { LicenseClientService } from './license-client.service';
 
 type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
 
@@ -161,52 +162,90 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
             <h3 class="section-title">📜 激活記錄</h3>
             
             <div class="license-history">
-              <div class="history-item">
-                <div class="history-info">
-                  <span class="license-code">TGM1-VIP7-2026-****</span>
-                  <span class="license-type">VIP 月卡</span>
-                </div>
-                <div class="history-meta">
-                  <span>2026-01-01 激活</span>
-                  <span class="status active">有效</span>
-                </div>
-              </div>
+              @if (isLoadingHistory()) {
+                <div class="loading-state">載入中...</div>
+              } @else if (activationHistory().length === 0) {
+                <div class="empty-state">暫無激活記錄</div>
+              } @else {
+                @for (record of activationHistory(); track record.id) {
+                  <div class="history-item">
+                    <div class="history-info">
+                      <span class="license-code">{{ formatLicenseKey(record.license_key) }}</span>
+                      <span class="license-type">{{ record.level_icon }} {{ record.level_name }} {{ record.duration_name }}</span>
+                    </div>
+                    <div class="history-meta">
+                      <span>{{ formatActivationDate(record.activated_at) }} 激活</span>
+                      <span class="status" [class.active]="record.is_active" [class.used]="!record.is_active">
+                        {{ record.is_active ? '有效' : '已過期' }}
+                      </span>
+                    </div>
+                  </div>
+                }
+              }
             </div>
           </div>
           
           <div class="section-card">
-            <h3 class="section-title">🛒 購買卡密</h3>
+            <h3 class="section-title">🛒 購買卡密（王者榮耀等級）</h3>
             
             <div class="purchase-options">
-              <div class="purchase-card vip">
-                <div class="plan-name">VIP 月卡</div>
-                <div class="plan-price">¥29</div>
+              <div class="purchase-card silver">
+                <div class="plan-name">🥈 白銀精英</div>
+                <div class="plan-price">9.9 USDT/月</div>
                 <ul class="plan-features">
-                  <li>10 個帳號</li>
-                  <li>500 次 AI 調用/月</li>
-                  <li>2 台設備</li>
+                  <li>5 個帳號</li>
+                  <li>每日 50 條消息</li>
+                  <li>每日 50 次 AI</li>
+                  <li>10 個群組</li>
                 </ul>
                 <button class="buy-btn">購買</button>
               </div>
               
-              <div class="purchase-card svip">
-                <div class="plan-name">SVIP 月卡</div>
-                <div class="plan-price">¥99</div>
+              <div class="purchase-card gold">
+                <div class="plan-name">🥇 黃金大師</div>
+                <div class="plan-price">29.9 USDT/月</div>
+                <ul class="plan-features">
+                  <li>15 個帳號</li>
+                  <li>每日 200 條消息</li>
+                  <li>每日 200 次 AI</li>
+                  <li>批量操作</li>
+                </ul>
+                <button class="buy-btn">購買</button>
+              </div>
+              
+              <div class="purchase-card diamond">
+                <div class="plan-name">💎 鑽石王牌</div>
+                <div class="plan-price">99.9 USDT/月</div>
+                <div class="recommended">推薦</div>
                 <ul class="plan-features">
                   <li>50 個帳號</li>
-                  <li>2000 次 AI 調用/月</li>
-                  <li>3 台設備</li>
+                  <li>每日 1000 條消息</li>
+                  <li>無限 AI 調用</li>
+                  <li>AI 銷售漏斗</li>
                 </ul>
                 <button class="buy-btn">購買</button>
               </div>
               
-              <div class="purchase-card mvp">
-                <div class="plan-name">MVP 年卡</div>
-                <div class="plan-price">¥999</div>
+              <div class="purchase-card star">
+                <div class="plan-name">🌟 星耀傳說</div>
+                <div class="plan-price">299 USDT/月</div>
+                <ul class="plan-features">
+                  <li>100 個帳號</li>
+                  <li>無限消息</li>
+                  <li>團隊管理</li>
+                  <li>智能防封</li>
+                </ul>
+                <button class="buy-btn">購買</button>
+              </div>
+              
+              <div class="purchase-card king">
+                <div class="plan-name">👑 榮耀王者</div>
+                <div class="plan-price">999 USDT/月</div>
                 <ul class="plan-features">
                   <li>無限帳號</li>
-                  <li>無限 AI 調用</li>
-                  <li>5 台設備</li>
+                  <li>無限一切</li>
+                  <li>API 接口</li>
+                  <li>專屬顧問</li>
                 </ul>
                 <button class="buy-btn">購買</button>
               </div>
@@ -368,7 +407,7 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
           <div class="section-card highlight">
             <h3 class="section-title">🎁 邀請好友得獎勵</h3>
             <p class="section-desc">
-              每邀請 1 位好友註冊並激活，您將獲得 <strong>3 天 VIP</strong> 獎勵！
+              每邀請 1 位好友註冊並激活，您將獲得 <strong>3 天白銀精英</strong> 獎勵！
             </p>
             
             <div class="invite-code-box">
@@ -466,10 +505,12 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
       font-weight: 500;
     }
     
-    .membership-badge.level-free { background: #475569; color: #e2e8f0; }
-    .membership-badge.level-vip { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
-    .membership-badge.level-svip { background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; }
-    .membership-badge.level-mvp { background: linear-gradient(135deg, #ec4899, #db2777); color: white; }
+    .membership-badge.level-bronze { background: linear-gradient(135deg, #CD7F32, #8B4513); color: white; }
+    .membership-badge.level-silver { background: linear-gradient(135deg, #C0C0C0, #A8A8A8); color: #1e293b; }
+    .membership-badge.level-gold { background: linear-gradient(135deg, #FFD700, #FFA500); color: #1e293b; }
+    .membership-badge.level-diamond { background: linear-gradient(135deg, #B9F2FF, #06b6d4); color: #1e293b; }
+    .membership-badge.level-star { background: linear-gradient(135deg, #9B59B6, #8E44AD); color: white; }
+    .membership-badge.level-king { background: linear-gradient(135deg, #FF6B6B, #ee5a5a); color: white; }
     
     .expires {
       opacity: 0.8;
@@ -793,9 +834,27 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));
     }
     
-    .purchase-card.vip { background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.1)); border-color: rgba(245, 158, 11, 0.3); }
-    .purchase-card.svip { background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(124, 58, 237, 0.1)); border-color: rgba(139, 92, 246, 0.3); }
-    .purchase-card.mvp { background: linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(219, 39, 119, 0.1)); border-color: rgba(236, 72, 153, 0.3); }
+    .purchase-card.silver { background: linear-gradient(135deg, rgba(192, 192, 192, 0.1), rgba(168, 168, 168, 0.1)); border-color: rgba(192, 192, 192, 0.3); }
+    .purchase-card.gold { background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 165, 0, 0.1)); border-color: rgba(255, 215, 0, 0.3); }
+    .purchase-card.diamond { background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(185, 242, 255, 0.1)); border-color: rgba(6, 182, 212, 0.4); }
+    .purchase-card.star { background: linear-gradient(135deg, rgba(155, 89, 182, 0.1), rgba(142, 68, 173, 0.1)); border-color: rgba(155, 89, 182, 0.3); }
+    .purchase-card.king { background: linear-gradient(135deg, rgba(255, 107, 107, 0.15), rgba(238, 90, 90, 0.1)); border-color: rgba(255, 107, 107, 0.4); }
+    
+    .recommended {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: linear-gradient(135deg, #06b6d4, #3b82f6);
+      color: white;
+      font-size: 0.625rem;
+      padding: 0.125rem 0.5rem;
+      border-radius: 0.25rem;
+      font-weight: 600;
+    }
+    
+    .purchase-card {
+      position: relative;
+    }
     
     .plan-name {
       font-weight: 600;
@@ -832,6 +891,45 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
       font-weight: 500;
     }
     
+    .license-input-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .license-input-group .form-input {
+      flex: 1;
+      font-family: monospace;
+    }
+    
+    .activate-btn {
+      padding: 0.75rem 1.5rem;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      border: none;
+      border-radius: 0.5rem;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    
+    .activate-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+    }
+    
+    .activate-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .hint-text {
+      color: var(--text-muted, #94a3b8);
+      font-size: 0.875rem;
+      margin-top: 0.5rem;
+    }
+    
     .empty-state, .loading-state {
       text-align: center;
       padding: 2rem;
@@ -839,11 +937,16 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
     }
   `]
 })
-export class ProfileComponent implements OnInit {
+export class ProfileComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private deviceService = inject(DeviceService);
   private i18n = inject(I18nService);
   private toast = inject(ToastService);
+  private licenseClient = inject(LicenseClientService);
+  private cdr = inject(ChangeDetectorRef);
+  
+  // 用於清理事件監聽
+  private membershipUpdateHandler: ((event: Event) => void) | null = null;
   
   // 狀態
   activeTab = signal<ProfileTab>('account');
@@ -868,6 +971,10 @@ export class ProfileComponent implements OnInit {
   invitedCount = signal(0);
   rewardDays = signal(0);
   
+  // 激活記錄
+  activationHistory = signal<any[]>([]);
+  isLoadingHistory = signal(false);
+  
   inviteLink = computed(() => {
     return `https://tg-matrix.com/invite?code=${this.inviteCode()}`;
   });
@@ -881,34 +988,73 @@ export class ProfileComponent implements OnInit {
     this.inviteCode.set(rewards.inviteCode);
     this.invitedCount.set(rewards.invitedCount);
     this.rewardDays.set(rewards.rewardDays);
+    
+    // 載入激活記錄
+    await this.loadActivationHistory();
+    
+    // 監聽會員狀態更新事件
+    this.membershipUpdateHandler = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log('[ProfileComponent] 收到會員狀態更新事件:', customEvent.detail);
+      // 強制觸發變更檢測以刷新 UI
+      this.cdr.detectChanges();
+    };
+    window.addEventListener('membership-updated', this.membershipUpdateHandler);
+  }
+  
+  ngOnDestroy(): void {
+    // 清理事件監聽
+    if (this.membershipUpdateHandler) {
+      window.removeEventListener('membership-updated', this.membershipUpdateHandler);
+    }
+  }
+  
+  async loadActivationHistory(): Promise<void> {
+    this.isLoadingHistory.set(true);
+    try {
+      const result = await this.licenseClient.getActivationHistory(50, 0);
+      if (result.success && result.data) {
+        this.activationHistory.set(result.data);
+      }
+    } catch (error) {
+      console.error('載入激活記錄失敗:', error);
+    } finally {
+      this.isLoadingHistory.set(false);
+    }
   }
   
   getMembershipIcon(): string {
     const icons: Record<string, string> = {
-      free: '🌟',
-      vip: '⭐',
-      svip: '💎',
-      mvp: '👑'
+      bronze: '⚔️',
+      silver: '🥈',
+      gold: '🥇',
+      diamond: '💎',
+      star: '🌟',
+      king: '👑'
     };
-    return icons[this.membershipLevel()] || '🌟';
+    return icons[this.membershipLevel()] || '⚔️';
   }
   
   getMembershipName(): string {
     const names: Record<string, string> = {
-      free: '免費版',
-      vip: 'VIP',
-      svip: 'SVIP',
-      mvp: 'MVP'
+      bronze: '青銅戰士',
+      silver: '白銀精英',
+      gold: '黃金大師',
+      diamond: '鑽石王牌',
+      star: '星耀傳說',
+      king: '榮耀王者'
     };
-    return names[this.membershipLevel()] || '免費版';
+    return names[this.membershipLevel()] || '青銅戰士';
   }
   
   getMaxDevices(): number {
     const limits: Record<string, number> = {
-      free: 1,
-      vip: 2,
-      svip: 3,
-      mvp: 5
+      bronze: 1,
+      silver: 2,
+      gold: 3,
+      diamond: 4,
+      star: 5,
+      king: -1 // 無限
     };
     return limits[this.membershipLevel()] || 1;
   }
@@ -957,11 +1103,30 @@ export class ProfileComponent implements OnInit {
     const result = await this.authService.renewMembership(this.newLicenseKey);
     
     if (result.success) {
-      this.toast.success('卡密激活成功！');
+      this.toast.success(result.message || '卡密激活成功！');
       this.newLicenseKey = '';
+      // 重新載入激活記錄
+      await this.loadActivationHistory();
+      // 強制刷新 UI
+      this.cdr.detectChanges();
     } else {
       this.toast.error(result.message);
     }
+  }
+  
+  formatLicenseKey(key: string): string {
+    if (!key) return '';
+    // 顯示前12個字符，後4個字符用****代替
+    if (key.length > 16) {
+      return key.substring(0, 12) + '-****';
+    }
+    return key;
+  }
+  
+  formatActivationDate(dateString: string): string {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('zh-TW');
   }
   
   async onUnbindDevice(deviceId: number): Promise<void> {

@@ -206,13 +206,13 @@ export class MembershipBadgeComponent {
                         @if(plan.monthlyPrice === 0) {
                           <span class="text-2xl font-bold text-green-400">免費</span>
                         } @else {
-                          <span class="text-2xl font-bold text-white">¥{{ plan.monthlyPrice }}</span>
+                          <span class="text-2xl font-bold text-white">{{ plan.monthlyPrice }} USDT</span>
                           <span class="text-slate-400">/月</span>
                         }
                       </div>
                       @if(plan.yearlyPrice > 0) {
                         <div class="text-sm text-slate-400 mt-1">
-                          年付 ¥{{ plan.yearlyPrice }} (省 {{ Math.round((1 - plan.yearlyPrice / (plan.monthlyPrice * 12)) * 100) }}%)
+                          年付 {{ plan.yearlyPrice }} USDT (省 {{ Math.round((1 - plan.yearlyPrice / (plan.monthlyPrice * 12)) * 100) }}%)
                         </div>
                       }
                     </div>
@@ -497,7 +497,7 @@ export class MembershipDialogComponent {
             </ul>
             <button (click)="upgrade()" 
                     class="bg-gradient-to-r from-cyan-500 to-purple-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:opacity-90">
-              立即升級 ¥{{ suggestion.price }}/月
+              立即升級 {{ suggestion.price }} USDT/月
             </button>
           </div>
         </div>

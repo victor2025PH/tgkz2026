@@ -123,12 +123,16 @@ createApp({
         const menuItems = ref([
             { id: 'dashboard', name: '儀表盤', icon: '📊' },
             { id: 'users', name: '用戶管理', icon: '👥' },
+            { id: 'expiring', name: '即將到期', icon: '⏰', badge: null },
             { id: 'licenses', name: '卡密管理', icon: '🎟️' },
             { id: 'orders', name: '訂單管理', icon: '💰' },
             { id: 'revenue', name: '收入報表', icon: '💹' },
             { id: 'analytics', name: '用戶分析', icon: '📈' },
+            { id: 'quotas', name: '配額監控', icon: '📉' },
             { id: 'referrals', name: '邀請管理', icon: '🎁' },
+            { id: 'notifications', name: '批量通知', icon: '📨' },
             { id: 'announcements', name: '公告管理', icon: '📢' },
+            { id: 'devices', name: '設備管理', icon: '💻' },
             { id: 'logs', name: '操作日誌', icon: '📝' },
             { id: 'admins', name: '管理員', icon: '👤' },
             { id: 'settings', name: '系統設置', icon: '⚙️' },
@@ -172,6 +176,29 @@ createApp({
         
         // 日誌數據
         const logs = ref([]);
+        
+        // 即將到期用戶
+        const expiringUsers = ref([]);
+        const expiringDays = ref(7);
+        
+        // 配額監控
+        const quotaStats = ref([]);
+        const quotaFilter = ref('all');
+        
+        // 批量通知
+        const notificationForm = ref({
+            targetLevel: 'all',
+            targetExpiring: false,
+            expiringDays: 7,
+            title: '',
+            content: '',
+            type: 'info'
+        });
+        const notificationHistory = ref([]);
+        
+        // 設備管理
+        const devices = ref([]);
+        const deviceFilter = ref('all');
         
         // 管理員列表
         const admins = ref([]);
@@ -235,6 +262,9 @@ createApp({
         
         // 配額配置
         const quotaConfig = ref({});
+        
+        // 價格編輯狀態
+        const editingPrices = ref(false);
         
         // 密碼修改表單
         const passwordForm = ref({
@@ -451,6 +481,154 @@ createApp({
             }
         };
         
+        // ============ 即將到期用戶 ============
+        const loadExpiringUsers = async () => {
+            const result = await apiRequest(`/admin/expiring-users?days=${expiringDays.value}`);
+            if (result.success) {
+                expiringUsers.value = result.data || [];
+                // 更新菜單徽章
+                const menuItem = menuItems.value.find(m => m.id === 'expiring');
+                if (menuItem) {
+                    menuItem.badge = expiringUsers.value.length > 0 ? expiringUsers.value.length : null;
+                }
+            }
+        };
+        
+        const sendExpiryReminder = async (userId) => {
+            const result = await apiRequest('/admin/notifications/send', {
+                method: 'POST',
+                body: JSON.stringify({
+                    user_ids: [userId],
+                    title: '會員即將到期提醒',
+                    content: '您的會員即將到期，續費享優惠！',
+                    type: 'warning'
+                })
+            });
+            if (result.success) {
+                showToast('提醒已發送', 'success');
+            } else {
+                showToast(result.message || '發送失敗', 'error');
+            }
+        };
+        
+        const batchSendExpiryReminders = async () => {
+            if (expiringUsers.value.length === 0) {
+                showToast('沒有即將到期的用戶', 'warning');
+                return;
+            }
+            
+            if (!confirm(`確定向 ${expiringUsers.value.length} 個即將到期用戶發送提醒？`)) return;
+            
+            const userIds = expiringUsers.value.map(u => u.user_id);
+            const result = await apiRequest('/admin/notifications/send', {
+                method: 'POST',
+                body: JSON.stringify({
+                    user_ids: userIds,
+                    title: '會員即將到期提醒',
+                    content: `您的會員將在 ${expiringDays.value} 天內到期，立即續費享受優惠！`,
+                    type: 'warning'
+                })
+            });
+            if (result.success) {
+                showToast(`已向 ${userIds.length} 個用戶發送提醒`, 'success');
+            } else {
+                showToast(result.message || '發送失敗', 'error');
+            }
+        };
+        
+        // ============ 配額監控 ============
+        const loadQuotaStats = async () => {
+            const result = await apiRequest('/admin/quota-usage');
+            if (result.success) {
+                quotaStats.value = result.data || [];
+            }
+        };
+        
+        const filteredQuotaStats = computed(() => {
+            if (quotaFilter.value === 'all') return quotaStats.value;
+            return quotaStats.value.filter(u => {
+                if (quotaFilter.value === 'exceeded') {
+                    return u.messagesPercent >= 90 || u.aiPercent >= 90;
+                }
+                return u.level === quotaFilter.value;
+            });
+        });
+        
+        // ============ 批量通知 ============
+        const sendBatchNotification = async () => {
+            if (!notificationForm.value.title || !notificationForm.value.content) {
+                showToast('請填寫標題和內容', 'error');
+                return;
+            }
+            
+            const result = await apiRequest('/admin/notifications/batch', {
+                method: 'POST',
+                body: JSON.stringify({
+                    target_level: notificationForm.value.targetLevel,
+                    target_expiring: notificationForm.value.targetExpiring,
+                    expiring_days: notificationForm.value.expiringDays,
+                    title: notificationForm.value.title,
+                    content: notificationForm.value.content,
+                    type: notificationForm.value.type
+                })
+            });
+            
+            if (result.success) {
+                showToast(`通知已發送給 ${result.data?.count || 0} 個用戶`, 'success');
+                notificationForm.value = {
+                    targetLevel: 'all',
+                    targetExpiring: false,
+                    expiringDays: 7,
+                    title: '',
+                    content: '',
+                    type: 'info'
+                };
+                await loadNotificationHistory();
+            } else {
+                showToast(result.message || '發送失敗', 'error');
+            }
+        };
+        
+        const loadNotificationHistory = async () => {
+            const result = await apiRequest('/admin/notifications/history');
+            if (result.success) {
+                notificationHistory.value = result.data || [];
+            }
+        };
+        
+        // ============ 設備管理 ============
+        const loadDevices = async () => {
+            const result = await apiRequest('/admin/devices');
+            if (result.success) {
+                devices.value = result.data || [];
+            }
+        };
+        
+        const filteredDevices = computed(() => {
+            if (deviceFilter.value === 'all') return devices.value;
+            if (deviceFilter.value === 'online') {
+                return devices.value.filter(d => d.isOnline);
+            }
+            if (deviceFilter.value === 'offline') {
+                return devices.value.filter(d => !d.isOnline);
+            }
+            return devices.value.filter(d => d.level === deviceFilter.value);
+        });
+        
+        const revokeDevice = async (deviceId) => {
+            if (!confirm('確定要解綁此設備？用戶需要重新激活。')) return;
+            
+            const result = await apiRequest(`/admin/devices/${deviceId}/revoke`, {
+                method: 'POST'
+            });
+            if (result.success) {
+                showToast('設備已解綁', 'success');
+                await loadDevices();
+            } else {
+                showToast(result.message || '操作失敗', 'error');
+            }
+        };
+        
         const loadSettings = async () => {
             const result = await apiRequest('/admin/settings');
             if (result.success) {
@@ -494,6 +672,10 @@ createApp({
             if (currentPage.value === 'logs') await loadLogs();
             if (currentPage.value === 'referrals') await loadReferralStats();
             if (currentPage.value === 'announcements') await loadAnnouncements();
+            if (currentPage.value === 'expiring') await loadExpiringUsers();
+            if (currentPage.value === 'quotas') await loadQuotaStats();
+            if (currentPage.value === 'notifications') await loadNotificationHistory();
+            if (currentPage.value === 'devices') await loadDevices();
         };
         
         // ============ 計算屬性 ============
@@ -904,16 +1086,44 @@ createApp({
                 referral_enabled: settings.value.referral_enabled ? '1' : '0',
                 maintenance_mode: settings.value.maintenance_mode ? '1' : '0'
             };
-            
+
             const result = await apiRequest('/admin/settings/save', {
                 method: 'POST',
                 body: JSON.stringify(settingsToSave)
             });
-            
+
             if (result.success) {
                 showToast('設置已保存', 'success');
             } else {
                 showToast('保存失敗: ' + result.message, 'error');
+            }
+        };
+        
+        // 保存價格配置
+        const savePrices = async () => {
+            if (!editingPrices.value) {
+                editingPrices.value = true;
+                return;
+            }
+            
+            // 正在編輯，點擊保存
+            const pricesToSave = {};
+            for (const [level, config] of Object.entries(quotaConfig.value)) {
+                if (level !== 'bronze' && config.prices) {
+                    pricesToSave[level] = config.prices;
+                }
+            }
+            
+            const result = await apiRequest('/admin/prices/save', {
+                method: 'POST',
+                body: JSON.stringify({ prices: pricesToSave })
+            });
+            
+            if (result.success) {
+                showToast('價格配置已保存', 'success');
+                editingPrices.value = false;
+            } else {
+                showToast('保存價格失敗: ' + result.message, 'error');
             }
         };
         
@@ -1016,7 +1226,7 @@ createApp({
                     data: {
                         labels: labels.length ? labels : ['1/6', '1/7', '1/8', '1/9', '1/10', '1/11', '1/12'],
                         datasets: [{
-                            label: '收入 (¥)',
+                            label: '收入 (USDT)',
                             data: data.length ? data : [0, 0, 0, 0, 0, 0, 0],
                             borderColor: '#8B5CF6',
                             backgroundColor: 'rgba(139, 92, 246, 0.1)',
@@ -1146,7 +1356,7 @@ createApp({
                     data: {
                         labels: data.map(d => d.period).reverse(),
                         datasets: [{
-                            label: '收入 (¥)',
+                            label: '收入 (USDT)',
                             data: data.map(d => d.revenue).reverse(),
                             backgroundColor: 'rgba(34, 197, 94, 0.6)',
                             borderColor: '#22C55E',
@@ -1263,10 +1473,14 @@ createApp({
             
             if (newPage === 'dashboard') await loadDashboard();
             else if (newPage === 'users') await loadUsers();
+            else if (newPage === 'expiring') await loadExpiringUsers();
             else if (newPage === 'licenses') await loadLicenses();
             else if (newPage === 'orders') await loadOrders();
             else if (newPage === 'revenue') await loadRevenueReport();
             else if (newPage === 'analytics') await loadUserAnalytics();
+            else if (newPage === 'quotas') await loadQuotaStats();
+            else if (newPage === 'notifications') await loadNotificationHistory();
+            else if (newPage === 'devices') await loadDevices();
             else if (newPage === 'logs') await loadLogs();
             else if (newPage === 'admins') await loadAdmins();
             else if (newPage === 'referrals') await loadReferralStats();
@@ -1324,6 +1538,7 @@ createApp({
             announcements,
             settings,
             quotaConfig,
+            editingPrices,
             revenueReportDays,
             revenueReport,
             userAnalytics,
@@ -1382,6 +1597,7 @@ createApp({
             
             // 設置操作
             saveSettings,
+            savePrices,
             passwordForm,
             changePassword,
             telegramConfig,
@@ -1394,6 +1610,32 @@ createApp({
             loadUserAnalytics,
             getLevelName,
             getDurationName,
+            
+            // 即將到期用戶
+            expiringUsers,
+            expiringDays,
+            loadExpiringUsers,
+            sendExpiryReminder,
+            batchSendExpiryReminders,
+            
+            // 配額監控
+            quotaStats,
+            quotaFilter,
+            filteredQuotaStats,
+            loadQuotaStats,
+            
+            // 批量通知
+            notificationForm,
+            notificationHistory,
+            sendBatchNotification,
+            loadNotificationHistory,
+            
+            // 設備管理
+            devices,
+            deviceFilter,
+            filteredDevices,
+            loadDevices,
+            revokeDevice,
             
             // 其他
             refreshData,

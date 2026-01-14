@@ -3,13 +3,14 @@
  * 獨立的會員管理頁面：等級權益、使用統計、升級購買、邀請獎勵
  */
 
-import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from './auth.service';
 import { MembershipService, MembershipLevel } from './membership.service';
 import { I18nService } from './i18n.service';
 import { ToastService } from './toast.service';
+import { LicenseClientService } from './license-client.service';
 
 type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
 
@@ -47,7 +48,7 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
           </div>
         </div>
         <div class="status-right">
-          @if (membershipLevel() !== 'mvp') {
+          @if (membershipLevel() !== 'king') {
             <button (click)="activeTab.set('upgrade')" class="upgrade-btn">
               🚀 立即升級
             </button>
@@ -187,7 +188,7 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
           <!-- 邀請獎勵卡片 -->
           <div class="section-card invite-card">
             <h3 class="section-title">🎁 邀請好友得獎勵</h3>
-            <p class="invite-desc">每邀請 1 位好友註冊並激活，您將獲得 <strong>3 天 VIP</strong> 獎勵！</p>
+            <p class="invite-desc">每邀請 1 位好友註冊並激活，您將獲得 <strong>3 天白銀精英</strong> 獎勵！</p>
             
             <div class="invite-code-display">
               <span class="label">我的邀請碼</span>
@@ -217,96 +218,113 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
               <thead>
                 <tr>
                   <th class="feature-col">功能</th>
-                  <th class="level-col free">🌟 免費版</th>
-                  <th class="level-col vip">⭐ VIP</th>
-                  <th class="level-col svip">💎 SVIP</th>
-                  <th class="level-col mvp">👑 MVP</th>
+                  <th class="level-col bronze">⚔️ 青銅</th>
+                  <th class="level-col silver">🥈 白銀</th>
+                  <th class="level-col gold">🥇 黃金</th>
+                  <th class="level-col diamond">💎 鑽石</th>
+                  <th class="level-col star">🌟 星耀</th>
+                  <th class="level-col king">👑 王者</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td class="feature-name">帳號數量</td>
                   <td>2 個</td>
+                  <td>5 個</td>
                   <td>10 個</td>
+                  <td>20 個</td>
                   <td>50 個</td>
                   <td>無限</td>
                 </tr>
                 <tr>
-                  <td class="feature-name">AI 調用次數/月</td>
-                  <td>50 次</td>
-                  <td>500 次</td>
-                  <td>2,000 次</td>
-                  <td>無限</td>
-                </tr>
-                <tr>
-                  <td class="feature-name">消息發送/天</td>
+                  <td class="feature-name">每日消息</td>
+                  <td>20 條</td>
                   <td>100 條</td>
+                  <td>300 條</td>
                   <td>1,000 條</td>
-                  <td>5,000 條</td>
+                  <td>無限</td>
                   <td>無限</td>
                 </tr>
                 <tr>
-                  <td class="feature-name">綁定設備數</td>
-                  <td>1 台</td>
-                  <td>2 台</td>
-                  <td>3 台</td>
-                  <td>5 台</td>
-                </tr>
-                <tr>
-                  <td class="feature-name">資源發現</td>
-                  <td>❌</td>
-                  <td>✅</td>
-                  <td>✅</td>
-                  <td>✅</td>
-                </tr>
-                <tr>
-                  <td class="feature-name">自動化規則</td>
-                  <td>1 條</td>
-                  <td>10 條</td>
-                  <td>50 條</td>
+                  <td class="feature-name">每日 AI 調用</td>
+                  <td>10 次</td>
+                  <td>50 次</td>
+                  <td>200 次</td>
+                  <td>無限</td>
+                  <td>無限</td>
                   <td>無限</td>
                 </tr>
                 <tr>
-                  <td class="feature-name">語音克隆</td>
+                  <td class="feature-name">群組數量</td>
+                  <td>3 個</td>
+                  <td>10 個</td>
+                  <td>30 個</td>
+                  <td>100 個</td>
+                  <td>無限</td>
+                  <td>無限</td>
+                </tr>
+                <tr>
+                  <td class="feature-name">廣告發送</td>
+                  <td>❌</td>
+                  <td>✅</td>
+                  <td>✅</td>
+                  <td>✅</td>
+                  <td>✅</td>
+                  <td>✅</td>
+                </tr>
+                <tr>
+                  <td class="feature-name">批量操作</td>
+                  <td>❌</td>
+                  <td>❌</td>
+                  <td>✅</td>
+                  <td>✅</td>
+                  <td>✅</td>
+                  <td>✅</td>
+                </tr>
+                <tr>
+                  <td class="feature-name">AI 銷售漏斗</td>
+                  <td>❌</td>
+                  <td>❌</td>
+                  <td>❌</td>
+                  <td>✅</td>
+                  <td>✅</td>
+                  <td>✅</td>
+                </tr>
+                <tr>
+                  <td class="feature-name">智能防封</td>
+                  <td>❌</td>
+                  <td>❌</td>
                   <td>❌</td>
                   <td>❌</td>
                   <td>✅</td>
                   <td>✅</td>
                 </tr>
                 <tr>
-                  <td class="feature-name">RAG 知識庫</td>
+                  <td class="feature-name">API 接口</td>
                   <td>❌</td>
-                  <td>✅</td>
-                  <td>✅</td>
-                  <td>✅</td>
-                </tr>
-                <tr>
-                  <td class="feature-name">數據導出</td>
                   <td>❌</td>
-                  <td>✅</td>
-                  <td>✅</td>
-                  <td>✅</td>
-                </tr>
-                <tr>
-                  <td class="feature-name">API 訪問</td>
                   <td>❌</td>
                   <td>❌</td>
                   <td>❌</td>
                   <td>✅</td>
                 </tr>
                 <tr>
-                  <td class="feature-name">專屬客服</td>
+                  <td class="feature-name">優先支持</td>
+                  <td>❌</td>
+                  <td>❌</td>
                   <td>❌</td>
                   <td>❌</td>
                   <td>✅</td>
-                  <td>✅ 24/7</td>
+                  <td>✅ 專屬</td>
                 </tr>
                 <tr class="price-row">
                   <td class="feature-name">價格</td>
                   <td class="price">免費</td>
-                  <td class="price">¥29/月</td>
-                  <td class="price">¥99/月</td>
-                  <td class="price">¥999/年</td>
+                  <td class="price">9.9 USDT/月</td>
+                  <td class="price">29.9 USDT/月</td>
+                  <td class="price">99.9 USDT/月</td>
+                  <td class="price">299 USDT/月</td>
+                  <td class="price">999 USDT/月</td>
                 </tr>
               </tbody>
             </table>
@@ -314,97 +332,156 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
         </div>
       }
       
-      <!-- 升級購買 -->
+      <!-- 升級購買（王者榮耀等級） -->
       @if (activeTab() === 'upgrade') {
         <div class="tab-content">
           <div class="pricing-cards">
-            <!-- VIP -->
-            <div class="pricing-card vip" [class.current]="membershipLevel() === 'vip'">
-              @if (membershipLevel() === 'vip') {
+            <!-- 白銀精英 -->
+            <div class="pricing-card silver" [class.current]="membershipLevel() === 'silver'">
+              @if (membershipLevel() === 'silver') {
                 <div class="current-badge">當前方案</div>
               }
-              <div class="plan-icon">⭐</div>
-              <h3 class="plan-name">VIP</h3>
+              <div class="plan-icon">🥈</div>
+              <h3 class="plan-name">白銀精英</h3>
               <div class="plan-price">
-                <span class="amount">¥29</span>
+                <span class="amount">9.9 USDT</span>
                 <span class="period">/月</span>
               </div>
               <ul class="plan-features">
-                <li>✅ 10 個帳號</li>
-                <li>✅ 500 次 AI 調用/月</li>
-                <li>✅ 1,000 條消息/天</li>
-                <li>✅ 2 台設備</li>
-                <li>✅ 資源發現</li>
-                <li>✅ RAG 知識庫</li>
+                <li>✅ 5 個帳號</li>
+                <li>✅ 每日 50 條消息</li>
+                <li>✅ 每日 50 次 AI</li>
+                <li>✅ 10 個群組</li>
+                <li>✅ 廣告發送</li>
               </ul>
-              @if (membershipLevel() !== 'vip') {
-                <button class="buy-btn" (click)="onPurchase('vip', 'month')">
-                  {{ membershipLevel() === 'free' ? '立即開通' : '切換方案' }}
+              @if (membershipLevel() !== 'silver') {
+                <button class="buy-btn" (click)="onPurchase('silver', 'month')">
+                  {{ membershipLevel() === 'bronze' ? '立即開通' : '切換方案' }}
                 </button>
               } @else {
-                <button class="buy-btn renew" (click)="onPurchase('vip', 'month')">
+                <button class="buy-btn renew" (click)="onPurchase('silver', 'month')">
                   續費
                 </button>
               }
             </div>
             
-            <!-- SVIP -->
-            <div class="pricing-card svip popular" [class.current]="membershipLevel() === 'svip'">
-              <div class="popular-badge">最受歡迎</div>
-              @if (membershipLevel() === 'svip') {
+            <!-- 黃金大師 -->
+            <div class="pricing-card gold" [class.current]="membershipLevel() === 'gold'">
+              @if (membershipLevel() === 'gold') {
+                <div class="current-badge">當前方案</div>
+              }
+              <div class="plan-icon">🥇</div>
+              <h3 class="plan-name">黃金大師</h3>
+              <div class="plan-price">
+                <span class="amount">29.9 USDT</span>
+                <span class="period">/月</span>
+              </div>
+              <ul class="plan-features">
+                <li>✅ 15 個帳號</li>
+                <li>✅ 每日 200 條消息</li>
+                <li>✅ 每日 200 次 AI</li>
+                <li>✅ 30 個群組</li>
+                <li>✅ 批量操作</li>
+                <li>✅ 數據導出</li>
+              </ul>
+              @if (membershipLevel() !== 'gold') {
+                <button class="buy-btn" (click)="onPurchase('gold', 'month')">
+                  {{ ['bronze', 'silver'].includes(membershipLevel()) ? '立即升級' : '切換方案' }}
+                </button>
+              } @else {
+                <button class="buy-btn renew" (click)="onPurchase('gold', 'month')">
+                  續費
+                </button>
+              }
+            </div>
+            
+            <!-- 鑽石王牌 -->
+            <div class="pricing-card diamond popular" [class.current]="membershipLevel() === 'diamond'">
+              <div class="popular-badge">推薦</div>
+              @if (membershipLevel() === 'diamond') {
                 <div class="current-badge">當前方案</div>
               }
               <div class="plan-icon">💎</div>
-              <h3 class="plan-name">SVIP</h3>
+              <h3 class="plan-name">鑽石王牌</h3>
               <div class="plan-price">
-                <span class="amount">¥99</span>
+                <span class="amount">99.9 USDT</span>
                 <span class="period">/月</span>
               </div>
               <ul class="plan-features">
                 <li>✅ 50 個帳號</li>
-                <li>✅ 2,000 次 AI 調用/月</li>
-                <li>✅ 5,000 條消息/天</li>
-                <li>✅ 3 台設備</li>
-                <li>✅ 語音克隆</li>
-                <li>✅ 專屬客服</li>
+                <li>✅ 每日 1000 條消息</li>
+                <li>✅ 無限 AI 調用</li>
+                <li>✅ 100 個群組</li>
+                <li>✅ AI 銷售漏斗</li>
+                <li>✅ 高級分析</li>
               </ul>
-              @if (membershipLevel() !== 'svip') {
-                <button class="buy-btn" (click)="onPurchase('svip', 'month')">
-                  {{ ['free', 'vip'].includes(membershipLevel()) ? '立即升級' : '切換方案' }}
+              @if (membershipLevel() !== 'diamond') {
+                <button class="buy-btn" (click)="onPurchase('diamond', 'month')">
+                  {{ ['bronze', 'silver', 'gold'].includes(membershipLevel()) ? '立即升級' : '切換方案' }}
                 </button>
               } @else {
-                <button class="buy-btn renew" (click)="onPurchase('svip', 'month')">
+                <button class="buy-btn renew" (click)="onPurchase('diamond', 'month')">
                   續費
                 </button>
               }
             </div>
             
-            <!-- MVP -->
-            <div class="pricing-card mvp" [class.current]="membershipLevel() === 'mvp'">
-              @if (membershipLevel() === 'mvp') {
+            <!-- 星耀傳說 -->
+            <div class="pricing-card star" [class.current]="membershipLevel() === 'star'">
+              @if (membershipLevel() === 'star') {
+                <div class="current-badge">當前方案</div>
+              }
+              <div class="plan-icon">🌟</div>
+              <h3 class="plan-name">星耀傳說</h3>
+              <div class="plan-price">
+                <span class="amount">299 USDT</span>
+                <span class="period">/月</span>
+              </div>
+              <ul class="plan-features">
+                <li>✅ 100 個帳號</li>
+                <li>✅ 無限消息</li>
+                <li>✅ 無限 AI</li>
+                <li>✅ 無限群組</li>
+                <li>✅ 智能防封</li>
+                <li>✅ 團隊管理</li>
+              </ul>
+              @if (membershipLevel() !== 'star') {
+                <button class="buy-btn" (click)="onPurchase('star', 'month')">
+                  {{ membershipLevel() !== 'king' ? '立即升級' : '切換方案' }}
+                </button>
+              } @else {
+                <button class="buy-btn renew" (click)="onPurchase('star', 'month')">
+                  續費
+                </button>
+              }
+            </div>
+            
+            <!-- 榮耀王者 -->
+            <div class="pricing-card king" [class.current]="membershipLevel() === 'king'">
+              @if (membershipLevel() === 'king') {
                 <div class="current-badge">當前方案</div>
               }
               <div class="plan-icon">👑</div>
-              <h3 class="plan-name">MVP</h3>
+              <h3 class="plan-name">榮耀王者</h3>
               <div class="plan-price">
-                <span class="amount">¥999</span>
-                <span class="period">/年</span>
+                <span class="amount">999 USDT</span>
+                <span class="period">/月</span>
               </div>
-              <div class="savings">節省 ¥189</div>
+              <div class="savings">尊享特權</div>
               <ul class="plan-features">
                 <li>✅ 無限帳號</li>
-                <li>✅ 無限 AI 調用</li>
-                <li>✅ 無限消息</li>
-                <li>✅ 5 台設備</li>
-                <li>✅ API 訪問</li>
-                <li>✅ 24/7 專屬客服</li>
+                <li>✅ 無限一切</li>
+                <li>✅ API 接口</li>
+                <li>✅ 自定義品牌</li>
+                <li>✅ 專屬顧問</li>
+                <li>✅ 新功能內測</li>
               </ul>
-              @if (membershipLevel() !== 'mvp') {
-                <button class="buy-btn" (click)="onPurchase('mvp', 'year')">
+              @if (membershipLevel() !== 'king') {
+                <button class="buy-btn" (click)="onPurchase('king', 'month')">
                   終極升級
                 </button>
               } @else {
-                <button class="buy-btn renew" (click)="onPurchase('mvp', 'year')">
+                <button class="buy-btn renew" (click)="onPurchase('king', 'month')">
                   續費
                 </button>
               }
@@ -454,23 +531,24 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
             <h3 class="section-title">📜 訂閱歷史</h3>
             
             <div class="history-list">
-              <div class="history-item">
-                <div class="history-icon">🎫</div>
-                <div class="history-info">
-                  <div class="history-title">VIP 月卡激活</div>
-                  <div class="history-meta">2026-01-01 · 卡密激活</div>
-                </div>
-                <div class="history-status active">生效中</div>
-              </div>
-              
-              <div class="history-item">
-                <div class="history-icon">🎁</div>
-                <div class="history-info">
-                  <div class="history-title">邀請獎勵 +3 天</div>
-                  <div class="history-meta">2025-12-25 · 邀請用戶 user123</div>
-                </div>
-                <div class="history-status used">已使用</div>
-              </div>
+              @if (isLoadingHistory()) {
+                <div class="loading-state">載入中...</div>
+              } @else if (subscriptionHistory().length === 0) {
+                <div class="empty-state">暫無訂閱記錄</div>
+              } @else {
+                @for (record of subscriptionHistory(); track record.id) {
+                  <div class="history-item">
+                    <div class="history-icon">{{ record.level_icon || '🎫' }}</div>
+                    <div class="history-info">
+                      <div class="history-title">{{ record.level_name }} {{ record.duration_name }}激活</div>
+                      <div class="history-meta">{{ formatActivationDate(record.activated_at) }} · 卡密激活</div>
+                    </div>
+                    <div class="history-status" [class.active]="record.is_active" [class.used]="!record.is_active">
+                      {{ record.is_active ? '生效中' : '已過期' }}
+                    </div>
+                  </div>
+                }
+              }
             </div>
           </div>
         </div>
@@ -1046,11 +1124,16 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
     }
   `]
 })
-export class MembershipCenterComponent implements OnInit {
+export class MembershipCenterComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private membershipService = inject(MembershipService);
   private toast = inject(ToastService);
+  private licenseClient = inject(LicenseClientService);
+  private cdr = inject(ChangeDetectorRef);
   
+  // 用於清理事件監聽
+  private membershipUpdateHandler: ((event: Event) => void) | null = null;
+
   // 狀態
   activeTab = signal<MembershipTab>('overview');
   selectedPayment = signal<'alipay' | 'wechat' | 'usdt'>('alipay');
@@ -1067,21 +1150,72 @@ export class MembershipCenterComponent implements OnInit {
   invitedCount = signal(0);
   rewardDays = signal(0);
   
+  // 訂閱記錄
+  subscriptionHistory = signal<any[]>([]);
+  isLoadingHistory = signal(false);
+  
   async ngOnInit(): Promise<void> {
     const rewards = await this.authService.getInviteRewards();
     this.inviteCode.set(rewards.inviteCode);
     this.invitedCount.set(rewards.invitedCount);
     this.rewardDays.set(rewards.rewardDays);
+
+    // 載入訂閱記錄
+    await this.loadSubscriptionHistory();
+    
+    // 監聽會員狀態更新事件
+    this.membershipUpdateHandler = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log('[MembershipCenterComponent] 收到會員狀態更新事件:', customEvent.detail);
+      // 強制觸發變更檢測以刷新 UI
+      this.cdr.detectChanges();
+    };
+    window.addEventListener('membership-updated', this.membershipUpdateHandler);
+  }
+  
+  ngOnDestroy(): void {
+    // 清理事件監聯
+    if (this.membershipUpdateHandler) {
+      window.removeEventListener('membership-updated', this.membershipUpdateHandler);
+    }
+  }
+  
+  async loadSubscriptionHistory(): Promise<void> {
+    this.isLoadingHistory.set(true);
+    try {
+      const result = await this.licenseClient.getActivationHistory(50, 0);
+      if (result.success && result.data) {
+        this.subscriptionHistory.set(result.data);
+      }
+    } catch (error) {
+      console.error('載入訂閱記錄失敗:', error);
+    } finally {
+      this.isLoadingHistory.set(false);
+    }
   }
   
   getMembershipIcon(): string {
-    const icons: Record<string, string> = { free: '🌟', vip: '⭐', svip: '💎', mvp: '👑' };
-    return icons[this.membershipLevel()] || '🌟';
+    const icons: Record<string, string> = {
+      bronze: '⚔️',
+      silver: '🥈',
+      gold: '🥇',
+      diamond: '💎',
+      star: '🌟',
+      king: '👑'
+    };
+    return icons[this.membershipLevel()] || '⚔️';
   }
   
   getMembershipName(): string {
-    const names: Record<string, string> = { free: '免費版', vip: 'VIP', svip: 'SVIP', mvp: 'MVP' };
-    return names[this.membershipLevel()] || '免費版';
+    const names: Record<string, string> = {
+      bronze: '青銅戰士',
+      silver: '白銀精英',
+      gold: '黃金大師',
+      diamond: '鑽石王牌',
+      star: '星耀傳說',
+      king: '榮耀王者'
+    };
+    return names[this.membershipLevel()] || '青銅戰士';
   }
   
   formatDate(dateString?: string): string {
@@ -1126,10 +1260,20 @@ export class MembershipCenterComponent implements OnInit {
   async onActivateLicense(): Promise<void> {
     const result = await this.authService.renewMembership(this.licenseKey);
     if (result.success) {
-      this.toast.success('卡密激活成功！');
+      this.toast.success(result.message || '卡密激活成功！');
       this.licenseKey = '';
+      // 重新載入訂閱記錄
+      await this.loadSubscriptionHistory();
+      // 強制刷新 UI
+      this.cdr.detectChanges();
     } else {
       this.toast.error(result.message);
     }
+  }
+  
+  formatActivationDate(dateString: string): string {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('zh-TW');
   }
 }

@@ -3,10 +3,6 @@ name: 🚀 Auto Deploy to Server
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'backend/**'
-      - 'admin-panel/**'
-      - 'deploy/**'
   workflow_dispatch:  # 允許手動觸發
 
 jobs:

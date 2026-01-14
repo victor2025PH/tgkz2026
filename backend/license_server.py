@@ -3631,7 +3631,7 @@ class LicenseServer:
             return web.json_response({'success': False, 'message': str(e)}, status=500)
     
     async def handle_admin_quotas(self, request: web.Request) -> web.Response:
-        """獲取配額配置"""
+        """獲取配額配置（包含價格）"""
         authorized, error_response, admin = self._require_admin(request)
         if not authorized:
             return error_response
@@ -3641,6 +3641,7 @@ class LicenseServer:
                 level: {
                     'name': config['name'],
                     'icon': config['icon'],
+                    'prices': config['prices'],  # 包含價格數據
                     'quotas': config['quotas'],
                     'features': config['features']
                 }

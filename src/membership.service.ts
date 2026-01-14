@@ -714,46 +714,48 @@ export class MembershipService {
         level: 'silver',
         name: '🥈 白銀精英',
         icon: '🥈',
-        monthlyPrice: 9.9,
-        yearlyPrice: 99,
+        monthlyPrice: 4.99,
+        yearlyPrice: 49.9,
         quotas: MEMBERSHIP_CONFIG.silver.quotas,
         features: [
           '5 個賬戶',
-          '每日 50 條消息',
+          '每日 100 條消息',
           '每日 50 次 AI',
           '10 個群組',
-          '廣告發送'
+          '廣告發送',
+          '定時發送'
         ]
       },
       {
         level: 'gold',
         name: '🥇 黃金大師',
         icon: '🥇',
-        monthlyPrice: 29.9,
-        yearlyPrice: 299,
+        monthlyPrice: 19.9,
+        yearlyPrice: 199,
         quotas: MEMBERSHIP_CONFIG.gold.quotas,
+        recommended: true,
         features: [
           '15 個賬戶',
-          '每日 200 條消息',
-          '每日 200 次 AI',
-          '30 個群組',
+          '每日 500 條消息',
+          '每日 300 次 AI',
+          '50 個群組',
           '數據導出',
-          '批量操作'
+          '批量操作',
+          '關鍵詞回覆'
         ]
       },
       {
         level: 'diamond',
         name: '💎 鑽石王牌',
         icon: '💎',
-        monthlyPrice: 99.9,
-        yearlyPrice: 999,
+        monthlyPrice: 59.9,
+        yearlyPrice: 599,
         quotas: MEMBERSHIP_CONFIG.diamond.quotas,
-        recommended: true,
         features: [
           '50 個賬戶',
-          '每日 1000 條消息',
+          '每日 2000 條消息',
           '無限 AI 調用',
-          '100 個群組',
+          '200 個群組',
           '多角色協作',
           'AI 銷售漏斗',
           '高級分析'
@@ -763,8 +765,8 @@ export class MembershipService {
         level: 'star',
         name: '🌟 星耀傳說',
         icon: '🌟',
-        monthlyPrice: 299,
-        yearlyPrice: 2999,
+        monthlyPrice: 199,
+        yearlyPrice: 1999,
         quotas: MEMBERSHIP_CONFIG.star.quotas,
         features: [
           '100 個賬戶',
@@ -780,8 +782,8 @@ export class MembershipService {
         level: 'king',
         name: '👑 榮耀王者',
         icon: '👑',
-        monthlyPrice: 999,
-        yearlyPrice: 9999,
+        monthlyPrice: 599,
+        yearlyPrice: 5999,
         quotas: MEMBERSHIP_CONFIG.king.quotas,
         features: [
           '無限賬戶',

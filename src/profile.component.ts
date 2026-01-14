@@ -191,10 +191,10 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
             <div class="purchase-options">
               <div class="purchase-card silver">
                 <div class="plan-name">🥈 白銀精英</div>
-                <div class="plan-price">9.9 USDT/月</div>
+                <div class="plan-price">4.99 USDT/月</div>
                 <ul class="plan-features">
                   <li>5 個帳號</li>
-                  <li>每日 50 條消息</li>
+                  <li>每日 100 條消息</li>
                   <li>每日 50 次 AI</li>
                   <li>10 個群組</li>
                 </ul>
@@ -203,11 +203,12 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
               
               <div class="purchase-card gold">
                 <div class="plan-name">🥇 黃金大師</div>
-                <div class="plan-price">29.9 USDT/月</div>
+                <div class="plan-price">19.9 USDT/月</div>
+                <div class="recommended">推薦</div>
                 <ul class="plan-features">
                   <li>15 個帳號</li>
-                  <li>每日 200 條消息</li>
-                  <li>每日 200 次 AI</li>
+                  <li>每日 500 條消息</li>
+                  <li>每日 300 次 AI</li>
                   <li>批量操作</li>
                 </ul>
                 <button class="buy-btn">購買</button>
@@ -215,11 +216,10 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
               
               <div class="purchase-card diamond">
                 <div class="plan-name">💎 鑽石王牌</div>
-                <div class="plan-price">99.9 USDT/月</div>
-                <div class="recommended">推薦</div>
+                <div class="plan-price">59.9 USDT/月</div>
                 <ul class="plan-features">
                   <li>50 個帳號</li>
-                  <li>每日 1000 條消息</li>
+                  <li>每日 2000 條消息</li>
                   <li>無限 AI 調用</li>
                   <li>AI 銷售漏斗</li>
                 </ul>
@@ -228,7 +228,7 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
               
               <div class="purchase-card star">
                 <div class="plan-name">🌟 星耀傳說</div>
-                <div class="plan-price">299 USDT/月</div>
+                <div class="plan-price">199 USDT/月</div>
                 <ul class="plan-features">
                   <li>100 個帳號</li>
                   <li>無限消息</li>
@@ -240,7 +240,7 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
               
               <div class="purchase-card king">
                 <div class="plan-name">👑 榮耀王者</div>
-                <div class="plan-price">999 USDT/月</div>
+                <div class="plan-price">599 USDT/月</div>
                 <ul class="plan-features">
                   <li>無限帳號</li>
                   <li>無限一切</li>

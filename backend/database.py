@@ -37,6 +37,11 @@ ACCOUNTS_DB_PATH = Path(__file__).parent / "data" / "tgmatrix.db"
 
 
 # ============ 會員等級配置 (價格單位: USDT) ============
+# 基於市場分析的定價策略：
+# - 入門價格低門檻 ($4.99) 吸引轉化
+# - 黃金級別為主力營收產品 ($19.9)
+# - 高級別強調功能價值差異
+# - 年付享受約17%折扣，終身約為年付的2.5倍
 MEMBERSHIP_LEVELS = {
     'bronze': {
         'name': '青銅戰士',
@@ -65,16 +70,17 @@ MEMBERSHIP_LEVELS = {
         'icon': '🥈',
         'color': '#C0C0C0',
         'order': 1,
-        'prices': {'week': 2.9, 'month': 9.9, 'quarter': 24.9, 'year': 99, 'lifetime': 299},
+        # 入門級：低價策略吸引首次付費
+        'prices': {'week': 1.99, 'month': 4.99, 'quarter': 12.99, 'year': 49.9, 'lifetime': 129},
         'quotas': {
             'tg_accounts': 5,
-            'daily_messages': 50,
+            'daily_messages': 100,
             'ai_calls': 50,
             'devices': 2,
             'groups': 10,
-            'auto_reply_rules': 3,
-            'scheduled_tasks': 5,
-            'data_retention_days': 15,
+            'auto_reply_rules': 5,
+            'scheduled_tasks': 10,
+            'data_retention_days': 30,
             'platform_api_quota': 1,
             'platform_api_max_accounts': 3
         },
@@ -86,16 +92,17 @@ MEMBERSHIP_LEVELS = {
         'icon': '🥇',
         'color': '#FFD700',
         'order': 2,
-        'prices': {'week': 9.9, 'month': 29.9, 'quarter': 79, 'year': 299, 'lifetime': 799},
+        # 主力產品：性價比最高，功能完整
+        'prices': {'week': 6.99, 'month': 19.9, 'quarter': 49.9, 'year': 199, 'lifetime': 499},
         'quotas': {
             'tg_accounts': 15,
-            'daily_messages': 200,
-            'ai_calls': 200,
+            'daily_messages': 500,
+            'ai_calls': 300,
             'devices': 3,
-            'groups': 30,
-            'auto_reply_rules': 10,
-            'scheduled_tasks': 20,
-            'data_retention_days': 30,
+            'groups': 50,
+            'auto_reply_rules': 20,
+            'scheduled_tasks': 30,
+            'data_retention_days': 60,
             'platform_api_quota': 3,
             'platform_api_max_accounts': 9
         },
@@ -108,16 +115,17 @@ MEMBERSHIP_LEVELS = {
         'icon': '💎',
         'color': '#B9F2FF',
         'order': 3,
-        'prices': {'week': 29, 'month': 99.9, 'quarter': 249, 'year': 999, 'lifetime': 2999},
+        # 專業級：高級功能解鎖
+        'prices': {'week': 19.9, 'month': 59.9, 'quarter': 149, 'year': 599, 'lifetime': 1499},
         'quotas': {
             'tg_accounts': 50,
-            'daily_messages': 1000,
+            'daily_messages': 2000,
             'ai_calls': -1,  # 無限
             'devices': 5,
-            'groups': 100,
+            'groups': 200,
             'auto_reply_rules': -1,
-            'scheduled_tasks': 50,
-            'data_retention_days': 60,
+            'scheduled_tasks': 100,
+            'data_retention_days': 90,
             'platform_api_quota': 10,
             'platform_api_max_accounts': 30
         },
@@ -131,7 +139,8 @@ MEMBERSHIP_LEVELS = {
         'icon': '🌟',
         'color': '#9B59B6',
         'order': 4,
-        'prices': {'week': 89, 'month': 299, 'quarter': 749, 'year': 2999, 'lifetime': 7999},
+        # 團隊級：適合代理商和團隊
+        'prices': {'week': 59.9, 'month': 199, 'quarter': 499, 'year': 1999, 'lifetime': 4999},
         'quotas': {
             'tg_accounts': 100,
             'daily_messages': -1,  # 無限
@@ -155,7 +164,8 @@ MEMBERSHIP_LEVELS = {
         'icon': '👑',
         'color': '#FF6B6B',
         'order': 5,
-        'prices': {'week': 299, 'month': 999, 'quarter': 2499, 'year': 9999, 'lifetime': 29999},
+        # 企業級：無限一切 + 專屬服務
+        'prices': {'week': 199, 'month': 599, 'quarter': 1499, 'year': 5999, 'lifetime': 14999},
         'quotas': {
             'tg_accounts': -1,  # 無限
             'daily_messages': -1,

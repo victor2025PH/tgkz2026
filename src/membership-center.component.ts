@@ -320,11 +320,11 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
                 <tr class="price-row">
                   <td class="feature-name">價格</td>
                   <td class="price">免費</td>
-                  <td class="price">9.9 USDT/月</td>
-                  <td class="price">29.9 USDT/月</td>
-                  <td class="price">99.9 USDT/月</td>
-                  <td class="price">299 USDT/月</td>
-                  <td class="price">999 USDT/月</td>
+                  <td class="price">4.99 USDT/月</td>
+                  <td class="price">19.9 USDT/月</td>
+                  <td class="price">59.9 USDT/月</td>
+                  <td class="price">199 USDT/月</td>
+                  <td class="price">599 USDT/月</td>
                 </tr>
               </tbody>
             </table>
@@ -344,12 +344,12 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
               <div class="plan-icon">🥈</div>
               <h3 class="plan-name">白銀精英</h3>
               <div class="plan-price">
-                <span class="amount">9.9 USDT</span>
+                <span class="amount">4.99 USDT</span>
                 <span class="period">/月</span>
               </div>
               <ul class="plan-features">
                 <li>✅ 5 個帳號</li>
-                <li>✅ 每日 50 條消息</li>
+                <li>✅ 每日 100 條消息</li>
                 <li>✅ 每日 50 次 AI</li>
                 <li>✅ 10 個群組</li>
                 <li>✅ 廣告發送</li>
@@ -373,14 +373,14 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
               <div class="plan-icon">🥇</div>
               <h3 class="plan-name">黃金大師</h3>
               <div class="plan-price">
-                <span class="amount">29.9 USDT</span>
+                <span class="amount">19.9 USDT</span>
                 <span class="period">/月</span>
               </div>
               <ul class="plan-features">
                 <li>✅ 15 個帳號</li>
-                <li>✅ 每日 200 條消息</li>
-                <li>✅ 每日 200 次 AI</li>
-                <li>✅ 30 個群組</li>
+                <li>✅ 每日 500 條消息</li>
+                <li>✅ 每日 300 次 AI</li>
+                <li>✅ 50 個群組</li>
                 <li>✅ 批量操作</li>
                 <li>✅ 數據導出</li>
               </ul>
@@ -404,14 +404,14 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
               <div class="plan-icon">💎</div>
               <h3 class="plan-name">鑽石王牌</h3>
               <div class="plan-price">
-                <span class="amount">99.9 USDT</span>
+                <span class="amount">59.9 USDT</span>
                 <span class="period">/月</span>
               </div>
               <ul class="plan-features">
                 <li>✅ 50 個帳號</li>
-                <li>✅ 每日 1000 條消息</li>
+                <li>✅ 每日 2000 條消息</li>
                 <li>✅ 無限 AI 調用</li>
-                <li>✅ 100 個群組</li>
+                <li>✅ 200 個群組</li>
                 <li>✅ AI 銷售漏斗</li>
                 <li>✅ 高級分析</li>
               </ul>
@@ -434,7 +434,7 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
               <div class="plan-icon">🌟</div>
               <h3 class="plan-name">星耀傳說</h3>
               <div class="plan-price">
-                <span class="amount">299 USDT</span>
+                <span class="amount">199 USDT</span>
                 <span class="period">/月</span>
               </div>
               <ul class="plan-features">
@@ -464,7 +464,7 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
               <div class="plan-icon">👑</div>
               <h3 class="plan-name">榮耀王者</h3>
               <div class="plan-price">
-                <span class="amount">999 USDT</span>
+                <span class="amount">599 USDT</span>
                 <span class="period">/月</span>
               </div>
               <div class="savings">尊享特權</div>

@@ -1102,6 +1102,12 @@ createApp({
         // 保存價格配置
         const savePrices = async () => {
             if (!editingPrices.value) {
+                // 進入編輯模式前，確保每個等級都有 prices 對象
+                for (const [level, config] of Object.entries(quotaConfig.value)) {
+                    if (!config.prices) {
+                        config.prices = { week: 0, month: 0, quarter: 0, year: 0, lifetime: 0 };
+                    }
+                }
                 editingPrices.value = true;
                 return;
             }
@@ -1110,7 +1116,13 @@ createApp({
             const pricesToSave = {};
             for (const [level, config] of Object.entries(quotaConfig.value)) {
                 if (level !== 'bronze' && config.prices) {
-                    pricesToSave[level] = config.prices;
+                    pricesToSave[level] = {
+                        week: config.prices.week || 0,
+                        month: config.prices.month || 0,
+                        quarter: config.prices.quarter || 0,
+                        year: config.prices.year || 0,
+                        lifetime: config.prices.lifetime || 0
+                    };
                 }
             }
             

@@ -1525,7 +1525,7 @@
                                         <td class="py-3">
                                             <span :class="'rank-' + level">{{ config.icon }} {{ config.name }}</span>
                                         </td>
-                                        <template v-if="editingPrices && level !== 'bronze'">
+                                        <template v-if="editingPrices && level !== 'bronze' && config.prices">
                                             <td class="text-center py-3">
                                                 <input type="number" step="0.1" v-model.number="config.prices.week" 
                                                        class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-center text-sm">

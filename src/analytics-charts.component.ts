@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, OnDestroy, ViewChild, ElementRef, signal, computed } from '@angular/core';
+import { Component, Input, OnInit, OnDestroy, OnChanges, AfterViewInit, ViewChild, ElementRef, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 
@@ -15,9 +15,10 @@ export interface TimeSeriesData {
   datasets: {
     label: string;
     data: number[];
-    borderColor?: string;
-    backgroundColor?: string;
+    borderColor?: string | string[];
+    backgroundColor?: string | string[];
     fill?: boolean;
+    borderWidth?: number;
   }[];
 }
 
@@ -41,17 +42,25 @@ export interface TimeSeriesData {
     }
   `]
 })
-export class AnalyticsChartsComponent implements OnInit, OnDestroy {
+export class AnalyticsChartsComponent implements OnInit, OnDestroy, OnChanges, AfterViewInit {
   @ViewChild('chartCanvas', { static: false }) chartCanvas!: ElementRef<HTMLCanvasElement>;
   @Input() chartType: 'line' | 'bar' | 'doughnut' = 'line';
-  @Input() data = signal<TimeSeriesData | null>(null);
-  @Input() title = signal<string>('');
+  @Input() data: TimeSeriesData | null = null;
+  private _data = signal<TimeSeriesData | null>(null);
+  @Input() title: string = '';
+  private _title = signal<string>('');
   @Input() options: ChartConfiguration['options'] = {};
 
   private chart: Chart | null = null;
 
   ngOnInit() {
-    // Chart will be created when data is available
+    // Initialize data signals
+    if (this.data !== null) {
+      this._data.set(this.data);
+    }
+    if (this.title) {
+      this._title.set(this.title);
+    }
   }
 
   ngAfterViewInit() {
@@ -59,6 +68,14 @@ export class AnalyticsChartsComponent implements OnInit, OnDestroy {
   }
 
   ngOnChanges() {
+    // Update internal signals when inputs change
+    if (this.data !== null) {
+      this._data.set(this.data);
+    }
+    if (this.title !== undefined) {
+      this._title.set(this.title);
+    }
+    // Update chart if it exists, otherwise create it
     if (this.chart) {
       this.updateChart();
     } else if (this.chartCanvas) {
@@ -73,7 +90,7 @@ export class AnalyticsChartsComponent implements OnInit, OnDestroy {
   }
 
   private createChart() {
-    if (!this.chartCanvas || !this.data()) {
+    if (!this.chartCanvas || !this._data()) {
       return;
     }
 
@@ -82,7 +99,7 @@ export class AnalyticsChartsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const chartData = this.data();
+    const chartData = this._data();
     if (!chartData) {
       return;
     }
@@ -96,8 +113,8 @@ export class AnalyticsChartsComponent implements OnInit, OnDestroy {
           position: 'top',
         },
         title: {
-          display: !!this.title(),
-          text: this.title(),
+          display: !!this._title(),
+          text: this._title(),
         },
       },
       scales: this.chartType !== 'doughnut' ? {
@@ -121,11 +138,11 @@ export class AnalyticsChartsComponent implements OnInit, OnDestroy {
   }
 
   private updateChart() {
-    if (!this.chart || !this.data()) {
+    if (!this.chart || !this._data()) {
       return;
     }
 
-    const chartData = this.data();
+    const chartData = this._data();
     if (!chartData) {
       return;
     }
@@ -135,7 +152,7 @@ export class AnalyticsChartsComponent implements OnInit, OnDestroy {
   }
 
   public updateData(newData: TimeSeriesData) {
-    this.data.set(newData);
+    this._data.set(newData);
     this.updateChart();
   }
 }

@@ -226,18 +226,42 @@ class GroupSearchService:
                 import traceback
                 traceback.print_exc()
             
-            # 策略 2: 嘗試直接查找 @username（如果看起來像 username）
-            if len(results) == 0 and (query.startswith('@') or (not ' ' in query and query.isalnum())):
-                self.log("📋 策略2: 嘗試直接查找 @username...")
+            # 策略 2: 嘗試直接查找（支持 @username、t.me 鏈接、純 username）
+            # 檢測是否為可直接查找的格式
+            is_tme_link = 't.me/' in query or 'telegram.me/' in query
+            is_username = query.startswith('@')
+            is_simple_query = not ' ' in query and query.replace('_', '').isalnum()
+            
+            if len(results) == 0 and (is_tme_link or is_username or is_simple_query):
+                self.log("📋 策略2: 嘗試直接查找（支持 t.me 鏈接）...")
                 try:
-                    username = query.lstrip('@')
-                    chat = await client.get_chat(username)
+                    # 解析查詢，提取 username 或 ID
+                    identifier = query
+                    
+                    if is_tme_link:
+                        # 處理 t.me 鏈接格式
+                        # 支持: https://t.me/username, t.me/username, https://t.me/+hash
+                        import re
+                        # 匹配 t.me/username 或 t.me/+hash 或 t.me/joinchat/hash
+                        match = re.search(r't\.me/(?:joinchat/)?([+\w]+)', query)
+                        if match:
+                            identifier = match.group(1)
+                            self.log(f"  📎 從鏈接提取: {identifier}")
+                    elif is_username:
+                        identifier = query.lstrip('@')
+                    
+                    # 嘗試獲取群組信息
+                    chat = await client.get_chat(identifier)
                     if chat and chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
                         result = await self._parse_chat_full(chat)
                         if result and result.telegram_id not in seen_ids:
                             seen_ids.add(result.telegram_id)
                             results.append(result)
-                            self.log(f"  ✓ 直接找到: {result.title}")
+                            self.log(f"  ✓ 直接找到: {result.title} ({result.member_count} 成員)")
+                except UsernameNotOccupied:
+                    self.log(f"  ✗ 用戶名不存在: {query}", "warning")
+                except ChannelPrivate:
+                    self.log(f"  ✗ 私有群組，需要邀請鏈接: {query}", "warning")
                 except Exception as e:
                     self.log(f"  ✗ 直接查找失敗: {e}", "debug")
             

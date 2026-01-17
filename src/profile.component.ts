@@ -38,7 +38,7 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
           </div>
         </div>
         <button (click)="onLogout()" class="logout-btn">
-          🚪 登出
+          🚪 退出
         </button>
       </div>
       

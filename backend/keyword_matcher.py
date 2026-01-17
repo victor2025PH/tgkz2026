@@ -100,3 +100,6 @@ class KeywordMatcher:
         """Clear the match cache"""
         self._cache.clear()
 
+
+# 全局單例實例
+keyword_matcher = KeywordMatcher()

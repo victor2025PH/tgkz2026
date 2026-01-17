@@ -16,6 +16,33 @@ export interface TelegramAccount {
   group?: string; 
   twoFactorPassword?: string;
   selected?: boolean; // For bulk actions UI
+  
+  // Phase 2: IP Binding Fields
+  ipBindingId?: string;
+  ipBoundAt?: string;
+  ipLastVerifiedAt?: string;
+  ipFailCount?: number;
+  ipIsSticky?: boolean;  // 是否啟用 IP 粘性
+  proxyCountry?: string;
+  proxyType?: string;  // residential, datacenter, mobile
+  
+  // Phase 2: Device Fingerprint Fields
+  deviceModel?: string;
+  systemVersion?: string;
+  appVersion?: string;
+  platform?: string;  // ios, android, desktop
+  fingerprintHash?: string;
+  fingerprintGeneratedAt?: string;
+  
+  // Phase 2: API Credentials Fields
+  apiCredentialsType?: 'public' | 'native';  // 公共API/原生API
+  nativeApiId?: string;
+  nativeApiHash?: string;
+  apiCredentialsObtainedAt?: string;
+  
+  // Phase 2: AI Configuration Fields
+  aiConfigType?: 'global' | 'independent';  // 統一配置/獨立配置
+  aiConfigJson?: string;
 }
 
 export interface KeywordConfig {

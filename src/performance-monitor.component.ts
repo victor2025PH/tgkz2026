@@ -73,6 +73,19 @@ interface PerformanceAlert {
         <h2 class="text-2xl font-bold">性能监控</h2>
         <div class="flex gap-2">
           <button 
+            (click)="loadAdvancedStats()"
+            class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
+          >
+            加载高级统计
+          </button>
+          <button 
+            (click)="exportPerformanceReport()"
+            [disabled]="isExporting()"
+            class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+          >
+            {{ isExporting() ? '导出中...' : '导出报告' }}
+          </button>
+          <button 
             (click)="refreshSummary()"
             class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
@@ -261,6 +274,73 @@ interface PerformanceAlert {
         </div>
       </div>
 
+      <!-- Advanced Statistics -->
+      <div *ngIf="showAdvancedStats()" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Account Sending Comparison -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <h3 class="text-lg font-semibold mb-4">账户发送对比</h3>
+          <div *ngIf="accountSendingComparison().length > 0" class="space-y-2">
+            <div *ngFor="let account of accountSendingComparison()" class="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
+              <div>
+                <span class="font-medium">{{ account.phone }}</span>
+                <span class="text-sm text-gray-500 ml-2">{{ account.status }}</span>
+              </div>
+              <div class="text-right">
+                <div class="font-semibold">{{ account.success_count }}/{{ account.total_count }}</div>
+                <div class="text-sm text-gray-500">{{ account.success_rate.toFixed(1) }}%</div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="accountSendingComparison().length === 0" class="text-gray-500 text-center py-4">
+            暂无数据
+          </div>
+        </div>
+
+        <!-- Queue Length History -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <h3 class="text-lg font-semibold mb-4">队列长度历史</h3>
+          <div *ngIf="queueLengthHistory().length > 0" class="space-y-1">
+            <div *ngFor="let point of queueLengthHistory()" class="flex items-center gap-2">
+              <span class="text-xs text-gray-500 w-24">{{ point.timestamp | date:'HH:mm' }}</span>
+              <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
+                <div class="bg-blue-500 h-full transition-all" [style.width.%]="(point.length / maxQueueLength()) * 100"></div>
+              </div>
+              <span class="text-sm font-medium w-12 text-right">{{ point.length }}</span>
+            </div>
+          </div>
+          <div *ngIf="queueLengthHistory().length === 0" class="text-gray-500 text-center py-4">
+            暂无数据
+          </div>
+        </div>
+      </div>
+
+      <!-- Campaign Performance Stats -->
+      <div *ngIf="showAdvancedStats() && campaignPerformanceStats().length > 0" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+        <h3 class="text-lg font-semibold mb-4">活动性能统计</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+              <tr>
+                <th class="px-4 py-2 text-left text-xs font-medium">活动名称</th>
+                <th class="px-4 py-2 text-left text-xs font-medium">发送数</th>
+                <th class="px-4 py-2 text-left text-xs font-medium">成功率</th>
+                <th class="px-4 py-2 text-left text-xs font-medium">平均延迟</th>
+                <th class="px-4 py-2 text-left text-xs font-medium">回复率</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+              <tr *ngFor="let stat of campaignPerformanceStats()" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                <td class="px-4 py-2 text-sm">{{ stat.campaign_name }}</td>
+                <td class="px-4 py-2 text-sm">{{ stat.total_sent }}</td>
+                <td class="px-4 py-2 text-sm">{{ stat.success_rate.toFixed(1) }}%</td>
+                <td class="px-4 py-2 text-sm">{{ stat.avg_delay_ms.toFixed(0) }} ms</td>
+                <td class="px-4 py-2 text-sm">{{ stat.reply_rate.toFixed(1) }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Recent Metrics Table -->
       <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
         <div class="p-4 border-b">
@@ -303,9 +383,37 @@ export class PerformanceMonitorComponent implements OnInit, OnDestroy {
   metrics = signal<PerformanceMetric[]>([]);
   alerts = signal<PerformanceAlert[]>([]);
   autoRefreshEnabled = signal<boolean>(false);
+  showAdvancedStats = signal<boolean>(false);
+  isExporting = signal<boolean>(false);
+  
+  // Advanced statistics
+  accountSendingComparison = signal<Array<{
+    phone: string;
+    status: string;
+    success_count: number;
+    total_count: number;
+    success_rate: number;
+  }>>([]);
+  queueLengthHistory = signal<Array<{
+    timestamp: string;
+    length: number;
+  }>>([]);
+  campaignPerformanceStats = signal<Array<{
+    campaign_name: string;
+    total_sent: number;
+    success_rate: number;
+    avg_delay_ms: number;
+    reply_rate: number;
+  }>>([]);
   
   recentMetrics = computed(() => {
     return this.metrics().slice(-20).reverse(); // Last 20 metrics, newest first
+  });
+  
+  maxQueueLength = computed(() => {
+    const history = this.queueLengthHistory();
+    if (history.length === 0) return 100;
+    return Math.max(...history.map(h => h.length), 100);
   });
 
   private refreshInterval: any = null;
@@ -353,6 +461,37 @@ export class PerformanceMonitorComponent implements OnInit, OnDestroy {
         return newAlerts.slice(0, 10);
       });
     });
+    
+    // Listen for account sending comparison
+    this.ipcService.on('account-sending-comparison', (data: any) => {
+      if (data && data.comparison) {
+        this.accountSendingComparison.set(data.comparison);
+      }
+    });
+    
+    // Listen for queue length history
+    this.ipcService.on('queue-length-history', (data: any) => {
+      if (data && data.history) {
+        this.queueLengthHistory.set(data.history);
+      }
+    });
+    
+    // Listen for campaign performance stats
+    this.ipcService.on('campaign-performance-stats', (data: any) => {
+      if (data && data.stats) {
+        this.campaignPerformanceStats.set(data.stats);
+      }
+    });
+    
+    // Listen for export result
+    this.ipcService.on('performance-report-exported', (data: any) => {
+      this.isExporting.set(false);
+      if (data.success) {
+        alert('性能报告导出成功！');
+      } else {
+        alert('导出失败：' + (data.error || '未知错误'));
+      }
+    });
   }
 
   removeEventListeners() {
@@ -391,6 +530,34 @@ export class PerformanceMonitorComponent implements OnInit, OnDestroy {
         this.refreshInterval = null;
       }
     }
+  }
+  
+  loadAdvancedStats() {
+    this.showAdvancedStats.set(true);
+    
+    // Load account sending comparison
+    this.ipcService.send('get-account-sending-comparison', {
+      days: 7
+    });
+    
+    // Load queue length history
+    this.ipcService.send('get-queue-length-history', {
+      hours: 24
+    });
+    
+    // Load campaign performance stats
+    this.ipcService.send('get-campaign-performance-stats', {
+      days: 7
+    });
+  }
+  
+  exportPerformanceReport() {
+    this.isExporting.set(true);
+    this.ipcService.send('export-performance-report', {
+      format: 'excel',
+      includeMetrics: true,
+      includeAdvancedStats: this.showAdvancedStats()
+    });
   }
 
   getCpuColorClass(value: number, isBar: boolean = false): string {

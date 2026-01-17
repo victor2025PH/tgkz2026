@@ -1,10 +1,12 @@
 /**
  * 用戶認證服務
- * 處理登入、登出、Token 管理、用戶狀態
+ * 處理登入、退出、Token 管理、用戶狀態
  */
 
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Injectable, signal, computed, inject, Injector } from '@angular/core';
 import { DeviceService } from './device.service';
+import { MembershipLevel } from './membership.service';
+import { LicenseClientService } from './license-client.service';
 
 // 用戶信息接口
 export interface User {
@@ -13,7 +15,7 @@ export interface User {
   email?: string;
   phone?: string;
   avatar?: string;
-  membershipLevel: 'free' | 'vip' | 'svip' | 'mvp';
+  membershipLevel: MembershipLevel;
   membershipExpires?: string;
   inviteCode: string;
   invitedCount: number;
@@ -77,11 +79,32 @@ export interface UsageStats {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private deviceService = inject(DeviceService);
+  private injector = inject(Injector);
+  private licenseClient = inject(LicenseClientService);
+  
+  // ========== 免登錄完整版配置 ==========
+  // 設置為 true 時，應用啟動即為已登錄狀態，擁有全部功能
+  private readonly SKIP_LOGIN = true;
+  
+  // 默認用戶配置（免登錄模式使用）
+  private readonly DEFAULT_USER: User = {
+    id: 1,
+    username: 'Admin',
+    email: 'admin@tgai.local',
+    membershipLevel: 'king',  // 最高等級：榮耀王者
+    membershipExpires: new Date(Date.now() + 365 * 100 * 24 * 60 * 60 * 1000).toISOString(), // 100年後過期
+    inviteCode: 'ADMIN-VIP',
+    invitedCount: 0,
+    createdAt: new Date().toISOString(),
+    lastLogin: new Date().toISOString(),
+    status: 'active'
+  };
+  // ========== 免登錄配置結束 ==========
   
   // 響應式狀態
-  private _isAuthenticated = signal(false);
-  private _user = signal<User | null>(null);
-  private _token = signal<string | null>(null);
+  private _isAuthenticated = signal(this.SKIP_LOGIN);  // 免登錄模式默認為 true
+  private _user = signal<User | null>(this.SKIP_LOGIN ? this.DEFAULT_USER : null);
+  private _token = signal<string | null>(this.SKIP_LOGIN ? 'skip-login-token' : null);
   private _isLoading = signal(false);
   private _devices = signal<DeviceInfo[]>([]);
   private _usageStats = signal<UsageStats | null>(null);
@@ -93,11 +116,16 @@ export class AuthService {
   devices = computed(() => this._devices());
   usageStats = computed(() => this._usageStats());
   
-  // 會員等級相關計算屬性
-  membershipLevel = computed(() => this._user()?.membershipLevel || 'free');
-  isVip = computed(() => ['vip', 'svip', 'mvp'].includes(this.membershipLevel()));
-  isSvip = computed(() => ['svip', 'mvp'].includes(this.membershipLevel()));
-  isMvp = computed(() => this.membershipLevel() === 'mvp');
+  // 會員等級相關計算屬性（新版命名：bronze/silver/gold/diamond/star/king）
+  membershipLevel = computed(() => this._user()?.membershipLevel || 'bronze');
+  // 付費會員（白銀及以上）
+  isPaid = computed(() => ['silver', 'gold', 'diamond', 'star', 'king'].includes(this.membershipLevel()));
+  // 高級會員（鑽石及以上）
+  isPremium = computed(() => ['diamond', 'star', 'king'].includes(this.membershipLevel()));
+  // 頂級會員（星耀及以上）
+  isElite = computed(() => ['star', 'king'].includes(this.membershipLevel()));
+  // 王者會員
+  isKing = computed(() => this.membershipLevel() === 'king');
   
   // 會員到期信息
   membershipExpiresSoon = computed(() => {
@@ -114,6 +142,12 @@ export class AuthService {
   });
 
   constructor() {
+    // 免登錄模式：跳過所有認證檢查
+    if (this.SKIP_LOGIN) {
+      console.log('[AuthService] 免登錄模式已啟用，默認為王者會員');
+      return;
+    }
+    
     // 應用啟動時檢查本地存儲的登入狀態（異步執行，不阻塞渲染）
     // 使用 setTimeout 確保不阻塞 Angular 初始化
     setTimeout(() => {
@@ -263,7 +297,7 @@ export class AuthService {
   }
 
   /**
-   * 登出
+   * 退出
    */
   async logout(): Promise<void> {
     try {
@@ -272,7 +306,7 @@ export class AuthService {
         await this.callAuthApi('/api/auth/logout', { token });
       }
     } catch (error) {
-      console.error('登出 API 調用失敗:', error);
+      console.error('退出 API 調用失敗:', error);
     } finally {
       this.clearLocalAuth();
       this._isAuthenticated.set(false);
@@ -303,26 +337,130 @@ export class AuthService {
 
   /**
    * 續費/升級會員（使用卡密）
+   * 調用後端 API 激活卡密，並同步更新所有相關狀態
    */
   async renewMembership(licenseKey: string): Promise<{ success: boolean; message: string; newExpires?: string }> {
     try {
-      const response = await this.callAuthApi('/api/auth/renew', {
-        licenseKey,
-        token: this._token()
-      });
+      const currentUser = this._user();
+      const email = currentUser?.email || '';
       
-      if (response.success && response.user) {
-        this._user.set(response.user);
-        localStorage.setItem('tgm_user', JSON.stringify(response.user));
+      // 使用 LicenseClientService 調用後端 API
+      const result = await this.licenseClient.activateLicense(licenseKey, email);
+      
+      if (result.success) {
+        // 獲取會員等級信息：優先使用 API 返回的數據，否則從卡密解析
+        let newLevel: MembershipLevel = 'silver';
+        let newExpires = '';
+        let levelName = '白銀精英';
+        let levelIcon = '🥈';
+        
+        if (result.data?.level) {
+          newLevel = result.data.level as MembershipLevel;
+          newExpires = result.data.expiresAt || '';
+          levelName = result.data.levelName || this.getLevelName(newLevel);
+          levelIcon = result.data.levelIcon || this.getLevelIcon(newLevel);
+        } else {
+          // 從卡密解析等級信息（後備方案）
+          const parsedKey = this.parseLicenseKey(licenseKey);
+          if (parsedKey.valid) {
+            newLevel = parsedKey.level;
+            newExpires = parsedKey.expiresAt;
+            levelName = parsedKey.levelName;
+            levelIcon = parsedKey.levelIcon;
+          }
+        }
+        
+        // 更新 AuthService 中的用戶狀態
+        if (currentUser) {
+          const updatedUser: User = {
+            ...currentUser,
+            membershipLevel: newLevel,
+            membershipExpires: newExpires
+          };
+          this._user.set(updatedUser);
+          localStorage.setItem('tgm_user', JSON.stringify(updatedUser));
+          console.log('[AuthService] 用戶狀態已更新:', { level: newLevel, expires: newExpires });
+        } else {
+          // 如果沒有當前用戶，創建一個新用戶
+          const newUser: User = {
+            id: 1,
+            username: email.split('@')[0] || 'User',
+            email: email,
+            membershipLevel: newLevel,
+            membershipExpires: newExpires,
+            inviteCode: '',
+            invitedCount: 0,
+            createdAt: new Date().toISOString(),
+            status: 'active'
+          };
+          this._user.set(newUser);
+          localStorage.setItem('tgm_user', JSON.stringify(newUser));
+          console.log('[AuthService] 新用戶已創建:', { level: newLevel, expires: newExpires });
+        }
+        
+        // 刷新使用統計
+        await this.loadUsageStats();
+        
+        // 觸發狀態更新事件，讓其他組件知道會員狀態已更新
+        window.dispatchEvent(new CustomEvent('membership-updated', {
+          detail: {
+            level: newLevel,
+            levelName: levelName,
+            levelIcon: levelIcon,
+            expiresAt: newExpires
+          }
+        }));
+        
+        const successMessage = result.message || `🎉 ${levelIcon} ${levelName} 激活成功！`;
+        
+        return {
+          success: true,
+          message: successMessage,
+          newExpires: newExpires
+        };
       }
       
-      return response;
-    } catch (error: any) {
       return {
         success: false,
-        message: error.message || '續費失敗'
+        message: result.message || '激活失敗'
+      };
+    } catch (error: any) {
+      console.error('激活卡密失敗:', error);
+      return {
+        success: false,
+        message: error.message || '激活失敗，請稍後重試'
       };
     }
+  }
+
+  /**
+   * 獲取會員等級名稱
+   */
+  private getLevelName(level: MembershipLevel): string {
+    const names: Record<MembershipLevel, string> = {
+      bronze: '青銅戰士',
+      silver: '白銀精英',
+      gold: '黃金大師',
+      diamond: '鑽石王牌',
+      star: '星耀傳說',
+      king: '榮耀王者'
+    };
+    return names[level] || '青銅戰士';
+  }
+
+  /**
+   * 獲取會員等級圖標
+   */
+  private getLevelIcon(level: MembershipLevel): string {
+    const icons: Record<MembershipLevel, string> = {
+      bronze: '⚔️',
+      silver: '🥈',
+      gold: '🥇',
+      diamond: '💎',
+      star: '🌟',
+      king: '👑'
+    };
+    return icons[level] || '⚔️';
   }
 
   /**
@@ -399,6 +537,20 @@ export class AuthService {
    */
   async loadUsageStats(): Promise<void> {
     try {
+      // 優先使用 LicenseClientService 調用真實後端 API
+      try {
+        const { LicenseClientService } = await import('./license-client.service');
+        const licenseClient = this.injector.get(LicenseClientService);
+        const result = await licenseClient.getUsageStats();
+        if (result.success && result.stats) {
+          this._usageStats.set(result.stats);
+          return;
+        }
+      } catch (e) {
+        console.warn('使用 LicenseClientService 載入統計失敗，嘗試使用 mock API:', e);
+      }
+      
+      // 降級到 mock API（開發模式）
       const response = await this.callAuthApi('/api/auth/usage-stats', {
         token: this._token()
       });
@@ -535,7 +687,7 @@ export class AuthService {
               resolve({
                 success: true,
                 message: '激活成功',
-                user: this.getMockUser(data.username, 'vip'),
+                user: this.getMockUser(data.username, 'silver'),
                 token: 'mock_token_' + Date.now()
               });
             } else {
@@ -597,6 +749,31 @@ export class AuthService {
             });
             break;
             
+          case '/api/auth/renew':
+            // 解析卡密並更新會員等級
+            const renewResult = this.parseLicenseKey(data.licenseKey);
+            if (renewResult.valid) {
+              const currentUser = this._user();
+              if (currentUser) {
+                const updatedUser: User = {
+                  ...currentUser,
+                  membershipLevel: renewResult.level,
+                  membershipExpires: renewResult.expiresAt
+                };
+                resolve({
+                  success: true,
+                  message: `🎉 ${renewResult.levelIcon} ${renewResult.levelName} 激活成功！有效期至 ${new Date(renewResult.expiresAt).toLocaleDateString()}`,
+                  user: updatedUser,
+                  newExpires: renewResult.expiresAt
+                });
+              } else {
+                resolve({ success: false, message: '請先登入' });
+              }
+            } else {
+              resolve({ success: false, message: renewResult.message });
+            }
+            break;
+            
           default:
             resolve({ success: true, message: 'OK' });
         }
@@ -607,7 +784,7 @@ export class AuthService {
   /**
    * 生成模擬用戶數據
    */
-  private getMockUser(username: string, level: 'free' | 'vip' | 'svip' | 'mvp' = 'vip'): User {
+  private getMockUser(username: string, level: MembershipLevel = 'silver'): User {
     return {
       id: 1,
       username: username,
@@ -619,6 +796,88 @@ export class AuthService {
       createdAt: new Date().toISOString(),
       lastLogin: new Date().toISOString(),
       status: 'active'
+    };
+  }
+
+  /**
+   * 解析卡密格式
+   * 新格式: TGAI-[等級時長]-[XXXX]-[XXXX]-[XXXX]
+   * 舊格式: TGM-[等級時長]-[XXXX]-[XXXX]-[XXXX]
+   * 等級: B=白銀/G=黃金/D=鑽石/S=星耀/K=王者
+   * 時長: 1=周/2=月/3=季/Y=年/L=終身
+   */
+  private parseLicenseKey(licenseKey: string): {
+    valid: boolean;
+    message: string;
+    level: MembershipLevel;
+    levelName: string;
+    levelIcon: string;
+    durationDays: number;
+    expiresAt: string;
+  } {
+    if (!licenseKey) {
+      return { valid: false, message: '請輸入卡密', level: 'bronze', levelName: '', levelIcon: '', durationDays: 0, expiresAt: '' };
+    }
+
+    // 新版卡密格式驗證
+    const newKeyRegex = /^TGAI-([BGDSK][123YL]|EXT)-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i;
+    const oldKeyRegex = /^TGM-([BGDSK][123Y])-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i;
+    
+    let match = licenseKey.toUpperCase().match(newKeyRegex);
+    if (!match) {
+      match = licenseKey.toUpperCase().match(oldKeyRegex);
+    }
+    
+    if (!match) {
+      return { valid: false, message: '⚔️ 卡密格式不正確，請檢查後重試', level: 'bronze', levelName: '', levelIcon: '', durationDays: 0, expiresAt: '' };
+    }
+    
+    const typeCode = match[1];
+    const levelCode = typeCode[0];
+    const durationCode = typeCode[1] || '2';
+    
+    // 等級映射
+    const levelMap: Record<string, { level: MembershipLevel; name: string; icon: string }> = {
+      'B': { level: 'silver', name: '白銀精英', icon: '🥈' },
+      'G': { level: 'gold', name: '黃金大師', icon: '🥇' },
+      'D': { level: 'diamond', name: '鑽石王牌', icon: '💎' },
+      'S': { level: 'star', name: '星耀傳說', icon: '🌟' },
+      'K': { level: 'king', name: '榮耀王者', icon: '👑' },
+      'E': { level: 'gold', name: '黃金大師', icon: '🥇' },
+    };
+    
+    // 時長映射（天數）
+    const durationMap: Record<string, number> = {
+      '1': 7,      // 周卡
+      '2': 30,     // 月卡
+      '3': 90,     // 季卡
+      'Y': 365,    // 年卡
+      'L': 36500,  // 終身（100年）
+      'X': 30,     // EXT 默認30天
+    };
+    
+    const levelInfo = levelMap[levelCode] || { level: 'silver' as MembershipLevel, name: '白銀精英', icon: '🥈' };
+    const durationDays = durationMap[durationCode] || 30;
+    
+    // 計算到期時間：基於當前會員到期時間延長，或從現在開始
+    const currentUser = this._user();
+    let baseDate = new Date();
+    if (currentUser?.membershipExpires) {
+      const currentExpires = new Date(currentUser.membershipExpires);
+      if (currentExpires > baseDate) {
+        baseDate = currentExpires;
+      }
+    }
+    baseDate.setDate(baseDate.getDate() + durationDays);
+    
+    return {
+      valid: true,
+      message: '卡密有效',
+      level: levelInfo.level,
+      levelName: levelInfo.name,
+      levelIcon: levelInfo.icon,
+      durationDays,
+      expiresAt: baseDate.toISOString()
     };
   }
 }

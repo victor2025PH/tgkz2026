@@ -46,6 +46,10 @@ class Config:
         self.MAX_CONCURRENT_ACCOUNTS = app_config.monitoring.max_concurrent_accounts
         self.MIN_SEND_DELAY = app_config.sending.min_delay
         self.MAX_SEND_DELAY = app_config.sending.max_delay
+        
+        # Data path for sessions, backups, etc.
+        self.DATA_PATH = DATABASE_DIR  # Points to backend/data/
+        self.SESSIONS_DIR = SESSIONS_DIR  # Points to backend/sessions/
     
     @classmethod
     def get_session_path(cls, phone: str) -> Path:

@@ -4,10 +4,17 @@
  * 
  * 與服務器端通信，進行卡密驗證、激活和心跳檢測
  * 支持六級王者榮耀風格會員系統
+ * 
+ * 安全加固：
+ * - 請求簽名驗證
+ * - Token 自動刷新
+ * - 設備指紋驗證
+ * - 防重放攻擊
  */
 import { Injectable, signal, computed, inject, NgZone, OnDestroy } from '@angular/core';
 import { MembershipService, MembershipLevel } from './membership.service';
 import { ToastService } from './toast.service';
+import { SecurityClientService } from './security-client.service';
 
 export interface ServerLicenseData {
   level: string;
@@ -72,49 +79,46 @@ export interface ProductInfo {
 export class LicenseClientService implements OnDestroy {
   private membershipService = inject(MembershipService);
   private toastService = inject(ToastService);
+  private securityService = inject(SecurityClientService);
   private ngZone = inject(NgZone);
   
   // 服務器配置
   private serverUrl = signal<string>('');
   private token = signal<string | null>(null);
   private heartbeatInterval: any = null;
+  private tokenRefreshInterval: any = null;
   
   // 狀態
   isOnline = signal(true);
   lastHeartbeat = signal<Date | null>(null);
   offlineGracePeriod = 7 * 24 * 60 * 60 * 1000;  // 7天離線寬限期
   
-  // 產品列表（王者榮耀風格）
+  // 產品列表（USDT 定價）
+  // 所有價格均為 USDT (TRC20)
   readonly products: ProductInfo[] = [
-    // 白銀精英
-    { id: 'silver_week', level: 'silver', levelName: '白銀精英', levelIcon: '🥈', duration: 'week', durationName: '周卡', price: 15 },
-    { id: 'silver_month', level: 'silver', levelName: '白銀精英', levelIcon: '🥈', duration: 'month', durationName: '月卡', price: 49 },
-    { id: 'silver_quarter', level: 'silver', levelName: '白銀精英', levelIcon: '🥈', duration: 'quarter', durationName: '季卡', price: 129 },
-    { id: 'silver_year', level: 'silver', levelName: '白銀精英', levelIcon: '🥈', duration: 'year', durationName: '年卡', price: 399 },
+    // 白銀精英 - 入門級
+    { id: 'silver_month', level: 'silver', levelName: '白銀精英', levelIcon: '🥈', duration: 'month', durationName: '月卡', price: 9.9 },
+    { id: 'silver_quarter', level: 'silver', levelName: '白銀精英', levelIcon: '🥈', duration: 'quarter', durationName: '季卡', price: 24.9 },
+    { id: 'silver_year', level: 'silver', levelName: '白銀精英', levelIcon: '🥈', duration: 'year', durationName: '年卡', price: 79 },
     
-    // 黃金大師
-    { id: 'gold_week', level: 'gold', levelName: '黃金大師', levelIcon: '🥇', duration: 'week', durationName: '周卡', price: 29 },
-    { id: 'gold_month', level: 'gold', levelName: '黃金大師', levelIcon: '🥇', duration: 'month', durationName: '月卡', price: 99 },
-    { id: 'gold_quarter', level: 'gold', levelName: '黃金大師', levelIcon: '🥇', duration: 'quarter', durationName: '季卡', price: 249 },
-    { id: 'gold_year', level: 'gold', levelName: '黃金大師', levelIcon: '🥇', duration: 'year', durationName: '年卡', price: 799 },
+    // 黃金大師 - 專業級
+    { id: 'gold_month', level: 'gold', levelName: '黃金大師', levelIcon: '🥇', duration: 'month', durationName: '月卡', price: 29.9 },
+    { id: 'gold_quarter', level: 'gold', levelName: '黃金大師', levelIcon: '🥇', duration: 'quarter', durationName: '季卡', price: 74.9 },
+    { id: 'gold_year', level: 'gold', levelName: '黃金大師', levelIcon: '🥇', duration: 'year', durationName: '年卡', price: 249 },
     
-    // 鑽石王牌
-    { id: 'diamond_week', level: 'diamond', levelName: '鑽石王牌', levelIcon: '💎', duration: 'week', durationName: '周卡', price: 59 },
-    { id: 'diamond_month', level: 'diamond', levelName: '鑽石王牌', levelIcon: '💎', duration: 'month', durationName: '月卡', price: 199 },
-    { id: 'diamond_quarter', level: 'diamond', levelName: '鑽石王牌', levelIcon: '💎', duration: 'quarter', durationName: '季卡', price: 499 },
-    { id: 'diamond_year', level: 'diamond', levelName: '鑽石王牌', levelIcon: '💎', duration: 'year', durationName: '年卡', price: 1599 },
+    // 鑽石王牌 - 企業級
+    { id: 'diamond_month', level: 'diamond', levelName: '鑽石王牌', levelIcon: '💎', duration: 'month', durationName: '月卡', price: 99.9 },
+    { id: 'diamond_quarter', level: 'diamond', levelName: '鑽石王牌', levelIcon: '💎', duration: 'quarter', durationName: '季卡', price: 249 },
+    { id: 'diamond_year', level: 'diamond', levelName: '鑽石王牌', levelIcon: '💎', duration: 'year', durationName: '年卡', price: 899 },
     
-    // 星耀傳說
-    { id: 'star_week', level: 'star', levelName: '星耀傳說', levelIcon: '🌟', duration: 'week', durationName: '周卡', price: 119 },
-    { id: 'star_month', level: 'star', levelName: '星耀傳說', levelIcon: '🌟', duration: 'month', durationName: '月卡', price: 399 },
-    { id: 'star_quarter', level: 'star', levelName: '星耀傳說', levelIcon: '🌟', duration: 'quarter', durationName: '季卡', price: 999 },
-    { id: 'star_year', level: 'star', levelName: '星耀傳說', levelIcon: '🌟', duration: 'year', durationName: '年卡', price: 2999 },
+    // 星耀傳說 - 團隊級
+    { id: 'star_month', level: 'star', levelName: '星耀傳說', levelIcon: '🌟', duration: 'month', durationName: '月卡', price: 299 },
+    { id: 'star_quarter', level: 'star', levelName: '星耀傳說', levelIcon: '🌟', duration: 'quarter', durationName: '季卡', price: 749 },
+    { id: 'star_year', level: 'star', levelName: '星耀傳說', levelIcon: '🌟', duration: 'year', durationName: '年卡', price: 2499 },
     
-    // 榮耀王者
-    { id: 'king_week', level: 'king', levelName: '榮耀王者', levelIcon: '👑', duration: 'week', durationName: '周卡', price: 299 },
+    // 榮耀王者 - 無限尊享
     { id: 'king_month', level: 'king', levelName: '榮耀王者', levelIcon: '👑', duration: 'month', durationName: '月卡', price: 999 },
-    { id: 'king_quarter', level: 'king', levelName: '榮耀王者', levelIcon: '👑', duration: 'quarter', durationName: '季卡', price: 2499 },
-    { id: 'king_year', level: 'king', levelName: '榮耀王者', levelIcon: '👑', duration: 'year', durationName: '年卡', price: 6999 },
+    { id: 'king_year', level: 'king', levelName: '榮耀王者', levelIcon: '👑', duration: 'year', durationName: '年卡', price: 7999 },
     { id: 'king_lifetime', level: 'king', levelName: '榮耀王者', levelIcon: '👑', duration: 'lifetime', durationName: '終身', price: 19999 },
   ];
   
@@ -122,10 +126,13 @@ export class LicenseClientService implements OnDestroy {
     this.loadToken();
     this.loadServerUrl();
     this.startHeartbeat();
+    this.startTokenRefresh();
+    this.listenForTokenRefresh();
   }
   
   ngOnDestroy(): void {
     this.stopHeartbeat();
+    this.stopTokenRefresh();
   }
   
   // ============ 初始化 ============
@@ -152,6 +159,69 @@ export class LicenseClientService implements OnDestroy {
   private clearToken(): void {
     this.token.set(null);
     localStorage.removeItem('tgai-license-token');
+  }
+  
+  // ============ Token 刷新（安全加固）============
+  
+  private startTokenRefresh(): void {
+    // 每 20 小時刷新一次 Token
+    this.tokenRefreshInterval = setInterval(() => {
+      this.ngZone.run(() => {
+        this.refreshToken();
+      });
+    }, 20 * 60 * 60 * 1000);
+  }
+  
+  private stopTokenRefresh(): void {
+    if (this.tokenRefreshInterval) {
+      clearInterval(this.tokenRefreshInterval);
+      this.tokenRefreshInterval = null;
+    }
+  }
+  
+  private listenForTokenRefresh(): void {
+    window.addEventListener('refresh-token', () => {
+      this.refreshToken();
+    });
+  }
+  
+  /**
+   * 刷新 Token（安全加固）
+   */
+  async refreshToken(): Promise<{ success: boolean; message: string }> {
+    if (!this.isServerConfigured() || !this.token()) {
+      return { success: false, message: '未配置服務器或無 Token' };
+    }
+    
+    try {
+      const body = this.securityService.createSignedRequestBody({
+        token: this.token(),
+        machine_id: this.securityService.machineId,
+        device_fingerprint: this.securityService.deviceFingerprint
+      });
+      
+      const headers = this.securityService.createSecureHeaders();
+      
+      const response = await fetch(`${this.serverUrl()}/api/token/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers
+        },
+        body: JSON.stringify(body)
+      });
+      
+      const result = await response.json();
+      
+      if (result.success && result.data?.token) {
+        this.saveToken(result.data.token);
+        return { success: true, message: 'Token 刷新成功' };
+      }
+      
+      return { success: false, message: result.message || 'Token 刷新失敗' };
+    } catch (error) {
+      return { success: false, message: '網絡錯誤' };
+    }
   }
   
   // ============ 服務器配置 ============
@@ -241,11 +311,29 @@ export class LicenseClientService implements OnDestroy {
       const result = await response.json();
       this.isOnline.set(true);
       
-      if (result.success && result.data?.token) {
-        this.saveToken(result.data.token);
+      if (result.success) {
+        // 保存 Token（如果有）
+        if (result.data?.token) {
+          this.saveToken(result.data.token);
+        }
         
-        // 同步到本地會員服務
-        await this.membershipService.activateMembership(licenseKey, email);
+        // 無論是否有 token，都同步到本地會員服務
+        const localResult = await this.membershipService.activateMembership(licenseKey, email);
+        
+        // 如果後端沒有返回完整數據，從本地會員服務獲取
+        if (!result.data?.level || !result.data?.expiresAt) {
+          const currentMembership = this.membershipService.membership();
+          if (currentMembership) {
+            result.data = {
+              ...result.data,
+              level: currentMembership.level,
+              levelName: currentMembership.levelName,
+              levelIcon: currentMembership.levelIcon,
+              expiresAt: currentMembership.expiresAt?.toISOString() || '',
+              durationDays: 30
+            };
+          }
+        }
       }
       
       return {
@@ -347,6 +435,31 @@ export class LicenseClientService implements OnDestroy {
   }
   
   /**
+   * 獲取激活記錄
+   */
+  async getActivationHistory(limit: number = 50, offset: number = 0): Promise<{ success: boolean; data?: any[] }> {
+    if (!this.isServerConfigured()) {
+      return { success: false };
+    }
+    
+    try {
+      const machineId = this.getMachineId();
+      const url = `${this.serverUrl()}/api/user/activation-history?machine_id=${machineId}&limit=${limit}&offset=${offset}`;
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      
+      if (this.token()) {
+        headers['Authorization'] = `Bearer ${this.token()}`;
+      }
+      
+      const response = await fetch(url, { headers });
+      const result = await response.json();
+      return { success: result.success, data: result.data || [] };
+    } catch (error) {
+      return { success: false, data: [] };
+    }
+  }
+  
+  /**
    * 獲取配額信息
    */
   async getUserQuota(): Promise<{ success: boolean; data?: any }> {
@@ -364,6 +477,31 @@ export class LicenseClientService implements OnDestroy {
       
       const result = await response.json();
       return { success: result.success, data: result.data };
+    } catch (error) {
+      return { success: false };
+    }
+  }
+  
+  /**
+   * 獲取使用統計（前端格式）
+   */
+  async getUsageStats(): Promise<{ success: boolean; stats?: any }> {
+    if (!this.isServerConfigured()) {
+      return { success: false };
+    }
+    
+    try {
+      const machineId = this.getMachineId();
+      const url = `${this.serverUrl()}/api/user/usage-stats?machine_id=${machineId}`;
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      
+      if (this.token()) {
+        headers['Authorization'] = `Bearer ${this.token()}`;
+      }
+      
+      const response = await fetch(url, { headers });
+      const result = await response.json();
+      return { success: result.success, stats: result.stats };
     } catch (error) {
       return { success: false };
     }

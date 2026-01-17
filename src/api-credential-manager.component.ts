@@ -15,14 +15,15 @@ import { MembershipService } from './membership.service';
 
 interface LocalApiCredential {
   api_id: string;
-  api_hash: string;
+  api_hash?: string;
   name: string;
   source: string;
   created_at: string;
   is_active: boolean;
   account_count: number;
   max_accounts: number;
-  bound_phones: string[];
+  bound_phones?: string[];
+  is_public?: boolean;
 }
 
 interface PlatformAllocation {
@@ -73,13 +74,20 @@ type Tab = 'local' | 'platform';
       <!-- Tab 1: 我的自建 API -->
       @if (currentTab() === 'local') {
         <div class="tab-content">
-          <!-- 添加新 API -->
-          <div class="add-section">
-            <button (click)="showAddForm.set(!showAddForm())" class="add-btn">
+          <!-- 操作欄 -->
+          <div class="action-bar">
+            <button (click)="showAddForm.set(!showAddForm())" class="add-btn" [disabled]="isAdding()">
               @if (showAddForm()) {
                 ✕ 取消
               } @else {
                 ➕ 添加新 API 憑據
+              }
+            </button>
+            <button (click)="refreshList()" class="refresh-btn" [disabled]="isLoading()">
+              @if (isLoading()) {
+                ⏳ 載入中...
+              } @else {
+                🔄 刷新
               }
             </button>
           </div>
@@ -92,7 +100,8 @@ type Tab = 'local' | 'platform';
                 <label>API ID <span class="required">*</span></label>
                 <input 
                   type="text" 
-                  [(ngModel)]="newApiId"
+                  [value]="newApiId()"
+                  (input)="newApiId.set($any($event.target).value)"
                   placeholder="例如：12345678"
                   class="form-input">
               </div>
@@ -101,7 +110,8 @@ type Tab = 'local' | 'platform';
                 <label>API Hash <span class="required">*</span></label>
                 <input 
                   type="text" 
-                  [(ngModel)]="newApiHash"
+                  [value]="newApiHash()"
+                  (input)="newApiHash.set($any($event.target).value)"
                   placeholder="例如：a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
                   class="form-input">
               </div>
@@ -110,18 +120,34 @@ type Tab = 'local' | 'platform';
                 <label>憑據名稱</label>
                 <input 
                   type="text" 
-                  [(ngModel)]="newApiName"
+                  [value]="newApiName()"
+                  (input)="newApiName.set($any($event.target).value)"
                   placeholder="例如：主力 API"
                   class="form-input">
               </div>
 
+              <div class="form-group">
+                <label>申請手機號碼</label>
+                <input 
+                  type="text" 
+                  [value]="newApiPhone()"
+                  (input)="newApiPhone.set($any($event.target).value)"
+                  placeholder="例如：+86 138****1234"
+                  class="form-input">
+                <span class="form-hint">用於申請此 API 的 Telegram 手機號碼（選填）</span>
+              </div>
+
               <div class="form-actions">
-                <button (click)="showAddForm.set(false)" class="btn-secondary">取消</button>
+                <button (click)="showAddForm.set(false)" class="btn-secondary" [disabled]="isAdding()">取消</button>
                 <button 
                   (click)="addLocalApi()" 
-                  [disabled]="!isNewApiValid()"
+                  [disabled]="!isNewApiValid() || isAdding()"
                   class="btn-primary">
-                  添加 API
+                  @if (isAdding()) {
+                    ⏳ 添加中...
+                  } @else {
+                    添加 API
+                  }
                 </button>
               </div>
 
@@ -150,8 +176,18 @@ type Tab = 'local' | 'platform';
                 </button>
               </div>
             } @else {
+              <!-- API 數量統計 -->
+              <div class="api-count-bar">
+                <span class="count-text">共 {{ localApis().length }} 個自建 API</span>
+              </div>
+
               @for (api of localApis(); track api.api_id) {
-                <div class="api-card" [class.inactive]="!api.is_active">
+                <div class="api-card" 
+                     [class.inactive]="!api.is_active"
+                     [class.newly-added]="newlyAddedApiId() === api.api_id">
+                  @if (newlyAddedApiId() === api.api_id) {
+                    <div class="new-badge">✨ 新添加</div>
+                  }
                   <div class="api-header">
                     <div class="api-info">
                       <span class="api-name">{{ api.name || 'API ' + api.api_id }}</span>
@@ -166,25 +202,75 @@ type Tab = 'local' | 'platform';
                     </div>
                   </div>
 
+                  <!-- 憑據信息（可複製） -->
+                  <div class="credential-info">
+                    <div class="credential-row">
+                      <span class="credential-label">API ID:</span>
+                      <span class="credential-value">{{ api.api_id }}</span>
+                      <button class="copy-btn" (click)="copyToClipboard(api.api_id, 'API ID')" title="複製">
+                        📋
+                      </button>
+                    </div>
+                    @if (api.api_hash) {
+                      <div class="credential-row">
+                        <span class="credential-label">API Hash:</span>
+                        <span class="credential-value hash">{{ api.api_hash.substring(0, 8) }}...{{ api.api_hash.substring(24) }}</span>
+                        <button class="copy-btn" (click)="copyToClipboard(api.api_hash, 'API Hash')" title="複製">
+                          📋
+                        </button>
+                      </div>
+                    }
+                  </div>
+
                   <div class="api-usage">
                     <div class="usage-label">已綁帳號</div>
                     <div class="usage-bar">
                       <div 
                         class="usage-fill" 
-                        [style.width.%]="(api.account_count / api.max_accounts) * 100">
+                        [style.width.%]="api.max_accounts > 0 ? (api.account_count / api.max_accounts) * 100 : 0"
+                        [class.warning]="api.account_count >= api.max_accounts * 0.8"
+                        [class.full]="api.account_count >= api.max_accounts">
                       </div>
                     </div>
-                    <div class="usage-text">{{ api.account_count }}/{{ api.max_accounts }}</div>
+                    <div class="usage-text" [class.warning]="api.account_count >= api.max_accounts">
+                      {{ api.account_count }}/{{ api.max_accounts }}
+                    </div>
                   </div>
 
-                  @if (api.bound_phones && api.bound_phones.length > 0) {
-                    <div class="bound-phones">
-                      <span class="phones-label">綁定帳號：</span>
-                      @for (phone of api.bound_phones; track phone) {
-                        <span class="phone-tag">{{ phone }}</span>
-                      }
+                  @if (api.bound_accounts && api.bound_accounts.length > 0) {
+                    <div class="bound-accounts-section">
+                      <div class="accounts-header">
+                        <span class="accounts-label">📱 綁定帳號</span>
+                      </div>
+                      <div class="accounts-list">
+                        @for (account of api.bound_accounts; track account.phone) {
+                          <div class="account-tag" [class.online]="account.status === 'Online'" [class.offline]="account.status !== 'Online'">
+                            <span class="status-dot" [class.online]="account.status === 'Online'"></span>
+                            <span class="account-phone">{{ account.phone }}</span>
+                            @if (account.firstName || account.username) {
+                              <span class="account-name">{{ account.firstName || ('@' + account.username) }}</span>
+                            }
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  } @else if (api.account_count === 0) {
+                    <div class="no-accounts">
+                      <span class="no-accounts-text">暫無綁定帳號</span>
                     </div>
                   }
+
+                  <div class="api-meta">
+                    <span class="meta-item">📅 {{ formatDate(api.created_at) }}</span>
+                    @if (api.source && api.source !== 'expert') {
+                      <span class="meta-item phone-source">
+                        📱 {{ api.source }}
+                        <button class="copy-btn-small" (click)="copyToClipboard(api.source, '手機號碼')" title="複製">
+                          📋
+                        </button>
+                      </span>
+                    }
+                  </div>
 
                   <div class="api-actions">
                     @if (api.is_active) {
@@ -476,8 +562,10 @@ type Tab = 'local' | 'platform';
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* Add Section */
-    .add-section {
+    /* Action Bar */
+    .action-bar {
+      display: flex;
+      gap: 0.75rem;
       margin-bottom: 1rem;
     }
 
@@ -492,8 +580,34 @@ type Tab = 'local' | 'platform';
       transition: all 0.2s;
     }
 
-    .add-btn:hover {
+    .add-btn:hover:not(:disabled) {
       transform: translateY(-1px);
+    }
+
+    .add-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .refresh-btn {
+      padding: 0.75rem 1rem;
+      background: var(--bg-card, rgba(30, 41, 59, 0.8));
+      border: 1px solid var(--border-default, rgba(148, 163, 184, 0.3));
+      border-radius: 0.5rem;
+      color: var(--text-secondary, #cbd5e1);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .refresh-btn:hover:not(:disabled) {
+      border-color: var(--primary, #06b6d4);
+      color: var(--primary, #06b6d4);
+    }
+
+    .refresh-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
     /* Form Card */
@@ -616,6 +730,158 @@ type Tab = 'local' | 'platform';
       opacity: 0.6;
     }
 
+    .api-card.newly-added {
+      border-color: #22c55e !important;
+      box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+      animation: pulse-green 2s ease-in-out;
+    }
+
+    @keyframes pulse-green {
+      0%, 100% { box-shadow: 0 0 10px rgba(34, 197, 94, 0.2); }
+      50% { box-shadow: 0 0 25px rgba(34, 197, 94, 0.5); }
+    }
+
+    .new-badge {
+      position: absolute;
+      top: -8px;
+      right: 12px;
+      padding: 0.25rem 0.75rem;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      border-radius: 1rem;
+      font-size: 0.7rem;
+      color: white;
+      font-weight: 600;
+    }
+
+    .api-card {
+      position: relative;
+    }
+
+    /* API Count Bar */
+    .api-count-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      margin-bottom: 0.5rem;
+    }
+
+    .count-text {
+      font-size: 0.875rem;
+      color: var(--text-muted, #94a3b8);
+    }
+
+    /* Credential Info */
+    .credential-info {
+      background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .credential-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.375rem;
+    }
+
+    .credential-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .credential-label {
+      font-size: 0.75rem;
+      color: var(--text-muted, #94a3b8);
+      min-width: 60px;
+    }
+
+    .credential-value {
+      flex: 1;
+      font-size: 0.8rem;
+      font-family: monospace;
+      color: var(--text-primary, white);
+    }
+
+    .credential-value.hash {
+      color: var(--text-secondary, #cbd5e1);
+    }
+
+    .copy-btn {
+      padding: 0.25rem 0.5rem;
+      background: transparent;
+      border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
+      border-radius: 0.25rem;
+      color: var(--text-muted, #94a3b8);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .copy-btn:hover {
+      background: var(--primary, #06b6d4);
+      border-color: var(--primary, #06b6d4);
+      color: white;
+    }
+
+    /* API Meta */
+    .api-meta {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .meta-item {
+      font-size: 0.7rem;
+      color: var(--text-muted, #94a3b8);
+    }
+
+    .meta-item.phone-source {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.25rem 0.5rem;
+      background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
+      border-radius: 0.25rem;
+      color: var(--text-secondary, #cbd5e1);
+    }
+
+    .copy-btn-small {
+      padding: 0.125rem 0.25rem;
+      background: transparent;
+      border: none;
+      color: var(--text-muted, #94a3b8);
+      font-size: 0.65rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .copy-btn-small:hover {
+      color: var(--primary, #06b6d4);
+    }
+
+    /* Form hint */
+    .form-hint {
+      display: block;
+      margin-top: 0.25rem;
+      font-size: 0.75rem;
+      color: var(--text-muted, #94a3b8);
+    }
+
+    /* Usage warning states */
+    .usage-fill.warning {
+      background: linear-gradient(90deg, #f59e0b, #eab308);
+    }
+
+    .usage-fill.full {
+      background: linear-gradient(90deg, #ef4444, #dc2626);
+    }
+
+    .usage-text.warning {
+      color: #f59e0b;
+      font-weight: 600;
+    }
+
     .api-header {
       display: flex;
       justify-content: space-between;
@@ -696,6 +962,83 @@ type Tab = 'local' | 'platform';
       border-radius: 0.25rem;
       font-size: 0.7rem;
       color: var(--text-secondary, #cbd5e1);
+    }
+
+    /* Bound Accounts Section */
+    .bound-accounts-section {
+      margin-bottom: 0.75rem;
+      padding: 0.75rem;
+      background: var(--bg-tertiary, rgba(15, 23, 42, 0.3));
+      border-radius: 0.5rem;
+      border: 1px solid var(--border, rgba(100, 116, 139, 0.2));
+    }
+
+    .accounts-header {
+      margin-bottom: 0.5rem;
+    }
+
+    .accounts-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-secondary, #cbd5e1);
+    }
+
+    .accounts-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .account-tag {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.375rem 0.625rem;
+      background: var(--bg-primary, rgba(2, 6, 23, 0.8));
+      border-radius: 0.375rem;
+      border: 1px solid var(--border, rgba(100, 116, 139, 0.2));
+      transition: all 0.2s;
+    }
+
+    .account-tag.online {
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .account-tag.offline {
+      opacity: 0.7;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #ef4444;
+    }
+
+    .status-dot.online {
+      background: #10b981;
+      box-shadow: 0 0 4px rgba(16, 185, 129, 0.5);
+    }
+
+    .account-phone {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-primary, white);
+    }
+
+    .account-name {
+      font-size: 0.7rem;
+      color: var(--text-muted, #94a3b8);
+    }
+
+    .no-accounts {
+      padding: 0.5rem;
+      text-align: center;
+    }
+
+    .no-accounts-text {
+      font-size: 0.75rem;
+      color: var(--text-muted, #94a3b8);
     }
 
     .api-actions {
@@ -1046,12 +1389,18 @@ export class ApiCredentialManagerComponent implements OnInit, OnDestroy {
   // 狀態
   currentTab = signal<Tab>('local');
   showAddForm = signal(false);
+  isLoading = signal(false);
+  isAdding = signal(false);
   
   // 本地 API
   localApis = signal<LocalApiCredential[]>([]);
-  newApiId = '';
-  newApiHash = '';
-  newApiName = '';
+  newApiId = signal('');
+  newApiHash = signal('');
+  newApiName = signal('');
+  newApiPhone = signal('');  // 申請 API 的手機號碼
+  
+  // 新添加的 API ID，用於高亮顯示
+  newlyAddedApiId = signal<string | null>(null);
   
   // 平台 API 使用情況
   platformUsage = signal({
@@ -1078,10 +1427,12 @@ export class ApiCredentialManagerComponent implements OnInit, OnDestroy {
   });
 
   isNewApiValid = computed(() => {
-    return this.newApiId && 
-           /^\d+$/.test(this.newApiId) && 
-           this.newApiHash && 
-           /^[a-f0-9]{32}$/i.test(this.newApiHash);
+    const apiId = this.newApiId();
+    const apiHash = this.newApiHash();
+    return apiId && 
+           /^\d+$/.test(apiId) && 
+           apiHash && 
+           /^[a-f0-9]{32}$/i.test(apiHash);
   });
 
   ngOnInit(): void {
@@ -1095,6 +1446,7 @@ export class ApiCredentialManagerComponent implements OnInit, OnDestroy {
   }
 
   private loadLocalApis(): void {
+    this.isLoading.set(true);
     this.ipcService.send('get-api-credentials', {});
   }
 
@@ -1120,11 +1472,46 @@ export class ApiCredentialManagerComponent implements OnInit, OnDestroy {
   private setupIpcListeners(): void {
     // 本地 API 更新
     this.ipcService.on('api-credentials-updated', (data: any) => {
+      this.isLoading.set(false);
       if (data.credentials) {
-        this.localApis.set(data.credentials.filter((c: any) => c.source === 'expert' || c.source === 'local'));
+        // 過濾掉公共 API，只顯示用戶自建的
+        const userApis = data.credentials.filter((c: any) => !c.is_public);
+        this.localApis.set(userApis);
       }
     });
     this.ipcChannels.push('api-credentials-updated');
+
+    // API 添加結果
+    this.ipcService.on('api-credential-added', (data: any) => {
+      this.isAdding.set(false);
+      if (data.success) {
+        // 高亮新卡片 3 秒
+        setTimeout(() => {
+          this.newlyAddedApiId.set(null);
+        }, 3000);
+      } else {
+        this.toast.error(data.error || '添加失敗');
+        // 重新打開表單
+        this.showAddForm.set(true);
+      }
+    });
+    this.ipcChannels.push('api-credential-added');
+
+    // API 刪除結果
+    this.ipcService.on('api-credential-removed', (data: any) => {
+      if (!data.success) {
+        this.toast.error(data.error || '刪除失敗');
+      }
+    });
+    this.ipcChannels.push('api-credential-removed');
+
+    // API 狀態切換結果
+    this.ipcService.on('api-credential-toggled', (data: any) => {
+      if (!data.success) {
+        this.toast.error(data.error || '操作失敗');
+      }
+    });
+    this.ipcChannels.push('api-credential-toggled');
 
     // 平台 API 使用情況
     this.ipcService.on('platform-api-usage', (data: any) => {
@@ -1151,30 +1538,54 @@ export class ApiCredentialManagerComponent implements OnInit, OnDestroy {
   }
 
   addLocalApi(): void {
-    if (!this.isNewApiValid()) return;
+    if (!this.isNewApiValid() || this.isAdding()) return;
+
+    const apiId = this.newApiId();
+    const apiHash = this.newApiHash();
+    const apiName = this.newApiName();
+    const apiPhone = this.newApiPhone();
+
+    this.isAdding.set(true);
+    this.newlyAddedApiId.set(apiId);  // 預設高亮
 
     this.ipcService.send('add-api-credential', {
-      apiId: this.newApiId,
-      apiHash: this.newApiHash,
-      name: this.newApiName || `API ${this.newApiId}`,
-      source: 'expert'
+      api_id: apiId,
+      api_hash: apiHash,
+      name: apiName || `API ${apiId}`,
+      source: apiPhone || 'expert'  // 手機號碼作為來源
     });
 
-    this.newApiId = '';
-    this.newApiHash = '';
-    this.newApiName = '';
+    this.newApiId.set('');
+    this.newApiHash.set('');
+    this.newApiName.set('');
+    this.newApiPhone.set('');
     this.showAddForm.set(false);
-    this.toast.success('API 添加成功');
+    this.toast.success('正在添加 API...');
+  }
+
+  /** 複製到剪貼板 */
+  copyToClipboard(text: string, label: string): void {
+    navigator.clipboard.writeText(text).then(() => {
+      this.toast.success(`已複製 ${label}`);
+    }).catch(() => {
+      this.toast.error('複製失敗');
+    });
+  }
+
+  /** 刷新列表 */
+  refreshList(): void {
+    this.isLoading.set(true);
+    this.loadLocalApis();
   }
 
   toggleApiStatus(apiId: string, active: boolean): void {
-    this.ipcService.send('toggle-api-credential', { apiId, active });
+    this.ipcService.send('toggle-api-credential', { api_id: apiId, is_active: active });
     this.toast.info(active ? 'API 已啟用' : 'API 已停用');
   }
 
   removeApi(apiId: string): void {
     if (confirm('確定要刪除此 API 憑據嗎？')) {
-      this.ipcService.send('remove-api-credential', { apiId });
+      this.ipcService.send('remove-api-credential', { api_id: apiId });
       this.toast.success('API 已刪除');
     }
   }

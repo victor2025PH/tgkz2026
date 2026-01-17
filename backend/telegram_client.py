@@ -8,6 +8,8 @@ import time
 from typing import Dict, Optional, Callable, Any
 from pathlib import Path
 from pyrogram import Client
+import pyrogram.raw.functions.users
+import pyrogram.raw.types
 from pyrogram.errors import (
     SessionPasswordNeeded, PhoneCodeInvalid, PhoneCodeExpired, PhoneNumberInvalid,
     FloodWait, AuthKeyUnregistered, UserDeactivated, UserAlreadyParticipant,
@@ -351,10 +353,22 @@ class TelegramClientManager:
                             self.client_status[phone] = "Online"
                             self.login_callbacks.pop(phone, None)
                             
+                            # 提取用戶信息
+                            user_info = {}
+                            if signed_in:
+                                user_info = {
+                                    'id': getattr(signed_in, 'id', None),
+                                    'first_name': getattr(signed_in, 'first_name', ''),
+                                    'last_name': getattr(signed_in, 'last_name', ''),
+                                    'username': getattr(signed_in, 'username', ''),
+                                    'phone': getattr(signed_in, 'phone_number', phone)
+                                }
+                            
                             return {
                                 "success": True,
                                 "status": "Online",
-                                "message": f"Successfully logged in to {phone}"
+                                "message": f"Successfully logged in to {phone}",
+                                "user_info": user_info
                             }
                             
                         except SessionPasswordNeeded:
@@ -368,14 +382,27 @@ class TelegramClientManager:
                                     "requires_2fa": True
                                 }
                             try:
-                                await callback_client.check_password(two_factor_password)
+                                signed_in_2fa = await callback_client.check_password(two_factor_password)
                                 self.clients[phone] = callback_client
                                 self.client_status[phone] = "Online"
                                 self.login_callbacks.pop(phone, None)
+                                
+                                # 提取用戶信息
+                                user_info_2fa = {}
+                                if signed_in_2fa:
+                                    user_info_2fa = {
+                                        'id': getattr(signed_in_2fa, 'id', None),
+                                        'first_name': getattr(signed_in_2fa, 'first_name', ''),
+                                        'last_name': getattr(signed_in_2fa, 'last_name', ''),
+                                        'username': getattr(signed_in_2fa, 'username', ''),
+                                        'phone': getattr(signed_in_2fa, 'phone_number', phone)
+                                    }
+                                
                                 return {
                                     "success": True,
                                     "status": "Online",
-                                    "message": f"Successfully logged in to {phone} with 2FA"
+                                    "message": f"Successfully logged in to {phone} with 2FA",
+                                    "user_info": user_info_2fa
                                 }
                             except PasswordHashInvalid:
                                 return {
@@ -593,10 +620,23 @@ class TelegramClientManager:
                 # Session is valid, user is already authorized
                 self.clients[phone] = client
                 self.client_status[phone] = "Online"
+                
+                # 提取用戶信息
+                user_info_auth = {}
+                if me:
+                    user_info_auth = {
+                        'id': getattr(me, 'id', None),
+                        'first_name': getattr(me, 'first_name', ''),
+                        'last_name': getattr(me, 'last_name', ''),
+                        'username': getattr(me, 'username', ''),
+                        'phone': getattr(me, 'phone_number', phone)
+                    }
+                
                 return {
                     "success": True,
                     "status": "Online",
-                    "message": f"Account {phone} is already authorized"
+                    "message": f"Account {phone} is already authorized",
+                    "user_info": user_info_auth
                 }
             else:
                 # Session file exists but is invalid, need to re-login
@@ -1095,6 +1135,84 @@ class TelegramClientManager:
                 "message": f"Error checking status: {str(e)}"
             }
     
+    async def get_full_user_profile(self, phone: str, download_avatar: bool = True) -> Dict[str, Any]:
+        """
+        獲取完整的用戶資料，包括頭像下載
+        
+        Args:
+            phone: 帳號電話號碼
+            download_avatar: 是否下載頭像
+            
+        Returns:
+            Dict with user profile info including avatar path
+        """
+        import sys
+        from pathlib import Path
+        
+        try:
+            client = self.clients.get(phone)
+            if not client or not client.is_connected:
+                return {"success": False, "error": "客户端未连接"}
+            
+            me = await client.get_me()
+            if not me:
+                return {"success": False, "error": "无法获取用户信息"}
+            
+            # 基本信息
+            profile = {
+                "success": True,
+                "id": me.id,
+                "firstName": me.first_name or "",
+                "lastName": me.last_name or "",
+                "username": me.username or "",
+                "phone": me.phone_number or phone,
+                "bio": "",
+                "avatarPath": None,
+            }
+            
+            # 嘗試獲取 bio（個人簡介）
+            try:
+                full_user = await client.invoke(
+                    pyrogram.raw.functions.users.GetFullUser(
+                        id=pyrogram.raw.types.InputUserSelf()
+                    )
+                )
+                if full_user and hasattr(full_user, 'full_user'):
+                    profile["bio"] = getattr(full_user.full_user, 'about', '') or ""
+            except Exception as bio_err:
+                print(f"[TelegramClient] Could not get bio for {phone}: {bio_err}", file=sys.stderr)
+            
+            # 下載頭像
+            if download_avatar and me.photo:
+                try:
+                    # 確保頭像目錄存在
+                    avatar_dir = Path(__file__).parent / "data" / "avatars"
+                    avatar_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    # 下載頭像
+                    safe_phone = phone.replace('+', '').replace(' ', '')
+                    avatar_path = avatar_dir / f"{safe_phone}.jpg"
+                    
+                    # 使用 Pyrogram 下載頭像
+                    downloaded_path = await client.download_media(
+                        me.photo.big_file_id,
+                        file_name=str(avatar_path)
+                    )
+                    
+                    if downloaded_path:
+                        profile["avatarPath"] = str(avatar_path)
+                        print(f"[TelegramClient] Avatar downloaded for {phone}: {avatar_path}", file=sys.stderr)
+                except Exception as avatar_err:
+                    print(f"[TelegramClient] Could not download avatar for {phone}: {avatar_err}", file=sys.stderr)
+            
+            return profile
+            
+        except Exception as e:
+            import traceback
+            print(f"[TelegramClient] Error getting full profile for {phone}: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            return {"success": False, "error": str(e)}
+
     async def get_user_online_status(self, phone: str, user_id: str) -> str:
         """
         Get user's online status
@@ -1549,7 +1667,8 @@ class TelegramClientManager:
                         "chat_id": chat.id,
                         "chat_title": chat.title,
                         "chat_type": str(chat.type),
-                        "group_url": group_url
+                        "group_url": group_url,
+                        "members_count": getattr(chat, 'members_count', 0) or 0
                     }
                 else:
                     # 用戶狀態是 LEFT, BANNED, 或 RESTRICTED

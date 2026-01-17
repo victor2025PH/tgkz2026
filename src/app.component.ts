@@ -1,5 +1,5 @@
 
-import { ChangeDetectionStrategy, Component, signal, WritableSignal, computed, inject, OnDestroy, effect, OnInit, ChangeDetectorRef } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal, WritableSignal, computed, inject, OnDestroy, effect, OnInit, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TelegramAccount, KeywordConfig, MonitoredGroup, CapturedLead, LogEntry, GenerationState, MessageTemplate, LeadStatus, Interaction, OnlineStatus, AccountRole, Attachment, KeywordSet, AutomationCampaign, CampaignTrigger, CampaignAction, AccountStatus, QueueStatus, QueueMessage, Alert } from './models';
@@ -33,9 +33,20 @@ import { QrLoginComponent } from './qr-login.component';
 import { AccountCardListComponent, Account } from './account-card-list.component';
 import { AddAccountPageComponent } from './add-account-page.component';
 import { ApiCredentialManagerComponent } from './api-credential-manager.component';
+// 客戶培育系統
+import { LeadManagementComponent } from './lead-nurturing/lead-management.component';
+// Phase 4 分析儀表板
+import { AnalyticsDashboardComponent } from './lead-nurturing/analytics-dashboard.component';
+// Phase 1 優化組件
+import { QueueProgressComponent, AccountQueueStatus } from './queue-progress.component';
+import { QuickWorkflowComponent, Workflow } from './quick-workflow.component';
+// Phase 2 數據分析組件
+import { AnalyticsCenterComponent } from './analytics/analytics-center.component';
+// 自動化中心整合組件
+import { AutomationCenterComponent } from './automation/automation-center.component';
 
 // 更新視圖類型：合併 monitoring 和 alerts 為 runtime-logs，添加 add-account 和 api-credentials
-type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'automation' | 'leads' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-center' | 'runtime-logs' | 'settings' | 'analytics' | 'logs' | 'performance' | 'alerts' | 'profile' | 'membership-center';
+type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-center' | 'runtime-logs' | 'settings' | 'analytics' | 'analytics-center' | 'logs' | 'performance' | 'alerts' | 'profile' | 'membership-center';
 type LeadDetailView = 'sendMessage' | 'history';
 type LeadsViewMode = 'kanban' | 'list';
 
@@ -44,7 +55,7 @@ type LeadsViewMode = 'kanban' | 'list';
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
-  imports: [CommonModule, FormsModule, PerformanceMonitorComponent, AnalyticsChartsComponent, ToastComponent, ProgressDialogComponent, MembershipDialogComponent, UpgradePromptComponent, PaymentComponent, LoadingOverlayComponent, OnboardingComponent, LanguageSwitcherCompactComponent, LoginComponent, ProfileComponent, MembershipCenterComponent, QrLoginComponent, AccountCardListComponent, AddAccountPageComponent, ApiCredentialManagerComponent],
+  imports: [CommonModule, FormsModule, PerformanceMonitorComponent, AnalyticsChartsComponent, ToastComponent, ProgressDialogComponent, MembershipDialogComponent, UpgradePromptComponent, PaymentComponent, LoadingOverlayComponent, OnboardingComponent, LanguageSwitcherCompactComponent, LoginComponent, ProfileComponent, MembershipCenterComponent, QrLoginComponent, AccountCardListComponent, AddAccountPageComponent, ApiCredentialManagerComponent, LeadManagementComponent, AnalyticsDashboardComponent, QueueProgressComponent, QuickWorkflowComponent, AnalyticsCenterComponent, AutomationCenterComponent],
   providers: [AccountLoaderService, ToastService],
   styles: [`
     /* 錯誤引導高亮動畫 */
@@ -78,6 +89,7 @@ export class AppComponent implements OnDestroy, OnInit {
   authService = inject(AuthService);  // 新增：認證服務
   private document = inject(DOCUMENT);
   private cdr = inject(ChangeDetectorRef);
+  private ngZone = inject(NgZone);
   
   // 用於清理事件監聽
   private membershipUpdateHandler: ((event: Event) => void) | null = null;
@@ -101,6 +113,7 @@ export class AppComponent implements OnDestroy, OnInit {
   // --- 子視圖狀態 ---
   runtimeLogsTab = signal<'analytics' | 'logs' | 'performance' | 'alerts'>('analytics');  // 合併監控和告警
   aiCenterTab = signal<'config' | 'chat' | 'rag' | 'voice' | 'memory'>('config');
+  automationTab = signal<'targets' | 'keywords' | 'templates' | 'campaigns'>('targets');  // 自動化中心標籤頁
   
   // --- Phase 5: System Management State ---
   // Database Migration
@@ -175,7 +188,7 @@ export class AppComponent implements OnDestroy, OnInit {
   showMembershipDialog = signal(false);
   
   // Settings Tab
-  settingsTab = signal<'general' | 'backup' | 'migration' | 'logs' | 'scheduler'>('general');
+  settingsTab = signal<'backup' | 'migration' | 'scheduler'>('backup');
   
   // --- Vector Memory State ---
   vectorMemoryStats = signal<{
@@ -249,6 +262,11 @@ export class AppComponent implements OnDestroy, OnInit {
   backendRunning = signal(true);  // 默認假設運行中
   backendError = signal('');
   showBackendErrorDialog = signal(false);
+  
+  // --- 孤立 Session 恢復 ---
+  showOrphanSessionDialog = signal(false);
+  orphanSessions = signal<{phone: string, hasMetadata: boolean, metadata?: any}[]>([]);
+  isRecoveringOrphanSessions = signal(false);
   
   // --- 會員統計面板 ---
   showMembershipStats = signal(false);
@@ -343,6 +361,10 @@ export class AppComponent implements OnDestroy, OnInit {
   resourceSearchQuery = '';
   pendingSearchQuery = '';  // 待搜索的關鍵詞（初始化後自動執行）
   resourceSearchType = signal<'all' | 'group' | 'channel' | 'supergroup'>('all');
+  
+  // 資源發現使用的帳號
+  resourceAccountId = signal<number | null>(null);
+  showResourceAccountSelector = signal(false);
   resourceMinMembers = signal(0);
   showSearchOptions = signal(false);
   searchReplaceMode = signal(true);  // 搜索替換模式（默認開啟）
@@ -364,6 +386,7 @@ export class AppComponent implements OnDestroy, OnInit {
     discovery_source: string;
     discovery_keyword: string;
     created_at: string;
+    invite_link?: string;
   }>>([]);
   resourceStats = signal<{
     total_resources: number;
@@ -385,10 +408,124 @@ export class AppComponent implements OnDestroy, OnInit {
   discoveryKeywords = signal<Array<{id: number; keyword: string; category: string; priority: number; total_found: number}>>([]);
   showAddResourceDialog = signal(false);
   showAddKeywordDialog = signal(false);
+  showChannelManageDialog = signal(false);
+  showAddChannelDialog = signal(false);
   newResourceKeyword = '';
+  
+  // 搜索渠道管理
+  systemChannels = signal<Array<{id: number; bot_username: string; display_name: string; priority: string; status: string; is_system: boolean; enabled: boolean; notes?: string}>>([]);
+  customChannels = signal<Array<{id: number; bot_username: string; display_name: string; priority: string; status: string; is_system: boolean; enabled: boolean; notes?: string; query_format?: string}>>([]);
+  newChannelUsername = '';
+  newChannelDisplayName = '';
+  newChannelQueryFormat = '{keyword}';
+  newChannelPriority: 'primary' | 'backup' = 'backup';
+
+  // 加入並監控對話框
+  showJoinMonitorDialog = signal(false);
+  joinMonitorResource = signal<any>(null);
+  joinMonitorSelectedPhone = signal<string>('');
+  joinMonitorSelectedPhones = signal<string[]>([]); // 多帳號選擇
+  joinMonitorKeywords = signal<string[]>([]);
+  joinMonitorNewKeyword = '';
+  joinMonitorAutoEnable = signal(true);
+  joinMonitorBatchMode = signal(true); // 分批加入模式
+  joinMonitorBatchInterval = signal(45); // 分批間隔秒數
+  isJoiningResource = signal(false);
+  
+  // 批量加入並監控對話框
+  showBatchJoinMonitorDialog = signal(false);
+  batchJoinResources = signal<any[]>([]);
+  batchJoinProgress = signal({ current: 0, total: 0, status: '' });
+  
+  // 成員列表對話框
+  showMemberListDialog = signal(false);
+  memberListResource = signal<any>(null);
+  memberListData = signal<Array<{
+    id?: number;
+    user_id: string;
+    username: string;
+    first_name: string;
+    last_name: string;
+    full_name?: string;
+    phone: string;
+    
+    // 擴展信息
+    bio?: string;
+    language_code?: string;
+    dc_id?: number;
+    photo_id?: string;
+    has_photo?: boolean;
+    
+    // 帳號狀態
+    is_bot: boolean;
+    is_premium: boolean;
+    is_verified?: boolean;
+    is_scam?: boolean;
+    is_fake?: boolean;
+    is_restricted?: boolean;
+    restriction_reason?: string;
+    is_support?: boolean;
+    is_deleted?: boolean;
+    is_contact?: boolean;
+    is_mutual_contact?: boolean;
+    
+    // 群組內角色
+    chat_member_status?: string;
+    joined_date?: string;
+    
+    // 在線狀態
+    online_status: string;
+    last_online?: string;
+    last_seen?: string;
+    
+    // 來源信息
+    source_chat_id?: string;
+    source_chat_title?: string;
+    extracted_at?: string;
+    
+    // 評分
+    activity_score?: number;
+    value_level?: string;
+  }>>([]);
+  memberListLoading = signal(false);
+  memberListProgress = signal({ extracted: 0, total: 0, status: '' });
+  selectedMemberIds = signal<string[]>([]);
+  memberExtractStarted = signal(false);
+  memberListFilter = signal<string>('all'); // 'all', 'chinese', 'online', 'premium', 'hasUsername'
+  memberExtractConfig = signal({
+    limit: 500,
+    customLimit: 1000,
+    onlineOnly: false,
+    chineseOnly: false,
+    premiumOnly: false,
+    hasUsername: false,
+    excludeBots: true,
+    backgroundMode: false
+  });
+  
+  // 單個群組發消息對話框
+  showSingleMessageDialog = signal(false);
+  singleMessageResource = signal<any>(null);
+  singleMessageContent = '';
+  singleMessageScheduled = signal(false);
+  singleMessageScheduleTime = '';
+  singleMessageAccountId = signal<string>('');
+  
+  // 帳號配額信息
+  accountQuotas = signal<Array<{
+    phone: string;
+    nickname: string;
+    joinedGroups: number;
+    dailyLimit: number;
+    dailyUsed: number;
+    isRecommended: boolean;
+  }>>([]);
+  newChannelNotes = '';
+  isTestingChannel = signal(false);
   selectedResourceIds = signal<number[]>([]);
   resourceFilterStatus = signal<string>('');
   resourceFilterType = signal<string>('');
+  resourceFilterLink = signal<string>(''); // 鏈接狀態篩選：'', 'has_link', 'no_link'
   
   // 🔍 多渠道選擇（新增）
   selectedSearchSources = signal<string[]>(['telegram', 'jiso']); // 默認選擇 Telegram 和 極搜
@@ -402,7 +539,10 @@ export class AppComponent implements OnDestroy, OnInit {
     delayMin: 60,
     delayMax: 120,
     dailyLimit: 50,
-    smartAntiBlock: true
+    smartAntiBlock: true,
+    accountMode: 'rotate' as string, // 'rotate' 或特定帳號 phone
+    scheduled: false,
+    scheduleTime: ''
   };
   batchInviteConfig = {
     selectedMemberIds: [] as string[],
@@ -413,6 +553,9 @@ export class AppComponent implements OnDestroy, OnInit {
     smartAntiBlock: true
   };
   availableMembersForInvite = signal<Array<{id: string; name?: string; username?: string}>>([]);
+  
+  // 📋 資源操作菜單狀態（點擊觸發）
+  openResourceMenuId = signal<number | null>(null);
   
   // --- Discussion Watcher State ---
   discussionWatcherInitialized = signal(false);
@@ -1160,10 +1303,71 @@ export class AppComponent implements OnDestroy, OnInit {
   
   // ==================== Resource Discovery Methods ====================
   
+  // 獲取資源發現可用的帳號列表（優先探索號，其次監控號，最後任意在線帳號）
+  getResourceDiscoveryAccounts(): TelegramAccount[] {
+    const onlineAccounts = this.accounts().filter(a => a.status === 'Online');
+    // 優先級排序：Explorer > Listener > Sender > 其他
+    return onlineAccounts.sort((a, b) => {
+      const priority: Record<string, number> = {
+        'Explorer': 1,
+        'Listener': 2,
+        'Sender': 3,
+        'AI': 4,
+        'Backup': 5,
+        'Unassigned': 6
+      };
+      return (priority[a.role] || 99) - (priority[b.role] || 99);
+    });
+  }
+  
+  // 獲取當前資源發現使用的帳號
+  getSelectedResourceAccount(): TelegramAccount | null {
+    const accountId = this.resourceAccountId();
+    if (accountId) {
+      return this.accounts().find(a => a.id === accountId) || null;
+    }
+    // 自動選擇優先級最高的在線帳號
+    const accounts = this.getResourceDiscoveryAccounts();
+    return accounts.length > 0 ? accounts[0] : null;
+  }
+  
+  // 選擇資源發現帳號
+  selectResourceAccount(accountId: number): void {
+    this.resourceAccountId.set(accountId);
+    const account = this.accounts().find(a => a.id === accountId);
+    if (account) {
+      this.toastService.success(`資源發現將使用: ${account.phone}`);
+    }
+    this.showResourceAccountSelector.set(false);
+  }
+
+  // 獲取角色名稱
+  getRoleDisplayName(role: string): string {
+    const roleNames: Record<string, string> = {
+      'Explorer': '🔍 探索號',
+      'Listener': '👁️ 監控號',
+      'Sender': '📤 發送號',
+      'AI': '🤖 AI號',
+      'Backup': '⚡ 備用號',
+      'Unassigned': '⭕ 未分配'
+    };
+    return roleNames[role] || '⭕ 未分配';
+  }
+
   // 初始化資源發現系統
   initResourceDiscovery() {
-    this.toastService.info('正在初始化資源發現系統...');
-    this.ipcService.send('init-resource-discovery', {});
+    // 確保有選中的帳號
+    const account = this.getSelectedResourceAccount();
+    if (!account) {
+      this.toastService.error('沒有可用的在線帳號，請先登入帳號');
+      return;
+    }
+    
+    this.toastService.info(`正在使用 ${account.phone} 初始化資源發現系統...`);
+    this.ipcService.send('init-resource-discovery', { 
+      accountId: account.id,
+      phone: account.phone
+    });
   }
   
   // 自動初始化（進入頁面時調用）
@@ -1177,93 +1381,116 @@ export class AppComponent implements OnDestroy, OnInit {
   
   private searchTimeout: any = null;
   
-  // 搜索資源（支持多關鍵詞）
+  // 搜索资源（支持多渠道和多关键词）
   searchResources() {
     if (!this.resourceSearchQuery.trim()) {
-      this.toastService.error('請輸入搜索關鍵詞');
+      this.toastService.error(this.t('searchPlaceholder'));
       return;
     }
     
-    // 檢查是否選擇了搜索源
+    // 检查是否选择了搜索源
     if (this.selectedSearchSources().length === 0) {
-      this.toastService.error('請至少選擇一個搜索渠道');
+      this.toastService.error('请至少选择一个搜索渠道');
       return;
     }
     
-    // 確保系統已初始化
+    // 确保系统已初始化
     if (!this.resourceDiscoveryInitialized()) {
-      this.pendingSearchQuery = this.resourceSearchQuery.trim();  // 保存待搜索關鍵詞
-      this.toastService.warning('系統正在初始化，請稍候...');
+      this.pendingSearchQuery = this.resourceSearchQuery.trim();
+      this.toastService.warning('系统正在初始化，请稍候...');
       this.initResourceDiscovery();
       return;
     }
     
     const query = this.resourceSearchQuery.trim();
     
-    // 替換模式：先清空之前的搜索結果
+    // 替换模式：先清空之前的搜索结果
     if (this.searchReplaceMode()) {
       this.discoveredResources.set([]);
     }
     
-    // 使用選中的搜索源
+    // 使用选中的搜索源
     const sources = this.selectedSearchSources();
     
-    // 檢查是否是多關鍵詞搜索（用逗號或分號分隔）
+    // 检查是否是多关键词搜索（用逗号或分号分隔）
     const keywords = query.split(/[,;，；]/).map(k => k.trim()).filter(k => k.length > 0);
     
     if (keywords.length > 1) {
-      // 多關鍵詞搜索
-      this.toastService.info(`正在搜索 ${keywords.length} 個關鍵詞...`);
+      // 多关键词搜索
+      this.toastService.info(`正在搜索 ${keywords.length} 个关键词...`);
       this.searchMultipleKeywords(keywords);
     } else {
-      // 單關鍵詞搜索
+      // 单关键词搜索
       this.isSearchingResources.set(true);
       this.toastService.info(`正在搜索 "${query}"...`);
       
-      // 設置前端超時保護（70秒）
+      // 设置前端超时保护（70秒）
       if (this.searchTimeout) clearTimeout(this.searchTimeout);
       this.searchTimeout = setTimeout(() => {
         if (this.isSearchingResources()) {
           this.isSearchingResources.set(false);
-          this.toastService.error('搜索超時，請檢查網絡或稍後再試');
+          this.toastService.error('搜索超时，请检查网络或稍后再试');
         }
       }, 70000);
       
+      // 根据选择的渠道调用不同的搜索API
+      this.executeMultiSourceSearch(query, sources);
+    }
+  }
+  
+  // 执行多渠道搜索
+  private executeMultiSourceSearch(query: string, sources: string[]) {
+    const phone = this.getSelectedResourceAccount()?.phone;
+    
+    // Telegram 官方搜索
+    if (sources.includes('telegram') || sources.includes('local')) {
       this.ipcService.send('search-resources', {
         query: query,
-        sources: this.selectedSearchSources(), // 傳遞選中的搜索源
+        phone: phone,
+        sources: sources.filter(s => s !== 'jiso'), // 排除 jiso，单独处理
         limit: 50,
         searchType: this.resourceSearchType(),
         minMembers: this.resourceMinMembers(),
         replaceMode: this.searchReplaceMode()
       });
     }
+    
+    // 极搜 Bot 搜索
+    if (sources.includes('jiso')) {
+      this.toastService.info('正在通过极搜 Bot 搜索...');
+      this.ipcService.send('search-jiso', {
+        keyword: query,
+        phone: phone,
+        limit: 50
+      });
+    }
+    
+    // TGStat 搜索（如果选中且有API key）
+    if (sources.includes('tgstat')) {
+      // TGStat 目前通过 search-resources 处理
+      // 后续可以单独对接 TGStat API
+    }
   }
   
-  // 多關鍵詞搜索
+  // 多关键词搜索
   private searchMultipleKeywords(keywords: string[]) {
     this.isSearchingResources.set(true);
+    const sources = this.selectedSearchSources();
     
-    // 設置前端超時保護
+    // 设置前端超时保护
     if (this.searchTimeout) clearTimeout(this.searchTimeout);
     this.searchTimeout = setTimeout(() => {
       if (this.isSearchingResources()) {
         this.isSearchingResources.set(false);
-        this.toastService.error('搜索超時');
+        this.toastService.error('搜索超时');
       }
     }, keywords.length * 10000 + 30000);
     
-    // 逐個搜索
+    // 逐个搜索
     keywords.forEach((keyword, index) => {
       setTimeout(() => {
-        this.ipcService.send('search-resources', {
-          query: keyword,
-          sources: this.selectedSearchSources(), // 傳遞選中的搜索源
-          limit: 30,
-          searchType: this.resourceSearchType(),
-          minMembers: this.resourceMinMembers()
-        });
-      }, index * 3000); // 每3秒搜索一個，避免頻率限制
+        this.executeMultiSourceSearch(keyword, sources);
+      }, index * 5000); // 每5秒搜索一个，避免频率限制
     });
   }
   
@@ -1281,15 +1508,26 @@ export class AppComponent implements OnDestroy, OnInit {
   
   // 複製群組鏈接
   copyTelegramLink(resource: any) {
-    const link = resource.username 
+    const link = resource.username
       ? `https://t.me/${resource.username}`
       : resource.invite_link || '';
     if (link) {
       navigator.clipboard.writeText(link);
       this.toastService.success('鏈接已複製');
+    } else {
+      // 沒有公開鏈接時，複製群組名稱供用戶搜索
+      navigator.clipboard.writeText(resource.title);
+      this.toastService.warning('此群組無公開鏈接，已複製群組名稱，請在 Telegram 中手動搜索');
     }
   }
-  
+
+  // 複製用戶名
+  copyUsername(username: string) {
+    const text = `@${username}`;
+    navigator.clipboard.writeText(text);
+    this.toastService.success('已複製 ' + text);
+  }
+
   // 獲取資源類型圖標
   getResourceTypeIcon(type: string): string {
     switch(type) {
@@ -1335,11 +1573,885 @@ export class AppComponent implements OnDestroy, OnInit {
     });
   }
   
+  // 根據鏈接狀態篩選資源（前端過濾）
+  filterResourcesByLink() {
+    const filterValue = this.resourceFilterLink();
+    if (!filterValue) {
+      // 重新加載所有資源
+      this.loadResources();
+      return;
+    }
+    
+    // 前端過濾
+    const allResources = this.discoveredResources();
+    const filtered = allResources.filter(r => {
+      const hasLink = !!(r.username || r.invite_link);
+      if (filterValue === 'has_link') {
+        return hasLink;
+      } else if (filterValue === 'no_link') {
+        return !hasLink;
+      }
+      return true;
+    });
+    
+    this.discoveredResources.set(filtered);
+  }
+
   // 刷新資源統計
   refreshResourceStats() {
     this.ipcService.send('get-resource-stats', {});
   }
-  
+
+  // ==================== 搜索渠道管理 ====================
+
+  // 打開渠道管理對話框
+  openChannelManageDialog() {
+    this.loadSearchChannels();
+    this.showChannelManageDialog.set(true);
+  }
+
+  // 關閉渠道管理對話框
+  closeChannelManageDialog() {
+    this.showChannelManageDialog.set(false);
+  }
+
+  // 加載搜索渠道列表
+  loadSearchChannels() {
+    this.ipcService.send('get-search-channels', {});
+  }
+
+  // 打開添加渠道對話框
+  openAddChannelDialog() {
+    this.newChannelUsername = '';
+    this.newChannelDisplayName = '';
+    this.newChannelQueryFormat = '{keyword}';
+    this.newChannelPriority = 'backup';
+    this.newChannelNotes = '';
+    this.showAddChannelDialog.set(true);
+  }
+
+  // 關閉添加渠道對話框
+  closeAddChannelDialog() {
+    this.showAddChannelDialog.set(false);
+  }
+
+  // 添加自定義渠道
+  addSearchChannel() {
+    if (!this.newChannelUsername.trim()) {
+      this.toastService.error('請輸入 Bot 用戶名');
+      return;
+    }
+
+    this.ipcService.send('add-search-channel', {
+      botUsername: this.newChannelUsername.trim(),
+      displayName: this.newChannelDisplayName.trim() || this.newChannelUsername.trim(),
+      queryFormat: this.newChannelQueryFormat,
+      priority: this.newChannelPriority,
+      notes: this.newChannelNotes
+    });
+  }
+
+  // 刪除自定義渠道
+  deleteSearchChannel(channelId: number) {
+    if (channelId < 0) {
+      this.toastService.warning('無法刪除系統渠道');
+      return;
+    }
+    if (confirm('確定要刪除這個搜索渠道嗎？')) {
+      this.ipcService.send('delete-search-channel', { channelId });
+    }
+  }
+
+  // 測試渠道
+  testSearchChannel(botUsername: string) {
+    this.isTestingChannel.set(true);
+    this.toastService.info(`正在測試 @${botUsername}...`);
+    this.ipcService.send('test-search-channel', { botUsername });
+  }
+
+  // 切換渠道啟用狀態
+  toggleChannelEnabled(channelId: number, currentEnabled: boolean) {
+    if (channelId < 0) {
+      this.toastService.warning('無法修改系統渠道');
+      return;
+    }
+    this.ipcService.send('update-search-channel', {
+      channelId,
+      enabled: !currentEnabled
+    });
+  }
+
+  // 獲取渠道狀態顏色
+  getChannelStatusColor(status: string): string {
+    switch (status) {
+      case 'online': return 'text-green-400';
+      case 'offline': return 'text-red-400';
+      case 'captcha': return 'text-yellow-400';
+      default: return 'text-gray-400';
+    }
+  }
+
+  // 獲取渠道狀態圖標
+  getChannelStatusIcon(status: string): string {
+    switch (status) {
+      case 'online': return '🟢';
+      case 'offline': return '🔴';
+      case 'captcha': return '🟡';
+      default: return '⚪';
+    }
+  }
+
+  // ==================== 加入並監控 ====================
+
+  // 打開加入並監控對話框
+  openJoinAndMonitorDialog(resource: any) {
+    this.joinMonitorResource.set(resource);
+    this.joinMonitorKeywords.set([]);
+    this.joinMonitorNewKeyword = '';
+    this.joinMonitorAutoEnable.set(true);
+    
+    // 加載帳號配額信息
+    this.loadAccountQuotas();
+    
+    // 如果資源已加入，預選已加入的帳號
+    if (resource.joined_by_phone) {
+      this.joinMonitorSelectedPhone.set(resource.joined_by_phone);
+    } else {
+      this.joinMonitorSelectedPhone.set('');
+    }
+    
+    this.showJoinMonitorDialog.set(true);
+  }
+
+  // 關閉加入並監控對話框
+  closeJoinMonitorDialog() {
+    this.showJoinMonitorDialog.set(false);
+    this.joinMonitorResource.set(null);
+  }
+
+  // 加載帳號配額信息
+  loadAccountQuotas() {
+    const accounts = this.accounts();
+    const quotas = accounts
+      .filter(acc => acc.status === 'Online')
+      .map(acc => {
+        // 計算已加入群組數（從 dailySendCount 估算）
+        const joinedGroups = Math.floor(acc.dailySendCount / 10) || 0;
+        const dailyLimit = 20; // 每天加群上限
+        const dailyUsed = Math.floor(acc.dailySendCount / 5) || 0;
+        
+        return {
+          phone: acc.phone,
+          nickname: acc.group || acc.phone,
+          joinedGroups,
+          dailyLimit,
+          dailyUsed: Math.min(dailyUsed, dailyLimit),
+          isRecommended: acc.healthScore >= 80 && dailyUsed < dailyLimit * 0.5
+        };
+      })
+      .sort((a, b) => {
+        // 推薦帳號排前面
+        if (a.isRecommended && !b.isRecommended) return -1;
+        if (!a.isRecommended && b.isRecommended) return 1;
+        // 負載低的排前面
+        return a.dailyUsed - b.dailyUsed;
+      });
+    
+    this.accountQuotas.set(quotas);
+    
+    // 自動選擇推薦帳號
+    if (!this.joinMonitorSelectedPhone()) {
+      const recommended = quotas.find(q => q.isRecommended);
+      if (recommended) {
+        this.joinMonitorSelectedPhone.set(recommended.phone);
+      } else if (quotas.length > 0) {
+        this.joinMonitorSelectedPhone.set(quotas[0].phone);
+      }
+    }
+  }
+
+  // 添加監控關鍵詞
+  addMonitorKeyword() {
+    const keyword = this.joinMonitorNewKeyword.trim();
+    if (keyword && !this.joinMonitorKeywords().includes(keyword)) {
+      this.joinMonitorKeywords.update(kws => [...kws, keyword]);
+      this.joinMonitorNewKeyword = '';
+    }
+  }
+
+  // 移除監控關鍵詞
+  removeMonitorKeyword(keyword: string) {
+    this.joinMonitorKeywords.update(kws => kws.filter(k => k !== keyword));
+  }
+
+  // 添加推薦關鍵詞
+  addRecommendedKeyword(keyword: string) {
+    if (!this.joinMonitorKeywords().includes(keyword)) {
+      this.joinMonitorKeywords.update(kws => [...kws, keyword]);
+    }
+  }
+
+  // 獲取推薦關鍵詞（基於群組標題）
+  getRecommendedKeywords(): string[] {
+    const resource = this.joinMonitorResource();
+    if (!resource) return [];
+    
+    const title = resource.title || '';
+    const recommendations: string[] = [];
+    
+    // 基於標題的關鍵詞推薦
+    if (title.includes('二手') || title.includes('交易')) {
+      recommendations.push('求購', '出售', '轉讓');
+    }
+    if (title.includes('招聘') || title.includes('求職')) {
+      recommendations.push('招人', '求職', '兼職');
+    }
+    if (title.includes('華人') || title.includes('海外')) {
+      recommendations.push('合作', '資源', '求助');
+    }
+    
+    // 通用推薦
+    if (recommendations.length === 0) {
+      recommendations.push('求購', '合作', '諮詢');
+    }
+    
+    return recommendations.filter(r => !this.joinMonitorKeywords().includes(r));
+  }
+
+  // 執行加入並監控
+  executeJoinAndMonitor() {
+    const resource = this.joinMonitorResource();
+    const phone = this.joinMonitorSelectedPhone();
+    
+    if (!resource) {
+      this.toastService.error('請選擇要加入的群組');
+      return;
+    }
+    
+    if (!phone) {
+      this.toastService.error('請選擇加入帳號');
+      return;
+    }
+    
+    this.isJoiningResource.set(true);
+    
+    this.ipcService.send('join-and-monitor-with-account', {
+      resourceId: resource.id,
+      phone: phone,
+      keywords: this.joinMonitorKeywords(),
+      autoEnableMonitor: this.joinMonitorAutoEnable()
+    });
+  }
+
+  // 打開監控設置（已加入的群組）
+  openMonitorSettings(resource: any) {
+    this.openJoinAndMonitorDialog(resource);
+  }
+
+  // ==================== 批量加入並監控 ====================
+
+  // 打開批量加入並監控對話框
+  openBatchJoinMonitorDialog() {
+    const selectedIds = this.selectedResourceIds();
+    if (selectedIds.length === 0) {
+      this.toastService.warning('請先選擇要加入的群組');
+      return;
+    }
+
+    const resources = this.discoveredResources().filter(r => selectedIds.includes(r.id));
+    this.batchJoinResources.set(resources);
+    this.joinMonitorSelectedPhones.set([]);
+    this.joinMonitorKeywords.set([]);
+    this.joinMonitorBatchMode.set(true);
+    this.joinMonitorBatchInterval.set(45);
+    this.loadAccountQuotas();
+    this.showBatchJoinMonitorDialog.set(true);
+  }
+
+  // 計算批量加入群組的總成員數
+  getBatchJoinTotalMembers(): number {
+    return this.batchJoinResources().reduce((sum, r) => sum + (r.member_count || 0), 0);
+  }
+
+  // 關閉批量加入對話框
+  closeBatchJoinMonitorDialog() {
+    this.showBatchJoinMonitorDialog.set(false);
+    this.batchJoinResources.set([]);
+  }
+
+  // 切換帳號選擇（多選）
+  toggleAccountSelection(phone: string) {
+    const current = this.joinMonitorSelectedPhones();
+    if (current.includes(phone)) {
+      this.joinMonitorSelectedPhones.set(current.filter(p => p !== phone));
+    } else {
+      this.joinMonitorSelectedPhones.set([...current, phone]);
+    }
+  }
+
+  // 全選帳號
+  selectAllAccounts() {
+    const allPhones = this.accountQuotas().map(a => a.phone);
+    this.joinMonitorSelectedPhones.set(allPhones);
+  }
+
+  // 執行批量加入並監控
+  executeBatchJoinMonitor() {
+    const resources = this.batchJoinResources();
+    const phones = this.joinMonitorSelectedPhones();
+    
+    if (resources.length === 0) {
+      this.toastService.error('沒有選擇群組');
+      return;
+    }
+    
+    if (phones.length === 0) {
+      this.toastService.error('請選擇至少一個帳號');
+      return;
+    }
+    
+    this.isJoiningResource.set(true);
+    this.batchJoinProgress.set({ current: 0, total: resources.length, status: '準備中...' });
+    
+    // 發送批量加入請求
+    this.ipcService.send('batch-join-and-monitor', {
+      resourceIds: resources.map(r => r.id),
+      phones: phones,
+      keywords: this.joinMonitorKeywords(),
+      autoEnableMonitor: this.joinMonitorAutoEnable(),
+      batchMode: this.joinMonitorBatchMode(),
+      batchInterval: this.joinMonitorBatchInterval()
+    });
+    
+    this.toastService.info(`🚀 開始批量加入 ${resources.length} 個群組，使用 ${phones.length} 個帳號`);
+  }
+
+  // ==================== 成員列表對話框 ====================
+
+  // 打開成員列表對話框
+  openMemberListDialog(resource: any) {
+    this.memberListResource.set(resource);
+    this.memberListData.set([]);
+    this.memberListLoading.set(false);
+    this.memberListProgress.set({ extracted: 0, total: resource.member_count || 0, status: '' });
+    this.selectedMemberIds.set([]);
+    this.memberExtractStarted.set(false); // 重置提取狀態，顯示設置面板
+    this.memberListFilter.set('all');
+    this.memberExtractConfig.set({
+      limit: 500,
+      customLimit: 1000,
+      onlineOnly: false,
+      chineseOnly: false,
+      premiumOnly: false,
+      hasUsername: false,
+      excludeBots: true,
+      backgroundMode: false
+    });
+    this.showMemberListDialog.set(true);
+  }
+
+  // 關閉成員列表對話框
+  closeMemberListDialog() {
+    this.showMemberListDialog.set(false);
+    this.memberListResource.set(null);
+    this.memberListData.set([]);
+  }
+
+  // 加載成員列表
+  loadMemberList(resource: any) {
+    if (!resource || !resource.telegram_id) {
+      this.toastService.error('無效的群組信息');
+      return;
+    }
+    
+    this.memberListLoading.set(true);
+    this.memberListProgress.update(p => ({ ...p, status: '正在提取成員...' }));
+    
+    this.ipcService.send('extract-members', {
+      resourceId: resource.id,
+      telegramId: resource.telegram_id,
+      username: resource.username,
+      limit: 200, // 首次加載 200 個
+      offset: 0
+    });
+  }
+
+  // 繼續提取更多成員
+  extractMoreMembers() {
+    const resource = this.memberListResource();
+    const currentCount = this.memberListData().length;
+    
+    if (!resource) return;
+    
+    this.memberListLoading.set(true);
+    this.memberListProgress.update(p => ({ ...p, status: '正在提取更多成員...' }));
+    
+    this.ipcService.send('extract-members', {
+      resourceId: resource.id,
+      telegramId: resource.telegram_id,
+      username: resource.username,
+      limit: 200,
+      offset: currentCount
+    });
+  }
+
+  // 切換成員選擇
+  toggleMemberIdSelection(memberId: string) {
+    const current = this.selectedMemberIds();
+    if (current.includes(memberId)) {
+      this.selectedMemberIds.set(current.filter(id => id !== memberId));
+    } else {
+      this.selectedMemberIds.set([...current, memberId]);
+    }
+  }
+
+  // 全選成員
+  selectAllMembers() {
+    const allIds = this.memberListData().map(m => m.user_id);
+    this.selectedMemberIds.set(allIds);
+  }
+
+  // 導出成員為 CSV（包含所有欄位）
+  exportMembersToCSV() {
+    const members = this.getFilteredMembers();
+    if (members.length === 0) {
+      this.toastService.warning('沒有可導出的成員');
+      return;
+    }
+
+    const resource = this.memberListResource();
+    const filename = `members_${resource?.username || resource?.telegram_id}_${new Date().toISOString().slice(0,10)}.csv`;
+
+    // CSV 內容（完整欄位）
+    const headers = [
+      '用戶ID', '用戶名', '名字', '姓氏', '全名', '電話號碼',
+      '個人簡介', '語言', 'DC', '在線狀態', '最後上線',
+      '角色', '加入日期', 'Premium', '已認證', 'Bot', 
+      '有頭像', '詐騙', '假帳號', '受限制', '已刪除',
+      '華人', '活躍度', '價值等級', '來源群組', '提取時間'
+    ];
+    
+    const escapeCSV = (val: any) => {
+      if (val === null || val === undefined) return '';
+      const str = String(val);
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+    
+    const rows = members.map(m => [
+      m.user_id,
+      m.username || '',
+      m.first_name || '',
+      m.last_name || '',
+      m.full_name || `${m.first_name || ''} ${m.last_name || ''}`.trim(),
+      m.phone || '',
+      escapeCSV(m.bio || ''),
+      m.language_code || '',
+      m.dc_id || '',
+      m.online_status || '',
+      m.last_online || '',
+      m.chat_member_status || 'member',
+      m.joined_date || '',
+      m.is_premium ? '是' : '否',
+      m.is_verified ? '是' : '否',
+      m.is_bot ? '是' : '否',
+      m.has_photo ? '是' : '否',
+      m.is_scam ? '是' : '否',
+      m.is_fake ? '是' : '否',
+      m.is_restricted ? '是' : '否',
+      m.is_deleted ? '是' : '否',
+      this.isChineseMember(m) ? '是' : '否',
+      m.activity_score ? (m.activity_score * 100).toFixed(0) + '%' : '',
+      m.value_level || '',
+      m.source_chat_title || '',
+      m.extracted_at || ''
+    ]);
+
+    const csv = [headers, ...rows].map(row => row.map(escapeCSV).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    this.toastService.success(`✅ 已導出 ${members.length} 個成員`);
+  }
+
+  // 設置提取數量限制
+  setMemberExtractLimit(limit: number) {
+    this.memberExtractConfig.update(c => ({ ...c, limit }));
+  }
+
+  // 開始成員提取
+  startMemberExtraction() {
+    console.log('[Frontend] startMemberExtraction called');
+    const resource = this.memberListResource();
+    console.log('[Frontend] Resource:', resource);
+    
+    if (!resource) {
+      console.error('[Frontend] No resource selected');
+      this.toastService.error('請先選擇一個群組');
+      return;
+    }
+
+    this.memberExtractStarted.set(true);
+    this.memberListLoading.set(true);
+    this.memberListData.set([]);
+
+    const config = this.memberExtractConfig();
+    const limit = config.limit === -1 ? config.customLimit : (config.limit === 0 ? 99999 : config.limit);
+    
+    console.log('[Frontend] Extraction config:', { limit, config });
+
+    this.memberListProgress.set({
+      extracted: 0,
+      total: resource.member_count || 0,
+      status: '正在提取成員...'
+    });
+
+    const payload = {
+      resourceId: resource.id,
+      telegramId: resource.telegram_id,
+      username: resource.username,
+      limit: limit,
+      offset: 0,
+      filters: {
+        onlineOnly: config.onlineOnly,
+        chineseOnly: config.chineseOnly,
+        premiumOnly: config.premiumOnly,
+        hasUsername: config.hasUsername,
+        excludeBots: config.excludeBots
+      }
+    };
+    
+    console.log('[Frontend] Sending extract-members IPC:', payload);
+    this.toastService.info('📤 正在發送提取請求...');
+    this.ipcService.send('extract-members', payload);
+    
+    if (config.backgroundMode) {
+      this.toastService.info('📤 成員提取已轉為後台運行');
+      this.closeMemberListDialog();
+    }
+  }
+
+  // 暫停成員提取
+  pauseMemberExtraction() {
+    this.memberListLoading.set(false);
+    this.memberListProgress.update(p => ({ ...p, status: '已暫停' }));
+    this.toastService.info('⏸️ 成員提取已暫停');
+  }
+
+  // 停止成員提取
+  stopMemberExtraction() {
+    this.memberListLoading.set(false);
+    this.memberListProgress.update(p => ({ ...p, status: '已停止' }));
+    this.toastService.info('⏹️ 成員提取已停止');
+  }
+
+  // 切換後台運行
+  toggleMemberExtractBackground() {
+    this.toastService.info('📤 成員提取已轉為後台運行，完成後會通知您');
+    this.closeMemberListDialog();
+  }
+
+  // 處理成員提取錯誤
+  handleMemberExtractionError(data: { 
+    error?: string, 
+    error_code?: string, 
+    error_details?: { reason?: string, suggestion?: string, can_auto_join?: boolean, alternative?: string }
+  }) {
+    const errorCode = data.error_code || 'UNKNOWN';
+    const details = data.error_details || {};
+    
+    // 更新進度狀態
+    this.memberListProgress.update(p => ({ ...p, status: '提取失敗' }));
+    
+    // 根據錯誤類型顯示不同的提示
+    switch (errorCode) {
+      case 'PEER_ID_INVALID':
+      case 'NOT_PARTICIPANT':
+      case 'CHANNEL_PRIVATE':
+        // 需要先加入群組
+        this.showExtractionErrorWithAction(
+          '⚠️ 無法提取成員',
+          details.reason || '帳號尚未加入此群組',
+          details.suggestion || '請先加入群組再嘗試提取',
+          details.can_auto_join ? 'join' : undefined
+        );
+        break;
+        
+      case 'ADMIN_REQUIRED':
+        // 需要管理員權限
+        this.showExtractionErrorWithAction(
+          '🔒 成員列表受限',
+          details.reason || '群組設置限制了成員列表訪問',
+          details.suggestion || '可嘗試監控群組消息收集活躍用戶',
+          details.alternative === 'monitor_messages' ? 'monitor' : undefined
+        );
+        break;
+        
+      case 'FLOOD_WAIT':
+        // 頻率限制
+        this.toastService.warning(`⏳ ${data.error}\n\n${details.suggestion || '請稍後重試'}`);
+        break;
+        
+      case 'CHANNEL_INVALID':
+        // 無效群組
+        this.toastService.error(`❌ ${data.error}\n\n${details.suggestion || '請刷新資源列表'}`);
+        break;
+        
+      default:
+        // 其他錯誤
+        this.toastService.error(`❌ 提取失敗: ${data.error}`);
+    }
+  }
+
+  // 顯示帶有操作按鈕的錯誤提示
+  showExtractionErrorWithAction(title: string, reason: string, suggestion: string, action?: 'join' | 'monitor') {
+    const resource = this.memberListResource();
+    
+    // 構建提示消息
+    let message = `${title}\n\n原因：${reason}\n\n💡 ${suggestion}`;
+    
+    if (action === 'join' && resource) {
+      // 提示用戶可以加入群組
+      message += '\n\n點擊「加入群組」按鈕後重試';
+      this.toastService.warning(message);
+      
+      // 更新狀態提示用戶操作
+      this.memberListProgress.update(p => ({ 
+        ...p, 
+        status: '需要先加入群組' 
+      }));
+    } else if (action === 'monitor' && resource) {
+      message += '\n\n建議：啟動消息監控來收集活躍用戶';
+      this.toastService.warning(message);
+      
+      this.memberListProgress.update(p => ({ 
+        ...p, 
+        status: '建議使用消息監控' 
+      }));
+    } else {
+      this.toastService.error(message);
+    }
+  }
+
+  // 嘗試自動加入群組並重新提取
+  async autoJoinAndExtract() {
+    const resource = this.memberListResource();
+    if (!resource) return;
+    
+    this.toastService.info('🚀 正在嘗試加入群組...');
+    
+    // 發送加入群組請求
+    const firstAccount = this.accounts().find(a => a.status === 'Online');
+    if (firstAccount) {
+      this.ipcService.send('join-group', {
+        phone: firstAccount.phone,
+        groupUrl: resource.username ? `https://t.me/${resource.username}` : resource.invite_link
+      });
+      
+      // 監聯加入結果
+      this.ipcService.once('group-join-result', (result: any) => {
+        if (result.success) {
+          this.toastService.success('✅ 成功加入群組，正在重新提取...');
+          // 延遲後重新提取
+          setTimeout(() => {
+            this.startMemberExtraction();
+          }, 2000);
+        } else {
+          this.toastService.error(`❌ 加入群組失敗: ${result.error}`);
+        }
+      });
+    } else {
+      this.toastService.error('沒有可用的在線帳號');
+    }
+  }
+
+  // 獲取第一個在線帳號
+  getFirstOnlineAccount(): any {
+    return this.accounts().find(a => a.status === 'Online');
+  }
+
+  // 設置成員列表篩選
+  setMemberFilter(filter: string) {
+    this.memberListFilter.set(filter);
+  }
+
+  // 獲取篩選後的成員列表
+  getFilteredMembers() {
+    const members = this.memberListData();
+    const filter = this.memberListFilter();
+    
+    switch (filter) {
+      case 'chinese':
+        return members.filter(m => this.isChineseMember(m));
+      case 'online':
+        return members.filter(m => m.online_status === 'online' || m.online_status === 'recently');
+      case 'premium':
+        return members.filter(m => m.is_premium);
+      case 'hasUsername':
+        return members.filter(m => !!m.username);
+      default:
+        return members;
+    }
+  }
+
+  // 判斷是否為華人用戶（中文字符檢測）
+  isChineseMember(member: any): boolean {
+    const chineseRegex = /[\u4e00-\u9fa5]/;
+    const name = (member.first_name || '') + (member.last_name || '');
+    return chineseRegex.test(name);
+  }
+
+  // 獲取華人成員數量
+  getChineseMemberCount(): number {
+    return this.memberListData().filter(m => this.isChineseMember(m)).length;
+  }
+
+  // 獲取在線成員數量
+  getOnlineMemberCount(): number {
+    return this.memberListData().filter(m => m.online_status === 'online' || m.online_status === 'recently').length;
+  }
+
+  // 獲取 Premium 成員數量
+  getPremiumMemberCount(): number {
+    return this.memberListData().filter(m => m.is_premium).length;
+  }
+
+  // 獲取提取進度百分比
+  getMemberExtractPercent(): number {
+    const progress = this.memberListProgress();
+    if (progress.total === 0) return 0;
+    return Math.min(100, Math.round((this.memberListData().length / progress.total) * 100));
+  }
+
+  // 是否全選成員
+  isAllMembersSelected(): boolean {
+    const filtered = this.getFilteredMembers();
+    return filtered.length > 0 && filtered.every(m => this.selectedMemberIds().includes(m.user_id));
+  }
+
+  // 切換全選成員（成員列表對話框用）
+  toggleSelectAllMembersList() {
+    const filtered = this.getFilteredMembers();
+    if (this.isAllMembersSelected()) {
+      this.selectedMemberIds.set([]);
+    } else {
+      this.selectedMemberIds.set(filtered.map(m => m.user_id));
+    }
+  }
+
+  // 發送私信
+  sendPrivateMessage(member: any) {
+    if (!member.username) {
+      this.toastService.warning('該用戶沒有用戶名，無法發送私信');
+      return;
+    }
+    this.toastService.info(`📨 準備發送私信給 @${member.username}`);
+    // TODO: 打開私信對話框
+  }
+
+  // 批量發送私信
+  batchSendPrivateMessage() {
+    const count = this.selectedMemberIds().length;
+    this.toastService.info(`📨 準備批量發送私信給 ${count} 個成員`);
+    // TODO: 打開批量私信對話框
+  }
+
+  // 批量添加好友
+  batchAddFriend() {
+    const count = this.selectedMemberIds().length;
+    this.toastService.info(`➕ 準備批量添加 ${count} 個好友`);
+    // TODO: 實現批量加好友邏輯
+  }
+
+  // 批量提取成員（多個群組）
+  openBatchMemberExtractDialog() {
+    const selectedIds = this.selectedResourceIds();
+    if (selectedIds.length === 0) {
+      this.toastService.warning('請先選擇群組');
+      return;
+    }
+    
+    this.toastService.info(`🚀 開始批量提取 ${selectedIds.length} 個群組的成員`);
+    
+    // 發送批量提取請求
+    this.ipcService.send('batch-extract-members', {
+      resourceIds: selectedIds,
+      limit: 100, // 每個群組提取 100 個
+      safeMode: true // 安全模式：分批分時提取
+    });
+  }
+
+  // ==================== 單個群組發消息 ====================
+
+  // 打開單個群組發消息對話框
+  openSingleMessageDialog(resource: any) {
+    this.singleMessageResource.set(resource);
+    this.singleMessageContent = '';
+    this.singleMessageScheduled.set(false);
+    this.singleMessageScheduleTime = '';
+    this.singleMessageAccountId.set('');
+    this.loadAccountQuotas();
+    this.showSingleMessageDialog.set(true);
+  }
+
+  // 關閉單個群組發消息對話框
+  closeSingleMessageDialog() {
+    this.showSingleMessageDialog.set(false);
+    this.singleMessageResource.set(null);
+  }
+
+  // 發送單個群組消息
+  executeSingleMessage() {
+    const resource = this.singleMessageResource();
+    const content = this.singleMessageContent.trim();
+    
+    if (!resource) {
+      this.toastService.error('無效的群組');
+      return;
+    }
+    
+    if (!content) {
+      this.toastService.error('請輸入消息內容');
+      return;
+    }
+    
+    const accountId = this.singleMessageAccountId();
+    if (!accountId) {
+      this.toastService.error('請選擇發送帳號');
+      return;
+    }
+    
+    if (this.singleMessageScheduled() && this.singleMessageScheduleTime) {
+      // 定時發送
+      this.ipcService.send('schedule-message', {
+        resourceId: resource.id,
+        telegramId: resource.telegram_id,
+        content: content,
+        accountPhone: accountId,
+        scheduledTime: this.singleMessageScheduleTime
+      });
+      this.toastService.success(`⏰ 消息已排程，將於 ${this.singleMessageScheduleTime} 發送`);
+    } else {
+      // 立即發送
+      this.ipcService.send('send-group-message', {
+        resourceId: resource.id,
+        telegramId: resource.telegram_id,
+        content: content,
+        accountPhone: accountId
+      });
+      this.toastService.info('📨 正在發送消息...');
+    }
+    
+    this.closeSingleMessageDialog();
+  }
+
   // 刷新全部資源數據
   refreshAllResources() {
     this.isRefreshing.set(true);
@@ -1357,17 +2469,35 @@ export class AppComponent implements OnDestroy, OnInit {
     }, 2000);
   }
   
-  // 清空搜索結果（僅清空前端顯示，不刪除數據庫）
+  // 清空搜索結果（清空前端顯示 + 刪除數據庫中的所有資源）
   clearSearchResults() {
-    if (this.discoveredResources().length === 0) {
+    const resourceCount = this.discoveredResources().length;
+    if (resourceCount === 0) {
       this.toastService.warning('沒有可清空的資源');
       return;
     }
     
-    // 直接清空前端顯示的資源列表
-    this.discoveredResources.set([]);
-    this.selectedResourceIds.set([]);
-    this.toastService.success('✅ 搜索結果已清空');
+    // 確認刪除
+    if (!confirm(`確定要清空所有 ${resourceCount} 條搜索結果嗎？\n\n此操作將刪除數據庫中的所有資源記錄，不可恢復。`)) {
+      return;
+    }
+    
+    // 🔧 修復：使用 NgZone.run 確保在 Angular zone 內執行更新
+    // confirm() 對話框會阻斷 Angular zone，導致後續更新無法觸發變更檢測
+    this.ngZone.run(() => {
+      // 調用後端清空所有資源
+      this.ipcService.send('clear-all-resources', {});
+      
+      // 清空前端顯示
+      this.discoveredResources.set([]);
+      this.selectedResourceIds.set([]);
+      
+      // 更新統計
+      this.refreshResourceStats();
+      
+      // 強制觸發變更檢測，確保輸入框可用
+      this.cdr.detectChanges();
+    });
   }
   
   // 刪除所有未處理的資源（從數據庫）
@@ -1382,9 +2512,7 @@ export class AppComponent implements OnDestroy, OnInit {
     }
     
     if (confirm('確定要刪除所有未處理的資源嗎？此操作不可恢復。')) {
-      discoveredIds.forEach(id => {
-        this.ipcService.send('delete-resource', { resourceId: id });
-      });
+      this.ipcService.send('delete-resources-batch', { resourceIds: discoveredIds });
       this.toastService.success(`🗑️ 已刪除 ${discoveredIds.length} 個資源`);
       setTimeout(() => this.loadResources(), 500);
     }
@@ -1620,6 +2748,21 @@ export class AppComponent implements OnDestroy, OnInit {
         resourceId: resourceId
       });
     }
+    this.openResourceMenuId.set(null);
+  }
+
+  // 📋 資源操作菜單控制
+  toggleResourceMenu(resourceId: number, event: Event) {
+    event.stopPropagation();
+    if (this.openResourceMenuId() === resourceId) {
+      this.openResourceMenuId.set(null);
+    } else {
+      this.openResourceMenuId.set(resourceId);
+    }
+  }
+
+  closeResourceMenu() {
+    this.openResourceMenuId.set(null);
   }
   
   // 獲取狀態顏色
@@ -1635,6 +2778,47 @@ export class AppComponent implements OnDestroy, OnInit {
       'invalid': 'bg-slate-500'
     };
     return colors[status] || 'bg-gray-500';
+  }
+
+  // 基於成員數獲取規模等級 (S/A/B/C/D)
+  getSizeGrade(memberCount: number): { grade: string; color: string; bgColor: string; label: string } {
+    if (memberCount >= 100000) {
+      return { grade: 'S', color: 'text-amber-400', bgColor: 'bg-amber-500/20 border-amber-500/50', label: '超大型' };
+    } else if (memberCount >= 10000) {
+      return { grade: 'A', color: 'text-green-400', bgColor: 'bg-green-500/20 border-green-500/50', label: '大型' };
+    } else if (memberCount >= 1000) {
+      return { grade: 'B', color: 'text-blue-400', bgColor: 'bg-blue-500/20 border-blue-500/50', label: '中型' };
+    } else if (memberCount >= 100) {
+      return { grade: 'C', color: 'text-slate-400', bgColor: 'bg-slate-500/20 border-slate-500/50', label: '小型' };
+    } else {
+      return { grade: 'D', color: 'text-red-400', bgColor: 'bg-red-500/20 border-red-500/50', label: '微型' };
+    }
+  }
+
+  // 舊方法保留相容性
+  getScoreGrade(score: number): { grade: string; color: string; bgColor: string; icon: string } {
+    const percent = score * 100;
+    if (percent >= 90) {
+      return { grade: 'S', color: 'text-amber-400', bgColor: 'bg-amber-500/20 border-amber-500/50', icon: '🏆' };
+    } else if (percent >= 75) {
+      return { grade: 'A', color: 'text-green-400', bgColor: 'bg-green-500/20 border-green-500/50', icon: '⭐' };
+    } else if (percent >= 60) {
+      return { grade: 'B', color: 'text-blue-400', bgColor: 'bg-blue-500/20 border-blue-500/50', icon: '👍' };
+    } else if (percent >= 40) {
+      return { grade: 'C', color: 'text-slate-400', bgColor: 'bg-slate-500/20 border-slate-500/50', icon: '👌' };
+    } else {
+      return { grade: 'D', color: 'text-red-400', bgColor: 'bg-red-500/20 border-red-500/50', icon: '⚠️' };
+    }
+  }
+
+  // 獲取評分進度條顏色
+  getScoreBarColor(score: number): string {
+    const percent = score * 100;
+    if (percent >= 90) return 'bg-amber-400';
+    if (percent >= 75) return 'bg-green-400';
+    if (percent >= 60) return 'bg-blue-400';
+    if (percent >= 40) return 'bg-slate-400';
+    return 'bg-red-400';
   }
   
   // 獲取狀態顯示名稱
@@ -1657,11 +2841,109 @@ export class AppComponent implements OnDestroy, OnInit {
     const names: {[key: string]: string} = {
       'group': '群組',
       'supergroup': '超級群組',
-      'channel': '頻道'
+      'channel': '頻道',
+      'bot': '機器人'
     };
     return names[type] || type;
   }
   
+  // 獲取資源類型圖標和樣式
+  getResourceTypeStyle(type: string): { icon: string; label: string; bgClass: string; textClass: string; canMessage: boolean; canExtract: boolean } {
+    const styles: {[key: string]: { icon: string; label: string; bgClass: string; textClass: string; canMessage: boolean; canExtract: boolean }} = {
+      'channel': { icon: '📢', label: '頻道', bgClass: 'bg-purple-500/20', textClass: 'text-purple-400', canMessage: false, canExtract: false },
+      'supergroup': { icon: '👥', label: '超級群組', bgClass: 'bg-blue-500/20', textClass: 'text-blue-400', canMessage: true, canExtract: true },
+      'group': { icon: '💬', label: '群組', bgClass: 'bg-green-500/20', textClass: 'text-green-400', canMessage: true, canExtract: true },
+      'bot': { icon: '🤖', label: '機器人', bgClass: 'bg-orange-500/20', textClass: 'text-orange-400', canMessage: true, canExtract: false }
+    };
+    return styles[type] || { icon: '📌', label: '未知', bgClass: 'bg-slate-500/20', textClass: 'text-slate-400', canMessage: false, canExtract: false };
+  }
+
+  // 判斷資源是否為頻道
+  isChannel(resource: any): boolean {
+    return resource?.resource_type === 'channel';
+  }
+
+  // 判斷資源是否可以發送消息（用於資源發現頁面）
+  canSendMessageToResource(resource: any): boolean {
+    // 頻道不能發送消息
+    if (this.isChannel(resource)) return false;
+    // TODO: 後續可添加禁言群組檢測
+    return true;
+  }
+
+  // 判斷資源是否可以提取成員
+  canExtractMembers(resource: any): boolean {
+    // 頻道不能提取成員
+    if (this.isChannel(resource)) return false;
+    return true;
+  }
+
+  // 顯示頻道無法提取成員的警告
+  showChannelMemberWarning() {
+    this.toastService.warning('📢 頻道無法提取成員列表\n\nTelegram 不允許查看頻道的訂閱者列表。\n\n💡 建議：尋找該頻道的關聯討論群組');
+  }
+
+  // 顯示頻道無法發送消息的警告
+  showChannelMessageWarning() {
+    this.toastService.warning('📢 頻道無法發送消息\n\n只有頻道管理員可以發布內容。\n\n💡 建議：關注頻道獲取資訊，或尋找討論群組');
+  }
+
+  // 驗證資源類型（通過 Telegram API）
+  verifyResourceType(resource: any) {
+    if (!resource?.id) {
+      this.toastService.error('無效的資源');
+      return;
+    }
+    this.toastService.info(`🔍 正在驗證: ${resource.title || resource.username}...`);
+    this.ipcService.send('verify-resource-type', { resourceId: resource.id });
+  }
+
+  // 獲取資源的權限狀態描述
+  getResourcePermissionStatus(resource: any): { icon: string; text: string; class: string } {
+    if (this.isChannel(resource)) {
+      return { icon: '📢', text: '僅訂閱', class: 'text-purple-400' };
+    }
+    // TODO: 檢測禁言群組
+    return { icon: '✅', text: '可互動', class: 'text-green-400' };
+  }
+
+  // 獲取選中的頻道數量
+  getSelectedChannelCount(): number {
+    const selectedIds = this.selectedResourceIds();
+    const resources = this.discoveredResources();
+    return resources.filter(r => selectedIds.includes(r.id) && r.resource_type === 'channel').length;
+  }
+
+  // 獲取選中的群組數量（非頻道）
+  getSelectedGroupCount(): number {
+    const selectedIds = this.selectedResourceIds();
+    const resources = this.discoveredResources();
+    return resources.filter(r => selectedIds.includes(r.id) && r.resource_type !== 'channel').length;
+  }
+
+  // 獲取可發消息的選中資源
+  getSelectedMessageableResources(): any[] {
+    const selectedIds = this.selectedResourceIds();
+    const resources = this.discoveredResources();
+    return resources.filter(r => selectedIds.includes(r.id) && r.resource_type !== 'channel');
+  }
+
+  // 獲取可提取成員的選中資源
+  getSelectedExtractableResources(): any[] {
+    const selectedIds = this.selectedResourceIds();
+    const resources = this.discoveredResources();
+    return resources.filter(r => selectedIds.includes(r.id) && r.resource_type !== 'channel');
+  }
+
+  // 打開批量群發（自動過濾頻道）
+  openBatchMessageWithFilter() {
+    const channels = this.getSelectedChannelCount();
+    if (channels > 0) {
+      this.toastService.info(`📢 已自動排除 ${channels} 個頻道，將對 ${this.getSelectedGroupCount()} 個群組發送消息`);
+    }
+    this.showBatchMessageDialog.set(true);
+  }
+
   // ==================== Discussion Watcher Methods ====================
   
   // 初始化討論組監控
@@ -2414,6 +3696,7 @@ export class AppComponent implements OnDestroy, OnInit {
   newGroup = signal({ url: '', keywordSetIds: [] as number[] });
   newTemplate = signal({ name: '', prompt: ''});
   showTemplateCreator = signal(false); // 控制創建模板面板的顯示
+  showKeywordSetCreator = signal(false); // 控制創建關鍵詞集對話框的顯示
   newCampaign = signal(this.getEmptyCampaignForm());
   
   // --- Login State ---
@@ -2449,6 +3732,32 @@ export class AppComponent implements OnDestroy, OnInit {
 
   listenerAccounts = computed(() => this.accounts().filter(a => a.role === 'Listener' && a.status === 'Online'));
   senderAccounts = computed(() => this.accounts().filter(a => a.role === 'Sender' && (a.status === 'Online' || a.status === 'Warming Up')));
+  
+  // 獲取監控號列表（用於快速引導面板）
+  getListenerAccounts(): TelegramAccount[] {
+    return this.accounts().filter(a => a.role === 'Listener' && a.status === 'Online');
+  }
+  
+  // 獲取發送號列表（用於快速引導面板）
+  getSenderAccounts(): TelegramAccount[] {
+    return this.accounts().filter(a => a.role === 'Sender' && (a.status === 'Online' || a.status === 'Warming Up'));
+  }
+
+  // 獲取在線帳號數量（用於模板，避免在模板中使用箭頭函數）
+  getOnlineAccountsCount(): number {
+    return this.accounts().filter(a => a.status === 'Online').length;
+  }
+
+  // 導航到指定視圖（用於模板，避免在 @if 區塊中直接賦值）
+  navigateToView(viewName: string): void {
+    this.changeView(viewName as View);
+  }
+
+  // 導航到自動化中心的指定標籤頁
+  navigateToAutomationTab(tab: string): void {
+    this.currentView.set('automation');
+    this.automationTab.set(tab as 'targets' | 'keywords' | 'templates' | 'campaigns');
+  }
 
   // --- Kanban State ---
   leadStatuses: LeadStatus[] = ['New', 'Contacted', 'Replied', 'Follow-up', 'Closed-Won', 'Closed-Lost'];
@@ -3208,7 +4517,12 @@ export class AppComponent implements OnDestroy, OnInit {
     this.ipcService.cleanup('account-login-error');
     this.ipcService.cleanup('session-files-cleaned');
     this.ipcService.cleanup('session-files-cleanup-error');
-    
+    this.ipcService.cleanup('session-import-result');
+    this.ipcService.cleanup('session-import-needs-credentials');
+    this.ipcService.cleanup('orphan-sessions-detected');
+    this.ipcService.cleanup('orphan-sessions-scanned');
+    this.ipcService.cleanup('orphan-sessions-recovered');
+
     // Clear intervals and timers
     if (this.queueRefreshInterval) {
       clearInterval(this.queueRefreshInterval);
@@ -3502,7 +4816,58 @@ export class AppComponent implements OnDestroy, OnInit {
         this.toastService.error(`清理失败：${data.error}`);
         console.error('[Frontend] Session files cleanup error:', data);
     });
-    
+
+    // === Session 導入事件 ===
+    this.ipcService.on('session-import-result', (data: {success: boolean, message: string, phone?: string, count?: number}) => {
+        console.log('[Frontend] Session import result:', data);
+        if (data.success) {
+            this.toastService.success(data.phone ? `✅ Session 導入成功: ${data.phone}` : `✅ 導入完成: ${data.count || 1} 個帳號`, 3000);
+            // 刷新帳號列表
+            this.ipcService.send('get-initial-state');
+        } else {
+            this.toastService.error(`導入失敗: ${data.message}`, 4000);
+        }
+    });
+
+    this.ipcService.on('session-import-needs-credentials', (data: {filePath: string, phoneNumber: string, message: string}) => {
+        console.log('[Frontend] Session import needs credentials:', data);
+        this.toastService.warning(`⚠️ 導入 ${data.phoneNumber} 需要 API 憑據`, 4000);
+        // 可以在這裡打開一個對話框讓用戶輸入 API 憑據
+        // 暫時提示用戶去 API 憑據池頁面獲取
+        this.toastService.info('請先在「API 憑據池」頁面添加 API 憑據，然後重試導入', 5000);
+    });
+
+    // === 孤立 Session 檢測事件 ===
+    this.ipcService.on('orphan-sessions-detected', (data: {count: number, sessions: any[], message: string}) => {
+        console.log('[Frontend] Orphan sessions detected:', data);
+        if (data.count > 0) {
+            this.orphanSessions.set(data.sessions);
+            this.showOrphanSessionDialog.set(true);
+            this.toastService.warning(`發現 ${data.count} 個需要手動恢復的 Session 文件`, 5000);
+        }
+    });
+
+    this.ipcService.on('orphan-sessions-scanned', (data: {success: boolean, orphan_sessions: any[], message: string}) => {
+        console.log('[Frontend] Orphan sessions scanned:', data);
+        if (data.success && data.orphan_sessions.length > 0) {
+            this.orphanSessions.set(data.orphan_sessions);
+        }
+    });
+
+    this.ipcService.on('orphan-sessions-recovered', (data: {success: boolean, recovered_count: number, failed_count: number, message: string}) => {
+        console.log('[Frontend] Orphan sessions recovered:', data);
+        this.isRecoveringOrphanSessions.set(false);
+        if (data.success) {
+            this.toastService.success(`成功恢復 ${data.recovered_count} 個帳號`, 3000);
+            this.showOrphanSessionDialog.set(false);
+            this.orphanSessions.set([]);
+            // 刷新帳號列表
+            this.ipcService.send('get-accounts');
+        } else {
+            this.toastService.error(`恢復失敗: ${data.message}`, 4000);
+        }
+    });
+
     // Validation error handlers for automation center
     this.ipcService.on('keyword-set-validation-error', (data: {errors: string[], name?: string}) => {
         console.error('[Frontend] Keyword set validation error:', data);
@@ -3754,6 +5119,10 @@ export class AppComponent implements OnDestroy, OnInit {
     });
 
     this.ipcService.on('initial-state', (state: any) => {
+        console.log('[Frontend] ★★★ Received initial-state event ★★★');
+        console.log('[Frontend] initial-state payload:', state);
+        console.log('[Frontend] accounts in payload:', state?.accounts?.length || 0);
+        
         // Debounce rapid initial-state updates (min 500ms between updates to reduce memory pressure)
         const now = Date.now();
         if (now - this.lastInitialStateTime < 500) {
@@ -4218,7 +5587,16 @@ export class AppComponent implements OnDestroy, OnInit {
         this.loadResources();
       }
     });
-    
+
+    this.ipcService.on('resources-cleared', (data: any) => {
+      if (data.success) {
+        this.toastService.success(`🗑️ 已清空所有資源，共 ${data.deletedCount || 0} 條`);
+        this.refreshResourceStats();
+      } else {
+        this.toastService.error(`清空失敗: ${data.error}`);
+      }
+    });
+
     // 用戶列表事件
     this.ipcService.on('users-with-profiles', (data: any) => {
         console.log('[Frontend] Received users-with-profiles:', data.users?.length || 0);
@@ -4942,29 +6320,122 @@ export class AppComponent implements OnDestroy, OnInit {
     });
     
     this.ipcService.on('search-resources-complete', (data: { success: boolean, query?: string, found?: number, new?: number, updated?: number, error?: string }) => {
-      // 清除超時計時器
+      // 清除超时计时器
       if (this.searchTimeout) {
         clearTimeout(this.searchTimeout);
         this.searchTimeout = null;
       }
-      
+
       this.isSearchingResources.set(false);
       if (data.success) {
         if (data.found === 0) {
-          this.toastService.warning(`搜索完成：沒有找到相關結果，請嘗試其他關鍵詞`);
+          this.toastService.warning(`搜索完成：没有找到相关结果，请尝试其他关键词`);
         } else {
-          this.toastService.success(`🔍 搜索完成：找到 ${data.found} 個，新增 ${data.new} 個`);
+          this.toastService.success(`🔍 搜索完成：找到 ${data.found} 个，新增 ${data.new} 个`);
         }
         this.loadResources();
         this.refreshResourceStats();
       } else {
-        this.toastService.error(`搜索失敗: ${data.error}`);
+        this.toastService.error(`搜索失败: ${data.error}`);
       }
     });
-    
+
+    // 极搜搜索完成事件
+    this.ipcService.on('search-jiso-complete', (data: { success: boolean, results?: any[], total?: number, cached?: boolean, error?: string, bot?: string }) => {
+      if (data.success) {
+        const resultCount = data.results?.length || 0;
+        if (resultCount === 0) {
+          this.toastService.warning('极搜：没有找到相关结果');
+        } else {
+          const cacheTag = data.cached ? '（缓存）' : '';
+          this.toastService.success(`🔍 极搜完成${cacheTag}：找到 ${resultCount} 个群组`);
+        }
+        // 刷新资源列表以显示新保存的结果
+        this.loadResources();
+        this.refreshResourceStats();
+      } else {
+        this.toastService.error(`极搜失败: ${data.error}`);
+      }
+      
+      // 如果只选择了极搜渠道，则停止搜索状态
+      const sources = this.selectedSearchSources();
+      if (sources.length === 1 && sources[0] === 'jiso') {
+        this.isSearchingResources.set(false);
+        if (this.searchTimeout) {
+          clearTimeout(this.searchTimeout);
+          this.searchTimeout = null;
+        }
+      }
+    });
+
+    // 极搜进度事件
+    this.ipcService.on('jiso-search-progress', (data: { status: string, message: string }) => {
+      if (data.status === 'searching') {
+        this.toastService.info(`极搜：${data.message}`);
+      } else if (data.status === 'waiting') {
+        this.toastService.warning(`极搜：${data.message}`);
+      }
+    });
+
+    // 搜索渠道管理事件
+    this.ipcService.on('search-channels-list', (data: { success: boolean, system_channels?: any[], custom_channels?: any[], error?: string }) => {
+      if (data.success) {
+        this.systemChannels.set(data.system_channels || []);
+        this.customChannels.set(data.custom_channels || []);
+      }
+    });
+
+    this.ipcService.on('search-channel-added', (data: { success: boolean, channelId?: number, botUsername?: string, error?: string }) => {
+      if (data.success) {
+        this.toastService.success(`✅ 已添加渠道 @${data.botUsername}`);
+        this.showAddChannelDialog.set(false);
+        this.loadSearchChannels();
+      } else {
+        this.toastService.error(`添加失敗: ${data.error}`);
+      }
+    });
+
+    this.ipcService.on('search-channel-updated', (data: { success: boolean, channelId?: number, error?: string }) => {
+      if (data.success) {
+        this.toastService.success('✅ 渠道已更新');
+        this.loadSearchChannels();
+      } else {
+        this.toastService.error(`更新失敗: ${data.error}`);
+      }
+    });
+
+    this.ipcService.on('search-channel-deleted', (data: { success: boolean, channelId?: number, error?: string }) => {
+      if (data.success) {
+        this.toastService.success('🗑️ 渠道已刪除');
+        this.loadSearchChannels();
+      } else {
+        this.toastService.error(`刪除失敗: ${data.error}`);
+      }
+    });
+
+    this.ipcService.on('search-channel-tested', (data: { success: boolean, botUsername?: string, status?: string, responseTime?: number, error?: string }) => {
+      this.isTestingChannel.set(false);
+      if (data.success) {
+        this.toastService.success(`✅ @${data.botUsername} 測試成功 (${data.responseTime?.toFixed(1)}s)`);
+        this.loadSearchChannels();
+      } else {
+        this.toastService.warning(`❌ @${data.botUsername} 測試失敗: ${data.error}`);
+        this.loadSearchChannels();
+      }
+    });
+
     this.ipcService.on('resources-list', (data: { success: boolean, resources?: any[], total?: number, error?: string }) => {
       if (data.success && data.resources) {
         this.discoveredResources.set(data.resources);
+        
+        // 自動驗證尚未驗證類型的資源（批量處理，避免 FloodWait）
+        const unverifiedResources = data.resources.filter(r => !r.type_verified && r.username);
+        if (unverifiedResources.length > 0) {
+          // 限制每次最多驗證 10 個資源
+          const toVerify = unverifiedResources.slice(0, 10);
+          const resourceIds = toVerify.map(r => r.id);
+          this.ipcService.send('batch-verify-resource-types', { resourceIds });
+        }
       }
     });
     
@@ -4993,6 +6464,27 @@ export class AppComponent implements OnDestroy, OnInit {
         this.refreshResourceStats();
       } else {
         this.toastService.error(`添加失敗: ${data.error}`);
+      }
+    });
+
+    // 資源類型驗證結果
+    this.ipcService.on('resource-type-verified', (data: { success: boolean, resourceId?: number, oldType?: string, newType?: string, title?: string, error?: string }) => {
+      if (data.success) {
+        if (data.oldType !== data.newType) {
+          this.toastService.success(`✅ 類型已更新: ${data.oldType} → ${data.newType}`);
+        } else {
+          this.toastService.info(`📋 類型確認: ${data.newType}`);
+        }
+        this.loadResources();
+      } else {
+        this.toastService.error(`驗證失敗: ${data.error}`);
+      }
+    });
+    
+    // 批量類型驗證完成
+    this.ipcService.on('resources-types-verified', (data: { success: boolean, count?: number }) => {
+      if (data.success && data.count && data.count > 0) {
+        this.loadResources();
       }
     });
     
@@ -5043,8 +6535,23 @@ export class AppComponent implements OnDestroy, OnInit {
     
     // 加入並監控事件
     this.ipcService.on('join-and-monitor-complete', (data: { success: boolean, resourceId?: number, error?: string }) => {
+      this.isJoiningResource.set(false);
       if (data.success) {
         this.toastService.success('✅ 已加入並添加到監控');
+        this.showJoinMonitorDialog.set(false);
+        this.loadResources();
+        this.refreshResourceStats();
+      } else {
+        this.toastService.error(`加入失敗: ${data.error}`);
+      }
+    });
+
+    // 帶帳號選擇的加入並監控事件
+    this.ipcService.on('join-and-monitor-with-account-complete', (data: { success: boolean, resourceId?: number, phone?: string, error?: string }) => {
+      this.isJoiningResource.set(false);
+      if (data.success) {
+        this.toastService.success(`✅ 已使用 ${data.phone} 加入並設置監控`);
+        this.showJoinMonitorDialog.set(false);
         this.loadResources();
         this.refreshResourceStats();
       } else {
@@ -5054,6 +6561,8 @@ export class AppComponent implements OnDestroy, OnInit {
     
     // 批量加入並監控事件
     this.ipcService.on('batch-join-and-monitor-complete', (data: { success: boolean, total?: number, successCount?: number, failed?: number, error?: string }) => {
+      this.isJoiningResource.set(false);
+      this.closeBatchJoinMonitorDialog();
       if (data.success) {
         this.toastService.success(`✅ 批量加入監控完成：成功 ${data.successCount}，失敗 ${data.failed}`);
         this.loadResources();
@@ -5063,7 +6572,66 @@ export class AppComponent implements OnDestroy, OnInit {
         this.toastService.error(`批量操作失敗: ${data.error}`);
       }
     });
+
+    // 成員提取進度事件
+    this.ipcService.on('members-extraction-progress', (data: { resourceId: number, extracted: number, total: number, status: string }) => {
+      this.memberListProgress.set({
+        extracted: data.extracted,
+        total: data.total,
+        status: data.status
+      });
+    });
+
+    // 成員提取完成事件
+    this.ipcService.on('members-extracted', (data: { 
+      success: boolean, 
+      resourceId?: number, 
+      members?: any[], 
+      total?: number, 
+      error?: string,
+      error_code?: string,
+      error_details?: { reason?: string, suggestion?: string, can_auto_join?: boolean, alternative?: string }
+    }) => {
+      this.memberListLoading.set(false);
+      if (data.success && data.members) {
+        // 追加成員數據
+        const existingIds = new Set(this.memberListData().map(m => m.user_id));
+        const newMembers = data.members.filter(m => !existingIds.has(m.user_id));
+        this.memberListData.update(current => [...current, ...newMembers]);
+        this.memberListProgress.update(p => ({
+          ...p,
+          extracted: this.memberListData().length,
+          status: `已提取 ${this.memberListData().length} 個成員`
+        }));
+        if (newMembers.length > 0) {
+          this.toastService.success(`✅ 成功提取 ${newMembers.length} 個新成員`);
+        } else {
+          this.toastService.info('沒有更多新成員');
+        }
+      } else if (data.error) {
+        // 顯示結構化錯誤信息
+        this.handleMemberExtractionError(data);
+      }
+    });
+
+    // 批量成員提取完成事件
+    this.ipcService.on('batch-members-extracted', (data: { success: boolean, totalGroups?: number, totalMembers?: number, error?: string }) => {
+      if (data.success) {
+        this.toastService.success(`✅ 批量提取完成：${data.totalGroups} 個群組，共 ${data.totalMembers} 個成員`);
+      } else {
+        this.toastService.error(`批量提取失敗: ${data.error}`);
+      }
+    });
     
+    // 群組消息發送結果事件
+    this.ipcService.on('group-message-sent', (data: { success: boolean, resourceId?: number, messageId?: number, error?: string }) => {
+      if (data.success) {
+        this.toastService.success('✅ 消息已成功發送到群組');
+      } else {
+        this.toastService.error(`❌ 發送失敗: ${data.error || '未知錯誤'}`);
+      }
+    });
+
     // 鏈接分析事件
     this.ipcService.on('link-analysis-complete', (data: any) => {
       this.isAnalyzingLink.set(false);
@@ -5527,18 +7095,27 @@ export class AppComponent implements OnDestroy, OnInit {
   }
 
   /**
-   * 登出帳戶
+   * 退出账户（断开连接但保留账户）
    */
   logoutAccount(accountId: number): void {
     const account = this.accounts().find(a => a.id === accountId);
     if (!account) {
-      this.toastService.error('帳戶未找到');
+      this.toastService.error('账户未找到');
       return;
     }
     
-    if (confirm(`確定要登出帳戶 ${account.phone} 嗎？`)) {
-      this.toastService.info('正在登出帳戶...');
+    if (confirm(`确定要退出账户 ${account.phone} 吗？`)) {
+      this.toastService.info('正在退出账户...');
       this.ipcService.send('logout-account', accountId);
+      
+      // 监听退出结果
+      this.ipcService.once('logout-account-result', (result: any) => {
+        if (result.success) {
+          this.toastService.success(`账户 ${account.phone} 已退出`);
+        } else {
+          this.toastService.error(`退出失败: ${result.error || '未知错误'}`);
+        }
+      });
     }
   }
 
@@ -5660,7 +7237,7 @@ export class AppComponent implements OnDestroy, OnInit {
     'NO_ACTIVE_CAMPAIGN': {view: 'automation', elementId: 'campaign-list-section'},
     'CAMPAIGN_INCOMPLETE': {view: 'automation', elementId: 'campaign-rules-section'},
     'NO_TEMPLATE': {view: 'automation', elementId: 'templates-section'},
-    'AI_NOT_ENABLED': {view: 'settings', elementId: 'ai-settings-section'}
+    'AI_NOT_ENABLED': {view: 'ai-center', elementId: 'ai-settings-section'}
   };
   
   // 導航到錯誤位置
@@ -6211,7 +7788,30 @@ export class AppComponent implements OnDestroy, OnInit {
       this.toastService.info('正在清理孤立的 session 文件...');
     }
   }
-  
+
+  // === 孤立 Session 恢復 ===
+  scanOrphanSessions() {
+    this.toastService.info('正在掃描孤立的 Session 文件...', 2000);
+    this.ipcService.send('scan-orphan-sessions', {});
+  }
+
+  recoverOrphanSessions() {
+    const sessions = this.orphanSessions();
+    if (sessions.length === 0) {
+      this.toastService.warning('沒有需要恢復的 Session 文件');
+      return;
+    }
+    
+    this.isRecoveringOrphanSessions.set(true);
+    this.toastService.info(`正在恢復 ${sessions.length} 個帳號...`, 2000);
+    this.ipcService.send('recover-orphan-sessions', { sessions });
+  }
+
+  dismissOrphanSessionDialog() {
+    this.showOrphanSessionDialog.set(false);
+    this.orphanSessions.set([]);
+  }
+
   toggleAllAccountSelection(event: Event) {
       const isChecked = (event.target as HTMLInputElement).checked;
       const filteredIds = new Set(this.filteredAccounts().map(a => a.id));
@@ -6314,6 +7914,45 @@ export class AppComponent implements OnDestroy, OnInit {
       this.ipcService.send('update-account-data', { id: accountId, updates: { role }});
   }
 
+  // 顯示添加群組對話框
+  showAddGroupDialog() {
+      // 提示用戶添加群組
+      this.toastService.info('請在監控群組區塊中點擊「+ 添加群組」');
+  }
+  
+  // 顯示添加關鍵詞集對話框
+  showAddKeywordSetDialog() {
+      // 會員配額檢查 - 關鍵詞集數量限制
+      const quotas = this.membershipService.quotas();
+      if (quotas.maxKeywordSets !== -1 && this.keywordSets().length >= quotas.maxKeywordSets) {
+          this.toastService.warning(`${this.membershipService.levelIcon()} ${this.membershipService.levelName()} 最多支持 ${quotas.maxKeywordSets} 個關鍵詞集，升級解鎖更多`);
+          window.dispatchEvent(new CustomEvent('open-membership-dialog'));
+          return;
+      }
+      // 顯示創建對話框
+      this.newKeywordSet.set({ name: '' });
+      this.showKeywordSetCreator.set(true);
+  }
+  
+  submitNewKeywordSet() {
+      const form = this.newKeywordSet();
+      const name = form.name.trim();
+      if (name) {
+          console.log('[Frontend] Sending add-keyword-set command:', name);
+          this.ipcService.send('add-keyword-set', { name: name });
+          this.toastService.success('正在創建關鍵詞集...', 2000);
+          this.showKeywordSetCreator.set(false);
+          this.newKeywordSet.set({ name: '' });
+      } else {
+          this.toastService.warning('請輸入關鍵詞集名稱', 3000);
+      }
+  }
+  
+  cancelNewKeywordSet() {
+      this.showKeywordSetCreator.set(false);
+      this.newKeywordSet.set({ name: '' });
+  }
+
   addKeywordSet() {
       // 會員配額檢查 - 關鍵詞集數量限制
       const quotas = this.membershipService.quotas();
@@ -6337,6 +7976,54 @@ export class AppComponent implements OnDestroy, OnInit {
           // 不要立即清空輸入框，等成功後再清空（由事件監聯器處理）
       } else {
           this.toastService.warning('請輸入關鍵詞集名稱', 3000);
+      }
+  }
+  
+  // 處理群組配置保存（從自動化中心發送）
+  handleSaveGroupConfig(event: { groupId: number; keywordSetIds: number[] }) {
+      console.log('[Frontend] Saving group config:', event);
+      
+      // 找到群組並獲取其 URL
+      const group = this.monitoredGroups().find(g => g.id === event.groupId);
+      if (group) {
+          // 使用 add-group IPC 更新群組的關鍵詞集綁定
+          // 後端的 add_group 會檢測 URL 是否已存在，並更新而非創建
+          this.ipcService.send('add-group', { 
+              url: group.url, 
+              keywordSetIds: event.keywordSetIds 
+          });
+          this.toastService.success('群組配置已保存', 2000);
+      } else {
+          console.error('[Frontend] Group not found for config save:', event.groupId);
+          this.toastService.error('找不到群組，無法保存配置');
+      }
+  }
+  
+  // 處理關鍵詞集配置保存（從自動化中心發送）
+  handleSaveKeywordSetConfig(event: { setId: number; keywords: string[] }) {
+      console.log('[Frontend] Saving keyword set config:', event);
+      
+      // 獲取當前詞集的關鍵詞列表
+      const currentSet = this.keywordSets().find(s => s.id === event.setId);
+      const currentKeywords = currentSet?.keywords?.map(k => k.keyword) || [];
+      
+      // 計算需要添加的新關鍵詞
+      const newKeywords = event.keywords.filter(k => !currentKeywords.includes(k));
+      
+      // 為每個新關鍵詞調用 add-keyword
+      for (const keyword of newKeywords) {
+          console.log('[Frontend] Adding keyword:', keyword, 'to set:', event.setId);
+          this.ipcService.send('add-keyword', { 
+              setId: event.setId, 
+              keyword: keyword,
+              isRegex: false 
+          });
+      }
+      
+      if (newKeywords.length > 0) {
+          this.toastService.success(`已添加 ${newKeywords.length} 個關鍵詞`, 2000);
+      } else {
+          this.toastService.info('沒有新關鍵詞需要添加', 2000);
       }
   }
 
@@ -8456,6 +10143,104 @@ export class AppComponent implements OnDestroy, OnInit {
         this.refreshQueueStatus();
       }, 2000 - timeSinceLastRefresh);
     }
+  }
+  
+  // === Phase 1 優化：隊列進度組件支持方法 ===
+  
+  // 獲取帳號隊列狀態（轉換為組件需要的格式）
+  getAccountQueueStatuses(): AccountQueueStatus[] {
+    const statuses = this.queueStatuses();
+    return Object.entries(statuses).map(([phone, status]) => {
+      const account = this.accounts().find(a => a.phone === phone);
+      return {
+        phone,
+        displayName: phone,  // 使用電話號碼作為顯示名稱
+        status: status.processing > 0 ? 'active' as const : 
+                status.pending > 0 ? 'idle' as const : 'idle' as const,
+        pending: status.pending,
+        processing: status.processing,
+        completed: status.stats.completed,
+        failed: status.stats.failed,
+        retrying: status.retrying,
+        sendRate: status.processing > 0 ? 1.5 : 0,  // 估算值
+        avgResponseTime: 500,  // 預設值
+        dailyLimit: account?.dailySendLimit ?? 100,
+        dailyUsed: account?.dailySendCount ?? 0,
+        estimatedMinutes: status.pending > 0 ? Math.ceil(status.pending / 1.5) : 0,
+        lastError: status.failed > 0 ? '部分消息發送失敗' : undefined
+      };
+    });
+  }
+  
+  // 暫停所有隊列
+  pauseAllQueues() {
+    this.ipcService.send('pause-all-queues', {});
+    this.toastService.info('正在暫停所有發送隊列...', 2000);
+  }
+  
+  // 恢復所有隊列
+  resumeAllQueues() {
+    this.ipcService.send('resume-all-queues', {});
+    this.toastService.info('正在恢復所有發送隊列...', 2000);
+  }
+  
+  // 重試所有失敗項
+  retryAllFailed() {
+    this.ipcService.send('retry-all-failed', {});
+    this.toastService.info('正在重試所有失敗的消息...', 2000);
+  }
+  
+  // === Phase 1 優化：配置診斷方法 ===
+  
+  // 運行配置診斷
+  checkAutomationConfig() {
+    this.toastService.info('正在檢查配置...', 2000);
+    
+    // 發送診斷請求到後端
+    this.ipcService.send('check-automation-config', {
+      accounts: this.accounts().map(a => ({ phone: a.phone, role: a.role, status: a.status })),
+      groups: this.monitoredGroups(),
+      keywords: this.keywordSets(),
+      campaigns: this.campaigns()
+    });
+  }
+  
+  // === Phase 1 優化：快速工作流支持方法 ===
+  
+  // 處理工作流導航
+  handleWorkflowNavigation(event: {view: string, handler?: string}) {
+    // 切換到目標視圖
+    this.changeView(event.view as any);
+    
+    // 如果有特殊操作處理
+    if (event.handler) {
+      setTimeout(() => {
+        switch (event.handler) {
+          case 'start-monitoring':
+            this.startMonitoring();
+            break;
+          case 'scan-sessions':
+            this.scanOrphanSessions();
+            break;
+          case 'new-campaign':
+            // 觸發創建新活動的邏輯
+            break;
+          case 'export-leads':
+            this.exportLeads();
+            break;
+          default:
+            console.log('[Workflow] Unknown handler:', event.handler);
+        }
+      }, 300);
+    }
+  }
+  
+  // 工作流完成回調
+  onWorkflowCompleted(workflow: Workflow) {
+    this.toastService.success(`🎉 工作流「${workflow.title}」已完成！`, 4000);
+    
+    // 記錄完成的工作流（可用於統計）
+    console.log('[Workflow] Completed:', workflow.id);
   }
   
   async loadChatHistory(userId: string, reset: boolean = true) {

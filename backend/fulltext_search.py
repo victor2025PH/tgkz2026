@@ -126,11 +126,16 @@ class FullTextSearchEngine:
             print("[FullTextSearch] FTS5 tables and triggers created", file=sys.stderr)
             
         except aiosqlite.OperationalError as e:
-            if "already exists" not in str(e).lower():
+            error_str = str(e).lower()
+            # 靜默處理已存在或表不存在的情況
+            if "already exists" not in error_str and "no such table" not in error_str:
                 print(f"[FullTextSearch] Warning: {e}", file=sys.stderr)
             self._initialized = True
         except Exception as e:
-            print(f"[FullTextSearch] Error initializing FTS: {e}", file=sys.stderr)
+            error_str = str(e).lower()
+            if "no such table" not in error_str:
+                print(f"[FullTextSearch] Error initializing FTS: {e}", file=sys.stderr)
+            self._initialized = True  # 標記為已初始化，避免重複嘗試
         finally:
             await conn.close()
     
@@ -364,30 +369,53 @@ class FullTextSearchEngine:
                 print(f"[FullTextSearch] Database integrity check failed: {result[0]}, skipping index rebuild", file=sys.stderr)
                 return
             
-            # 重建聊天記錄索引
-            await conn.execute("DELETE FROM chat_history_fts")
-            await conn.execute("""
-                INSERT INTO chat_history_fts(rowid, content, user_id, timestamp, role, account_phone)
-                SELECT id, content, user_id, timestamp, role, account_phone
-                FROM chat_history
-            """)
+            # ========== 優化：檢查表是否存在再重建索引 ==========
+            # 檢查 chat_history 表是否存在
+            cursor = await conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='chat_history'"
+            )
+            chat_history_exists = await cursor.fetchone() is not None
             
-            # 重建 Lead 索引
-            await conn.execute("DELETE FROM leads_fts")
-            await conn.execute("""
-                INSERT INTO leads_fts(rowid, username, first_name, last_name, source_group, triggered_keyword, status, user_id, id)
-                SELECT id, username, first_name, last_name, source_group, triggered_keyword, status, user_id, id
-                FROM leads
-            """)
+            if chat_history_exists:
+                # 重建聊天記錄索引
+                try:
+                    await conn.execute("DELETE FROM chat_history_fts")
+                    await conn.execute("""
+                        INSERT INTO chat_history_fts(rowid, content, user_id, timestamp, role, account_phone)
+                        SELECT id, content, user_id, timestamp, role, account_phone
+                        FROM chat_history
+                    """)
+                except Exception as e:
+                    pass  # 靜默處理 FTS 表不存在的情況
+            
+            # 檢查 leads 表是否存在
+            cursor = await conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='leads'"
+            )
+            leads_exists = await cursor.fetchone() is not None
+            
+            if leads_exists:
+                # 重建 Lead 索引
+                try:
+                    await conn.execute("DELETE FROM leads_fts")
+                    await conn.execute("""
+                        INSERT INTO leads_fts(rowid, username, first_name, last_name, source_group, triggered_keyword, status, user_id, id)
+                        SELECT id, username, first_name, last_name, source_group, triggered_keyword, status, user_id, id
+                        FROM leads
+                    """)
+                except Exception as e:
+                    pass  # 靜默處理 FTS 表不存在的情況
             
             await conn.commit()
-            print("[FullTextSearch] FTS indexes rebuilt", file=sys.stderr)
+            if chat_history_exists or leads_exists:
+                print("[FullTextSearch] FTS indexes rebuilt", file=sys.stderr)
             
         except Exception as e:
             error_str = str(e).lower()
             if "malformed" in error_str or "corrupt" in error_str or "database disk image" in error_str:
                 print(f"[FullTextSearch] Database corruption detected during index rebuild: {e}", file=sys.stderr)
-                print("[FullTextSearch] You may need to repair or recreate the database", file=sys.stderr)
+            elif "no such table" in error_str:
+                pass  # 靜默處理表不存在的情況，這是正常的
             else:
                 print(f"[FullTextSearch] Error rebuilding index: {e}", file=sys.stderr)
         finally:

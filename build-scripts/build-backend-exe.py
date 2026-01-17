@@ -63,6 +63,36 @@ def create_spec_file():
         'pyrogram.crypto',
         'tgcrypto',
         
+        # Telethon 相關 (QR 碼登入)
+        'telethon',
+        'telethon.client',
+        'telethon.sessions',
+        'telethon.sessions.string',
+        'telethon.errors',
+        'telethon.tl',
+        'telethon.tl.functions',
+        'telethon.tl.functions.auth',
+        'telethon.tl.types',
+        'telethon.tl.types.auth',
+        'telethon.crypto',
+        
+        # QR 碼生成
+        'qrcode',
+        'qrcode.main',
+        'qrcode.image',
+        'qrcode.image.pil',
+        'qrcode.image.base',
+        'qrcode.constants',
+        
+        # Pillow (QR 碼圖片處理)
+        'PIL',
+        'PIL.Image',
+        'PIL.ImageDraw',
+        
+        # SOCKS 代理支持
+        'socks',
+        'pysocks',
+        
         # 數據庫
         'aiosqlite',
         'sqlite3',
@@ -101,6 +131,10 @@ def create_spec_file():
         'httpx',
         'socksio',
         'python_socks',
+        
+        # Playwright (API 憑據抓取)
+        'playwright',
+        'playwright.async_api',
     ]
     
     # 收集後端所有 Python 文件作為數據
@@ -142,7 +176,7 @@ a = Analysis(
         'matplotlib',
         'numpy.testing',
         'scipy',
-        'PIL',
+        # 'PIL',  # 需要 PIL 來生成 QR 碼圖片
         'tkinter',
         'test',
         'unittest',

@@ -17,7 +17,7 @@ a = Analysis(
         # 包含默認配置
         (str(Path(r'C:\tgkz2026') / 'default-config'), 'default-config'),
     ],
-    hiddenimports=['pyrogram', 'pyrogram.raw', 'pyrogram.raw.all', 'pyrogram.raw.base', 'pyrogram.raw.functions', 'pyrogram.raw.types', 'pyrogram.handlers', 'pyrogram.types', 'pyrogram.errors', 'pyrogram.crypto', 'tgcrypto', 'aiosqlite', 'sqlite3', 'aiohttp', 'aiohttp.web', 'sentence_transformers', 'chromadb', 'torch', 'transformers', 'asyncio', 'json', 'typing', 'datetime', 'pathlib', 'hashlib', 'uuid', 'random', 'time', 're', 'os', 'sys', 'gc', 'traceback', 'logging', 'collections', 'functools', 'itertools', 'httpx', 'socksio', 'python_socks'],
+    hiddenimports=['pyrogram', 'pyrogram.raw', 'pyrogram.raw.all', 'pyrogram.raw.base', 'pyrogram.raw.functions', 'pyrogram.raw.types', 'pyrogram.handlers', 'pyrogram.types', 'pyrogram.errors', 'pyrogram.crypto', 'tgcrypto', 'telethon', 'telethon.client', 'telethon.sessions', 'telethon.sessions.string', 'telethon.errors', 'telethon.tl', 'telethon.tl.functions', 'telethon.tl.functions.auth', 'telethon.tl.types', 'telethon.tl.types.auth', 'telethon.crypto', 'qrcode', 'qrcode.main', 'qrcode.image', 'qrcode.image.pil', 'qrcode.image.base', 'qrcode.constants', 'PIL', 'PIL.Image', 'PIL.ImageDraw', 'socks', 'pysocks', 'aiosqlite', 'sqlite3', 'aiohttp', 'aiohttp.web', 'sentence_transformers', 'chromadb', 'torch', 'transformers', 'asyncio', 'json', 'typing', 'datetime', 'pathlib', 'hashlib', 'uuid', 'random', 'time', 're', 'os', 'sys', 'gc', 'traceback', 'logging', 'collections', 'functools', 'itertools', 'httpx', 'socksio', 'python_socks', 'playwright', 'playwright.async_api'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -25,7 +25,7 @@ a = Analysis(
         'matplotlib',
         'numpy.testing',
         'scipy',
-        'PIL',
+        # 'PIL',  # 需要 PIL 來生成 QR 碼圖片
         'tkinter',
         'test',
         'unittest',

@@ -1,5 +1,5 @@
 
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -9,6 +9,12 @@ const AutoAiSetup = require('./auto-ai-setup');
 // 在应用启动前设置语言环境为中文
 // 必须在 app.on('ready') 之前调用
 app.commandLine.appendSwitch('lang', 'zh-CN');
+
+// 修復截屏時畫面消失的問題
+// 禁用 GPU 合成器，使用軟體渲染來確保截屏工具可以正常捕獲畫面
+app.commandLine.appendSwitch('disable-gpu-compositing');
+// 啟用離屏渲染以提高兼容性
+app.commandLine.appendSwitch('enable-features', 'CanvasOopRasterization');
 
 let mainWindow;
 let pythonProcess = null;
@@ -234,10 +240,17 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 768,
+    // 設置背景顏色，避免截屏時畫面消失
+    backgroundColor: '#0f172a',
+    // 確保窗口不透明
+    transparent: false,
     webPreferences: {
       nodeIntegration: true, // Allows renderer to use Node.js APIs like 'require'
       contextIsolation: false, // Required for nodeIntegration to work
-      preload: path.join(__dirname, 'preload.js') // We will create this in a future step for better security
+      preload: path.join(__dirname, 'preload.js'), // We will create this in a future step for better security
+      // 禁用 WebGL 硬體加速以提高截屏兼容性
+      enableBlinkFeatures: '',
+      disableBlinkFeatures: 'Accelerated2dCanvas'
     },
     title: 'TG-Matrix',
     // In a real build, you'd create an icon file.
@@ -346,6 +359,20 @@ app.on('ready', async () => {
     process.env.LANG = 'zh_CN.UTF-8';
     process.env.LC_ALL = 'zh_CN.UTF-8';
   }
+  
+  // 註冊本地文件協議，用於安全載入頭像等本地資源
+  protocol.registerFileProtocol('local-file', (request, callback) => {
+    const filePath = decodeURIComponent(request.url.replace('local-file://', ''));
+    // 安全檢查：只允許載入 backend/data 目錄下的文件
+    const normalizedPath = path.normalize(filePath);
+    const dataDir = path.join(__dirname, 'backend', 'data');
+    if (normalizedPath.startsWith(dataDir)) {
+      callback({ path: normalizedPath });
+    } else {
+      console.error('[Protocol] Blocked access to:', normalizedPath);
+      callback({ error: -6 }); // NET::ERR_FILE_NOT_FOUND
+    }
+  });
   
   // 初始化 AI 自動設置模塊
   autoAiSetup = new AutoAiSetup();
@@ -510,7 +537,7 @@ function findPythonExecutable() {
 }
 
 function startPythonBackend() {
-    // 優先使用編譯好的 exe，否則使用 Python 腳本
+    // 開發模式下優先使用 Python 腳本，生產環境優先使用編譯好的 exe
     const backendExe = path.join(__dirname, 'backend-exe', 'tg-matrix-backend.exe');
     const backendExeResources = path.join(process.resourcesPath || __dirname, 'backend-exe', 'tg-matrix-backend.exe');
     const pythonScript = path.join(__dirname, 'backend', 'main.py');
@@ -520,22 +547,35 @@ function startPythonBackend() {
     let backendArgs = [];
     let workingDir = __dirname;
     
-    // 檢查是否有編譯好的 exe
-    if (fs.existsSync(backendExe)) {
+    // 開發模式：優先使用 Python 腳本（方便調試和修改代碼）
+    const isDevelopment = !app.isPackaged;
+    
+    if (isDevelopment && fs.existsSync(pythonScript)) {
+        // 開發模式：使用 Python 腳本
+        const pythonExecutable = findPythonExecutable();
+        backendPath = pythonExecutable;
+        backendArgs = [pythonScript];
+        workingDir = path.join(__dirname, 'backend');
+        console.log('[Backend] 🔧 開發模式：使用 Python 腳本後端');
+        console.log('[Backend] Python executable:', pythonExecutable);
+    } else if (fs.existsSync(backendExe)) {
+        // 生產環境：使用本地 exe
         useExe = true;
         backendPath = backendExe;
         workingDir = path.join(__dirname, 'backend-exe');
         console.log('[Backend] 使用編譯好的 exe 後端');
     } else if (fs.existsSync(backendExeResources)) {
+        // 生產環境：使用 resources 中的 exe
         useExe = true;
         backendPath = backendExeResources;
         workingDir = path.dirname(backendExeResources);
         console.log('[Backend] 使用 resources 中的 exe 後端');
     } else if (fs.existsSync(pythonScript)) {
-        // 使用 Python 腳本
+        // 回退：使用 Python 腳本
         const pythonExecutable = findPythonExecutable();
         backendPath = pythonExecutable;
         backendArgs = [pythonScript];
+        workingDir = path.join(__dirname, 'backend');
         console.log('[Backend] 使用 Python 腳本後端');
         console.log('[Backend] Python executable:', pythonExecutable);
     } else {
@@ -577,10 +617,21 @@ function startPythonBackend() {
         }
     });
     
+    // Buffer for incomplete lines (handles JSON split across multiple data events)
+    let stdoutBuffer = '';
+    
     // Handle stdout (events from Python)
     pythonProcess.stdout.on('data', (data) => {
-        const lines = data.toString().split('\n').filter(line => line.trim());
-        lines.forEach(line => {
+        // Append new data to buffer
+        stdoutBuffer += data.toString();
+        
+        // Process complete lines
+        const lines = stdoutBuffer.split('\n');
+        
+        // Keep the last incomplete line in buffer (or empty if ends with newline)
+        stdoutBuffer = lines.pop() || '';
+        
+        lines.filter(line => line.trim()).forEach(line => {
             try {
                 const event = JSON.parse(line);
                 console.log('[Backend] Event:', event.event);
@@ -602,6 +653,15 @@ function startPythonBackend() {
                 
                 // Forward other events to frontend
                 if (mainWindow && !mainWindow.isDestroyed()) {
+                    // Special logging for initial-state and accounts-updated
+                    if (event.event === 'initial-state') {
+                        console.log('[Backend] ★★★ Forwarding initial-state to frontend ★★★');
+                        console.log('[Backend] initial-state accounts count:', event.payload?.accounts?.length || 0);
+                    }
+                    if (event.event === 'accounts-updated') {
+                        console.log('[Backend] ★★★ Forwarding accounts-updated to frontend ★★★');
+                        console.log('[Backend] accounts-updated count:', Array.isArray(event.payload) ? event.payload.length : 'not array');
+                    }
                     mainWindow.webContents.send(event.event, event.payload);
                 }
             } catch (e) {
@@ -781,6 +841,10 @@ const passThroughChannels = [
     'init-resource-discovery', 'search-resources', 'get-resources', 'get-resource-stats',
     'add-resource-manually', 'delete-resource', 'add-to-join-queue', 'process-join-queue',
     'batch-join-resources', 'get-discovery-keywords', 'add-discovery-keyword', 'get-discovery-logs',
+    // Jiso Search Commands
+    'search-jiso', 'check-jiso-availability',
+    // Search Channel Management Commands
+    'get-search-channels', 'add-search-channel', 'update-search-channel', 'delete-search-channel', 'test-search-channel',
     // Discussion Watcher Commands
     'init-discussion-watcher', 'discover-discussion', 'discover-discussions-from-resources',
     'get-discussion-groups', 'update-discussion-monitoring', 'get-discussion-messages',
@@ -812,10 +876,37 @@ const passThroughChannels = [
     'get-collab-groups', 'create-collab-group', 'update-collab-group',
     'delete-collab-group', 'start-collab-session', 'stop-collab-session', 'get-collab-stats',
     // Resource Discovery Extended Commands
-    'join-and-monitor-resource', 'batch-join-and-monitor', 'analyze-group-link',
+    'join-and-monitor-resource', 'join-and-monitor-with-account', 'batch-join-and-monitor', 'analyze-group-link',
     'batch-analyze-links', 'get-analysis-history',
     // Ollama / Local AI Commands
-    'get-ollama-models', 'test-ollama-connection', 'ollama-generate'
+    'get-ollama-models', 'test-ollama-connection', 'ollama-generate',
+    // QR Login Commands (Phase 1)
+    'qr-login-create', 'qr-login-status', 'qr-login-refresh', 'qr-login-submit-2fa', 'qr-login-cancel',
+    // IP Binding Commands (Phase 2)
+    'ip-bind', 'ip-unbind', 'ip-get-binding', 'ip-get-all-bindings', 'ip-get-statistics', 'ip-verify-binding',
+    // Credential Scraper Commands (Phase 2)
+    'credential-start-scrape', 'credential-submit-code', 'credential-get-status', 'credential-get-all', 'credential-cancel-scrape',
+    // API Credential Pool Commands
+    'get-api-credentials', 'add-api-credential', 'remove-api-credential', 'toggle-api-credential',
+    'bulk-import-api-credentials', 'get-api-recommendation',
+    // Platform API Pool Commands
+    'get-platform-api-usage', 'allocate-platform-api', 'release-platform-api',
+    // Account Edit & Proxy Commands
+    'update-account', 'test-proxy', 'sync-account-info', 'batch-update-accounts', 'logout-account',
+    // Tags & Groups
+    'save-tags', 'save-groups', 'get-tags', 'get-groups',
+    // AI Personas
+    'save-personas', 'get-personas',
+    // Member Extraction Commands
+    'extract-members', 'get-extracted-members', 'get-member-stats', 'get-online-members',
+    // Group Message Commands
+    'send-group-message', 'schedule-message',
+    // Resource Commands
+    'clear-all-resources', 'verify-resource-type',
+    // TData Import Commands
+    'scan-tdata', 'import-tdata-account', 'import-tdata-batch', 'get-default-tdata-path',
+    // Orphan Session Recovery Commands
+    'scan-orphan-sessions', 'recover-orphan-sessions'
 ];
 
 passThroughChannels.forEach(channel => {
@@ -962,8 +1053,9 @@ ipcMain.on('import-session', async (event, options = {}) => {
         filters: [
             { name: 'TG-Matrix Session 包 (推薦)', extensions: ['tgpkg'] },
             { name: '批量 Session 包', extensions: ['tgbatch'] },
+            { name: 'TData 壓縮包', extensions: ['zip'] },
             { name: '舊版 Session 文件', extensions: ['session'] },
-            { name: '所有支持的格式', extensions: ['tgpkg', 'tgbatch', 'session'] }
+            { name: '所有支持的格式', extensions: ['tgpkg', 'tgbatch', 'session', 'zip'] }
         ]
     });
 
@@ -999,6 +1091,73 @@ ipcMain.on('import-session-with-credentials', async (event, payload) => {
         apiHash: payload.apiHash,
         proxy: payload.proxy || ''
     });
+});
+
+// TData 文件夾選擇
+ipcMain.on('select-tdata-folder', async (event) => {
+    console.log('[IPC] Received: select-tdata-folder');
+    const { filePaths } = await dialog.showOpenDialog({
+        title: '選擇 TData 文件夾',
+        properties: ['openDirectory'],
+        buttonLabel: '選擇此文件夾'
+    });
+
+    if (filePaths && filePaths.length > 0) {
+        const folderPath = filePaths[0];
+        console.log(`[IPC] TData folder selected: ${folderPath}`);
+        mainWindow.webContents.send('tdata-folder-selected', { path: folderPath });
+        // 自動觸發掃描
+        sendToPython('scan-tdata', { path: folderPath });
+    } else {
+        mainWindow.webContents.send('tdata-folder-selected', { path: null });
+    }
+});
+
+// TData ZIP 文件選擇
+ipcMain.on('select-tdata-zip', async (event) => {
+    console.log('[IPC] Received: select-tdata-zip');
+    const { filePaths } = await dialog.showOpenDialog({
+        title: '選擇 TData 壓縮包',
+        properties: ['openFile'],
+        filters: [
+            { name: 'ZIP 壓縮包', extensions: ['zip'] },
+            { name: '所有文件', extensions: ['*'] }
+        ]
+    });
+
+    if (filePaths && filePaths.length > 0) {
+        const filePath = filePaths[0];
+        console.log(`[IPC] TData ZIP selected: ${filePath}`);
+        mainWindow.webContents.send('tdata-zip-selected', { path: filePath });
+        // 自動觸發掃描
+        sendToPython('scan-tdata', { path: filePath });
+    } else {
+        mainWindow.webContents.send('tdata-zip-selected', { path: null });
+    }
+});
+
+// 打開系統默認 TData 路徑
+ipcMain.on('open-default-tdata-folder', async (event) => {
+    console.log('[IPC] Received: open-default-tdata-folder');
+    const os = require('os');
+    const fs = require('fs');
+    let tdataPath = '';
+    
+    if (process.platform === 'win32') {
+        tdataPath = path.join(process.env.APPDATA || '', 'Telegram Desktop', 'tdata');
+    } else if (process.platform === 'darwin') {
+        tdataPath = path.join(os.homedir(), 'Library', 'Application Support', 'Telegram Desktop', 'tdata');
+    } else {
+        tdataPath = path.join(os.homedir(), '.local', 'share', 'TelegramDesktop', 'tdata');
+    }
+    
+    if (fs.existsSync(tdataPath)) {
+        const { shell } = require('electron');
+        shell.openPath(path.dirname(tdataPath));
+        mainWindow.webContents.send('default-tdata-opened', { path: tdataPath, exists: true });
+    } else {
+        mainWindow.webContents.send('default-tdata-opened', { path: tdataPath, exists: false });
+    }
 });
 
 ipcMain.on('export-session', async (event, phoneNumber) => {

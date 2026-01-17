@@ -49,11 +49,17 @@ from fulltext_search import init_search_engine, get_search_engine
 from private_message_poller import private_message_poller
 from group_join_service import group_join_service, GroupJoinService
 from text_utils import safe_json_dumps, sanitize_text, sanitize_dict, format_chat_info, format_user_info
+from member_extraction_service import member_extraction_service, MemberExtractionService
+from marketing_outreach_service import marketing_outreach_service, MarketingOutreachService
 from connection_monitor import connection_monitor
 from resource_discovery import resource_discovery, DiscoveredResource
 from group_search_service import group_search_service
+from jiso_search_service import jiso_search_service
 from discussion_watcher import discussion_watcher
 from batch_operations import init_batch_operations, get_batch_ops, BatchOperationManager
+from qr_auth_manager import init_qr_auth_manager, get_qr_auth_manager, QRAuthManager
+from ip_binding_manager import init_ip_binding_manager, get_ip_binding_manager, IPBindingManager
+from credential_scraper import init_credential_scraper, get_credential_scraper, CredentialScraper
 from ad_template import init_ad_template_manager, get_ad_template_manager, SpintaxGenerator
 from ad_manager import init_ad_manager, get_ad_manager
 from ad_broadcaster import init_ad_broadcaster, get_ad_broadcaster
@@ -100,6 +106,15 @@ class BackendService:
         # Smart alert manager (will be initialized in initialize())
         self.smart_alert_manager: Optional[Any] = None
         
+        # QR Auth Manager for QR code login
+        self.qr_auth_manager: Optional[QRAuthManager] = None
+        
+        # IP Binding Manager for IP stickiness (Phase 2)
+        self.ip_binding_manager: Optional[IPBindingManager] = None
+        
+        # Credential Scraper for native API credentials (Phase 2)
+        self.credential_scraper: Optional[CredentialScraper] = None
+
         # Cache for frequently accessed data (TTL: 30 seconds)
         self._cache: Dict[str, Any] = {}
         self._cache_timestamps: Dict[str, datetime] = {}
@@ -112,6 +127,14 @@ class BackendService:
     
     async def initialize(self):
         """Initialize the backend service"""
+        # 確保 sys 在函數開頭導入（避免後續 import sys 導致的 UnboundLocalError）
+        import sys
+        import traceback
+        import time
+        
+        init_start_time = time.time()
+        print("[Backend] ========== Starting initialization ==========", file=sys.stderr)
+        
         # Initialize error handler
         def error_log_callback(error_type: str, message: str, details: Dict[str, Any]):
             """Callback for error logging"""
@@ -181,20 +204,34 @@ class BackendService:
         # Initialize migration manager (after database is ready)
         from migrations.migration_manager import init_migration_manager, get_migration_manager
         from pathlib import Path
-        migrations_dir = Path(__file__).parent / "migrations"
-        init_migration_manager(db, migrations_dir)
-        migration_manager = get_migration_manager()
-        if migration_manager:
-            await migration_manager.initialize()
-            # Apply pending migrations on startup
-            pending = await migration_manager.get_pending_migrations()
-            if pending:
-                self.send_log(f"Found {len(pending)} pending migration(s), applying...", "info")
-                success = await migration_manager.migrate()
-                if success:
-                    self.send_log("Migrations applied successfully", "success")
+        try:
+            # 首先建立異步數據庫連接（遷移系統需要）
+            await db.connect()
+            print("[Backend] Async database connection established for migrations", file=sys.stderr)
+            
+            migrations_dir = Path(__file__).parent / "migrations"
+            init_migration_manager(db, migrations_dir)
+            migration_manager = get_migration_manager()
+            if migration_manager:
+                await migration_manager.initialize()
+                # Apply pending migrations on startup
+                current_version = await migration_manager.get_current_version()
+                pending = await migration_manager.get_pending_migrations()
+                print(f"[Backend] Database version: {current_version}, pending migrations: {len(pending)}", file=sys.stderr)
+                if pending:
+                    self.send_log(f"Found {len(pending)} pending migration(s), applying...", "info")
+                    success = await migration_manager.migrate()
+                    if success:
+                        self.send_log("Migrations applied successfully", "success")
+                    else:
+                        self.send_log("Some migrations may have failed", "warning")
                 else:
-                    self.send_log("Some migrations may have failed", "warning")
+                    print(f"[Backend] Database is up to date (version {current_version})", file=sys.stderr)
+        except Exception as e:
+            import traceback
+            print(f"[Backend] Error initializing migration system: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            self.send_log(f"遷移系統初始化失敗: {str(e)}", "warning")
         
         # Initialize alert manager (after database is ready)
         from alert_manager import init_alert_manager
@@ -217,35 +254,42 @@ class BackendService:
         self.alert_manager = init_alert_manager(db, alert_notification_callback)
         await self.alert_manager.start()
         
-        # 備份管理器已在上面初始化
-        # 如果需要啟動時備份，可以在這裡調用
-        if self.backup_manager:
-            try:
-                await self.backup_manager.create_backup(backup_type='startup', compress=True)
-                self.send_log("✓ 啟動時備份已創建", "success")
-            except Exception as e:
-                self.send_log(f"啟動時備份失敗: {str(e)}", "warning")
-        
-        # Cleanup old backups
-        try:
-            removed_count = backup_manager.cleanup_old_backups()
-            if removed_count > 0:
-                self.send_log(f"Cleaned up {removed_count} old backup(s)", "info")
-        except Exception as e:
-            self.send_log(f"Failed to cleanup old backups: {str(e)}", "warning")
-        
-        # Rotate and cleanup logs on startup
-        try:
-            log_rotator = get_log_rotator()
-            rotated_files = log_rotator.rotate_all_logs()
-            if rotated_files:
-                self.send_log(f"Rotated {len(rotated_files)} log file(s)", "info")
+        # ========== 優化：延遲執行備份和清理任務（不阻塞啟動） ==========
+        async def delayed_maintenance_tasks():
+            """延遲執行的維護任務，避免阻塞啟動"""
+            await asyncio.sleep(5)  # 等待 5 秒後再執行，確保應用已完成載入
             
-            removed_logs = log_rotator.cleanup_old_logs()
-            if removed_logs > 0:
-                self.send_log(f"Cleaned up {removed_logs} old log file(s)", "info")
-        except Exception as e:
-            self.send_log(f"Failed to rotate/cleanup logs: {str(e)}", "warning")
+            # 啟動備份（延遲執行）
+            if self.backup_manager:
+                try:
+                    await self.backup_manager.create_backup(backup_type='startup', compress=True)
+                    self.send_log("✓ 啟動備份已創建（延遲）", "success")
+                except Exception as e:
+                    self.send_log(f"啟動備份失敗: {str(e)}", "warning")
+            
+            # 清理舊備份
+            try:
+                removed_count = backup_manager.cleanup_old_backups()
+                if removed_count > 0:
+                    self.send_log(f"Cleaned up {removed_count} old backup(s)", "info")
+            except Exception as e:
+                pass  # 靜默處理清理錯誤
+            
+            # 日誌輪轉和清理
+            try:
+                log_rotator = get_log_rotator()
+                rotated_files = log_rotator.rotate_all_logs()
+                if rotated_files:
+                    self.send_log(f"Rotated {len(rotated_files)} log file(s)", "info")
+                
+                removed_logs = log_rotator.cleanup_old_logs()
+                if removed_logs > 0:
+                    self.send_log(f"Cleaned up {removed_logs} old log file(s)", "info")
+            except Exception as e:
+                pass  # 靜默處理輪轉錯誤
+        
+        # 創建後台任務（不等待完成）
+        asyncio.create_task(delayed_maintenance_tasks())
         
         # Initialize queue optimizer (消息发送队列优化)
         self.queue_optimizer = QueueOptimizer(
@@ -262,51 +306,86 @@ class BackendService:
             optimizer=self.queue_optimizer
         )
         
-        # Initialize proxy rotation manager (智能代理轮换)
-        await self._initialize_proxy_rotation_manager()
+        # ========== 優化：並行初始化子系統 ==========
+        import time
+        parallel_init_start = time.time()
+        print("[Backend] Starting parallel subsystem initialization...", file=sys.stderr)
         
-        # Initialize enhanced health monitor (账户健康监控增强)
-        await self._initialize_enhanced_health_monitor()
+        # 第一批並行初始化（核心管理器）
+        await asyncio.gather(
+            self._initialize_proxy_rotation_manager(),      # 智能代理轮换
+            self._initialize_enhanced_health_monitor(),     # 账户健康监控增强
+            self._initialize_error_recovery(),              # 错误恢复和自动重试
+            self._initialize_auto_funnel(),                 # 全自动销售漏斗
+            self._initialize_ai_auto_chat(),                # AI自动聊天
+            self._initialize_vector_memory(),               # 向量化记忆系统
+            return_exceptions=True  # 防止單個失敗影響其他
+        )
         
-        # Initialize error recovery manager (错误恢复和自动重试)
-        await self._initialize_error_recovery()
+        # 第二批並行初始化（業務系統，依賴第一批）
+        await asyncio.gather(
+            self._initialize_scheduler(),                   # 自动化任务调度器
+            self._initialize_batch_operations(),            # 批量操作系統
+            self._initialize_ad_system(),                   # 廣告發送系統
+            self._initialize_user_tracking(),               # 用戶追蹤系統
+            self._initialize_campaign_system(),             # 營銷活動協調器
+            self._initialize_multi_role_system(),           # 多角色協作系統
+            return_exceptions=True
+        )
         
-        # Initialize auto funnel manager (全自动销售漏斗)
-        await self._initialize_auto_funnel()
-        
-        # Initialize AI auto chat (AI自动聊天)
-        await self._initialize_ai_auto_chat()
-        
-        # Initialize vector memory system (向量化记忆系统)
-        await self._initialize_vector_memory()
-        
-        # Initialize task scheduler (自动化任务调度器)
-        await self._initialize_scheduler()
-        
-        # Initialize batch operations manager (批量操作系統)
-        await self._initialize_batch_operations()
-        
-        # Initialize ad system (廣告發送系統)
-        await self._initialize_ad_system()
-        
-        # Initialize user tracking system (用戶追蹤系統)
-        await self._initialize_user_tracking()
-        
-        # Initialize campaign orchestrator (營銷活動協調器)
-        await self._initialize_campaign_system()
-        
-        # Initialize multi-role collaboration system (多角色協作系統)
-        await self._initialize_multi_role_system()
+        parallel_init_duration = time.time() - parallel_init_start
+        print(f"[Backend] ✓ Parallel subsystem initialization completed in {parallel_init_duration:.3f}s", file=sys.stderr)
         
         # Register private message handlers for already logged-in Sender accounts
         await self._register_existing_sender_handlers()
         
-        # Sync leads to user_profiles (one-time migration)
-        await self._sync_leads_to_user_profiles()
+        # ========== 優化：後台執行非關鍵啟動任務 ==========
+        async def background_startup_tasks():
+            """後台執行的非關鍵啟動任務，不阻塞主啟動流程"""
+            await asyncio.sleep(2)  # 等待主要初始化完成
+            
+            # Sync leads to user_profiles (one-time migration)
+            try:
+                await self._sync_leads_to_user_profiles()
+            except Exception as e:
+                import sys
+                print(f"[Backend] Background sync leads error: {e}", file=sys.stderr)
+            
+            # 一致性檢查（後台執行）
+            try:
+                await self._startup_consistency_check()
+            except Exception as e:
+                import sys
+                print(f"[Backend] Background consistency check error: {e}", file=sys.stderr)
+        
+        # 創建後台任務（不等待完成）
+        asyncio.create_task(background_startup_tasks())
+        
+        total_init_time = time.time() - init_start_time
+        print(f"[Backend] ========== Initialization complete in {total_init_time:.3f}s ==========", file=sys.stderr)
+        self.send_log(f"✓ 後端初始化完成 ({total_init_time:.2f}s)", "success")
     
     async def _sync_leads_to_user_profiles(self):
         """同步現有的 leads 到 user_profiles 表"""
         try:
+            # 先確保 user_profiles 表存在
+            await db._connection.execute("""
+                CREATE TABLE IF NOT EXISTS user_profiles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT UNIQUE NOT NULL,
+                    username TEXT,
+                    first_name TEXT,
+                    last_name TEXT,
+                    funnel_stage TEXT DEFAULT 'new',
+                    interest_level INTEGER DEFAULT 1,
+                    last_interaction TEXT,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            await db._connection.commit()
+            
             leads = await db.get_all_leads()
             synced_count = 0
             
@@ -337,6 +416,117 @@ class BackendService:
         except Exception as e:
             import sys
             print(f"[Backend] Error syncing leads to user_profiles: {e}", file=sys.stderr)
+    
+    async def _startup_consistency_check(self):
+        """
+        啟動時一致性檢查：
+        1. 掃描有 session 文件但無數據庫記錄的「孤立」帳號
+        2. 嘗試使用 metadata.json 自動恢復
+        3. 向前端發送恢復提示事件
+        """
+        import sys
+        import json
+        from pathlib import Path
+        from config import SESSIONS_DIR
+        
+        try:
+            print("[Backend] Starting consistency check...", file=sys.stderr)
+            
+            # 獲取所有 session 文件
+            session_files = list(SESSIONS_DIR.glob("*.session"))
+            
+            if not session_files:
+                print("[Backend] No session files found, skipping consistency check", file=sys.stderr)
+                return
+            
+            # 獲取數據庫中的帳號
+            existing_accounts = await db.get_all_accounts()
+            existing_phones = set()
+            for acc in existing_accounts:
+                phone = acc.get('phone', '')
+                safe_phone = phone.replace("+", "").replace("-", "").replace(" ", "")
+                existing_phones.add(safe_phone)
+                existing_phones.add(phone)
+            
+            # 查找孤立的 session
+            orphan_sessions = []
+            auto_recoverable = []
+            
+            for session_file in session_files:
+                phone = session_file.stem
+                # 跳過臨時文件
+                if phone.endswith('-journal') or phone.startswith('.'):
+                    continue
+                
+                # 檢查是否在數據庫中
+                if phone not in existing_phones and f"+{phone}" not in existing_phones:
+                    # 檢查是否有 metadata 文件
+                    metadata_path = SESSIONS_DIR / f"{phone}.metadata.json"
+                    metadata = None
+                    
+                    if metadata_path.exists():
+                        try:
+                            with open(metadata_path, 'r', encoding='utf-8') as f:
+                                metadata = json.load(f)
+                        except Exception:
+                            pass
+                    
+                    session_info = {
+                        "phone": phone,
+                        "hasMetadata": metadata is not None,
+                        "metadata": metadata
+                    }
+                    
+                    orphan_sessions.append(session_info)
+                    
+                    if metadata:
+                        auto_recoverable.append(session_info)
+            
+            if orphan_sessions:
+                print(f"[Backend] Found {len(orphan_sessions)} orphan session(s), {len(auto_recoverable)} auto-recoverable", file=sys.stderr)
+                
+                # 自動恢復有 metadata 的帳號
+                recovered_count = 0
+                for session_info in auto_recoverable:
+                    try:
+                        metadata = session_info['metadata']
+                        phone = metadata.get('phone', f"+{session_info['phone']}")
+                        
+                        # 使用 add_account 方法插入到正確的數據庫（tgmatrix.db）
+                        account_data = {
+                            'phone': phone,
+                            'apiId': metadata.get('apiId'),
+                            'apiHash': metadata.get('apiHash'),
+                            'firstName': metadata.get('firstName', ''),
+                            'lastName': metadata.get('lastName', ''),
+                            'username': metadata.get('username', ''),
+                            'telegramId': metadata.get('telegramId', ''),
+                            'role': metadata.get('role', 'Unassigned'),
+                            'status': 'Offline'
+                        }
+                        await db.add_account(account_data)
+                        recovered_count += 1
+                        print(f"[Backend] Auto-recovered account: {phone}", file=sys.stderr)
+                    except Exception as e:
+                        print(f"[Backend] Failed to auto-recover {session_info['phone']}: {e}", file=sys.stderr)
+                
+                if recovered_count > 0:
+                    self.send_log(f"🔄 已自動恢復 {recovered_count} 個帳號", "success")
+                
+                # 還有無法自動恢復的帳號，發送事件給前端
+                remaining_orphans = [s for s in orphan_sessions if not s.get('hasMetadata')]
+                if remaining_orphans:
+                    self.send_event("orphan-sessions-detected", {
+                        "count": len(remaining_orphans),
+                        "sessions": remaining_orphans,
+                        "message": f"發現 {len(remaining_orphans)} 個無法自動恢復的 Session 文件"
+                    })
+            else:
+                print("[Backend] No orphan sessions found, database is consistent", file=sys.stderr)
+                
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in consistency check: {e}", file=sys.stderr)
     
     async def _register_existing_sender_handlers(self):
         """為已登錄的發送帳號註冊私信處理器"""
@@ -798,7 +988,86 @@ class BackendService:
             import sys
             print(f"[Backend] Failed to initialize smart alert manager: {e}", file=sys.stderr)
             self.smart_alert_manager = None
-    
+        
+        # Initialize QR Auth Manager for QR code login
+        try:
+            # 檢查依賴庫是否可用
+            from qr_auth_manager import HAS_TELETHON, HAS_QRCODE
+            print(f"[Backend] QR Auth dependencies: HAS_TELETHON={HAS_TELETHON}, HAS_QRCODE={HAS_QRCODE}", file=sys.stderr)
+            
+            if not HAS_TELETHON:
+                print("[Backend] Warning: telethon library not available for QR login", file=sys.stderr)
+                self.send_log("telethon 庫未安裝，QR 登入功能不可用", "warning")
+            if not HAS_QRCODE:
+                print("[Backend] Warning: qrcode library not available for QR login", file=sys.stderr)
+                self.send_log("qrcode 庫未安裝，QR 登入功能不可用", "warning")
+            
+            sessions_dir = str(Path(config.DATA_PATH) / "sessions")
+            print(f"[Backend] Initializing QR Auth manager with sessions_dir: {sessions_dir}", file=sys.stderr)
+            
+            # 創建 QR 登入事件回調函數，處理 qr-login-account-ready 事件
+            def qr_event_callback(event_name: str, payload: Any):
+                # 發送事件到前端
+                self.send_event(event_name, payload)
+                
+                # 處理 qr-login-account-ready 事件：將帳號添加到數據庫
+                if event_name == "qr-login-account-ready":
+                    # 使用 asyncio 在事件循環中執行異步操作
+                    asyncio.create_task(self._handle_qr_login_account_ready(payload))
+            
+            self.qr_auth_manager = init_qr_auth_manager(sessions_dir, qr_event_callback)
+            await self.qr_auth_manager.start()
+            print("[Backend] QR Auth manager initialized successfully", file=sys.stderr)
+            self.send_log("QR 掃碼登入管理器已初始化", "success")
+        except Exception as e:
+            print(f"[Backend] Failed to initialize QR auth manager: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            self.qr_auth_manager = None
+        
+        # Initialize IP Binding Manager (Phase 2)
+        try:
+            data_dir = str(Path(config.DATA_PATH))
+            self.ip_binding_manager = init_ip_binding_manager(data_dir, self.send_event)
+            import sys
+            print("[Backend] IP Binding manager initialized", file=sys.stderr)
+            self.send_log("IP 粘性綁定管理器已初始化", "success")
+        except Exception as e:
+            import sys
+            print(f"[Backend] Failed to initialize IP binding manager: {e}", file=sys.stderr)
+            self.ip_binding_manager = None
+        
+        # Initialize Credential Scraper (Phase 2)
+        try:
+            sessions_dir = str(Path(config.DATA_PATH) / "sessions")
+            data_dir = str(Path(config.DATA_PATH))
+            
+            # Database callback for saving credential logs
+            async def save_credential_log(log):
+                try:
+                    await db.add_credential_log(
+                        account_id=log.account_id,
+                        phone=log.phone,
+                        action=log.action,
+                        api_id=log.api_id,
+                        api_hash=log.api_hash,
+                        status=log.status,
+                        error_message=log.error_message,
+                        details_json=log.details_json
+                    )
+                except Exception as e:
+                    print(f"[Backend] Error saving credential log: {e}", file=sys.stderr)
+            
+            self.credential_scraper = init_credential_scraper(
+                sessions_dir, data_dir, self.send_event, save_credential_log
+            )
+            import sys
+            print("[Backend] Credential scraper initialized", file=sys.stderr)
+            self.send_log("API 憑據獲取器已初始化", "success")
+        except Exception as e:
+            import sys
+            print(f"[Backend] Failed to initialize credential scraper: {e}", file=sys.stderr)
+            self.credential_scraper = None
+
     async def _user_has_interacted(self, user_id: str) -> bool:
         """
         檢查用戶是否已互動過（用於發送限額豁免）
@@ -1106,6 +1375,17 @@ class BackendService:
         self.background_tasks.append(asyncio.create_task(self.queue_cleanup_task()))
         self.background_tasks.append(asyncio.create_task(self.message_confirmation_timeout_task()))
         
+        # 同步 API 憑據使用計數
+        try:
+            from api_credential_pool import get_api_credential_pool
+            data_dir = str(Path(config.DATA_PATH))
+            pool = get_api_credential_pool(data_dir)
+            accounts = await db.get_all_accounts()
+            pool.sync_usage_counts(accounts)
+            print(f"[Backend] API credential usage counts synced for {len(accounts)} accounts", file=sys.stderr)
+        except Exception as e:
+            print(f"[Backend] Error syncing API credential usage: {e}", file=sys.stderr)
+        
         # Log startup
         await db.add_log("Backend service started", "info")
         print(safe_json_dumps({
@@ -1195,10 +1475,28 @@ class BackendService:
         }
         if message_id:
             message["message_id"] = message_id
+        
+        # Debug logging for important events
+        if event_name in ('initial-state', 'accounts-updated'):
+            import sys
+            print(f"[Backend] ★★★ send_event called for {event_name} ★★★", file=sys.stderr)
+            if event_name == 'initial-state':
+                accounts_count = len(payload.get('accounts', [])) if isinstance(payload, dict) else 0
+                print(f"[Backend] initial-state payload accounts: {accounts_count}", file=sys.stderr)
+            elif event_name == 'accounts-updated':
+                accounts_count = len(payload) if isinstance(payload, list) else 0
+                print(f"[Backend] accounts-updated payload count: {accounts_count}", file=sys.stderr)
+        
         # 使用安全的 JSON 序列化，處理 emoji 和特殊字符
         try:
-            print(safe_json_dumps(message), flush=True)
+            json_str = safe_json_dumps(message)
+            if event_name in ('initial-state', 'accounts-updated'):
+                import sys
+                print(f"[Backend] JSON length for {event_name}: {len(json_str)}", file=sys.stderr)
+            print(json_str, flush=True)
         except Exception as e:
+            import sys
+            print(f"[Backend] Error in safe_json_dumps for {event_name}: {e}", file=sys.stderr)
             # 最後的備用方案：強制 ASCII 編碼
             print(json.dumps(sanitize_dict(message), ensure_ascii=True, default=str), flush=True)
     
@@ -1211,6 +1509,27 @@ class BackendService:
             "type": log_type
         }
         self.send_event("log-entry", log_entry)
+    
+    async def _save_session_metadata(self, phone: str, metadata: dict):
+        """
+        保存 Session Metadata 到 JSON 文件
+        用於在數據庫丟失時恢復帳號
+        """
+        import json
+        from pathlib import Path
+        
+        # 規範化電話號碼（移除 +）
+        normalized_phone = phone.replace('+', '').strip()
+        
+        # Metadata 文件路徑
+        metadata_path = Path(__file__).parent / "sessions" / f"{normalized_phone}.metadata.json"
+        
+        # 確保目錄存在
+        metadata_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # 寫入 metadata
+        with open(metadata_path, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
     
     async def handle_command(self, command: str, payload: Any, request_id: Optional[str] = None):
         """Handle incoming commands"""
@@ -1248,15 +1567,99 @@ class BackendService:
             elif command == "login-account":
                 await self.handle_login_account(payload)
             
+            # QR Code Login Commands
+            elif command == "qr-login-create":
+                await self.handle_qr_login_create(payload)
+            
+            elif command == "qr-login-status":
+                await self.handle_qr_login_status(payload)
+            
+            elif command == "qr-login-refresh":
+                await self.handle_qr_login_refresh(payload)
+            
+            elif command == "qr-login-submit-2fa":
+                await self.handle_qr_login_submit_2fa(payload)
+            
+            elif command == "qr-login-cancel":
+                await self.handle_qr_login_cancel(payload)
+
+            # IP Binding Commands (Phase 2)
+            elif command == "ip-bind":
+                await self.handle_ip_bind(payload)
+            
+            elif command == "ip-unbind":
+                await self.handle_ip_unbind(payload)
+            
+            elif command == "ip-get-binding":
+                await self.handle_ip_get_binding(payload)
+            
+            elif command == "ip-get-all-bindings":
+                await self.handle_ip_get_all_bindings(payload)
+            
+            elif command == "ip-get-statistics":
+                await self.handle_ip_get_statistics(payload)
+            
+            elif command == "ip-verify-binding":
+                await self.handle_ip_verify_binding(payload)
+            
+            # Credential Scraper Commands (Phase 2)
+            elif command == "credential-start-scrape":
+                await self.handle_credential_start_scrape(payload)
+            
+            elif command == "credential-submit-code":
+                await self.handle_credential_submit_code(payload)
+            
+            elif command == "credential-get-status":
+                await self.handle_credential_get_status(payload)
+            
+            elif command == "credential-get-all":
+                await self.handle_credential_get_all(payload)
+            
+            elif command == "credential-cancel-scrape":
+                await self.handle_credential_cancel_scrape(payload)
+
             elif command == "check-account-status":
                 await self.handle_check_account_status(payload)
             
             elif command == "update-account-data":
                 await self.handle_update_account_data(payload)
-            
+
+            elif command == "update-account":
+                await self.handle_update_account(payload)
+
+            elif command == "test-proxy":
+                await self.handle_test_proxy(payload)
+
+            elif command == "sync-account-info":
+                await self.handle_sync_account_info(payload)
+
+            elif command == "logout-account":
+                await self.handle_logout_account(payload)
+
             elif command == "bulk-assign-role":
                 await self.handle_bulk_assign_role(payload)
-            
+
+            elif command == "batch-update-accounts":
+                await self.handle_batch_update_accounts(payload)
+
+            elif command == "save-tags":
+                await self.handle_save_tags(payload)
+
+            elif command == "save-groups":
+                await self.handle_save_groups(payload)
+
+            elif command == "get-tags":
+                await self.handle_get_tags(payload)
+
+            elif command == "get-groups":
+                await self.handle_get_groups(payload)
+
+            elif command == "save-personas":
+                await self.handle_save_personas(payload)
+
+            elif command == "get-personas":
+                await self.handle_get_personas(payload)
+
             elif command == "bulk-assign-group":
                 await self.handle_bulk_assign_group(payload)
             
@@ -1332,6 +1735,9 @@ class BackendService:
             elif command == "send-message":
                 await self.handle_send_message(payload)
             
+            elif command == "send-group-message":
+                await self.handle_send_group_message(payload)
+            
             elif command == "update-lead-status":
                 await self.handle_update_lead_status(payload)
             
@@ -1349,8 +1755,20 @@ class BackendService:
             
             elif command == "reload-sessions-and-accounts":
                 await self.handle_reload_sessions_and_accounts()
+            elif command == "scan-orphan-sessions":
+                await self.handle_scan_orphan_sessions(payload)
+            elif command == "recover-orphan-sessions":
+                await self.handle_recover_orphan_sessions(payload)
             elif command == "import-session":
                 await self.handle_import_session(payload)
+            elif command == "scan-tdata":
+                await self.handle_scan_tdata(payload)
+            elif command == "import-tdata-account":
+                await self.handle_import_tdata_account(payload)
+            elif command == "import-tdata-batch":
+                await self.handle_import_tdata_batch(payload)
+            elif command == "get-default-tdata-path":
+                await self.handle_get_default_tdata_path()
             elif command == "cleanup-session-files":
                 await self.handle_cleanup_session_files()
             elif command == "cleanup-session-files":
@@ -1626,7 +2044,29 @@ class BackendService:
             
             elif command == "search-resources":
                 await self.handle_search_resources(payload)
-            
+
+            elif command == "search-jiso":
+                await self.handle_search_jiso(payload)
+
+            elif command == "check-jiso-availability":
+                await self.handle_check_jiso_availability(payload)
+
+            # 自定義搜索渠道管理
+            elif command == "get-search-channels":
+                await self.handle_get_search_channels(payload)
+
+            elif command == "add-search-channel":
+                await self.handle_add_search_channel(payload)
+
+            elif command == "update-search-channel":
+                await self.handle_update_search_channel(payload)
+
+            elif command == "delete-search-channel":
+                await self.handle_delete_search_channel(payload)
+
+            elif command == "test-search-channel":
+                await self.handle_test_search_channel(payload)
+
             elif command == "get-resources":
                 await self.handle_get_resources(payload)
             
@@ -1639,6 +2079,18 @@ class BackendService:
             elif command == "delete-resource":
                 await self.handle_delete_resource(payload)
             
+            elif command == "delete-resources-batch":
+                await self.handle_delete_resources_batch(payload)
+
+            elif command == "verify-resource-type":
+                await self.handle_verify_resource_type(payload)
+
+            elif command == "batch-verify-resource-types":
+                await self.handle_batch_verify_resource_types(payload)
+
+            elif command == "clear-all-resources":
+                await self.handle_clear_all_resources()
+            
             elif command == "add-to-join-queue":
                 await self.handle_add_to_join_queue(payload)
             
@@ -1650,7 +2102,10 @@ class BackendService:
             
             elif command == "join-and-monitor-resource":
                 await self.handle_join_and_monitor_resource(payload)
-            
+
+            elif command == "join-and-monitor-with-account":
+                await self.handle_join_and_monitor_with_account(payload)
+
             elif command == "batch-join-and-monitor":
                 await self.handle_batch_join_and_monitor(payload)
             
@@ -1674,6 +2129,35 @@ class BackendService:
             
             elif command == "get-discovery-logs":
                 await self.handle_get_discovery_logs(payload)
+            
+            # ==================== Member Extraction Commands ====================
+            elif command == "extract-members":
+                await self.handle_extract_members(payload)
+            
+            elif command == "get-extracted-members":
+                await self.handle_get_extracted_members(payload)
+            
+            elif command == "get-member-stats":
+                await self.handle_get_member_stats(payload)
+            
+            elif command == "get-online-members":
+                await self.handle_get_online_members(payload)
+            
+            # ==================== Marketing Outreach Commands ====================
+            elif command == "send-bulk-messages":
+                await self.handle_send_bulk_messages(payload)
+            
+            elif command == "batch-invite-to-group":
+                await self.handle_batch_invite_to_group(payload)
+            
+            elif command == "create-marketing-campaign":
+                await self.handle_create_marketing_campaign(payload)
+            
+            elif command == "start-marketing-campaign":
+                await self.handle_start_marketing_campaign(payload)
+            
+            elif command == "get-marketing-stats":
+                await self.handle_get_marketing_stats(payload)
             
             # ==================== Discussion Watcher Commands ====================
             elif command == "init-discussion-watcher":
@@ -2028,6 +2512,51 @@ class BackendService:
             elif command == "get-collab-stats":
                 await self.handle_get_collab_stats(payload)
 
+            # ==================== API Credential Pool Commands ====================
+            elif command == "get-api-credentials":
+                await self.handle_get_api_credentials(payload)
+            
+            elif command == "add-api-credential":
+                await self.handle_add_api_credential(payload)
+            
+            elif command == "remove-api-credential":
+                await self.handle_remove_api_credential(payload)
+            
+            elif command == "toggle-api-credential":
+                await self.handle_toggle_api_credential(payload)
+            
+            elif command == "bulk-import-api-credentials":
+                await self.handle_bulk_import_api_credentials(payload)
+            
+            elif command == "get-api-recommendation":
+                await self.handle_get_api_recommendation(payload)
+
+            # ==================== Platform API Pool Commands ====================
+            elif command == "get-platform-api-usage":
+                await self.handle_get_platform_api_usage(payload)
+            
+            elif command == "allocate-platform-api":
+                await self.handle_allocate_platform_api(payload)
+            
+            elif command == "release-platform-api":
+                await self.handle_release_platform_api(payload)
+            
+            elif command == "admin-add-platform-api":
+                await self.handle_admin_add_platform_api(payload)
+            
+            elif command == "admin-list-platform-apis":
+                await self.handle_admin_list_platform_apis(payload)
+
+            # ==================== TData Import Commands ====================
+            elif command == "select-tdata-folder":
+                await self.handle_select_tdata_folder(payload)
+            
+            elif command == "parse-tdata":
+                await self.handle_parse_tdata(payload)
+            
+            elif command == "import-tdata":
+                await self.handle_import_tdata(payload)
+
             else:
                 self.send_log(f"Unknown command: {command}", "warning")
         
@@ -2053,46 +2582,103 @@ class BackendService:
     async def handle_get_initial_state(self):
         """Handle get-initial-state command and restore monitoring state if needed"""
         try:
-            # Fetch all data from database
-            accounts = await db.get_all_accounts()
-            keyword_sets = await db.get_all_keyword_sets()
-            monitored_groups = await db.get_all_groups()
-            campaigns = await db.get_all_campaigns()
-            message_templates = await db.get_all_templates()
-            leads = await db.get_all_leads()
-            logs = await db.get_recent_logs(limit=100)
+            import sys
+            import time
+            start_time = time.time()
+            print("[Backend] handle_get_initial_state called", file=sys.stderr)
             
-            # Format timestamps to ISO 8601
+            # ========== 優化：並行獲取所有數據 ==========
+            print("[Backend] Loading all data in parallel...", file=sys.stderr)
+            parallel_start = time.time()
+            
+            # 並行執行所有數據庫查詢
+            results = await asyncio.gather(
+                db.get_all_accounts(),
+                db.get_all_keyword_sets(),
+                db.get_all_groups(),
+                db.get_all_campaigns(),
+                db.get_all_templates(),
+                db.get_all_leads(),
+                db.get_recent_logs(limit=100),
+                db.get_all_settings(),
+                db.get_monitoring_config(),
+                return_exceptions=True
+            )
+            
+            parallel_duration = time.time() - parallel_start
+            print(f"[Backend] Parallel data loading completed in {parallel_duration:.3f}s", file=sys.stderr)
+            
+            # 解析結果（處理可能的異常）
+            accounts = results[0] if not isinstance(results[0], Exception) else []
+            keyword_sets = results[1] if not isinstance(results[1], Exception) else []
+            monitored_groups = results[2] if not isinstance(results[2], Exception) else []
+            campaigns = results[3] if not isinstance(results[3], Exception) else []
+            message_templates = results[4] if not isinstance(results[4], Exception) else []
+            leads = results[5] if not isinstance(results[5], Exception) else []
+            logs = results[6] if not isinstance(results[6], Exception) else []
+            settings = results[7] if not isinstance(results[7], Exception) else {}
+            monitoring_config = results[8] if not isinstance(results[8], Exception) else {}
+            
+            # 記錄任何查詢錯誤
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    print(f"[Backend] Query {i} failed: {result}", file=sys.stderr)
+            
+            print(f"[Backend] Loaded: {len(accounts)} accounts, {len(keyword_sets)} keyword_sets, {len(monitored_groups)} groups, {len(campaigns)} campaigns, {len(message_templates)} templates, {len(leads)} leads, {len(logs)} logs", file=sys.stderr)
+            
+            print("[Backend] Syncing account connection status...", file=sys.stderr)
+            # 同步账号的实际连接状态
+            # 应用启动时，Telegram 客户端尚未连接，所以将所有显示 "Online" 的账号状态重置为 "Offline"
             for account in accounts:
-                # Accounts don't have timestamps in the response
-                pass
-            
-            for lead in leads:
-                if isinstance(lead.get('timestamp'), str):
-                    # Already a string, ensure ISO format
-                    pass
-                else:
-                    lead['timestamp'] = datetime.fromisoformat(lead['timestamp']).isoformat() + "Z"
+                phone = account.get('phone')
+                db_status = account.get('status', 'Offline')
                 
-                # Format interaction timestamps
-                for interaction in lead.get('interactionHistory', []):
-                    if isinstance(interaction.get('timestamp'), str):
-                        pass
-                    else:
-                        interaction['timestamp'] = datetime.fromisoformat(interaction['timestamp']).isoformat() + "Z"
+                # 检查 Telegram 客户端是否真正连接
+                client = self.telegram_manager.get_client(phone) if phone else None
+                is_actually_connected = client and client.is_connected if client else False
+                
+                # 如果数据库显示在线但客户端未连接，更新状态为离线
+                if db_status == 'Online' and not is_actually_connected:
+                    account['status'] = 'Offline'
+                    # 更新数据库
+                    if account.get('id'):
+                        await db.update_account(account['id'], {'status': 'Offline'})
+                
+                # 添加一个字段指示是否真正连接
+                account['isConnected'] = is_actually_connected
             
+            # ========== 優化：批量處理時間戳 ==========
+            def normalize_timestamp(ts):
+                """快速格式化時間戳"""
+                if ts is None:
+                    return datetime.now().isoformat() + "Z"
+                if isinstance(ts, str):
+                    return ts if ts.endswith('Z') else ts + "Z"
+                try:
+                    return datetime.fromisoformat(str(ts)).isoformat() + "Z"
+                except (ValueError, TypeError):
+                    return datetime.now().isoformat() + "Z"
+            
+            ts_start = time.time()
+            
+            # 批量處理 leads 時間戳
+            for lead in leads:
+                lead['timestamp'] = normalize_timestamp(lead.get('timestamp'))
+                # 只處理前幾個 interaction（優化）
+                interactions = lead.get('interactionHistory', [])
+                for interaction in interactions[:10]:  # 只處理最近10個
+                    interaction['timestamp'] = normalize_timestamp(interaction.get('timestamp'))
+            
+            # 批量處理 logs 時間戳
             for log in logs:
-                if isinstance(log.get('timestamp'), str):
-                    pass
-                else:
-                    log['timestamp'] = datetime.fromisoformat(log['timestamp']).isoformat() + "Z"
+                log['timestamp'] = normalize_timestamp(log.get('timestamp'))
             
-            # Get settings
-            settings = await db.get_all_settings()
+            ts_duration = time.time() - ts_start
+            print(f"[Backend] Timestamps processed in {ts_duration:.3f}s", file=sys.stderr)
             
-            # Get monitoring state from database
-            monitoring_config = await db.get_monitoring_config()
+            # Settings 和 monitoring_config 已在並行查詢中獲取
             is_monitoring = monitoring_config.get('isActive', False)
+            print(f"[Backend] Monitoring config: isActive={is_monitoring}", file=sys.stderr)
             
             # Restore monitoring state if it was active
             if is_monitoring and not self.is_monitoring:
@@ -2117,6 +2703,8 @@ class BackendService:
             self.is_monitoring = is_monitoring
             
             # Send initial state event
+            print(f"[Backend] Sending initial-state with {len(accounts)} accounts", file=sys.stderr)
+            print(f"[Backend] Account details: {[(a.get('phone'), a.get('firstName'), a.get('status')) for a in accounts]}", file=sys.stderr)
             self.send_event("initial-state", {
                 "accounts": accounts,
                 "keywordSets": keyword_sets,
@@ -2129,9 +2717,18 @@ class BackendService:
                 "isMonitoring": is_monitoring
             })
             
-            await db.add_log("Initial state sent to frontend", "success")
+            # 額外發送 accounts-updated 事件確保前端接收
+            self.send_event("accounts-updated", accounts)
+            
+            total_duration = time.time() - start_time
+            print(f"[Backend] ✓ Initial state sent in {total_duration:.3f}s (parallel query: {parallel_duration:.3f}s)", file=sys.stderr)
+            
+            await db.add_log(f"Initial state sent to frontend ({total_duration:.2f}s)", "success")
         
         except Exception as e:
+            import traceback
+            print(f"[Backend] ★★★ ERROR in handle_get_initial_state: {str(e)} ★★★", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
             self.send_log(f"Error getting initial state: {str(e)}", "error")
     
     # ========== Partial Update Functions ==========
@@ -2260,6 +2857,151 @@ class BackendService:
     
     # ========== End Partial Update Functions ==========
     
+    async def _handle_qr_login_account_ready(self, payload: Dict[str, Any]):
+        """
+        處理 QR 登入成功事件，將帳號添加到數據庫
+        
+        Args:
+            payload: QR 登入返回的帳號數據，包含 phone, api_id, api_hash, session_string, device_fingerprint 等
+        """
+        try:
+            phone = payload.get('phone', '')
+            api_id = payload.get('api_id') or payload.get('apiId')  # 支持兩種字段名
+            api_hash = payload.get('api_hash') or payload.get('apiHash')  # 支持兩種字段名
+            proxy = payload.get('proxy', '')
+            session_string = payload.get('session_string', '')
+            device_fingerprint = payload.get('device_fingerprint', {})
+            user_info = payload.get('user_info', {})
+            
+            print(f"[Backend] Handling QR login account ready for {phone}", file=sys.stderr)
+            print(f"[Backend] QR login payload: api_id={api_id}, api_hash={'***' if api_hash else None}", file=sys.stderr)
+            
+            if not phone:
+                print(f"[Backend] Error: No phone number in QR login payload", file=sys.stderr)
+                return
+            
+            # 確保 API 憑證存在（QR 登入時必須有）
+            if not api_id or not api_hash:
+                print(f"[Backend] Warning: Missing API credentials in QR login payload. Payload keys: {list(payload.keys())}", file=sys.stderr)
+                # 嘗試從 client 獲取（如果 payload 中有 client 信息）
+                # 如果還是沒有，使用默認的公共 API 憑證
+                if not api_id or not api_hash:
+                    print(f"[Backend] Using default public API credentials for QR login", file=sys.stderr)
+                    # 使用 Telegram Desktop 的公共 API 憑證作為默認值
+                    api_id = api_id or "2040"
+                    api_hash = api_hash or "b18441a1ff607e10a989891a5462e627"
+            
+            # 檢查帳號是否已存在
+            existing_account = await db.get_account_by_phone(phone)
+            
+            if existing_account:
+                # 帳號已存在，更新相關信息
+                account_id = existing_account.get('id')
+                print(f"[Backend] Account {phone} already exists (ID: {account_id}), updating...", file=sys.stderr)
+                
+                update_data = {
+                    'status': 'Online',  # QR 登入成功，設置為在線
+                }
+                
+                # 強制更新 API 憑據（QR 登入時必須有）
+                # 優先使用新的 API 憑證，如果沒有則檢查現有帳號是否有
+                if api_id and api_hash:
+                    update_data['apiId'] = str(api_id)
+                    update_data['apiHash'] = str(api_hash)
+                    print(f"[Backend] Updating API credentials: apiId={api_id}", file=sys.stderr)
+                elif not existing_account.get('apiId') or not existing_account.get('apiHash'):
+                    # 如果現有帳號沒有 API 憑證，使用默認公共憑證
+                    print(f"[Backend] WARNING: Missing API credentials, using default public credentials", file=sys.stderr)
+                    update_data['apiId'] = "2040"
+                    update_data['apiHash'] = "b18441a1ff607e10a989891a5462e627"
+                else:
+                    # 保持現有的 API 憑證
+                    print(f"[Backend] Keeping existing API credentials", file=sys.stderr)
+                if proxy:
+                    update_data['proxy'] = proxy
+                
+                # 更新設備指紋
+                if device_fingerprint:
+                    update_data['deviceModel'] = device_fingerprint.get('device_model', '')
+                    update_data['systemVersion'] = device_fingerprint.get('system_version', '')
+                    update_data['appVersion'] = device_fingerprint.get('app_version', '')
+                    update_data['langCode'] = device_fingerprint.get('lang_code', '')
+                    update_data['platform'] = device_fingerprint.get('platform', '')
+                
+                await db.update_account(account_id, update_data)
+                self.send_log(f"✅ QR 登入成功，帳號 {phone} 已更新", "success")
+            else:
+                # 新帳號，添加到數據庫
+                print(f"[Backend] Adding new account {phone} from QR login", file=sys.stderr)
+                
+                # 確保 API 憑證不為空（QR 登入時必須有）
+                if not api_id or not api_hash:
+                    print(f"[Backend] Error: Cannot add account without API credentials", file=sys.stderr)
+                    self.send_log(f"❌ QR 登入失敗：缺少 API 憑證", "error")
+                    return
+                
+                # ========== QR 登入智能角色分配 ==========
+                all_accounts = await db.get_all_accounts()
+                has_listener = any(a.get('role') == 'Listener' for a in all_accounts)
+                has_sender = any(a.get('role') == 'Sender' for a in all_accounts)
+                
+                auto_role = 'Unassigned'
+                role_message = None
+                
+                if not has_listener:
+                    auto_role = 'Listener'
+                    role_message = f'已自動將 {phone} 設為「監控號」（用於監控群組消息）'
+                elif not has_sender:
+                    auto_role = 'Sender'
+                    role_message = f'已自動將 {phone} 設為「發送號」（用於發送消息給潛在客戶）'
+                # ========== QR 登入智能角色分配結束 ==========
+
+                account_data = {
+                    'phone': phone,
+                    'apiId': str(api_id),  # 強制轉換為字符串
+                    'apiHash': str(api_hash),  # 確保不為空
+                    'proxy': proxy or '',
+                    'group': '',
+                    'role': auto_role,  # 使用自動分配的角色
+                    'status': 'Online',  # QR 登入成功，直接設置為在線
+                    'twoFactorPassword': '',
+                }
+
+                print(f"[Backend] Adding account with API ID: {api_id}, API Hash: {'***' if api_hash else 'MISSING'}, role={auto_role}", file=sys.stderr)
+
+                # 添加設備指紋
+                if device_fingerprint:
+                    account_data['deviceModel'] = device_fingerprint.get('device_model', '')
+                    account_data['systemVersion'] = device_fingerprint.get('system_version', '')
+                    account_data['appVersion'] = device_fingerprint.get('app_version', '')
+                    account_data['langCode'] = device_fingerprint.get('lang_code', '')
+                    account_data['platform'] = device_fingerprint.get('platform', '')
+
+                account_id = await db.add_account(account_data)
+                print(f"[Backend] Account {phone} added with ID: {account_id}", file=sys.stderr)
+
+                # 使用 self.send_log 而不是 db.add_log（Database 類沒有這個方法）
+                self.send_log(f"✅ QR 登入成功，帳號 {phone} 已添加", "success")
+                
+                # 顯示角色分配提示
+                if role_message:
+                    self.send_log(f"🎯 {role_message}", "success")
+                else:
+                    self.send_log(f"💡 帳號 {phone} 已登入，請在帳號管理中分配角色", "info")
+            
+            # 發送帳號列表更新事件
+            accounts = await db.get_all_accounts()
+            self._cache.pop("accounts", None)
+            self._cache_timestamps.pop("accounts", None)
+            self.send_event("accounts-updated", accounts)
+            print(f"[Backend] Sent accounts-updated event with {len(accounts)} accounts", file=sys.stderr)
+            
+        except Exception as e:
+            print(f"[Backend] Error handling QR login account ready: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_log(f"❌ QR 登入帳號處理失敗: {str(e)}", "error")
+
     async def handle_add_account(self, payload: Dict[str, Any]):
         """Handle add-account command"""
         try:
@@ -2317,8 +3059,11 @@ class BackendService:
                     
                     # Update account data if provided (API ID, API Hash, etc.)
                     update_data = {}
-                    if payload.get('apiId'):
-                        update_data['apiId'] = payload['apiId']
+                    old_api_id = existing_account.get('apiId')
+                    new_api_id = payload.get('apiId')
+                    
+                    if new_api_id:
+                        update_data['apiId'] = new_api_id
                     if payload.get('apiHash'):
                         update_data['apiHash'] = payload['apiHash']
                     if payload.get('proxy'):
@@ -2333,6 +3078,28 @@ class BackendService:
                     if update_data:
                         await db.update_account(existing_id, update_data)
                         print(f"[Backend] Updated account data for {phone}", file=sys.stderr)
+                    
+                    # 更新 API 憑據使用計數（當 API ID 改變時）
+                    if new_api_id and new_api_id != old_api_id:
+                        try:
+                            from api_credential_pool import get_api_credential_pool
+                            data_dir = str(Path(config.DATA_PATH))
+                            pool = get_api_credential_pool(data_dir)
+                            
+                            # 釋放舊的 API 憑據
+                            if old_api_id:
+                                pool.release_credential(old_api_id)
+                                print(f"[Backend] Released old API credential {old_api_id}", file=sys.stderr)
+                            
+                            # 分配新的 API 憑據
+                            pool.allocate_credential(new_api_id)
+                            print(f"[Backend] Allocated new API credential {new_api_id}", file=sys.stderr)
+                            
+                            # 發送更新的憑據信息
+                            credentials = pool.list_credentials()
+                            self.send_event("api-credentials-updated", {"credentials": credentials})
+                        except Exception as e:
+                            print(f"[Backend] Error updating API credential usage: {e}", file=sys.stderr)
                     
                     # Send updated accounts list
                     accounts = await db.get_all_accounts()
@@ -2470,6 +3237,21 @@ class BackendService:
             await db.update_account(account_id, {"status": "Offline"})
             print(f"[Backend] Account status set to Offline for {phone}", file=sys.stderr)
             
+            # 更新 API 憑據池使用計數
+            api_id = payload.get('apiId')
+            if api_id:
+                try:
+                    from api_credential_pool import get_api_credential_pool
+                    data_dir = str(Path(config.DATA_PATH))
+                    pool = get_api_credential_pool(data_dir)
+                    if pool.allocate_credential(api_id):
+                        print(f"[Backend] API credential {api_id} usage count incremented", file=sys.stderr)
+                        # 發送更新的憑據信息
+                        credentials = pool.list_credentials()
+                        self.send_event("api-credentials-updated", {"credentials": credentials})
+                except Exception as e:
+                    print(f"[Backend] Error updating API credential usage: {e}", file=sys.stderr)
+            
             await db.add_log(f"Account added: {payload.get('phone')}", "success")
             self.send_log(f"账户添加成功: {payload.get('phone')}", "success")
             
@@ -2537,10 +3319,23 @@ class BackendService:
                 two_factor_password = None
             else:
                 account_id = payload.get('accountId')
-                account = await db.get_account(account_id)
                 phone_code = payload.get('phoneCode')
                 phone_code_hash = payload.get('phoneCodeHash')
                 two_factor_password = payload.get('twoFactorPassword')
+                
+                # Try to get account by ID first, then by phone number
+                if account_id:
+                    account = await db.get_account(account_id)
+                else:
+                    # If no accountId provided, try to find by phone number
+                    phone_from_payload = payload.get('phone')
+                    if phone_from_payload:
+                        account = await db.get_account_by_phone(phone_from_payload)
+                        if account:
+                            account_id = account.get('id')
+                            print(f"[Backend] Found account by phone {phone_from_payload}, ID: {account_id}", file=sys.stderr)
+                    else:
+                        account = None
             
             if not account:
                 error_msg = f"Account {account_id} not found"
@@ -2683,9 +3478,97 @@ class BackendService:
                     await db.update_account(account_id, {"status": result.get('status', 'Online')})
                     self.send_log(f"Account {phone} logged in successfully", "success")
                     
+                    # 獲取完整用戶資料（包括頭像）
+                    try:
+                        full_profile = await self.telegram_manager.get_full_user_profile(phone, download_avatar=True)
+                        if full_profile.get('success'):
+                            # 保存用戶信息到數據庫
+                            await db.update_account(account_id, {
+                                "firstName": full_profile.get('firstName', ''),
+                                "lastName": full_profile.get('lastName', ''),
+                                "username": full_profile.get('username', ''),
+                                "bio": full_profile.get('bio', ''),
+                                "avatarPath": full_profile.get('avatarPath', ''),
+                                "telegramId": full_profile.get('id', '')
+                            })
+                            print(f"[Backend] Full profile saved for {phone}: {full_profile.get('firstName')} @{full_profile.get('username')}", file=sys.stderr)
+                    except Exception as profile_err:
+                        print(f"[Backend] Could not get full profile for {phone}: {profile_err}", file=sys.stderr)
+                    
                     # 獲取帳號信息
                     account = await db.get_account(account_id)
                     account_role = account.get('role', 'Unassigned')
+                    
+                    # ========== 智能角色分配 ==========
+                    # 如果帳號未分配角色，根據現有帳號情況自動分配
+                    if account_role == 'Unassigned':
+                        all_accounts = await db.get_all_accounts()
+                        has_listener = any(a.get('role') == 'Listener' for a in all_accounts)
+                        has_sender = any(a.get('role') == 'Sender' for a in all_accounts)
+                        
+                        new_role = None
+                        role_message = None
+                        
+                        if not has_listener:
+                            # 優先分配為監控號
+                            new_role = 'Listener'
+                            role_message = f'已自動將 {phone} 設為「監控號」（用於監控群組消息）'
+                        elif not has_sender:
+                            # 其次分配為發送號
+                            new_role = 'Sender'
+                            role_message = f'已自動將 {phone} 設為「發送號」（用於發送消息給潛在客戶）'
+                        
+                        if new_role:
+                            await db.update_account(account_id, {"role": new_role})
+                            account_role = new_role
+                            self.send_log(f"🎯 {role_message}", "success")
+                            print(f"[Backend] Auto-assigned role {new_role} to account {phone}", file=sys.stderr)
+                        else:
+                            self.send_log(f"💡 帳號 {phone} 已登入，請在帳號管理中分配角色", "info")
+                    # ========== 智能角色分配結束 ==========
+
+                    # 發送登入成功事件給前端（包含完整信息）
+                    user_info = result.get('user_info', {})
+                    self.send_event("login-success", {
+                        "accountId": account_id,
+                        "phone": phone,
+                        "status": "Online",
+                        "role": account_role,  # 包含角色信息
+                        "message": f"帳號 {phone} 登入成功",
+                        "userInfo": {
+                            "phone": phone,
+                            "firstName": account.get('firstName') or user_info.get('first_name', ''),
+                            "lastName": account.get('lastName') or user_info.get('last_name', ''),
+                            "username": account.get('username') or user_info.get('username', ''),
+                            "id": account.get('telegramId') or user_info.get('id', ''),
+                            "bio": account.get('bio', ''),
+                            "avatarPath": account.get('avatarPath', '')
+                        }
+                    })
+                    print(f"[Backend] login-success event sent for account {account_id} ({phone}), role={account_role}", file=sys.stderr)
+                    
+                    # === P0: 保存 Session Metadata ===
+                    try:
+                        await self._save_session_metadata(phone, {
+                            'phone': phone,
+                            'apiId': account.get('apiId'),
+                            'apiHash': account.get('apiHash'),
+                            'firstName': account.get('firstName') or user_info.get('first_name', ''),
+                            'lastName': account.get('lastName') or user_info.get('last_name', ''),
+                            'username': account.get('username') or user_info.get('username', ''),
+                            'telegramId': str(account.get('telegramId') or user_info.get('id', '')),
+                            'role': account_role,
+                            'created_at': datetime.now().isoformat()
+                        })
+                        print(f"[Backend] Session metadata saved for {phone}", file=sys.stderr)
+                    except Exception as e:
+                        print(f"[Backend] Error saving session metadata: {e}", file=sys.stderr)
+                    
+                    # 刷新 API 憑據列表（確保綁定帳號數據正確）
+                    try:
+                        await self.handle_get_api_credentials({})
+                    except Exception as e:
+                        print(f"[Backend] Error refreshing API credentials after login: {e}", file=sys.stderr)
                     
                     # 為所有帳號註冊私信處理器（處理用戶回復）
                     try:
@@ -2729,6 +3612,13 @@ class BackendService:
                                 'warmupDaysCompleted': stage_info.get('days_completed', 0)
                             })
                             print(f"[Backend] Warmup progress updated for {phone}: Stage {stage_info.get('stage')} - {stage_info.get('stage_name')}, Days: {stage_info.get('days_completed')}", file=sys.stderr)
+                    
+                    # 🔧 關鍵修復：登入成功後發送 accounts-updated 事件更新前端狀態
+                    accounts = await db.get_all_accounts()
+                    self._cache.pop("accounts", None)
+                    self._cache_timestamps.pop("accounts", None)
+                    self.send_event("accounts-updated", accounts)
+                    print(f"[Backend] Sent accounts-updated after successful login for {phone}", file=sys.stderr)
             else:
                 # Login failed
                 import sys
@@ -2868,6 +3758,466 @@ class BackendService:
             traceback.print_exc(file=sys.stderr)
             self.send_log(error_msg, "error")
     
+    # ===================== QR Code Login Handlers =====================
+    
+    async def handle_qr_login_create(self, payload: Dict[str, Any]):
+        """Handle qr-login-create command - Create a new QR login session"""
+        try:
+            import sys
+            print(f"[Backend] handle_qr_login_create called with payload: {payload}", file=sys.stderr)
+            
+            if not self.qr_auth_manager:
+                # 提供更詳細的錯誤信息
+                from qr_auth_manager import HAS_TELETHON, HAS_QRCODE
+                missing_libs = []
+                if not HAS_TELETHON:
+                    missing_libs.append("telethon")
+                if not HAS_QRCODE:
+                    missing_libs.append("qrcode")
+                
+                if missing_libs:
+                    error_msg = f"QR 登入功能未啟用，缺少依賴庫: {', '.join(missing_libs)}。請運行: pip install telethon qrcode[pil]"
+                else:
+                    error_msg = "QR 登入功能初始化失敗，請查看後端日誌了解詳情"
+                
+                print(f"[Backend] {error_msg} (HAS_TELETHON={HAS_TELETHON}, HAS_QRCODE={HAS_QRCODE})", file=sys.stderr)
+                self.send_event("qr-login-error", {"error": error_msg})
+                self.send_log(error_msg, "error")
+                return
+            
+            proxy = payload.get("proxy") if isinstance(payload, dict) else None
+            device_type = payload.get("deviceType") if isinstance(payload, dict) else None
+            two_factor_password = payload.get("twoFactorPassword") if isinstance(payload, dict) else None
+            
+            # 獲取自定義 API 憑據（防封推薦）
+            custom_api_id = payload.get("customApiId") if isinstance(payload, dict) else None
+            custom_api_hash = payload.get("customApiHash") if isinstance(payload, dict) else None
+            
+            if custom_api_id and custom_api_hash:
+                print(f"[Backend] Using CUSTOM API credentials (api_id={custom_api_id}) - Recommended for anti-ban", file=sys.stderr)
+            else:
+                print(f"[Backend] ⚠️ WARNING: No custom API credentials provided - Using PUBLIC API (HIGH BAN RISK!)", file=sys.stderr)
+            
+            print(f"[Backend] Calling qr_auth_manager.create_qr_login with proxy={proxy}, device_type={device_type}", file=sys.stderr)
+            
+            # 添加超時保護（60秒）
+            try:
+                result = await asyncio.wait_for(
+                    self.qr_auth_manager.create_qr_login(
+                        proxy=proxy,
+                        device_type=device_type,
+                        two_factor_password=two_factor_password,
+                        custom_api_id=custom_api_id,
+                        custom_api_hash=custom_api_hash
+                    ),
+                    timeout=60.0
+                )
+            except asyncio.TimeoutError:
+                error_msg = "創建 QR 登入超時（60秒），請檢查網絡連接或代理設置"
+                print(f"[Backend] {error_msg}", file=sys.stderr)
+                self.send_event("qr-login-error", {"error": error_msg})
+                self.send_log(error_msg, "error")
+                return
+            
+            print(f"[Backend] create_qr_login result: success={result.get('success')}, error={result.get('error', 'None')}", file=sys.stderr)
+            
+            if result.get("success"):
+                print(f"[Backend] Sending qr-login-created event with sessionId={result.get('sessionId')}", file=sys.stderr)
+                self.send_event("qr-login-created", result)
+                self.send_log(f"QR 登入會話已創建，請掃描二維碼", "info")
+            else:
+                error_msg = result.get("error", "創建 QR 登入失敗")
+                print(f"[Backend] QR login failed: {error_msg}", file=sys.stderr)
+                self.send_event("qr-login-error", {"error": error_msg})
+                self.send_log(f"創建 QR 登入失敗: {error_msg}", "error")
+                
+        except Exception as e:
+            import sys
+            import traceback
+            error_msg = f"創建 QR 登入時發生錯誤: {str(e)}"
+            print(f"[Backend] Error in handle_qr_login_create: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            self.send_event("qr-login-error", {"error": error_msg})
+            self.send_log(error_msg, "error")
+    
+    async def handle_qr_login_status(self, payload: Dict[str, Any]):
+        """Handle qr-login-status command - Get QR login session status"""
+        try:
+            if not self.qr_auth_manager:
+                self.send_event("qr-login-status-result", {
+                    "success": False,
+                    "error": "QR 登入功能未啟用"
+                })
+                return
+            
+            session_id = payload.get("sessionId") if isinstance(payload, dict) else payload
+            result = self.qr_auth_manager.get_session_status(session_id)
+            self.send_event("qr-login-status-result", result)
+            
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_qr_login_status: {e}", file=sys.stderr)
+            self.send_event("qr-login-status-result", {"success": False, "error": str(e)})
+    
+    async def handle_qr_login_refresh(self, payload: Dict[str, Any]):
+        """Handle qr-login-refresh command - Refresh QR code"""
+        try:
+            if not self.qr_auth_manager:
+                self.send_event("qr-login-error", {"error": "QR 登入功能未啟用"})
+                return
+            
+            session_id = payload.get("sessionId") if isinstance(payload, dict) else payload
+            result = await self.qr_auth_manager.refresh_qr_code(session_id)
+            
+            if result.get("success"):
+                self.send_event("qr-login-refreshed", result)
+            else:
+                self.send_event("qr-login-error", {
+                    "sessionId": session_id,
+                    "error": result.get("error", "刷新 QR 碼失敗")
+                })
+                
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_qr_login_refresh: {e}", file=sys.stderr)
+            self.send_event("qr-login-error", {"error": str(e)})
+    
+    async def handle_qr_login_submit_2fa(self, payload: Dict[str, Any]):
+        """Handle qr-login-submit-2fa command - Submit 2FA password"""
+        try:
+            if not self.qr_auth_manager:
+                self.send_event("qr-login-error", {"error": "QR 登入功能未啟用"})
+                return
+            
+            session_id = payload.get("sessionId")
+            password = payload.get("password")
+            
+            if not session_id or not password:
+                self.send_event("qr-login-error", {
+                    "sessionId": session_id,
+                    "error": "缺少會話 ID 或密碼"
+                })
+                return
+            
+            result = await self.qr_auth_manager.submit_2fa_password(session_id, password)
+            
+            if result.get("success"):
+                self.send_event("qr-login-2fa-success", {
+                    "sessionId": session_id,
+                    "message": "二步驗證成功"
+                })
+            else:
+                self.send_event("qr-login-error", {
+                    "sessionId": session_id,
+                    "error": result.get("error", "二步驗證失敗")
+                })
+                
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_qr_login_submit_2fa: {e}", file=sys.stderr)
+            self.send_event("qr-login-error", {"error": str(e)})
+    
+    async def handle_qr_login_cancel(self, payload: Dict[str, Any]):
+        """Handle qr-login-cancel command - Cancel QR login session"""
+        try:
+            if not self.qr_auth_manager:
+                return
+            
+            session_id = payload.get("sessionId") if isinstance(payload, dict) else payload
+            result = await self.qr_auth_manager.cancel_session(session_id)
+            
+            self.send_event("qr-login-cancelled", {
+                "sessionId": session_id,
+                "message": "QR 登入已取消"
+            })
+            
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_qr_login_cancel: {e}", file=sys.stderr)
+    
+    # ===================== End QR Code Login Handlers =====================
+
+    # ===================== IP Binding Handlers (Phase 2) =====================
+    
+    async def handle_ip_bind(self, payload: Dict[str, Any]):
+        """Handle ip-bind command - Bind IP to account"""
+        try:
+            if not self.ip_binding_manager:
+                self.send_event("ip-binding-error", {"error": "IP Binding Manager 未初始化"})
+                return
+            
+            account_id = payload.get("accountId")
+            phone = payload.get("phone")
+            proxy = payload.get("proxy")
+            proxy_country = payload.get("proxyCountry")
+            proxy_type = payload.get("proxyType", "residential")
+            reason = payload.get("reason", "manual")
+            
+            if not account_id or not phone or not proxy:
+                self.send_event("ip-binding-error", {"error": "缺少必要參數"})
+                return
+            
+            binding = await self.ip_binding_manager.bind_ip(
+                account_id=account_id,
+                phone=phone,
+                proxy=proxy,
+                proxy_country=proxy_country,
+                proxy_type=proxy_type,
+                reason=reason
+            )
+            
+            # Update account in database
+            from dataclasses import asdict
+            await db.update_account(account_id, {
+                "proxy": proxy,
+                "ip_binding_id": binding.proxy_ip,
+                "ip_bound_at": binding.bound_at,
+                "proxy_country": binding.proxy_country,
+                "proxy_type": binding.proxy_type,
+                "ip_is_sticky": 1
+            })
+            
+            self.send_event("ip-binding-success", {
+                "accountId": account_id,
+                "phone": phone,
+                "binding": asdict(binding)
+            })
+            self.send_log(f"帳號 {phone} 已綁定 IP: {binding.proxy_ip}", "success")
+            
+            # Refresh accounts list
+            accounts = await db.get_all_accounts()
+            self._cache.pop("accounts", None)
+            self.send_event("accounts-updated", accounts)
+            
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_ip_bind: {e}", file=sys.stderr)
+            self.send_event("ip-binding-error", {"error": str(e)})
+    
+    async def handle_ip_unbind(self, payload: Dict[str, Any]):
+        """Handle ip-unbind command - Remove IP binding from account"""
+        try:
+            if not self.ip_binding_manager:
+                return
+            
+            account_id = payload.get("accountId")
+            
+            # Just update the database to remove binding info
+            await db.update_account(account_id, {
+                "ip_binding_id": None,
+                "ip_bound_at": None,
+                "ip_is_sticky": 0
+            })
+            
+            self.send_event("ip-unbinding-success", {"accountId": account_id})
+            
+            # Refresh accounts list
+            accounts = await db.get_all_accounts()
+            self._cache.pop("accounts", None)
+            self.send_event("accounts-updated", accounts)
+            
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_ip_unbind: {e}", file=sys.stderr)
+    
+    async def handle_ip_get_binding(self, payload: Dict[str, Any]):
+        """Handle ip-get-binding command - Get IP binding for account"""
+        try:
+            if not self.ip_binding_manager:
+                return
+            
+            account_id = payload.get("accountId")
+            binding = self.ip_binding_manager.get_binding(account_id)
+            
+            if binding:
+                from dataclasses import asdict
+                self.send_event("ip-binding-info", {
+                    "accountId": account_id,
+                    "binding": asdict(binding)
+                })
+            else:
+                self.send_event("ip-binding-info", {
+                    "accountId": account_id,
+                    "binding": None
+                })
+                
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_ip_get_binding: {e}", file=sys.stderr)
+    
+    async def handle_ip_get_all_bindings(self, payload: Dict[str, Any]):
+        """Handle ip-get-all-bindings command - Get all IP bindings"""
+        try:
+            if not self.ip_binding_manager:
+                self.send_event("ip-all-bindings", {"bindings": []})
+                return
+            
+            bindings = self.ip_binding_manager.get_all_bindings()
+            self.send_event("ip-all-bindings", {"bindings": bindings})
+            
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_ip_get_all_bindings: {e}", file=sys.stderr)
+    
+    async def handle_ip_get_statistics(self, payload: Dict[str, Any]):
+        """Handle ip-get-statistics command - Get IP binding statistics"""
+        try:
+            if not self.ip_binding_manager:
+                return
+            
+            stats = self.ip_binding_manager.get_statistics()
+            self.send_event("ip-binding-statistics", stats)
+            
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_ip_get_statistics: {e}", file=sys.stderr)
+    
+    async def handle_ip_verify_binding(self, payload: Dict[str, Any]):
+        """Handle ip-verify-binding command - Verify IP binding health"""
+        try:
+            if not self.ip_binding_manager:
+                return
+            
+            account_id = payload.get("accountId")
+            is_valid, error = await self.ip_binding_manager.verify_binding(account_id)
+            
+            self.send_event("ip-binding-verified", {
+                "accountId": account_id,
+                "isValid": is_valid,
+                "error": error
+            })
+            
+            if not is_valid:
+                self.send_log(f"帳號 {account_id} 的 IP 綁定驗證失敗: {error}", "warning")
+            
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_ip_verify_binding: {e}", file=sys.stderr)
+    
+    # ===================== End IP Binding Handlers =====================
+    
+    # ===================== Credential Scraper Handlers (Phase 2) =====================
+    
+    async def handle_credential_start_scrape(self, payload: Dict[str, Any]):
+        """Handle credential-start-scrape command - Start API credential scraping"""
+        try:
+            if not self.credential_scraper:
+                self.send_event("credential-scrape-error", {"error": "Credential Scraper 未初始化"})
+                return
+            
+            account_id = payload.get("accountId")
+            phone = payload.get("phone")
+            proxy = payload.get("proxy")
+            headless = payload.get("headless", True)
+            
+            if not account_id or not phone:
+                self.send_event("credential-scrape-error", {"error": "缺少必要參數"})
+                return
+            
+            # Get Telethon client if available for code reception
+            telegram_client = None
+            # Note: In production, you would get the client from qr_auth_manager or session
+            
+            result = await self.credential_scraper.start_scrape(
+                account_id=account_id,
+                phone=phone,
+                telegram_client=telegram_client,
+                proxy=proxy,
+                headless=headless
+            )
+            
+            self.send_event("credential-scrape-started", {
+                "accountId": account_id,
+                "phone": phone,
+                "result": result
+            })
+            
+            if result.get("success"):
+                self.send_log(f"帳號 {phone} 開始獲取 API 憑據", "info")
+            else:
+                self.send_log(f"帳號 {phone} 獲取 API 憑據失敗: {result.get('message')}", "warning")
+                
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_credential_start_scrape: {e}", file=sys.stderr)
+            self.send_event("credential-scrape-error", {"error": str(e)})
+    
+    async def handle_credential_submit_code(self, payload: Dict[str, Any]):
+        """Handle credential-submit-code command - Submit verification code for scraping"""
+        try:
+            if not self.credential_scraper:
+                return
+            
+            phone = payload.get("phone")
+            code = payload.get("code")
+            
+            if not phone or not code:
+                self.send_event("credential-code-error", {"error": "缺少必要參數"})
+                return
+            
+            success = self.credential_scraper.submit_code(phone, code)
+            
+            self.send_event("credential-code-submitted", {
+                "phone": phone,
+                "success": success
+            })
+            
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_credential_submit_code: {e}", file=sys.stderr)
+    
+    async def handle_credential_get_status(self, payload: Dict[str, Any]):
+        """Handle credential-get-status command - Get scraping status"""
+        try:
+            if not self.credential_scraper:
+                return
+            
+            phone = payload.get("phone")
+            status = self.credential_scraper.get_scrape_status(phone)
+            
+            self.send_event("credential-status", {
+                "phone": phone,
+                "status": status
+            })
+            
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_credential_get_status: {e}", file=sys.stderr)
+    
+    async def handle_credential_get_all(self, payload: Dict[str, Any]):
+        """Handle credential-get-all command - Get all credentials"""
+        try:
+            if not self.credential_scraper:
+                self.send_event("credentials-list", {"credentials": []})
+                return
+            
+            credentials = self.credential_scraper.get_all_credentials()
+            self.send_event("credentials-list", {"credentials": credentials})
+            
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_credential_get_all: {e}", file=sys.stderr)
+    
+    async def handle_credential_cancel_scrape(self, payload: Dict[str, Any]):
+        """Handle credential-cancel-scrape command - Cancel scraping"""
+        try:
+            if not self.credential_scraper:
+                return
+            
+            phone = payload.get("phone")
+            success = await self.credential_scraper.cancel_scrape(phone)
+            
+            self.send_event("credential-scrape-cancelled", {
+                "phone": phone,
+                "success": success
+            })
+            
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in handle_credential_cancel_scrape: {e}", file=sys.stderr)
+    
+    # ===================== End Credential Scraper Handlers =====================
+
     async def handle_check_account_status(self, payload: int):
         """Handle check-account-status command with Pyrogram"""
         try:
@@ -2924,6 +4274,471 @@ class BackendService:
         except Exception as e:
             self.send_log(f"Error updating account: {str(e)}", "error")
     
+    async def handle_update_account(self, payload: Dict[str, Any]):
+        """Handle update-account command - 完整帳號編輯"""
+        try:
+            import sys
+            account_id = payload.get('id')
+            phone = payload.get('phone')
+            
+            if not account_id:
+                self.send_event("update-account-result", {"success": False, "error": "缺少帳號 ID"})
+                return
+
+            # 構建更新數據
+            update_data = {}
+            
+            # 基本設置
+            if 'nickname' in payload:
+                update_data['nickname'] = payload['nickname']
+            if 'notes' in payload:
+                update_data['notes'] = payload['notes']
+            if 'dailySendLimit' in payload:
+                update_data['dailySendLimit'] = payload['dailySendLimit']
+            if 'group' in payload:
+                update_data['group'] = payload['group']
+            if 'enableWarmup' in payload:
+                update_data['enableWarmup'] = 1 if payload['enableWarmup'] else 0
+
+            # API 凭证（数据库字段名是 apiId 和 apiHash）
+            if 'apiId' in payload and payload['apiId']:
+                update_data['apiId'] = payload['apiId']
+            if 'apiHash' in payload and payload['apiHash']:
+                update_data['apiHash'] = payload['apiHash']
+
+            # 代理設置
+            if 'proxy' in payload:
+                update_data['proxy'] = payload['proxy']
+            if 'proxyType' in payload:
+                update_data['proxyType'] = payload['proxyType']
+            if 'proxyHost' in payload:
+                update_data['proxyHost'] = payload['proxyHost']
+            if 'proxyPort' in payload:
+                update_data['proxyPort'] = payload['proxyPort']
+            if 'proxyUsername' in payload:
+                update_data['proxyUsername'] = payload['proxyUsername']
+            if 'proxyPassword' in payload:
+                update_data['proxyPassword'] = payload['proxyPassword']
+            if 'proxyCountry' in payload:
+                update_data['proxyCountry'] = payload['proxyCountry']
+            if 'proxyRotationEnabled' in payload:
+                update_data['proxyRotationEnabled'] = 1 if payload['proxyRotationEnabled'] else 0
+
+            # 角色設置
+            if 'role' in payload:
+                update_data['role'] = payload['role']
+            if 'aiPersonality' in payload:
+                update_data['aiPersonality'] = payload['aiPersonality']
+
+            # AI 設置
+            if 'aiEnabled' in payload:
+                update_data['aiEnabled'] = 1 if payload['aiEnabled'] else 0
+            if 'aiModel' in payload:
+                update_data['aiModel'] = payload['aiModel']
+
+            # 執行更新
+            await db.update_account(account_id, update_data)
+            print(f"[Backend] Account {phone or account_id} updated: {list(update_data.keys())}", file=sys.stderr)
+
+            # 刷新帳號列表
+            accounts = await db.get_all_accounts()
+            self._cache.pop("accounts", None)
+            self._cache_timestamps.pop("accounts", None)
+            self.send_event("accounts-updated", accounts)
+            
+            # 發送成功響應
+            self.send_event("update-account-result", {"success": True})
+            await db.add_log(f"帳號 {phone or account_id} 設置已更新", "success")
+
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error updating account: {e}", file=sys.stderr)
+            self.send_event("update-account-result", {"success": False, "error": str(e)})
+            self.send_log(f"Error updating account: {str(e)}", "error")
+
+    async def handle_test_proxy(self, payload: Dict[str, Any]):
+        """Handle test-proxy command - 測試代理連接"""
+        import sys
+        import asyncio
+        import aiohttp
+        
+        try:
+            proxy_type = payload.get('type', 'socks5')
+            host = payload.get('host', '')
+            port = payload.get('port', 0)
+            username = payload.get('username', '')
+            password = payload.get('password', '')
+
+            if not host or not port:
+                self.send_event("test-proxy-result", {
+                    "success": False, 
+                    "error": "請填寫代理地址和端口"
+                })
+                return
+
+            print(f"[Backend] Testing proxy: {proxy_type}://{host}:{port}", file=sys.stderr)
+
+            # 構建代理 URL
+            if username and password:
+                proxy_url = f"{proxy_type}://{username}:{password}@{host}:{port}"
+            else:
+                proxy_url = f"{proxy_type}://{host}:{port}"
+
+            # 測試連接
+            start_time = asyncio.get_event_loop().time()
+            
+            try:
+                connector = None
+                if proxy_type in ['socks5', 'socks4']:
+                    # 使用 aiohttp-socks 支持 SOCKS 代理
+                    try:
+                        from aiohttp_socks import ProxyConnector
+                        connector = ProxyConnector.from_url(proxy_url)
+                    except ImportError:
+                        # 如果沒有 aiohttp-socks，嘗試基本測試
+                        pass
+                
+                timeout = aiohttp.ClientTimeout(total=10)
+                
+                if connector:
+                    async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
+                        async with session.get('https://api.telegram.org') as response:
+                            end_time = asyncio.get_event_loop().time()
+                            latency = int((end_time - start_time) * 1000)
+                            
+                            if response.status == 200:
+                                self.send_event("test-proxy-result", {
+                                    "success": True,
+                                    "latency": latency,
+                                    "message": f"連接成功，延遲 {latency}ms"
+                                })
+                            else:
+                                self.send_event("test-proxy-result", {
+                                    "success": False,
+                                    "error": f"HTTP 狀態碼: {response.status}"
+                                })
+                else:
+                    # HTTP 代理測試
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        async with session.get('https://api.telegram.org', proxy=proxy_url) as response:
+                            end_time = asyncio.get_event_loop().time()
+                            latency = int((end_time - start_time) * 1000)
+                            
+                            if response.status == 200:
+                                self.send_event("test-proxy-result", {
+                                    "success": True,
+                                    "latency": latency,
+                                    "message": f"連接成功，延遲 {latency}ms"
+                                })
+                            else:
+                                self.send_event("test-proxy-result", {
+                                    "success": False,
+                                    "error": f"HTTP 狀態碼: {response.status}"
+                                })
+                                
+            except asyncio.TimeoutError:
+                self.send_event("test-proxy-result", {
+                    "success": False,
+                    "error": "連接超時（10秒）"
+                })
+            except Exception as conn_err:
+                self.send_event("test-proxy-result", {
+                    "success": False,
+                    "error": f"連接失敗: {str(conn_err)}"
+                })
+
+        except Exception as e:
+            print(f"[Backend] Error testing proxy: {e}", file=sys.stderr)
+            self.send_event("test-proxy-result", {
+                "success": False,
+                "error": str(e)
+            })
+
+    async def handle_sync_account_info(self, payload: Dict[str, Any]):
+        """Handle sync-account-info command - 同步帳號信息（包括頭像）"""
+        import sys
+        
+        try:
+            account_id = payload.get('id') or payload.get('accountId')
+            phone = payload.get('phone')
+            
+            if not account_id and not phone:
+                self.send_event("sync-account-info-result", {
+                    "success": False, 
+                    "error": "缺少账户 ID 或电话号码"
+                })
+                return
+
+            # 獲取帳號信息
+            if account_id:
+                account = await db.get_account(account_id)
+            else:
+                account = await db.get_account_by_phone(phone)
+            
+            if not account:
+                self.send_event("sync-account-info-result", {
+                    "success": False, 
+                    "error": "账户不存在"
+                })
+                return
+            
+            phone = account.get('phone')
+            account_id = account.get('id')
+            
+            print(f"[Backend] Syncing account info for {phone}...", file=sys.stderr)
+            
+            # 检查客户端是否已连接，如果未连接则尝试连接
+            client = self.telegram_manager.get_client(phone)
+            if not client or not client.is_connected:
+                print(f"[Backend] Client not connected, attempting to connect for {phone}...", file=sys.stderr)
+                
+                # 获取 API 凭证（数据库字段名是 apiId 和 apiHash）
+                api_id = account.get('apiId') or account.get('api_id')
+                api_hash = account.get('apiHash') or account.get('api_hash')
+                
+                if not api_id or not api_hash:
+                    self.send_event("sync-account-info-result", {
+                        "success": False, 
+                        "error": "账户缺少 API 凭证，请在账户设置中填写 API ID 和 API Hash"
+                    })
+                    return
+                
+                # 尝试登录/连接
+                try:
+                    login_result = await self.telegram_manager.login_account(
+                        phone=phone,
+                        api_id=api_id,
+                        api_hash=api_hash,
+                        proxy=account.get('proxy')
+                    )
+                    
+                    if not login_result.get('success') and login_result.get('status') != 'Online':
+                        self.send_event("sync-account-info-result", {
+                            "success": False, 
+                            "error": f"无法连接账户: {login_result.get('error', '连接失败')}"
+                        })
+                        return
+                        
+                    print(f"[Backend] Client connected for {phone}", file=sys.stderr)
+                except Exception as conn_error:
+                    self.send_event("sync-account-info-result", {
+                        "success": False, 
+                        "error": f"连接账户失败: {str(conn_error)}"
+                    })
+                    return
+            
+            # 獲取完整用戶資料
+            full_profile = await self.telegram_manager.get_full_user_profile(phone, download_avatar=True)
+            
+            if not full_profile.get('success'):
+                self.send_event("sync-account-info-result", {
+                    "success": False,
+                    "error": full_profile.get('error', '无法获取用户信息')
+                })
+                return
+            
+            # 更新數據庫
+            await db.update_account(account_id, {
+                "firstName": full_profile.get('firstName', ''),
+                "lastName": full_profile.get('lastName', ''),
+                "username": full_profile.get('username', ''),
+                "bio": full_profile.get('bio', ''),
+                "avatarPath": full_profile.get('avatarPath', ''),
+                "telegramId": str(full_profile.get('id', ''))
+            })
+            
+            print(f"[Backend] Account info synced for {phone}", file=sys.stderr)
+            
+            # 刷新帳號列表
+            accounts = await db.get_all_accounts()
+            self._cache.pop("accounts", None)
+            self._cache_timestamps.pop("accounts", None)
+            self.send_event("accounts-updated", accounts)
+            
+            # 發送成功結果
+            self.send_event("sync-account-info-result", {
+                "success": True,
+                "accountId": account_id,
+                "phone": phone,
+                "profile": full_profile
+            })
+            
+            self.send_log(f"帳號 {phone} 信息已同步", "success")
+
+        except Exception as e:
+            print(f"[Backend] Error syncing account info: {e}", file=sys.stderr)
+            self.send_event("sync-account-info-result", {
+                "success": False,
+                "error": str(e)
+            })
+
+    async def handle_logout_account(self, payload: Dict[str, Any]):
+        """Handle logout-account command - 退出账户（断开连接但保留账户）"""
+        import sys
+
+        try:
+            account_id = payload if isinstance(payload, int) else payload.get('id') or payload.get('accountId')
+
+            if not account_id:
+                self.send_event("logout-account-result", {
+                    "success": False,
+                    "error": "缺少账户 ID"
+                })
+                return
+
+            # 获取账户信息
+            account = await db.get_account(account_id)
+            if not account:
+                self.send_event("logout-account-result", {
+                    "success": False,
+                    "error": "账户不存在"
+                })
+                return
+
+            phone = account.get('phone')
+            print(f"[Backend] Logging out account {phone}...", file=sys.stderr)
+
+            # 断开客户端连接
+            try:
+                await self.telegram_manager.disconnect_account(phone, graceful=True)
+                print(f"[Backend] Account {phone} disconnected successfully", file=sys.stderr)
+            except Exception as e:
+                print(f"[Backend] Warning: Error disconnecting account {phone}: {e}", file=sys.stderr)
+
+            # 更新数据库状态为离线
+            await db.update_account(account_id, {"status": "Offline"})
+
+            # 刷新账户列表
+            accounts = await db.get_all_accounts()
+            self._cache.pop("accounts", None)
+            self._cache_timestamps.pop("accounts", None)
+            self.send_event("accounts-updated", accounts)
+
+            # 发送成功结果
+            self.send_event("logout-account-result", {
+                "success": True,
+                "accountId": account_id,
+                "phone": phone
+            })
+
+            self.send_log(f"账户 {phone} 已退出", "success")
+
+        except Exception as e:
+            print(f"[Backend] Error logging out account: {e}", file=sys.stderr)
+            self.send_event("logout-account-result", {
+                "success": False,
+                "error": str(e)
+            })
+
+    async def handle_save_tags(self, payload: Dict[str, Any]):
+        """Save tags to settings"""
+        try:
+            tags = payload.get('tags', [])
+            await db.save_setting('account_tags', json.dumps(tags))
+            self.send_event("save-tags-result", {"success": True})
+        except Exception as e:
+            self.send_event("save-tags-result", {"success": False, "error": str(e)})
+
+    async def handle_save_groups(self, payload: Dict[str, Any]):
+        """Save groups to settings"""
+        try:
+            groups = payload.get('groups', [])
+            await db.save_setting('account_groups', json.dumps(groups))
+            self.send_event("save-groups-result", {"success": True})
+        except Exception as e:
+            self.send_event("save-groups-result", {"success": False, "error": str(e)})
+
+    async def handle_get_tags(self, payload: Dict[str, Any]):
+        """Get saved tags"""
+        try:
+            tags_json = await db.get_setting('account_tags')
+            tags = json.loads(tags_json) if tags_json else []
+            self.send_event("get-tags-result", {"success": True, "tags": tags})
+        except Exception as e:
+            self.send_event("get-tags-result", {"success": False, "error": str(e), "tags": []})
+
+    async def handle_get_groups(self, payload: Dict[str, Any]):
+        """Get saved groups"""
+        try:
+            groups_json = await db.get_setting('account_groups')
+            groups = json.loads(groups_json) if groups_json else []
+            self.send_event("get-groups-result", {"success": True, "groups": groups})
+        except Exception as e:
+            self.send_event("get-groups-result", {"success": False, "error": str(e), "groups": []})
+
+    async def handle_save_personas(self, payload: Dict[str, Any]):
+        """Save custom AI personas to settings"""
+        try:
+            personas = payload.get('personas', [])
+            await db.save_setting('ai_personas', json.dumps(personas))
+            self.send_event("save-personas-result", {"success": True})
+        except Exception as e:
+            self.send_event("save-personas-result", {"success": False, "error": str(e)})
+
+    async def handle_get_personas(self, payload: Dict[str, Any]):
+        """Get saved custom AI personas"""
+        try:
+            personas_json = await db.get_setting('ai_personas')
+            personas = json.loads(personas_json) if personas_json else []
+            self.send_event("get-personas-result", {"success": True, "personas": personas})
+        except Exception as e:
+            self.send_event("get-personas-result", {"success": False, "error": str(e), "personas": []})
+
+    async def handle_batch_update_accounts(self, payload: Dict[str, Any]):
+        """Handle batch-update-accounts command - 批量更新帳號設置"""
+        import sys
+        
+        try:
+            account_ids = payload.get('accountIds', [])
+            updates = payload.get('updates', {})
+            
+            if not account_ids:
+                self.send_event("batch-update-accounts-result", {
+                    "success": False,
+                    "error": "未選擇帳號"
+                })
+                return
+            
+            if not updates:
+                self.send_event("batch-update-accounts-result", {
+                    "success": False,
+                    "error": "未提供更新數據"
+                })
+                return
+            
+            print(f"[Backend] Batch updating {len(account_ids)} accounts with: {list(updates.keys())}", file=sys.stderr)
+            
+            # 批量更新每個帳號
+            success_count = 0
+            for account_id in account_ids:
+                try:
+                    await db.update_account(account_id, updates)
+                    success_count += 1
+                except Exception as e:
+                    print(f"[Backend] Error updating account {account_id}: {e}", file=sys.stderr)
+            
+            # 刷新帳號列表
+            accounts = await db.get_all_accounts()
+            self._cache.pop("accounts", None)
+            self._cache_timestamps.pop("accounts", None)
+            self.send_event("accounts-updated", accounts)
+            
+            # 發送成功結果
+            self.send_event("batch-update-accounts-result", {
+                "success": True,
+                "count": success_count,
+                "total": len(account_ids)
+            })
+            
+            self.send_log(f"批量更新完成: {success_count}/{len(account_ids)} 個帳號", "success")
+
+        except Exception as e:
+            print(f"[Backend] Error in batch update: {e}", file=sys.stderr)
+            self.send_event("batch-update-accounts-result", {
+                "success": False,
+                "error": str(e)
+            })
+
     async def handle_bulk_assign_role(self, payload: Dict[str, Any]):
         """Handle bulk-assign-role command"""
         try:
@@ -3048,10 +4863,25 @@ class BackendService:
                 return
             
             phone = account.get('phone')
+            api_id = account.get('apiId')
             print(f"[Backend] Removing account {account_id} (phone: {phone})", file=sys.stderr)
             
+            # 0. 釋放 API 憑據使用計數
+            if api_id:
+                try:
+                    from api_credential_pool import get_api_credential_pool
+                    data_dir = str(Path(config.DATA_PATH))
+                    pool = get_api_credential_pool(data_dir)
+                    if pool.release_credential(api_id):
+                        print(f"[Backend] API credential {api_id} usage count decremented", file=sys.stderr)
+                        # 發送更新的憑據信息
+                        credentials = pool.list_credentials()
+                        self.send_event("api-credentials-updated", {"credentials": credentials})
+                except Exception as e:
+                    print(f"[Backend] Error releasing API credential: {e}", file=sys.stderr)
+            
             # 1. Delete from database (this also cleans up related data)
-            deleted_phone = await db.delete_account(account_id)
+            deleted_phone = await db.remove_account(account_id)
             if not deleted_phone:
                 self.send_log(f"删除账户 {account_id} 失败", "error")
                 return
@@ -3365,6 +5195,7 @@ class BackendService:
     
     async def handle_start_monitoring(self):
         """Handle start-monitoring command with Pyrogram"""
+        import sys  # 在函數開頭導入，避免 UnboundLocalError
         try:
             if self.is_monitoring:
                 self.send_log("Monitoring is already running", "warning")
@@ -3375,6 +5206,7 @@ class BackendService:
             try:
                 config_check = await self.check_monitoring_configuration()
             except Exception as check_error:
+                import sys
                 import traceback
                 traceback.print_exc(file=sys.stderr)
                 self.send_log(f"配置檢查時發生錯誤: {str(check_error)}", "error")
@@ -3612,6 +5444,7 @@ class BackendService:
                     await self.execute_matching_campaigns(lead_id, lead_data)
                 
                 except Exception as e:
+                    import sys
                     import traceback
                     error_details = traceback.format_exc()
                     error_msg = f"Error processing captured lead: {str(e)}\n{error_details}"
@@ -4222,6 +6055,13 @@ class BackendService:
             })
             
             self.send_event("one-click-start-result", results)
+            
+            # 🔧 關鍵修復：一鍵啟動完成後發送 accounts-updated 更新前端狀態
+            accounts = await db.get_all_accounts()
+            self._cache.pop("accounts", None)
+            self._cache_timestamps.pop("accounts", None)
+            self.send_event("accounts-updated", accounts)
+            print(f"[Backend] Sent accounts-updated after one-click start completion", file=sys.stderr)
             
             summary = f"一鍵啟動完成 - 帳號: {results['accounts']['success']}/{results['accounts']['total']}, "
             summary += f"監控: {'✓' if results['monitoring']['success'] else '✗'}, "
@@ -5505,7 +7345,7 @@ class BackendService:
             print(f"[Backend] Removing keyword set with ID: {set_id}", file=sys.stderr)
             
             # Delete from database (idempotent - won't error if already deleted)
-            await db.delete_keyword_set(set_id)
+            await db.remove_keyword_set(set_id)
             print(f"[Backend] Keyword set {set_id} delete operation completed", file=sys.stderr)
             
             # Invalidate cache and send update
@@ -5659,8 +7499,13 @@ class BackendService:
                             membership_status = {
                                 "is_member": True,
                                 "account": phone,
-                                "chat_title": check_result.get("chat_title")
+                                "chat_title": check_result.get("chat_title"),
+                                "members_count": check_result.get("members_count", 0)
                             }
+                            # 更新群組成員數到數據庫
+                            members_count = check_result.get("members_count", 0)
+                            if members_count > 0:
+                                await db.update_group_member_count(url, members_count)
                             break
                         elif check_result.get("can_join"):
                             membership_status = {
@@ -5785,7 +7630,7 @@ class BackendService:
         """Handle remove-group command"""
         try:
             group_id = payload.get('id')
-            await db.delete_group(group_id)
+            await db.remove_group(group_id)
             await db.add_log(f"Group {group_id} removed", "success")
             await self.send_groups_update()
         
@@ -5844,7 +7689,7 @@ class BackendService:
         """Handle remove-template command"""
         try:
             template_id = payload.get('id')
-            await db.delete_template(template_id)
+            await db.remove_template(template_id)
             await db.add_log(f"Template {template_id} removed", "success")
             await self.send_templates_update()
         
@@ -5920,7 +7765,7 @@ class BackendService:
         """Handle remove-campaign command"""
         try:
             campaign_id = payload.get('id')
-            await db.delete_campaign(campaign_id)
+            await db.remove_campaign(campaign_id)
             await db.add_log(f"Campaign {campaign_id} removed", "success")
             await self.send_campaigns_update()
         
@@ -6081,6 +7926,118 @@ class BackendService:
                 })
         
         return callback
+    
+    async def handle_send_group_message(self, payload: Dict[str, Any]):
+        """Handle send-group-message command - Send message to a group/chat"""
+        import sys
+        try:
+            resource_id = payload.get('resourceId')
+            telegram_id = payload.get('telegramId')
+            content = payload.get('content')
+            account_phone = payload.get('accountPhone')
+            
+            print(f"[Backend] send-group-message: resourceId={resource_id}, telegramId={telegram_id}, phone={account_phone}", file=sys.stderr)
+            
+            if not content:
+                self.send_log("消息內容不能為空", "error")
+                self.send_event("group-message-sent", {
+                    "success": False,
+                    "resourceId": resource_id,
+                    "error": "消息內容不能為空"
+                })
+                return
+            
+            if not account_phone:
+                self.send_log("請選擇發送帳號", "error")
+                self.send_event("group-message-sent", {
+                    "success": False,
+                    "resourceId": resource_id,
+                    "error": "請選擇發送帳號"
+                })
+                return
+            
+            # 獲取群組信息
+            chat_id = telegram_id
+            if not chat_id:
+                # 嘗試從數據庫獲取
+                from backend.resource_discovery import ResourceDiscoveryService
+                resource_service = ResourceDiscoveryService()
+                resource = await resource_service.get_resource(resource_id)
+                if resource:
+                    chat_id = resource.get('telegram_id') or resource.get('username')
+            
+            if not chat_id:
+                self.send_log("無法獲取群組 ID", "error")
+                self.send_event("group-message-sent", {
+                    "success": False,
+                    "resourceId": resource_id,
+                    "error": "無法獲取群組 ID"
+                })
+                return
+            
+            # 獲取客戶端
+            if account_phone not in self.telegram_manager.clients:
+                self.send_log(f"帳號 {account_phone} 未連接", "error")
+                self.send_event("group-message-sent", {
+                    "success": False,
+                    "resourceId": resource_id,
+                    "error": f"帳號 {account_phone} 未連接"
+                })
+                return
+            
+            client = self.telegram_manager.clients[account_phone]
+            
+            if not client.is_connected:
+                await client.connect()
+            
+            self.send_log(f"📨 正在發送消息到群組...", "info")
+            
+            # 發送消息
+            try:
+                # 解析 chat_id
+                target_chat = chat_id
+                if isinstance(chat_id, str) and chat_id.lstrip('-').isdigit():
+                    target_chat = int(chat_id)
+                
+                message = await client.send_message(target_chat, content)
+                
+                self.send_log(f"✅ 消息已發送到群組", "success")
+                self.send_event("group-message-sent", {
+                    "success": True,
+                    "resourceId": resource_id,
+                    "messageId": message.id
+                })
+                
+            except Exception as send_error:
+                error_msg = str(send_error)
+                print(f"[Backend] Error sending message: {send_error}", file=sys.stderr)
+                
+                # 檢查是否是權限問題
+                if "CHAT_WRITE_FORBIDDEN" in error_msg:
+                    error_msg = "沒有發送消息的權限（可能是頻道或禁言群組）"
+                elif "CHAT_RESTRICTED" in error_msg:
+                    error_msg = "群組已被限制"
+                elif "USER_BANNED" in error_msg:
+                    error_msg = "帳號已被該群組封禁"
+                elif "SLOWMODE_WAIT" in error_msg:
+                    error_msg = "慢速模式限制，請稍後再試"
+                
+                self.send_log(f"❌ 發送失敗: {error_msg}", "error")
+                self.send_event("group-message-sent", {
+                    "success": False,
+                    "resourceId": resource_id,
+                    "error": error_msg
+                })
+        
+        except Exception as e:
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_log(f"❌ 發送群組消息失敗: {str(e)}", "error")
+            self.send_event("group-message-sent", {
+                "success": False,
+                "resourceId": payload.get('resourceId'),
+                "error": str(e)
+            })
     
     async def handle_update_lead_status(self, payload: Dict[str, Any]):
         """Handle update-lead-status command"""
@@ -6346,8 +8303,8 @@ class BackendService:
                         # For now, create with minimal info
                         await db.add_account({
                             'phone': phone_number,
-                            'api_id': '',  # Will need to be filled manually
-                            'api_hash': '',  # Will need to be filled manually
+                            'apiId': '',  # Will need to be filled manually
+                            'apiHash': '',  # Will need to be filled manually
                             'proxy': '',
                             'group': '',
                             'role': 'Unassigned',
@@ -6387,8 +8344,234 @@ class BackendService:
         except Exception as e:
             self.send_log(f"Error reloading sessions: {str(e)}", "error")
     
+    async def handle_scan_orphan_sessions(self, payload: Dict[str, Any]):
+        """掃描孤立的 Session 文件（有 session 但無數據庫記錄）"""
+        try:
+            from pathlib import Path
+            from config import SESSIONS_DIR
+            
+            self.send_log("🔍 正在掃描孤立的 Session 文件...", "info")
+            
+            # 獲取所有 session 文件
+            session_files = list(SESSIONS_DIR.glob("*.session"))
+            
+            if not session_files:
+                self.send_event("orphan-sessions-scanned", {
+                    "success": True,
+                    "orphan_sessions": [],
+                    "message": "沒有找到 Session 文件"
+                })
+                return
+            
+            # 獲取數據庫中的帳號
+            existing_accounts = await db.get_all_accounts()
+            existing_phones = set()
+            for acc in existing_accounts:
+                phone = acc.get('phone', '')
+                # 標準化電話號碼
+                safe_phone = phone.replace("+", "").replace("-", "").replace(" ", "")
+                existing_phones.add(safe_phone)
+                existing_phones.add(phone)
+            
+            # 查找孤立的 session
+            orphan_sessions = []
+            for session_file in session_files:
+                phone = session_file.stem
+                # 跳過臨時文件和 journal 文件
+                if phone.endswith('-journal') or phone.startswith('.'):
+                    continue
+                    
+                # 檢查是否在數據庫中
+                if phone not in existing_phones and f"+{phone}" not in existing_phones:
+                    orphan_sessions.append({
+                        "phone": phone,
+                        "file_path": str(session_file),
+                        "file_size": session_file.stat().st_size,
+                        "modified_at": session_file.stat().st_mtime
+                    })
+            
+            self.send_log(f"📂 發現 {len(orphan_sessions)} 個孤立的 Session 文件", "info")
+            
+            self.send_event("orphan-sessions-scanned", {
+                "success": True,
+                "orphan_sessions": orphan_sessions,
+                "total_sessions": len(session_files),
+                "existing_accounts": len(existing_accounts)
+            })
+            
+        except Exception as e:
+            self.send_log(f"Error scanning orphan sessions: {str(e)}", "error")
+            self.send_event("orphan-sessions-scanned", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_recover_orphan_sessions(self, payload: Dict[str, Any]):
+        """恢復孤立的 Session 文件，創建帳號記錄"""
+        try:
+            from pathlib import Path
+            from config import SESSIONS_DIR
+            from api_credential_pool import get_api_credential_pool
+            
+            phones_to_recover = payload.get('phones', [])
+            api_id = payload.get('apiId', '')
+            api_hash = payload.get('apiHash', '')
+            
+            if not phones_to_recover:
+                self.send_event("orphan-sessions-recovered", {
+                    "success": False,
+                    "error": "沒有選擇要恢復的帳號"
+                })
+                return
+            
+            # 如果沒有提供 API 憑據，嘗試從 API 池獲取推薦的
+            if not api_id or not api_hash:
+                data_dir = str(Path(config.DATA_PATH))
+                pool = get_api_credential_pool(data_dir)
+                recommendation = pool.get_best_credential()
+                if recommendation:
+                    api_id = recommendation.get('api_id', '')
+                    api_hash = recommendation.get('api_hash', '')
+                    self.send_log(f"使用推薦的 API 憑據: {api_id}", "info")
+            
+            results = {
+                "success_count": 0,
+                "fail_count": 0,
+                "accounts": []
+            }
+            
+            for phone in phones_to_recover:
+                try:
+                    self.send_log(f"🔄 正在恢復帳號: {phone}...", "info")
+                    
+                    # 檢查是否已存在
+                    existing = await db.get_account_by_phone(phone)
+                    if existing:
+                        self.send_log(f"⚠️ 帳號 {phone} 已存在，跳過", "warning")
+                        results["accounts"].append({
+                            "phone": phone,
+                            "success": False,
+                            "error": "帳號已存在"
+                        })
+                        results["fail_count"] += 1
+                        continue
+                    
+                    # 驗證 session 文件是否存在
+                    session_file = SESSIONS_DIR / f"{phone}.session"
+                    if not session_file.exists():
+                        results["accounts"].append({
+                            "phone": phone,
+                            "success": False,
+                            "error": "Session 文件不存在"
+                        })
+                        results["fail_count"] += 1
+                        continue
+                    
+                    # 嘗試連接 Telegram 獲取用戶信息
+                    user_info = {}
+                    try:
+                        if api_id and api_hash:
+                            # 嘗試使用 Pyrogram 連接驗證
+                            from pyrogram import Client
+                            
+                            session_name = str(session_file).replace('.session', '')
+                            client = Client(
+                                name=session_name,
+                                api_id=int(api_id),
+                                api_hash=api_hash,
+                                workdir=str(SESSIONS_DIR)
+                            )
+                            
+                            await client.start()
+                            me = await client.get_me()
+                            
+                            user_info = {
+                                "firstName": me.first_name or "",
+                                "lastName": me.last_name or "",
+                                "username": me.username or "",
+                                "telegramId": str(me.id),
+                                "phone": me.phone_number or phone
+                            }
+                            
+                            # 下載頭像
+                            try:
+                                if me.photo:
+                                    avatar_path = Path(config.DATA_PATH) / "avatars" / f"{phone}.jpg"
+                                    avatar_path.parent.mkdir(parents=True, exist_ok=True)
+                                    await client.download_media(me.photo.big_file_id, file_name=str(avatar_path))
+                                    user_info["avatarPath"] = str(avatar_path)
+                            except Exception:
+                                pass
+                            
+                            await client.stop()
+                            self.send_log(f"✅ 驗證成功: {user_info.get('firstName', '')} @{user_info.get('username', '')}", "success")
+                    except Exception as e:
+                        self.send_log(f"⚠️ 無法驗證 session（可能已過期）: {e}", "warning")
+                        # 仍然創建帳號，但標記為離線
+                    
+                    # 創建帳號記錄
+                    account_data = {
+                        'phone': phone if phone.startswith('+') else f"+{phone}",
+                        'apiId': api_id,
+                        'apiHash': api_hash,
+                        'proxy': '',
+                        'group': '',
+                        'role': 'Unassigned',
+                        'status': 'Online' if user_info else 'Offline',
+                        'firstName': user_info.get('firstName', ''),
+                        'lastName': user_info.get('lastName', ''),
+                        'username': user_info.get('username', ''),
+                        'telegramId': user_info.get('telegramId', ''),
+                        'avatarPath': user_info.get('avatarPath', '')
+                    }
+                    
+                    await db.add_account(account_data)
+                    
+                    results["success_count"] += 1
+                    results["accounts"].append({
+                        "phone": phone,
+                        "success": True,
+                        "user_info": user_info
+                    })
+                    
+                    self.send_log(f"✅ 帳號 {phone} 恢復成功", "success")
+                    
+                except Exception as e:
+                    self.send_log(f"❌ 恢復 {phone} 失敗: {e}", "error")
+                    results["fail_count"] += 1
+                    results["accounts"].append({
+                        "phone": phone,
+                        "success": False,
+                        "error": str(e)
+                    })
+            
+            # 刷新帳號列表
+            accounts = await db.get_all_accounts()
+            self._cache.pop("accounts", None)
+            self._cache_timestamps.pop("accounts", None)
+            self.send_event("accounts-updated", accounts)
+            
+            self.send_log(
+                f"📊 Session 恢復完成: 成功 {results['success_count']}, 失敗 {results['fail_count']}", 
+                "success" if results['success_count'] > 0 else "warning"
+            )
+            
+            self.send_event("orphan-sessions-recovered", {
+                "success": True,
+                **results
+            })
+            
+        except Exception as e:
+            self.send_log(f"Error recovering orphan sessions: {str(e)}", "error")
+            self.send_event("orphan-sessions-recovered", {
+                "success": False,
+                "error": str(e)
+            })
+    
     async def handle_import_session(self, payload: Dict[str, Any]):
         """Handle import-session command - import a session file or package"""
+        import sys
+        print(f"[Backend] handle_import_session called with payload: {payload}", file=sys.stderr)
         try:
             from pathlib import Path
             import shutil
@@ -6425,8 +8608,8 @@ class BackendService:
                 if existing_account:
                     # Update existing account with new credentials
                     await db.update_account(existing_account['id'], {
-                        'api_id': account_data['api_id'],
-                        'api_hash': account_data['api_hash'],
+                        'apiId': account_data.get('api_id') or account_data.get('apiId'),
+                        'apiHash': account_data.get('api_hash') or account_data.get('apiHash'),
                         'proxy': account_data.get('proxy', existing_account.get('proxy', '')),
                         'status': 'Offline'
                     })
@@ -6459,8 +8642,8 @@ class BackendService:
                     existing_account = await db.get_account_by_phone(account_data['phone'])
                     if existing_account:
                         await db.update_account(existing_account['id'], {
-                            'api_id': account_data['api_id'],
-                            'api_hash': account_data['api_hash'],
+                            'apiId': account_data.get('api_id') or account_data.get('apiId'),
+                            'apiHash': account_data.get('api_hash') or account_data.get('apiHash'),
                             'proxy': account_data.get('proxy', ''),
                             'status': 'Offline'
                         })
@@ -6477,6 +8660,7 @@ class BackendService:
                 
             elif SessionPackage.is_legacy_session(file_path):
                 # Legacy .session file - requires API credentials
+                print(f"[Backend] Processing legacy session file: {file_path}", file=sys.stderr)
                 phone_number = payload.get('phoneNumber', '')
                 api_id = payload.get('apiId', '')
                 api_hash = payload.get('apiHash', '')
@@ -6484,16 +8668,40 @@ class BackendService:
                 # Determine phone number from filename if not provided
                 if not phone_number:
                     phone_number = file_path.stem.replace('+', '').replace('-', '').replace(' ', '')
+                print(f"[Backend] Phone number from file: {phone_number}", file=sys.stderr)
                 
                 # Check if we have API credentials
                 if not api_id or not api_hash:
-                    # Try to get from existing account
+                    print(f"[Backend] No API credentials provided, checking database...", file=sys.stderr)
+                    # Try to get from existing account (数据库字段名是 apiId 和 apiHash)
+                    # Try with and without + prefix
                     existing_account = await db.get_account_by_phone(phone_number)
-                    if existing_account and existing_account.get('api_id') and existing_account.get('api_hash'):
-                        api_id = existing_account.get('api_id')
-                        api_hash = existing_account.get('api_hash')
+                    if not existing_account:
+                        existing_account = await db.get_account_by_phone(f"+{phone_number}")
+                    print(f"[Backend] Existing account found: {existing_account is not None}", file=sys.stderr)
+                    
+                    if existing_account and (existing_account.get('apiId') or existing_account.get('api_id')) and (existing_account.get('apiHash') or existing_account.get('api_hash')):
+                        api_id = existing_account.get('apiId') or existing_account.get('api_id')
+                        api_hash = existing_account.get('apiHash') or existing_account.get('api_hash')
+                        print(f"[Backend] Using credentials from existing account", file=sys.stderr)
                     else:
+                        # Try to get from API credential pool
+                        print(f"[Backend] Trying API credential pool...", file=sys.stderr)
+                        try:
+                            from api_credential_pool import get_api_credential_pool
+                            data_dir = str(Path(config.DATA_PATH))
+                            pool = get_api_credential_pool(data_dir)
+                            recommended = pool.get_recommended_credential()
+                            if recommended:
+                                api_id = recommended.api_id
+                                api_hash = recommended.api_hash
+                                print(f"[Backend] Using recommended API credential: {api_id}", file=sys.stderr)
+                        except Exception as pool_err:
+                            print(f"[Backend] Error getting API from pool: {pool_err}", file=sys.stderr)
+                    
+                    if not api_id or not api_hash:
                         # No credentials - notify frontend to ask user
+                        print(f"[Backend] No credentials available, notifying frontend", file=sys.stderr)
                         self.send_event("session-import-needs-credentials", {
                             "filePath": str(file_path),
                             "phoneNumber": phone_number,
@@ -6502,23 +8710,38 @@ class BackendService:
                         self.send_log("⚠️ 導入舊格式 session 需要提供 API ID 和 API Hash", "warning")
                         return
                 
-                # Copy session file
+                # Copy session file (skip if source and target are the same)
                 target_path = SESSIONS_DIR / f"{phone_number}.session"
-                shutil.copy2(file_path, target_path)
+                source_resolved = Path(file_path).resolve()
+                target_resolved = target_path.resolve()
                 
-                # Create or update account
+                if source_resolved != target_resolved:
+                    # Only copy if different locations
+                    try:
+                        shutil.copy2(file_path, target_path)
+                        print(f"[Backend] Session file copied to {target_path}", file=sys.stderr)
+                    except PermissionError as pe:
+                        print(f"[Backend] Permission error copying session: {pe}", file=sys.stderr)
+                        # File might be locked, try to continue anyway if target exists
+                        if not target_path.exists():
+                            raise
+                        print(f"[Backend] Target session already exists, continuing...", file=sys.stderr)
+                else:
+                    print(f"[Backend] Source and target are same, skipping copy", file=sys.stderr)
+                
+                # Create or update account (数据库字段名是 apiId 和 apiHash)
                 existing_account = await db.get_account_by_phone(phone_number)
                 if existing_account:
                     await db.update_account(existing_account['id'], {
-                        'api_id': api_id,
-                        'api_hash': api_hash,
+                        'apiId': api_id,
+                        'apiHash': api_hash,
                         'status': 'Offline'
                     })
                 else:
                     await db.add_account({
                         'phone': phone_number,
-                        'api_id': api_id,
-                        'api_hash': api_hash,
+                        'apiId': api_id,
+                        'apiHash': api_hash,
                         'proxy': payload.get('proxy', ''),
                         'group': payload.get('group', ''),
                         'role': payload.get('role', 'Unassigned'),
@@ -6550,6 +8773,187 @@ class BackendService:
             self.send_event("session-import-result", {
                 "success": False,
                 "message": str(e)
+            })
+    
+    async def handle_scan_tdata(self, payload: Dict[str, Any]):
+        """掃描 TData 目錄，返回帳號列表"""
+        try:
+            from tdata_importer import get_tdata_importer
+            
+            path = payload.get('path', '')
+            
+            if not path:
+                self.send_event("tdata-scan-result", {
+                    "success": False,
+                    "error": "未提供路徑"
+                })
+                return
+            
+            importer = get_tdata_importer()
+            result = importer.scan_tdata(path)
+            
+            self.send_event("tdata-scan-result", result)
+            
+            if result.get("success"):
+                self.send_log(f"📂 發現 {len(result.get('accounts', []))} 個帳號", "info")
+            else:
+                self.send_log(f"❌ 掃描失敗: {result.get('error', '未知錯誤')}", "error")
+                
+        except Exception as e:
+            self.send_log(f"Error scanning TData: {str(e)}", "error")
+            self.send_event("tdata-scan-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_import_tdata_account(self, payload: Dict[str, Any]):
+        """導入單個 TData 帳號"""
+        try:
+            from tdata_importer import get_tdata_importer
+            
+            tdata_path = payload.get('tdataPath', '')
+            account_index = payload.get('accountIndex', 0)
+            api_id = payload.get('apiId')
+            api_hash = payload.get('apiHash')
+            
+            if not tdata_path:
+                self.send_event("tdata-import-result", {
+                    "success": False,
+                    "error": "未提供 TData 路徑"
+                })
+                return
+            
+            self.send_log(f"🔄 正在導入帳號 #{account_index + 1}...", "info")
+            
+            importer = get_tdata_importer()
+            result = await importer.import_account(
+                tdata_path,
+                account_index,
+                api_id,
+                api_hash
+            )
+            
+            if result.get("success"):
+                # 添加帳號到數據庫
+                phone = result.get("phone", "").replace("+", "")
+                existing = await db.get_account_by_phone(phone)
+                
+                if not existing:
+                    await db.add_account({
+                        'phone': phone,
+                        'apiId': api_id or '',
+                        'apiHash': api_hash or '',
+                        'status': 'Offline',
+                        'firstName': result.get('first_name', ''),
+                        'lastName': result.get('last_name', ''),
+                        'username': result.get('username', ''),
+                        'telegramId': str(result.get('user_id', ''))
+                    })
+                
+                self.send_log(f"✅ 帳號導入成功: {phone}", "success")
+                
+                # 刷新帳號列表
+                accounts = await db.get_all_accounts()
+                self.send_event("accounts-updated", accounts)
+            else:
+                self.send_log(f"❌ 導入失敗: {result.get('error', '未知錯誤')}", "error")
+            
+            self.send_event("tdata-import-result", result)
+            
+        except Exception as e:
+            self.send_log(f"Error importing TData account: {str(e)}", "error")
+            self.send_event("tdata-import-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_import_tdata_batch(self, payload: Dict[str, Any]):
+        """批量導入 TData 帳號"""
+        try:
+            from tdata_importer import get_tdata_importer
+            
+            tdata_path = payload.get('tdataPath', '')
+            account_indices = payload.get('accountIndices', [])
+            api_id = payload.get('apiId')
+            api_hash = payload.get('apiHash')
+            
+            if not tdata_path or not account_indices:
+                self.send_event("tdata-batch-result", {
+                    "success": False,
+                    "error": "未提供必要參數"
+                })
+                return
+            
+            self.send_log(f"🔄 開始批量導入 {len(account_indices)} 個帳號...", "info")
+            
+            importer = get_tdata_importer()
+            
+            def progress_callback(current, total, message):
+                self.send_event("tdata-import-progress", {
+                    "current": current,
+                    "total": total,
+                    "message": message
+                })
+            
+            result = await importer.import_batch(
+                tdata_path,
+                account_indices,
+                api_id,
+                api_hash,
+                progress_callback
+            )
+            
+            # 添加成功的帳號到數據庫
+            for account in result.get("accounts", []):
+                if account.get("success"):
+                    phone = account.get("phone", "").replace("+", "")
+                    existing = await db.get_account_by_phone(phone)
+                    
+                    if not existing:
+                        await db.add_account({
+                            'phone': phone,
+                            'apiId': api_id or '',
+                            'apiHash': api_hash or '',
+                            'status': 'Offline',
+                            'firstName': account.get('first_name', ''),
+                            'lastName': account.get('last_name', ''),
+                            'username': account.get('username', ''),
+                            'telegramId': str(account.get('user_id', ''))
+                        })
+            
+            self.send_log(
+                f"📊 批量導入完成: 成功 {result.get('success_count', 0)}, 失敗 {result.get('fail_count', 0)}", 
+                "success" if result.get('success_count', 0) > 0 else "warning"
+            )
+            
+            # 刷新帳號列表
+            accounts = await db.get_all_accounts()
+            self.send_event("accounts-updated", accounts)
+            
+            self.send_event("tdata-batch-result", result)
+            
+        except Exception as e:
+            self.send_log(f"Error batch importing TData: {str(e)}", "error")
+            self.send_event("tdata-batch-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_get_default_tdata_path(self):
+        """獲取系統默認 TData 路徑"""
+        try:
+            from tdata_importer import get_tdata_importer
+            
+            importer = get_tdata_importer()
+            result = importer.check_default_tdata()
+            
+            self.send_event("default-tdata-path", result)
+            
+        except Exception as e:
+            self.send_event("default-tdata-path", {
+                "path": "",
+                "exists": False,
+                "error": str(e)
             })
     
     async def handle_export_session(self, payload: Dict[str, Any]):
@@ -6589,16 +8993,17 @@ class BackendService:
             
             if export_format == 'package' or export_path.endswith('.tgpkg'):
                 # Export as TG-Matrix session package (recommended)
+                # 数据库字段名是 apiId 和 apiHash
                 success, message = SessionPackage.create_package(
                     session_file_path=session_file,
-                    api_id=account.get('api_id', ''),
-                    api_hash=account.get('api_hash', ''),
+                    api_id=account.get('apiId') or account.get('api_id', ''),
+                    api_hash=account.get('apiHash') or account.get('api_hash', ''),
                     phone=phone_number,
                     output_path=export_path_obj,
                     proxy=account.get('proxy', ''),
                     role=account.get('role', 'Unassigned'),
                     group=account.get('group', ''),
-                    daily_send_limit=account.get('daily_send_limit', 50),
+                    daily_send_limit=account.get('dailySendLimit') or account.get('daily_send_limit', 50),
                     notes=account.get('notes', '')
                 )
                 
@@ -11627,7 +14032,506 @@ class BackendService:
             
         except Exception as e:
             self.send_event("collab-stats", {"success": False, "error": str(e)})
+
+    # ==================== API Credential Pool Handlers ====================
     
+    async def handle_get_api_credentials(self, payload: Dict[str, Any]):
+        """獲取 API 憑據池信息"""
+        import sys
+        print("[Backend] handle_get_api_credentials called", file=sys.stderr)
+        try:
+            from api_credential_pool import get_api_credential_pool
+            data_dir = str(Path(config.DATA_PATH))
+            print(f"[Backend] API pool data_dir: {data_dir}", file=sys.stderr)
+            pool = get_api_credential_pool(data_dir)
+            print(f"[Backend] API pool loaded, credentials count: {len(pool.credentials)}", file=sys.stderr)
+
+            # 每次獲取時同步使用計數，確保準確性
+            accounts = await db.get_all_accounts()
+            print(f"[Backend] Got {len(accounts)} accounts for API sync", file=sys.stderr)
+            pool.sync_usage_counts(accounts)
+
+            statistics = pool.get_statistics()
+            print(f"[Backend] API statistics: {statistics}", file=sys.stderr)
+            # 傳遞帳號數據以獲取正確的綁定帳號列表
+            credentials = pool.list_credentials(include_hash=True, accounts=accounts)
+            print(f"[Backend] Sending {len(credentials)} API credentials to frontend", file=sys.stderr)
+
+            self.send_event("api-credentials-updated", {
+                "success": True,
+                "statistics": statistics,
+                "credentials": credentials
+            })
+            print("[Backend] api-credentials-updated event sent", file=sys.stderr)
+            
+        except Exception as e:
+            print(f"[Backend] Error getting API credentials: {e}", file=sys.stderr)
+            self.send_event("api-credentials-updated", {
+                "success": False,
+                "error": str(e),
+                "statistics": None,
+                "credentials": []
+            })
+    
+    async def handle_add_api_credential(self, payload: Dict[str, Any]):
+        """添加 API 憑據"""
+        try:
+            from api_credential_pool import get_api_credential_pool
+            data_dir = str(Path(config.DATA_PATH))
+            pool = get_api_credential_pool(data_dir)
+            
+            api_id = payload.get("api_id", "").strip()
+            api_hash = payload.get("api_hash", "").strip()
+            name = payload.get("name", "").strip()
+            source = payload.get("source", "").strip()
+            max_accounts = payload.get("max_accounts", 5)
+            
+            if not api_id or not api_hash:
+                self.send_event("api-credential-added", {
+                    "success": False,
+                    "error": "API ID 和 API Hash 為必填項"
+                })
+                return
+            
+            # 驗證格式
+            if not api_id.isdigit():
+                self.send_event("api-credential-added", {
+                    "success": False,
+                    "error": "API ID 必須是純數字"
+                })
+                return
+            
+            import re
+            if not re.match(r'^[a-f0-9]{32}$', api_hash, re.IGNORECASE):
+                self.send_event("api-credential-added", {
+                    "success": False,
+                    "error": "API Hash 格式不正確（應為32位十六進制字符串）"
+                })
+                return
+            
+            success = pool.add_credential(
+                api_id=api_id,
+                api_hash=api_hash,
+                name=name or f"API_{api_id[-4:]}",
+                source=source,
+                max_accounts=max_accounts
+            )
+            
+            if success:
+                self.send_event("api-credential-added", {"success": True})
+                self.send_log(f"✅ 已添加 API 憑據：{api_id}", "success")
+                # 刷新列表
+                await self.handle_get_api_credentials({})
+            else:
+                self.send_event("api-credential-added", {
+                    "success": False,
+                    "error": "添加失敗，可能該 API ID 已存在"
+                })
+            
+        except Exception as e:
+            print(f"[Backend] Error adding API credential: {e}", file=sys.stderr)
+            self.send_event("api-credential-added", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_remove_api_credential(self, payload: Dict[str, Any]):
+        """移除 API 憑據"""
+        try:
+            from api_credential_pool import get_api_credential_pool
+            data_dir = str(Path(config.DATA_PATH))
+            pool = get_api_credential_pool(data_dir)
+            
+            api_id = payload.get("api_id", "").strip()
+            
+            if not api_id:
+                self.send_event("api-credential-removed", {
+                    "success": False,
+                    "error": "請指定要刪除的 API ID"
+                })
+                return
+            
+            success = pool.remove_credential(api_id)
+            
+            if success:
+                self.send_event("api-credential-removed", {"success": True})
+                self.send_log(f"🗑️ 已刪除 API 憑據：{api_id}", "info")
+                # 刷新列表
+                await self.handle_get_api_credentials({})
+            else:
+                self.send_event("api-credential-removed", {
+                    "success": False,
+                    "error": "刪除失敗，未找到該 API ID"
+                })
+            
+        except Exception as e:
+            print(f"[Backend] Error removing API credential: {e}", file=sys.stderr)
+            self.send_event("api-credential-removed", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_toggle_api_credential(self, payload: Dict[str, Any]):
+        """切換 API 憑據啟用狀態"""
+        try:
+            from api_credential_pool import get_api_credential_pool
+            data_dir = str(Path(config.DATA_PATH))
+            pool = get_api_credential_pool(data_dir)
+            
+            api_id = payload.get("api_id", "").strip()
+            is_active = payload.get("is_active", True)
+            
+            cred = pool.get_credential(api_id)
+            if cred:
+                cred.is_active = is_active
+                pool.save()
+                self.send_event("api-credential-toggled", {"success": True})
+                self.send_log(f"{'▶️ 已啟用' if is_active else '⏸️ 已停用'} API 憑據：{api_id}", "info")
+                # 刷新列表
+                await self.handle_get_api_credentials({})
+            else:
+                self.send_event("api-credential-toggled", {
+                    "success": False,
+                    "error": "未找到該 API ID"
+                })
+            
+        except Exception as e:
+            print(f"[Backend] Error toggling API credential: {e}", file=sys.stderr)
+            self.send_event("api-credential-toggled", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_bulk_import_api_credentials(self, payload: Dict[str, Any]):
+        """批量導入 API 憑據"""
+        try:
+            from api_credential_pool import get_api_credential_pool
+            data_dir = str(Path(config.DATA_PATH))
+            pool = get_api_credential_pool(data_dir)
+            
+            credentials = payload.get("credentials", [])
+            
+            if not credentials:
+                self.send_event("api-credentials-imported", {
+                    "success": False,
+                    "error": "沒有提供憑據"
+                })
+                return
+            
+            success_count = 0
+            fail_count = 0
+            
+            for cred in credentials:
+                api_id = cred.get("api_id", "").strip()
+                api_hash = cred.get("api_hash", "").strip()
+                name = cred.get("name", "").strip()
+                
+                if api_id and api_hash:
+                    if pool.add_credential(api_id, api_hash, name):
+                        success_count += 1
+                    else:
+                        fail_count += 1
+                else:
+                    fail_count += 1
+            
+            self.send_event("api-credentials-imported", {
+                "success": True,
+                "success_count": success_count,
+                "fail_count": fail_count
+            })
+            self.send_log(f"📥 批量導入完成：成功 {success_count} 個，失敗 {fail_count} 個", "info")
+            
+            # 刷新列表
+            await self.handle_get_api_credentials({})
+            
+        except Exception as e:
+            print(f"[Backend] Error bulk importing API credentials: {e}", file=sys.stderr)
+            self.send_event("api-credentials-imported", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_get_api_recommendation(self, payload: Dict[str, Any]):
+        """獲取 API 憑據建議"""
+        try:
+            from api_credential_pool import get_api_credential_pool
+            data_dir = str(Path(config.DATA_PATH))
+            pool = get_api_credential_pool(data_dir)
+            
+            account_count = payload.get("account_count", 50)
+            recommendation = pool.get_recommendation(account_count)
+            
+            self.send_event("api-recommendation", {
+                "success": True,
+                **recommendation
+            })
+            
+        except Exception as e:
+            print(f"[Backend] Error getting API recommendation: {e}", file=sys.stderr)
+            self.send_event("api-recommendation", {
+                "success": False,
+                "error": str(e)
+            })
+
+    # ==================== Platform API Pool Handlers ====================
+    
+    async def handle_get_platform_api_usage(self, payload: Dict[str, Any]):
+        """獲取用戶的平台 API 使用情況"""
+        try:
+            from platform_api_pool import get_platform_api_pool
+            
+            user_id = payload.get("userId", "default_user")
+            membership_level = payload.get("membershipLevel", "bronze")
+
+            data_dir = str(Path(config.DATA_PATH))
+            pool = get_platform_api_pool(data_dir)
+            quota_info = pool.check_user_quota(user_id, membership_level)
+            
+            self.send_event("platform-api-usage", quota_info)
+            
+        except Exception as e:
+            print(f"[Backend] Error getting platform API usage: {e}", file=sys.stderr)
+            self.send_event("platform-api-usage", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_allocate_platform_api(self, payload: Dict[str, Any]):
+        """為用戶分配平台 API"""
+        try:
+            from platform_api_pool import get_platform_api_pool
+            
+            user_id = payload.get("userId", "default_user")
+            phone = payload.get("phone", "")
+            membership_level = payload.get("membershipLevel", "bronze")
+            
+            if not phone:
+                self.send_event("platform-api-allocated", {
+                    "success": False,
+                    "error": "請提供手機號"
+                })
+                return
+            
+            data_dir = str(Path(config.DATA_PATH))
+            pool = get_platform_api_pool(data_dir)
+            result = pool.allocate_api_for_user(user_id, phone, membership_level)
+            
+            self.send_event("platform-api-allocated", result)
+            
+            if result.get("success"):
+                self.send_log(f"✅ 已為 {phone} 分配平台 API", "info")
+            
+        except Exception as e:
+            print(f"[Backend] Error allocating platform API: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_event("platform-api-allocated", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_release_platform_api(self, payload: Dict[str, Any]):
+        """釋放用戶的平台 API 分配"""
+        try:
+            from platform_api_pool import get_platform_api_pool
+            
+            phone = payload.get("phone", "")
+            
+            if not phone:
+                self.send_event("platform-api-released", {
+                    "success": False,
+                    "error": "請提供手機號"
+                })
+                return
+            
+            data_dir = str(Path(config.DATA_PATH))
+            pool = get_platform_api_pool(data_dir)
+            success, message = pool.release_allocation(phone)
+            
+            self.send_event("platform-api-released", {
+                "success": success,
+                "message": message
+            })
+            
+        except Exception as e:
+            print(f"[Backend] Error releasing platform API: {e}", file=sys.stderr)
+            self.send_event("platform-api-released", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_admin_add_platform_api(self, payload: Dict[str, Any]):
+        """管理員添加平台 API"""
+        try:
+            from platform_api_pool import get_platform_api_pool
+            
+            api_id = payload.get("apiId", "")
+            api_hash = payload.get("apiHash", "")
+            name = payload.get("name", "")
+            max_accounts = payload.get("maxAccounts", 3)
+            
+            if not api_id or not api_hash:
+                self.send_event("admin-platform-api-added", {
+                    "success": False,
+                    "error": "請提供完整的 API 憑據"
+                })
+                return
+            
+            data_dir = str(Path(config.DATA_PATH))
+            pool = get_platform_api_pool(data_dir)
+            success, message = pool.add_platform_api(api_id, api_hash, name, max_accounts)
+            
+            self.send_event("admin-platform-api-added", {
+                "success": success,
+                "message": message
+            })
+            
+            if success:
+                self.send_log(f"✅ 管理員添加平台 API: {name}", "info")
+            
+        except Exception as e:
+            print(f"[Backend] Error adding platform API: {e}", file=sys.stderr)
+            self.send_event("admin-platform-api-added", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_admin_list_platform_apis(self, payload: Dict[str, Any]):
+        """管理員列出所有平台 API"""
+        try:
+            from platform_api_pool import get_platform_api_pool
+            
+            data_dir = str(Path(config.DATA_PATH))
+            pool = get_platform_api_pool(data_dir)
+            apis = pool.list_platform_apis()
+            stats = pool.get_pool_statistics()
+            
+            self.send_event("admin-platform-apis-list", {
+                "success": True,
+                "apis": apis,
+                "statistics": stats
+            })
+            
+        except Exception as e:
+            print(f"[Backend] Error listing platform APIs: {e}", file=sys.stderr)
+            self.send_event("admin-platform-apis-list", {
+                "success": False,
+                "error": str(e)
+            })
+
+    # ==================== TData Import Handlers ====================
+    
+    async def handle_select_tdata_folder(self, payload: Dict[str, Any]):
+        """處理選擇 TData 文件夾請求"""
+        try:
+            # 這個需要由前端的 Electron 處理文件對話框
+            # 這裡只是發送一個事件讓前端打開對話框
+            self.send_event("open-folder-dialog", {
+                "purpose": "tdata",
+                "title": "選擇 TData 文件夾"
+            })
+        except Exception as e:
+            print(f"[Backend] Error in select-tdata-folder: {e}", file=sys.stderr)
+    
+    async def handle_parse_tdata(self, payload: Dict[str, Any]):
+        """解析 TData 文件夾"""
+        try:
+            from tdata_importer import get_tdata_importer
+            
+            tdata_path = payload.get("path", "")
+            
+            if not tdata_path:
+                self.send_event("tdata-parsed", {
+                    "success": False,
+                    "error": "請指定 TData 路徑"
+                })
+                return
+            
+            importer = get_tdata_importer(str(self.sessions_dir))
+            accounts = importer.find_tdata_accounts(tdata_path)
+            
+            self.send_event("tdata-parsed", {
+                "success": True,
+                "accounts": accounts,
+                "count": len(accounts)
+            })
+            
+            self.send_log(f"📂 已解析 TData，找到 {len(accounts)} 個帳戶", "info")
+            
+        except Exception as e:
+            print(f"[Backend] Error parsing TData: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_event("tdata-parsed", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_import_tdata(self, payload: Dict[str, Any]):
+        """導入 TData 帳戶"""
+        try:
+            from tdata_importer import get_tdata_importer
+            from database import db
+            
+            tdata_path = payload.get("path", "")
+            accounts = payload.get("accounts", [])
+            
+            if not tdata_path or not accounts:
+                self.send_event("tdata-imported", {
+                    "success": False,
+                    "error": "請指定 TData 路徑和要導入的帳戶"
+                })
+                return
+            
+            importer = get_tdata_importer(str(self.sessions_dir))
+            result = importer.import_batch(tdata_path, accounts)
+            
+            # 為成功導入的帳戶添加到數據庫
+            for detail in result.get("details", []):
+                if detail.get("success"):
+                    phone = detail.get("phone")
+                    try:
+                        # 檢查是否已存在
+                        existing = await db.get_account_by_phone(phone)
+                        if not existing:
+                            # 添加新帳戶
+                            from device_fingerprint import DeviceFingerprintGenerator
+                            fingerprint = DeviceFingerprintGenerator.generate_for_phone(phone)
+                            
+                            await db.add_account({
+                                "phone": phone,
+                                "status": "Offline",
+                                "deviceModel": fingerprint.get("device_model", "Unknown"),
+                                "systemVersion": fingerprint.get("system_version", "Unknown"),
+                                "appVersion": fingerprint.get("app_version", "Unknown"),
+                                "langCode": fingerprint.get("lang_code", "en"),
+                                "platform": fingerprint.get("platform", "android"),
+                                "healthScore": 100,
+                                "dailySendLimit": 50
+                            })
+                    except Exception as e:
+                        print(f"[Backend] Error adding imported account {phone}: {e}", file=sys.stderr)
+            
+            self.send_event("tdata-imported", {
+                "success": True,
+                **result
+            })
+            
+            self.send_log(f"📥 TData 導入完成：成功 {result['success_count']} 個，失敗 {result['fail_count']} 個", "info")
+            
+            # 刷新帳戶列表
+            all_accounts = await db.get_all_accounts()
+            self.send_event("accounts-updated", all_accounts)
+            
+        except Exception as e:
+            print(f"[Backend] Error importing TData: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_event("tdata-imported", {
+                "success": False,
+                "error": str(e)
+            })
+
     # ==================== Resource Discovery Handlers ====================
     
     async def handle_init_resource_discovery(self):
@@ -11644,7 +14548,10 @@ class BackendService:
             # 統計已連接的帳號
             connected_clients = {phone: client for phone, client in self.telegram_manager.clients.items() if client.is_connected}
             self.send_log(f"📱 找到 {len(connected_clients)} 個已連接的帳號", "info")
-            
+
+            # 載入自定義搜索渠道
+            await self._refresh_custom_bots()
+
             self.send_log("✅ 資源發現系統初始化完成", "success")
             self.send_event("resource-discovery-initialized", {"success": True})
             
@@ -11738,6 +14645,357 @@ class BackendService:
                 "error": str(e)
             })
     
+    async def handle_search_jiso(self, payload: Dict[str, Any]):
+        """极搜 Bot 搜索"""
+        try:
+            keyword = payload.get('keyword', '').strip()
+            phone = payload.get('phone')
+            limit = payload.get('limit', 50)
+            
+            if not keyword:
+                self.send_event("search-jiso-complete", {
+                    "success": False,
+                    "error": "搜索关键词不能为空"
+                })
+                return
+            
+            self.send_log(f"🔍 开始极搜搜索: '{keyword}'", "info")
+            
+            # 确保客户端已设置
+            jiso_search_service.set_clients(self.telegram_manager.clients)
+            jiso_search_service.set_event_callback(self.send_event)
+            
+            # 执行搜索
+            result = await jiso_search_service.search(
+                keyword=keyword,
+                phone=phone,
+                limit=limit
+            )
+            
+            if result["success"]:
+                self.send_log(f"🔍 极搜完成: 找到 {len(result['results'])} 个结果", "success")
+                
+                # 保存结果到资源发现数据库
+                saved_count = 0
+                import hashlib as _hashlib
+                
+                for item in result["results"]:
+                    try:
+                        # 优先使用 username，否则使用 title 生成唯一标识
+                        username = item.get("username")
+                        title = item.get("title", "")
+
+                        # 如果没有 username，尝试从 title 中提取或生成
+                        if not username and title:
+                            # 尝试从 title 中提取 @username
+                            import re
+                            at_match = re.search(r'@([a-zA-Z][a-zA-Z0-9_]{3,})', title)
+                            if at_match:
+                                username = at_match.group(1)
+                            else:
+                                # 使用 title 的哈希作为唯一标识
+                                title_hash = _hashlib.md5(title.encode()).hexdigest()[:12]
+                                username = f"jiso_{title_hash}"
+
+                        if username or title:
+                            # 計算相關度評分
+                            description = item.get("description", "")
+                            relevance_score = resource_discovery.calculate_relevance_score(
+                                title, description, [keyword]
+                            )
+                            
+                            # 判斷是否有真實鏈接（用於可達性評分）
+                            has_real_link = bool(item.get("link") or (username and not username.startswith("jiso_")))
+                            
+                            # 创建 DiscoveredResource 对象
+                            resource = DiscoveredResource(
+                                telegram_id=username or f"jiso_{saved_count}",
+                                username=username if not username.startswith("jiso_") else "",  # jiso_ 開頭不是真實 username
+                                title=title,
+                                description=description,
+                                member_count=item.get("member_count", 0),
+                                resource_type=item.get("chat_type", "supergroup"),
+                                discovery_source="jiso",
+                                discovery_keyword=keyword,
+                                status="discovered",
+                                relevance_score=relevance_score,
+                                invite_link=item.get("link", "")
+                            )
+                            resource_id = await resource_discovery.add_resource(resource)
+                            if saved_count < 3:  # 只显示前3个
+                                self.send_log(f"  💾 保存: {title[:30]}... (ID:{resource_id})", "info")
+                            saved_count += 1
+                    except Exception as e:
+                        self.send_log(f"保存资源失败: {e}", "warning")
+                        import traceback
+                        traceback.print_exc()
+
+                self.send_log(f"💾 总共保存了 {saved_count}/{len(result['results'])} 个资源", "info")
+            
+            self.send_event("search-jiso-complete", result)
+            
+        except Exception as e:
+            self.send_log(f"❌ 极搜失败: {e}", "error")
+            import traceback
+            traceback.print_exc()
+            self.send_event("search-jiso-complete", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_check_jiso_availability(self, payload: Dict[str, Any]):
+        """检查极搜可用性"""
+        try:
+            phone = payload.get('phone')
+            
+            # 确保客户端已设置
+            jiso_search_service.set_clients(self.telegram_manager.clients)
+            
+            result = await jiso_search_service.check_availability(phone)
+            
+            self.send_event("jiso-availability", result)
+            
+        except Exception as e:
+            self.send_event("jiso-availability", {
+                "available": False,
+                "reason": str(e)
+            })
+
+    # ==================== 自定義搜索渠道管理 ====================
+
+    async def handle_get_search_channels(self, payload: Dict[str, Any]):
+        """獲取搜索渠道列表"""
+        try:
+            enabled_only = payload.get('enabledOnly', False)
+            
+            # 獲取自定義渠道
+            custom_channels = await db.get_custom_search_channels(enabled_only)
+            
+            # 系統渠道已內建在後端，不在前端顯示
+            # 前端只管理用戶自定義渠道
+            system_channels = []
+            
+            # 標記自定義渠道
+            for ch in custom_channels:
+                ch['is_system'] = False
+            
+            self.send_event("search-channels-list", {
+                "success": True,
+                "system_channels": system_channels,
+                "custom_channels": custom_channels
+            })
+            
+        except Exception as e:
+            self.send_log(f"獲取搜索渠道失敗: {e}", "error")
+            self.send_event("search-channels-list", {
+                "success": False,
+                "error": str(e)
+            })
+
+    async def handle_add_search_channel(self, payload: Dict[str, Any]):
+        """添加自定義搜索渠道"""
+        try:
+            bot_username = payload.get('botUsername', '').strip().lstrip('@')
+            display_name = payload.get('displayName', '').strip()
+            query_format = payload.get('queryFormat', '{keyword}')
+            priority = payload.get('priority', 'backup')
+            notes = payload.get('notes', '')
+            
+            if not bot_username:
+                self.send_event("search-channel-added", {
+                    "success": False,
+                    "error": "Bot 用戶名不能為空"
+                })
+                return
+            
+            # 檢查是否已存在
+            existing = await db.get_custom_search_channels()
+            for ch in existing:
+                if ch['bot_username'] == bot_username:
+                    self.send_event("search-channel-added", {
+                        "success": False,
+                        "error": f"@{bot_username} 已存在"
+                    })
+                    return
+            
+            channel_id = await db.add_custom_search_channel(
+                bot_username=bot_username,
+                display_name=display_name or bot_username,
+                query_format=query_format,
+                priority=priority,
+                notes=notes
+            )
+            
+            if channel_id:
+                self.send_log(f"➕ 添加搜索渠道: @{bot_username}", "success")
+                self.send_event("search-channel-added", {
+                    "success": True,
+                    "channelId": channel_id,
+                    "botUsername": bot_username
+                })
+                
+                # 更新 jiso_search_service 的自定義 Bot 列表
+                await self._refresh_custom_bots()
+            else:
+                self.send_event("search-channel-added", {
+                    "success": False,
+                    "error": "添加失敗"
+                })
+                
+        except Exception as e:
+            self.send_log(f"添加搜索渠道失敗: {e}", "error")
+            self.send_event("search-channel-added", {
+                "success": False,
+                "error": str(e)
+            })
+
+    async def handle_update_search_channel(self, payload: Dict[str, Any]):
+        """更新搜索渠道"""
+        try:
+            channel_id = payload.get('channelId')
+            
+            if not channel_id or channel_id < 0:
+                self.send_event("search-channel-updated", {
+                    "success": False,
+                    "error": "無法修改系統渠道"
+                })
+                return
+            
+            updates = {}
+            if 'displayName' in payload:
+                updates['display_name'] = payload['displayName']
+            if 'queryFormat' in payload:
+                updates['query_format'] = payload['queryFormat']
+            if 'priority' in payload:
+                updates['priority'] = payload['priority']
+            if 'enabled' in payload:
+                updates['enabled'] = 1 if payload['enabled'] else 0
+            if 'notes' in payload:
+                updates['notes'] = payload['notes']
+            
+            success = await db.update_custom_search_channel(channel_id, **updates)
+            
+            if success:
+                self.send_log(f"✏️ 更新搜索渠道 ID:{channel_id}", "success")
+                await self._refresh_custom_bots()
+            
+            self.send_event("search-channel-updated", {
+                "success": success,
+                "channelId": channel_id
+            })
+            
+        except Exception as e:
+            self.send_log(f"更新搜索渠道失敗: {e}", "error")
+            self.send_event("search-channel-updated", {
+                "success": False,
+                "error": str(e)
+            })
+
+    async def handle_delete_search_channel(self, payload: Dict[str, Any]):
+        """刪除搜索渠道"""
+        try:
+            channel_id = payload.get('channelId')
+            
+            if not channel_id or channel_id < 0:
+                self.send_event("search-channel-deleted", {
+                    "success": False,
+                    "error": "無法刪除系統渠道"
+                })
+                return
+            
+            success = await db.delete_custom_search_channel(channel_id)
+            
+            if success:
+                self.send_log(f"🗑️ 刪除搜索渠道 ID:{channel_id}", "success")
+                await self._refresh_custom_bots()
+            
+            self.send_event("search-channel-deleted", {
+                "success": success,
+                "channelId": channel_id
+            })
+            
+        except Exception as e:
+            self.send_log(f"刪除搜索渠道失敗: {e}", "error")
+            self.send_event("search-channel-deleted", {
+                "success": False,
+                "error": str(e)
+            })
+
+    async def handle_test_search_channel(self, payload: Dict[str, Any]):
+        """測試搜索渠道"""
+        try:
+            bot_username = payload.get('botUsername', '').lstrip('@')
+            
+            if not bot_username:
+                self.send_event("search-channel-tested", {
+                    "success": False,
+                    "error": "Bot 用戶名不能為空"
+                })
+                return
+            
+            self.send_log(f"🔍 測試渠道: @{bot_username}...", "info")
+            
+            # 使用 jiso_search_service 測試 Bot
+            import time
+            start_time = time.time()
+            
+            jiso_search_service.set_clients(self.telegram_manager.clients)
+            
+            # 嘗試解析 Bot
+            available_clients = {p: c for p, c in self.telegram_manager.clients.items() if c.is_connected}
+            if not available_clients:
+                self.send_event("search-channel-tested", {
+                    "success": False,
+                    "botUsername": bot_username,
+                    "status": "offline",
+                    "error": "沒有可用的帳號"
+                })
+                return
+            
+            client = list(available_clients.values())[0]
+            peer = await jiso_search_service._resolve_bot(client, bot_username)
+            
+            response_time = time.time() - start_time
+            
+            if peer:
+                # 更新數據庫
+                await db.update_channel_test_result(bot_username, True, response_time)
+                
+                self.send_log(f"✅ @{bot_username} 可用 ({response_time:.1f}s)", "success")
+                self.send_event("search-channel-tested", {
+                    "success": True,
+                    "botUsername": bot_username,
+                    "status": "online",
+                    "responseTime": response_time
+                })
+            else:
+                await db.update_channel_test_result(bot_username, False)
+                
+                self.send_log(f"❌ @{bot_username} 不可用", "warning")
+                self.send_event("search-channel-tested", {
+                    "success": False,
+                    "botUsername": bot_username,
+                    "status": "offline",
+                    "error": "Bot 不存在或不可訪問"
+                })
+                
+        except Exception as e:
+            self.send_log(f"測試渠道失敗: {e}", "error")
+            self.send_event("search-channel-tested", {
+                "success": False,
+                "error": str(e)
+            })
+
+    async def _refresh_custom_bots(self):
+        """刷新自定義 Bot 列表到 jiso_search_service"""
+        try:
+            channels = await db.get_custom_search_channels(enabled_only=True)
+            custom_bots = [ch['bot_username'] for ch in channels]
+            jiso_search_service.config.custom_bots = custom_bots
+            self.send_log(f"🔄 已刷新自定義 Bot 列表: {len(custom_bots)} 個", "info")
+        except Exception as e:
+            self.send_log(f"刷新自定義 Bot 列表失敗: {e}", "warning")
+
     async def handle_get_resources(self, payload: Dict[str, Any]):
         """獲取資源列表"""
         try:
@@ -11765,12 +15023,101 @@ class BackendService:
                 "offset": offset
             })
             
+            # 🔧 後台自動驗證未驗證類型的資源（異步執行，不阻塞）
+            asyncio.create_task(self._auto_verify_resource_types(resources))
+            
         except Exception as e:
             self.send_log(f"❌ 獲取資源列表失敗: {e}", "error")
             self.send_event("resources-list", {
                 "success": False,
                 "error": str(e)
             })
+    
+    async def _auto_verify_resource_types(self, resources: list):
+        """後台自動驗證資源類型"""
+        import sys
+        import asyncio
+        
+        try:
+            # 找出未驗證的資源（type_verified = 0 或不存在）
+            unverified = [r for r in resources if not r.get('type_verified')]
+            
+            if not unverified:
+                return
+            
+            # 獲取在線帳號
+            accounts = await db.get_all_accounts()
+            online_phone = None
+            for acc in accounts:
+                if acc.get('status') == 'Online':
+                    phone = acc.get('phone')
+                    if phone in self.telegram_manager.clients:
+                        online_phone = phone
+                        break
+            
+            if not online_phone:
+                return  # 沒有可用帳號，跳過驗證
+            
+            client = self.telegram_manager.clients[online_phone]
+            
+            # 批量驗證（每次最多 5 個，避免 FloodWait）
+            verified_count = 0
+            for resource in unverified[:5]:
+                try:
+                    username = resource.get('username', '')
+                    invite_link = resource.get('invite_link', '')
+                    chat_target = username or invite_link
+                    
+                    if not chat_target:
+                        continue
+                    
+                    # 添加延遲避免 FloodWait
+                    await asyncio.sleep(0.5)
+                    
+                    chat_info = await client.get_chat(chat_target)
+                    
+                    if chat_info:
+                        from pyrogram.enums import ChatType
+                        if chat_info.type == ChatType.CHANNEL:
+                            new_type = "channel"
+                        elif chat_info.type == ChatType.SUPERGROUP:
+                            new_type = "supergroup"
+                        elif chat_info.type == ChatType.GROUP:
+                            new_type = "group"
+                        else:
+                            new_type = resource.get('resource_type', 'unknown')
+                        
+                        old_type = resource.get('resource_type', 'unknown')
+                        resource_id = resource.get('id')
+                        
+                        # 更新數據庫
+                        await db.execute(
+                            "UPDATE discovered_resources SET resource_type = ?, type_verified = 1 WHERE id = ?",
+                            (new_type, resource_id)
+                        )
+                        await db._connection.commit()
+                        
+                        verified_count += 1
+                        
+                        if new_type != old_type:
+                            # 發送更新事件到前端
+                            self.send_event("resource-type-verified", {
+                                "success": True,
+                                "resourceId": resource_id,
+                                "oldType": old_type,
+                                "newType": new_type,
+                                "title": resource.get('title', '')
+                            })
+                            
+                except Exception as e:
+                    print(f"[Backend] Auto-verify error for resource {resource.get('id')}: {e}", file=sys.stderr)
+                    continue
+            
+            if verified_count > 0:
+                print(f"[Backend] Auto-verified {verified_count} resource types", file=sys.stderr)
+                
+        except Exception as e:
+            print(f"[Backend] Error in auto-verify task: {e}", file=sys.stderr)
     
     async def handle_get_resource_stats(self):
         """獲取資源統計"""
@@ -11805,7 +15152,7 @@ class BackendService:
                 notes=payload.get('notes', '')
             )
             
-            # 如果有 username 或邀請鏈接，嘗試獲取詳細信息
+            # 如果有 username 或邀請鏈接，嘗試獲取詳細信息並自動識別類型
             if resource.username or resource.invite_link:
                 group_search_service.set_clients(self.telegram_manager.clients)
                 chat_id = resource.username or resource.invite_link
@@ -11817,6 +15164,11 @@ class BackendService:
                     resource.member_count = info.get('member_count', resource.member_count)
                     resource.is_public = info.get('is_public', True)
                     resource.has_discussion = info.get('has_discussion', False)
+                    # 🔧 自動識別資源類型（頻道/群組）
+                    chat_type = info.get('type', '')
+                    if chat_type:
+                        resource.resource_type = chat_type
+                        self.send_log(f"📋 自動識別類型: {chat_type}", "info")
             
             resource_id = await resource_discovery.add_resource(resource)
             
@@ -11851,6 +15203,239 @@ class BackendService:
         except Exception as e:
             self.send_log(f"❌ 刪除資源失敗: {e}", "error")
             self.send_event("resource-deleted", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_delete_resources_batch(self, payload: Dict[str, Any]):
+        """批量刪除資源"""
+        try:
+            resource_ids = payload.get('resourceIds', [])
+            if not resource_ids:
+                raise ValueError("資源 ID 列表不能為空")
+            
+            deleted_count = 0
+            for rid in resource_ids:
+                try:
+                    await resource_discovery.delete_resource(rid)
+                    deleted_count += 1
+                except Exception as e:
+                    self.send_log(f"刪除資源 {rid} 失敗: {e}", "warning")
+            
+            self.send_log(f"🗑️ 已批量刪除 {deleted_count}/{len(resource_ids)} 個資源", "success")
+            self.send_event("resources-batch-deleted", {
+                "success": True,
+                "deletedCount": deleted_count,
+                "totalRequested": len(resource_ids)
+            })
+            
+        except Exception as e:
+            self.send_log(f"❌ 批量刪除資源失敗: {e}", "error")
+            self.send_event("resources-batch-deleted", {
+                "success": False,
+                "error": str(e)
+            })
+
+    async def handle_verify_resource_type(self, payload: Dict[str, Any]):
+        """驗證並更新資源的真實類型"""
+        try:
+            import sys
+            resource_id = payload.get('resourceId')
+            
+            if not resource_id:
+                raise ValueError("資源 ID 不能為空")
+            
+            # 獲取資源詳情
+            from database import db
+            await db.connect()
+            
+            resources = await db.fetch_all(
+                "SELECT * FROM discovered_resources WHERE id = ?",
+                (resource_id,)
+            )
+            
+            if not resources:
+                raise ValueError(f"找不到資源 ID: {resource_id}")
+            
+            resource = resources[0]
+            username = resource.get('username', '')
+            invite_link = resource.get('invite_link', '')
+            title = resource.get('title', '')
+            old_type = resource.get('resource_type', 'unknown')
+            
+            self.send_log(f"🔍 正在驗證資源類型: {title}", "info")
+            
+            # 獲取在線帳號
+            accounts = await db.get_all_accounts()
+            online_phone = None
+            for acc in accounts:
+                if acc.get('status') == 'Online':
+                    phone = acc.get('phone')
+                    if phone in self.telegram_manager.clients:
+                        online_phone = phone
+                        break
+            
+            if not online_phone:
+                raise ValueError("沒有可用的在線帳號，請先登錄")
+            
+            client = self.telegram_manager.clients[online_phone]
+            
+            # 使用 Telegram API 獲取真實類型
+            chat_target = username or invite_link
+            if not chat_target:
+                raise ValueError("沒有可用的 username 或 invite_link")
+            
+            chat_info = await client.get_chat(chat_target)
+            
+            verified_type = old_type
+            if chat_info:
+                from pyrogram.enums import ChatType
+                if chat_info.type == ChatType.CHANNEL:
+                    verified_type = "channel"
+                elif chat_info.type == ChatType.SUPERGROUP:
+                    verified_type = "supergroup"
+                elif chat_info.type == ChatType.GROUP:
+                    verified_type = "group"
+                elif chat_info.type == ChatType.BOT:
+                    verified_type = "bot"
+            
+            # 更新數據庫
+            if verified_type != old_type:
+                await db.execute(
+                    "UPDATE discovered_resources SET resource_type = ? WHERE id = ?",
+                    (verified_type, resource_id)
+                )
+                await db._connection.commit()
+                self.send_log(f"✅ 類型已更新: {old_type} → {verified_type}", "success")
+            else:
+                self.send_log(f"✅ 類型確認: {verified_type}", "info")
+            
+            self.send_event("resource-type-verified", {
+                "success": True,
+                "resourceId": resource_id,
+                "oldType": old_type,
+                "newType": verified_type,
+                "title": title
+            })
+            
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error verifying resource type: {e}", file=sys.stderr)
+            self.send_log(f"❌ 驗證類型失敗: {e}", "error")
+            self.send_event("resource-type-verified", {
+                "success": False,
+                "resourceId": payload.get('resourceId'),
+                "error": str(e)
+            })
+
+    async def handle_batch_verify_resource_types(self, payload: Dict[str, Any]):
+        """批量驗證資源類型（在後台靜默處理，避免 FloodWait）"""
+        try:
+            import sys
+            import asyncio
+            resource_ids = payload.get('resourceIds', [])
+            
+            if not resource_ids:
+                return
+            
+            print(f"[Backend] Batch verifying {len(resource_ids)} resources", file=sys.stderr)
+            
+            # 獲取在線帳號
+            from database import db
+            await db.connect()
+            accounts = await db.get_all_accounts()
+            online_phone = None
+            for acc in accounts:
+                if acc.get('status') == 'Online':
+                    phone = acc.get('phone')
+                    if phone in self.telegram_manager.clients:
+                        online_phone = phone
+                        break
+            
+            if not online_phone:
+                print("[Backend] No online account for batch verification", file=sys.stderr)
+                return
+            
+            client = self.telegram_manager.clients[online_phone]
+            verified_count = 0
+            
+            for resource_id in resource_ids:
+                try:
+                    resources = await db.fetch_all(
+                        "SELECT * FROM discovered_resources WHERE id = ?",
+                        (resource_id,)
+                    )
+                    
+                    if not resources:
+                        continue
+                    
+                    resource = resources[0]
+                    username = resource.get('username', '')
+                    old_type = resource.get('resource_type', 'unknown')
+                    
+                    if not username:
+                        continue
+                    
+                    chat_info = await client.get_chat(username)
+                    
+                    if chat_info:
+                        from pyrogram.enums import ChatType
+                        if chat_info.type == ChatType.CHANNEL:
+                            new_type = "channel"
+                        elif chat_info.type == ChatType.SUPERGROUP:
+                            new_type = "supergroup"
+                        elif chat_info.type == ChatType.GROUP:
+                            new_type = "group"
+                        else:
+                            new_type = old_type
+                        
+                        if new_type != old_type:
+                            await db.execute(
+                                "UPDATE discovered_resources SET resource_type = ?, type_verified = 1 WHERE id = ?",
+                                (new_type, resource_id)
+                            )
+                            await db._connection.commit()
+                            verified_count += 1
+                            print(f"[Backend] Type updated: {resource.get('title')} {old_type} -> {new_type}", file=sys.stderr)
+                        else:
+                            # 標記為已驗證
+                            await db.execute(
+                                "UPDATE discovered_resources SET type_verified = 1 WHERE id = ?",
+                                (resource_id,)
+                            )
+                            await db._connection.commit()
+                    
+                    # 等待 1-2 秒避免 FloodWait
+                    await asyncio.sleep(1.5)
+                    
+                except Exception as e:
+                    print(f"[Backend] Error verifying resource {resource_id}: {e}", file=sys.stderr)
+                    continue
+            
+            if verified_count > 0:
+                self.send_log(f"✅ 自動更新了 {verified_count} 個資源類型", "info")
+                # 發送更新事件讓前端刷新
+                self.send_event("resources-types-verified", {
+                    "success": True,
+                    "count": verified_count
+                })
+                
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error in batch verify: {e}", file=sys.stderr)
+
+    async def handle_clear_all_resources(self):
+        """清空所有搜索結果資源"""
+        try:
+            deleted_count = await resource_discovery.clear_all_resources()
+            self.send_log(f"🗑️ 已清空所有資源，共 {deleted_count} 條", "success")
+            self.send_event("resources-cleared", {
+                "success": True,
+                "deletedCount": deleted_count
+            })
+        except Exception as e:
+            self.send_log(f"❌ 清空資源失敗: {e}", "error")
+            self.send_event("resources-cleared", {
                 "success": False,
                 "error": str(e)
             })
@@ -12005,6 +15590,175 @@ class BackendService:
                 "success": False,
                 "error": str(e)
             })
+
+    async def handle_join_and_monitor_with_account(self, payload: Dict[str, Any]):
+        """使用指定帳號加入並監控群組"""
+        try:
+            resource_id = payload.get('resourceId')
+            phone = payload.get('phone')
+            keywords = payload.get('keywords', [])
+            auto_enable = payload.get('autoEnableMonitor', True)
+            
+            if not resource_id:
+                raise ValueError("資源 ID 不能為空")
+            if not phone:
+                raise ValueError("請選擇加入帳號")
+            
+            self.send_log(f"🚀 使用 {phone} 加入群組並設置監控...", "info")
+            
+            # 獲取資源詳情
+            from database import db
+            await db.connect()
+            
+            resources = await db.fetch_all(
+                "SELECT * FROM discovered_resources WHERE id = ?",
+                (resource_id,)
+            )
+            
+            if not resources:
+                raise ValueError(f"找不到資源 ID: {resource_id}")
+            
+            resource = resources[0]
+            title = resource.get('title', '')
+            username = resource.get('username', '')
+            invite_link = resource.get('invite_link', '')
+            current_status = resource.get('status', 'discovered')
+            
+            # 檢查帳號是否存在且已連接
+            if phone not in self.telegram_manager.clients:
+                raise ValueError(f"帳號 {phone} 未連接")
+            
+            client = self.telegram_manager.clients[phone]
+            if not client.is_connected:
+                raise ValueError(f"帳號 {phone} 未連接")
+            
+            # 如果資源尚未加入，先加入群組
+            if current_status not in ['joined', 'monitoring']:
+                self.send_log(f"📥 正在加入群組: {title}", "info")
+                
+                # 嘗試加入群組
+                join_target = username or invite_link
+                if not join_target:
+                    raise ValueError("沒有可用的加入方式（username 或 invite_link）")
+                
+                try:
+                    if username:
+                        await client.join_chat(username)
+                    elif invite_link:
+                        await client.join_chat(invite_link)
+                    
+                    self.send_log(f"✅ 已加入群組: {title}", "success")
+                    
+                    # 🔍 關鍵：獲取真實的聊天類型並更新數據庫
+                    verified_type = None
+                    try:
+                        chat_target = username or invite_link
+                        chat_info = await client.get_chat(chat_target)
+                        if chat_info:
+                            # 從 Pyrogram Chat 對象獲取真實類型
+                            from pyrogram.enums import ChatType
+                            if chat_info.type == ChatType.CHANNEL:
+                                verified_type = "channel"
+                            elif chat_info.type == ChatType.SUPERGROUP:
+                                verified_type = "supergroup"
+                            elif chat_info.type == ChatType.GROUP:
+                                verified_type = "group"
+                            elif chat_info.type == ChatType.BOT:
+                                verified_type = "bot"
+                            
+                            if verified_type:
+                                self.send_log(f"📋 類型確認: {verified_type}", "info")
+                    except Exception as type_err:
+                        import sys
+                        print(f"[Backend] Error getting chat type: {type_err}", file=sys.stderr)
+                    
+                    # 更新資源狀態（包含驗證後的類型）
+                    if verified_type:
+                        await db.execute(
+                            """UPDATE discovered_resources 
+                               SET status = ?, joined_by_phone = ?, joined_at = CURRENT_TIMESTAMP, resource_type = ?
+                               WHERE id = ?""",
+                            ('joined', phone, verified_type, resource_id)
+                        )
+                    else:
+                        await db.execute(
+                            """UPDATE discovered_resources 
+                               SET status = ?, joined_by_phone = ?, joined_at = CURRENT_TIMESTAMP 
+                               WHERE id = ?""",
+                            ('joined', phone, resource_id)
+                        )
+                    await db._connection.commit()
+                    
+                except Exception as join_error:
+                    error_msg = str(join_error)
+                    if 'already' in error_msg.lower() or 'participant' in error_msg.lower():
+                        self.send_log(f"ℹ️ 帳號已在群組中", "info")
+                        await db.execute(
+                            """UPDATE discovered_resources 
+                               SET status = ?, joined_by_phone = ? 
+                               WHERE id = ?""",
+                            ('joined', phone, resource_id)
+                        )
+                        await db._connection.commit()
+                    else:
+                        raise join_error
+            
+            # 設置監控
+            if auto_enable or keywords:
+                new_status = 'monitoring'
+                keywords_str = ','.join(keywords) if keywords else ''
+                
+                await db.execute(
+                    """UPDATE discovered_resources 
+                       SET status = ?, monitoring_keywords = ?, monitoring_enabled = 1 
+                       WHERE id = ?""",
+                    (new_status, keywords_str, resource_id)
+                )
+                await db._connection.commit()
+                
+                # 添加到 monitored_groups 表
+                existing = await db.fetch_all(
+                    "SELECT id FROM monitored_groups WHERE link LIKE ? OR name = ?",
+                    (f"%{username}%" if username else f"%{title}%", title)
+                )
+                
+                if not existing:
+                    await db.execute(
+                        """INSERT INTO monitored_groups (name, link, phone, is_active, keywords, last_active)
+                           VALUES (?, ?, ?, 1, ?, CURRENT_TIMESTAMP)""",
+                        (title, f"https://t.me/{username}" if username else invite_link, phone, keywords_str)
+                    )
+                    await db._connection.commit()
+                    self.send_log(f"✅ 已添加到監控列表: {title}", "success")
+                else:
+                    # 更新現有記錄
+                    await db.execute(
+                        """UPDATE monitored_groups 
+                           SET keywords = ?, phone = ?, is_active = 1 
+                           WHERE link LIKE ? OR name = ?""",
+                        (keywords_str, phone, f"%{username}%" if username else f"%{title}%", title)
+                    )
+                    await db._connection.commit()
+                    self.send_log(f"✅ 已更新監控設置: {title}", "success")
+                
+                if keywords:
+                    self.send_log(f"🔍 監控關鍵詞: {', '.join(keywords)}", "info")
+            
+            self.send_event("join-and-monitor-with-account-complete", {
+                "success": True,
+                "resourceId": resource_id,
+                "phone": phone,
+                "keywords": keywords
+            })
+            
+        except Exception as e:
+            self.send_log(f"❌ 加入並監控失敗: {e}", "error")
+            import traceback
+            traceback.print_exc()
+            self.send_event("join-and-monitor-with-account-complete", {
+                "success": False,
+                "error": str(e)
+            })
     
     async def handle_batch_join_and_monitor(self, payload: Dict[str, Any]):
         """批量加入並監控"""
@@ -12138,6 +15892,382 @@ class BackendService:
         except Exception as e:
             self.send_log(f"❌ 分析鏈接失敗: {e}", "error")
             self.send_event("link-analysis-complete", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    # ==================== 成員提取處理器 ====================
+    
+    async def handle_extract_members(self, payload: Dict[str, Any]):
+        """提取群組成員"""
+        import sys
+        print(f"[Backend] ========== handle_extract_members CALLED ==========", file=sys.stderr)
+        print(f"[Backend] Payload: {payload}", file=sys.stderr)
+        self.send_log("📥 收到成員提取請求", "info")
+        
+        try:
+            # 支持兩種參數格式
+            chat_id = payload.get('chatId') or payload.get('telegramId') or payload.get('username')
+            phone = payload.get('phone')
+            resource_id = payload.get('resourceId')
+            limit = payload.get('limit', 100)
+            
+            # 從 filters 獲取過濾選項
+            filters = payload.get('filters', {})
+            filter_bots = filters.get('excludeBots', True) if filters else payload.get('filterBots', True)
+            filter_offline = filters.get('onlineOnly', False) if filters else payload.get('filterOffline', False)
+            chinese_only = filters.get('chineseOnly', False) if filters else False
+            premium_only = filters.get('premiumOnly', False) if filters else False
+            has_username = filters.get('hasUsername', False) if filters else False
+            
+            print(f"[Backend] extract-members: chat_id={chat_id}, resource_id={resource_id}, limit={limit}", file=sys.stderr)
+            print(f"[Backend] Filters: bots={filter_bots}, offline={filter_offline}, chinese={chinese_only}", file=sys.stderr)
+            
+            if not chat_id:
+                # 嘗試從資源獲取
+                if resource_id:
+                    from backend.resource_discovery import ResourceDiscoveryService
+                    resource_service = ResourceDiscoveryService()
+                    resource = await resource_service.get_resource(resource_id)
+                    if resource:
+                        chat_id = resource.get('telegram_id') or resource.get('username')
+            
+            if not chat_id:
+                raise ValueError("群組 ID 不能為空")
+            
+            # 如果沒有指定帳號，使用第一個可用的客戶端
+            if not phone and self.telegram_manager.clients:
+                phone = list(self.telegram_manager.clients.keys())[0]
+                print(f"[Backend] Using default phone: {phone}", file=sys.stderr)
+            
+            self.send_log(f"🔍 開始提取成員: {chat_id}", "info")
+            
+            # 設置客戶端
+            member_extraction_service.set_clients(self.telegram_manager.clients)
+            member_extraction_service.set_event_callback(self.send_event)
+            
+            # 發送開始事件
+            self.send_event("members-extraction-progress", {
+                "resourceId": resource_id,
+                "status": "starting",
+                "extracted": 0,
+                "total": 0
+            })
+            
+            # 提取成員
+            result = await member_extraction_service.extract_members(
+                chat_id=chat_id,
+                phone=phone,
+                limit=limit,
+                filter_bots=filter_bots,
+                filter_offline=filter_offline,
+                save_to_db=True
+            )
+            
+            if result['success']:
+                members = result.get('members', [])
+                
+                # 應用額外的過濾器
+                filtered_members = []
+                for member in members:
+                    # 華人過濾
+                    if chinese_only:
+                        name = (member.get('first_name', '') or '') + (member.get('last_name', '') or '')
+                        bio = member.get('bio', '') or ''
+                        # 檢查是否有中文字符
+                        import re
+                        if not re.search(r'[\u4e00-\u9fff]', name + bio):
+                            continue
+                    
+                    # Premium 過濾
+                    if premium_only and not member.get('is_premium'):
+                        continue
+                    
+                    # 用戶名過濾
+                    if has_username and not member.get('username'):
+                        continue
+                    
+                    filtered_members.append(member)
+                
+                result['members'] = filtered_members
+                result['extracted'] = len(filtered_members)
+                
+                self.send_log(f"✅ 提取完成: {len(filtered_members)} 成員 (總計: {len(members)})", "success")
+            else:
+                self.send_log(f"❌ 提取失敗: {result['error']}", "error")
+            
+            # 發送完成事件
+            self.send_event("members-extracted", {
+                "resourceId": resource_id,
+                "success": result.get('success', False),
+                "members": result.get('members', []),
+                "extracted": result.get('extracted', 0),
+                "total": result.get('total', 0),
+                "onlineCount": result.get('online_count', 0),
+                "error": result.get('error')
+            })
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_log(f"❌ 提取成員失敗: {e}", "error")
+            self.send_event("members-extracted", {
+                "resourceId": payload.get('resourceId'),
+                "success": False,
+                "error": str(e),
+                "members": [],
+                "extracted": 0,
+                "total": 0
+            })
+    
+    async def handle_get_extracted_members(self, payload: Dict[str, Any]):
+        """獲取已提取的成員列表"""
+        try:
+            online_only = payload.get('onlineOnly', False)
+            min_value_level = payload.get('minValueLevel')
+            source_chat_id = payload.get('sourceChatId')
+            not_contacted = payload.get('notContacted', False)
+            limit = payload.get('limit', 100)
+            offset = payload.get('offset', 0)
+            
+            members = await member_extraction_service.get_members(
+                online_only=online_only,
+                min_value_level=min_value_level,
+                source_chat_id=source_chat_id,
+                not_contacted=not_contacted,
+                limit=limit,
+                offset=offset
+            )
+            
+            self.send_event("extracted-members-list", {
+                "success": True,
+                "members": members,
+                "count": len(members)
+            })
+            
+        except Exception as e:
+            self.send_log(f"❌ 獲取成員列表失敗: {e}", "error")
+            self.send_event("extracted-members-list", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_get_member_stats(self, payload: Dict[str, Any]):
+        """獲取成員統計"""
+        try:
+            source_chat_id = payload.get('sourceChatId')
+            
+            stats = await member_extraction_service.count_members(source_chat_id)
+            
+            self.send_event("member-stats", {
+                "success": True,
+                **stats
+            })
+            
+        except Exception as e:
+            self.send_log(f"❌ 獲取成員統計失敗: {e}", "error")
+            self.send_event("member-stats", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_get_online_members(self, payload: Dict[str, Any]):
+        """獲取在線成員"""
+        try:
+            limit = payload.get('limit', 100)
+            
+            members = await member_extraction_service.get_online_members(limit)
+            
+            self.send_event("online-members-list", {
+                "success": True,
+                "members": members,
+                "count": len(members)
+            })
+            
+        except Exception as e:
+            self.send_log(f"❌ 獲取在線成員失敗: {e}", "error")
+            self.send_event("online-members-list", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    # ==================== 營銷觸達處理器 ====================
+    
+    async def handle_send_bulk_messages(self, payload: Dict[str, Any]):
+        """批量發送私信"""
+        try:
+            user_ids = payload.get('userIds', [])
+            message_template = payload.get('messageTemplate', '')
+            delay_min = payload.get('delayMin', 30)
+            delay_max = payload.get('delayMax', 90)
+            
+            if not user_ids:
+                raise ValueError("用戶 ID 列表不能為空")
+            if not message_template:
+                raise ValueError("消息模板不能為空")
+            
+            self.send_log(f"📤 開始批量發送: {len(user_ids)} 人", "info")
+            
+            # 設置客戶端
+            marketing_outreach_service.set_clients(self.telegram_manager.clients)
+            marketing_outreach_service.set_event_callback(self.send_event)
+            
+            # 在後台執行
+            async def send_task():
+                stats = await marketing_outreach_service.batch_send_messages(
+                    user_ids=user_ids,
+                    message_template=message_template,
+                    delay_range=(delay_min, delay_max)
+                )
+                self.send_event("bulk-send-complete", {
+                    "success": True,
+                    **stats
+                })
+            
+            asyncio.create_task(send_task())
+            
+            self.send_event("bulk-send-started", {
+                "success": True,
+                "total": len(user_ids)
+            })
+            
+        except Exception as e:
+            self.send_log(f"❌ 批量發送失敗: {e}", "error")
+            self.send_event("bulk-send-complete", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_batch_invite_to_group(self, payload: Dict[str, Any]):
+        """批量邀請入群"""
+        try:
+            user_ids = payload.get('userIds', [])
+            group_id = payload.get('groupId', '')
+            delay_min = payload.get('delayMin', 30)
+            delay_max = payload.get('delayMax', 90)
+            
+            if not user_ids:
+                raise ValueError("用戶 ID 列表不能為空")
+            if not group_id:
+                raise ValueError("目標群組不能為空")
+            
+            self.send_log(f"📥 開始批量邀請: {len(user_ids)} 人 -> {group_id}", "info")
+            
+            # 設置客戶端
+            marketing_outreach_service.set_clients(self.telegram_manager.clients)
+            marketing_outreach_service.set_event_callback(self.send_event)
+            
+            # 在後台執行
+            async def invite_task():
+                stats = await marketing_outreach_service.batch_invite(
+                    user_ids=user_ids,
+                    group_id=group_id,
+                    delay_range=(delay_min, delay_max)
+                )
+                self.send_event("batch-invite-complete", {
+                    "success": True,
+                    **stats
+                })
+            
+            asyncio.create_task(invite_task())
+            
+            self.send_event("batch-invite-started", {
+                "success": True,
+                "total": len(user_ids)
+            })
+            
+        except Exception as e:
+            self.send_log(f"❌ 批量邀請失敗: {e}", "error")
+            self.send_event("batch-invite-complete", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_create_marketing_campaign(self, payload: Dict[str, Any]):
+        """創建營銷活動"""
+        try:
+            name = payload.get('name', '')
+            campaign_type = payload.get('type', 'pm')
+            target_users = payload.get('targetUsers', [])
+            target_group = payload.get('targetGroup')
+            message_template = payload.get('messageTemplate')
+            
+            if not name:
+                raise ValueError("活動名稱不能為空")
+            
+            campaign_id = await marketing_outreach_service.create_campaign(
+                name=name,
+                campaign_type=campaign_type,
+                target_users=target_users,
+                target_group=target_group,
+                message_template=message_template
+            )
+            
+            self.send_log(f"📢 創建營銷活動成功: {name} (ID: {campaign_id})", "success")
+            self.send_event("campaign-created", {
+                "success": True,
+                "campaignId": campaign_id,
+                "name": name
+            })
+            
+        except Exception as e:
+            self.send_log(f"❌ 創建營銷活動失敗: {e}", "error")
+            self.send_event("campaign-created", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_start_marketing_campaign(self, payload: Dict[str, Any]):
+        """啟動營銷活動"""
+        try:
+            campaign_id = payload.get('campaignId')
+            
+            if not campaign_id:
+                raise ValueError("活動 ID 不能為空")
+            
+            # 設置客戶端
+            marketing_outreach_service.set_clients(self.telegram_manager.clients)
+            marketing_outreach_service.set_event_callback(self.send_event)
+            
+            self.send_log(f"🚀 啟動營銷活動: {campaign_id}", "info")
+            
+            # 在後台執行
+            async def campaign_task():
+                result = await marketing_outreach_service.start_campaign(campaign_id)
+                self.send_event("campaign-complete", {
+                    "campaignId": campaign_id,
+                    **result
+                })
+            
+            asyncio.create_task(campaign_task())
+            
+            self.send_event("campaign-started", {
+                "success": True,
+                "campaignId": campaign_id
+            })
+            
+        except Exception as e:
+            self.send_log(f"❌ 啟動營銷活動失敗: {e}", "error")
+            self.send_event("campaign-complete", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_get_marketing_stats(self, payload: Dict[str, Any]):
+        """獲取營銷統計"""
+        try:
+            campaign_id = payload.get('campaignId')
+            
+            stats = await marketing_outreach_service.get_campaign_stats(campaign_id)
+            
+            self.send_event("marketing-stats", {
+                "success": True,
+                "stats": stats
+            })
+            
+        except Exception as e:
+            self.send_log(f"❌ 獲取營銷統計失敗: {e}", "error")
+            self.send_event("marketing-stats", {
                 "success": False,
                 "error": str(e)
             })

@@ -110,4 +110,13 @@ export class ElectronIpcService {
     }
     this.ipcRenderer.removeAllListeners(channel);
   }
+
+  /**
+   * Alias for cleanup - removes all listeners from a channel.
+   * @param channel The channel to clean up listeners for.
+   * @param _listener Ignored - provided for API compatibility
+   */
+  off(channel: string, _listener?: (...args: any[]) => void): void {
+    this.cleanup(channel);
+  }
 }

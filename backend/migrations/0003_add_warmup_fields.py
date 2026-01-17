@@ -18,6 +18,15 @@ class Migration0003_AddWarmupFields(Migration):
     async def up(self, db) -> None:
         """Apply migration (upgrade) - Add warmup columns to accounts table"""
         try:
+            # Check if accounts table exists in this database
+            # Note: accounts table is in tgmatrix.db, not tgai_server.db
+            cursor = await db._connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='accounts'"
+            )
+            if not await cursor.fetchone():
+                print("Migration 0003: accounts table not in this database (it's in tgmatrix.db), skipping", file=sys.stderr)
+                return
+            
             # Check if columns already exist (for idempotency)
             cursor = await db._connection.execute("PRAGMA table_info(accounts)")
             columns = [row[1] for row in await cursor.fetchall()]

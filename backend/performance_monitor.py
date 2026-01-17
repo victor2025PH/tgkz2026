@@ -415,14 +415,18 @@ class PerformanceMonitor:
 _performance_monitor: Optional[PerformanceMonitor] = None
 
 
-def init_performance_monitor(event_callback: Optional[Callable[[str, Any], None]] = None) -> PerformanceMonitor:
+def init_performance_monitor(
+    event_callback: Optional[Callable[[str, Any], None]] = None,
+    collection_interval: float = 30.0  # 優化：默認 30 秒，減少事件發送頻率
+) -> PerformanceMonitor:
     """Initialize the global performance monitor"""
     global _performance_monitor
     if _performance_monitor is None:
         config = get_config()
-        collection_interval = getattr(config.monitoring, 'performance_collection_interval', 5.0)
+        # 使用配置值或傳入的間隔，默認 30 秒
+        interval = getattr(config.monitoring, 'performance_collection_interval', collection_interval)
         _performance_monitor = PerformanceMonitor(
-            collection_interval=collection_interval,
+            collection_interval=interval,
             event_callback=event_callback
         )
     return _performance_monitor

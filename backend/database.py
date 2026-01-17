@@ -237,21 +237,72 @@ class Database:
     
     def _migrate_db(self):
         """數據庫遷移：添加缺失的字段"""
+        import sys
         conn = self.get_connection()
         cursor = conn.cursor()
-        
+
         try:
             # 檢查 admins 表是否有 last_login_ip 字段
             cursor.execute("PRAGMA table_info(admins)")
             columns = [col[1] for col in cursor.fetchall()]
-            
+
             if 'last_login_ip' not in columns:
-                print("🔄 添加缺失字段: admins.last_login_ip")
+                print("[Database] Adding column: admins.last_login_ip", file=sys.stderr)
                 cursor.execute('ALTER TABLE admins ADD COLUMN last_login_ip TEXT')
                 conn.commit()
-                print("✅ 字段添加成功")
+            
+            # 檢查 discovered_resources 表的字段
+            cursor.execute("PRAGMA table_info(discovered_resources)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            if 'type_verified' not in columns:
+                print("[Database] Adding column: discovered_resources.type_verified", file=sys.stderr)
+                cursor.execute('ALTER TABLE discovered_resources ADD COLUMN type_verified INTEGER DEFAULT 0')
+                conn.commit()
+            
+            if 'details_fetched' not in columns:
+                print("[Database] Adding column: discovered_resources.details_fetched", file=sys.stderr)
+                cursor.execute('ALTER TABLE discovered_resources ADD COLUMN details_fetched INTEGER DEFAULT 0')
+                conn.commit()
+            
+            # 添加監控相關字段
+            if 'monitoring_keywords' not in columns:
+                print("[Database] Adding column: discovered_resources.monitoring_keywords", file=sys.stderr)
+                cursor.execute('ALTER TABLE discovered_resources ADD COLUMN monitoring_keywords TEXT DEFAULT ""')
+                conn.commit()
+            
+            if 'monitoring_enabled' not in columns:
+                print("[Database] Adding column: discovered_resources.monitoring_enabled", file=sys.stderr)
+                cursor.execute('ALTER TABLE discovered_resources ADD COLUMN monitoring_enabled INTEGER DEFAULT 0')
+                conn.commit()
+            
+            # 檢查 monitored_groups 表的字段
+            cursor.execute("PRAGMA table_info(monitored_groups)")
+            mg_columns = [col[1] for col in cursor.fetchall()]
+            
+            if mg_columns:  # 表存在
+                if 'phone' not in mg_columns:
+                    print("[Database] Adding column: monitored_groups.phone", file=sys.stderr)
+                    cursor.execute('ALTER TABLE monitored_groups ADD COLUMN phone TEXT')
+                    conn.commit()
+                
+                if 'keywords' not in mg_columns:
+                    print("[Database] Adding column: monitored_groups.keywords", file=sys.stderr)
+                    cursor.execute('ALTER TABLE monitored_groups ADD COLUMN keywords TEXT DEFAULT ""')
+                    conn.commit()
+                
+                if 'last_active' not in mg_columns:
+                    print("[Database] Adding column: monitored_groups.last_active", file=sys.stderr)
+                    cursor.execute('ALTER TABLE monitored_groups ADD COLUMN last_active TIMESTAMP')
+                    conn.commit()
+                
+                if 'keyword_set_ids' not in mg_columns:
+                    print("[Database] Adding column: monitored_groups.keyword_set_ids", file=sys.stderr)
+                    cursor.execute("ALTER TABLE monitored_groups ADD COLUMN keyword_set_ids TEXT DEFAULT '[]'")
+                    conn.commit()
+                
         except Exception as e:
-            print(f"⚠️ 遷移警告: {e}")
+            print(f"[Database] Migration warning: {e}", file=sys.stderr)
         finally:
             conn.close()
     
@@ -741,6 +792,10 @@ class Database:
                 tags TEXT DEFAULT '[]',
                 notes TEXT,
                 metadata TEXT DEFAULT '{}',
+                type_verified INTEGER DEFAULT 0,
+                details_fetched INTEGER DEFAULT 0,
+                monitoring_keywords TEXT DEFAULT '',
+                monitoring_enabled INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -794,7 +849,28 @@ class Database:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        
+
+        # ============ 自定義搜索渠道表 ============
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS custom_search_channels (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bot_username TEXT UNIQUE NOT NULL,
+                display_name TEXT,
+                query_format TEXT DEFAULT '{keyword}',
+                priority TEXT DEFAULT 'backup',
+                status TEXT DEFAULT 'unknown',
+                enabled INTEGER DEFAULT 1,
+                success_count INTEGER DEFAULT 0,
+                fail_count INTEGER DEFAULT 0,
+                last_test_at TIMESTAMP,
+                last_success_at TIMESTAMP,
+                avg_response_time REAL DEFAULT 0,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
         # ============ 提取成員表 ============
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS extracted_members (
@@ -902,6 +978,34 @@ class Database:
             )
         ''')
         
+        # ============ 日誌表 ============
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                message TEXT NOT NULL,
+                type TEXT DEFAULT 'info',
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # ============ 消息隊列表 ============
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS message_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phone TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                text TEXT NOT NULL,
+                priority INTEGER DEFAULT 1,
+                status TEXT DEFAULT 'pending',
+                scheduled_at TIMESTAMP,
+                sent_at TIMESTAMP,
+                error_message TEXT,
+                retry_count INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         # ============ 創建索引 ============
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_invite_code ON users(invite_code)')
@@ -925,6 +1029,13 @@ class Database:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_members_status ON extracted_members(online_status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_members_value ON extracted_members(value_level)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_campaigns_status ON marketing_campaigns(status)')
+        
+        # 日誌和消息隊列索引
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_logs_type ON logs(type)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_message_queue_phone ON message_queue(phone)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_message_queue_status ON message_queue(status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_message_queue_created ON message_queue(created_at)')
         
         # ============ 初始化默認設置 ============
         default_settings = [
@@ -1618,27 +1729,98 @@ class Database:
         conn.commit()
         conn.close()
     
-    def get_all_settings(self, category: str = None) -> Dict[str, Any]:
+    async def get_all_settings(self, category: str = None) -> Dict[str, Any]:
         """獲取所有設置"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        if category:
-            cursor.execute('SELECT * FROM settings WHERE category = ?', (category,))
-        else:
-            cursor.execute('SELECT * FROM settings')
-        
-        settings = {}
-        for row in cursor.fetchall():
-            settings[row['setting_key']] = {
-                'value': row['setting_value'],
-                'type': row['setting_type'],
-                'category': row['category'],
-                'description': row['description']
+        try:
+            if category:
+                rows = await self.fetch_all('SELECT * FROM settings WHERE category = ?', (category,))
+            else:
+                rows = await self.fetch_all('SELECT * FROM settings')
+            
+            settings = {}
+            for row in rows:
+                settings[row['setting_key']] = {
+                    'value': row['setting_value'],
+                    'type': row['setting_type'],
+                    'category': row['category'],
+                    'description': row['description']
+                }
+            
+            return settings
+        except Exception as e:
+            print(f"Error getting all settings: {e}")
+            return {}
+    
+    # ============ AI Settings Methods ============
+    
+    async def get_ai_settings(self) -> Dict[str, Any]:
+        """獲取 AI 相關設置"""
+        try:
+            rows = await self.fetch_all('''
+                SELECT setting_key, setting_value FROM settings 
+                WHERE category = 'ai' OR setting_key LIKE 'auto_chat%' 
+                   OR setting_key LIKE 'local_ai%' OR setting_key LIKE 'auto_greeting%'
+            ''')
+            
+            settings = {}
+            for row in rows:
+                key = row['setting_key']
+                value = row['setting_value']
+                # 嘗試轉換數值
+                if value is not None:
+                    if value.isdigit():
+                        value = int(value)
+                    elif value.lower() in ('true', 'false'):
+                        value = 1 if value.lower() == 'true' else 0
+                settings[key] = value
+            
+            # 設置默認值
+            if 'auto_chat_enabled' not in settings:
+                settings['auto_chat_enabled'] = 0
+            if 'auto_chat_mode' not in settings:
+                settings['auto_chat_mode'] = 'semi'
+            if 'auto_greeting' not in settings:
+                settings['auto_greeting'] = 0
+            if 'local_ai_endpoint' not in settings:
+                settings['local_ai_endpoint'] = ''
+            if 'local_ai_model' not in settings:
+                settings['local_ai_model'] = ''
+            
+            return settings
+        except Exception as e:
+            import sys
+            print(f"[Database] Error getting AI settings: {e}", file=sys.stderr)
+            # 返回默認設置
+            return {
+                'auto_chat_enabled': 0,
+                'auto_chat_mode': 'semi',
+                'auto_greeting': 0,
+                'local_ai_endpoint': '',
+                'local_ai_model': ''
             }
-        
-        conn.close()
-        return settings
+    
+    async def update_ai_settings(self, settings: Dict[str, Any]) -> bool:
+        """更新 AI 相關設置"""
+        import sys
+        try:
+            for key, value in settings.items():
+                # 將值轉換為字符串存儲
+                str_value = str(value) if value is not None else ''
+                
+                await self.execute('''
+                    INSERT INTO settings (setting_key, setting_value, category, updated_at)
+                    VALUES (?, ?, 'ai', CURRENT_TIMESTAMP)
+                    ON CONFLICT(setting_key) DO UPDATE SET
+                        setting_value = excluded.setting_value,
+                        category = 'ai',
+                        updated_at = CURRENT_TIMESTAMP
+                ''', (key, str_value))
+            
+            print(f"[Database] AI settings updated: {list(settings.keys())}", file=sys.stderr)
+            return True
+        except Exception as e:
+            print(f"[Database] Error updating AI settings: {e}", file=sys.stderr)
+            return False
     
     # ============ API Credential Logs (Phase 2) ============
     
@@ -1781,6 +1963,13 @@ class Database:
         try:
             accounts_db_path = self._get_accounts_db_path()
             
+            # 標準化電話號碼格式
+            phone = str(phone).strip()
+            if phone.startswith('+'):
+                normalized_phone = '+' + ''.join(c for c in phone[1:] if c.isdigit())
+            else:
+                normalized_phone = '+' + ''.join(c for c in phone if c.isdigit())
+            
             # 確保表存在
             await self._ensure_accounts_table(accounts_db_path)
             
@@ -1789,7 +1978,9 @@ class Database:
                 conn = sqlite3.connect(str(accounts_db_path))
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
-                cursor.execute('SELECT * FROM accounts WHERE phone = ?', (phone,))
+                # 嘗試兩種格式（有 + 和沒有 +）
+                cursor.execute('SELECT * FROM accounts WHERE phone = ? OR phone = ?', 
+                              (normalized_phone, normalized_phone[1:]))
                 row = cursor.fetchone()
                 conn.close()
                 return dict(row) if row else None
@@ -1797,7 +1988,9 @@ class Database:
             # 異步方式
             async with aiosqlite.connect(str(accounts_db_path)) as conn:
                 conn.row_factory = aiosqlite.Row
-                cursor = await conn.execute('SELECT * FROM accounts WHERE phone = ?', (phone,))
+                # 嘗試兩種格式（有 + 和沒有 +）
+                cursor = await conn.execute('SELECT * FROM accounts WHERE phone = ? OR phone = ?', 
+                                           (normalized_phone, normalized_phone[1:]))
                 row = await cursor.fetchone()
                 return dict(row) if row else None
         except Exception as e:
@@ -1809,29 +2002,59 @@ class Database:
         try:
             accounts_db_path = self._get_accounts_db_path()
             accounts_db_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # 確保 accounts 表存在
             await self._ensure_accounts_table(accounts_db_path)
-            
+
+            # 標準化電話號碼格式（確保有 + 前綴）
+            if 'phone' in account_data:
+                phone = str(account_data['phone']).strip()
+                # 移除所有非數字字符（除了開頭的 +）
+                if phone.startswith('+'):
+                    phone = '+' + ''.join(c for c in phone[1:] if c.isdigit())
+                else:
+                    phone = '+' + ''.join(c for c in phone if c.isdigit())
+                account_data['phone'] = phone
+
             # SQL 保留關鍵字需要用方括號轉義
             def escape_column(col):
                 reserved_keywords = {'group', 'order', 'select', 'insert', 'update', 'delete', 'from', 'where', 'table', 'index', 'key'}
                 if col.lower() in reserved_keywords:
                     return f'[{col}]'
                 return col
-            
+
+            # 定義有效的列名（與表結構匹配）
+            valid_columns = {
+                'phone', 'apiId', 'apiHash', 'proxy', 'group', 'role', 'status',
+                'twoFactorPassword', 'deviceModel', 'systemVersion', 'appVersion',
+                'langCode', 'platform', 'deviceId', 'proxyType', 'proxyHost',
+                'proxyPort', 'proxyUsername', 'proxyPassword', 'proxyCountry',
+                'proxyRotationEnabled', 'enableWarmup', 'warmupStatus',
+                'dailySendCount', 'dailySendLimit', 'healthScore',
+                'nickname', 'notes', 'aiEnabled', 'aiModel', 'aiPersonality',
+                'firstName', 'lastName', 'username', 'bio', 'avatarPath', 'telegramId',
+                'tags'  # 標籤（JSON 字符串）
+            }
+
+            # tags 需要轉換為 JSON 字符串
+            if 'tags' in account_data and isinstance(account_data['tags'], list):
+                account_data['tags'] = json.dumps(account_data['tags'])
+
+            # 過濾掉不存在的列
+            filtered_data = {k: v for k, v in account_data.items() if k in valid_columns}
+
             if not HAS_AIOSQLITE:
                 # 同步回退
                 conn = sqlite3.connect(str(accounts_db_path))
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
-                
+
                 # 構建插入語句（轉義保留關鍵字）
-                columns = list(account_data.keys())
+                columns = list(filtered_data.keys())
                 escaped_columns = [escape_column(col) for col in columns]
                 placeholders = ','.join(['?' for _ in columns])
-                values = [account_data[col] for col in columns]
-                
+                values = [filtered_data[col] for col in columns]
+
                 cursor.execute(f'''
                     INSERT INTO accounts ({','.join(escaped_columns)})
                     VALUES ({placeholders})
@@ -1840,15 +2063,15 @@ class Database:
                 account_id = cursor.lastrowid
                 conn.close()
                 return account_id
-            
+
             # 異步方式
             async with aiosqlite.connect(str(accounts_db_path)) as conn:
                 # 構建插入語句（轉義保留關鍵字）
-                columns = list(account_data.keys())
+                columns = list(filtered_data.keys())
                 escaped_columns = [escape_column(col) for col in columns]
                 placeholders = ','.join(['?' for _ in columns])
-                values = [account_data[col] for col in columns]
-                
+                values = [filtered_data[col] for col in columns]
+
                 cursor = await conn.execute(f'''
                     INSERT INTO accounts ({','.join(escaped_columns)})
                     VALUES ({placeholders})
@@ -1899,22 +2122,45 @@ class Database:
             accounts_db_path = self._get_accounts_db_path()
             if not accounts_db_path.exists():
                 return False
-            
+
             # SQL 保留關鍵字需要用方括號轉義
             def escape_column(col):
                 reserved_keywords = {'group', 'order', 'select', 'insert', 'update', 'delete', 'from', 'where', 'table', 'index', 'key'}
                 if col.lower() in reserved_keywords:
                     return f'[{col}]'
                 return col
+
+            # 定義有效的列名（與表結構匹配）
+            valid_columns = {
+                'phone', 'apiId', 'apiHash', 'proxy', 'group', 'role', 'status',
+                'twoFactorPassword', 'deviceModel', 'systemVersion', 'appVersion',
+                'langCode', 'platform', 'deviceId', 'proxyType', 'proxyHost',
+                'proxyPort', 'proxyUsername', 'proxyPassword', 'proxyCountry',
+                'proxyRotationEnabled', 'enableWarmup', 'warmupStatus',
+                'dailySendCount', 'dailySendLimit', 'healthScore',
+                'nickname', 'notes', 'aiEnabled', 'aiModel', 'aiPersonality',
+                'firstName', 'lastName', 'username', 'bio', 'avatarPath', 'telegramId',
+                'tags'  # 標籤（JSON 字符串）
+            }
+
+            # tags 需要轉換為 JSON 字符串
+            if 'tags' in updates and isinstance(updates['tags'], list):
+                updates['tags'] = json.dumps(updates['tags'])
+
+            # 過濾掉不存在的列
+            filtered_updates = {k: v for k, v in updates.items() if k in valid_columns}
             
+            if not filtered_updates:
+                return True  # 沒有有效的更新
+
             if not HAS_AIOSQLITE:
                 # 同步回退
                 conn = sqlite3.connect(str(accounts_db_path))
                 cursor = conn.cursor()
-                
-                set_clause = ','.join([f"{escape_column(k)} = ?" for k in updates.keys()])
-                values = list(updates.values()) + [account_id]
-                
+
+                set_clause = ','.join([f"{escape_column(k)} = ?" for k in filtered_updates.keys()])
+                values = list(filtered_updates.values()) + [account_id]
+
                 cursor.execute(f'''
                     UPDATE accounts SET {set_clause}, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
@@ -1923,12 +2169,12 @@ class Database:
                 success = cursor.rowcount > 0
                 conn.close()
                 return success
-            
+
             # 異步方式
             async with aiosqlite.connect(str(accounts_db_path)) as conn:
-                set_clause = ','.join([f"{escape_column(k)} = ?" for k in updates.keys()])
-                values = list(updates.values()) + [account_id]
-                
+                set_clause = ','.join([f"{escape_column(k)} = ?" for k in filtered_updates.keys()])
+                values = list(filtered_updates.values()) + [account_id]
+
                 cursor = await conn.execute(f'''
                     UPDATE accounts SET {set_clause}, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
@@ -1996,7 +2242,7 @@ class Database:
             return False
     
     async def _ensure_accounts_table(self, db_path: Path):
-        """確保 accounts 表存在（如果不存在則創建）"""
+        """確保 accounts 表存在（如果不存在則創建），並自動添加缺失的欄位"""
         try:
             # 注意：[group] 使用方括號轉義，因為 group 是 SQL 保留關鍵字
             create_table_sql = '''
@@ -2017,6 +2263,10 @@ class Database:
                     platform TEXT,
                     deviceId TEXT,
                     proxyType TEXT,
+                    proxyHost TEXT,
+                    proxyPort INTEGER,
+                    proxyUsername TEXT,
+                    proxyPassword TEXT,
                     proxyCountry TEXT,
                     proxyRotationEnabled INTEGER DEFAULT 0,
                     enableWarmup INTEGER DEFAULT 0,
@@ -2024,15 +2274,69 @@ class Database:
                     dailySendCount INTEGER DEFAULT 0,
                     dailySendLimit INTEGER DEFAULT 50,
                     healthScore REAL DEFAULT 100.0,
+                    nickname TEXT,
+                    notes TEXT,
+                    aiEnabled INTEGER DEFAULT 0,
+                    aiModel TEXT,
+                    aiPersonality TEXT,
+                    firstName TEXT,
+                    lastName TEXT,
+                    username TEXT,
+                    bio TEXT,
+                    avatarPath TEXT,
+                    telegramId TEXT,
+                    tags TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             '''
             
+            # 定義所有需要的欄位（用於自動添加缺失欄位）
+            required_columns = [
+                ("proxyHost", "TEXT"),
+                ("proxyPort", "INTEGER"),
+                ("proxyUsername", "TEXT"),
+                ("proxyPassword", "TEXT"),
+                ("proxyCountry", "TEXT"),
+                ("proxyRotationEnabled", "INTEGER DEFAULT 0"),
+                ("enableWarmup", "INTEGER DEFAULT 0"),
+                ("warmupStatus", "TEXT"),
+                ("dailySendCount", "INTEGER DEFAULT 0"),
+                ("dailySendLimit", "INTEGER DEFAULT 50"),
+                ("healthScore", "REAL DEFAULT 100.0"),
+                ("nickname", "TEXT"),
+                ("notes", "TEXT"),
+                ("aiEnabled", "INTEGER DEFAULT 0"),
+                ("aiModel", "TEXT"),
+                ("aiPersonality", "TEXT"),
+                ("firstName", "TEXT"),
+                ("lastName", "TEXT"),
+                ("username", "TEXT"),
+                ("bio", "TEXT"),
+                ("avatarPath", "TEXT"),
+                ("telegramId", "TEXT"),
+                ("tags", "TEXT"),
+            ]
+            
             if not HAS_AIOSQLITE:
                 conn = sqlite3.connect(str(db_path))
                 cursor = conn.cursor()
                 cursor.execute(create_table_sql)
+                conn.commit()
+                
+                # 檢查並添加缺失的欄位
+                cursor.execute("PRAGMA table_info(accounts)")
+                existing_columns = {row[1] for row in cursor.fetchall()}
+                
+                for col_name, col_type in required_columns:
+                    if col_name not in existing_columns:
+                        try:
+                            cursor.execute(f"ALTER TABLE accounts ADD COLUMN {col_name} {col_type}")
+                            print(f"[Database] Added missing column: {col_name}", file=sys.stderr)
+                        except Exception as col_err:
+                            # 欄位可能已存在
+                            pass
+                
                 conn.commit()
                 conn.close()
                 return
@@ -2041,8 +2345,803 @@ class Database:
             async with aiosqlite.connect(str(db_path)) as conn:
                 await conn.execute(create_table_sql)
                 await conn.commit()
+                
+                # 檢查並添加缺失的欄位
+                cursor = await conn.execute("PRAGMA table_info(accounts)")
+                rows = await cursor.fetchall()
+                existing_columns = {row[1] for row in rows}
+                
+                for col_name, col_type in required_columns:
+                    if col_name not in existing_columns:
+                        try:
+                            await conn.execute(f"ALTER TABLE accounts ADD COLUMN {col_name} {col_type}")
+                            print(f"[Database] Added missing column: {col_name}", file=sys.stderr)
+                        except Exception as col_err:
+                            # 欄位可能已存在
+                            pass
+                
+                await conn.commit()
         except Exception as e:
             print(f"Error ensuring accounts table: {e}")
+    
+    # ============ 異步 SQL 執行方法 ============
+    
+    async def fetch_all(self, query: str, params: tuple = None) -> List[Dict]:
+        """異步執行 SQL 查詢並返回所有結果"""
+        try:
+            if not HAS_AIOSQLITE:
+                # 同步回退
+                conn = sqlite3.connect(str(self.db_path))
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+                rows = cursor.fetchall()
+                conn.close()
+                return [dict(row) for row in rows]
+            
+            # 異步方式
+            await self.connect()
+            if params:
+                cursor = await self._connection.execute(query, params)
+            else:
+                cursor = await self._connection.execute(query)
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+        except Exception as e:
+            print(f"Error in fetch_all: {e}")
+            return []
+    
+    async def fetch_one(self, query: str, params: tuple = None) -> Optional[Dict]:
+        """異步執行 SQL 查詢並返回單個結果"""
+        try:
+            if not HAS_AIOSQLITE:
+                # 同步回退
+                conn = sqlite3.connect(str(self.db_path))
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+                row = cursor.fetchone()
+                conn.close()
+                return dict(row) if row else None
+            
+            # 異步方式
+            await self.connect()
+            if params:
+                cursor = await self._connection.execute(query, params)
+            else:
+                cursor = await self._connection.execute(query)
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+        except Exception as e:
+            print(f"Error in fetch_one: {e}")
+            return None
+    
+    async def execute(self, query: str, params: tuple = None) -> int:
+        """異步執行 SQL 語句並返回影響的行數"""
+        try:
+            if not HAS_AIOSQLITE:
+                # 同步回退
+                conn = sqlite3.connect(str(self.db_path))
+                cursor = conn.cursor()
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+                conn.commit()
+                affected = cursor.rowcount
+                conn.close()
+                return affected
+            
+            # 異步方式
+            await self.connect()
+            if params:
+                cursor = await self._connection.execute(query, params)
+            else:
+                cursor = await self._connection.execute(query)
+            await self._connection.commit()
+            return cursor.rowcount
+        except Exception as e:
+            print(f"Error in execute: {e}")
+            return 0
+    
+    async def execute_insert(self, query: str, params: tuple = None) -> int:
+        """異步執行 INSERT 語句並返回新插入行的 ID"""
+        try:
+            if not HAS_AIOSQLITE:
+                # 同步回退
+                conn = sqlite3.connect(str(self.db_path))
+                cursor = conn.cursor()
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+                conn.commit()
+                last_id = cursor.lastrowid
+                conn.close()
+                return last_id
+            
+            # 異步方式
+            await self.connect()
+            if params:
+                cursor = await self._connection.execute(query, params)
+            else:
+                cursor = await self._connection.execute(query)
+            await self._connection.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            print(f"Error in execute_insert: {e}")
+            raise e
+    
+    # ============ 日誌操作 ============
+    
+    async def add_log(self, message: str, log_type: str = "info") -> Optional[int]:
+        """添加日誌"""
+        try:
+            if not HAS_AIOSQLITE:
+                # 同步回退
+                conn = sqlite3.connect(str(self.db_path))
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO logs (message, type, timestamp)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                ''', (message, log_type))
+                conn.commit()
+                log_id = cursor.lastrowid
+                conn.close()
+                return log_id
+            
+            # 異步方式
+            await self.connect()
+            cursor = await self._connection.execute('''
+                INSERT INTO logs (message, type, timestamp)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+            ''', (message, log_type))
+            await self._connection.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            print(f"Error adding log: {e}")
+            return None
+    
+    async def get_logs(self, limit: int = 100, log_type: str = None) -> List[Dict]:
+        """獲取日誌"""
+        try:
+            if log_type:
+                query = 'SELECT * FROM logs WHERE type = ? ORDER BY timestamp DESC LIMIT ?'
+                params = (log_type, limit)
+            else:
+                query = 'SELECT * FROM logs ORDER BY timestamp DESC LIMIT ?'
+                params = (limit,)
+            
+            return await self.fetch_all(query, params)
+        except Exception as e:
+            print(f"Error getting logs: {e}")
+            return []
+    
+    async def clear_logs(self) -> bool:
+        """清除日誌"""
+        try:
+            await self.execute('DELETE FROM logs')
+            return True
+        except Exception as e:
+            print(f"Error clearing logs: {e}")
+            return False
+    
+    async def get_recent_logs(self, limit: int = 100) -> List[Dict]:
+        """獲取最近的日誌"""
+        return await self.get_logs(limit=limit)
+    
+    # ============ 關鍵詞集操作 ============
+    
+    async def _ensure_keyword_tables(self):
+        """確保關鍵詞相關表存在"""
+        try:
+            # 關鍵詞集表
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS keyword_sets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    description TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 關鍵詞表
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS keywords (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    keyword_set_id INTEGER NOT NULL,
+                    keyword TEXT NOT NULL,
+                    match_type TEXT DEFAULT 'contains',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (keyword_set_id) REFERENCES keyword_sets(id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # 監控群組表
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS monitored_groups (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    link TEXT,
+                    telegram_id TEXT,
+                    keyword_set_id INTEGER,
+                    keyword_set_ids TEXT DEFAULT '[]',
+                    account_phone TEXT,
+                    phone TEXT,
+                    keywords TEXT DEFAULT '',
+                    is_active INTEGER DEFAULT 1,
+                    member_count INTEGER DEFAULT 0,
+                    last_active TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (keyword_set_id) REFERENCES keyword_sets(id) ON DELETE SET NULL
+                )
+            ''')
+            
+            # 消息模板表
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS message_templates (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    category TEXT DEFAULT 'general',
+                    is_active INTEGER DEFAULT 1,
+                    use_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+        except Exception as e:
+            print(f"Error creating keyword tables: {e}")
+    
+    async def add_keyword_set(self, name: str, description: str = '') -> int:
+        """添加關鍵詞集"""
+        await self._ensure_keyword_tables()
+        try:
+            return await self.execute_insert(
+                'INSERT INTO keyword_sets (name, description) VALUES (?, ?)',
+                (name, description)
+            )
+        except Exception as e:
+            print(f"Error adding keyword set: {e}")
+            raise e
+    
+    async def get_all_keyword_sets(self) -> List[Dict]:
+        """獲取所有關鍵詞集"""
+        await self._ensure_keyword_tables()
+        try:
+            rows = await self.fetch_all('SELECT * FROM keyword_sets ORDER BY created_at DESC')
+            # 為每個關鍵詞集添加關鍵詞列表
+            result = []
+            for row in rows:
+                row_dict = dict(row) if hasattr(row, 'keys') else row
+                keywords = await self.get_keywords_by_set(row_dict['id'])
+                row_dict['keywords'] = keywords
+                result.append(row_dict)
+            return result
+        except Exception as e:
+            print(f"Error getting keyword sets: {e}")
+            return []
+    
+    async def get_keyword_set(self, set_id: int) -> Optional[Dict]:
+        """獲取單個關鍵詞集"""
+        await self._ensure_keyword_tables()
+        try:
+            row = await self.fetch_one('SELECT * FROM keyword_sets WHERE id = ?', (set_id,))
+            if row:
+                row_dict = dict(row) if hasattr(row, 'keys') else row
+                row_dict['keywords'] = await self.get_keywords_by_set(set_id)
+                return row_dict
+            return None
+        except Exception as e:
+            print(f"Error getting keyword set: {e}")
+            return None
+    
+    async def remove_keyword_set(self, set_id: int) -> bool:
+        """刪除關鍵詞集"""
+        await self._ensure_keyword_tables()
+        try:
+            await self.execute('DELETE FROM keyword_sets WHERE id = ?', (set_id,))
+            return True
+        except Exception as e:
+            print(f"Error removing keyword set: {e}")
+            return False
+    
+    async def add_keyword(self, set_id_or_data, keyword: str = None, is_regex: bool = False) -> int:
+        """添加關鍵詞到關鍵詞集
+        
+        支持兩種調用方式:
+        1. add_keyword(set_id, keyword, is_regex) - 直接傳入參數
+        2. add_keyword(keyword_data_dict) - 傳入字典
+        """
+        await self._ensure_keyword_tables()
+        try:
+            # 處理不同的調用方式
+            if isinstance(set_id_or_data, dict):
+                # 舊方式：傳入字典
+                set_id = set_id_or_data.get('keywordSetId') or set_id_or_data.get('keyword_set_id')
+                keyword = set_id_or_data.get('keyword') or set_id_or_data.get('text')
+                is_regex = set_id_or_data.get('isRegex', False)
+            else:
+                # 新方式：直接傳入參數
+                set_id = set_id_or_data
+            
+            match_type = 'regex' if is_regex else 'contains'
+            
+            return await self.execute_insert(
+                'INSERT INTO keywords (keyword_set_id, keyword, match_type) VALUES (?, ?, ?)',
+                (set_id, keyword, match_type)
+            )
+        except Exception as e:
+            import sys
+            print(f"Error adding keyword: {e}", file=sys.stderr)
+            raise e
+    
+    async def get_keywords_by_set(self, set_id: int) -> List[Dict]:
+        """獲取關鍵詞集中的所有關鍵詞"""
+        await self._ensure_keyword_tables()
+        try:
+            rows = await self.fetch_all(
+                'SELECT * FROM keywords WHERE keyword_set_id = ? ORDER BY id',
+                (set_id,)
+            )
+            return [dict(row) if hasattr(row, 'keys') else row for row in rows]
+        except Exception as e:
+            print(f"Error getting keywords: {e}")
+            return []
+    
+    async def remove_keyword(self, keyword_id: int) -> bool:
+        """刪除關鍵詞"""
+        await self._ensure_keyword_tables()
+        try:
+            await self.execute('DELETE FROM keywords WHERE id = ?', (keyword_id,))
+            return True
+        except Exception as e:
+            print(f"Error removing keyword: {e}")
+            return False
+    
+    # ============ 監控群組操作 ============
+    
+    async def add_group(self, url_or_data, name: str = None, keyword_set_ids: list = None) -> int:
+        """添加或更新監控群組
+        
+        支持兩種調用方式:
+        1. add_group(url, name, keyword_set_ids) - 直接傳入參數
+        2. add_group(group_data_dict) - 傳入字典
+        """
+        await self._ensure_keyword_tables()
+        import json
+        
+        # 處理不同的調用方式
+        if isinstance(url_or_data, dict):
+            # 舊方式：傳入字典
+            url = url_or_data.get('link', url_or_data.get('url', ''))
+            name = url_or_data.get('name', url)
+            keyword_set_ids = url_or_data.get('keywordSetIds', [])
+            telegram_id = url_or_data.get('telegramId', '')
+            account_phone = url_or_data.get('accountPhone', '')
+        else:
+            # 新方式：直接傳入參數
+            url = url_or_data
+            name = name or url
+            keyword_set_ids = keyword_set_ids or []
+            telegram_id = ''
+            account_phone = ''
+        
+        try:
+            # 檢查群組是否已存在
+            existing = await self.get_group_by_url(url)
+            
+            if existing:
+                # 更新現有群組的關鍵詞集綁定
+                keyword_set_ids_json = json.dumps(keyword_set_ids) if keyword_set_ids else '[]'
+                await self.execute('''
+                    UPDATE monitored_groups 
+                    SET name = ?, keyword_set_ids = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (name, keyword_set_ids_json, existing['id']))
+                return existing['id']
+            else:
+                # 新增群組
+                keyword_set_ids_json = json.dumps(keyword_set_ids) if keyword_set_ids else '[]'
+                first_keyword_set_id = keyword_set_ids[0] if keyword_set_ids else None
+                return await self.execute_insert('''
+                    INSERT INTO monitored_groups (name, link, telegram_id, keyword_set_id, keyword_set_ids, account_phone)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    name,
+                    url,
+                    telegram_id,
+                    first_keyword_set_id,
+                    keyword_set_ids_json,
+                    account_phone
+                ))
+        except Exception as e:
+            import sys
+            print(f"Error adding/updating group: {e}", file=sys.stderr)
+            raise e
+    
+    async def get_all_groups(self) -> List[Dict]:
+        """獲取所有監控群組"""
+        await self._ensure_keyword_tables()
+        try:
+            rows = await self.fetch_all('SELECT * FROM monitored_groups ORDER BY created_at DESC')
+            groups = []
+            for row in rows:
+                group = dict(row) if hasattr(row, 'keys') else dict(row) if isinstance(row, dict) else {}
+                
+                # 確保 url 欄位存在（可能是 link 欄位）
+                if 'url' not in group and 'link' in group:
+                    group['url'] = group['link']
+                
+                # 將 keyword_set_id 轉換為 keywordSetIds 陣列格式（前端期望的格式）
+                keyword_set_id = group.get('keyword_set_id')
+                keyword_set_ids_str = group.get('keyword_set_ids', '[]')
+                
+                # 嘗試解析 keyword_set_ids JSON 字符串
+                keywordSetIds = []
+                if keyword_set_ids_str and keyword_set_ids_str != '[]':
+                    try:
+                        import json
+                        parsed = json.loads(keyword_set_ids_str)
+                        if isinstance(parsed, list):
+                            keywordSetIds = parsed
+                    except:
+                        pass
+                
+                # 如果有單個 keyword_set_id 且不在列表中，添加進去
+                if keyword_set_id and keyword_set_id not in keywordSetIds:
+                    keywordSetIds.append(keyword_set_id)
+                
+                group['keywordSetIds'] = keywordSetIds
+                # 確保 memberCount 欄位存在（前端期望的格式）
+                group['memberCount'] = group.get('member_count', 0) or 0
+                groups.append(group)
+            
+            return groups
+        except Exception as e:
+            import sys
+            print(f"[Database] Error getting groups: {e}", file=sys.stderr)
+            return []
+    
+    async def remove_group(self, group_id: int) -> bool:
+        """刪除監控群組"""
+        await self._ensure_keyword_tables()
+        try:
+            await self.execute('DELETE FROM monitored_groups WHERE id = ?', (group_id,))
+            return True
+        except Exception as e:
+            print(f"Error removing group: {e}")
+            return False
+    
+    async def get_all_monitored_groups(self) -> List[Dict]:
+        """獲取所有監控群組（get_all_groups 的別名）"""
+        return await self.get_all_groups()
+    
+    async def update_group_member_count(self, url: str, member_count: int) -> bool:
+        """更新群組成員數"""
+        try:
+            await self.execute('''
+                UPDATE monitored_groups 
+                SET member_count = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE link = ? OR link LIKE ?
+            ''', (member_count, url, f'%{url.split("/")[-1]}%'))
+            return True
+        except Exception as e:
+            import sys
+            print(f"[Database] Error updating group member count: {e}", file=sys.stderr)
+            return False
+    
+    async def get_group_by_url(self, url: str) -> Optional[Dict]:
+        """根據 URL 獲取群組"""
+        try:
+            # 提取群組標識符
+            import re
+            match = re.search(r'(?:t\.me|telegram\.me)/(?:joinchat/)?([^/\s]+)', url)
+            identifier = match.group(1) if match else url
+            
+            row = await self.fetch_one('''
+                SELECT * FROM monitored_groups 
+                WHERE link = ? OR link LIKE ? OR link LIKE ?
+            ''', (url, f'%/{identifier}', f'%/{identifier}%'))
+            
+            if row:
+                return dict(row) if hasattr(row, 'keys') else row
+            return None
+        except Exception as e:
+            import sys
+            print(f"[Database] Error getting group by URL: {e}", file=sys.stderr)
+            return None
+    
+    # ============ 消息模板操作 ============
+    
+    async def add_template(self, template_data: Dict) -> int:
+        """添加消息模板"""
+        await self._ensure_keyword_tables()
+        try:
+            return await self.execute_insert('''
+                INSERT INTO message_templates (name, content, category)
+                VALUES (?, ?, ?)
+            ''', (
+                template_data.get('name', ''),
+                template_data.get('content', ''),
+                template_data.get('category', 'general')
+            ))
+        except Exception as e:
+            print(f"Error adding template: {e}")
+            raise e
+    
+    async def get_all_templates(self) -> List[Dict]:
+        """獲取所有消息模板"""
+        await self._ensure_keyword_tables()
+        try:
+            rows = await self.fetch_all('SELECT * FROM message_templates ORDER BY created_at DESC')
+            return [dict(row) if hasattr(row, 'keys') else row for row in rows]
+        except Exception as e:
+            print(f"Error getting templates: {e}")
+            return []
+    
+    async def remove_template(self, template_id: int) -> bool:
+        """刪除消息模板"""
+        await self._ensure_keyword_tables()
+        try:
+            await self.execute('DELETE FROM message_templates WHERE id = ?', (template_id,))
+            return True
+        except Exception as e:
+            print(f"Error removing template: {e}")
+            return False
+    
+    async def toggle_template_status(self, template_id: int, is_active: bool) -> bool:
+        """切換模板狀態"""
+        await self._ensure_keyword_tables()
+        try:
+            await self.execute(
+                'UPDATE message_templates SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                (1 if is_active else 0, template_id)
+            )
+            return True
+        except Exception as e:
+            print(f"Error toggling template status: {e}")
+            return False
+    
+    # ============ 營銷活動操作 ============
+    
+    async def get_all_campaigns(self) -> List[Dict]:
+        """獲取所有營銷活動"""
+        try:
+            return await self.fetch_all('SELECT * FROM marketing_campaigns ORDER BY created_at DESC')
+        except Exception as e:
+            print(f"Error getting campaigns: {e}")
+            return []
+    
+    async def remove_campaign(self, campaign_id: int) -> bool:
+        """刪除營銷活動"""
+        try:
+            await self.execute('DELETE FROM marketing_campaigns WHERE id = ?', (campaign_id,))
+            return True
+        except Exception as e:
+            print(f"Error removing campaign: {e}")
+            return False
+    
+    async def get_all_leads(self, limit: int = 50) -> List[Dict]:
+        """獲取潛在客戶（優化：初始載入減少數量）"""
+        try:
+            return await self.fetch_all(f'SELECT * FROM extracted_members ORDER BY created_at DESC LIMIT {limit}')
+        except Exception as e:
+            print(f"Error getting leads: {e}")
+            return []
+    
+    async def get_leads_paginated(self, limit: int = 50, offset: int = 0) -> List[Dict]:
+        """分頁獲取潛在客戶"""
+        try:
+            return await self.fetch_all(
+                'SELECT * FROM extracted_members ORDER BY created_at DESC LIMIT ? OFFSET ?',
+                (limit, offset)
+            )
+        except Exception as e:
+            print(f"Error getting leads paginated: {e}")
+            return []
+
+    async def get_user_profile(self, user_id: str) -> Optional[Dict]:
+        """根據 user_id 獲取用戶資料"""
+        try:
+            result = await self.fetch_one(
+                'SELECT * FROM user_profiles WHERE user_id = ?',
+                (user_id,)
+            )
+            return result
+        except Exception as e:
+            # 表可能不存在，忽略錯誤
+            return None
+
+    async def get_monitoring_config(self) -> Dict:
+        """獲取監控配置"""
+        try:
+            is_active = self.get_setting('monitoring_active', '0')
+            return {
+                'isActive': is_active == '1' or is_active == 'true'
+            }
+        except Exception as e:
+            print(f"Error getting monitoring config: {e}")
+            return {'isActive': False}
+    
+    async def set_monitoring_active(self, is_active: bool) -> bool:
+        """設置監控狀態"""
+        try:
+            self.set_setting('monitoring_active', '1' if is_active else '0')
+            return True
+        except Exception as e:
+            print(f"Error setting monitoring active: {e}")
+            return False
+    
+    # ============ 消息隊列統計 ============
+    
+    async def get_message_sending_stats(self, days: int = 7, phone: str = None) -> List[Dict]:
+        """獲取消息發送統計"""
+        try:
+            since = (datetime.now() - timedelta(days=days)).isoformat()
+            
+            if phone:
+                query = '''
+                    SELECT 
+                        DATE(created_at) as date,
+                        phone,
+                        COUNT(*) as total,
+                        SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as sent,
+                        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+                        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
+                    FROM message_queue
+                    WHERE created_at >= ? AND phone = ?
+                    GROUP BY DATE(created_at), phone
+                    ORDER BY date DESC
+                '''
+                params = (since, phone)
+            else:
+                query = '''
+                    SELECT 
+                        DATE(created_at) as date,
+                        COUNT(*) as total,
+                        SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as sent,
+                        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+                        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
+                    FROM message_queue
+                    WHERE created_at >= ?
+                    GROUP BY DATE(created_at)
+                    ORDER BY date DESC
+                '''
+                params = (since,)
+            
+            return await self.fetch_all(query, params)
+        except Exception as e:
+            print(f"Error getting message sending stats: {e}")
+            return []
+
+    # ==================== 自定義搜索渠道 ====================
+    
+    async def get_custom_search_channels(self, enabled_only: bool = False) -> List[Dict]:
+        """獲取自定義搜索渠道列表"""
+        try:
+            if enabled_only:
+                query = "SELECT * FROM custom_search_channels WHERE enabled = 1 ORDER BY priority, created_at"
+            else:
+                query = "SELECT * FROM custom_search_channels ORDER BY priority, created_at"
+            return await self.fetch_all(query)
+        except Exception as e:
+            print(f"Error getting custom search channels: {e}")
+            return []
+    
+    async def add_custom_search_channel(
+        self,
+        bot_username: str,
+        display_name: str = None,
+        query_format: str = "{keyword}",
+        priority: str = "backup",
+        notes: str = None
+    ) -> Optional[int]:
+        """添加自定義搜索渠道"""
+        try:
+            # 移除 @ 前綴
+            bot_username = bot_username.lstrip('@')
+            
+            query = """
+                INSERT INTO custom_search_channels 
+                (bot_username, display_name, query_format, priority, notes)
+                VALUES (?, ?, ?, ?, ?)
+            """
+            return await self.execute(query, (
+                bot_username,
+                display_name or bot_username,
+                query_format,
+                priority,
+                notes
+            ))
+        except Exception as e:
+            print(f"Error adding custom search channel: {e}")
+            return None
+    
+    async def update_custom_search_channel(
+        self,
+        channel_id: int,
+        **kwargs
+    ) -> bool:
+        """更新自定義搜索渠道"""
+        try:
+            allowed_fields = ['display_name', 'query_format', 'priority', 'enabled', 'notes', 'status']
+            updates = []
+            params = []
+            
+            for field, value in kwargs.items():
+                if field in allowed_fields:
+                    updates.append(f"{field} = ?")
+                    params.append(value)
+            
+            if not updates:
+                return False
+            
+            updates.append("updated_at = CURRENT_TIMESTAMP")
+            params.append(channel_id)
+            
+            query = f"UPDATE custom_search_channels SET {', '.join(updates)} WHERE id = ?"
+            await self.execute(query, tuple(params))
+            return True
+        except Exception as e:
+            print(f"Error updating custom search channel: {e}")
+            return False
+    
+    async def delete_custom_search_channel(self, channel_id: int) -> bool:
+        """刪除自定義搜索渠道"""
+        try:
+            query = "DELETE FROM custom_search_channels WHERE id = ?"
+            await self.execute(query, (channel_id,))
+            return True
+        except Exception as e:
+            print(f"Error deleting custom search channel: {e}")
+            return False
+    
+    async def update_channel_test_result(
+        self,
+        bot_username: str,
+        success: bool,
+        response_time: float = 0
+    ) -> bool:
+        """更新渠道測試結果"""
+        try:
+            bot_username = bot_username.lstrip('@')
+            
+            if success:
+                query = """
+                    UPDATE custom_search_channels SET
+                        status = 'online',
+                        success_count = success_count + 1,
+                        last_test_at = CURRENT_TIMESTAMP,
+                        last_success_at = CURRENT_TIMESTAMP,
+                        avg_response_time = (avg_response_time * success_count + ?) / (success_count + 1),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE bot_username = ?
+                """
+                await self.execute(query, (response_time, bot_username))
+            else:
+                query = """
+                    UPDATE custom_search_channels SET
+                        status = 'offline',
+                        fail_count = fail_count + 1,
+                        last_test_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE bot_username = ?
+                """
+                await self.execute(query, (bot_username,))
+            return True
+        except Exception as e:
+            print(f"Error updating channel test result: {e}")
+            return False
 
 
 # 創建全局實例

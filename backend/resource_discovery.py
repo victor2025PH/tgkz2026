@@ -88,14 +88,15 @@ class ResourceDiscoverySystem:
         self.event_callback = None
         self._search_lock = asyncio.Lock()
         
-        # 評分權重配置
+        # 評分權重配置（優化版 v2.0）
         self.score_weights = {
-            'member_count': 0.3,      # 成員數權重
-            'activity': 0.3,           # 活躍度權重
-            'relevance': 0.25,         # 相關度權重
-            'recency': 0.15            # 最近活躍度權重
+            'member_count': 0.25,      # 成員數權重
+            'activity': 0.20,          # 活躍度權重
+            'relevance': 0.20,         # 相關度權重
+            'accessibility': 0.20,     # 可達性權重（有 username/link）
+            'data_quality': 0.15       # 數據質量權重
         }
-        
+
         # 成員數評分區間
         self.member_score_ranges = [
             (100000, 1.0),    # 10萬+ 滿分
@@ -285,9 +286,12 @@ class ResourceDiscoverySystem:
     async def list_resources(self, status: str = None, resource_type: str = None,
                             limit: int = 50, offset: int = 0,
                             order_by: str = "overall_score DESC") -> List[Dict]:
-        """列出資源"""
+        """列出資源（只返回有公開鏈接的資源）"""
         conditions = []
         params = []
+        
+        # 只返回有公開鏈接的資源（username 或 invite_link 不為空）
+        conditions.append("(username IS NOT NULL AND username != '' OR invite_link IS NOT NULL AND invite_link != '')")
         
         if status:
             conditions.append("status = ?")
@@ -311,9 +315,12 @@ class ResourceDiscoverySystem:
         return [self._row_to_dict(r) for r in results]
     
     async def count_resources(self, status: str = None, resource_type: str = None) -> int:
-        """統計資源數量"""
+        """統計資源數量（只統計有公開鏈接的資源）"""
         conditions = []
         params = []
+        
+        # 只統計有公開鏈接的資源
+        conditions.append("(username IS NOT NULL AND username != '' OR invite_link IS NOT NULL AND invite_link != '')")
         
         if status:
             conditions.append("status = ?")
@@ -334,22 +341,81 @@ class ResourceDiscoverySystem:
         await db.execute("DELETE FROM discovered_resources WHERE id = ?", (resource_id,))
         self.log(f"🗑️ 刪除資源: ID={resource_id}")
     
+    async def clear_all_resources(self) -> int:
+        """清空所有搜索結果資源"""
+        # 獲取當前數量
+        result = await db.fetch_one("SELECT COUNT(*) as count FROM discovered_resources")
+        count = result['count'] if result else 0
+        
+        # 刪除所有資源
+        await db.execute("DELETE FROM discovered_resources")
+        self.log(f"🗑️ 已清空所有資源，共 {count} 條")
+        return count
+    
     # ==================== 評分系統 ====================
     
     def _calculate_overall_score(self, resource: DiscoveredResource) -> float:
-        """計算綜合評分"""
-        # 成員數評分
+        """
+        計算綜合評分 v2.0
+        
+        評分維度：
+        1. 成員數 (25%) - 群組規模
+        2. 活躍度 (20%) - 日消息數/在線率
+        3. 相關度 (20%) - 關鍵詞匹配度
+        4. 可達性 (20%) - 是否有公開鏈接
+        5. 數據質量 (15%) - 信息完整度
+        """
+        # 1. 成員數評分
         member_score = 0.2
         for threshold, score in self.member_score_ranges:
             if resource.member_count >= threshold:
                 member_score = score
                 break
         
+        # 2. 活躍度評分（如果有真實數據則用，否則根據成員數估算）
+        activity_score = resource.activity_score
+        if activity_score == 0.5:  # 默認值，需要估算
+            # 根據成員數粗略估算活躍度（大群組通常更活躍）
+            if resource.member_count >= 50000:
+                activity_score = 0.75
+            elif resource.member_count >= 10000:
+                activity_score = 0.65
+            elif resource.member_count >= 1000:
+                activity_score = 0.55
+            else:
+                activity_score = 0.45
+        
+        # 3. 相關度評分
+        relevance_score = resource.relevance_score
+        
+        # 4. 可達性評分（有 username 或 invite_link）
+        accessibility_score = 0.3  # 基礎分
+        if resource.username:
+            accessibility_score = 1.0  # 有公開 username
+        elif hasattr(resource, 'invite_link') and resource.invite_link:
+            accessibility_score = 0.9  # 有邀請鏈接
+        elif resource.telegram_id:
+            accessibility_score = 0.5  # 只有 ID
+        
+        # 5. 數據質量評分（信息完整度）
+        data_quality_score = 0.3  # 基礎分
+        if resource.title and len(resource.title) > 3:
+            data_quality_score += 0.2
+        if resource.description and len(resource.description) > 10:
+            data_quality_score += 0.2
+        if resource.username:
+            data_quality_score += 0.15
+        if resource.member_count > 0:
+            data_quality_score += 0.15
+        data_quality_score = min(1.0, data_quality_score)
+        
         # 計算加權總分
         overall = (
             member_score * self.score_weights['member_count'] +
-            resource.activity_score * self.score_weights['activity'] +
-            resource.relevance_score * self.score_weights['relevance']
+            activity_score * self.score_weights['activity'] +
+            relevance_score * self.score_weights['relevance'] +
+            accessibility_score * self.score_weights['accessibility'] +
+            data_quality_score * self.score_weights['data_quality']
         )
         
         return round(min(1.0, max(0.0, overall)), 3)
@@ -372,7 +438,7 @@ class ResourceDiscoverySystem:
         return min(1.0, score)
     
     async def recalculate_scores(self, resource_id: int = None):
-        """重新計算評分"""
+        """重新計算評分（使用完整資源信息）"""
         if resource_id:
             resources = [await self.get_resource_by_id(resource_id)]
         else:
@@ -382,10 +448,16 @@ class ResourceDiscoverySystem:
             if not res:
                 continue
             
+            # 使用完整資源信息計算評分
             resource = DiscoveredResource(
-                member_count=res['member_count'],
-                activity_score=res['activity_score'],
-                relevance_score=res['relevance_score']
+                member_count=res.get('member_count', 0),
+                activity_score=res.get('activity_score', 0.5),
+                relevance_score=res.get('relevance_score', 0.5),
+                username=res.get('username', ''),
+                title=res.get('title', ''),
+                description=res.get('description', ''),
+                telegram_id=res.get('telegram_id', ''),
+                invite_link=res.get('invite_link', '')
             )
             new_score = self._calculate_overall_score(resource)
             

@@ -24,6 +24,8 @@ import { GroupConfigDrawerComponent, GroupDetailData, AvailableKeywordSetForGrou
 import { KeywordSetDrawerComponent, KeywordSetDetailData, KeywordItemData } from './components/keyword-set-drawer.component';
 import { SetupWizardComponent } from './components/setup-wizard.component';
 import { RealtimeStatsComponent, RealtimeStats } from './components/realtime-stats.component';
+import { DraggableKeywordChipComponent, DroppableGroupCardComponent, DragDropHintComponent } from './components/drag-drop-binding.component';
+import { RealtimeMatchesComponent, MatchedMessage } from './components/realtime-matches.component';
 
 // Tab 類型
 type AutomationTab = 'monitor' | 'resources' | 'rules' | 'settings';
@@ -69,7 +71,11 @@ interface DrawerState {
     GroupConfigDrawerComponent,
     KeywordSetDrawerComponent,
     SetupWizardComponent,
-    RealtimeStatsComponent
+    RealtimeStatsComponent,
+    DraggableKeywordChipComponent,
+    DroppableGroupCardComponent,
+    DragDropHintComponent,
+    RealtimeMatchesComponent
   ],
   template: `
     <div class="automation-center h-full flex flex-col bg-slate-900">
@@ -259,10 +265,16 @@ interface DrawerState {
           @case ('monitor') {
             <!-- 監控配置 -->
             <div class="h-full overflow-y-auto p-4">
-              <!-- 實時數據儀表盤 (監控中時顯示) -->
+              <!-- 實時數據儀表盤和匹配消息 (監控中時顯示) -->
               @if (isMonitoring()) {
-                <div class="mb-6">
+                <div class="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <app-realtime-stats [stats]="realtimeStats()"></app-realtime-stats>
+                  <app-realtime-matches
+                    [isMonitoring]="isMonitoring()"
+                    [messages]="matchedMessages()"
+                    (quickReply)="onQuickReplyMatch($event)"
+                    (addToLeads)="onAddMatchToLeads($event)">
+                  </app-realtime-matches>
                 </div>
               }
               
@@ -355,11 +367,16 @@ interface DrawerState {
                 </div>
                 
                 <!-- 監控群組 -->
-                <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+                <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden"
+                     [class.ring-2]="isDraggingKeywordSet()"
+                     [class.ring-cyan-500/50]="isDraggingKeywordSet()">
                   <div class="p-4 border-b border-slate-700/50 flex items-center justify-between">
                     <h3 class="font-semibold text-white flex items-center gap-2">
                       <span>👥</span> 監控群組
                       <span class="text-xs text-slate-500">({{ monitorGroups().length }})</span>
+                      @if (isDraggingKeywordSet()) {
+                        <span class="text-xs text-cyan-400 animate-pulse">← 拖到這裡綁定</span>
+                      }
                     </h3>
                     <button (click)="addGroupClick.emit()"
                             class="text-sm text-cyan-400 hover:text-cyan-300">
@@ -368,62 +385,24 @@ interface DrawerState {
                   </div>
                   <div class="p-4 space-y-3 max-h-80 overflow-y-auto">
                     @for (group of monitorGroups(); track group.id) {
-                      <div (click)="openGroupDrawer(group)"
-                           class="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg 
-                                  hover:bg-slate-700 transition-colors cursor-pointer group border border-transparent
-                                  hover:border-cyan-500/30">
-                        <div class="flex items-center gap-3">
-                          <div class="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400">
-                            👥
-                          </div>
-                          <div>
-                            <div class="text-sm font-medium text-white flex items-center gap-2">
-                              {{ group.name }}
-                              @if (group.activityLevel === 'high') {
-                                <span class="text-xs text-red-400">🔥</span>
-                              }
-                            </div>
-                            <div class="flex items-center gap-2 text-xs text-slate-400">
-                              <span>{{ group.memberCount }} 成員</span>
-                              @if (group.stats) {
-                                <span>· 今日 {{ group.stats.matchesToday }} 匹配</span>
-                              }
-                            </div>
-                          </div>
-                        </div>
-                        <div class="flex items-center gap-3">
-                          @if (group.linkedKeywordSets.length > 0) {
-                            <span class="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs rounded">
-                              {{ group.linkedKeywordSets.length }} 詞集
-                            </span>
-                          }
-                          <label class="relative inline-flex cursor-pointer" (click)="$event.stopPropagation()">
-                            <input type="checkbox" 
-                                   [checked]="group.isMonitoring"
-                                   (change)="toggleGroupMonitoring(group)"
-                                   class="sr-only">
-                            <div class="w-9 h-5 rounded-full transition-all"
-                                 [class.bg-emerald-500]="group.isMonitoring"
-                                 [class.bg-slate-600]="!group.isMonitoring">
-                              <div class="absolute w-4 h-4 bg-white rounded-full top-0.5 transition-all"
-                                   [class.left-4]="group.isMonitoring"
-                                   [class.left-0.5]="!group.isMonitoring">
-                              </div>
-                            </div>
-                          </label>
-                          <svg class="w-4 h-4 text-slate-500 group-hover:text-cyan-400 transition-colors" 
-                               fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                          </svg>
-                        </div>
-                      </div>
-                    } @empty {
-                      <div class="text-center py-8 text-slate-400">
-                        <div class="text-4xl mb-2">👥</div>
-                        <p>暫無監控群組</p>
-                        <button (click)="addGroupClick.emit()"
-                                class="mt-3 px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-colors">
-                          + 添加群組
+                      <!-- 使用可放置的群組卡片 -->
+                      <app-droppable-group-card
+                        [id]="group.id"
+                        [name]="group.name"
+                        [memberCount]="group.memberCount"
+                        [linkedSets]="getLinkedSetNames(group)"
+                        [linkedSetCount]="group.linkedKeywordSets.length"
+                        (keywordSetDropped)="onKeywordSetDropped($event)"
+                        (click)="openGroupDrawer(group)">
+                      </app-droppable-group-card>
+                    }
+                    @empty {
+                      <div class="text-center py-8 text-slate-500">
+                        <div class="text-3xl mb-2">👥</div>
+                        <p>還沒有監控群組</p>
+                        <button (click)="addGroupClick.emit()" 
+                                class="mt-2 text-cyan-400 hover:text-cyan-300 text-sm">
+                          + 添加第一個群組
                         </button>
                       </div>
                     }
@@ -447,6 +426,28 @@ interface DrawerState {
                       + 新建詞集
                     </button>
                   </div>
+                  
+                  <!-- 可拖拽的詞集芯片區 -->
+                  @if (keywordSets().length > 0) {
+                    <div class="px-4 pt-3 pb-2 border-b border-slate-700/30">
+                      <div class="flex items-center gap-2 mb-2">
+                        <span class="text-xs text-slate-500">🎯 拖拽綁定：</span>
+                        <app-drag-drop-hint [isActive]="isDraggingKeywordSet()"></app-drag-drop-hint>
+                      </div>
+                      <div class="flex flex-wrap gap-2">
+                        @for (set of keywordSets(); track set.id) {
+                          <app-draggable-keyword-chip
+                            [id]="set.id"
+                            [name]="set.name"
+                            [keywordCount]="set.keywords.length"
+                            (dragStart)="onKeywordSetDragStart($event)"
+                            (dragEnd)="onKeywordSetDragEnd()">
+                          </app-draggable-keyword-chip>
+                        }
+                      </div>
+                    </div>
+                  }
+                  
                   <div class="p-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                       @for (set of keywordSets(); track set.id) {
@@ -1012,6 +1013,100 @@ export class AutomationCenterComponent implements OnInit {
         }
         break;
     }
+  }
+  
+  // === 實時匹配消息 ===
+  matchedMessages = signal<MatchedMessage[]>([]);
+  
+  // 模擬接收匹配消息 (實際應該從 IPC 接收)
+  addMatchedMessage(msg: MatchedMessage) {
+    const current = this.matchedMessages();
+    this.matchedMessages.set([{ ...msg, isNew: true }, ...current.slice(0, 49)]);
+    // 3秒後移除 isNew 標記
+    setTimeout(() => {
+      const updated = this.matchedMessages().map(m => 
+        m.id === msg.id ? { ...m, isNew: false } : m
+      );
+      this.matchedMessages.set(updated);
+    }, 3000);
+  }
+  
+  onQuickReplyMatch(msg: MatchedMessage) {
+    // 觸發快速回覆
+    window.dispatchEvent(new CustomEvent('open-quick-reply', {
+      detail: { userId: msg.senderId, userName: msg.senderName, message: msg.text }
+    }));
+  }
+  
+  onAddMatchToLeads(msg: MatchedMessage) {
+    // 添加到線索
+    window.dispatchEvent(new CustomEvent('add-lead', {
+      detail: { 
+        userId: msg.senderId, 
+        userName: msg.senderName, 
+        source: msg.groupName,
+        matchedKeyword: msg.matchedKeyword
+      }
+    }));
+    window.dispatchEvent(new CustomEvent('show-toast', {
+      detail: { message: `已將 ${msg.senderName} 添加到線索庫`, type: 'success' }
+    }));
+  }
+  
+  // === 拖拽綁定功能 ===
+  isDraggingKeywordSet = signal(false);
+  draggingSetName = signal('');
+  
+  onKeywordSetDragStart(event: { id: string; name: string }) {
+    this.isDraggingKeywordSet.set(true);
+    this.draggingSetName.set(event.name);
+  }
+  
+  onKeywordSetDragEnd() {
+    this.isDraggingKeywordSet.set(false);
+    this.draggingSetName.set('');
+  }
+  
+  onKeywordSetDropped(event: { groupId: string; keywordSetId: string; keywordSetName: string }) {
+    // 找到群組並添加詞集綁定
+    const group = this.monitorGroups().find(g => g.id === event.groupId);
+    if (group) {
+      const currentLinkedSets = [...group.linkedKeywordSets];
+      if (!currentLinkedSets.includes(event.keywordSetId)) {
+        currentLinkedSets.push(event.keywordSetId);
+        
+        // 更新本地狀態
+        const updatedGroups = this.monitorGroups().map(g => 
+          g.id === event.groupId 
+            ? { ...g, linkedKeywordSets: currentLinkedSets }
+            : g
+        );
+        this.monitorGroups.set(updatedGroups);
+        
+        // 發送到後端保存
+        this.saveGroupConfig.emit({
+          groupId: parseInt(event.groupId),
+          keywordSetIds: currentLinkedSets.map(id => parseInt(id))
+        });
+        
+        // 顯示成功提示 (通過 DOM 事件)
+        window.dispatchEvent(new CustomEvent('show-toast', {
+          detail: { message: `已將「${event.keywordSetName}」綁定到「${group.name}」`, type: 'success' }
+        }));
+      } else {
+        // 已經綁定
+        window.dispatchEvent(new CustomEvent('show-toast', {
+          detail: { message: `「${event.keywordSetName}」已經綁定到該群組`, type: 'warning' }
+        }));
+      }
+    }
+  }
+  
+  // 獲取群組已綁定的詞集名稱
+  getLinkedSetNames(group: any): string[] {
+    return group.linkedKeywordSets
+      .map((id: string) => this.keywordSets().find(s => s.id === id)?.name)
+      .filter((name: string | undefined): name is string => !!name);
   }
   
   onSendMessage(resource: Resource) {

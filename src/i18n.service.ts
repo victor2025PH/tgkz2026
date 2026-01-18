@@ -903,6 +903,23 @@ export class I18nService {
         messageSent: '訊息發送成功！',
         messageQueued: '訊息已加入發送佇列',
         
+        // 消息隊列面板
+        messageQueue: '消息發送隊列',
+        triggerActionLog: '觸發動作日誌',
+        pendingMessages: '待發送',
+        processingMessages: '發送中',
+        sentMessages: '已發送',
+        failedMessages: '失敗',
+        queuePaused: '已暫停',
+        resumeQueue: '恢復',
+        pauseQueue: '暫停',
+        clearQueue: '清空',
+        viewMessages: '查看消息',
+        retryMessage: '重試',
+        successRate: '成功率',
+        avgSendTime: '平均耗時',
+        noQueueData: '暫無發送隊列',
+        
         // 儀表板
         totalAccounts: '總帳號數',
         onlineAccounts: '線上帳號',

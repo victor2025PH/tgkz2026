@@ -32,13 +32,15 @@ class RotationStrategy(Enum):
 
 
 class AccountRotator:
-    """帳號輪換器 - 自動選擇最適合的發送帳號"""
+    """帳號輪換器 - 自動選擇最適合的發送帳號 (增強版)"""
     
     def __init__(self, database):
         self.database = database
-        self.strategy = RotationStrategy.LOAD_BALANCE
+        self.strategy = RotationStrategy.HEALTH_FIRST  # 默認健康優先
         self._current_index = 0
         self._account_stats: Dict[str, Dict[str, Any]] = {}
+        self._cooldown_accounts: Dict[str, float] = {}  # 帳號冷卻時間
+        self._flood_wait_accounts: Dict[str, float] = {}  # FloodWait 帳號
     
     async def get_sender_accounts(self) -> List[Dict[str, Any]]:
         """獲取所有可用的發送帳號"""
@@ -48,8 +50,76 @@ class AccountRotator:
             if a.get('role') == 'Sender' and a.get('status') == 'Online'
         ]
     
+    def is_account_available(self, phone: str) -> bool:
+        """檢查帳號是否可用（非冷卻/FloodWait 狀態）"""
+        import time
+        now = time.time()
+        
+        # 檢查冷卻
+        if phone in self._cooldown_accounts:
+            if now < self._cooldown_accounts[phone]:
+                return False
+            else:
+                del self._cooldown_accounts[phone]
+        
+        # 檢查 FloodWait
+        if phone in self._flood_wait_accounts:
+            if now < self._flood_wait_accounts[phone]:
+                return False
+            else:
+                del self._flood_wait_accounts[phone]
+        
+        return True
+    
+    def set_cooldown(self, phone: str, seconds: int = 60):
+        """設置帳號冷卻時間"""
+        import time
+        self._cooldown_accounts[phone] = time.time() + seconds
+        print(f"[AccountRotator] 帳號 {phone} 進入冷卻，{seconds}秒後可用", file=sys.stderr)
+    
+    def set_flood_wait(self, phone: str, seconds: int):
+        """設置 FloodWait 等待時間"""
+        import time
+        self._flood_wait_accounts[phone] = time.time() + seconds
+        print(f"[AccountRotator] 帳號 {phone} FloodWait，{seconds}秒後可用", file=sys.stderr)
+    
+    def calculate_health_score(self, account: Dict[str, Any]) -> float:
+        """計算帳號健康分數 (0-100)"""
+        score = 100.0
+        phone = account.get('phone')
+        stats = self._account_stats.get(phone, {})
+        
+        # 1. 基礎健康分（從數據庫）
+        db_health = account.get('health_score', 85)
+        score = min(score, db_health)
+        
+        # 2. 今日發送比例扣分
+        daily_limit = account.get('daily_send_limit', 50)
+        daily_count = account.get('daily_send_count', 0)
+        usage_ratio = daily_count / max(daily_limit, 1)
+        if usage_ratio > 0.8:
+            score -= 20  # 接近限制扣20分
+        elif usage_ratio > 0.5:
+            score -= 10  # 超過一半扣10分
+        
+        # 3. 失敗率扣分
+        sent_today = stats.get('sent_today', 0)
+        failed_today = stats.get('failed_today', 0)
+        if sent_today > 0:
+            fail_rate = failed_today / sent_today
+            if fail_rate > 0.3:
+                score -= 30  # 失敗率超過30%扣30分
+            elif fail_rate > 0.1:
+                score -= 15  # 失敗率超過10%扣15分
+        
+        # 4. 冷卻中扣分
+        if not self.is_account_available(phone):
+            score -= 50  # 冷卻中大幅扣分
+        
+        return max(0, min(100, score))
+    
     async def select_account(self, exclude_phones: List[str] = None) -> Optional[Dict[str, Any]]:
-        """根據策略選擇一個發送帳號
+        """根據策略選擇一個發送帳號 (增強版)
         
         Args:
             exclude_phones: 要排除的帳號電話號碼列表
@@ -61,6 +131,7 @@ class AccountRotator:
         
         accounts = await self.get_sender_accounts()
         if not accounts:
+            print(f"[AccountRotator] 沒有在線的發送帳號", file=sys.stderr)
             return None
         
         # 排除指定帳號
@@ -69,17 +140,27 @@ class AccountRotator:
             if not accounts:
                 return None
         
-        # 過濾掉已達到每日限制的帳號
+        # 過濾掉不可用的帳號
         available_accounts = []
         for acc in accounts:
             phone = acc.get('phone')
+            
+            # 檢查可用性（冷卻/FloodWait）
+            if not self.is_account_available(phone):
+                continue
+            
+            # 檢查每日限制
             daily_limit = acc.get('daily_send_limit', 50)
             daily_count = acc.get('daily_send_count', 0)
-            if daily_count < daily_limit:
-                available_accounts.append(acc)
+            if daily_count >= daily_limit:
+                continue
+            
+            # 計算健康分數
+            acc['_calculated_health'] = self.calculate_health_score(acc)
+            available_accounts.append(acc)
         
         if not available_accounts:
-            print(f"[AccountRotator] 所有帳號都已達到每日發送限制", file=sys.stderr)
+            print(f"[AccountRotator] 所有帳號都不可用（限制/冷卻/FloodWait）", file=sys.stderr)
             return None
         
         # 根據策略選擇帳號
@@ -100,9 +181,11 @@ class AccountRotator:
             return random.choice(available_accounts)
         
         elif self.strategy == RotationStrategy.HEALTH_FIRST:
-            # 健康度優先 - 選擇健康度最高的帳號
-            available_accounts.sort(key=lambda a: a.get('health_score', 0), reverse=True)
-            return available_accounts[0]
+            # 健康度優先 - 選擇計算健康分最高的帳號
+            available_accounts.sort(key=lambda a: a.get('_calculated_health', 0), reverse=True)
+            selected = available_accounts[0]
+            print(f"[AccountRotator] 選擇帳號 {selected.get('phone')} (健康分: {selected.get('_calculated_health', 0):.1f})", file=sys.stderr)
+            return selected
         
         # 默認返回第一個
         return available_accounts[0]
@@ -112,20 +195,59 @@ class AccountRotator:
         self.strategy = strategy
         print(f"[AccountRotator] 輪換策略設置為: {strategy.value}", file=sys.stderr)
     
-    async def update_account_stats(self, phone: str, success: bool):
-        """更新帳號統計信息"""
+    async def update_account_stats(self, phone: str, success: bool, error_type: str = None):
+        """更新帳號統計信息 (增強版)"""
         if phone not in self._account_stats:
             self._account_stats[phone] = {
                 'sent_today': 0,
                 'success_today': 0,
-                'failed_today': 0
+                'failed_today': 0,
+                'consecutive_failures': 0
             }
         
         self._account_stats[phone]['sent_today'] += 1
+        
         if success:
             self._account_stats[phone]['success_today'] += 1
+            self._account_stats[phone]['consecutive_failures'] = 0
         else:
             self._account_stats[phone]['failed_today'] += 1
+            self._account_stats[phone]['consecutive_failures'] += 1
+            
+            # 連續失敗處理
+            consecutive_failures = self._account_stats[phone]['consecutive_failures']
+            if consecutive_failures >= 5:
+                # 連續5次失敗，冷卻10分鐘
+                self.set_cooldown(phone, 600)
+                self._account_stats[phone]['consecutive_failures'] = 0
+            elif consecutive_failures >= 3:
+                # 連續3次失敗，冷卻2分鐘
+                self.set_cooldown(phone, 120)
+            
+            # FloodWait 處理
+            if error_type == 'flood_wait':
+                # 從錯誤中提取等待時間，默認5分鐘
+                self.set_flood_wait(phone, 300)
+    
+    def get_account_health_report(self) -> List[Dict[str, Any]]:
+        """獲取所有帳號的健康報告"""
+        report = []
+        for phone, stats in self._account_stats.items():
+            sent = stats.get('sent_today', 0)
+            success = stats.get('success_today', 0)
+            failed = stats.get('failed_today', 0)
+            
+            report.append({
+                'phone': phone,
+                'sentToday': sent,
+                'successToday': success,
+                'failedToday': failed,
+                'successRate': (success / sent * 100) if sent > 0 else 100.0,
+                'isAvailable': self.is_account_available(phone),
+                'consecutiveFailures': stats.get('consecutive_failures', 0)
+            })
+        
+        return report
 
 
 class MessageStatus(Enum):
@@ -711,27 +833,65 @@ class MessageQueue:
                     ]
     
     async def get_queue_status(self, phone: Optional[str] = None) -> Dict[str, Any]:
-        """Get queue status for account(s)"""
+        """Get queue status for account(s) - Enhanced with message details"""
         async with self.lock:
             if phone:
                 if phone not in self.queues:
                     return {}
                 
                 queue = self.queues[phone]
+                pending = [m for m in queue if m.status == MessageStatus.PENDING]
+                processing = [m for m in queue if m.status == MessageStatus.PROCESSING]
+                retrying = [m for m in queue if m.status == MessageStatus.RETRYING]
+                failed = [m for m in queue if m.status == MessageStatus.FAILED]
+                completed = self.stats.get(phone, {}).get('completed', 0)
+                
+                # 計算成功率
+                total_processed = completed + len(failed)
+                success_rate = (completed / total_processed * 100) if total_processed > 0 else 100.0
+                
+                # 獲取消息詳情（最近20條）
+                messages = []
+                for m in queue[:20]:
+                    messages.append({
+                        "id": m.id,
+                        "userId": m.user_id,
+                        "text": m.text[:100] + "..." if len(m.text) > 100 else m.text,
+                        "status": m.status.value,
+                        "attempts": m.attempts,
+                        "createdAt": m.created_at.isoformat() if m.created_at else "",
+                        "scheduledAt": m.scheduled_at.isoformat() if m.scheduled_at else "",
+                        "error": m.last_error or ""
+                    })
+                
+                stats = self.stats.get(phone, {})
+                
                 return {
                     "phone": phone,
-                    "pending": len([m for m in queue if m.status == MessageStatus.PENDING]),
-                    "processing": len([m for m in queue if m.status == MessageStatus.PROCESSING]),
-                    "retrying": len([m for m in queue if m.status == MessageStatus.RETRYING]),
-                    "failed": len([m for m in queue if m.status == MessageStatus.FAILED]),
+                    "pending": len(pending),
+                    "processing": len(processing),
+                    "retrying": len(retrying),
+                    "failed": len(failed),
+                    "completed": completed,
                     "total": len(queue),
-                    "stats": self.stats.get(phone, {})
+                    "paused": self.paused.get(phone, False),
+                    "messages": messages,
+                    "stats": {
+                        "total": stats.get('total', 0),
+                        "completed": stats.get('completed', 0),
+                        "failed": stats.get('failed', 0),
+                        "retries": stats.get('retries', 0),
+                        "avgTime": stats.get('avg_time', 0.0),
+                        "successRate": success_rate
+                    }
                 }
             else:
-                # All accounts
-                result = {}
+                # All accounts - return as list for frontend
+                result = []
                 for p in self.queues.keys():
-                    result[p] = await self.get_queue_status(p)
+                    status = await self.get_queue_status(p)
+                    if status:
+                        result.append(status)
                 return result
     
     async def clear_queue(self, phone: str, status: Optional[MessageStatus] = None):

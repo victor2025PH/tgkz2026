@@ -1830,6 +1830,9 @@ class BackendService:
             elif command == "get-queue-status":
                 await self.handle_get_queue_status(payload)
             
+            elif command == "get-account-health-report":
+                await self.handle_get_account_health_report(payload)
+            
             elif command == "clear-queue":
                 await self.handle_clear_queue(payload)
             
@@ -7094,6 +7097,18 @@ class BackendService:
         
         except Exception as e:
             self.send_log(f"Error getting queue status: {str(e)}", "error")
+    
+    async def handle_get_account_health_report(self, payload: Dict[str, Any]):
+        """Handle get-account-health-report command - 獲取帳號健康報告"""
+        try:
+            if self.message_queue.account_rotator:
+                report = self.message_queue.account_rotator.get_account_health_report()
+                self.send_event("account-health-report", report)
+            else:
+                self.send_event("account-health-report", [])
+        
+        except Exception as e:
+            self.send_log(f"Error getting account health report: {str(e)}", "error")
     
     async def handle_clear_queue(self, payload: Dict[str, Any]):
         """Handle clear-queue command"""

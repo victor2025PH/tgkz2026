@@ -26,6 +26,8 @@ import { SetupWizardComponent } from './components/setup-wizard.component';
 import { RealtimeStatsComponent, RealtimeStats } from './components/realtime-stats.component';
 import { DraggableKeywordChipComponent, DroppableGroupCardComponent, DragDropHintComponent } from './components/drag-drop-binding.component';
 import { RealtimeMatchesComponent, MatchedMessage } from './components/realtime-matches.component';
+import { MessageQueuePanelComponent } from './components/message-queue-panel.component';
+import { TriggerActionLogComponent } from './components/trigger-action-log.component';
 
 // Tab 類型
 type AutomationTab = 'monitor' | 'resources' | 'rules' | 'settings';
@@ -75,7 +77,9 @@ interface DrawerState {
     DraggableKeywordChipComponent,
     DroppableGroupCardComponent,
     DragDropHintComponent,
-    RealtimeMatchesComponent
+    RealtimeMatchesComponent,
+    MessageQueuePanelComponent,
+    TriggerActionLogComponent
   ],
   template: `
     <div class="automation-center h-full flex flex-col bg-slate-900">
@@ -650,6 +654,12 @@ interface DrawerState {
                     </button>
                   </div>
                 </div>
+                
+                <!-- 消息發送隊列 -->
+                <app-message-queue-panel></app-message-queue-panel>
+                
+                <!-- 觸發動作日誌 -->
+                <app-trigger-action-log></app-trigger-action-log>
               </div>
             </div>
           }

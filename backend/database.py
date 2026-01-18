@@ -3050,6 +3050,50 @@ class Database:
             import sys
             print(f"Error adding interaction: {e}", file=sys.stderr)
             return False
+    
+    async def update_lead(self, lead_id: int, updates: Dict) -> bool:
+        """更新 Lead 信息
+        
+        Args:
+            lead_id: Lead ID
+            updates: 要更新的字段字典
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            # 構建 UPDATE 語句
+            fields = []
+            values = []
+            
+            # 映射前端字段名到數據庫字段名
+            field_mapping = {
+                'status': 'response_status',
+                'contacted': 'contacted',
+                'notes': 'notes',
+                'tags': 'tags',
+                'value_level': 'value_level'
+            }
+            
+            for key, value in updates.items():
+                db_field = field_mapping.get(key, key)
+                fields.append(f"{db_field} = ?")
+                values.append(value)
+            
+            if not fields:
+                return True  # 沒有需要更新的字段
+            
+            # 添加更新時間
+            fields.append("updated_at = CURRENT_TIMESTAMP")
+            values.append(lead_id)
+            
+            query = f"UPDATE extracted_members SET {', '.join(fields)} WHERE id = ?"
+            await self.execute(query, tuple(values))
+            return True
+        except Exception as e:
+            import sys
+            print(f"Error updating lead: {e}", file=sys.stderr)
+            return False
 
     async def get_user_profile(self, user_id: str) -> Optional[Dict]:
         """根據 user_id 獲取用戶資料"""

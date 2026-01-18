@@ -81,7 +81,7 @@ export class DraggableKeywordChipComponent {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="droppable-card relative p-4 rounded-xl transition-all duration-200 border-2"
+    <div class="droppable-card relative p-4 rounded-xl transition-all duration-200 border-2 cursor-pointer hover:bg-slate-700/70"
          [class.bg-slate-700/50]="!isDragOver()"
          [class.border-transparent]="!isDragOver()"
          [class.bg-emerald-500/10]="isDragOver()"
@@ -102,39 +102,66 @@ export class DraggableKeywordChipComponent {
       }
       
       <!-- 群組內容 -->
-      <div class="flex items-center gap-3" [class.opacity-50]="isDragOver()">
-        <div class="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400 text-xl shrink-0">
-          👥
+      <div class="flex items-start gap-3" [class.opacity-50]="isDragOver()">
+        <!-- 群組頭像 -->
+        <div class="w-12 h-12 rounded-xl overflow-hidden shrink-0"
+             [style.background]="'linear-gradient(135deg, ' + getGradientColor() + ')'">
+          @if (avatar()) {
+            <img [src]="avatar()" alt="群組頭像" class="w-full h-full object-cover">
+          } @else {
+            <div class="w-full h-full flex items-center justify-center text-white text-xl">
+              {{ getInitial() }}
+            </div>
+          }
         </div>
+        
         <div class="flex-1 min-w-0">
-          <div class="font-medium text-white truncate">{{ name() }}</div>
-          <div class="text-xs text-slate-400 flex items-center gap-2">
-            <span>{{ memberCount() }} 成員</span>
-            @if (linkedSetCount() > 0) {
-              <span class="px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 rounded">
-                {{ linkedSetCount() }} 詞集
+          <!-- 群組名稱 -->
+          <div class="font-medium text-white truncate">{{ displayName() }}</div>
+          
+          <!-- 群組 URL (如果名稱不是 URL) -->
+          @if (showUrl()) {
+            <div class="text-xs text-slate-500 truncate">{{ url() }}</div>
+          }
+          
+          <!-- 統計行 -->
+          <div class="flex items-center gap-3 mt-1 text-xs">
+            <span class="text-slate-400 flex items-center gap-1">
+              <span>👥</span> {{ memberCount() || 0 }} 成員
+            </span>
+            @if (matchesToday() > 0) {
+              <span class="text-emerald-400 flex items-center gap-1">
+                <span>🎯</span> {{ matchesToday() }} 匹配
               </span>
+            }
+            @if (leadsToday() > 0) {
+              <span class="text-cyan-400 flex items-center gap-1">
+                <span>👤</span> {{ leadsToday() }} Lead
+              </span>
+            }
+          </div>
+          
+          <!-- 已綁定詞集 -->
+          <div class="flex items-center gap-2 mt-2">
+            @if (linkedSets().length > 0) {
+              @for (set of linkedSets().slice(0, 3); track set) {
+                <span class="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs rounded-full">
+                  🔑 {{ set }}
+                </span>
+              }
+              @if (linkedSets().length > 3) {
+                <span class="text-xs text-slate-500">+{{ linkedSets().length - 3 }}</span>
+              }
             } @else {
-              <span class="text-amber-400">未綁定詞集</span>
+              <span class="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full">
+                ⚠ 未綁定詞集
+              </span>
             }
           </div>
         </div>
         
-        <!-- 已綁定的詞集標籤 -->
-        @if (linkedSets().length > 0) {
-          <div class="flex flex-wrap gap-1 max-w-[150px]">
-            @for (set of linkedSets().slice(0, 2); track set) {
-              <span class="px-1.5 py-0.5 bg-slate-600 text-slate-300 text-xs rounded truncate max-w-[60px]">
-                {{ set }}
-              </span>
-            }
-            @if (linkedSets().length > 2) {
-              <span class="px-1.5 py-0.5 bg-slate-600 text-slate-400 text-xs rounded">
-                +{{ linkedSets().length - 2 }}
-              </span>
-            }
-          </div>
-        }
+        <!-- 箭頭 -->
+        <div class="text-slate-500 text-lg">›</div>
       </div>
     </div>
   `
@@ -142,9 +169,51 @@ export class DraggableKeywordChipComponent {
 export class DroppableGroupCardComponent {
   id = input.required<string>();
   name = input.required<string>();
+  url = input<string>('');
+  avatar = input<string>('');
   memberCount = input(0);
+  matchesToday = input(0);
+  leadsToday = input(0);
   linkedSets = input<string[]>([]);
   linkedSetCount = input(0);
+  
+  // 顯示名稱：如果 name 是 URL，則截取最後部分
+  displayName = () => {
+    const n = this.name();
+    if (n.startsWith('http') || n.startsWith('t.me')) {
+      const parts = n.split('/');
+      return parts[parts.length - 1] || n;
+    }
+    return n;
+  };
+  
+  // 是否顯示 URL（當名稱不是 URL 時顯示）
+  showUrl = () => {
+    const n = this.name();
+    const u = this.url();
+    return u && !n.startsWith('http') && !n.startsWith('t.me');
+  };
+  
+  // 獲取首字母
+  getInitial = () => {
+    const n = this.displayName();
+    return n ? n.charAt(0).toUpperCase() : '?';
+  };
+  
+  // 獲取漸變顏色（基於名稱生成）
+  getGradientColor = () => {
+    const colors = [
+      ['#8B5CF6', '#6366F1'],  // 紫色
+      ['#EC4899', '#F43F5E'],  // 粉色
+      ['#06B6D4', '#0EA5E9'],  // 青色
+      ['#10B981', '#22C55E'],  // 綠色
+      ['#F59E0B', '#EAB308'],  // 黃色
+      ['#EF4444', '#F97316'],  // 紅橙
+    ];
+    const hash = this.name().split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+    const pair = colors[hash % colors.length];
+    return pair.join(', ');
+  };
   
   isDragOver = signal(false);
   

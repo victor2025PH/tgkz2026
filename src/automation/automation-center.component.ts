@@ -396,7 +396,10 @@ interface DrawerState {
                       <app-droppable-group-card
                         [id]="group.id"
                         [name]="group.name"
+                        [url]="group.url || ''"
                         [memberCount]="group.memberCount"
+                        [matchesToday]="group.stats?.matchesToday || 0"
+                        [leadsToday]="group.stats?.leadsToday || 0"
                         [linkedSets]="getLinkedSetNames(group)"
                         [linkedSetCount]="group.linkedKeywordSets.length"
                         (keywordSetDropped)="onKeywordSetDropped($event)"
@@ -809,12 +812,19 @@ export class AutomationCenterComponent implements OnInit {
       const convertedGroups = realGroups.map((group: any) => ({
         id: String(group.id),
         name: group.name || group.url || '未知群組',
-        memberCount: group.memberCount || 0,
+        url: group.url || '',  // 添加 URL 字段
+        memberCount: group.memberCount || group.member_count || 0,
         isMonitoring: true,
-        linkedKeywordSets: (group.keywordSetIds || []).map((id: number) => String(id)),
+        linkedKeywordSets: (group.keywordSetIds || group.keyword_set_ids || []).map((id: number) => String(id)),
         activityLevel: 'medium' as const,
         dailyMessages: 0,
-        stats: { matchesToday: 0, matchesWeek: 0, leadsToday: 0, leadsWeek: 0, conversions: 0 }
+        stats: { 
+          matchesToday: group.matchesToday || 0, 
+          matchesWeek: group.matchesWeek || 0, 
+          leadsToday: group.leadsToday || 0, 
+          leadsWeek: group.leadsWeek || 0, 
+          conversions: group.conversions || 0 
+        }
       }));
       this.monitorGroups.set(convertedGroups);
     }

@@ -300,6 +300,26 @@ class Database:
                     print("[Database] Adding column: monitored_groups.keyword_set_ids", file=sys.stderr)
                     cursor.execute("ALTER TABLE monitored_groups ADD COLUMN keyword_set_ids TEXT DEFAULT '[]'")
                     conn.commit()
+            
+            # 檢查 extracted_members 表的字段（Lead 意圖評分）
+            cursor.execute("PRAGMA table_info(extracted_members)")
+            em_columns = [col[1] for col in cursor.fetchall()]
+            
+            if em_columns:  # 表存在
+                if 'intent_score' not in em_columns:
+                    print("[Database] Adding column: extracted_members.intent_score", file=sys.stderr)
+                    cursor.execute('ALTER TABLE extracted_members ADD COLUMN intent_score INTEGER DEFAULT 0')
+                    conn.commit()
+                
+                if 'intent_level' not in em_columns:
+                    print("[Database] Adding column: extracted_members.intent_level", file=sys.stderr)
+                    cursor.execute("ALTER TABLE extracted_members ADD COLUMN intent_level TEXT DEFAULT 'none'")
+                    conn.commit()
+                
+                if 'auto_tags' not in em_columns:
+                    print("[Database] Adding column: extracted_members.auto_tags", file=sys.stderr)
+                    cursor.execute("ALTER TABLE extracted_members ADD COLUMN auto_tags TEXT DEFAULT '[]'")
+                    conn.commit()
                 
         except Exception as e:
             print(f"[Database] Migration warning: {e}", file=sys.stderr)

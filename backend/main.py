@@ -2600,6 +2600,19 @@ class BackendService:
             elif command == "import-tdata":
                 await self.handle_import_tdata(payload)
 
+            # 智能模組命令 (Phase B)
+            elif command == "get-intent-score":
+                await self.handle_get_intent_score(payload)
+            
+            elif command == "get-smart-replies":
+                await self.handle_get_smart_replies(payload)
+            
+            elif command == "get-auto-tags":
+                await self.handle_get_auto_tags(payload)
+            
+            elif command == "predict-send-time":
+                await self.handle_predict_send_time(payload)
+
             else:
                 self.send_log(f"Unknown command: {command}", "warning")
         
@@ -5439,6 +5452,19 @@ class BackendService:
                             'onlineStatus': lead_data.get('online_status', 'Unknown')
                         })
                         
+                        # 進行意圖評分
+                        from intent_scorer import score_lead_intent
+                        message_text = lead_data.get('message_text', lead_data.get('triggered_keyword', ''))
+                        intent_result = await score_lead_intent(message_text)
+                        
+                        # 更新 Lead 的意圖分數
+                        await db.update_lead(lead_id, {
+                            'intent_score': intent_result['score'],
+                            'intent_level': intent_result['level']
+                        })
+                        
+                        self.send_log(f"📊 意圖評分: {intent_result['score']}分 ({intent_result['level']})", "info")
+                        
                         # Send event with properly formatted data for frontend
                         import datetime
                         self.send_event("lead-captured", {
@@ -5453,7 +5479,10 @@ class BackendService:
                             "status": "New",
                             "onlineStatus": lead_data.get('online_status', 'Unknown'),
                             "interactionHistory": [],
-                            "doNotContact": False
+                            "doNotContact": False,
+                            "intentScore": intent_result['score'],
+                            "intentLevel": intent_result['level'],
+                            "intentSuggestions": intent_result['suggestions']
                         })
                         
                         self.send_log(f"✓ 新潛在客戶已捕獲: @{lead_data.get('username') or lead_data.get('first_name')}", "success")
@@ -14584,6 +14613,113 @@ class BackendService:
             import traceback
             traceback.print_exc(file=sys.stderr)
             self.send_event("tdata-imported", {
+                "success": False,
+                "error": str(e)
+            })
+
+    # ==================== 智能模組 Handlers (Phase B) ====================
+    
+    async def handle_get_intent_score(self, payload: Dict[str, Any]):
+        """獲取消息的意圖評分"""
+        try:
+            from intent_scorer import score_lead_intent
+            
+            message = payload.get("message", "")
+            context = payload.get("context", [])
+            
+            result = await score_lead_intent(message, context)
+            
+            self.send_event("intent-score-result", {
+                "success": True,
+                **result
+            })
+        except Exception as e:
+            print(f"[Backend] Error scoring intent: {e}", file=sys.stderr)
+            self.send_event("intent-score-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_get_smart_replies(self, payload: Dict[str, Any]):
+        """獲取智能回覆建議"""
+        try:
+            from smart_reply import generate_smart_replies
+            
+            message = payload.get("message", "")
+            context = payload.get("context", [])
+            intent_type = payload.get("intentType", "general")
+            intent_score = payload.get("intentScore", 50)
+            max_suggestions = payload.get("maxSuggestions", 3)
+            
+            result = await generate_smart_replies(
+                message=message,
+                context=context,
+                intent_type=intent_type,
+                intent_score=intent_score,
+                max_suggestions=max_suggestions
+            )
+            
+            self.send_event("smart-replies-result", {
+                "success": True,
+                **result
+            })
+        except Exception as e:
+            print(f"[Backend] Error generating smart replies: {e}", file=sys.stderr)
+            self.send_event("smart-replies-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_get_auto_tags(self, payload: Dict[str, Any]):
+        """獲取自動標籤"""
+        try:
+            from auto_tagger import auto_tag_lead
+            
+            message = payload.get("message", "")
+            intent_score = payload.get("intentScore", 0)
+            source_url = payload.get("sourceUrl", "")
+            has_replied = payload.get("hasReplied", False)
+            inquiry_count = payload.get("inquiryCount", 0)
+            
+            result = await auto_tag_lead(
+                message=message,
+                intent_score=intent_score,
+                source_url=source_url,
+                has_replied=has_replied,
+                inquiry_count=inquiry_count
+            )
+            
+            self.send_event("auto-tags-result", {
+                "success": True,
+                **result
+            })
+        except Exception as e:
+            print(f"[Backend] Error auto-tagging: {e}", file=sys.stderr)
+            self.send_event("auto-tags-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_predict_send_time(self, payload: Dict[str, Any]):
+        """預測最佳發送時間"""
+        try:
+            from send_time_predictor import predict_best_send_time
+            
+            user_id = payload.get("userId")
+            urgency = payload.get("urgency", "normal")
+            
+            result = await predict_best_send_time(
+                user_id=user_id,
+                urgency=urgency
+            )
+            
+            self.send_event("send-time-prediction", {
+                "success": True,
+                **result
+            })
+        except Exception as e:
+            print(f"[Backend] Error predicting send time: {e}", file=sys.stderr)
+            self.send_event("send-time-prediction", {
                 "success": False,
                 "error": str(e)
             })

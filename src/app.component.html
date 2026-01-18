@@ -88,6 +88,62 @@
       </div>
     }
     
+    <!-- 邀請進群對話框 -->
+    @if(showInviteGroupDialog()) {
+      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center" 
+           (click)="showInviteGroupDialog.set(false)">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+             (click)="$event.stopPropagation()">
+          <!-- 標題 -->
+          <div class="px-6 py-4 border-b border-slate-700 flex items-center gap-3">
+            <div class="p-2 bg-emerald-500/20 rounded-lg">
+              <span class="text-xl">👥</span>
+            </div>
+            <div>
+              <h3 class="text-lg font-bold text-white">邀請進群</h3>
+              <p class="text-sm text-slate-400">選擇協作群組</p>
+            </div>
+          </div>
+          
+          <!-- 群組列表 -->
+          <div class="px-6 py-4 max-h-64 overflow-y-auto">
+            @if(collabGroups().length === 0) {
+              <div class="text-center py-8 text-slate-400">
+                <p class="mb-2">暫無協作群組</p>
+                <button (click)="currentView.set('multi-role'); showInviteGroupDialog.set(false)" 
+                        class="text-cyan-400 hover:underline text-sm">
+                  去創建群組 →
+                </button>
+              </div>
+            } @else {
+              <div class="space-y-2">
+                @for(group of collabGroups(); track group.id) {
+                  <button (click)="executeInviteToGroup(group.id)"
+                          class="w-full p-3 bg-slate-800/50 hover:bg-emerald-500/20 border border-slate-700 hover:border-emerald-500/50 rounded-xl text-left transition-all group">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <p class="font-medium text-white group-hover:text-emerald-400">{{ group.name }}</p>
+                        <p class="text-xs text-slate-500">{{ group.members?.length || 0 }} 個成員</p>
+                      </div>
+                      <span class="text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                    </div>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+          
+          <!-- 取消按鈕 -->
+          <div class="px-6 py-4 border-t border-slate-700">
+            <button (click)="showInviteGroupDialog.set(false)" 
+                    class="w-full py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors">
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+    
     <!-- Sidebar -->
     <aside class="w-64 backdrop-blur-sm flex-shrink-0 flex flex-col sidebar" 
            style="background-color: var(--bg-sidebar); border-right: 1px solid var(--border-default);">
@@ -4548,69 +4604,87 @@
                                 </div>
                                 
                                 <div (click)="openLeadDetailModal(lead)" class="cursor-pointer flex-1 min-w-0">
-                                    <div class="flex items-start justify-between">
+                                    <!-- 頭部：用戶信息 -->
+                                    <div class="flex items-start justify-between mb-2">
                                         <div class="flex items-center gap-2">
-                                            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ring-2 ring-slate-700">
                                               {{ (lead.username || lead.firstName || lead.userId || '?')[0].toUpperCase() }}
                                             </div>
                                             <div class="min-w-0 flex-1">
-                                                <p class="font-bold text-cyan-400 truncate text-sm">
-                                                  @if(lead.username) {
-                                                    @<!---->{{ lead.username }}
-                                                  } @else if(lead.firstName) {
-                                                    {{ lead.firstName }}
-                                                  } @else {
-                                                    ID:{{ lead.userId | slice:0:10 }}
-                                                  }
-                                                </p>
-                                                <p class="text-xs text-slate-400 truncate">
-                                                  @if(lead.firstName || lead.lastName) {
-                                                    {{ lead.firstName }} {{ lead.lastName }}
-                                                  } @else {
-                                                    {{ (lead.sourceGroup || '') | slice:0:15 }}
-                                                  }
-                                                </p>
+                                                <div class="flex items-center gap-2">
+                                                  <p class="font-bold text-white truncate text-sm">
+                                                    @if(lead.username) {
+                                                      @<!---->{{ lead.username }}
+                                                    } @else if(lead.firstName) {
+                                                      {{ lead.firstName }} {{ lead.lastName || '' }}
+                                                    } @else {
+                                                      ID:{{ (lead.userId || '') | slice:0:8 }}
+                                                    }
+                                                  </p>
+                                                  <span class="h-2 w-2 rounded-full flex-shrink-0" [class]="getOnlineStatusColor(lead.onlineStatus)"></span>
+                                                </div>
+                                                <p class="text-xs text-slate-500">{{ lead.userId ? '+' + (lead.userId | slice:0:12) : '-' }}</p>
                                             </div>
                                         </div>
-                                        <div class="flex items-center gap-1 flex-shrink-0">
-                                          <span class="h-2 w-2 rounded-full" [class]="getOnlineStatusColor(lead.onlineStatus)"></span>
-                                          @if(lead.intentScore) {
-                                            <span class="text-xs px-1.5 py-0.5 rounded-full" 
-                                                  [class.bg-red-500/20]="lead.intentScore >= 70"
-                                                  [class.text-red-400]="lead.intentScore >= 70"
-                                                  [class.bg-amber-500/20]="lead.intentScore >= 40 && lead.intentScore < 70"
-                                                  [class.text-amber-400]="lead.intentScore >= 40 && lead.intentScore < 70"
-                                                  [class.bg-slate-500/20]="lead.intentScore < 40"
-                                                  [class.text-slate-400]="lead.intentScore < 40">
-                                              {{ lead.intentScore }}分
-                                            </span>
+                                        <!-- 意向等級 -->
+                                        <div class="flex-shrink-0">
+                                          @if((lead.intentScore || 0) >= 70) {
+                                            <span class="text-xs px-2 py-1 rounded-full bg-red-500/20 text-red-400 font-medium">🔥 熱</span>
+                                          } @else if((lead.intentScore || 0) >= 40) {
+                                            <span class="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-400 font-medium">🌡️ 溫</span>
+                                          } @else {
+                                            <span class="text-xs px-2 py-1 rounded-full bg-slate-500/20 text-slate-400 font-medium">❄️ 冷</span>
                                           }
                                         </div>
                                     </div>
+                                    
+                                    <!-- 狀態標籤行 -->
+                                    <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                      <span class="text-xs px-2 py-0.5 rounded-full" [class]="getStatusColor(lead.status || 'New')">{{ t(lead.status || 'New') }}</span>
+                                      @if(lead.sourceGroup) {
+                                        <span class="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400">📍 {{ (lead.sourceGroup) | slice:0:12 }}</span>
+                                      }
+                                    </div>
+                                    
+                                    <!-- 觸發詞 -->
+                                    @if(lead.triggeredKeyword && lead.triggeredKeyword !== '無') {
+                                      <div class="text-xs font-mono bg-slate-800/50 rounded px-2 py-1 text-cyan-400/80 truncate mb-2">
+                                        🔑 {{ lead.triggeredKeyword | slice:0:25 }}
+                                      </div>
+                                    }
+                                    
+                                    <!-- 時間 -->
+                                    <p class="text-xs text-slate-500">⏰ {{ safeFormatDate(lead.timestamp, 'MM/dd HH:mm') }}</p>
                                 </div>
                             </div>
-                            <!-- 狀態和來源 -->
-                            <div class="flex items-center gap-2 mb-2 ml-6">
-                              <span class="text-xs px-2 py-0.5 rounded-full" [class]="getStatusColor(lead.status || 'New')">{{ t(lead.status || 'New') }}</span>
-                              <span class="text-xs text-slate-500 truncate">{{ (lead.sourceGroup || '') | slice:0:15 }}...</span>
-                            </div>
-                            <div class="ml-6">
-                              <p class="text-xs font-mono bg-slate-800/50 rounded px-2 py-1 text-slate-400 truncate">🔑 {{ lead.triggeredKeyword || '無' }}</p>
-                              <p class="text-xs text-slate-500 mt-2">{{ safeFormatDate(lead.timestamp, 'MM/dd HH:mm') }}</p>
-                            </div>
-                            <div class="flex gap-2 mt-3 pt-3 border-t border-slate-700/50">
-                                <button (click)="openLeadDetailModal(lead)" 
-                                        class="flex-1 text-xs bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 py-1.5 rounded-lg transition-colors">
-                                    💬 聯繫
+                            
+                            <!-- 快速操作按鈕 -->
+                            <div class="flex gap-1 mt-3 pt-3 border-t border-slate-700/50">
+                                <button (click)="$event.stopPropagation(); openLeadDetailModal(lead)" 
+                                        class="flex-1 text-xs bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
+                                        title="發送消息">
+                                    📩
+                                </button>
+                                <button (click)="$event.stopPropagation(); startAiChat(lead)" 
+                                        class="flex-1 text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
+                                        title="AI 聊天">
+                                    🤖
+                                </button>
+                                <button (click)="$event.stopPropagation(); inviteToGroup(lead)" 
+                                        class="flex-1 text-xs bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
+                                        title="邀請進群">
+                                    👥
                                 </button>
                                 <div class="relative">
                                     <button (click)="$event.stopPropagation(); toggleLeadMenu(lead.id)" 
-                                            class="text-xs bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 py-1.5 px-3 rounded-lg transition-colors">
+                                            class="text-xs bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 py-2 px-3 rounded-lg transition-colors"
+                                            title="更多操作">
                                         ⋮
                                     </button>
                                     @if(openLeadMenuId() === lead.id) {
-                                        <div class="absolute z-50 right-0 top-full mt-1 bg-slate-800 rounded-lg shadow-xl border border-slate-700 overflow-hidden min-w-[120px]"
+                                        <div class="absolute z-50 right-0 top-full mt-1 bg-slate-800 rounded-lg shadow-xl border border-slate-700 overflow-hidden min-w-[140px]"
                                              (click)="$event.stopPropagation()">
+                                            <div class="px-3 py-2 text-xs text-slate-500 border-b border-slate-700">更改狀態</div>
                                             @for(s of leadStatuses; track s) {
                                                 @if(s !== lead.status) {
                                                     <a (click)="updateLeadStatus(lead.id, s); closeLeadMenu()" 
@@ -4619,6 +4693,12 @@
                                                     </a>
                                                 }
                                             }
+                                            <div class="border-t border-slate-700">
+                                              <a (click)="addToDnc(lead); closeLeadMenu()" 
+                                                 class="block px-3 py-2 text-xs text-red-400 hover:bg-red-500/20 cursor-pointer transition-colors">
+                                                  🚫 加入黑名單
+                                              </a>
+                                            </div>
                                         </div>
                                     }
                                 </div>

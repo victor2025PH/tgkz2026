@@ -643,6 +643,10 @@ export class AppComponent implements OnDestroy, OnInit {
   leadsTotal: WritableSignal<number> = signal(0);  // 數據庫中的實際總數
   logs: WritableSignal<LogEntry[]> = signal([]);
   
+  // 邀請進群相關
+  selectedLeadForInvite: WritableSignal<CapturedLead | null> = signal(null);
+  showInviteGroupDialog = signal(false);
+  
   // 實時匹配數據
   realtimeMatches: WritableSignal<{
     keyword: string;
@@ -8559,6 +8563,54 @@ export class AppComponent implements OnDestroy, OnInit {
     this.generationState.set({ status: 'idle', lead: null, generatedMessage: '', error: null, customPrompt: '', attachment: null }); 
     this.editableMessage.set('');
     this.messageMode.set('manual');
+  }
+  
+  // 啟動 AI 聊天
+  startAiChat(lead: CapturedLead) {
+    // 打開詳情面板並自動選擇 AI 模式
+    this.openLeadDetailModal(lead);
+    this.messageMode.set('ai');
+    this.toastService.info(`🤖 已開啟 AI 聊天模式，為 @${lead.username || lead.userId} 生成智能回覆`);
+  }
+  
+  // 邀請進群（整合多角色協作）
+  inviteToGroup(lead: CapturedLead) {
+    // 檢查是否有可用的協作群組
+    const collabGroups = this.collabGroups();
+    if (collabGroups.length === 0) {
+      this.toastService.warning('⚠️ 請先在「多角色協作」中創建協作群組');
+      this.currentView.set('multi-role');
+      return;
+    }
+    
+    // 顯示群組選擇對話框
+    this.selectedLeadForInvite.set(lead);
+    this.showInviteGroupDialog.set(true);
+    this.toastService.info(`👥 選擇要邀請 @${lead.username || lead.userId} 的群組`);
+  }
+  
+  // 執行邀請進群
+  executeInviteToGroup(groupId: string) {
+    const lead = this.selectedLeadForInvite();
+    if (!lead) return;
+    
+    // 發送邀請命令到後端
+    this.ipcService.send('invite-lead-to-collab-group', {
+      leadId: lead.id,
+      userId: lead.userId,
+      username: lead.username,
+      groupId: groupId
+    });
+    
+    this.showInviteGroupDialog.set(false);
+    this.selectedLeadForInvite.set(null);
+    this.toastService.success(`✓ 已發送邀請請求`);
+  }
+  
+  // 添加到黑名單
+  addToDnc(lead: CapturedLead) {
+    this.ipcService.send('add-to-dnc', { leadId: lead.id, userId: lead.userId });
+    this.toastService.success(`🚫 已將 @${lead.username || lead.userId} 加入黑名單`);
   }
 
   async generateMessage() {

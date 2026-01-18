@@ -8870,6 +8870,9 @@ export class AppComponent implements OnDestroy, OnInit {
   executeDeleteLeads() {
     const dialog = this.deleteConfirmDialog();
     
+    // 先關閉對話框
+    this.deleteConfirmDialog.set({ show: false, type: 'single' });
+    
     if (dialog.type === 'single' && dialog.lead) {
       // 單個刪除
       this.ipcService.send('delete-lead', { leadId: dialog.lead.id });
@@ -8878,13 +8881,24 @@ export class AppComponent implements OnDestroy, OnInit {
     } else if (dialog.type === 'batch') {
       // 批量刪除
       const leadIds = Array.from(this.selectedLeadIds());
+      
+      if (leadIds.length === 0) {
+        this.toastService.warning('沒有選中的客戶');
+        return;
+      }
+      
+      // 設置進度狀態
+      this.batchOperationInProgress.set(true);
+      this.showBatchOperationMenu.set(false);
+      
+      // 發送刪除請求
       this.ipcService.send('batch-delete-leads', { leadIds });
+      
+      // 立即更新本地狀態
       this.leads.update(leads => leads.filter(l => !this.selectedLeadIds().has(l.id)));
-      this.toastService.success(`已刪除 ${leadIds.length} 個客戶`);
+      this.toastService.success(`正在刪除 ${leadIds.length} 個客戶...`);
       this.clearLeadSelection();
     }
-    
-    this.deleteConfirmDialog.set({ show: false, type: 'single' });
   }
   
   // 取消刪除
@@ -9043,7 +9057,7 @@ export class AppComponent implements OnDestroy, OnInit {
     });
   }
   
-  // Batch delete leads
+  // Batch delete leads - 使用統一的確認對話框
   batchDeleteLeads() {
     if (!this.checkBatchOperationPermission()) return;
     
@@ -9053,14 +9067,8 @@ export class AppComponent implements OnDestroy, OnInit {
       return;
     }
     
-    if (!confirm(`確定要刪除 ${leadIds.length} 個 Lead 嗎？此操作無法撤銷！`)) {
-      return;
-    }
-    
-    this.batchOperationInProgress.set(true);
-    this.showBatchOperationMenu.set(false);
-    
-    this.ipcService.send('batch-delete-leads', { leadIds });
+    // 使用統一的確認對話框
+    this.confirmBatchDeleteLeads();
   }
   
   // Undo batch operation

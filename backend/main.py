@@ -12722,22 +12722,26 @@ class BackendService:
                 })
                 return
             
-            batch_ops = get_batch_ops()
-            if not batch_ops:
-                self.send_event("batch-operation-result", {
-                    "success": False,
-                    "error": "批量操作系統未初始化"
-                })
-                return
+            # 直接使用 database 方法刪除，避免依賴可能未初始化的 batch_ops
+            success_count = 0
+            for lead_id in lead_ids:
+                try:
+                    await db.execute('DELETE FROM extracted_members WHERE id = ?', (lead_id,))
+                    success_count += 1
+                except Exception as e:
+                    self.send_log(f"刪除 Lead {lead_id} 失敗: {e}", "warning")
             
-            result = await batch_ops.batch_delete_leads(lead_ids)
+            self.send_log(f"批量刪除完成: {success_count}/{len(lead_ids)} 成功", "success")
             
-            if result.get('success'):
-                self.send_log(f"批量刪除完成: {result.get('successCount')}/{len(lead_ids)} 成功", "success")
-            else:
-                self.send_log(f"批量刪除失敗: {result.get('error')}", "error")
+            # 刷新 leads 列表
+            leads = await db.get_all_leads()
+            self.send_event("leads-updated", {"leads": leads})
             
-            self.send_event("batch-operation-result", result)
+            self.send_event("batch-operation-result", {
+                "success": True,
+                "successCount": success_count,
+                "failureCount": len(lead_ids) - success_count
+            })
             
         except Exception as e:
             self.send_log(f"批量刪除失敗: {str(e)}", "error")

@@ -911,7 +911,9 @@ const passThroughChannels = [
     'delete-lead', 'batch-delete-leads', 'get-detailed-funnel-stats',
     // Batch Operations
     'batch-update-leads', 'batch-tag-leads', 'batch-export-leads',
-    'undo-batch-operation', 'get-batch-operation-history', 'get-all-tags'
+    'undo-batch-operation', 'get-batch-operation-history', 'get-all-tags',
+    // Lead to Group Integration
+    'invite-lead-to-collab-group', 'create-collab-group-for-lead'
 ];
 
 passThroughChannels.forEach(channel => {

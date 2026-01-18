@@ -2320,6 +2320,12 @@ class BackendService:
             elif command == "delete-lead":
                 await self.handle_delete_lead(payload)
             
+            elif command == "invite-lead-to-collab-group":
+                await self.handle_invite_lead_to_collab_group(payload)
+            
+            elif command == "create-collab-group-for-lead":
+                await self.handle_create_collab_group_for_lead(payload)
+            
             elif command == "undo-batch-operation":
                 await self.handle_undo_batch_operation(payload)
             
@@ -12790,6 +12796,161 @@ class BackendService:
             import traceback
             traceback.print_exc()
             self.send_event("lead-deleted", {"success": False, "error": str(e)})
+    
+    async def handle_invite_lead_to_collab_group(self, payload: Dict[str, Any]):
+        """邀請 Lead 進入協作群組"""
+        try:
+            lead_id = payload.get('leadId')
+            user_id = payload.get('userId')
+            username = payload.get('username')
+            group_id = payload.get('groupId')
+            
+            if not user_id or not group_id:
+                self.send_event("invite-result", {
+                    "success": False,
+                    "error": "缺少用戶 ID 或群組 ID"
+                })
+                return
+            
+            self.send_log(f"🔗 正在邀請 @{username or user_id} 進入協作群組 {group_id}", "info")
+            
+            # 獲取協作群組信息
+            collab_group = await db.fetch_one(
+                'SELECT * FROM collab_groups WHERE id = ?',
+                (group_id,)
+            )
+            
+            if not collab_group:
+                self.send_event("invite-result", {
+                    "success": False,
+                    "error": "協作群組不存在"
+                })
+                return
+            
+            # 獲取發送帳號（用於邀請）
+            sender_accounts = [a for a in self.telegram_manager.active_clients.keys()]
+            if not sender_accounts:
+                self.send_event("invite-result", {
+                    "success": False,
+                    "error": "沒有可用的發送帳號"
+                })
+                return
+            
+            # 使用第一個可用的帳號發送邀請
+            sender_phone = sender_accounts[0]
+            client = self.telegram_manager.get_client(sender_phone)
+            
+            if client and client.is_connected():
+                try:
+                    # 嘗試邀請用戶
+                    from telethon.tl.functions.channels import InviteToChannelRequest
+                    from telethon.tl.functions.messages import AddChatUserRequest
+                    
+                    # 獲取目標用戶實體
+                    target_user = await client.get_entity(int(user_id))
+                    
+                    # 獲取群組實體
+                    group_chat_id = collab_group.get('chat_id')
+                    if group_chat_id:
+                        group_entity = await client.get_entity(int(group_chat_id))
+                        
+                        # 邀請用戶
+                        await client(InviteToChannelRequest(
+                            channel=group_entity,
+                            users=[target_user]
+                        ))
+                        
+                        self.send_log(f"✓ 已成功邀請 @{username or user_id} 進入群組", "success")
+                        self.send_event("invite-result", {
+                            "success": True,
+                            "userId": user_id,
+                            "groupId": group_id
+                        })
+                        
+                        # 更新 lead 狀態
+                        await db.execute(
+                            'UPDATE extracted_members SET invited = 1, invited_at = CURRENT_TIMESTAMP WHERE user_id = ?',
+                            (str(user_id),)
+                        )
+                    else:
+                        self.send_event("invite-result", {
+                            "success": False,
+                            "error": "協作群組未創建 Telegram 群"
+                        })
+                        
+                except Exception as e:
+                    self.send_log(f"邀請失敗: {str(e)}", "error")
+                    self.send_event("invite-result", {
+                        "success": False,
+                        "error": str(e)
+                    })
+            else:
+                self.send_event("invite-result", {
+                    "success": False,
+                    "error": "發送帳號未連接"
+                })
+                
+        except Exception as e:
+            self.send_log(f"邀請 Lead 進群失敗: {str(e)}", "error")
+            import traceback
+            traceback.print_exc()
+            self.send_event("invite-result", {"success": False, "error": str(e)})
+    
+    async def handle_create_collab_group_for_lead(self, payload: Dict[str, Any]):
+        """為高意向客戶自動創建協作群組"""
+        try:
+            lead_id = payload.get('leadId')
+            user_id = payload.get('userId')
+            username = payload.get('username')
+            script_id = payload.get('scriptId')  # 使用的劇本 ID
+            
+            if not user_id:
+                self.send_event("create-collab-group-result", {
+                    "success": False,
+                    "error": "缺少用戶 ID"
+                })
+                return
+            
+            self.send_log(f"🎭 正在為 @{username or user_id} 創建多角色協作群組", "info")
+            
+            # 創建協作群組記錄
+            group_name = f"VIP-{username or user_id[:8]}"
+            
+            await db.execute('''
+                INSERT INTO collab_groups (name, target_user_id, script_id, status, created_at)
+                VALUES (?, ?, ?, 'pending', CURRENT_TIMESTAMP)
+            ''', (group_name, str(user_id), script_id))
+            
+            # 獲取創建的群組 ID
+            result = await db.fetch_one(
+                'SELECT id FROM collab_groups WHERE target_user_id = ? ORDER BY created_at DESC LIMIT 1',
+                (str(user_id),)
+            )
+            
+            if result:
+                self.send_log(f"✓ 協作群組 '{group_name}' 創建成功", "success")
+                self.send_event("create-collab-group-result", {
+                    "success": True,
+                    "groupId": result['id'],
+                    "groupName": group_name
+                })
+                
+                # 更新 lead 狀態
+                await db.execute(
+                    'UPDATE extracted_members SET notes = notes || ? WHERE user_id = ?',
+                    (f'\n🎭 已創建協作群組: {group_name}', str(user_id))
+                )
+            else:
+                self.send_event("create-collab-group-result", {
+                    "success": False,
+                    "error": "創建群組記錄失敗"
+                })
+                
+        except Exception as e:
+            self.send_log(f"創建協作群組失敗: {str(e)}", "error")
+            import traceback
+            traceback.print_exc()
+            self.send_event("create-collab-group-result", {"success": False, "error": str(e)})
 
     async def handle_undo_batch_operation(self, payload: Dict[str, Any]):
         """撤銷批量操作"""

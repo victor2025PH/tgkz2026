@@ -319,13 +319,20 @@ interface DrawerState {
                                   hover:bg-slate-700 transition-colors cursor-pointer group border border-transparent
                                   hover:border-cyan-500/30">
                         <div class="flex items-center gap-3">
-                          <div class="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center">
-                            👤
-                          </div>
+                          @if (account.avatar) {
+                            <img [src]="account.avatar" 
+                                 class="w-10 h-10 rounded-full object-cover"
+                                 alt="{{ account.username }}">
+                          } @else {
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold">
+                              {{ (account.username || account.phone || '?')[0].toUpperCase() }}
+                            </div>
+                          }
                           <div>
                             <div class="text-sm font-medium text-white">
                               {{ account.username || account.phone }}
                             </div>
+                            <div class="text-xs text-slate-500">{{ account.phone }}</div>
                             <div class="flex items-center gap-2 text-xs">
                               @if (account.isListener) {
                                 <span class="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">監聽</span>
@@ -747,34 +754,29 @@ export class AutomationCenterComponent implements OnInit {
     { id: 'settings' as const, icon: '⚙️', label: '發送設置', badge: null as string | null }
   ];
   
-  // 模擬數據 - 監控帳號
-  monitorAccounts = signal<AccountData[]>([
-    { 
-      id: 1, 
-      phone: '+86 138****1234', 
-      username: 'listener_01', 
-      status: 'connected', 
-      isListener: true, 
-      isSender: false,
-      healthScore: 92,
-      dailySendLimit: 50,
-      stats: { sentToday: 0, sentWeek: 0, repliesWeek: 0, conversionsWeek: 0 }
-    },
-    { 
-      id: 2, 
-      phone: '+86 139****5678', 
-      username: 'sender_01', 
-      status: 'connected', 
-      isListener: false, 
-      isSender: true,
-      healthScore: 88,
-      dailySendLimit: 50,
-      dailySendCount: 25,
-      cooldownMin: 30,
-      cooldownMax: 60,
-      stats: { sentToday: 25, sentWeek: 156, repliesWeek: 23, conversionsWeek: 5 }
+  // 帳號數據 - 會被真實數據覆蓋
+  monitorAccounts = signal<AccountData[]>([]);
+  
+  // 同步真實帳號數據到本地 signal
+  private syncRealAccounts = effect(() => {
+    const realAccs = this.realAccounts();
+    if (realAccs && realAccs.length > 0) {
+      const convertedAccounts: AccountData[] = realAccs.map((acc: any) => ({
+        id: acc.id || acc.phone,
+        phone: acc.phone || '',
+        username: acc.nickname || acc.username || acc.firstName || acc.phone || '未知',
+        avatar: acc.avatar || acc.photo || '',
+        status: (acc.status === 'Online' ? 'connected' : 'disconnected') as 'connected' | 'disconnected' | 'error',
+        isListener: acc.role === 'Listener',
+        isSender: acc.role === 'Sender',
+        healthScore: acc.healthScore || 100,
+        dailySendLimit: acc.dailySendLimit || 50,
+        dailySendCount: acc.dailySendCount || 0,
+        stats: { sentToday: 0, sentWeek: 0, repliesWeek: 0, conversionsWeek: 0 }
+      }));
+      this.monitorAccounts.set(convertedAccounts);
     }
-  ]);
+  });
   
   // 模擬數據 - 監控群組
   // 本地群組數據 - 會被真實數據覆蓋

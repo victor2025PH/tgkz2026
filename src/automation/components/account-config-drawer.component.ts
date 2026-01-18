@@ -20,6 +20,7 @@ export interface AccountData {
   phone: string;
   username?: string;
   firstName?: string;
+  avatar?: string;
   status: 'connected' | 'disconnected' | 'error';
   isListener: boolean;
   isSender: boolean;

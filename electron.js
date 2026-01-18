@@ -906,7 +906,12 @@ const passThroughChannels = [
     // TData Import Commands
     'scan-tdata', 'import-tdata-account', 'import-tdata-batch', 'get-default-tdata-path',
     // Orphan Session Recovery Commands
-    'scan-orphan-sessions', 'recover-orphan-sessions'
+    'scan-orphan-sessions', 'recover-orphan-sessions',
+    // Lead Management Commands
+    'delete-lead', 'batch-delete-leads', 'get-detailed-funnel-stats',
+    // Batch Operations
+    'batch-update-leads', 'batch-tag-leads', 'batch-export-leads',
+    'undo-batch-operation', 'get-batch-operation-history', 'get-all-tags'
 ];
 
 passThroughChannels.forEach(channel => {

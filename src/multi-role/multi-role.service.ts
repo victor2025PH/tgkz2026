@@ -17,6 +17,7 @@ import {
 } from './multi-role.models';
 import { AICenterService } from '../ai-center/ai-center.service';
 import { ConversationEngineService } from '../ai-center/conversation-engine.service';
+import { ElectronIpcService } from '../electron-ipc.service';
 
 @Injectable({
   providedIn: 'root'
@@ -24,6 +25,7 @@ import { ConversationEngineService } from '../ai-center/conversation-engine.serv
 export class MultiRoleService {
   private aiCenter = inject(AICenterService);
   private conversationEngine = inject(ConversationEngineService);
+  private ipc = inject(ElectronIpcService);
   
   // 配置
   private config = signal<MultiRoleConfig>(DEFAULT_MULTI_ROLE_CONFIG);
@@ -84,6 +86,9 @@ export class MultiRoleService {
       roles: [...c.roles, newRole]
     }));
     
+    // 同步到後端
+    this.ipc.send('multi-role-add-role', newRole);
+    
     return id;
   }
   
@@ -94,6 +99,9 @@ export class MultiRoleService {
         r.id === id ? { ...r, ...updates, updatedAt: new Date().toISOString() } : r
       )
     }));
+    
+    // 同步到後端
+    this.ipc.send('multi-role-update-role', { id, ...updates });
   }
   
   deleteRole(id: string) {
@@ -101,6 +109,9 @@ export class MultiRoleService {
       ...c,
       roles: c.roles.filter(r => r.id !== id)
     }));
+    
+    // 同步到後端
+    this.ipc.send('multi-role-delete-role', { id });
   }
   
   bindAccountToRole(roleId: string, accountId: number, accountPhone: string) {
@@ -146,6 +157,9 @@ export class MultiRoleService {
       scripts: [...c.scripts, newScript]
     }));
     
+    // 同步到後端
+    this.ipc.send('multi-role-add-script', newScript);
+    
     return id;
   }
   
@@ -156,6 +170,9 @@ export class MultiRoleService {
         s.id === id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s
       )
     }));
+    
+    // 同步到後端
+    this.ipc.send('multi-role-update-script', { id, ...updates });
   }
   
   deleteScript(id: string) {
@@ -163,6 +180,9 @@ export class MultiRoleService {
       ...c,
       scripts: c.scripts.filter(s => s.id !== id)
     }));
+    
+    // 同步到後端
+    this.ipc.send('multi-role-delete-script', { id });
   }
   
   addStageToScript(scriptId: string, stage: ScriptStage) {

@@ -1,768 +1,462 @@
 """
-TG-Matrix Multi-Role Manager
-Manages account roles for collaborative marketing scenarios
+多角色協作管理器
+Multi-Role Collaboration Manager
+
+管理角色定義、劇本模板和協作群組
 """
+
 import json
-import sys
+import os
+import asyncio
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Callable
-from dataclasses import dataclass, asdict
-from enum import Enum
-
-
-class RoleType(Enum):
-    """Role types for collaborative marketing"""
-    SELLER = "seller"           # 銷售 - 主動觸達、需求挖掘
-    EXPERT = "expert"           # 專家 - 專業解答、技術背書
-    SATISFIED = "satisfied"     # 滿意客戶 - 分享好評、推薦產品
-    HESITANT = "hesitant"       # 猶豫客戶 - 提出疑問、示範轉化
-    CONVERTED = "converted"     # 成交客戶 - 曬單反饋、增加緊迫感
-    CURIOUS = "curious"         # 好奇者 - 問問題、帶節奏
-    MANAGER = "manager"         # 經理 - 特批優惠、增加緊迫感
-    SUPPORT = "support"         # 售後 - 處理問題、增加信任
-
-
-class SpeakingStyle(Enum):
-    """Speaking style presets"""
-    PROFESSIONAL = "professional"   # 專業正式
-    FRIENDLY = "friendly"           # 友好親切
-    CASUAL = "casual"               # 隨意輕鬆
-    ENTHUSIASTIC = "enthusiastic"   # 熱情洋溢
-    CAREFUL = "careful"             # 謹慎小心
-    CURIOUS = "curious"             # 好奇提問
-
-
-class ResponseSpeed(Enum):
-    """Response speed settings"""
-    FAST = "fast"           # 1-5 秒
-    MEDIUM = "medium"       # 5-15 秒
-    SLOW = "slow"           # 15-60 秒
-    RANDOM = "random"       # 隨機
-
-
-class EmojiFrequency(Enum):
-    """Emoji usage frequency"""
-    NONE = "none"
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-
-
-# Role templates with default configurations
-ROLE_TEMPLATES: Dict[str, Dict[str, Any]] = {
-    RoleType.SELLER.value: {
-        "icon": "🧑‍💼",
-        "displayName": "銷售顧問",
-        "defaultPersonality": {
-            "proactive": True,
-            "persuasive": True,
-            "patient": True,
-            "solution_oriented": True
-        },
-        "defaultStyle": SpeakingStyle.PROFESSIONAL.value,
-        "defaultEmoji": EmojiFrequency.MEDIUM.value,
-        "defaultSpeed": ResponseSpeed.MEDIUM.value,
-        "promptTemplate": """你是一位專業的銷售顧問，名叫{name}。
-你的目標是：
-- 主動了解客戶需求
-- 用專業知識解決客戶疑慮
-- 引導客戶做出購買決定
-- 保持友好但專業的態度
-
-說話風格：{style}
-注意事項：
-- 不要太過強硬推銷
-- 先建立信任再談產品
-- 適時使用表情符號增加親和力"""
-    },
-    RoleType.EXPERT.value: {
-        "icon": "👨‍🔬",
-        "displayName": "專業顧問",
-        "defaultPersonality": {
-            "knowledgeable": True,
-            "analytical": True,
-            "objective": True,
-            "helpful": True
-        },
-        "defaultStyle": SpeakingStyle.PROFESSIONAL.value,
-        "defaultEmoji": EmojiFrequency.LOW.value,
-        "defaultSpeed": ResponseSpeed.SLOW.value,
-        "promptTemplate": """你是一位專業的技術顧問，名叫{name}。
-你的目標是：
-- 提供專業、客觀的技術解答
-- 用數據和案例支持觀點
-- 建立專業可信的形象
-- 幫助解決技術疑問
-
-說話風格：{style}
-注意事項：
-- 保持專業客觀
-- 可以適當分享行業見解
-- 回答要有深度和依據"""
-    },
-    RoleType.SATISFIED.value: {
-        "icon": "😊",
-        "displayName": "滿意客戶",
-        "defaultPersonality": {
-            "enthusiastic": True,
-            "helpful": True,
-            "genuine": True,
-            "positive": True
-        },
-        "defaultStyle": SpeakingStyle.ENTHUSIASTIC.value,
-        "defaultEmoji": EmojiFrequency.HIGH.value,
-        "defaultSpeed": ResponseSpeed.RANDOM.value,
-        "promptTemplate": """你是一位滿意的老客戶，名叫{name}。
-你的目標是：
-- 分享自己使用產品的真實體驗
-- 回答新客戶的疑問
-- 自然地推薦產品
-- 表達對產品的滿意
-
-說話風格：{style}
-注意事項：
-- 像普通用戶一樣說話
-- 分享具體的使用場景
-- 不要像托兒一樣刻意吹捧
-- 可以提到一些小缺點增加可信度"""
-    },
-    RoleType.HESITANT.value: {
-        "icon": "🤔",
-        "displayName": "猶豫客戶",
-        "defaultPersonality": {
-            "cautious": True,
-            "questioning": True,
-            "practical": True,
-            "budget_conscious": True
-        },
-        "defaultStyle": SpeakingStyle.CAREFUL.value,
-        "defaultEmoji": EmojiFrequency.LOW.value,
-        "defaultSpeed": ResponseSpeed.SLOW.value,
-        "promptTemplate": """你是一位正在考慮購買的潛在客戶，名叫{name}。
-你的目標是：
-- 提出常見的購買疑慮
-- 問出新客戶想問但不敢問的問題
-- 在被說服後表示興趣
-- 展示從猶豫到信任的轉變過程
-
-說話風格：{style}
-注意事項：
-- 一開始保持謹慎
-- 提出價格、效果、售後等疑問
-- 逐漸被其他人說服
-- 最後可以表示要考慮購買"""
-    },
-    RoleType.CONVERTED.value: {
-        "icon": "🎉",
-        "displayName": "成交客戶",
-        "defaultPersonality": {
-            "excited": True,
-            "grateful": True,
-            "sharing": True,
-            "supportive": True
-        },
-        "defaultStyle": SpeakingStyle.ENTHUSIASTIC.value,
-        "defaultEmoji": EmojiFrequency.HIGH.value,
-        "defaultSpeed": ResponseSpeed.FAST.value,
-        "promptTemplate": """你是一位剛剛購買成功的客戶，名叫{name}。
-你的目標是：
-- 分享購買的喜悅
-- 曬出購買證明或使用效果
-- 感謝其他人的建議
-- 營造購買的緊迫感
-
-說話風格：{style}
-注意事項：
-- 表現出真實的興奮
-- 可以提到優惠或贈品
-- 說明購買決定的原因
-- 適時催促還在猶豫的人"""
-    },
-    RoleType.CURIOUS.value: {
-        "icon": "❓",
-        "displayName": "好奇者",
-        "defaultPersonality": {
-            "curious": True,
-            "engaged": True,
-            "open_minded": True,
-            "interactive": True
-        },
-        "defaultStyle": SpeakingStyle.CURIOUS.value,
-        "defaultEmoji": EmojiFrequency.MEDIUM.value,
-        "defaultSpeed": ResponseSpeed.RANDOM.value,
-        "promptTemplate": """你是一位對產品感到好奇的圍觀者，名叫{name}。
-你的目標是：
-- 問出引導對話的問題
-- 活躍群內氣氛
-- 帶動討論節奏
-- 表達對產品的興趣
-
-說話風格：{style}
-注意事項：
-- 問簡單直接的問題
-- 對回答表示感謝或驚訝
-- 適時附和其他人
-- 保持活躍但不搶戲"""
-    },
-    RoleType.MANAGER.value: {
-        "icon": "👔",
-        "displayName": "經理主管",
-        "defaultPersonality": {
-            "authoritative": True,
-            "generous": True,
-            "decisive": True,
-            "accommodating": True
-        },
-        "defaultStyle": SpeakingStyle.PROFESSIONAL.value,
-        "defaultEmoji": EmojiFrequency.LOW.value,
-        "defaultSpeed": ResponseSpeed.SLOW.value,
-        "promptTemplate": """你是銷售團隊的經理，名叫{name}。
-你的目標是：
-- 在關鍵時刻出現給予特別優惠
-- 增加購買的緊迫感
-- 顯示誠意和重視
-- 促成最終成交
-
-說話風格：{style}
-注意事項：
-- 表現出有權限做決定
-- 特批優惠要有合理理由
-- 強調名額有限
-- 營造稀缺感"""
-    },
-    RoleType.SUPPORT.value: {
-        "icon": "🛠️",
-        "displayName": "售後客服",
-        "defaultPersonality": {
-            "helpful": True,
-            "patient": True,
-            "responsible": True,
-            "reassuring": True
-        },
-        "defaultStyle": SpeakingStyle.FRIENDLY.value,
-        "defaultEmoji": EmojiFrequency.MEDIUM.value,
-        "defaultSpeed": ResponseSpeed.FAST.value,
-        "promptTemplate": """你是售後服務團隊成員，名叫{name}。
-你的目標是：
-- 回答售後相關問題
-- 讓客戶對售後服務放心
-- 處理可能的投訴顧慮
-- 增加購買信心
-
-說話風格：{style}
-注意事項：
-- 展現專業和耐心
-- 強調售後保障
-- 分享成功處理案例
-- 讓客戶感到被重視"""
-    }
-}
-
-
-@dataclass
-class AccountRole:
-    """Account role configuration"""
-    id: int
-    account_phone: str
-    role_type: str
-    role_name: str
-    personality: Dict[str, Any]
-    speaking_style: str
-    emoji_frequency: str
-    response_speed: str
-    custom_prompt: Optional[str]
-    avatar_url: Optional[str]
-    bio: Optional[str]
-    is_active: bool
-    created_at: str
-    updated_at: str
-    
-    def to_dict(self) -> Dict[str, Any]:
-        template = ROLE_TEMPLATES.get(self.role_type, {})
-        return {
-            "id": self.id,
-            "accountPhone": self.account_phone,
-            "roleType": self.role_type,
-            "roleName": self.role_name,
-            "icon": template.get("icon", "👤"),
-            "personality": self.personality,
-            "speakingStyle": self.speaking_style,
-            "emojiFrequency": self.emoji_frequency,
-            "responseSpeed": self.response_speed,
-            "customPrompt": self.custom_prompt,
-            "avatarUrl": self.avatar_url,
-            "bio": self.bio,
-            "isActive": self.is_active,
-            "createdAt": self.created_at,
-            "updatedAt": self.updated_at
-        }
+from typing import Dict, List, Any, Optional
+from pathlib import Path
 
 
 class MultiRoleManager:
-    """
-    Multi-role management system
+    """多角色協作管理器"""
     
-    Features:
-    - Configure accounts with different roles
-    - Manage role personalities and speaking styles
-    - Generate role-specific AI prompts
-    - Support multiple roles per account
-    """
-    
-    def __init__(self, db, event_callback: Callable = None, log_callback: Callable = None):
-        self.db = db
-        self.event_callback = event_callback
-        self.log_callback = log_callback or self._default_log
-        self._initialized = False
-    
-    def _default_log(self, message: str, level: str = "info"):
-        print(f"[MultiRole] [{level.upper()}] {message}", file=sys.stderr)
-    
-    def _send_event(self, event_name: str, data: Dict[str, Any]):
-        """Send event to frontend"""
-        if self.event_callback:
-            self.event_callback(event_name, data)
-    
-    async def initialize(self):
-        """Initialize role management tables"""
-        if self._initialized:
-            return
+    def __init__(self, data_dir: str = None):
+        """初始化管理器"""
+        self.data_dir = Path(data_dir) if data_dir else Path("data/multi_role")
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         
-        try:
-            # Create account_roles table
-            await self.db.execute('''
-                CREATE TABLE IF NOT EXISTS account_roles (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    account_phone TEXT NOT NULL,
-                    role_type TEXT NOT NULL,
-                    role_name TEXT NOT NULL,
-                    personality TEXT,
-                    speaking_style TEXT DEFAULT 'professional',
-                    emoji_frequency TEXT DEFAULT 'medium',
-                    response_speed TEXT DEFAULT 'medium',
-                    custom_prompt TEXT,
-                    avatar_url TEXT,
-                    bio TEXT,
-                    is_active INTEGER DEFAULT 1,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    UNIQUE(account_phone, role_type)
-                )
-            ''')
-            
-            # Create indexes
-            await self.db.execute('''
-                CREATE INDEX IF NOT EXISTS idx_account_roles_phone 
-                ON account_roles(account_phone)
-            ''')
-            await self.db.execute('''
-                CREATE INDEX IF NOT EXISTS idx_account_roles_type 
-                ON account_roles(role_type)
-            ''')
-            
-            self._initialized = True
-            self.log_callback("多角色管理器已初始化", "success")
-            
-        except Exception as e:
-            self.log_callback(f"初始化失敗: {e}", "error")
-    
-    # ==================== Role Templates ====================
-    
-    def get_role_templates(self) -> Dict[str, Any]:
-        """Get all available role templates"""
-        templates = {}
-        for role_type, template in ROLE_TEMPLATES.items():
-            templates[role_type] = {
-                "roleType": role_type,
-                "icon": template["icon"],
-                "displayName": template["displayName"],
-                "defaultStyle": template["defaultStyle"],
-                "defaultEmoji": template["defaultEmoji"],
-                "defaultSpeed": template["defaultSpeed"]
-            }
-        return templates
-    
-    # ==================== Account Role CRUD ====================
-    
-    async def assign_role(
-        self,
-        account_phone: str,
-        role_type: str,
-        role_name: str,
-        personality: Dict[str, Any] = None,
-        speaking_style: str = None,
-        emoji_frequency: str = None,
-        response_speed: str = None,
-        custom_prompt: str = None,
-        bio: str = None
-    ) -> Dict[str, Any]:
-        """Assign a role to an account"""
+        # 數據文件路徑
+        self.roles_file = self.data_dir / "roles.json"
+        self.scripts_file = self.data_dir / "scripts.json"
+        self.groups_file = self.data_dir / "groups.json"
+        self.stats_file = self.data_dir / "stats.json"
         
-        # Validate role type
-        if role_type not in [r.value for r in RoleType]:
-            return {"success": False, "error": f"無效的角色類型: {role_type}"}
+        # 內存緩存
+        self._roles: Dict[str, Dict] = {}
+        self._scripts: Dict[str, Dict] = {}
+        self._groups: Dict[str, Dict] = {}
+        self._stats: Dict[str, Any] = {
+            "total_groups": 0,
+            "active_groups": 0,
+            "completed_groups": 0,
+            "total_conversions": 0,
+            "conversion_rate": 0.0,
+            "total_messages_sent": 0,
+            "avg_messages_per_group": 0.0,
+            "by_role": {},
+            "by_script": {}
+        }
         
-        template = ROLE_TEMPLATES.get(role_type, {})
-        now = datetime.now().isoformat()
+        # 加載數據
+        self._load_data()
+    
+    def _load_data(self):
+        """加載所有數據"""
+        self._roles = self._load_json(self.roles_file, {})
+        self._scripts = self._load_json(self.scripts_file, {})
+        self._groups = self._load_json(self.groups_file, {})
+        self._stats = self._load_json(self.stats_file, self._stats)
+    
+    def _load_json(self, path: Path, default: Any) -> Any:
+        """加載 JSON 文件"""
+        try:
+            if path.exists():
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"Error loading {path}: {e}")
+        return default
+    
+    def _save_json(self, path: Path, data: Any):
+        """保存 JSON 文件"""
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False, default=str)
+        except Exception as e:
+            print(f"Error saving {path}: {e}")
+    
+    # ========== 角色管理 ==========
+    
+    async def add_role(self, role_data: Dict) -> Dict:
+        """添加新角色"""
+        role_id = role_data.get('id') or f"role_{int(datetime.now().timestamp() * 1000)}"
         
-        # Use defaults from template if not provided
-        personality = personality or template.get("defaultPersonality", {})
-        speaking_style = speaking_style or template.get("defaultStyle", "professional")
-        emoji_frequency = emoji_frequency or template.get("defaultEmoji", "medium")
-        response_speed = response_speed or template.get("defaultSpeed", "medium")
+        role = {
+            "id": role_id,
+            "name": role_data.get("name", ""),
+            "type": role_data.get("type", "custom"),
+            "personality": role_data.get("personality", {
+                "description": "",
+                "speakingStyle": "friendly",
+                "traits": []
+            }),
+            "aiConfig": role_data.get("aiConfig", {
+                "useGlobalAI": True,
+                "customPrompt": "",
+                "responseLength": "medium",
+                "emojiFrequency": "low",
+                "typingSpeed": "medium"
+            }),
+            "responsibilities": role_data.get("responsibilities", []),
+            "boundAccountId": role_data.get("boundAccountId"),
+            "boundAccountPhone": role_data.get("boundAccountPhone"),
+            "isActive": role_data.get("isActive", True),
+            "usageCount": 0,
+            "successCount": 0,
+            "createdAt": datetime.now().isoformat(),
+            "updatedAt": datetime.now().isoformat()
+        }
         
-        try:
-            # Check if role already exists for this account
-            existing = await self.db.fetch_one('''
-                SELECT id FROM account_roles 
-                WHERE account_phone = ? AND role_type = ?
-            ''', (account_phone, role_type))
-            
-            if existing:
-                # Update existing role
-                await self.db.execute('''
-                    UPDATE account_roles SET
-                        role_name = ?,
-                        personality = ?,
-                        speaking_style = ?,
-                        emoji_frequency = ?,
-                        response_speed = ?,
-                        custom_prompt = ?,
-                        bio = ?,
-                        is_active = 1,
-                        updated_at = ?
-                    WHERE account_phone = ? AND role_type = ?
-                ''', (
-                    role_name,
-                    json.dumps(personality),
-                    speaking_style,
-                    emoji_frequency,
-                    response_speed,
-                    custom_prompt,
-                    bio,
-                    now,
-                    account_phone,
-                    role_type
-                ))
-                
-                self.log_callback(f"已更新角色: {account_phone} -> {role_name}", "info")
-                return {"success": True, "roleId": existing['id'], "updated": True}
-            
-            else:
-                # Insert new role
-                role_id = await self.db.execute('''
-                    INSERT INTO account_roles 
-                    (account_phone, role_type, role_name, personality, speaking_style,
-                     emoji_frequency, response_speed, custom_prompt, bio, is_active,
-                     created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-                ''', (
-                    account_phone,
-                    role_type,
-                    role_name,
-                    json.dumps(personality),
-                    speaking_style,
-                    emoji_frequency,
-                    response_speed,
-                    custom_prompt,
-                    bio,
-                    now,
-                    now
-                ))
-                
-                self.log_callback(f"已分配角色: {account_phone} -> {role_name} ({role_type})", "success")
-                return {"success": True, "roleId": role_id, "created": True}
-            
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        self._roles[role_id] = role
+        self._save_json(self.roles_file, self._roles)
+        
+        return {"success": True, "role": role}
     
-    async def update_role(
-        self,
-        role_id: int,
-        updates: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Update an existing role configuration"""
-        try:
-            update_parts = []
-            params = []
-            
-            field_mapping = {
-                'roleName': 'role_name',
-                'personality': 'personality',
-                'speakingStyle': 'speaking_style',
-                'emojiFrequency': 'emoji_frequency',
-                'responseSpeed': 'response_speed',
-                'customPrompt': 'custom_prompt',
-                'bio': 'bio',
-                'isActive': 'is_active'
-            }
-            
-            for js_field, db_field in field_mapping.items():
-                if js_field in updates:
-                    value = updates[js_field]
-                    if js_field == 'personality':
-                        value = json.dumps(value)
-                    elif js_field == 'isActive':
-                        value = 1 if value else 0
-                    update_parts.append(f"{db_field} = ?")
-                    params.append(value)
-            
-            if not update_parts:
-                return {"success": False, "error": "沒有要更新的欄位"}
-            
-            update_parts.append("updated_at = ?")
-            params.append(datetime.now().isoformat())
-            params.append(role_id)
-            
-            await self.db.execute(f'''
-                UPDATE account_roles SET {', '.join(update_parts)}
-                WHERE id = ?
-            ''', tuple(params))
-            
-            return {"success": True, "roleId": role_id}
-            
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+    async def update_role(self, role_id: str, updates: Dict) -> Dict:
+        """更新角色"""
+        if role_id not in self._roles:
+            return {"success": False, "error": "角色不存在"}
+        
+        role = self._roles[role_id]
+        
+        # 更新允許的字段
+        allowed_fields = [
+            "name", "type", "personality", "aiConfig", "responsibilities",
+            "boundAccountId", "boundAccountPhone", "isActive"
+        ]
+        
+        for field in allowed_fields:
+            if field in updates:
+                if field in ["personality", "aiConfig"]:
+                    role[field] = {**role.get(field, {}), **updates[field]}
+                else:
+                    role[field] = updates[field]
+        
+        role["updatedAt"] = datetime.now().isoformat()
+        
+        self._save_json(self.roles_file, self._roles)
+        
+        return {"success": True, "role": role}
     
-    async def remove_role(self, role_id: int) -> Dict[str, Any]:
-        """Remove a role assignment"""
-        try:
-            await self.db.execute('DELETE FROM account_roles WHERE id = ?', (role_id,))
-            return {"success": True}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+    async def delete_role(self, role_id: str) -> Dict:
+        """刪除角色"""
+        if role_id not in self._roles:
+            return {"success": False, "error": "角色不存在"}
+        
+        del self._roles[role_id]
+        self._save_json(self.roles_file, self._roles)
+        
+        return {"success": True}
     
-    async def get_account_roles(self, account_phone: str) -> List[AccountRole]:
-        """Get all roles for an account"""
-        try:
-            rows = await self.db.fetch_all('''
-                SELECT * FROM account_roles 
-                WHERE account_phone = ? AND is_active = 1
-                ORDER BY role_type
-            ''', (account_phone,))
-            
-            return [self._row_to_role(row) for row in rows]
-            
-        except Exception as e:
-            self.log_callback(f"獲取角色失敗: {e}", "error")
-            return []
+    async def get_role(self, role_id: str) -> Optional[Dict]:
+        """獲取角色"""
+        return self._roles.get(role_id)
     
-    async def get_all_roles(
-        self,
-        role_type: Optional[str] = None,
-        active_only: bool = True
-    ) -> Dict[str, Any]:
-        """Get all role assignments"""
-        try:
-            query = 'SELECT * FROM account_roles WHERE 1=1'
-            params = []
-            
-            if role_type:
-                query += ' AND role_type = ?'
-                params.append(role_type)
-            
-            if active_only:
-                query += ' AND is_active = 1'
-            
-            query += ' ORDER BY account_phone, role_type'
-            
-            rows = await self.db.fetch_all(query, tuple(params))
-            
-            roles = [self._row_to_role(row).to_dict() for row in rows]
-            
-            # Group by account
-            by_account = {}
-            for role in roles:
-                phone = role['accountPhone']
-                if phone not in by_account:
-                    by_account[phone] = []
-                by_account[phone].append(role)
-            
-            return {
-                "success": True,
-                "roles": roles,
-                "byAccount": by_account,
-                "total": len(roles)
-            }
-            
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+    async def get_all_roles(self) -> List[Dict]:
+        """獲取所有角色"""
+        return list(self._roles.values())
     
-    async def get_accounts_by_role(self, role_type: str) -> List[str]:
-        """Get all accounts with a specific role"""
-        try:
-            rows = await self.db.fetch_all('''
-                SELECT DISTINCT account_phone FROM account_roles
-                WHERE role_type = ? AND is_active = 1
-            ''', (role_type,))
-            
-            return [row['account_phone'] for row in rows]
-            
-        except Exception:
-            return []
+    # ========== 劇本管理 ==========
     
-    def _row_to_role(self, row) -> AccountRole:
-        """Convert database row to AccountRole object"""
-        return AccountRole(
-            id=row['id'],
-            account_phone=row['account_phone'],
-            role_type=row['role_type'],
-            role_name=row['role_name'],
-            personality=json.loads(row['personality'] or '{}'),
-            speaking_style=row['speaking_style'] or 'professional',
-            emoji_frequency=row['emoji_frequency'] or 'medium',
-            response_speed=row['response_speed'] or 'medium',
-            custom_prompt=row['custom_prompt'],
-            avatar_url=row['avatar_url'],
-            bio=row['bio'],
-            is_active=bool(row['is_active']),
-            created_at=row['created_at'],
-            updated_at=row['updated_at']
-        )
+    async def add_script(self, script_data: Dict) -> Dict:
+        """添加新劇本"""
+        script_id = script_data.get('id') or f"script_{int(datetime.now().timestamp() * 1000)}"
+        
+        script = {
+            "id": script_id,
+            "name": script_data.get("name", ""),
+            "description": script_data.get("description", ""),
+            "scenario": script_data.get("scenario", "custom"),
+            "requiredRoles": script_data.get("requiredRoles", []),
+            "minRoleCount": script_data.get("minRoleCount", 1),
+            "stages": script_data.get("stages", []),
+            "stats": {
+                "useCount": 0,
+                "successCount": 0,
+                "avgDuration": 0,
+                "conversionRate": 0
+            },
+            "isActive": script_data.get("isActive", True),
+            "createdAt": datetime.now().isoformat(),
+            "updatedAt": datetime.now().isoformat()
+        }
+        
+        self._scripts[script_id] = script
+        self._save_json(self.scripts_file, self._scripts)
+        
+        return {"success": True, "script": script}
     
-    # ==================== AI Prompt Generation ====================
+    async def update_script(self, script_id: str, updates: Dict) -> Dict:
+        """更新劇本"""
+        if script_id not in self._scripts:
+            return {"success": False, "error": "劇本不存在"}
+        
+        script = self._scripts[script_id]
+        
+        allowed_fields = [
+            "name", "description", "scenario", "requiredRoles",
+            "minRoleCount", "stages", "isActive"
+        ]
+        
+        for field in allowed_fields:
+            if field in updates:
+                script[field] = updates[field]
+        
+        script["updatedAt"] = datetime.now().isoformat()
+        
+        self._save_json(self.scripts_file, self._scripts)
+        
+        return {"success": True, "script": script}
     
-    async def generate_role_prompt(
-        self,
-        account_phone: str,
-        role_type: str,
-        context: Dict[str, Any] = None
-    ) -> Optional[str]:
-        """Generate AI prompt for a specific role"""
-        try:
-            row = await self.db.fetch_one('''
-                SELECT * FROM account_roles
-                WHERE account_phone = ? AND role_type = ? AND is_active = 1
-            ''', (account_phone, role_type))
+    async def delete_script(self, script_id: str) -> Dict:
+        """刪除劇本"""
+        if script_id not in self._scripts:
+            return {"success": False, "error": "劇本不存在"}
+        
+        del self._scripts[script_id]
+        self._save_json(self.scripts_file, self._scripts)
+        
+        return {"success": True}
+    
+    async def get_script(self, script_id: str) -> Optional[Dict]:
+        """獲取劇本"""
+        return self._scripts.get(script_id)
+    
+    async def get_all_scripts(self) -> List[Dict]:
+        """獲取所有劇本"""
+        return list(self._scripts.values())
+    
+    # ========== 群組管理 ==========
+    
+    async def create_group(self, group_data: Dict) -> Dict:
+        """創建協作群組"""
+        group_id = group_data.get('id') or f"group_{int(datetime.now().timestamp() * 1000)}"
+        
+        group = {
+            "id": group_id,
+            "telegramGroupId": group_data.get("telegramGroupId"),
+            "groupTitle": group_data.get("groupTitle", ""),
+            "targetCustomer": group_data.get("targetCustomer", {}),
+            "participants": group_data.get("participants", []),
+            "scriptId": group_data.get("scriptId", ""),
+            "scriptName": group_data.get("scriptName", ""),
+            "status": "creating",
+            "currentStageId": None,
+            "currentStageOrder": 0,
+            "messagesSent": 0,
+            "customerMessages": 0,
+            "outcome": "pending",
+            "messageHistory": [],
+            "createdAt": datetime.now().isoformat(),
+            "updatedAt": datetime.now().isoformat()
+        }
+        
+        self._groups[group_id] = group
+        self._save_json(self.groups_file, self._groups)
+        
+        # 更新統計
+        self._stats["total_groups"] += 1
+        self._stats["active_groups"] += 1
+        self._save_json(self.stats_file, self._stats)
+        
+        return {"success": True, "group": group}
+    
+    async def update_group(self, group_id: str, updates: Dict) -> Dict:
+        """更新群組"""
+        if group_id not in self._groups:
+            return {"success": False, "error": "群組不存在"}
+        
+        group = self._groups[group_id]
+        old_status = group.get("status")
+        
+        allowed_fields = [
+            "telegramGroupId", "groupTitle", "status", "currentStageId",
+            "currentStageOrder", "messagesSent", "customerMessages", "outcome"
+        ]
+        
+        for field in allowed_fields:
+            if field in updates:
+                group[field] = updates[field]
+        
+        group["updatedAt"] = datetime.now().isoformat()
+        
+        # 狀態變化處理
+        new_status = group.get("status")
+        if old_status != new_status:
+            await self._handle_status_change(group_id, old_status, new_status)
+        
+        self._save_json(self.groups_file, self._groups)
+        
+        return {"success": True, "group": group}
+    
+    async def _handle_status_change(self, group_id: str, old_status: str, new_status: str):
+        """處理狀態變化"""
+        if new_status == "completed":
+            self._stats["active_groups"] = max(0, self._stats["active_groups"] - 1)
+            self._stats["completed_groups"] += 1
             
-            if not row:
-                return None
-            
-            role = self._row_to_role(row)
-            template = ROLE_TEMPLATES.get(role_type, {})
-            
-            # Use custom prompt if provided
-            if role.custom_prompt:
-                prompt = role.custom_prompt
-            else:
-                prompt = template.get("promptTemplate", "")
-            
-            # Replace placeholders
-            style_descriptions = {
-                "professional": "專業正式，用詞精準",
-                "friendly": "友好親切，像朋友一樣交流",
-                "casual": "隨意輕鬆，使用口語化表達",
-                "enthusiastic": "熱情洋溢，充滿活力",
-                "careful": "謹慎小心，多思考後發言",
-                "curious": "充滿好奇，喜歡提問"
-            }
-            
-            prompt = prompt.format(
-                name=role.role_name,
-                style=style_descriptions.get(role.speaking_style, role.speaking_style)
+            # 檢查是否轉化
+            group = self._groups.get(group_id)
+            if group and group.get("outcome") == "converted":
+                self._stats["total_conversions"] += 1
+        
+        elif new_status == "failed":
+            self._stats["active_groups"] = max(0, self._stats["active_groups"] - 1)
+        
+        # 更新轉化率
+        if self._stats["completed_groups"] > 0:
+            self._stats["conversion_rate"] = (
+                self._stats["total_conversions"] / self._stats["completed_groups"] * 100
             )
-            
-            # Add emoji instructions
-            emoji_instructions = {
-                "none": "不使用任何表情符號。",
-                "low": "偶爾使用表情符號，每2-3句話一個。",
-                "medium": "適度使用表情符號，讓對話更生動。",
-                "high": "經常使用表情符號，表達豐富情感。"
-            }
-            prompt += f"\n\n表情符號使用：{emoji_instructions.get(role.emoji_frequency, '')}"
-            
-            # Add context if provided
-            if context:
-                if context.get("targetUser"):
-                    prompt += f"\n\n目標用戶信息：{context['targetUser']}"
-                if context.get("scenario"):
-                    prompt += f"\n\n當前場景：{context['scenario']}"
-                if context.get("previousMessages"):
-                    prompt += f"\n\n之前的對話：{context['previousMessages']}"
-            
-            return prompt
-            
-        except Exception as e:
-            self.log_callback(f"生成提示詞失敗: {e}", "error")
-            return None
-    
-    async def get_response_delay(self, account_phone: str, role_type: str) -> tuple:
-        """Get response delay range based on role settings"""
-        import random
         
-        try:
-            row = await self.db.fetch_one('''
-                SELECT response_speed FROM account_roles
-                WHERE account_phone = ? AND role_type = ? AND is_active = 1
-            ''', (account_phone, role_type))
-            
-            speed = row['response_speed'] if row else 'medium'
-            
-            delay_ranges = {
-                "fast": (1, 5),
-                "medium": (5, 15),
-                "slow": (15, 60),
-                "random": (random.randint(1, 10), random.randint(20, 60))
-            }
-            
-            return delay_ranges.get(speed, (5, 15))
-            
-        except Exception:
-            return (5, 15)
+        self._save_json(self.stats_file, self._stats)
     
-    # ==================== Role Statistics ====================
+    async def add_message_to_group(self, group_id: str, message: Dict) -> Dict:
+        """添加消息到群組歷史"""
+        if group_id not in self._groups:
+            return {"success": False, "error": "群組不存在"}
+        
+        group = self._groups[group_id]
+        
+        msg = {
+            "id": f"msg_{int(datetime.now().timestamp() * 1000)}",
+            "senderId": message.get("senderId"),
+            "senderName": message.get("senderName"),
+            "roleId": message.get("roleId"),
+            "content": message.get("content", ""),
+            "isFromTarget": message.get("isFromTarget", False),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        if "messageHistory" not in group:
+            group["messageHistory"] = []
+        
+        group["messageHistory"].append(msg)
+        
+        # 更新統計
+        if message.get("isFromTarget"):
+            group["customerMessages"] = group.get("customerMessages", 0) + 1
+        else:
+            group["messagesSent"] = group.get("messagesSent", 0) + 1
+            self._stats["total_messages_sent"] += 1
+        
+        group["updatedAt"] = datetime.now().isoformat()
+        
+        self._save_json(self.groups_file, self._groups)
+        
+        return {"success": True, "message": msg}
     
-    async def get_role_stats(self) -> Dict[str, Any]:
-        """Get statistics about role assignments"""
-        try:
-            # Total roles
-            total_row = await self.db.fetch_one(
-                'SELECT COUNT(*) as count FROM account_roles WHERE is_active = 1'
+    async def get_group(self, group_id: str) -> Optional[Dict]:
+        """獲取群組"""
+        return self._groups.get(group_id)
+    
+    async def get_all_groups(self, status: str = None) -> List[Dict]:
+        """獲取所有群組（可按狀態篩選）"""
+        groups = list(self._groups.values())
+        
+        if status:
+            groups = [g for g in groups if g.get("status") == status]
+        
+        return groups
+    
+    async def get_active_groups(self) -> List[Dict]:
+        """獲取活躍群組"""
+        return await self.get_all_groups(status="running")
+    
+    # ========== 統計 ==========
+    
+    async def get_stats(self) -> Dict:
+        """獲取統計數據"""
+        # 更新即時統計
+        self._stats["active_groups"] = len([
+            g for g in self._groups.values() 
+            if g.get("status") in ["creating", "inviting", "running"]
+        ])
+        
+        if self._stats["total_groups"] > 0:
+            self._stats["avg_messages_per_group"] = (
+                self._stats["total_messages_sent"] / self._stats["total_groups"]
             )
-            total = total_row['count'] if total_row else 0
+        
+        return self._stats
+    
+    async def update_role_stats(self, role_id: str, success: bool):
+        """更新角色統計"""
+        if role_id in self._roles:
+            role = self._roles[role_id]
+            role["usageCount"] = role.get("usageCount", 0) + 1
+            if success:
+                role["successCount"] = role.get("successCount", 0) + 1
+            self._save_json(self.roles_file, self._roles)
+    
+    async def update_script_stats(self, script_id: str, success: bool, duration: int = 0):
+        """更新劇本統計"""
+        if script_id in self._scripts:
+            script = self._scripts[script_id]
+            stats = script.get("stats", {})
             
-            # By role type
-            type_rows = await self.db.fetch_all('''
-                SELECT role_type, COUNT(*) as count 
-                FROM account_roles WHERE is_active = 1
-                GROUP BY role_type
-            ''')
-            by_type = {row['role_type']: row['count'] for row in type_rows}
+            stats["useCount"] = stats.get("useCount", 0) + 1
+            if success:
+                stats["successCount"] = stats.get("successCount", 0) + 1
             
-            # Accounts with roles
-            accounts_row = await self.db.fetch_one('''
-                SELECT COUNT(DISTINCT account_phone) as count 
-                FROM account_roles WHERE is_active = 1
-            ''')
-            accounts_with_roles = accounts_row['count'] if accounts_row else 0
+            # 更新平均時長
+            if duration > 0:
+                old_avg = stats.get("avgDuration", 0)
+                old_count = stats.get("useCount", 1) - 1
+                if old_count > 0:
+                    stats["avgDuration"] = (old_avg * old_count + duration) / stats["useCount"]
+                else:
+                    stats["avgDuration"] = duration
             
-            return {
-                "success": True,
-                "total": total,
-                "byType": by_type,
-                "accountsWithRoles": accounts_with_roles
-            }
+            # 更新轉化率
+            if stats["useCount"] > 0:
+                stats["conversionRate"] = stats["successCount"] / stats["useCount"] * 100
             
+            script["stats"] = stats
+            self._save_json(self.scripts_file, self._scripts)
+    
+    # ========== 數據導出 ==========
+    
+    async def export_data(self) -> Dict:
+        """導出所有數據"""
+        return {
+            "roles": list(self._roles.values()),
+            "scripts": list(self._scripts.values()),
+            "groups": list(self._groups.values()),
+            "stats": self._stats,
+            "exportedAt": datetime.now().isoformat()
+        }
+    
+    async def import_data(self, data: Dict) -> Dict:
+        """導入數據"""
+        try:
+            if "roles" in data:
+                for role in data["roles"]:
+                    self._roles[role["id"]] = role
+                self._save_json(self.roles_file, self._roles)
+            
+            if "scripts" in data:
+                for script in data["scripts"]:
+                    self._scripts[script["id"]] = script
+                self._save_json(self.scripts_file, self._scripts)
+            
+            if "groups" in data:
+                for group in data["groups"]:
+                    self._groups[group["id"]] = group
+                self._save_json(self.groups_file, self._groups)
+            
+            return {"success": True, "imported": {
+                "roles": len(data.get("roles", [])),
+                "scripts": len(data.get("scripts", [])),
+                "groups": len(data.get("groups", []))
+            }}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
 
-# Global instance
-multi_role_manager: Optional[MultiRoleManager] = None
+# 單例實例
+_manager_instance: Optional[MultiRoleManager] = None
 
 
-async def init_multi_role_manager(db, event_callback=None, log_callback=None) -> MultiRoleManager:
-    """Initialize multi-role manager"""
-    global multi_role_manager
-    multi_role_manager = MultiRoleManager(
-        db=db,
-        event_callback=event_callback,
-        log_callback=log_callback
-    )
-    await multi_role_manager.initialize()
-    return multi_role_manager
-
-
-def get_multi_role_manager() -> Optional[MultiRoleManager]:
-    """Get multi-role manager instance"""
-    return multi_role_manager
+def get_multi_role_manager(data_dir: str = None) -> MultiRoleManager:
+    """獲取管理器單例"""
+    global _manager_instance
+    if _manager_instance is None:
+        _manager_instance = MultiRoleManager(data_dir)
+    return _manager_instance

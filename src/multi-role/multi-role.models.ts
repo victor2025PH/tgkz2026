@@ -52,6 +52,10 @@ export interface RoleDefinition {
   // 核心職責
   responsibilities: string[];
   
+  // 統計數據
+  usageCount?: number;      // 使用次數
+  successCount?: number;    // 成功次數
+  
   // 狀態
   isActive: boolean;
   createdAt: string;

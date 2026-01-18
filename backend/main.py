@@ -43,6 +43,7 @@ except ImportError:
     ErrorCategory = None
 from auto_funnel_manager import auto_funnel, AutoFunnelManager
 from vector_memory import vector_memory, VectorMemorySystem
+from multi_role_manager import get_multi_role_manager
 from scheduler import scheduler, TaskScheduler
 from cache_manager import init_cache_manager, get_cache_manager
 from fulltext_search import init_search_engine, get_search_engine
@@ -1783,6 +1784,49 @@ class BackendService:
             
             elif command == "get-settings":
                 await self.handle_get_settings()
+            
+            # ========== 多角色協作命令 ==========
+            elif command == "multi-role-add-role":
+                await self.handle_multi_role_add_role(payload)
+            
+            elif command == "multi-role-update-role":
+                await self.handle_multi_role_update_role(payload)
+            
+            elif command == "multi-role-delete-role":
+                await self.handle_multi_role_delete_role(payload)
+            
+            elif command == "multi-role-get-roles":
+                await self.handle_multi_role_get_roles()
+            
+            elif command == "multi-role-add-script":
+                await self.handle_multi_role_add_script(payload)
+            
+            elif command == "multi-role-update-script":
+                await self.handle_multi_role_update_script(payload)
+            
+            elif command == "multi-role-delete-script":
+                await self.handle_multi_role_delete_script(payload)
+            
+            elif command == "multi-role-get-scripts":
+                await self.handle_multi_role_get_scripts()
+            
+            elif command == "multi-role-create-group":
+                await self.handle_multi_role_create_group(payload)
+            
+            elif command == "multi-role-update-group":
+                await self.handle_multi_role_update_group(payload)
+            
+            elif command == "multi-role-get-groups":
+                await self.handle_multi_role_get_groups(payload)
+            
+            elif command == "multi-role-get-stats":
+                await self.handle_multi_role_get_stats()
+            
+            elif command == "multi-role-export-data":
+                await self.handle_multi_role_export_data()
+            
+            elif command == "multi-role-import-data":
+                await self.handle_multi_role_import_data(payload)
             
             elif command == "get-queue-status":
                 await self.handle_get_queue_status(payload)
@@ -16613,6 +16657,193 @@ class BackendService:
                 "discussion_id": discussion_id,
                 "messages": messages
             })
+    
+    # ========== 多角色協作處理器 ==========
+    
+    async def handle_multi_role_add_role(self, payload: Dict[str, Any]):
+        """添加角色"""
+        try:
+            manager = get_multi_role_manager()
+            result = await manager.add_role(payload)
+            
+            self.send_event("multi-role-role-added", result)
+            
+            if result.get("success"):
+                self.send_log(f"🎭 添加角色: {payload.get('name', '')}", "success")
+        except Exception as e:
+            self.send_log(f"❌ 添加角色失敗: {e}", "error")
+            self.send_event("multi-role-role-added", {"success": False, "error": str(e)})
+    
+    async def handle_multi_role_update_role(self, payload: Dict[str, Any]):
+        """更新角色"""
+        try:
+            manager = get_multi_role_manager()
+            role_id = payload.get("id")
+            result = await manager.update_role(role_id, payload)
+            
+            self.send_event("multi-role-role-updated", result)
+            
+            if result.get("success"):
+                self.send_log(f"🎭 更新角色: {role_id}", "success")
+        except Exception as e:
+            self.send_log(f"❌ 更新角色失敗: {e}", "error")
+            self.send_event("multi-role-role-updated", {"success": False, "error": str(e)})
+    
+    async def handle_multi_role_delete_role(self, payload: Dict[str, Any]):
+        """刪除角色"""
+        try:
+            manager = get_multi_role_manager()
+            role_id = payload.get("id")
+            result = await manager.delete_role(role_id)
+            
+            self.send_event("multi-role-role-deleted", result)
+            
+            if result.get("success"):
+                self.send_log(f"🗑️ 刪除角色: {role_id}", "success")
+        except Exception as e:
+            self.send_log(f"❌ 刪除角色失敗: {e}", "error")
+            self.send_event("multi-role-role-deleted", {"success": False, "error": str(e)})
+    
+    async def handle_multi_role_get_roles(self):
+        """獲取所有角色"""
+        try:
+            manager = get_multi_role_manager()
+            roles = await manager.get_all_roles()
+            
+            self.send_event("multi-role-roles", {"success": True, "roles": roles})
+        except Exception as e:
+            self.send_log(f"❌ 獲取角色失敗: {e}", "error")
+            self.send_event("multi-role-roles", {"success": False, "error": str(e)})
+    
+    async def handle_multi_role_add_script(self, payload: Dict[str, Any]):
+        """添加劇本"""
+        try:
+            manager = get_multi_role_manager()
+            result = await manager.add_script(payload)
+            
+            self.send_event("multi-role-script-added", result)
+            
+            if result.get("success"):
+                self.send_log(f"📜 添加劇本: {payload.get('name', '')}", "success")
+        except Exception as e:
+            self.send_log(f"❌ 添加劇本失敗: {e}", "error")
+            self.send_event("multi-role-script-added", {"success": False, "error": str(e)})
+    
+    async def handle_multi_role_update_script(self, payload: Dict[str, Any]):
+        """更新劇本"""
+        try:
+            manager = get_multi_role_manager()
+            script_id = payload.get("id")
+            result = await manager.update_script(script_id, payload)
+            
+            self.send_event("multi-role-script-updated", result)
+            
+            if result.get("success"):
+                self.send_log(f"📜 更新劇本: {script_id}", "success")
+        except Exception as e:
+            self.send_log(f"❌ 更新劇本失敗: {e}", "error")
+            self.send_event("multi-role-script-updated", {"success": False, "error": str(e)})
+    
+    async def handle_multi_role_delete_script(self, payload: Dict[str, Any]):
+        """刪除劇本"""
+        try:
+            manager = get_multi_role_manager()
+            script_id = payload.get("id")
+            result = await manager.delete_script(script_id)
+            
+            self.send_event("multi-role-script-deleted", result)
+            
+            if result.get("success"):
+                self.send_log(f"🗑️ 刪除劇本: {script_id}", "success")
+        except Exception as e:
+            self.send_log(f"❌ 刪除劇本失敗: {e}", "error")
+            self.send_event("multi-role-script-deleted", {"success": False, "error": str(e)})
+    
+    async def handle_multi_role_get_scripts(self):
+        """獲取所有劇本"""
+        try:
+            manager = get_multi_role_manager()
+            scripts = await manager.get_all_scripts()
+            
+            self.send_event("multi-role-scripts", {"success": True, "scripts": scripts})
+        except Exception as e:
+            self.send_log(f"❌ 獲取劇本失敗: {e}", "error")
+            self.send_event("multi-role-scripts", {"success": False, "error": str(e)})
+    
+    async def handle_multi_role_create_group(self, payload: Dict[str, Any]):
+        """創建協作群組"""
+        try:
+            manager = get_multi_role_manager()
+            result = await manager.create_group(payload)
+            
+            self.send_event("multi-role-group-created", result)
+            
+            if result.get("success"):
+                self.send_log(f"👥 創建協作群組: {payload.get('groupTitle', '')}", "success")
+        except Exception as e:
+            self.send_log(f"❌ 創建群組失敗: {e}", "error")
+            self.send_event("multi-role-group-created", {"success": False, "error": str(e)})
+    
+    async def handle_multi_role_update_group(self, payload: Dict[str, Any]):
+        """更新群組"""
+        try:
+            manager = get_multi_role_manager()
+            group_id = payload.get("id")
+            result = await manager.update_group(group_id, payload)
+            
+            self.send_event("multi-role-group-updated", result)
+        except Exception as e:
+            self.send_log(f"❌ 更新群組失敗: {e}", "error")
+            self.send_event("multi-role-group-updated", {"success": False, "error": str(e)})
+    
+    async def handle_multi_role_get_groups(self, payload: Dict[str, Any]):
+        """獲取群組列表"""
+        try:
+            manager = get_multi_role_manager()
+            status = payload.get("status") if payload else None
+            groups = await manager.get_all_groups(status)
+            
+            self.send_event("multi-role-groups", {"success": True, "groups": groups})
+        except Exception as e:
+            self.send_log(f"❌ 獲取群組失敗: {e}", "error")
+            self.send_event("multi-role-groups", {"success": False, "error": str(e)})
+    
+    async def handle_multi_role_get_stats(self):
+        """獲取統計數據"""
+        try:
+            manager = get_multi_role_manager()
+            stats = await manager.get_stats()
+            
+            self.send_event("multi-role-stats", {"success": True, "stats": stats})
+        except Exception as e:
+            self.send_log(f"❌ 獲取統計失敗: {e}", "error")
+            self.send_event("multi-role-stats", {"success": False, "error": str(e)})
+    
+    async def handle_multi_role_export_data(self):
+        """導出數據"""
+        try:
+            manager = get_multi_role_manager()
+            data = await manager.export_data()
+            
+            self.send_event("multi-role-data-exported", {"success": True, "data": data})
+            self.send_log("📦 多角色數據導出完成", "success")
+        except Exception as e:
+            self.send_log(f"❌ 導出數據失敗: {e}", "error")
+            self.send_event("multi-role-data-exported", {"success": False, "error": str(e)})
+    
+    async def handle_multi_role_import_data(self, payload: Dict[str, Any]):
+        """導入數據"""
+        try:
+            manager = get_multi_role_manager()
+            result = await manager.import_data(payload.get("data", {}))
+            
+            self.send_event("multi-role-data-imported", result)
+            
+            if result.get("success"):
+                self.send_log(f"📥 多角色數據導入完成", "success")
+        except Exception as e:
+            self.send_log(f"❌ 導入數據失敗: {e}", "error")
+            self.send_event("multi-role-data-imported", {"success": False, "error": str(e)})
             
         except Exception as e:
             self.send_log(f"❌ 獲取討論組消息失敗: {e}", "error")

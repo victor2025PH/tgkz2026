@@ -11,6 +11,7 @@ import { AutoGroupService } from './auto-group.service';
 import { CollaborationExecutorService } from './collaboration-executor.service';
 import { RoleEditorComponent } from './components/role-editor.component';
 import { ScriptEditorComponent } from './components/script-editor.component';
+import { CollaborationDashboardComponent } from './components/collaboration-dashboard.component';
 import { 
   RoleDefinition, 
   ScriptTemplate, 
@@ -19,12 +20,12 @@ import {
   ROLE_TYPE_META
 } from './multi-role.models';
 
-type MultiRoleTab = 'roles' | 'scripts' | 'groups' | 'settings';
+type MultiRoleTab = 'dashboard' | 'roles' | 'scripts' | 'groups' | 'settings';
 
 @Component({
   selector: 'app-multi-role-center',
   standalone: true,
-  imports: [CommonModule, FormsModule, RoleEditorComponent, ScriptEditorComponent],
+  imports: [CommonModule, FormsModule, RoleEditorComponent, ScriptEditorComponent, CollaborationDashboardComponent],
   template: `
     <div class="multi-role-center h-full flex flex-col bg-slate-900">
       <!-- 頂部標題欄 -->
@@ -93,6 +94,11 @@ type MultiRoleTab = 'roles' | 'scripts' | 'groups' | 'settings';
       <!-- Tab 內容區 -->
       <div class="flex-1 overflow-y-auto p-4">
         @switch (activeTab()) {
+          @case ('dashboard') {
+            <!-- 監控儀表板 -->
+            <app-collaboration-dashboard></app-collaboration-dashboard>
+          }
+          
           @case ('roles') {
             <!-- 角色管理 -->
             <div class="max-w-4xl mx-auto space-y-6">
@@ -530,7 +536,7 @@ export class MultiRoleCenterComponent {
   autoGroupService = inject(AutoGroupService);
   executorService = inject(CollaborationExecutorService);
   
-  activeTab = signal<MultiRoleTab>('roles');
+  activeTab = signal<MultiRoleTab>('dashboard');
   showAddRole = signal(false);
   
   // 編輯器狀態
@@ -540,6 +546,7 @@ export class MultiRoleCenterComponent {
   editingScript = signal<ScriptTemplate | null>(null);
   
   tabs = [
+    { id: 'dashboard' as const, icon: '📊', label: '監控中心' },
     { id: 'roles' as const, icon: '🎭', label: '角色管理' },
     { id: 'scripts' as const, icon: '📜', label: '劇本編排' },
     { id: 'groups' as const, icon: '🏠', label: '協作群組' },

@@ -2613,6 +2613,46 @@ class BackendService:
             elif command == "predict-send-time":
                 await self.handle_predict_send_time(payload)
 
+            # 流程自動化命令 (Phase C)
+            elif command == "get-automation-rules":
+                await self.handle_get_automation_rules(payload)
+            
+            elif command == "add-automation-rule":
+                await self.handle_add_automation_rule(payload)
+            
+            elif command == "update-automation-rule":
+                await self.handle_update_automation_rule(payload)
+            
+            elif command == "delete-automation-rule":
+                await self.handle_delete_automation_rule(payload)
+            
+            elif command == "get-reminders":
+                await self.handle_get_reminders(payload)
+            
+            elif command == "create-reminder":
+                await self.handle_create_reminder(payload)
+            
+            elif command == "snooze-reminder":
+                await self.handle_snooze_reminder(payload)
+            
+            elif command == "complete-reminder":
+                await self.handle_complete_reminder(payload)
+            
+            elif command == "process-stage-event":
+                await self.handle_process_stage_event(payload)
+            
+            elif command == "get-stage-flow":
+                await self.handle_get_stage_flow(payload)
+            
+            elif command == "create-ab-test":
+                await self.handle_create_ab_test(payload)
+            
+            elif command == "start-ab-test":
+                await self.handle_start_ab_test(payload)
+            
+            elif command == "get-ab-test-results":
+                await self.handle_get_ab_test_results(payload)
+
             else:
                 self.send_log(f"Unknown command: {command}", "warning")
         
@@ -14723,6 +14763,250 @@ class BackendService:
                 "success": False,
                 "error": str(e)
             })
+
+    # ==================== 流程自動化 Handlers (Phase C) ====================
+    
+    async def handle_get_automation_rules(self, payload: Dict[str, Any]):
+        """獲取自動化規則"""
+        try:
+            from automation_rules import get_automation_engine
+            
+            engine = get_automation_engine()
+            rules_data = engine.to_dict()
+            
+            self.send_event("automation-rules", {
+                "success": True,
+                **rules_data
+            })
+        except Exception as e:
+            print(f"[Backend] Error getting automation rules: {e}", file=sys.stderr)
+            self.send_event("automation-rules", {"success": False, "error": str(e)})
+    
+    async def handle_add_automation_rule(self, payload: Dict[str, Any]):
+        """添加自動化規則"""
+        try:
+            from automation_rules import get_automation_engine, AutomationRule, Trigger, Action, TriggerType, ActionType, Condition, ConditionOperator
+            
+            engine = get_automation_engine()
+            
+            # 構建規則
+            triggers = []
+            for t in payload.get("triggers", []):
+                conditions = [
+                    Condition(c["field"], ConditionOperator(c["operator"]), c["value"])
+                    for c in t.get("conditions", [])
+                ]
+                triggers.append(Trigger(TriggerType(t["type"]), conditions, t.get("params", {})))
+            
+            actions = [
+                Action(ActionType(a["type"]), a.get("params", {}), a.get("delay_seconds", 0))
+                for a in payload.get("actions", [])
+            ]
+            
+            rule = AutomationRule(
+                id=payload.get("id", f"rule_{len(engine.rules)}"),
+                name=payload.get("name", "新規則"),
+                description=payload.get("description", ""),
+                triggers=triggers,
+                actions=actions,
+                enabled=payload.get("enabled", True),
+                priority=payload.get("priority", 0)
+            )
+            
+            engine.add_rule(rule)
+            
+            self.send_event("automation-rule-added", {"success": True, "ruleId": rule.id})
+        except Exception as e:
+            print(f"[Backend] Error adding automation rule: {e}", file=sys.stderr)
+            self.send_event("automation-rule-added", {"success": False, "error": str(e)})
+    
+    async def handle_update_automation_rule(self, payload: Dict[str, Any]):
+        """更新自動化規則"""
+        try:
+            from automation_rules import get_automation_engine
+            
+            engine = get_automation_engine()
+            rule_id = payload.get("ruleId")
+            updates = payload.get("updates", {})
+            
+            engine.update_rule(rule_id, updates)
+            
+            self.send_event("automation-rule-updated", {"success": True, "ruleId": rule_id})
+        except Exception as e:
+            print(f"[Backend] Error updating automation rule: {e}", file=sys.stderr)
+            self.send_event("automation-rule-updated", {"success": False, "error": str(e)})
+    
+    async def handle_delete_automation_rule(self, payload: Dict[str, Any]):
+        """刪除自動化規則"""
+        try:
+            from automation_rules import get_automation_engine
+            
+            engine = get_automation_engine()
+            rule_id = payload.get("ruleId")
+            
+            engine.remove_rule(rule_id)
+            
+            self.send_event("automation-rule-deleted", {"success": True, "ruleId": rule_id})
+        except Exception as e:
+            print(f"[Backend] Error deleting automation rule: {e}", file=sys.stderr)
+            self.send_event("automation-rule-deleted", {"success": False, "error": str(e)})
+    
+    async def handle_get_reminders(self, payload: Dict[str, Any]):
+        """獲取提醒列表"""
+        try:
+            from follow_up_reminder import get_reminder_system
+            
+            system = get_reminder_system()
+            reminders = system.get_all_reminders()
+            stats = system.get_stats()
+            
+            self.send_event("reminders", {
+                "success": True,
+                "reminders": [
+                    {
+                        "id": r.id,
+                        "leadId": r.lead_id,
+                        "leadName": r.lead_name,
+                        "type": r.type.value,
+                        "priority": r.priority.value,
+                        "message": r.message,
+                        "dueAt": r.due_at.isoformat(),
+                        "isDue": r.is_due(),
+                        "snoozeCount": r.snooze_count
+                    }
+                    for r in reminders
+                ],
+                "stats": stats
+            })
+        except Exception as e:
+            print(f"[Backend] Error getting reminders: {e}", file=sys.stderr)
+            self.send_event("reminders", {"success": False, "error": str(e)})
+    
+    async def handle_create_reminder(self, payload: Dict[str, Any]):
+        """創建提醒"""
+        try:
+            from follow_up_reminder import create_follow_up_reminder
+            
+            result = await create_follow_up_reminder(
+                lead_id=payload.get("leadId"),
+                lead_name=payload.get("leadName", ""),
+                message=payload.get("message", ""),
+                priority=payload.get("priority", "medium"),
+                due_in_minutes=payload.get("dueInMinutes", 0)
+            )
+            
+            self.send_event("reminder-created", {"success": True, **result})
+        except Exception as e:
+            print(f"[Backend] Error creating reminder: {e}", file=sys.stderr)
+            self.send_event("reminder-created", {"success": False, "error": str(e)})
+    
+    async def handle_snooze_reminder(self, payload: Dict[str, Any]):
+        """延後提醒"""
+        try:
+            from follow_up_reminder import get_reminder_system
+            
+            system = get_reminder_system()
+            system.snooze_reminder(
+                payload.get("reminderId"),
+                payload.get("minutes", 30)
+            )
+            
+            self.send_event("reminder-snoozed", {"success": True})
+        except Exception as e:
+            print(f"[Backend] Error snoozing reminder: {e}", file=sys.stderr)
+            self.send_event("reminder-snoozed", {"success": False, "error": str(e)})
+    
+    async def handle_complete_reminder(self, payload: Dict[str, Any]):
+        """完成提醒"""
+        try:
+            from follow_up_reminder import get_reminder_system
+            
+            system = get_reminder_system()
+            system.complete_reminder(payload.get("reminderId"))
+            
+            self.send_event("reminder-completed", {"success": True})
+        except Exception as e:
+            print(f"[Backend] Error completing reminder: {e}", file=sys.stderr)
+            self.send_event("reminder-completed", {"success": False, "error": str(e)})
+    
+    async def handle_process_stage_event(self, payload: Dict[str, Any]):
+        """處理階段流轉事件"""
+        try:
+            from stage_flow import process_stage_event
+            
+            result = await process_stage_event(
+                lead_id=payload.get("leadId"),
+                current_stage=payload.get("currentStage"),
+                trigger=payload.get("trigger"),
+                event_data=payload.get("eventData", {})
+            )
+            
+            self.send_event("stage-event-processed", {
+                "success": True,
+                "transition": result
+            })
+        except Exception as e:
+            print(f"[Backend] Error processing stage event: {e}", file=sys.stderr)
+            self.send_event("stage-event-processed", {"success": False, "error": str(e)})
+    
+    async def handle_get_stage_flow(self, payload: Dict[str, Any]):
+        """獲取階段流轉配置"""
+        try:
+            from stage_flow import get_stage_flow_manager
+            
+            manager = get_stage_flow_manager()
+            visualization = manager.get_flow_visualization()
+            
+            self.send_event("stage-flow", {"success": True, **visualization})
+        except Exception as e:
+            print(f"[Backend] Error getting stage flow: {e}", file=sys.stderr)
+            self.send_event("stage-flow", {"success": False, "error": str(e)})
+    
+    async def handle_create_ab_test(self, payload: Dict[str, Any]):
+        """創建 A/B 測試"""
+        try:
+            from ab_testing import create_ab_test
+            
+            result = await create_ab_test(
+                name=payload.get("name", "新測試"),
+                variants=payload.get("variants", []),
+                description=payload.get("description", ""),
+                primary_metric=payload.get("primaryMetric", "response_rate")
+            )
+            
+            self.send_event("ab-test-created", {"success": True, **result})
+        except Exception as e:
+            print(f"[Backend] Error creating A/B test: {e}", file=sys.stderr)
+            self.send_event("ab-test-created", {"success": False, "error": str(e)})
+    
+    async def handle_start_ab_test(self, payload: Dict[str, Any]):
+        """開始 A/B 測試"""
+        try:
+            from ab_testing import get_ab_testing_manager
+            
+            manager = get_ab_testing_manager()
+            success = manager.start_test(payload.get("testId"))
+            
+            self.send_event("ab-test-started", {"success": success})
+        except Exception as e:
+            print(f"[Backend] Error starting A/B test: {e}", file=sys.stderr)
+            self.send_event("ab-test-started", {"success": False, "error": str(e)})
+    
+    async def handle_get_ab_test_results(self, payload: Dict[str, Any]):
+        """獲取 A/B 測試結果"""
+        try:
+            from ab_testing import get_ab_testing_manager
+            
+            manager = get_ab_testing_manager()
+            results = manager.get_test_results(payload.get("testId"))
+            
+            self.send_event("ab-test-results", {
+                "success": True,
+                "results": results
+            })
+        except Exception as e:
+            print(f"[Backend] Error getting A/B test results: {e}", file=sys.stderr)
+            self.send_event("ab-test-results", {"success": False, "error": str(e)})
 
     # ==================== Resource Discovery Handlers ====================
     

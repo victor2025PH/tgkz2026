@@ -44,6 +44,12 @@ import { QuickWorkflowComponent, Workflow } from './quick-workflow.component';
 import { AnalyticsCenterComponent } from './analytics/analytics-center.component';
 // 自動化中心整合組件
 import { AutomationCenterComponent } from './automation/automation-center.component';
+// AI 中心組件
+import { AICenterComponent } from './ai-center/ai-center.component';
+// 多角色協作組件
+import { MultiRoleCenterComponent } from './multi-role/multi-role-center.component';
+// 觸發動作配置組件
+import { TriggerActionConfigComponent } from './automation/components/trigger-action-config.component';
 
 // 更新視圖類型：合併 monitoring 和 alerts 為 runtime-logs，添加 add-account 和 api-credentials
 type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-center' | 'runtime-logs' | 'settings' | 'analytics' | 'analytics-center' | 'logs' | 'performance' | 'alerts' | 'profile' | 'membership-center';
@@ -55,7 +61,7 @@ type LeadsViewMode = 'kanban' | 'list';
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
-  imports: [CommonModule, FormsModule, PerformanceMonitorComponent, AnalyticsChartsComponent, ToastComponent, ProgressDialogComponent, MembershipDialogComponent, UpgradePromptComponent, PaymentComponent, LoadingOverlayComponent, OnboardingComponent, LanguageSwitcherCompactComponent, LoginComponent, ProfileComponent, MembershipCenterComponent, QrLoginComponent, AccountCardListComponent, AddAccountPageComponent, ApiCredentialManagerComponent, LeadManagementComponent, AnalyticsDashboardComponent, QueueProgressComponent, QuickWorkflowComponent, AnalyticsCenterComponent, AutomationCenterComponent],
+  imports: [CommonModule, FormsModule, PerformanceMonitorComponent, AnalyticsChartsComponent, ToastComponent, ProgressDialogComponent, MembershipDialogComponent, UpgradePromptComponent, PaymentComponent, LoadingOverlayComponent, OnboardingComponent, LanguageSwitcherCompactComponent, LoginComponent, ProfileComponent, MembershipCenterComponent, QrLoginComponent, AccountCardListComponent, AddAccountPageComponent, ApiCredentialManagerComponent, LeadManagementComponent, AnalyticsDashboardComponent, QueueProgressComponent, QuickWorkflowComponent, AnalyticsCenterComponent, AutomationCenterComponent, AICenterComponent, MultiRoleCenterComponent, TriggerActionConfigComponent],
   providers: [AccountLoaderService, ToastService],
   styles: [`
     /* 錯誤引導高亮動畫 */

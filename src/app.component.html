@@ -5663,7 +5663,11 @@
         </div>
       }
       @case ('multi-role') {
-        <!-- 多角色協作頁面 -->
+        <!-- 多角色協作頁面 - 使用整合組件 -->
+        <app-multi-role-center class="block h-full -m-4"></app-multi-role-center>
+        
+        <!-- 舊版 UI（已隱藏，保留作為備份）-->
+        <div class="hidden">
         <h2 class="text-4xl font-bold mb-6 text-slate-900 dark:text-white flex items-center gap-3">
           <span class="text-3xl">🎭</span> 多角色協作系統
         </h2>
@@ -5946,9 +5950,14 @@
             }
           </div>
         }
+        </div> <!-- 關閉隱藏的舊版多角色 UI -->
       }
       @case ('ai-center') {
-        <!-- AI 中心頁面 -->
+        <!-- AI 中心頁面 - 使用整合組件 -->
+        <app-ai-center class="block h-full -m-4"></app-ai-center>
+        
+        <!-- 舊版 UI（已隱藏，保留作為備份）-->
+        <div class="hidden">
         <h2 class="text-4xl font-bold mb-6 text-slate-900 dark:text-white flex items-center gap-3">
           <span class="text-3xl">🧠</span> {{ t('aiCenter') }}
         </h2>
@@ -6768,6 +6777,7 @@
             </div>
           </div>
         }
+        </div> <!-- 關閉隱藏的舊版 AI 中心 UI -->
       }
       @case ('runtime-logs') {
         <!-- 運行日誌頁面（合併監控中心和告警） -->

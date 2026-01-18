@@ -36,6 +36,58 @@
       [cancellable]="progressDialog().cancellable">
     </app-progress-dialog>
     
+    <!-- 刪除確認對話框 -->
+    @if(deleteConfirmDialog().show) {
+      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center" 
+           (click)="cancelDeleteLeads()">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+             (click)="$event.stopPropagation()">
+          <!-- 標題 -->
+          <div class="px-6 py-4 border-b border-slate-700 flex items-center gap-3">
+            <div class="p-2 bg-red-500/20 rounded-lg">
+              <svg class="h-6 w-6 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                <line x1="10" y1="11" x2="10" y2="17"/>
+                <line x1="14" y1="11" x2="14" y2="17"/>
+              </svg>
+            </div>
+            <h3 class="text-lg font-bold text-white">確認刪除</h3>
+          </div>
+          
+          <!-- 內容 -->
+          <div class="px-6 py-6">
+            @if(deleteConfirmDialog().type === 'single') {
+              <p class="text-slate-300 mb-4">
+                確定要刪除客戶 <span class="font-bold text-cyan-400">@{{ deleteConfirmDialog().lead?.username || deleteConfirmDialog().lead?.userId }}</span> 嗎？
+              </p>
+            } @else {
+              <p class="text-slate-300 mb-4">
+                確定要刪除 <span class="font-bold text-red-400">{{ deleteConfirmDialog().count }}</span> 個選中的客戶嗎？
+              </p>
+            }
+            <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-sm text-red-300">
+              ⚠️ 此操作無法撤銷，所有相關記錄將被永久刪除。
+            </div>
+          </div>
+          
+          <!-- 按鈕 -->
+          <div class="px-6 py-4 border-t border-slate-700 flex justify-end gap-3">
+            <button (click)="cancelDeleteLeads()" 
+                    class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors">
+              取消
+            </button>
+            <button (click)="executeDeleteLeads()" 
+                    class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex items-center gap-2">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+              </svg>
+              確認刪除
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+    
     <!-- Sidebar -->
     <aside class="w-64 backdrop-blur-sm flex-shrink-0 flex flex-col sidebar" 
            style="background-color: var(--bg-sidebar); border-right: 1px solid var(--border-default);">
@@ -4462,57 +4514,86 @@
             <!-- 卡片網格視圖 -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 @for(lead of filteredLeads(); track lead.id) {
-                    <div class="bg-slate-900/50 backdrop-blur-sm border border-slate-700/50 rounded-xl shadow-lg overflow-hidden hover:border-cyan-500/50 transition-all"
+                    <div class="group bg-slate-900/50 backdrop-blur-sm border rounded-xl shadow-lg overflow-hidden transition-all relative"
+                         [class.border-cyan-500/50]="isLeadSelected(lead.id)"
+                         [class.border-slate-700/50]="!isLeadSelected(lead.id)"
+                         [class.ring-2]="isLeadSelected(lead.id)"
+                         [class.ring-cyan-500/30]="isLeadSelected(lead.id)"
                          (click)="closeLeadMenu()">
                         <!-- 狀態標籤 -->
                         <div class="h-1" [class]="getStatusBarColor(lead.status)"></div>
+                        
+                        <!-- 懸停操作按鈕 -->
+                        <div class="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                          <button (click)="$event.stopPropagation(); confirmDeleteLead(lead)" 
+                                  class="p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-lg transition-colors"
+                                  title="刪除">
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                          </button>
+                        </div>
+                        
                         <div class="p-4">
-                            <div (click)="openLeadDetailModal(lead)" class="cursor-pointer">
-                                <div class="flex items-start justify-between mb-2">
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
-                                          {{ (lead.username || lead.firstName || lead.userId || '?')[0].toUpperCase() }}
+                            <!-- 勾選框 + 用戶信息 -->
+                            <div class="flex items-start gap-2 mb-2">
+                                <!-- 勾選框 -->
+                                <div class="flex-shrink-0 pt-1">
+                                  <input type="checkbox" 
+                                         [checked]="isLeadSelected(lead.id)" 
+                                         (change)="$event.stopPropagation(); toggleLeadSelection(lead.id)"
+                                         (click)="$event.stopPropagation()"
+                                         class="w-4 h-4 rounded border-slate-500 text-cyan-500 focus:ring-cyan-500/50 cursor-pointer bg-slate-800">
+                                </div>
+                                
+                                <div (click)="openLeadDetailModal(lead)" class="cursor-pointer flex-1 min-w-0">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                                              {{ (lead.username || lead.firstName || lead.userId || '?')[0].toUpperCase() }}
+                                            </div>
+                                            <div class="min-w-0 flex-1">
+                                                <p class="font-bold text-cyan-400 truncate text-sm">
+                                                  @if(lead.username) {
+                                                    @<!---->{{ lead.username }}
+                                                  } @else if(lead.firstName) {
+                                                    {{ lead.firstName }}
+                                                  } @else {
+                                                    ID:{{ lead.userId | slice:0:10 }}
+                                                  }
+                                                </p>
+                                                <p class="text-xs text-slate-400 truncate">
+                                                  @if(lead.firstName || lead.lastName) {
+                                                    {{ lead.firstName }} {{ lead.lastName }}
+                                                  } @else {
+                                                    {{ (lead.sourceGroup || '') | slice:0:15 }}
+                                                  }
+                                                </p>
+                                            </div>
                                         </div>
-                                        <div class="min-w-0 flex-1">
-                                            <p class="font-bold text-cyan-400 truncate">
-                                              @if(lead.username) {
-                                                @<!---->{{ lead.username }}
-                                              } @else if(lead.firstName) {
-                                                {{ lead.firstName }}
-                                              } @else {
-                                                ID:{{ lead.userId | slice:0:10 }}
-                                              }
-                                            </p>
-                                            <p class="text-xs text-slate-400 truncate">
-                                              @if(lead.firstName || lead.lastName) {
-                                                {{ lead.firstName }} {{ lead.lastName }}
-                                              } @else {
-                                                {{ lead.sourceGroup | slice:0:20 }}
-                                              }
-                                            </p>
+                                        <div class="flex items-center gap-1 flex-shrink-0">
+                                          <span class="h-2 w-2 rounded-full" [class]="getOnlineStatusColor(lead.onlineStatus)"></span>
+                                          @if(lead.intentScore) {
+                                            <span class="text-xs px-1.5 py-0.5 rounded-full" 
+                                                  [class.bg-red-500/20]="lead.intentScore >= 70"
+                                                  [class.text-red-400]="lead.intentScore >= 70"
+                                                  [class.bg-amber-500/20]="lead.intentScore >= 40 && lead.intentScore < 70"
+                                                  [class.text-amber-400]="lead.intentScore >= 40 && lead.intentScore < 70"
+                                                  [class.bg-slate-500/20]="lead.intentScore < 40"
+                                                  [class.text-slate-400]="lead.intentScore < 40">
+                                              {{ lead.intentScore }}分
+                                            </span>
+                                          }
                                         </div>
                                     </div>
-                                    <div class="flex items-center gap-1">
-                                      <span class="h-2 w-2 rounded-full" [class]="getOnlineStatusColor(lead.onlineStatus)"></span>
-                                      @if(lead.intentScore) {
-                                        <span class="text-xs px-1.5 py-0.5 rounded-full" 
-                                              [class.bg-red-500/20]="lead.intentScore >= 70"
-                                              [class.text-red-400]="lead.intentScore >= 70"
-                                              [class.bg-amber-500/20]="lead.intentScore >= 40 && lead.intentScore < 70"
-                                              [class.text-amber-400]="lead.intentScore >= 40 && lead.intentScore < 70"
-                                              [class.bg-slate-500/20]="lead.intentScore < 40"
-                                              [class.text-slate-400]="lead.intentScore < 40">
-                                          {{ lead.intentScore }}分
-                                        </span>
-                                      }
-                                    </div>
                                 </div>
-                                <div class="flex items-center gap-2 mb-2">
-                                  <span class="text-xs px-2 py-0.5 rounded-full" [class]="getStatusColor(lead.status || 'New')">{{ t(lead.status || 'New') }}</span>
-                                  <span class="text-xs text-slate-500">{{ (lead.sourceGroup || '') | slice:0:20 }}...</span>
-                                </div>
-                                <p class="text-xs font-mono bg-slate-800/50 rounded px-2 py-1 text-slate-400 truncate">🔑 {{ lead.triggeredKeyword }}</p>
-                                <p class="text-xs text-slate-500 mt-2">{{ lead.timestamp | date:'MM/dd HH:mm' }}</p>
+                            </div>
+                            <!-- 狀態和來源 -->
+                            <div class="flex items-center gap-2 mb-2 ml-6">
+                              <span class="text-xs px-2 py-0.5 rounded-full" [class]="getStatusColor(lead.status || 'New')">{{ t(lead.status || 'New') }}</span>
+                              <span class="text-xs text-slate-500 truncate">{{ (lead.sourceGroup || '') | slice:0:15 }}...</span>
+                            </div>
+                            <div class="ml-6">
+                              <p class="text-xs font-mono bg-slate-800/50 rounded px-2 py-1 text-slate-400 truncate">🔑 {{ lead.triggeredKeyword || '無' }}</p>
+                              <p class="text-xs text-slate-500 mt-2">{{ lead.timestamp | date:'MM/dd HH:mm' }}</p>
                             </div>
                             <div class="flex gap-2 mt-3 pt-3 border-t border-slate-700/50">
                                 <button (click)="openLeadDetailModal(lead)" 
@@ -4551,6 +4632,47 @@
                   </div>
                 }
             </div>
+            
+            <!-- 批量操作浮動欄 -->
+            @if(hasSelectedLeads()) {
+              <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900/95 backdrop-blur-sm border border-cyan-500/30 rounded-2xl shadow-2xl px-6 py-4 z-50 flex items-center gap-4">
+                <div class="flex items-center gap-3">
+                  <span class="text-cyan-400 font-bold">✓ 已選 {{ selectedLeadsCount() }} 個</span>
+                  <button (click)="selectAllFilteredLeads()" class="text-xs text-slate-400 hover:text-cyan-400 underline">
+                    全選 ({{ filteredLeads().length }})
+                  </button>
+                  <button (click)="clearLeadSelection()" class="text-xs text-slate-400 hover:text-slate-300 underline">
+                    取消選擇
+                  </button>
+                </div>
+                <div class="h-6 w-px bg-slate-600"></div>
+                <div class="flex items-center gap-2">
+                  <!-- 更新狀態 -->
+                  <select (change)="batchUpdateLeadStatus($any($event.target).value); $any($event.target).value = ''" 
+                          class="bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-sm rounded-lg px-3 py-1.5 cursor-pointer hover:bg-cyan-500/30">
+                    <option value="" disabled selected>📝 更新狀態</option>
+                    @for(status of leadStatuses; track status) {
+                      <option [value]="status">{{ t(status) }}</option>
+                    }
+                  </select>
+                  <!-- 添加標籤 -->
+                  <button (click)="showBatchTagSelector.set(!showBatchTagSelector())" 
+                          class="flex items-center gap-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-sm px-3 py-1.5 rounded-lg">
+                    🏷️ 標籤
+                  </button>
+                  <!-- 導出 -->
+                  <button (click)="exportSelectedLeads()" 
+                          class="flex items-center gap-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-sm px-3 py-1.5 rounded-lg">
+                    📤 導出
+                  </button>
+                  <!-- 批量刪除 -->
+                  <button (click)="confirmBatchDeleteLeads()" 
+                          class="flex items-center gap-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm px-3 py-1.5 rounded-lg">
+                    🗑️ 刪除
+                  </button>
+                </div>
+              </div>
+            }
         } @else {
             <div class="bg-slate-100/50 dark:bg-slate-900/50 backdrop-blur-sm border border-slate-500/20 rounded-xl shadow-lg overflow-hidden">
                 <table class="w-full text-left">

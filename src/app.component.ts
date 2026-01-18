@@ -8829,6 +8829,99 @@ export class AppComponent implements OnDestroy, OnInit {
     return this.selectedLeadIds().has(leadId);
   }
   
+  // 全選當前篩選的 leads
+  selectAllFilteredLeads() {
+    const allIds = new Set(this.filteredLeads().map(l => l.id));
+    this.selectedLeadIds.set(allIds);
+  }
+  
+  // 刪除確認狀態
+  deleteConfirmDialog = signal<{
+    show: boolean;
+    type: 'single' | 'batch';
+    lead?: CapturedLead;
+    count?: number;
+  }>({ show: false, type: 'single' });
+  
+  // 確認刪除單個 lead
+  confirmDeleteLead(lead: CapturedLead) {
+    this.deleteConfirmDialog.set({
+      show: true,
+      type: 'single',
+      lead
+    });
+  }
+  
+  // 確認批量刪除
+  confirmBatchDeleteLeads() {
+    const count = this.selectedLeadsCount();
+    if (count === 0) {
+      this.toastService.warning('請先選擇要刪除的客戶');
+      return;
+    }
+    this.deleteConfirmDialog.set({
+      show: true,
+      type: 'batch',
+      count
+    });
+  }
+  
+  // 執行刪除
+  executeDeleteLeads() {
+    const dialog = this.deleteConfirmDialog();
+    
+    if (dialog.type === 'single' && dialog.lead) {
+      // 單個刪除
+      this.ipcService.send('delete-lead', { leadId: dialog.lead.id });
+      this.leads.update(leads => leads.filter(l => l.id !== dialog.lead!.id));
+      this.toastService.success(`已刪除客戶 @${dialog.lead.username || dialog.lead.userId}`);
+    } else if (dialog.type === 'batch') {
+      // 批量刪除
+      const leadIds = Array.from(this.selectedLeadIds());
+      this.ipcService.send('batch-delete-leads', { leadIds });
+      this.leads.update(leads => leads.filter(l => !this.selectedLeadIds().has(l.id)));
+      this.toastService.success(`已刪除 ${leadIds.length} 個客戶`);
+      this.clearLeadSelection();
+    }
+    
+    this.deleteConfirmDialog.set({ show: false, type: 'single' });
+  }
+  
+  // 取消刪除
+  cancelDeleteLeads() {
+    this.deleteConfirmDialog.set({ show: false, type: 'single' });
+  }
+  
+  // 導出選中的 leads
+  exportSelectedLeads() {
+    const leadIds = Array.from(this.selectedLeadIds());
+    if (leadIds.length === 0) {
+      this.toastService.warning('請先選擇要導出的客戶');
+      return;
+    }
+    const selectedLeads = this.leads().filter(l => leadIds.includes(l.id));
+    // 生成 CSV
+    const headers = ['ID', '用戶名', '姓名', '狀態', '來源', '關鍵詞', '時間'];
+    const rows = selectedLeads.map(l => [
+      l.userId,
+      l.username || '',
+      `${l.firstName || ''} ${l.lastName || ''}`.trim(),
+      l.status,
+      l.sourceGroup,
+      l.triggeredKeyword,
+      new Date(l.timestamp).toLocaleString()
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `leads_export_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.toastService.success(`已導出 ${selectedLeads.length} 個客戶`);
+  }
+  
   // Batch update status
   batchUpdateLeadStatus(newStatus: LeadStatus) {
     // 检查批量操作权限

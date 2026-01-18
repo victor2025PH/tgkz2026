@@ -12,6 +12,8 @@ import { CollaborationExecutorService } from './collaboration-executor.service';
 import { RoleEditorComponent } from './components/role-editor.component';
 import { ScriptEditorComponent } from './components/script-editor.component';
 import { CollaborationDashboardComponent } from './components/collaboration-dashboard.component';
+import { RoleLibraryComponent } from './components/role-library.component';
+import { ScenarioSelectorComponent } from './components/scenario-selector.component';
 import { 
   RoleDefinition, 
   ScriptTemplate, 
@@ -19,13 +21,14 @@ import {
   RoleType,
   ROLE_TYPE_META
 } from './multi-role.models';
+import { PresetScenario } from './preset-scenarios';
 
-type MultiRoleTab = 'dashboard' | 'roles' | 'scripts' | 'groups' | 'settings';
+type MultiRoleTab = 'dashboard' | 'library' | 'roles' | 'scenarios' | 'scripts' | 'groups' | 'settings';
 
 @Component({
   selector: 'app-multi-role-center',
   standalone: true,
-  imports: [CommonModule, FormsModule, RoleEditorComponent, ScriptEditorComponent, CollaborationDashboardComponent],
+  imports: [CommonModule, FormsModule, RoleEditorComponent, ScriptEditorComponent, CollaborationDashboardComponent, RoleLibraryComponent, ScenarioSelectorComponent],
   template: `
     <div class="multi-role-center h-full flex flex-col bg-slate-900">
       <!-- 頂部標題欄 -->
@@ -97,6 +100,31 @@ type MultiRoleTab = 'dashboard' | 'roles' | 'scripts' | 'groups' | 'settings';
           @case ('dashboard') {
             <!-- 監控儀表板 -->
             <app-collaboration-dashboard></app-collaboration-dashboard>
+          }
+          
+          @case ('library') {
+            <!-- 角色庫 (50個預設角色) -->
+            <app-role-library 
+              (roleAdded)="onPresetRoleAdded($event)"
+              (roleEdit)="onPresetRoleEdit($event)">
+            </app-role-library>
+          }
+          
+          @case ('scenarios') {
+            <!-- 場景模板 (10個預設場景) -->
+            <div class="space-y-6">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                    <span>🎬</span> 場景模板庫
+                  </h2>
+                  <p class="text-sm text-slate-400 mt-1">10個預設場景，快速啟動多角色協作</p>
+                </div>
+              </div>
+              <app-scenario-selector 
+                (scenarioApplied)="onScenarioApplied($event)">
+              </app-scenario-selector>
+            </div>
           }
           
           @case ('roles') {
@@ -547,7 +575,9 @@ export class MultiRoleCenterComponent {
   
   tabs = [
     { id: 'dashboard' as const, icon: '📊', label: '監控中心' },
-    { id: 'roles' as const, icon: '🎭', label: '角色管理' },
+    { id: 'library' as const, icon: '📚', label: '角色庫 (50+)' },
+    { id: 'roles' as const, icon: '🎭', label: '我的角色' },
+    { id: 'scenarios' as const, icon: '🎬', label: '場景模板' },
     { id: 'scripts' as const, icon: '📜', label: '劇本編排' },
     { id: 'groups' as const, icon: '🏠', label: '協作群組' },
     { id: 'settings' as const, icon: '⚙️', label: '設置' }
@@ -694,6 +724,65 @@ export class MultiRoleCenterComponent {
   onScriptEditorCancelled() {
     this.showScriptEditor.set(false);
     this.editingScript.set(null);
+  }
+  
+  // 預設角色和場景處理
+  onPresetRoleAdded(role: RoleDefinition) {
+    this.multiRoleService.addRole({
+      name: role.name,
+      type: role.type,
+      personality: role.personality,
+      aiConfig: role.aiConfig,
+      responsibilities: role.responsibilities
+    });
+    // 切換到我的角色標籤查看
+    this.activeTab.set('roles');
+  }
+  
+  onPresetRoleEdit(preset: any) {
+    // 先添加然後打開編輯器
+    const roleId = this.multiRoleService.addRole({
+      name: preset.name,
+      type: preset.type,
+      personality: preset.personality,
+      aiConfig: preset.aiConfig,
+      responsibilities: preset.responsibilities
+    });
+    if (roleId) {
+      // 查找剛添加的角色
+      const role = this.multiRoleService.roles().find(r => r.id === roleId);
+      if (role) {
+        this.editRole(role);
+      }
+    }
+  }
+  
+  onScenarioApplied(scenario: PresetScenario) {
+    // 1. 添加場景中的所有角色
+    scenario.roles.forEach(roleConfig => {
+      // 查找預設角色
+      const presetRoles = (window as any).PRESET_ROLES || [];
+      const preset = presetRoles.find((r: any) => r.roleType === roleConfig.roleType);
+      if (preset) {
+        this.multiRoleService.addRole({
+          name: preset.name,
+          type: preset.type,
+          personality: preset.personality,
+          aiConfig: preset.aiConfig,
+          responsibilities: preset.responsibilities
+        });
+      }
+    });
+    
+    // 2. 創建對應的劇本
+    this.multiRoleService.addScript({
+      name: scenario.name,
+      description: scenario.description,
+      scenario: scenario.type as any
+    });
+    
+    // 3. 切換到劇本編排標籤
+    this.activeTab.set('scripts');
   }
   
   // 群組操作

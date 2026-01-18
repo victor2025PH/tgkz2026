@@ -16657,6 +16657,13 @@ class BackendService:
                 "discussion_id": discussion_id,
                 "messages": messages
             })
+            
+        except Exception as e:
+            self.send_log(f"❌ 獲取消息失敗: {e}", "error")
+            self.send_event("discussion-messages", {
+                "success": False,
+                "error": str(e)
+            })
     
     # ========== 多角色協作處理器 ==========
     

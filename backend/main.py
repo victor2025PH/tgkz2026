@@ -6398,31 +6398,39 @@ class BackendService:
             first_name = lead_data.get('first_name', '')
             source_group = lead_data.get('source_group_url') or lead_data.get('source_group', '')
             
-            # Get sender account (prefer sender role, fallback to listener)
+            # 使用帳號輪換器自動選擇發送帳號
             sender_phone = ''
-            accounts = await db.get_all_accounts()
+            if self.message_queue.account_rotator:
+                selected_account = await self.message_queue.account_rotator.select_account()
+                if selected_account:
+                    sender_phone = selected_account.get('phone', '')
+                    self.send_log(f"[AI] 帳號輪換選擇: {sender_phone} (負載均衡)", "info")
             
-            # First try to find an online sender account (case-insensitive role check)
-            for acc in accounts:
-                role = str(acc.get('role', '')).lower()
-                status = str(acc.get('status', '')).lower()
-                if role == 'sender' and status == 'online':
-                    sender_phone = acc.get('phone', '')
-                    self.send_log(f"[AI] 找到發送帳號: {sender_phone}", "info")
-                    break
-            
-            # If no sender, use any online account
+            # 回退到舊邏輯（如果輪換器未初始化或無可用帳號）
             if not sender_phone:
+                accounts = await db.get_all_accounts()
+                
+                # First try to find an online sender account
                 for acc in accounts:
+                    role = str(acc.get('role', '')).lower()
                     status = str(acc.get('status', '')).lower()
-                    if status == 'online':
+                    if role == 'sender' and status == 'online':
                         sender_phone = acc.get('phone', '')
-                        self.send_log(f"[AI] 使用在線帳號: {sender_phone}", "info")
+                        self.send_log(f"[AI] 找到發送帳號: {sender_phone}", "info")
                         break
-            
-            # Fallback to the monitoring account
-            if not sender_phone:
-                sender_phone = lead_data.get('account_phone', '')
+                
+                # If no sender, use any online account
+                if not sender_phone:
+                    for acc in accounts:
+                        status = str(acc.get('status', '')).lower()
+                        if status == 'online':
+                            sender_phone = acc.get('phone', '')
+                            self.send_log(f"[AI] 使用在線帳號: {sender_phone}", "info")
+                            break
+                
+                # Fallback to the monitoring account
+                if not sender_phone:
+                    sender_phone = lead_data.get('account_phone', '')
             
             if not sender_phone:
                 self.send_log("[AI] 沒有可用的發送帳號，跳過自動問候", "warning")

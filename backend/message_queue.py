@@ -23,6 +23,111 @@ class MessagePriority(Enum):
     LOW = 3
 
 
+class RotationStrategy(Enum):
+    """帳號輪換策略"""
+    ROUND_ROBIN = "round_robin"      # 順序輪換
+    LOAD_BALANCE = "load_balance"    # 負載均衡（選擇發送最少的帳號）
+    RANDOM = "random"                # 隨機選擇
+    HEALTH_FIRST = "health_first"    # 健康度優先
+
+
+class AccountRotator:
+    """帳號輪換器 - 自動選擇最適合的發送帳號"""
+    
+    def __init__(self, database):
+        self.database = database
+        self.strategy = RotationStrategy.LOAD_BALANCE
+        self._current_index = 0
+        self._account_stats: Dict[str, Dict[str, Any]] = {}
+    
+    async def get_sender_accounts(self) -> List[Dict[str, Any]]:
+        """獲取所有可用的發送帳號"""
+        accounts = await self.database.get_all_accounts()
+        return [
+            a for a in accounts 
+            if a.get('role') == 'Sender' and a.get('status') == 'Online'
+        ]
+    
+    async def select_account(self, exclude_phones: List[str] = None) -> Optional[Dict[str, Any]]:
+        """根據策略選擇一個發送帳號
+        
+        Args:
+            exclude_phones: 要排除的帳號電話號碼列表
+            
+        Returns:
+            選中的帳號，如果沒有可用帳號則返回 None
+        """
+        import random
+        
+        accounts = await self.get_sender_accounts()
+        if not accounts:
+            return None
+        
+        # 排除指定帳號
+        if exclude_phones:
+            accounts = [a for a in accounts if a.get('phone') not in exclude_phones]
+            if not accounts:
+                return None
+        
+        # 過濾掉已達到每日限制的帳號
+        available_accounts = []
+        for acc in accounts:
+            phone = acc.get('phone')
+            daily_limit = acc.get('daily_send_limit', 50)
+            daily_count = acc.get('daily_send_count', 0)
+            if daily_count < daily_limit:
+                available_accounts.append(acc)
+        
+        if not available_accounts:
+            print(f"[AccountRotator] 所有帳號都已達到每日發送限制", file=sys.stderr)
+            return None
+        
+        # 根據策略選擇帳號
+        if self.strategy == RotationStrategy.ROUND_ROBIN:
+            # 順序輪換
+            self._current_index = self._current_index % len(available_accounts)
+            selected = available_accounts[self._current_index]
+            self._current_index += 1
+            return selected
+        
+        elif self.strategy == RotationStrategy.LOAD_BALANCE:
+            # 負載均衡 - 選擇今日發送最少的帳號
+            available_accounts.sort(key=lambda a: a.get('daily_send_count', 0))
+            return available_accounts[0]
+        
+        elif self.strategy == RotationStrategy.RANDOM:
+            # 隨機選擇
+            return random.choice(available_accounts)
+        
+        elif self.strategy == RotationStrategy.HEALTH_FIRST:
+            # 健康度優先 - 選擇健康度最高的帳號
+            available_accounts.sort(key=lambda a: a.get('health_score', 0), reverse=True)
+            return available_accounts[0]
+        
+        # 默認返回第一個
+        return available_accounts[0]
+    
+    def set_strategy(self, strategy: RotationStrategy):
+        """設置輪換策略"""
+        self.strategy = strategy
+        print(f"[AccountRotator] 輪換策略設置為: {strategy.value}", file=sys.stderr)
+    
+    async def update_account_stats(self, phone: str, success: bool):
+        """更新帳號統計信息"""
+        if phone not in self._account_stats:
+            self._account_stats[phone] = {
+                'sent_today': 0,
+                'success_today': 0,
+                'failed_today': 0
+            }
+        
+        self._account_stats[phone]['sent_today'] += 1
+        if success:
+            self._account_stats[phone]['success_today'] += 1
+        else:
+            self._account_stats[phone]['failed_today'] += 1
+
+
 class MessageStatus(Enum):
     """Message status"""
     PENDING = "pending"
@@ -227,6 +332,54 @@ class MessageQueue:
         self.stats: Dict[str, Dict[str, Any]] = {}  # phone -> stats
         self.running = True
         self.workers: Dict[str, asyncio.Task] = {}  # phone -> worker task
+        
+        # 帳號輪換器
+        self.account_rotator = AccountRotator(database) if database else None
+    
+    async def add_message_auto_rotate(
+        self,
+        user_id: str,
+        text: str,
+        attachment: Optional[str] = None,
+        source_group: Optional[str] = None,
+        target_username: Optional[str] = None,
+        priority: MessagePriority = MessagePriority.NORMAL,
+        scheduled_at: Optional[datetime] = None,
+        max_attempts: int = 3,
+        callback: Optional[Callable] = None
+    ) -> Optional[str]:
+        """
+        自動選擇帳號並添加消息到隊列
+        
+        Returns:
+            Message ID, or None if no account available
+        """
+        if not self.account_rotator:
+            print("[MessageQueue] 帳號輪換器未初始化", file=sys.stderr)
+            return None
+        
+        # 自動選擇發送帳號
+        account = await self.account_rotator.select_account()
+        if not account:
+            print("[MessageQueue] 沒有可用的發送帳號", file=sys.stderr)
+            return None
+        
+        phone = account.get('phone')
+        print(f"[MessageQueue] 自動選擇帳號: {phone}", file=sys.stderr)
+        
+        # 使用選中的帳號添加消息
+        return await self.add_message(
+            phone=phone,
+            user_id=user_id,
+            text=text,
+            attachment=attachment,
+            source_group=source_group,
+            target_username=target_username,
+            priority=priority,
+            scheduled_at=scheduled_at,
+            max_attempts=max_attempts,
+            callback=callback
+        )
     
     async def add_message(
         self,

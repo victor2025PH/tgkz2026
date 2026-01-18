@@ -3809,7 +3809,7 @@ export class AppComponent implements OnDestroy, OnInit {
     return this.leads();
   });
   
-  leadsByStatus = computed(() => {
+  leadsByStatusMap = computed(() => {
     const leads = this.displayLeads();
     const statusMap = new Map<LeadStatus, CapturedLead[]>();
     this.leadStatuses.forEach(status => statusMap.set(status, []));
@@ -3820,6 +3820,29 @@ export class AppComponent implements OnDestroy, OnInit {
     });
     return statusMap;
   });
+  
+  // 根據狀態獲取 Lead 列表（用於模板）
+  leadsByStatus(status: LeadStatus): CapturedLead[] {
+    return this.leadsByStatusMap().get(status) || [];
+  }
+  
+  // 今日新 Lead 數量
+  todayNewLeads(): number {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return this.leads().filter(lead => {
+      const leadDate = new Date(lead.timestamp);
+      return leadDate >= today;
+    }).length;
+  }
+  
+  // 計算轉化率
+  getConversionRate(): string {
+    const total = this.leads().length;
+    if (total === 0) return '0.0';
+    const converted = this.leadsByStatus('Closed-Won').length;
+    return ((converted / total) * 100).toFixed(1);
+  }
 
   // --- Funnel Stats & User Management ---
   funnelStats = signal<{

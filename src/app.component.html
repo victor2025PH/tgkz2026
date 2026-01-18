@@ -3926,6 +3926,64 @@
         </div>
       }
       @case ('leads') {
+        <!-- 統計看板 -->
+        <div class="grid grid-cols-5 gap-4 mb-6">
+          <div class="bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-xl p-4 border border-amber-500/30">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-2xl font-bold text-amber-400">{{ leadsByStatus('New').length }}</div>
+                <div class="text-xs text-slate-400">新 Lead</div>
+              </div>
+              <span class="text-2xl opacity-50">🆕</span>
+            </div>
+            <div class="mt-2 text-xs text-slate-500">今日 +{{ todayNewLeads() }}</div>
+          </div>
+          
+          <div class="bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl p-4 border border-cyan-500/30">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-2xl font-bold text-cyan-400">{{ leadsByStatus('Contacted').length }}</div>
+                <div class="text-xs text-slate-400">已聯繫</div>
+              </div>
+              <span class="text-2xl opacity-50">💬</span>
+            </div>
+            <div class="mt-2 text-xs text-slate-500">等待回覆</div>
+          </div>
+          
+          <div class="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl p-4 border border-purple-500/30">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-2xl font-bold text-purple-400">{{ leadsByStatus('Replied').length }}</div>
+                <div class="text-xs text-slate-400">已回覆</div>
+              </div>
+              <span class="text-2xl opacity-50">✉️</span>
+            </div>
+            <div class="mt-2 text-xs text-slate-500">跟進中</div>
+          </div>
+          
+          <div class="bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-xl p-4 border border-emerald-500/30">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-2xl font-bold text-emerald-400">{{ leadsByStatus('Closed-Won').length }}</div>
+                <div class="text-xs text-slate-400">已轉化</div>
+              </div>
+              <span class="text-2xl opacity-50">🎉</span>
+            </div>
+            <div class="mt-2 text-xs text-emerald-400/70">{{ getConversionRate() }}% 轉化率</div>
+          </div>
+          
+          <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-2xl font-bold text-white">{{ leads().length }}</div>
+                <div class="text-xs text-slate-400">總計</div>
+              </div>
+              <span class="text-2xl opacity-50">📊</span>
+            </div>
+            <div class="mt-2 text-xs text-slate-500">所有潛在客戶</div>
+          </div>
+        </div>
+        
         <!-- 搜索框 -->
         <div class="mb-4">
             <div class="relative">
@@ -4431,7 +4489,7 @@
         @if(leadsViewMode() === 'kanban') {
             <div class="flex gap-4 overflow-x-auto pb-4 -mx-8 px-8">
                 @for(status of leadStatuses; track status) {
-                    @let leads = leadsByStatus().get(status) ?? [];
+                    @let leads = leadsByStatusMap().get(status) ?? [];
                     <div class="w-80 bg-slate-100/50 dark:bg-slate-900/50 backdrop-blur-sm border border-slate-500/20 rounded-xl shadow-lg flex-shrink-0">
                         <h3 class="text-lg font-semibold p-4 border-b border-slate-500/20 flex justify-between"><span>{{ t(status) }}</span><span class="text-sm font-normal bg-slate-200/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 rounded-full px-2.5 py-0.5">{{ leads.length }}</span></h3>
                         <div class="p-2 space-y-2 h-[calc(100vh-300px)] overflow-y-auto">

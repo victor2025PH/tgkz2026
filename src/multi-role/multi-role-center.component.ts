@@ -7,6 +7,10 @@ import { Component, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MultiRoleService } from './multi-role.service';
+import { AutoGroupService } from './auto-group.service';
+import { CollaborationExecutorService } from './collaboration-executor.service';
+import { RoleEditorComponent } from './components/role-editor.component';
+import { ScriptEditorComponent } from './components/script-editor.component';
 import { 
   RoleDefinition, 
   ScriptTemplate, 
@@ -20,7 +24,7 @@ type MultiRoleTab = 'roles' | 'scripts' | 'groups' | 'settings';
 @Component({
   selector: 'app-multi-role-center',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RoleEditorComponent, ScriptEditorComponent],
   template: `
     <div class="multi-role-center h-full flex flex-col bg-slate-900">
       <!-- 頂部標題欄 -->
@@ -499,14 +503,41 @@ type MultiRoleTab = 'roles' | 'scripts' | 'groups' | 'settings';
           </div>
         </div>
       }
+      
+      <!-- 角色編輯器 -->
+      @if (showRoleEditor()) {
+        <app-role-editor
+          [role]="editingRole()"
+          [availableAccounts]="availableAccounts()"
+          (saved)="onRoleSaved($event)"
+          (cancelled)="onRoleEditorCancelled()">
+        </app-role-editor>
+      }
+      
+      <!-- 劇本編輯器 -->
+      @if (showScriptEditor()) {
+        <app-script-editor
+          [script]="editingScript()"
+          (saved)="onScriptSaved($event)"
+          (cancelled)="onScriptEditorCancelled()">
+        </app-script-editor>
+      }
     </div>
   `
 })
 export class MultiRoleCenterComponent {
   multiRoleService = inject(MultiRoleService);
+  autoGroupService = inject(AutoGroupService);
+  executorService = inject(CollaborationExecutorService);
   
   activeTab = signal<MultiRoleTab>('roles');
   showAddRole = signal(false);
+  
+  // 編輯器狀態
+  showRoleEditor = signal(false);
+  editingRole = signal<RoleDefinition | null>(null);
+  showScriptEditor = signal(false);
+  editingScript = signal<ScriptTemplate | null>(null);
   
   tabs = [
     { id: 'roles' as const, icon: '🎭', label: '角色管理' },
@@ -521,6 +552,12 @@ export class MultiRoleCenterComponent {
       id: id as RoleType,
       ...meta
     }));
+  
+  // 可用帳號
+  availableAccounts = computed(() => {
+    // 從服務獲取已登錄帳號
+    return [];
+  });
   
   // 新角色表單
   newRoleType = signal<RoleType>('expert');
@@ -605,13 +642,66 @@ export class MultiRoleCenterComponent {
   }
   
   editRole(role: RoleDefinition) {
-    // TODO: 實現編輯功能
+    this.editingRole.set(role);
+    this.showRoleEditor.set(true);
+  }
+  
+  openNewRoleEditor() {
+    this.editingRole.set(null);
+    this.showRoleEditor.set(true);
+  }
+  
+  onRoleSaved(role: RoleDefinition) {
+    this.showRoleEditor.set(false);
+    this.editingRole.set(null);
+    this.showAddRole.set(false);
+  }
+  
+  onRoleEditorCancelled() {
+    this.showRoleEditor.set(false);
+    this.editingRole.set(null);
   }
   
   deleteRole(role: RoleDefinition) {
     if (confirm(`確定要刪除角色「${role.name}」嗎？`)) {
       this.multiRoleService.deleteRole(role.id);
     }
+  }
+  
+  // 劇本編輯
+  openNewScriptEditor() {
+    this.editingScript.set(null);
+    this.showScriptEditor.set(true);
+  }
+  
+  editScript(script: ScriptTemplate) {
+    this.editingScript.set(script);
+    this.showScriptEditor.set(true);
+  }
+  
+  onScriptSaved(script: ScriptTemplate) {
+    this.showScriptEditor.set(false);
+    this.editingScript.set(null);
+  }
+  
+  onScriptEditorCancelled() {
+    this.showScriptEditor.set(false);
+    this.editingScript.set(null);
+  }
+  
+  // 群組操作
+  pauseGroup(group: CollaborationGroup) {
+    this.autoGroupService.pauseGroup(group.id);
+    this.executorService.pauseExecution(group.id);
+  }
+  
+  resumeGroup(group: CollaborationGroup) {
+    this.autoGroupService.resumeGroup(group.id);
+    this.executorService.resumeExecution(group.id);
+  }
+  
+  markGroupConverted(group: CollaborationGroup) {
+    this.autoGroupService.markAsConverted(group.id);
   }
   
   addScript() {

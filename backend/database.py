@@ -2970,6 +2970,79 @@ class Database:
             print(f"Error getting leads paginated: {e}")
             return []
     
+    async def get_detailed_funnel_stats(self) -> Dict:
+        """獲取詳細漏斗統計"""
+        try:
+            from datetime import datetime, timedelta
+            
+            # 獲取所有 leads
+            all_leads = await self.fetch_all('SELECT * FROM extracted_members')
+            
+            today = datetime.now().date()
+            week_ago = today - timedelta(days=7)
+            
+            # 計算統計
+            today_new = sum(1 for l in all_leads if l.get('created_at') and 
+                          datetime.fromisoformat(str(l['created_at']).replace('Z', '')).date() == today)
+            
+            week_converted = sum(1 for l in all_leads if 
+                                l.get('status') == 'Closed-Won' and 
+                                l.get('created_at') and
+                                datetime.fromisoformat(str(l['created_at']).replace('Z', '')).date() >= week_ago)
+            
+            # 按狀態統計
+            stages = {}
+            status_mapping = {
+                'New': 'new',
+                'Contacted': 'contacted', 
+                'Replied': 'replied',
+                'Follow-up': 'follow_up',
+                'Interested': 'interested',
+                'Negotiating': 'negotiating',
+                'Closed-Won': 'closed_won',
+                'Closed-Lost': 'closed_lost'
+            }
+            
+            for lead in all_leads:
+                status = lead.get('status', 'New')
+                stage_key = status_mapping.get(status, status.lower().replace('-', '_'))
+                if stage_key not in stages:
+                    stages[stage_key] = {'count': 0, 'value': 0}
+                stages[stage_key]['count'] += 1
+            
+            # 收集標籤
+            tags = {}
+            for lead in all_leads:
+                lead_tags = lead.get('auto_tags') or lead.get('tags') or ''
+                if lead_tags:
+                    try:
+                        import json
+                        tag_list = json.loads(lead_tags) if isinstance(lead_tags, str) else lead_tags
+                        for tag in tag_list:
+                            tags[tag] = tags.get(tag, 0) + 1
+                    except:
+                        pass
+            
+            sorted_tags = sorted(tags.items(), key=lambda x: x[1], reverse=True)
+            
+            return {
+                'today_new': today_new,
+                'week_converted': week_converted,
+                'total': len(all_leads),
+                'stages': stages,
+                'tags': sorted_tags[:10]
+            }
+            
+        except Exception as e:
+            print(f"Error getting detailed funnel stats: {e}")
+            return {
+                'today_new': 0,
+                'week_converted': 0,
+                'total': 0,
+                'stages': {},
+                'tags': []
+            }
+    
     async def check_lead_and_dnc(self, user_id) -> tuple:
         """檢查用戶是否已存在於 Lead 列表及是否在黑名單中
         

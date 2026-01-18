@@ -1103,6 +1103,7 @@ export class I18nService {
    * 獲取嵌套值
    */
   private getNestedValue(obj: any, key: string): any {
+    if (!key || typeof key !== 'string') return undefined;
     return key.split('.').reduce((o, k) => o?.[k], obj);
   }
   

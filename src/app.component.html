@@ -4508,8 +4508,8 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2 mb-2">
-                                  <span class="text-xs px-2 py-0.5 rounded-full" [class]="getStatusColor(lead.status)">{{ t(lead.status) }}</span>
-                                  <span class="text-xs text-slate-500">{{ lead.sourceGroup | slice:0:20 }}...</span>
+                                  <span class="text-xs px-2 py-0.5 rounded-full" [class]="getStatusColor(lead.status || 'New')">{{ t(lead.status || 'New') }}</span>
+                                  <span class="text-xs text-slate-500">{{ (lead.sourceGroup || '') | slice:0:20 }}...</span>
                                 </div>
                                 <p class="text-xs font-mono bg-slate-800/50 rounded px-2 py-1 text-slate-400 truncate">🔑 {{ lead.triggeredKeyword }}</p>
                                 <p class="text-xs text-slate-500 mt-2">{{ lead.timestamp | date:'MM/dd HH:mm' }}</p>

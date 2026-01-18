@@ -2444,9 +2444,11 @@ class Database:
     
     async def execute(self, query: str, params: tuple = None) -> int:
         """異步執行 SQL 語句並返回影響的行數"""
+        import sys
         try:
             if not HAS_AIOSQLITE:
                 # 同步回退
+                print(f"[Database] execute (sync): {query[:60]}...", file=sys.stderr)
                 conn = sqlite3.connect(str(self.db_path))
                 cursor = conn.cursor()
                 if params:
@@ -2456,18 +2458,21 @@ class Database:
                 conn.commit()
                 affected = cursor.rowcount
                 conn.close()
+                print(f"[Database] execute (sync): affected={affected}, committed", file=sys.stderr)
                 return affected
             
             # 異步方式
+            print(f"[Database] execute (async): {query[:60]}...", file=sys.stderr)
             await self.connect()
             if params:
                 cursor = await self._connection.execute(query, params)
             else:
                 cursor = await self._connection.execute(query)
             await self._connection.commit()
+            print(f"[Database] execute (async): affected={cursor.rowcount}, committed", file=sys.stderr)
             return cursor.rowcount
         except Exception as e:
-            print(f"Error in execute: {e}")
+            print(f"[Database] execute ERROR: {e}", file=sys.stderr)
             return 0
     
     async def execute_insert(self, query: str, params: tuple = None) -> int:
@@ -2953,10 +2958,18 @@ class Database:
     
     async def get_all_leads(self, limit: int = 50) -> List[Dict]:
         """獲取潛在客戶（優化：初始載入減少數量）"""
+        import sys
         try:
-            return await self.fetch_all(f'SELECT * FROM extracted_members ORDER BY created_at DESC LIMIT {limit}')
+            # 先獲取總數
+            count_result = await self.fetch_one('SELECT COUNT(*) as total FROM extracted_members')
+            total_count = count_result['total'] if count_result else 0
+            print(f"[Database] get_all_leads: Total records in DB = {total_count}", file=sys.stderr)
+            
+            results = await self.fetch_all(f'SELECT * FROM extracted_members ORDER BY created_at DESC LIMIT {limit}')
+            print(f"[Database] get_all_leads: Returning {len(results)} records (limit={limit})", file=sys.stderr)
+            return results
         except Exception as e:
-            print(f"Error getting leads: {e}")
+            print(f"Error getting leads: {e}", file=sys.stderr)
             return []
     
     async def get_leads_paginated(self, limit: int = 50, offset: int = 0) -> List[Dict]:

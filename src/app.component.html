@@ -3991,7 +3991,7 @@
                     [class.bg-slate-700]="leadStatusFilter() === 'all'"
                     [class.ring-2]="leadStatusFilter() === 'all'"
                     [class.ring-cyan-500]="leadStatusFilter() === 'all'">
-              <div class="text-lg font-bold text-white">{{ leads().length }}</div>
+              <div class="text-lg font-bold text-white">{{ leadsTotal() || leads().length }}</div>
               <div class="text-xs text-slate-400">全部</div>
             </button>
             <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
@@ -4098,6 +4098,9 @@
             <div class="flex items-center gap-3">
               <span class="text-sm text-slate-400">
                 顯示 <span class="font-bold text-white">{{ filteredLeads().length }}</span> 個客戶
+                @if(leadsTotal() > leads().length) {
+                  <span class="text-slate-500">(共 {{ leadsTotal() }} 條)</span>
+                }
                 @if(leadStatusFilter() !== 'all') {
                   <span class="text-cyan-400">({{ t(leadStatusFilter()) }})</span>
                 }

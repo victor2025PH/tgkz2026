@@ -12735,10 +12735,10 @@ class BackendService:
             if failed:
                 self.send_log(f"刪除失敗的 ID: {failed}", "warning")
             
-            # 刷新 leads 列表
-            leads = await db.get_all_leads()
-            self.send_log(f"刷新後剩餘 {len(leads)} 個 Lead", "info")
-            self.send_event("leads-updated", {"leads": leads})
+            # 刷新 leads 列表（包含總數）
+            data = await db.get_leads_with_total()
+            self.send_log(f"刷新後剩餘 {data['total']} 個 Lead（顯示 {len(data['leads'])} 個）", "info")
+            self.send_event("leads-updated", {"leads": data['leads'], "total": data['total']})
             
             self.send_event("batch-operation-result", {
                 "success": success_count > 0,
@@ -12773,10 +12773,10 @@ class BackendService:
             
             if result:
                 self.send_log(f"✓ 已刪除 Lead: {lead_id}", "success")
-                # 刷新 leads 列表
-                leads = await db.get_all_leads()
-                self.send_log(f"刷新後剩餘 {len(leads)} 個 Lead", "info")
-                self.send_event("leads-updated", {"leads": leads})
+                # 刷新 leads 列表（包含總數）
+                data = await db.get_leads_with_total()
+                self.send_log(f"刷新後剩餘 {data['total']} 個 Lead（顯示 {len(data['leads'])} 個）", "info")
+                self.send_event("leads-updated", {"leads": data['leads'], "total": data['total']})
                 self.send_event("lead-deleted", {"success": True, "leadId": lead_id})
             else:
                 self.send_log(f"✗ 刪除 Lead {lead_id} 失敗 (記錄可能不存在)", "warning")

@@ -640,6 +640,7 @@ export class AppComponent implements OnDestroy, OnInit {
   keywordSets: WritableSignal<KeywordSet[]> = signal([]);
   monitoredGroups: WritableSignal<MonitoredGroup[]> = signal([]);
   leads: WritableSignal<CapturedLead[]> = signal([]);
+  leadsTotal: WritableSignal<number> = signal(0);  // 數據庫中的實際總數
   logs: WritableSignal<LogEntry[]> = signal([]);
   
   // 實時匹配數據
@@ -5488,9 +5489,11 @@ export class AppComponent implements OnDestroy, OnInit {
       }
     });
     
-    this.ipcService.on('leads-updated', (data: {leads: any[]}) => {
-        console.log('[Frontend] Received leads-updated:', data.leads?.length || 0);
+    this.ipcService.on('leads-updated', (data: {leads: any[], total?: number}) => {
+        const total = data.total ?? data.leads?.length ?? 0;
+        console.log('[Frontend] Received leads-updated:', data.leads?.length || 0, 'total:', total);
         this.leads.set((data.leads || []).map((l: CapturedLead) => ({...l, timestamp: new Date(l.timestamp)})));
+        this.leadsTotal.set(total);
     });
     
     // 漏斗統計事件

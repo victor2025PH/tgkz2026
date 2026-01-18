@@ -117,6 +117,8 @@ export class AppComponent implements OnDestroy, OnInit {
   leadsViewMode: WritableSignal<LeadsViewMode> = signal('kanban');
   leadStatusFilter = signal<string>('all');  // 當前篩選的 Lead 狀態
   leadSortBy = signal<'intent' | 'time' | 'name'>('time');  // 排序方式
+  showLeadsViewMenu = signal(false);  // 視圖下拉菜單
+  showLeadsActionMenu = signal(false);  // 操作下拉菜單
   
   // --- 子視圖狀態 ---
   runtimeLogsTab = signal<'analytics' | 'logs' | 'performance' | 'alerts'>('analytics');  // 合併監控和告警

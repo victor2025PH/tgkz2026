@@ -3926,61 +3926,79 @@
         </div>
       }
       @case ('leads') {
-        <!-- 統計看板 -->
-        <div class="grid grid-cols-5 gap-4 mb-6">
-          <div class="bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-xl p-4 border border-amber-500/30">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="text-2xl font-bold text-amber-400">{{ leadsByStatus('New').length }}</div>
-                <div class="text-xs text-slate-400">新 Lead</div>
-              </div>
-              <span class="text-2xl opacity-50">🆕</span>
-            </div>
-            <div class="mt-2 text-xs text-slate-500">今日 +{{ todayNewLeads() }}</div>
+        <!-- 迷你漏斗概覽 -->
+        <div class="bg-slate-900/50 rounded-xl p-4 mb-4 border border-slate-700/50">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-medium text-slate-400">轉化漏斗</h3>
+            <span class="text-xs text-emerald-400">{{ getConversionRate() }}% 總轉化率</span>
           </div>
-          
-          <div class="bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl p-4 border border-cyan-500/30">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="text-2xl font-bold text-cyan-400">{{ leadsByStatus('Contacted').length }}</div>
-                <div class="text-xs text-slate-400">已聯繫</div>
-              </div>
-              <span class="text-2xl opacity-50">💬</span>
-            </div>
-            <div class="mt-2 text-xs text-slate-500">等待回覆</div>
-          </div>
-          
-          <div class="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl p-4 border border-purple-500/30">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="text-2xl font-bold text-purple-400">{{ leadsByStatus('Replied').length }}</div>
-                <div class="text-xs text-slate-400">已回覆</div>
-              </div>
-              <span class="text-2xl opacity-50">✉️</span>
-            </div>
-            <div class="mt-2 text-xs text-slate-500">跟進中</div>
-          </div>
-          
-          <div class="bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-xl p-4 border border-emerald-500/30">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="text-2xl font-bold text-emerald-400">{{ leadsByStatus('Closed-Won').length }}</div>
-                <div class="text-xs text-slate-400">已轉化</div>
-              </div>
-              <span class="text-2xl opacity-50">🎉</span>
-            </div>
-            <div class="mt-2 text-xs text-emerald-400/70">{{ getConversionRate() }}% 轉化率</div>
-          </div>
-          
-          <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="text-2xl font-bold text-white">{{ leads().length }}</div>
-                <div class="text-xs text-slate-400">總計</div>
-              </div>
-              <span class="text-2xl opacity-50">📊</span>
-            </div>
-            <div class="mt-2 text-xs text-slate-500">所有潛在客戶</div>
+          <div class="flex items-center gap-1">
+            <!-- 漏斗階段 - 可點擊切換 -->
+            <button (click)="leadStatusFilter.set('all')" 
+                    class="flex-1 text-center py-2 px-1 rounded-lg transition-all"
+                    [class.bg-slate-700]="leadStatusFilter() === 'all'"
+                    [class.ring-2]="leadStatusFilter() === 'all'"
+                    [class.ring-cyan-500]="leadStatusFilter() === 'all'">
+              <div class="text-lg font-bold text-white">{{ leads().length }}</div>
+              <div class="text-xs text-slate-400">全部</div>
+            </button>
+            <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            <button (click)="leadStatusFilter.set('New')" 
+                    class="flex-1 text-center py-2 px-1 rounded-lg transition-all"
+                    [class.bg-amber-500/20]="leadStatusFilter() === 'New'"
+                    [class.ring-2]="leadStatusFilter() === 'New'"
+                    [class.ring-amber-500]="leadStatusFilter() === 'New'">
+              <div class="text-lg font-bold text-amber-400">{{ leadsByStatus('New').length }}</div>
+              <div class="text-xs text-slate-400">新客戶</div>
+            </button>
+            <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            <button (click)="leadStatusFilter.set('Contacted')" 
+                    class="flex-1 text-center py-2 px-1 rounded-lg transition-all"
+                    [class.bg-cyan-500/20]="leadStatusFilter() === 'Contacted'"
+                    [class.ring-2]="leadStatusFilter() === 'Contacted'"
+                    [class.ring-cyan-500]="leadStatusFilter() === 'Contacted'">
+              <div class="text-lg font-bold text-cyan-400">{{ leadsByStatus('Contacted').length }}</div>
+              <div class="text-xs text-slate-400">已聯繫</div>
+              @if(leadsByStatus('New').length > 0) {
+                <div class="text-xs text-cyan-400/60">{{ (leadsByStatus('Contacted').length / (leadsByStatus('New').length || 1) * 100) | number:'1.0-0' }}%</div>
+              }
+            </button>
+            <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            <button (click)="leadStatusFilter.set('Replied')" 
+                    class="flex-1 text-center py-2 px-1 rounded-lg transition-all"
+                    [class.bg-purple-500/20]="leadStatusFilter() === 'Replied'"
+                    [class.ring-2]="leadStatusFilter() === 'Replied'"
+                    [class.ring-purple-500]="leadStatusFilter() === 'Replied'">
+              <div class="text-lg font-bold text-purple-400">{{ leadsByStatus('Replied').length }}</div>
+              <div class="text-xs text-slate-400">已回覆</div>
+            </button>
+            <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            <button (click)="leadStatusFilter.set('Follow-up')" 
+                    class="flex-1 text-center py-2 px-1 rounded-lg transition-all"
+                    [class.bg-orange-500/20]="leadStatusFilter() === 'Follow-up'"
+                    [class.ring-2]="leadStatusFilter() === 'Follow-up'"
+                    [class.ring-orange-500]="leadStatusFilter() === 'Follow-up'">
+              <div class="text-lg font-bold text-orange-400">{{ leadsByStatus('Follow-up').length }}</div>
+              <div class="text-xs text-slate-400">跟進中</div>
+            </button>
+            <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            <button (click)="leadStatusFilter.set('Closed-Won')" 
+                    class="flex-1 text-center py-2 px-1 rounded-lg transition-all"
+                    [class.bg-emerald-500/20]="leadStatusFilter() === 'Closed-Won'"
+                    [class.ring-2]="leadStatusFilter() === 'Closed-Won'"
+                    [class.ring-emerald-500]="leadStatusFilter() === 'Closed-Won'">
+              <div class="text-lg font-bold text-emerald-400">{{ leadsByStatus('Closed-Won').length }}</div>
+              <div class="text-xs text-slate-400">成交</div>
+            </button>
+            <button (click)="leadStatusFilter.set('Closed-Lost')" 
+                    class="flex-1 text-center py-2 px-1 rounded-lg transition-all opacity-60"
+                    [class.bg-red-500/20]="leadStatusFilter() === 'Closed-Lost'"
+                    [class.ring-2]="leadStatusFilter() === 'Closed-Lost'"
+                    [class.ring-red-500]="leadStatusFilter() === 'Closed-Lost'"
+                    [class.opacity-100]="leadStatusFilter() === 'Closed-Lost'">
+              <div class="text-lg font-bold text-red-400">{{ leadsByStatus('Closed-Lost').length }}</div>
+              <div class="text-xs text-slate-400">流失</div>
+            </button>
           </div>
         </div>
         
@@ -4487,61 +4505,100 @@
           @default {
             <!-- 默認看板/列表視圖 -->
         @if(leadsViewMode() === 'kanban') {
-            <div class="flex gap-4 overflow-x-auto pb-4 -mx-8 px-8">
-                @for(status of leadStatuses; track status) {
-                    @let leads = leadsByStatusMap().get(status) ?? [];
-                    <div class="w-80 bg-slate-100/50 dark:bg-slate-900/50 backdrop-blur-sm border border-slate-500/20 rounded-xl shadow-lg flex-shrink-0">
-                        <h3 class="text-lg font-semibold p-4 border-b border-slate-500/20 flex justify-between"><span>{{ t(status) }}</span><span class="text-sm font-normal bg-slate-200/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 rounded-full px-2.5 py-0.5">{{ leads.length }}</span></h3>
-                        <div class="p-2 space-y-2 h-[calc(100vh-300px)] overflow-y-auto">
-                            @for(lead of leads; track lead.id) {
-                                <div class="bg-slate-50 dark:bg-slate-800/70 p-3 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/50 transition-shadow hover:shadow-md"
-                                     (click)="closeLeadMenu()">
-                                    <div (click)="openLeadDetailModal(lead)" class="cursor-pointer">
-                                        <div class="flex items-start justify-between">
-                                            <div>
-                                                <p class="font-bold text-cyan-500 dark:text-cyan-400">@{{ lead.username }}</p>
-                                                <p class="text-sm text-slate-600 dark:text-slate-300">{{lead.firstName}} {{lead.lastName}}</p>
-                                                <p class="text-xs text-slate-400">ID: {{lead.userId}}</p>
-                                            </div>
-                                            <span class="h-2.5 w-2.5 rounded-full mt-1.5" [class]="getOnlineStatusColor(lead.onlineStatus)" [title]="t(lead.onlineStatus)"></span>
+            <!-- 新版卡片網格視圖（無需水平滾動） -->
+            <div class="mb-4 flex items-center justify-between">
+              <div class="text-sm text-slate-400">
+                顯示 <span class="font-bold text-white">{{ filteredLeads().length }}</span> 個
+                @if(leadStatusFilter() !== 'all') {
+                  <span class="text-cyan-400">{{ t(leadStatusFilter()) }}</span>
+                }
+                客戶
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-slate-500">排序:</span>
+                <select [(ngModel)]="leadSortBy" 
+                        class="bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-300">
+                  <option value="time">最新優先</option>
+                  <option value="intent">意向優先</option>
+                  <option value="name">名稱排序</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                @for(lead of filteredLeads(); track lead.id) {
+                    <div class="bg-slate-900/50 backdrop-blur-sm border border-slate-700/50 rounded-xl shadow-lg overflow-hidden hover:border-cyan-500/50 transition-all"
+                         (click)="closeLeadMenu()">
+                        <!-- 狀態標籤 -->
+                        <div class="h-1" [class]="getStatusBarColor(lead.status)"></div>
+                        <div class="p-4">
+                            <div (click)="openLeadDetailModal(lead)" class="cursor-pointer">
+                                <div class="flex items-start justify-between mb-2">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold">
+                                          {{ (lead.username || lead.firstName || '?')[0].toUpperCase() }}
                                         </div>
-                                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-2">{{ lead.sourceGroup }}</p>
-                                        <p class="text-xs font-mono bg-slate-200/80 dark:bg-slate-700/50 rounded px-1.5 py-0.5 inline-block my-1.5">{{ lead.triggeredKeyword }}</p>
-                                        @if (getCampaignById(lead.campaignId); as campaign) {
-                                        <div class="relative group">
-                                            <p class="text-xs text-slate-400">{{ t('campaign') }}: <span class="font-semibold text-slate-500 dark:text-slate-300">{{ getCampaignName(lead.campaignId) }}</span></p>
-                                            <div class="absolute hidden group-hover:block bottom-full mb-2 w-72 bg-slate-900 text-white text-xs rounded-lg p-3 shadow-lg z-10">
-                                                <h4 class="font-bold border-b border-slate-600 pb-1 mb-1">{{ t('campaignDetails') }}</h4>
-                                                <p><strong>{{t('triggers')}}:</strong> {{ (campaign.trigger?.sourceGroupIds || []).map(getGroupName).join(', ') }}; {{ (campaign.trigger?.keywordSetIds || []).map(getKeywordSetName).join(', ') }}</p>
-                                                <p><strong>{{t('actions')}}:</strong> {{ getTemplateName(campaign.actions?.[0]?.templateId) }} ({{ campaign.actions?.[0]?.minDelaySeconds || 0 }}s-{{ campaign.actions?.[0]?.maxDelaySeconds || 0 }}s)</p>
-                                            </div>
+                                        <div>
+                                            <p class="font-bold text-cyan-400">@{{ lead.username || lead.firstName }}</p>
+                                            <p class="text-xs text-slate-400">{{ lead.firstName }} {{ lead.lastName }}</p>
                                         </div>
-                                        }
                                     </div>
-                                    <div class="relative mt-2 pt-2 border-t border-slate-200 dark:border-slate-700/50">
-                                        <button 
-                                            (click)="$event.stopPropagation(); toggleLeadMenu(lead.id)" 
-                                            class="w-full text-xs text-center text-slate-500 dark:text-slate-400 hover:text-cyan-400 transition-colors py-1">
-                                            {{ t('moveTo') }} &#9662;
-                                        </button>
-                                        @if(openLeadMenuId() === lead.id) {
-                                            <div class="absolute z-50 left-0 right-0 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
-                                                 (click)="$event.stopPropagation()">
-                                                @for(s of leadStatuses; track s) {
-                                                    @if(s !== lead.status) {
-                                                        <a (click)="updateLeadStatus(lead.id, s); closeLeadMenu()" 
-                                                           class="block px-3 py-2.5 text-sm hover:bg-cyan-500/20 dark:hover:bg-cyan-500/20 hover:text-cyan-400 cursor-pointer transition-colors">
-                                                            {{ t(s) }}
-                                                        </a>
-                                                    }
-                                                }
-                                            </div>
-                                        }
+                                    <div class="flex items-center gap-1">
+                                      <span class="h-2 w-2 rounded-full" [class]="getOnlineStatusColor(lead.onlineStatus)"></span>
+                                      @if(lead.intentScore) {
+                                        <span class="text-xs px-1.5 py-0.5 rounded-full" 
+                                              [class.bg-red-500/20]="lead.intentScore >= 70"
+                                              [class.text-red-400]="lead.intentScore >= 70"
+                                              [class.bg-amber-500/20]="lead.intentScore >= 40 && lead.intentScore < 70"
+                                              [class.text-amber-400]="lead.intentScore >= 40 && lead.intentScore < 70"
+                                              [class.bg-slate-500/20]="lead.intentScore < 40"
+                                              [class.text-slate-400]="lead.intentScore < 40">
+                                          {{ lead.intentScore }}分
+                                        </span>
+                                      }
                                     </div>
                                 </div>
-                            }
+                                <div class="flex items-center gap-2 mb-2">
+                                  <span class="text-xs px-2 py-0.5 rounded-full" [class]="getStatusColor(lead.status)">{{ t(lead.status) }}</span>
+                                  <span class="text-xs text-slate-500">{{ lead.sourceGroup | slice:0:20 }}...</span>
+                                </div>
+                                <p class="text-xs font-mono bg-slate-800/50 rounded px-2 py-1 text-slate-400 truncate">🔑 {{ lead.triggeredKeyword }}</p>
+                                <p class="text-xs text-slate-500 mt-2">{{ lead.timestamp | date:'MM/dd HH:mm' }}</p>
+                            </div>
+                            <div class="flex gap-2 mt-3 pt-3 border-t border-slate-700/50">
+                                <button (click)="openLeadDetailModal(lead)" 
+                                        class="flex-1 text-xs bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 py-1.5 rounded-lg transition-colors">
+                                    💬 聯繫
+                                </button>
+                                <div class="relative">
+                                    <button (click)="$event.stopPropagation(); toggleLeadMenu(lead.id)" 
+                                            class="text-xs bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 py-1.5 px-3 rounded-lg transition-colors">
+                                        ⋮
+                                    </button>
+                                    @if(openLeadMenuId() === lead.id) {
+                                        <div class="absolute z-50 right-0 top-full mt-1 bg-slate-800 rounded-lg shadow-xl border border-slate-700 overflow-hidden min-w-[120px]"
+                                             (click)="$event.stopPropagation()">
+                                            @for(s of leadStatuses; track s) {
+                                                @if(s !== lead.status) {
+                                                    <a (click)="updateLeadStatus(lead.id, s); closeLeadMenu()" 
+                                                       class="block px-3 py-2 text-xs hover:bg-cyan-500/20 hover:text-cyan-400 cursor-pointer transition-colors">
+                                                        → {{ t(s) }}
+                                                    </a>
+                                                }
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
                         </div>
                     </div>
+                } @empty {
+                  <div class="col-span-full text-center py-12 text-slate-500">
+                    <div class="text-4xl mb-2">📭</div>
+                    <p>沒有符合條件的客戶</p>
+                    @if(leadStatusFilter() !== 'all') {
+                      <button (click)="leadStatusFilter.set('all')" class="mt-2 text-cyan-400 hover:underline text-sm">查看全部</button>
+                    }
+                  </div>
                 }
             </div>
         } @else {

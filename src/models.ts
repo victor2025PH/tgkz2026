@@ -90,6 +90,8 @@ export interface CapturedLead {
   interactionHistory: Interaction[];
   doNotContact: boolean;
   campaignId?: number;
+  intentScore?: number;       // 意圖分數 (0-100)
+  intentLevel?: string;       // 意圖等級 (hot/warm/neutral/cold/none)
 }
 
 export interface LogEntry {

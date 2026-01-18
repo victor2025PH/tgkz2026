@@ -115,6 +115,8 @@ export class AppComponent implements OnDestroy, OnInit {
   currentView: WritableSignal<View> = signal('dashboard');
   leadDetailView: WritableSignal<LeadDetailView> = signal('sendMessage');
   leadsViewMode: WritableSignal<LeadsViewMode> = signal('kanban');
+  leadStatusFilter = signal<string>('all');  // 當前篩選的 Lead 狀態
+  leadSortBy = signal<'intent' | 'time' | 'name'>('time');  // 排序方式
   
   // --- 子視圖狀態 ---
   runtimeLogsTab = signal<'analytics' | 'logs' | 'performance' | 'alerts'>('analytics');  // 合併監控和告警
@@ -3843,6 +3845,30 @@ export class AppComponent implements OnDestroy, OnInit {
     const converted = this.leadsByStatus('Closed-Won').length;
     return ((converted / total) * 100).toFixed(1);
   }
+  
+  // 過濾和排序後的 Leads
+  filteredLeads = computed(() => {
+    const filter = this.leadStatusFilter();
+    const sortBy = this.leadSortBy();
+    
+    let result = this.displayLeads();
+    
+    // 按狀態篩選
+    if (filter !== 'all') {
+      result = result.filter(lead => lead.status === filter);
+    }
+    
+    // 排序
+    return result.sort((a, b) => {
+      if (sortBy === 'intent') {
+        return (b.intentScore || 0) - (a.intentScore || 0);
+      } else if (sortBy === 'time') {
+        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      } else {
+        return (a.username || '').localeCompare(b.username || '');
+      }
+    });
+  });
 
   // --- Funnel Stats & User Management ---
   funnelStats = signal<{
@@ -10559,7 +10585,21 @@ export class AppComponent implements OnDestroy, OnInit {
       default: return 'bg-slate-700/20 text-slate-300';
     }
   }
-   getHealthColor(score: number): string {
+  
+  // 狀態頂部條顏色
+  getStatusBarColor(status: string): string {
+    switch (status) {
+      case 'New': return 'bg-amber-500';
+      case 'Contacted': return 'bg-cyan-500';
+      case 'Replied': return 'bg-purple-500';
+      case 'Follow-up': return 'bg-orange-500';
+      case 'Closed-Won': return 'bg-emerald-500';
+      case 'Closed-Lost': return 'bg-red-500';
+      default: return 'bg-slate-500';
+    }
+  }
+  
+  getHealthColor(score: number): string {
     if (score > 80) return 'bg-green-500';
     if (score > 50) return 'bg-yellow-500';
     return 'bg-red-500';

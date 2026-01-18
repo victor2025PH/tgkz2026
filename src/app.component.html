@@ -4587,6 +4587,14 @@
                   class="px-4 py-2 rounded-lg transition-all flex items-center gap-2">
             <span>📈</span> 效果分析
           </button>
+          <button (click)="adSystemTab.set('queue'); refreshQueueStatus()" 
+                  [class]="adSystemTab() === 'queue' ? 'bg-orange-500/30 text-orange-300' : 'text-slate-400 hover:text-white'"
+                  class="px-4 py-2 rounded-lg transition-all flex items-center gap-2">
+            <span>📤</span> 發送隊列
+            @if (queueStats().pending > 0) {
+              <span class="px-1.5 py-0.5 bg-emerald-500/30 text-emerald-400 text-xs rounded-full">{{ queueStats().pending }}</span>
+            }
+          </button>
         </div>
         
         <!-- 模板管理 Tab -->
@@ -5046,6 +5054,116 @@
                 <p>正在加載統計數據...</p>
               </div>
             }
+          </div>
+        }
+        
+        <!-- 發送隊列 Tab -->
+        @if (adSystemTab() === 'queue') {
+          <div class="space-y-6">
+            <!-- 隊列統計 -->
+            <div class="grid grid-cols-5 gap-4">
+              <div class="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
+                <div class="text-2xl font-bold text-amber-400">{{ queueStats().pending }}</div>
+                <div class="text-xs text-slate-500">待發送</div>
+              </div>
+              <div class="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
+                <div class="text-2xl font-bold text-cyan-400">{{ queueStats().sending }}</div>
+                <div class="text-xs text-slate-500">發送中</div>
+              </div>
+              <div class="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
+                <div class="text-2xl font-bold text-emerald-400">{{ queueStats().sent }}</div>
+                <div class="text-xs text-slate-500">已發送</div>
+              </div>
+              <div class="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
+                <div class="text-2xl font-bold text-red-400">{{ queueStats().failed }}</div>
+                <div class="text-xs text-slate-500">失敗</div>
+              </div>
+              <div class="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
+                <div class="text-2xl font-bold text-purple-400">{{ (queueStats().successRate * 100).toFixed(0) }}%</div>
+                <div class="text-xs text-slate-500">成功率</div>
+              </div>
+            </div>
+            
+            <!-- 消息列表 -->
+            <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+              <div class="p-4 border-b border-slate-700/50 flex items-center justify-between">
+                <h3 class="font-semibold text-white flex items-center gap-2">
+                  <span>📋</span> 消息列表
+                </h3>
+                <div class="flex items-center gap-2">
+                  <button (click)="refreshQueueStatus()" 
+                          class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600">
+                    🔄 刷新
+                  </button>
+                  @if (queueStats().pending > 0) {
+                    <button (click)="clearPendingQueue()"
+                            class="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30">
+                      🗑️ 清空待發送
+                    </button>
+                  }
+                </div>
+              </div>
+              
+              <div class="max-h-96 overflow-y-auto">
+                @for (msg of queueMessages(); track msg.id) {
+                  <div class="flex items-center gap-4 p-4 border-b border-slate-700/30 hover:bg-slate-700/30 transition-colors">
+                    <!-- 狀態圖標 -->
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center"
+                         [class.bg-amber-500/20]="msg.status === 'pending'"
+                         [class.bg-cyan-500/20]="msg.status === 'sending'"
+                         [class.bg-emerald-500/20]="msg.status === 'sent'"
+                         [class.bg-red-500/20]="msg.status === 'failed'">
+                      @switch (msg.status) {
+                        @case ('pending') { <span class="text-amber-400">⏳</span> }
+                        @case ('sending') { <span class="text-cyan-400 animate-pulse">📤</span> }
+                        @case ('sent') { <span class="text-emerald-400">✓</span> }
+                        @case ('failed') { <span class="text-red-400">✗</span> }
+                      }
+                    </div>
+                    
+                    <!-- 收件人信息 -->
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium text-white truncate">{{ msg.recipientName || msg.recipientId }}</div>
+                      <div class="text-xs text-slate-400 truncate">{{ msg.content }}</div>
+                    </div>
+                    
+                    <!-- 時間 -->
+                    <div class="text-right text-xs text-slate-500">
+                      @if (msg.sentAt) {
+                        <div>發送於 {{ msg.sentAt | date:'HH:mm:ss' }}</div>
+                      } @else if (msg.scheduledAt) {
+                        <div>預計 {{ msg.scheduledAt | date:'HH:mm:ss' }}</div>
+                      } @else {
+                        <div>排隊中</div>
+                      }
+                    </div>
+                    
+                    <!-- 操作 -->
+                    <div class="flex items-center gap-1">
+                      @if (msg.status === 'failed') {
+                        <button (click)="retryMessage(msg.id)"
+                                class="p-1.5 text-amber-400 hover:bg-amber-500/20 rounded transition-colors"
+                                title="重試">
+                          🔄
+                        </button>
+                      }
+                      @if (msg.status === 'pending') {
+                        <button (click)="cancelMessage(msg.id)"
+                                class="p-1.5 text-red-400 hover:bg-red-500/20 rounded transition-colors"
+                                title="取消">
+                          ✗
+                        </button>
+                      }
+                    </div>
+                  </div>
+                } @empty {
+                  <div class="text-center py-12 text-slate-500">
+                    <div class="text-4xl mb-2">📭</div>
+                    <p>隊列中沒有消息</p>
+                  </div>
+                }
+              </div>
+            </div>
           </div>
         }
       }

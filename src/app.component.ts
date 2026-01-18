@@ -684,6 +684,18 @@ export class AppComponent implements OnDestroy, OnInit {
   queueMessages: WritableSignal<QueueMessage[]> = signal([]);
   selectedQueuePhone: WritableSignal<string | null> = signal(null);
   
+  // 隊列統計（用於廣告發送頁面）
+  queueStats = signal({
+    pending: 0,
+    sending: 0,
+    sent: 0,
+    failed: 0,
+    retrying: 0,
+    totalToday: 0,
+    successRate: 0,
+    avgSendTime: 0
+  });
+  
   // Analytics charts data
   sendingStatsData = signal<TimeSeriesData | null>(null);
   queueLengthHistoryData = signal<TimeSeriesData | null>(null);
@@ -5782,6 +5794,25 @@ export class AppComponent implements OnDestroy, OnInit {
             const statuses = status as Record<string, QueueStatus>;
             this.queueStatuses.set(statuses);
         }
+        
+        // 更新整體隊列統計
+        const allStatuses = Object.values(this.queueStatuses());
+        const totalPending = allStatuses.reduce((sum, s) => sum + (s.pending || 0), 0);
+        const totalSending = allStatuses.reduce((sum, s) => sum + (s.processing || 0), 0);
+        const totalSent = allStatuses.reduce((sum, s) => sum + (s.stats?.completed || 0), 0);
+        const totalFailed = allStatuses.reduce((sum, s) => sum + (s.failed || 0), 0);
+        const total = totalSent + totalFailed;
+        
+        this.queueStats.set({
+          pending: totalPending,
+          sending: totalSending,
+          sent: totalSent,
+          failed: totalFailed,
+          retrying: allStatuses.reduce((sum, s) => sum + (s.retrying || 0), 0),
+          totalToday: total,
+          successRate: total > 0 ? totalSent / total : 0,
+          avgSendTime: allStatuses.reduce((sum, s) => sum + (s.stats?.avg_time || 0), 0) / (allStatuses.length || 1)
+        });
     });
     
     this.ipcService.on('queue-messages', (data: { phone?: string, messages: QueueMessage[], count: number }) => {
@@ -7478,6 +7509,24 @@ export class AppComponent implements OnDestroy, OnInit {
   // Queue management
   refreshQueueStatus(phone?: string) {
     this.ipcService.send('get-queue-status', phone ? { phone } : {});
+  }
+  
+  clearPendingQueue() {
+    if (confirm('確定要清空所有待發送消息嗎？此操作不可撤銷。')) {
+      this.ipcService.send('clear-queue', { status: 'pending' });
+      this.toastService.success('待發送隊列已清空');
+    }
+  }
+  
+  retryMessage(messageId: string) {
+    this.ipcService.send('retry-message', { messageId });
+    this.toastService.info('正在重試發送...');
+  }
+  
+  cancelMessage(messageId: string) {
+    this.ipcService.send('cancel-message', { messageId });
+    this.toastService.success('消息已取消');
+    this.refreshQueueStatus();
   }
   
   clearQueue(phone: string, status?: string) {

@@ -2710,7 +2710,7 @@ class BackendService:
                 db.get_all_groups(),
                 db.get_all_campaigns(),
                 db.get_all_templates(),
-                db.get_all_leads(),
+                db.get_leads_with_total(),  # 使用新方法獲取 leads 和總數
                 db.get_recent_logs(limit=100),
                 db.get_all_settings(),
                 db.get_monitoring_config(),
@@ -2726,7 +2726,9 @@ class BackendService:
             monitored_groups = results[2] if not isinstance(results[2], Exception) else []
             campaigns = results[3] if not isinstance(results[3], Exception) else []
             message_templates = results[4] if not isinstance(results[4], Exception) else []
-            leads = results[5] if not isinstance(results[5], Exception) else []
+            leads_data = results[5] if not isinstance(results[5], Exception) else {'leads': [], 'total': 0}
+            leads = leads_data.get('leads', []) if isinstance(leads_data, dict) else []
+            leads_total = leads_data.get('total', 0) if isinstance(leads_data, dict) else 0
             logs = results[6] if not isinstance(results[6], Exception) else []
             settings = results[7] if not isinstance(results[7], Exception) else {}
             monitoring_config = results[8] if not isinstance(results[8], Exception) else {}
@@ -2815,7 +2817,7 @@ class BackendService:
             self.is_monitoring = is_monitoring
             
             # Send initial state event
-            print(f"[Backend] Sending initial-state with {len(accounts)} accounts", file=sys.stderr)
+            print(f"[Backend] Sending initial-state with {len(accounts)} accounts, {leads_total} leads total", file=sys.stderr)
             print(f"[Backend] Account details: {[(a.get('phone'), a.get('firstName'), a.get('status')) for a in accounts]}", file=sys.stderr)
             self.send_event("initial-state", {
                 "accounts": accounts,
@@ -2824,6 +2826,7 @@ class BackendService:
                 "campaigns": campaigns,
                 "messageTemplates": message_templates,
                 "leads": leads,
+                "leadsTotal": leads_total,  # 添加 leads 總數
                 "logs": logs,
                 "settings": settings,
                 "isMonitoring": is_monitoring

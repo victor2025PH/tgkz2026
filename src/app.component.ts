@@ -7109,6 +7109,8 @@ export class AppComponent implements OnDestroy, OnInit {
             this.isMonitoring.set(state.isMonitoring);
         }
         this.leads.set((state.leads || []).map((l: CapturedLead) => ({...l, timestamp: new Date(l.timestamp)})));
+        // 設置 leads 總數（如果後端提供了 total，則使用；否則使用 leads 數組長度）
+        this.leadsTotal.set(state.leadsTotal ?? state.leads?.length ?? 0);
         this.logs.set((state.logs || []).map((l: LogEntry) => ({...l, timestamp: new Date(l.timestamp)})));
         
         // Load settings
@@ -7885,6 +7887,30 @@ export class AppComponent implements OnDestroy, OnInit {
   
   formatDate(dateString: string): string {
     return new Date(dateString).toLocaleString();
+  }
+  
+  // 安全的日期格式化，處理 Invalid Date
+  safeFormatDate(date: any, format: string = 'MM/dd HH:mm'): string {
+    if (!date) return '-';
+    try {
+      const d = date instanceof Date ? date : new Date(date);
+      if (isNaN(d.getTime())) return '-';
+      
+      // 簡單格式化
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const month = pad(d.getMonth() + 1);
+      const day = pad(d.getDate());
+      const hours = pad(d.getHours());
+      const mins = pad(d.getMinutes());
+      const year = d.getFullYear();
+      
+      if (format === 'MM/dd HH:mm') return `${month}/${day} ${hours}:${mins}`;
+      if (format === 'yyyy-MM-dd HH:mm') return `${year}-${month}-${day} ${hours}:${mins}`;
+      if (format === 'HH:mm:ss') return `${hours}:${mins}:${pad(d.getSeconds())}`;
+      return `${month}/${day} ${hours}:${mins}`;
+    } catch {
+      return '-';
+    }
   }
   
   getQueueStatusForAccount(phone: string): QueueStatus | null {

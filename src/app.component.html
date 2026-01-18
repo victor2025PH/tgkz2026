@@ -4596,7 +4596,7 @@
                             </div>
                             <div class="ml-6">
                               <p class="text-xs font-mono bg-slate-800/50 rounded px-2 py-1 text-slate-400 truncate">🔑 {{ lead.triggeredKeyword || '無' }}</p>
-                              <p class="text-xs text-slate-500 mt-2">{{ lead.timestamp | date:'MM/dd HH:mm' }}</p>
+                              <p class="text-xs text-slate-500 mt-2">{{ safeFormatDate(lead.timestamp, 'MM/dd HH:mm') }}</p>
                             </div>
                             <div class="flex gap-2 mt-3 pt-3 border-t border-slate-700/50">
                                 <button (click)="openLeadDetailModal(lead)" 

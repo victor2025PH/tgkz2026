@@ -12715,6 +12715,8 @@ class BackendService:
         try:
             lead_ids = payload.get('leadIds', [])
             
+            self.send_log(f"收到批量刪除請求: {len(lead_ids)} 個 Lead, IDs: {lead_ids[:10]}{'...' if len(lead_ids) > 10 else ''}", "info")
+            
             if not lead_ids:
                 self.send_event("batch-operation-result", {
                     "success": False,
@@ -12722,29 +12724,32 @@ class BackendService:
                 })
                 return
             
-            # 直接使用 database 方法刪除，避免依賴可能未初始化的 batch_ops
-            success_count = 0
-            for lead_id in lead_ids:
-                try:
-                    await db.execute('DELETE FROM extracted_members WHERE id = ?', (lead_id,))
-                    success_count += 1
-                except Exception as e:
-                    self.send_log(f"刪除 Lead {lead_id} 失敗: {e}", "warning")
+            # 使用 database 的 batch_delete_leads 方法
+            result = await db.batch_delete_leads(lead_ids)
             
-            self.send_log(f"批量刪除完成: {success_count}/{len(lead_ids)} 成功", "success")
+            success_count = result.get('deleted', 0)
+            failed = result.get('failed', [])
+            
+            self.send_log(f"批量刪除完成: {success_count}/{len(lead_ids)} 成功", "success" if success_count > 0 else "warning")
+            
+            if failed:
+                self.send_log(f"刪除失敗的 ID: {failed}", "warning")
             
             # 刷新 leads 列表
             leads = await db.get_all_leads()
+            self.send_log(f"刷新後剩餘 {len(leads)} 個 Lead", "info")
             self.send_event("leads-updated", {"leads": leads})
             
             self.send_event("batch-operation-result", {
-                "success": True,
+                "success": success_count > 0,
                 "successCount": success_count,
                 "failureCount": len(lead_ids) - success_count
             })
             
         except Exception as e:
             self.send_log(f"批量刪除失敗: {str(e)}", "error")
+            import traceback
+            traceback.print_exc()
             self.send_event("batch-operation-result", {
                 "success": False,
                 "error": str(e)
@@ -12754,6 +12759,8 @@ class BackendService:
         """刪除單個 Lead"""
         try:
             lead_id = payload.get('leadId')
+            
+            self.send_log(f"收到刪除請求: Lead ID = {lead_id}", "info")
             
             if not lead_id:
                 self.send_event("lead-deleted", {
@@ -12765,16 +12772,20 @@ class BackendService:
             result = await db.delete_lead(lead_id)
             
             if result:
-                self.send_log(f"已刪除 Lead: {lead_id}", "success")
+                self.send_log(f"✓ 已刪除 Lead: {lead_id}", "success")
                 # 刷新 leads 列表
                 leads = await db.get_all_leads()
+                self.send_log(f"刷新後剩餘 {len(leads)} 個 Lead", "info")
                 self.send_event("leads-updated", {"leads": leads})
                 self.send_event("lead-deleted", {"success": True, "leadId": lead_id})
             else:
-                self.send_event("lead-deleted", {"success": False, "error": "刪除失敗"})
+                self.send_log(f"✗ 刪除 Lead {lead_id} 失敗 (記錄可能不存在)", "warning")
+                self.send_event("lead-deleted", {"success": False, "error": "刪除失敗 - 記錄可能不存在"})
                 
         except Exception as e:
             self.send_log(f"刪除 Lead 失敗: {str(e)}", "error")
+            import traceback
+            traceback.print_exc()
             self.send_event("lead-deleted", {"success": False, "error": str(e)})
 
     async def handle_undo_batch_operation(self, payload: Dict[str, Any]):

@@ -2981,23 +2981,50 @@ class Database:
     
     async def delete_lead(self, lead_id: int) -> bool:
         """刪除單個 Lead"""
+        import sys
         try:
-            await self.execute('DELETE FROM extracted_members WHERE id = ?', (lead_id,))
+            # 先確認記錄存在
+            existing = await self.fetch_one('SELECT id, user_id FROM extracted_members WHERE id = ?', (lead_id,))
+            print(f"[Database] delete_lead: looking for id={lead_id}, found={existing}", file=sys.stderr)
+            
+            if not existing:
+                print(f"[Database] delete_lead: Lead {lead_id} not found in database", file=sys.stderr)
+                return False
+            
+            # 執行刪除
+            affected = await self.execute('DELETE FROM extracted_members WHERE id = ?', (lead_id,))
+            print(f"[Database] delete_lead: DELETE affected {affected} rows", file=sys.stderr)
+            
+            # 確認刪除成功
+            check = await self.fetch_one('SELECT id FROM extracted_members WHERE id = ?', (lead_id,))
+            if check:
+                print(f"[Database] delete_lead: WARNING - Lead {lead_id} still exists after DELETE!", file=sys.stderr)
+                return False
+            
+            print(f"[Database] delete_lead: Successfully deleted Lead {lead_id}", file=sys.stderr)
             return True
         except Exception as e:
-            print(f"Error deleting lead: {e}")
+            print(f"[Database] delete_lead ERROR: {e}", file=sys.stderr)
             return False
     
     async def batch_delete_leads(self, lead_ids: List[int]) -> Dict:
         """批量刪除 Leads"""
+        import sys
         try:
+            print(f"[Database] batch_delete_leads: Deleting {len(lead_ids)} leads: {lead_ids}", file=sys.stderr)
             deleted = 0
+            failed = []
             for lead_id in lead_ids:
-                await self.execute('DELETE FROM extracted_members WHERE id = ?', (lead_id,))
-                deleted += 1
-            return {'success': True, 'deleted': deleted}
+                result = await self.delete_lead(lead_id)
+                if result:
+                    deleted += 1
+                else:
+                    failed.append(lead_id)
+            
+            print(f"[Database] batch_delete_leads: Deleted {deleted}/{len(lead_ids)}, failed: {failed}", file=sys.stderr)
+            return {'success': True, 'deleted': deleted, 'failed': failed}
         except Exception as e:
-            print(f"Error batch deleting leads: {e}")
+            print(f"[Database] batch_delete_leads ERROR: {e}", file=sys.stderr)
             return {'success': False, 'error': str(e)}
     
     async def get_users_with_profiles(

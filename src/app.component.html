@@ -4701,44 +4701,40 @@
                                 </div>
                             </div>
                             
-                            <!-- 快速操作按鈕 -->
-                            <div class="flex gap-1 mt-3 pt-3 border-t border-slate-700/50">
+                            <!-- 快速操作按鈕 - 青藍色主題 + 圖標文字 -->
+                            <div class="flex gap-1.5 mt-3 pt-3 border-t border-cyan-500/20">
                                 <button (click)="$event.stopPropagation(); openLeadDetailModal(lead)" 
-                                        class="flex-1 text-xs bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
-                                        title="發送消息">
-                                    📩
+                                        class="flex-1 text-xs bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 text-cyan-400 py-2 px-2 rounded-lg transition-all border border-cyan-500/30 hover:border-cyan-400/50 flex items-center justify-center gap-1 font-medium shadow-sm hover:shadow-cyan-500/20">
+                                    💬 訊息
                                 </button>
                                 <button (click)="$event.stopPropagation(); startAiChat(lead)" 
-                                        class="flex-1 text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
-                                        title="AI 聊天">
-                                    🤖
+                                        class="flex-1 text-xs bg-gradient-to-r from-cyan-500/20 to-purple-500/20 hover:from-cyan-500/30 hover:to-purple-500/30 text-cyan-300 py-2 px-2 rounded-lg transition-all border border-cyan-500/30 hover:border-cyan-400/50 flex items-center justify-center gap-1 font-medium shadow-sm hover:shadow-cyan-500/20">
+                                    🤖 AI
                                 </button>
                                 <button (click)="$event.stopPropagation(); inviteToGroup(lead)" 
-                                        class="flex-1 text-xs bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
-                                        title="邀請進群">
-                                    👥
+                                        class="flex-1 text-xs bg-gradient-to-r from-cyan-500/20 to-teal-500/20 hover:from-cyan-500/30 hover:to-teal-500/30 text-cyan-300 py-2 px-2 rounded-lg transition-all border border-cyan-500/30 hover:border-cyan-400/50 flex items-center justify-center gap-1 font-medium shadow-sm hover:shadow-cyan-500/20">
+                                    👥 拉群
                                 </button>
                                 <div class="relative">
                                     <button (click)="$event.stopPropagation(); toggleLeadMenu(lead.id)" 
-                                            class="text-xs bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 py-2 px-3 rounded-lg transition-colors"
-                                            title="更多操作">
-                                        ⋮
+                                            class="text-xs bg-slate-700/80 hover:bg-cyan-500/30 text-slate-300 hover:text-cyan-400 py-2 px-3 rounded-lg transition-all border border-slate-600/50 hover:border-cyan-500/30 font-medium">
+                                        ⋯
                                     </button>
                                     @if(openLeadMenuId() === lead.id) {
-                                        <div class="absolute z-50 right-0 top-full mt-1 bg-slate-800 rounded-lg shadow-xl border border-slate-700 overflow-hidden min-w-[140px]"
+                                        <div class="absolute z-[9999] right-0 bottom-full mb-2 bg-slate-900/95 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30 overflow-hidden min-w-[160px]"
                                              (click)="$event.stopPropagation()">
-                                            <div class="px-3 py-2 text-xs text-slate-500 border-b border-slate-700">更改狀態</div>
+                                            <div class="px-3 py-2 text-xs text-cyan-400 font-medium bg-cyan-500/10 border-b border-cyan-500/20">📝 更改狀態</div>
                                             @for(s of leadStatuses; track s) {
                                                 @if(s !== lead.status) {
                                                     <a (click)="updateLeadStatus(lead.id, s); closeLeadMenu()" 
-                                                       class="block px-3 py-2 text-xs hover:bg-cyan-500/20 hover:text-cyan-400 cursor-pointer transition-colors">
+                                                       class="block px-3 py-2.5 text-sm hover:bg-cyan-500/20 hover:text-cyan-400 cursor-pointer transition-colors text-slate-300">
                                                         → {{ t(s) }}
                                                     </a>
                                                 }
                                             }
-                                            <div class="border-t border-slate-700">
+                                            <div class="border-t border-slate-700/50">
                                               <a (click)="addToDnc(lead); closeLeadMenu()" 
-                                                 class="block px-3 py-2 text-xs text-red-400 hover:bg-red-500/20 cursor-pointer transition-colors">
+                                                 class="block px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/20 cursor-pointer transition-colors">
                                                   🚫 加入黑名單
                                               </a>
                                             </div>
@@ -8108,50 +8104,116 @@
     }
   </main>
 
-  <!-- Lead Detail Modal -->
+  <!-- Lead Detail Modal - 客戶操作中心 -->
   @if (generationState().lead; as lead) {
-    <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
-      <div class="bg-slate-100 dark:bg-slate-900/80 border border-slate-500/20 rounded-2xl shadow-2xl p-6 w-full max-w-2xl transform transition-all text-slate-800 dark:text-slate-200">
-        <div class="flex justify-between items-center border-b border-slate-500/20 pb-3 mb-4">
-          <h3 class="text-2xl font-semibold text-slate-900 dark:text-white">{{ t('leadDetails') }}: @{{ lead.username }}</h3>
-          <button (click)="closeLeadDetailModal()" class="text-slate-400 hover:text-slate-200 text-3xl leading-none transition-colors">&times;</button>
-        </div>
-        <div class="border-b border-slate-500/20"><nav class="-mb-px flex space-x-6" aria-label="Tabs"><a (click)="leadDetailView.set('sendMessage')" [class.border-cyan-400]="leadDetailView() === 'sendMessage'" [class.text-cyan-400]="leadDetailView() === 'sendMessage'" class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm cursor-pointer text-slate-500 hover:text-cyan-400 transition-colors">{{ t('sendMessageTab') }}</a><a (click)="leadDetailView.set('history')" [class.border-cyan-400]="leadDetailView() === 'history'" [class.text-cyan-400]="leadDetailView() === 'history'" class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm cursor-pointer text-slate-500 hover:text-cyan-400 transition-colors">{{ t('historyTab') }}</a></nav></div>
-        @if(leadDetailView() === 'sendMessage') {
-            <div class="py-4 space-y-4">
-              <!-- 發送賬號選擇器 -->
+    <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50" (click)="closeLeadDetailModal()">
+      <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 border border-cyan-500/30 rounded-2xl shadow-2xl shadow-cyan-500/10 w-full max-w-2xl max-h-[90vh] overflow-hidden text-slate-200" (click)="$event.stopPropagation()">
+        
+        <!-- 客戶信息頭部 -->
+        <div class="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 border-b border-cyan-500/20 p-5">
+          <div class="flex justify-between items-start">
+            <div class="flex items-center gap-4">
+              <!-- 頭像 -->
+              <div class="w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-cyan-500/30">
+                {{ (lead.username || lead.firstName || lead.userId || '?')[0].toUpperCase() }}
+              </div>
+              <!-- 用戶信息 -->
               <div>
-                <label class="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{{ t('selectSenderAccount') }}</label>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-xl font-bold text-white">
+                    @if(lead.username) { @{{ lead.username }} }
+                    @else if(lead.firstName) { {{ lead.firstName }} {{ lead.lastName || '' }} }
+                    @else { ID: {{ lead.userId | slice:0:12 }} }
+                  </h3>
+                  <span class="h-2.5 w-2.5 rounded-full animate-pulse" [class]="getOnlineStatusColor(lead.onlineStatus)"></span>
+                </div>
+                @if(lead.phone) {
+                  <p class="text-sm text-cyan-400">📱 {{ lead.phone }}</p>
+                }
+                <div class="flex items-center gap-2 mt-1 flex-wrap">
+                  @if(lead.sourceGroup) {
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">📍 {{ lead.sourceGroup | slice:0:20 }}</span>
+                  }
+                  @if(lead.triggeredKeyword && lead.triggeredKeyword !== '無') {
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">🔑 {{ lead.triggeredKeyword | slice:0:15 }}</span>
+                  }
+                  @if(lead.intentLevel) {
+                    <span class="text-xs px-2 py-0.5 rounded-full" [class]="getIntentLevelColor(lead.intentLevel)">{{ getIntentLevelEmoji(lead.intentLevel) }} {{ t(lead.intentLevel) }}</span>
+                  }
+                </div>
+              </div>
+            </div>
+            <button (click)="closeLeadDetailModal()" class="text-slate-400 hover:text-white text-2xl leading-none transition-colors p-2 hover:bg-white/10 rounded-lg">✕</button>
+          </div>
+        </div>
+
+        <!-- Tab 導航 -->
+        <div class="border-b border-cyan-500/20 bg-slate-900/50">
+          <nav class="flex px-5" aria-label="Tabs">
+            <a (click)="leadDetailView.set('sendMessage')" 
+               [class.border-cyan-400]="leadDetailView() === 'sendMessage'" 
+               [class.text-cyan-400]="leadDetailView() === 'sendMessage'" 
+               [class.bg-cyan-500/10]="leadDetailView() === 'sendMessage'"
+               class="whitespace-nowrap py-3 px-4 border-b-2 border-transparent font-medium text-sm cursor-pointer text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/5 transition-all rounded-t-lg flex items-center gap-2">
+              💬 {{ t('sendMessageTab') }}
+            </a>
+            <a (click)="leadDetailView.set('history')" 
+               [class.border-cyan-400]="leadDetailView() === 'history'" 
+               [class.text-cyan-400]="leadDetailView() === 'history'"
+               [class.bg-cyan-500/10]="leadDetailView() === 'history'"
+               class="whitespace-nowrap py-3 px-4 border-b-2 border-transparent font-medium text-sm cursor-pointer text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/5 transition-all rounded-t-lg flex items-center gap-2">
+              📋 {{ t('historyTab') }}
+            </a>
+          </nav>
+        </div>
+        
+        <!-- 內容區域 - 可滾動 -->
+        <div class="overflow-y-auto max-h-[calc(90vh-220px)] p-5">
+        @if(leadDetailView() === 'sendMessage') {
+            <div class="space-y-4">
+              <!-- 發送帳號選擇器 -->
+              <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                <label class="block text-sm font-medium text-cyan-400 mb-2">📤 {{ t('selectSenderAccount') }}</label>
                 <select 
                     [ngModel]="selectedSenderId()" 
                     (ngModelChange)="selectedSenderId.set($event)"
-                    class="form-select w-full bg-slate-200/50 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                    class="form-select w-full bg-slate-900/50 border-cyan-500/30 rounded-lg py-2.5 px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500">
                     @if(senderAccounts().length === 0) {
                         <option value="">{{ t('noSenderAccounts') }}</option>
                     } @else {
+                        <option value="">選擇發送帳號...</option>
                         @for(account of senderAccounts(); track account.id) {
-                            <option [value]="account.id">{{ account.phone }} ({{ account.status }})</option>
+                            <option [value]="account.id">{{ account.phone }} ({{ account.username || t(account.status) }})</option>
                         }
                     }
                 </select>
                 @if(senderAccounts().length === 0) {
-                    <p class="text-xs text-amber-400 mt-1">⚠️ {{ t('noSenderAccountsHint') }}</p>
+                    <div class="mt-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                      <p class="text-xs text-amber-400">⚠️ {{ t('noSenderAccountsHint') }}</p>
+                      <a (click)="currentView.set('accounts'); closeLeadDetailModal()" class="text-xs text-cyan-400 hover:underline cursor-pointer mt-1 inline-block">前往帳號管理 →</a>
+                    </div>
                 }
               </div>
 
-              <!-- 消息輸入方式選擇 -->
-              <div class="flex items-center gap-4 p-3 bg-slate-200/30 dark:bg-slate-800/30 rounded-lg">
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="messageMode" [checked]="messageMode() === 'manual'" (change)="messageMode.set('manual')" class="form-radio text-cyan-500">
-                    <span class="text-sm">{{ t('manualInput') }}</span>
+              <!-- 消息輸入方式選擇 - 青藍色主題卡片式 -->
+              <div class="grid grid-cols-3 gap-3">
+                <label (click)="messageMode.set('manual')"
+                       class="cursor-pointer p-3 rounded-xl border-2 transition-all text-center"
+                       [class]="messageMode() === 'manual' ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:border-cyan-500/30'">
+                    <div class="text-2xl mb-1">📝</div>
+                    <span class="text-sm font-medium">{{ t('manualInput') }}</span>
                 </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="messageMode" [checked]="messageMode() === 'ai'" (change)="messageMode.set('ai')" class="form-radio text-cyan-500">
-                    <span class="text-sm">{{ t('aiGenerate') }}</span>
+                <label (click)="messageMode.set('ai')"
+                       class="cursor-pointer p-3 rounded-xl border-2 transition-all text-center"
+                       [class]="messageMode() === 'ai' ? 'bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border-cyan-500 text-cyan-400' : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:border-cyan-500/30'">
+                    <div class="text-2xl mb-1">🤖</div>
+                    <span class="text-sm font-medium">{{ t('aiGenerate') }}</span>
                 </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="messageMode" [checked]="messageMode() === 'template'" (change)="messageMode.set('template')" class="form-radio text-cyan-500">
-                    <span class="text-sm">{{ t('useTemplate') }}</span>
+                <label (click)="messageMode.set('template')"
+                       class="cursor-pointer p-3 rounded-xl border-2 transition-all text-center"
+                       [class]="messageMode() === 'template' ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:border-cyan-500/30'">
+                    <div class="text-2xl mb-1">📋</div>
+                    <span class="text-sm font-medium">{{ t('useTemplate') }}</span>
                 </label>
               </div>
 
@@ -8237,11 +8299,11 @@
 
               <!-- 模板選擇模式 -->
               @if(messageMode() === 'template') {
-                <div>
-                    <label class="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{{ t('selectTemplate') }}</label>
+                <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                    <label class="block text-sm font-medium text-cyan-400 mb-2">📋 {{ t('selectTemplate') }}</label>
                     <select 
                         (change)="applyTemplate($event)"
-                        class="form-select w-full bg-slate-200/50 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                        class="form-select w-full bg-slate-900/50 border-cyan-500/30 rounded-lg py-2.5 px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
                         <option value="">{{ t('selectTemplatePlaceholder') }}</option>
                         @for(template of messageTemplates(); track template.id) {
                             <option [value]="template.id">{{ template.name }}</option>
@@ -8251,60 +8313,76 @@
               }
 
               <!-- 消息內容編輯區 -->
-              <div>
-                <div class="flex items-center justify-between mb-1">
-                    <label class="text-sm font-medium text-slate-500 dark:text-slate-400">{{ t('messageContent') }}</label>
-                    <span class="text-xs text-slate-500">{{ editableMessage().length }} {{ t('characters') }}</span>
+              <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                <div class="flex items-center justify-between mb-2">
+                    <label class="text-sm font-medium text-cyan-400">✏️ {{ t('messageContent') }}</label>
+                    <span class="text-xs text-slate-500 bg-slate-700/50 px-2 py-1 rounded">{{ editableMessage().length }} {{ t('characters') }}</span>
                 </div>
                 <textarea 
                     [ngModel]="editableMessage()" 
                     (ngModelChange)="editableMessage.set($event)"
-                    rows="4" 
-                    class="form-textarea w-full bg-slate-200/50 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700 rounded-lg py-3 px-3 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none"
+                    rows="5" 
+                    class="form-textarea w-full bg-slate-900/50 border-cyan-500/30 rounded-lg py-3 px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none placeholder-slate-500"
                     [placeholder]="t('messageContentPlaceholder')">
                 </textarea>
               </div>
 
               <!-- 附件區域 -->
-              <div class="flex items-center gap-4">
-                <button (click)="imageUpload.click()" class="flex items-center gap-2 bg-slate-200 dark:bg-slate-800/50 hover:bg-slate-300 dark:hover:bg-slate-700/50 text-sm font-medium py-2 px-4 rounded-lg transition duration-200">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                    {{ t('attachImage') }}
+              <div class="flex items-center gap-3">
+                <button (click)="imageUpload.click()" class="flex items-center gap-2 bg-slate-800/50 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-400 text-sm font-medium py-2 px-4 rounded-lg transition-all border border-slate-700/50 hover:border-cyan-500/30">
+                    🖼️ {{ t('attachImage') }}
                 </button>
                 <input #imageUpload type="file" (change)="onFileAttached($event, 'image')" accept="image/*" class="hidden">
-                <button (click)="fileUpload.click()" class="flex items-center gap-2 bg-slate-200 dark:bg-slate-800/50 hover:bg-slate-300 dark:hover:bg-slate-700/50 text-sm font-medium py-2 px-4 rounded-lg transition duration-200">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-                    {{ t('attachFile') }}
+                <button (click)="fileUpload.click()" class="flex items-center gap-2 bg-slate-800/50 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-400 text-sm font-medium py-2 px-4 rounded-lg transition-all border border-slate-700/50 hover:border-cyan-500/30">
+                    📎 {{ t('attachFile') }}
                 </button>
                 <input #fileUpload type="file" (change)="onFileAttached($event, 'file')" class="hidden">
               </div>
               @if(generationState().attachment; as attachment) {
-                <div class="p-2 rounded-lg bg-slate-200/50 dark:bg-slate-800/50 flex items-center justify-between text-sm">
+                <div class="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-between text-sm">
                     <div class="flex items-center gap-2 truncate">
-                       @if(attachment.type === 'image') { <svg class="h-4 w-4 flex-shrink-0 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg> }
-                       @else { <svg class="h-4 w-4 flex-shrink-0 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg> }
-                       <span class="truncate">{{ attachment.name }}</span>
+                       @if(attachment.type === 'image') { <span class="text-green-400">🖼️</span> }
+                       @else { <span class="text-blue-400">📄</span> }
+                       <span class="truncate text-white">{{ attachment.name }}</span>
                     </div>
-                    <button (click)="removeAttachment()" class="text-red-400 hover:text-red-300 text-lg font-bold">&times;</button>
+                    <button (click)="removeAttachment()" class="text-red-400 hover:text-red-300 text-lg font-bold p-1 hover:bg-red-500/20 rounded">&times;</button>
                 </div>
               }
 
-              <!-- 底部操作按鈕 -->
-              <div class="flex justify-between items-center pt-4 border-t border-slate-500/20">
-                <button (click)="addToDoNotContact(lead.id)" [disabled]="lead.doNotContact" class="text-xs text-red-400 hover:text-red-300 disabled:text-slate-500 disabled:cursor-not-allowed flex items-center gap-1">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
-                    {{ lead.doNotContact ? t('userOnDNC') : t('addToDNC') }}
+              <!-- 發送狀態提示 -->
+              @if(!canSendMessage() && !lead.doNotContact) {
+                <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                  <p class="text-sm text-amber-400">
+                    @if(senderAccounts().length === 0) {
+                      ⚠️ 無可用發送帳號
+                    } @else if(!selectedSenderId()) {
+                      ⚠️ 請選擇發送帳號
+                    } @else if(editableMessage().trim().length === 0) {
+                      ⚠️ 請輸入訊息內容
+                    }
+                  </p>
+                </div>
+              }
+              @if(lead.doNotContact) {
+                <div class="p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
+                  <p class="text-sm text-red-400">🚫 此客戶已加入黑名單，無法發送訊息</p>
+                </div>
+              }
+
+              <!-- 底部操作按鈕 - 青藍色主題 -->
+              <div class="flex justify-between items-center pt-4 border-t border-cyan-500/20">
+                <button (click)="addToDoNotContact(lead.id)" [disabled]="lead.doNotContact" class="text-sm text-red-400 hover:text-red-300 disabled:text-slate-500 disabled:cursor-not-allowed flex items-center gap-1.5 px-3 py-2 rounded-lg hover:bg-red-500/10 transition-all">
+                    🚫 {{ lead.doNotContact ? t('userOnDNC') : t('addToDNC') }}
                 </button>
                 <div class="flex gap-3">
-                    <button (click)="closeLeadDetailModal()" class="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-white font-semibold py-2.5 px-5 rounded-lg transition-colors">
+                    <button (click)="closeLeadDetailModal()" class="bg-slate-700/80 hover:bg-slate-600 text-slate-300 font-medium py-2.5 px-5 rounded-xl transition-all border border-slate-600/50 hover:border-slate-500">
                         {{ t('cancel') }}
                     </button>
                     <button 
                         (click)="sendMessageToLead()" 
                         [disabled]="!canSendMessage() || lead.doNotContact" 
-                        class="bg-green-500 hover:bg-green-600 text-white font-bold py-2.5 px-6 rounded-lg shadow-lg shadow-green-500/20 disabled:bg-slate-400 disabled:dark:bg-slate-600 disabled:shadow-none disabled:cursor-not-allowed flex items-center gap-2 transition-all">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                        {{ t('sendMessage') }}
+                        class="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg shadow-cyan-500/30 disabled:from-slate-500 disabled:to-slate-600 disabled:shadow-none disabled:cursor-not-allowed flex items-center gap-2 transition-all">
+                        ✈️ {{ t('sendMessage') }}
                     </button>
                 </div>
               </div>
@@ -8454,6 +8532,7 @@
                 }
             </div>
         }
+        </div><!-- 內容區域結束 -->
       </div>
     </div>
   }

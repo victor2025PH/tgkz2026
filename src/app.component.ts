@@ -5492,7 +5492,7 @@ export class AppComponent implements OnDestroy, OnInit {
     this.ipcService.on('leads-updated', (data: {leads: any[], total?: number}) => {
         const total = data.total ?? data.leads?.length ?? 0;
         console.log('[Frontend] Received leads-updated:', data.leads?.length || 0, 'total:', total);
-        this.leads.set((data.leads || []).map((l: CapturedLead) => ({...l, timestamp: new Date(l.timestamp)})));
+        this.leads.set((data.leads || []).map((l: any) => this.mapLeadFromBackend(l)));
         this.leadsTotal.set(total);
     });
     
@@ -7108,7 +7108,7 @@ export class AppComponent implements OnDestroy, OnInit {
         if (state.isMonitoring !== undefined) {
             this.isMonitoring.set(state.isMonitoring);
         }
-        this.leads.set((state.leads || []).map((l: CapturedLead) => ({...l, timestamp: new Date(l.timestamp)})));
+        this.leads.set((state.leads || []).map((l: any) => this.mapLeadFromBackend(l)));
         // 設置 leads 總數（如果後端提供了 total，則使用；否則使用 leads 數組長度）
         this.leadsTotal.set(state.leadsTotal ?? state.leads?.length ?? 0);
         this.logs.set((state.logs || []).map((l: LogEntry) => ({...l, timestamp: new Date(l.timestamp)})));
@@ -7887,6 +7887,28 @@ export class AppComponent implements OnDestroy, OnInit {
   
   formatDate(dateString: string): string {
     return new Date(dateString).toLocaleString();
+  }
+  
+  // 將後端數據映射為前端 Lead 格式（蛇形 -> 駝峰）
+  mapLeadFromBackend(l: any): CapturedLead {
+    return {
+      id: l.id,
+      userId: l.user_id || l.userId || '',
+      username: l.username || '',
+      firstName: l.first_name || l.firstName || '',
+      lastName: l.last_name || l.lastName || '',
+      sourceGroup: l.source_chat_title || l.sourceGroup || l.source_group || '',
+      triggeredKeyword: l.notes || l.triggeredKeyword || l.triggered_keyword || '',
+      timestamp: new Date(l.created_at || l.timestamp || l.extracted_at || Date.now()),
+      status: (l.status || l.response_status || 'New') as LeadStatus,
+      onlineStatus: (l.online_status || l.onlineStatus || 'hidden') as OnlineStatus,
+      assignedTemplateId: l.assignedTemplateId || l.assigned_template_id,
+      interactionHistory: l.interactionHistory || l.interaction_history || [],
+      doNotContact: !!l.doNotContact || !!l.do_not_contact,
+      campaignId: l.campaignId || l.campaign_id,
+      intentScore: l.intent_score || l.intentScore || 0,
+      intentLevel: l.intent_level || l.intentLevel || 'none'
+    };
   }
   
   // 安全的日期格式化，處理 Invalid Date

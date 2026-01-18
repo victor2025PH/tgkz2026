@@ -10842,11 +10842,36 @@ export class AppComponent implements OnDestroy, OnInit {
     if (score > 50) return 'bg-yellow-500';
     return 'bg-red-500';
   }
-  getOnlineStatusColor(status: OnlineStatus): string {
+  getOnlineStatusColor(status: OnlineStatus | string | undefined): string {
     switch (status) {
       case 'Online': return 'bg-green-500';
       case 'Recently': return 'bg-yellow-500';
-      default: return 'bg-slate-500';
+      case 'Offline': return 'bg-slate-500';
+      default: return 'bg-slate-400';
+    }
+  }
+
+  // 意向等級顏色
+  getIntentLevelColor(level: string | undefined): string {
+    switch (level) {
+      case 'HOT': return 'bg-red-500/20 text-red-400 border border-red-500/30';
+      case 'WARM': return 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
+      case 'NEUTRAL': return 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30';
+      case 'COLD': return 'bg-blue-500/20 text-blue-400 border border-blue-500/30';
+      case 'NONE': return 'bg-slate-500/20 text-slate-400 border border-slate-500/30';
+      default: return 'bg-slate-500/20 text-slate-400 border border-slate-500/30';
+    }
+  }
+
+  // 意向等級 Emoji
+  getIntentLevelEmoji(level: string | undefined): string {
+    switch (level) {
+      case 'HOT': return '🔥';
+      case 'WARM': return '🌡️';
+      case 'NEUTRAL': return '😐';
+      case 'COLD': return '❄️';
+      case 'NONE': return '⚪';
+      default: return '⚪';
     }
   }
   

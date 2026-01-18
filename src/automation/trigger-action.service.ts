@@ -14,12 +14,16 @@ import {
   TRIGGER_MODE_META
 } from './trigger-action.models';
 import { AICenterService } from '../ai-center/ai-center.service';
+import { ConversationEngineService, ReplyResult } from '../ai-center/conversation-engine.service';
+import { IntentRecognitionService } from '../ai-center/intent-recognition.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class TriggerActionService {
   private aiCenter = inject(AICenterService);
+  private conversationEngine = inject(ConversationEngineService);
+  private intentService = inject(IntentRecognitionService);
   
   // 全局觸發動作配置
   private globalConfig = signal<TriggerActionConfig>(DEFAULT_TRIGGER_CONFIG);
@@ -239,41 +243,68 @@ export class TriggerActionService {
       return { success: false, action: 'ai_smart' as const, error: 'AI 配置缺失' };
     }
     
-    // 1. 識別意圖
-    const intent = await this.aiCenter.recognizeIntent(params.message);
-    
-    // 2. 檢查是否需要轉人工
-    if (aiConfig.humanHandoff.onPurchaseIntent && intent.intent === 'purchase_intent') {
-      // 通知人工
+    try {
+      // 使用對話引擎生成完整回覆
+      const replyResult = await this.conversationEngine.generateReply(
+        params.message,
+        {
+          userId: params.userId,
+          userName: params.userName,
+          sourceGroup: params.groupId,
+          useKnowledgeBase: aiConfig.useAICenterConfig
+        }
+      );
+      
+      // 檢查是否需要轉人工
+      if (replyResult.shouldHandoff) {
+        // 檢查配置是否允許自動轉人工
+        const shouldHandoff = 
+          (aiConfig.humanHandoff.onPurchaseIntent && replyResult.intent.intent === 'purchase_intent') ||
+          (aiConfig.humanHandoff.onNegativeSentiment && replyResult.intent.sentiment === 'negative');
+        
+        if (shouldHandoff) {
+          return { 
+            success: true, 
+            action: 'ai_smart' as const, 
+            result: { 
+              type: 'handoff',
+              intent: replyResult.intent.intent,
+              reason: replyResult.handoffReason || '需要人工處理',
+              content: replyResult.content // 仍然提供回覆內容作為參考
+            } 
+          };
+        }
+      }
+      
+      // 計算延遲（使用配置或對話引擎建議的延遲）
+      const delay = aiConfig.replyStrategy.simulateTyping 
+        ? replyResult.delay 
+        : this.calculateDelay(aiConfig.replyStrategy.delayMin, aiConfig.replyStrategy.delayMax);
+      
+      return {
+        success: true,
+        action: 'ai_smart' as const,
+        result: {
+          type: 'reply',
+          content: replyResult.content,
+          delay,
+          senderAccountId: this.selectSenderAccount(config),
+          intent: replyResult.intent.intent,
+          confidence: replyResult.intent.confidence,
+          sentiment: replyResult.intent.sentiment,
+          triggeredRules: replyResult.triggeredRules.map(r => r.name),
+          suggestedFollowUp: replyResult.suggestedFollowUp,
+          metadata: replyResult.metadata
+        }
+      };
+    } catch (error) {
+      console.error('AI Smart Action failed:', error);
       return { 
-        success: true, 
+        success: false, 
         action: 'ai_smart' as const, 
-        result: { 
-          type: 'handoff',
-          intent: intent.intent,
-          reason: '購買意向明確' 
-        } 
+        error: error instanceof Error ? error.message : 'AI 處理失敗' 
       };
     }
-    
-    // 3. 生成回覆
-    const reply = await this.aiCenter.generateReply(params.message);
-    
-    // 4. 計算延遲
-    const delay = this.calculateDelay(aiConfig.replyStrategy.delayMin, aiConfig.replyStrategy.delayMax);
-    
-    return {
-      success: true,
-      action: 'ai_smart' as const,
-      result: {
-        type: 'reply',
-        content: reply,
-        delay,
-        senderAccountId: this.selectSenderAccount(config),
-        intent: intent.intent,
-        confidence: intent.confidence
-      }
-    };
   }
   
   private async executeTemplateSendAction(
@@ -323,38 +354,86 @@ export class TriggerActionService {
       return { success: false, action: 'multi_role' as const, error: '多角色配置缺失' };
     }
     
-    // 1. 識別意圖評分
-    const intent = await this.aiCenter.recognizeIntent(params.message);
-    
-    // 2. 檢查是否滿足建群條件
-    if (intent.confidence * 100 < multiConfig.triggerConditions.intentScoreThreshold) {
+    try {
+      // 1. 識別意圖評分（使用對話引擎）
+      const intentResult = await this.intentService.recognizeIntent(
+        params.message, 
+        params.userId,
+        true
+      );
+      
+      // 獲取用戶意向評分
+      const userScore = this.intentService.getIntentScore4User(params.userId);
+      
+      // 2. 檢查是否滿足建群條件
+      if (userScore < multiConfig.triggerConditions.intentScoreThreshold) {
+        // 未達閾值，先進行普通 AI 對話
+        const replyResult = await this.conversationEngine.generateReply(
+          params.message,
+          {
+            userId: params.userId,
+            userName: params.userName,
+            sourceGroup: params.groupId
+          }
+        );
+        
+        return {
+          success: true,
+          action: 'multi_role' as const,
+          result: {
+            type: 'waiting',
+            reason: '意向評分未達閾值，繼續培育',
+            score: userScore,
+            threshold: multiConfig.triggerConditions.intentScoreThreshold,
+            reply: replyResult.content,
+            delay: replyResult.delay
+          }
+        };
+      }
+      
+      // 檢查對話輪數
+      const context = this.intentService.getContext(params.userId);
+      const conversationRounds = context?.messages.filter(m => m.role === 'user').length || 0;
+      
+      if (conversationRounds < multiConfig.triggerConditions.minConversationRounds) {
+        return {
+          success: true,
+          action: 'multi_role' as const,
+          result: {
+            type: 'waiting',
+            reason: `對話輪數不足（${conversationRounds}/${multiConfig.triggerConditions.minConversationRounds}）`,
+            score: userScore
+          }
+        };
+      }
+      
+      // 3. 滿足條件，創建協作群組
+      const groupName = multiConfig.groupSettings.nameTemplate
+        .replace('{客戶名}', params.userName);
+      
       return {
         success: true,
         action: 'multi_role' as const,
         result: {
-          type: 'waiting',
-          reason: '意向評分未達閾值',
-          score: intent.confidence * 100
+          type: 'create_group',
+          groupName,
+          targetUserId: params.userId,
+          targetUserName: params.userName,
+          roleAccounts: multiConfig.roleAccounts,
+          scriptId: multiConfig.scriptId,
+          intentScore: userScore,
+          intent: intentResult.intent,
+          inviteMessage: multiConfig.groupSettings.inviteMessage
         }
       };
+    } catch (error) {
+      console.error('Multi-role action failed:', error);
+      return { 
+        success: false, 
+        action: 'multi_role' as const, 
+        error: error instanceof Error ? error.message : '多角色處理失敗' 
+      };
     }
-    
-    // 3. 創建協作群組（模擬）
-    const groupName = multiConfig.groupSettings.nameTemplate
-      .replace('{客戶名}', params.userName);
-    
-    return {
-      success: true,
-      action: 'multi_role' as const,
-      result: {
-        type: 'create_group',
-        groupName,
-        targetUserId: params.userId,
-        targetUserName: params.userName,
-        roleAccounts: multiConfig.roleAccounts,
-        scriptId: multiConfig.scriptId
-      }
-    };
   }
   
   private async executeRecordOnlyAction(

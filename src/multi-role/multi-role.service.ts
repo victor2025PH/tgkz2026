@@ -16,12 +16,14 @@ import {
   ScriptStage
 } from './multi-role.models';
 import { AICenterService } from '../ai-center/ai-center.service';
+import { ConversationEngineService } from '../ai-center/conversation-engine.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class MultiRoleService {
   private aiCenter = inject(AICenterService);
+  private conversationEngine = inject(ConversationEngineService);
   
   // 配置
   private config = signal<MultiRoleConfig>(DEFAULT_MULTI_ROLE_CONFIG);
@@ -300,18 +302,36 @@ export class MultiRoleService {
       let content: string;
       if (message.content.type === 'text') {
         content = message.content.text || '';
+        // 處理變量替換
+        if (message.content.variables) {
+          content = content
+            .replace('{客戶名}', group.targetCustomer.firstName || group.targetCustomer.username || 'VIP客戶')
+            .replace('{群名}', group.groupTitle);
+        }
       } else if (message.content.type === 'ai_generate') {
-        content = await this.aiCenter.generateReply(
-          message.content.aiPrompt || '',
-          [],
-          { rolePrompt: role.aiConfig.customPrompt }
+        // 使用對話引擎生成多角色回覆
+        const replyResult = await this.conversationEngine.generateMultiRoleReply(
+          message.content.aiPrompt || '請根據當前對話上下文生成合適的回覆',
+          {
+            roleId: role.id,
+            roleName: role.name,
+            rolePrompt: role.aiConfig.customPrompt || '',
+            personality: role.personality.description
+          },
+          {
+            userId: group.targetCustomer.id,
+            userName: group.targetCustomer.firstName || group.targetCustomer.username,
+            sourceGroup: group.telegramGroupId || group.id
+          }
         );
+        content = replyResult.content;
       } else {
         content = message.content.text || '';
       }
       
       // TODO: 發送消息
       // await this.sendMessage(group, role, content);
+      console.log(`[MultiRole] ${role.name}: ${content}`);
       
       // 更新統計
       this.activeGroups.update(groups => 

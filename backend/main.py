@@ -2317,6 +2317,9 @@ class BackendService:
             elif command == "batch-delete-leads":
                 await self.handle_batch_delete_leads(payload)
             
+            elif command == "delete-lead":
+                await self.handle_delete_lead(payload)
+            
             elif command == "undo-batch-operation":
                 await self.handle_undo_batch_operation(payload)
             
@@ -12743,6 +12746,33 @@ class BackendService:
                 "error": str(e)
             })
     
+    async def handle_delete_lead(self, payload: Dict[str, Any]):
+        """刪除單個 Lead"""
+        try:
+            lead_id = payload.get('leadId')
+            
+            if not lead_id:
+                self.send_event("lead-deleted", {
+                    "success": False,
+                    "error": "未提供 Lead ID"
+                })
+                return
+            
+            result = await db.delete_lead(lead_id)
+            
+            if result:
+                self.send_log(f"已刪除 Lead: {lead_id}", "success")
+                # 刷新 leads 列表
+                leads = await db.get_all_leads()
+                self.send_event("leads-updated", {"leads": leads})
+                self.send_event("lead-deleted", {"success": True, "leadId": lead_id})
+            else:
+                self.send_event("lead-deleted", {"success": False, "error": "刪除失敗"})
+                
+        except Exception as e:
+            self.send_log(f"刪除 Lead 失敗: {str(e)}", "error")
+            self.send_event("lead-deleted", {"success": False, "error": str(e)})
+
     async def handle_undo_batch_operation(self, payload: Dict[str, Any]):
         """撤銷批量操作"""
         try:

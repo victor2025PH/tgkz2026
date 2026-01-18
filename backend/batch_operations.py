@@ -699,7 +699,7 @@ class BatchOperationManager:
         for i, lead_id in enumerate(lead_ids):
             try:
                 # Get lead data before deletion (for backup)
-                lead = await self.db.get_lead(lead_id)
+                lead = await self.db.fetch_one('SELECT * FROM extracted_members WHERE id = ?', (lead_id,))
                 if not lead:
                     results.append(BatchOperationResult(
                         item_id=lead_id,
@@ -711,12 +711,18 @@ class BatchOperationManager:
                 # Store backup
                 deleted_leads_backup.append(lead)
                 
-                # Delete lead
-                await self.db.execute('DELETE FROM leads WHERE id = ?', (lead_id,))
+                # Delete lead (正確的表名是 extracted_members)
+                await self.db.execute('DELETE FROM extracted_members WHERE id = ?', (lead_id,))
                 
-                # Delete related data
-                await self.db.execute('DELETE FROM lead_tags WHERE lead_id = ?', (lead_id,))
-                await self.db.execute('DELETE FROM interactions WHERE lead_id = ?', (lead_id,))
+                # Delete related data (如果存在這些表)
+                try:
+                    await self.db.execute('DELETE FROM lead_tags WHERE lead_id = ?', (lead_id,))
+                except:
+                    pass
+                try:
+                    await self.db.execute('DELETE FROM interactions WHERE lead_id = ?', (lead_id,))
+                except:
+                    pass
                 
                 results.append(BatchOperationResult(
                     item_id=lead_id,

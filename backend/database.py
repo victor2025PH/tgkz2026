@@ -2970,6 +2970,75 @@ class Database:
             print(f"Error getting leads paginated: {e}")
             return []
     
+    async def get_lead(self, lead_id: int) -> Optional[Dict]:
+        """獲取單個 Lead"""
+        try:
+            result = await self.fetch_one('SELECT * FROM extracted_members WHERE id = ?', (lead_id,))
+            return result
+        except Exception as e:
+            print(f"Error getting lead: {e}")
+            return None
+    
+    async def delete_lead(self, lead_id: int) -> bool:
+        """刪除單個 Lead"""
+        try:
+            await self.execute('DELETE FROM extracted_members WHERE id = ?', (lead_id,))
+            return True
+        except Exception as e:
+            print(f"Error deleting lead: {e}")
+            return False
+    
+    async def batch_delete_leads(self, lead_ids: List[int]) -> Dict:
+        """批量刪除 Leads"""
+        try:
+            deleted = 0
+            for lead_id in lead_ids:
+                await self.execute('DELETE FROM extracted_members WHERE id = ?', (lead_id,))
+                deleted += 1
+            return {'success': True, 'deleted': deleted}
+        except Exception as e:
+            print(f"Error batch deleting leads: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    async def get_users_with_profiles(
+        self,
+        stage: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        interest_min: Optional[int] = None,
+        interest_max: Optional[int] = None,
+        search: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[Dict]:
+        """獲取用戶列表（含畫像），支持篩選"""
+        try:
+            query = 'SELECT * FROM extracted_members WHERE 1=1'
+            params = []
+            
+            if stage:
+                query += ' AND status = ?'
+                params.append(stage)
+            
+            if interest_min is not None:
+                query += ' AND COALESCE(intent_score, 0) >= ?'
+                params.append(interest_min)
+            
+            if interest_max is not None:
+                query += ' AND COALESCE(intent_score, 100) <= ?'
+                params.append(interest_max)
+            
+            if search:
+                query += ' AND (username LIKE ? OR first_name LIKE ? OR user_id LIKE ?)'
+                search_term = f'%{search}%'
+                params.extend([search_term, search_term, search_term])
+            
+            query += f' ORDER BY created_at DESC LIMIT {limit} OFFSET {offset}'
+            
+            return await self.fetch_all(query, tuple(params))
+        except Exception as e:
+            print(f"Error getting users with profiles: {e}")
+            return []
+    
     async def get_detailed_funnel_stats(self) -> Dict:
         """獲取詳細漏斗統計"""
         try:

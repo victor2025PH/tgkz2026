@@ -17,7 +17,7 @@ import {
   ConversationStyle
 } from './ai-center.models';
 
-type AITab = 'models' | 'knowledge' | 'strategy' | 'rules' | 'multi-role' | 'stats';
+type AITab = 'quick' | 'models' | 'knowledge' | 'strategy' | 'rules' | 'multi-role' | 'stats';
 
 @Component({
   selector: 'app-ai-center',
@@ -91,6 +91,193 @@ type AITab = 'models' | 'knowledge' | 'strategy' | 'rules' | 'multi-role' | 'sta
       <!-- Tab 內容區 -->
       <div class="flex-1 overflow-y-auto p-4">
         @switch (activeTab()) {
+          @case ('quick') {
+            <!-- 快速設置 -->
+            <div class="max-w-4xl mx-auto space-y-6">
+              <!-- 自動聊天總開關 -->
+              <div class="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl border border-purple-500/30 p-6">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-xl bg-purple-500/30 flex items-center justify-center text-3xl">
+                      🤖
+                    </div>
+                    <div>
+                      <h3 class="text-xl font-bold text-white">AI 自動聊天</h3>
+                      <p class="text-slate-400 text-sm">開啟後，AI 將自動問候新 Lead 並回覆私信</p>
+                    </div>
+                  </div>
+                  <button (click)="toggleAutoChat()"
+                          class="relative w-16 h-8 rounded-full transition-all"
+                          [class.bg-emerald-500]="autoChatEnabled()"
+                          [class.bg-slate-600]="!autoChatEnabled()">
+                    <span class="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform"
+                          [class.translate-x-8]="autoChatEnabled()"></span>
+                  </button>
+                </div>
+                
+                @if (autoChatEnabled()) {
+                  <div class="mt-6 pt-6 border-t border-purple-500/30 space-y-4">
+                    <!-- 模式選擇 -->
+                    <div>
+                      <label class="text-sm text-slate-400 block mb-2">聊天模式</label>
+                      <div class="grid grid-cols-3 gap-3">
+                        <button (click)="setAutoChatMode('full')"
+                                class="p-4 rounded-xl border transition-all text-center"
+                                [class.bg-emerald-500/20]="autoChatMode() === 'full'"
+                                [class.border-emerald-500]="autoChatMode() === 'full'"
+                                [class.bg-slate-700/50]="autoChatMode() !== 'full'"
+                                [class.border-slate-600]="autoChatMode() !== 'full'">
+                          <div class="text-2xl mb-1">🚀</div>
+                          <div class="font-medium text-white">全自動</div>
+                          <div class="text-xs text-slate-400">AI 自動發送回覆</div>
+                        </button>
+                        <button (click)="setAutoChatMode('semi')"
+                                class="p-4 rounded-xl border transition-all text-center"
+                                [class.bg-cyan-500/20]="autoChatMode() === 'semi'"
+                                [class.border-cyan-500]="autoChatMode() === 'semi'"
+                                [class.bg-slate-700/50]="autoChatMode() !== 'semi'"
+                                [class.border-slate-600]="autoChatMode() !== 'semi'">
+                          <div class="text-2xl mb-1">👥</div>
+                          <div class="font-medium text-white">半自動</div>
+                          <div class="text-xs text-slate-400">生成建議後確認發送</div>
+                        </button>
+                        <button (click)="setAutoChatMode('assist')"
+                                class="p-4 rounded-xl border transition-all text-center"
+                                [class.bg-amber-500/20]="autoChatMode() === 'assist'"
+                                [class.border-amber-500]="autoChatMode() === 'assist'"
+                                [class.bg-slate-700/50]="autoChatMode() !== 'assist'"
+                                [class.border-slate-600]="autoChatMode() !== 'assist'">
+                          <div class="text-2xl mb-1">💡</div>
+                          <div class="font-medium text-white">輔助模式</div>
+                          <div class="text-xs text-slate-400">僅提供建議不發送</div>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <!-- 功能開關 -->
+                    <div class="grid grid-cols-2 gap-4">
+                      <div class="flex items-center justify-between p-4 bg-slate-700/50 rounded-xl">
+                        <div class="flex items-center gap-3">
+                          <span class="text-xl">👋</span>
+                          <div>
+                            <div class="font-medium text-white">自動問候</div>
+                            <div class="text-xs text-slate-400">新 Lead 自動發送問候</div>
+                          </div>
+                        </div>
+                        <input type="checkbox" [checked]="autoGreetingEnabled()" 
+                               (change)="toggleAutoGreeting()"
+                               class="w-5 h-5 rounded bg-slate-600 border-slate-500">
+                      </div>
+                      <div class="flex items-center justify-between p-4 bg-slate-700/50 rounded-xl">
+                        <div class="flex items-center gap-3">
+                          <span class="text-xl">💬</span>
+                          <div>
+                            <div class="font-medium text-white">自動回覆</div>
+                            <div class="text-xs text-slate-400">用戶私信自動回覆</div>
+                          </div>
+                        </div>
+                        <input type="checkbox" [checked]="autoReplyEnabled()"
+                               (change)="toggleAutoReply()"
+                               class="w-5 h-5 rounded bg-slate-600 border-slate-500">
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+              
+              <!-- 發送帳號配置 -->
+              <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
+                <div class="flex items-center gap-3 mb-4">
+                  <span class="text-2xl">📤</span>
+                  <div>
+                    <h3 class="font-semibold text-white">發送帳號</h3>
+                    <p class="text-sm text-slate-400">選擇用於發送消息的帳號</p>
+                  </div>
+                </div>
+                
+                <div class="space-y-2">
+                  @for (account of senderAccounts(); track account.phone) {
+                    <div class="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+                      <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center overflow-hidden">
+                          @if (account.avatar) {
+                            <img [src]="account.avatar" alt="Avatar" class="w-full h-full object-cover">
+                          } @else {
+                            <span class="text-cyan-400">{{ account.username?.charAt(0) || '?' }}</span>
+                          }
+                        </div>
+                        <div>
+                          <div class="font-medium text-white">{{ account.username || account.phone }}</div>
+                          <div class="text-xs text-slate-400">今日: {{ account.sentToday || 0 }}/{{ account.dailyLimit || 50 }} 條</div>
+                        </div>
+                      </div>
+                      <span class="flex items-center gap-1 text-emerald-400 text-sm">
+                        <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                        在線
+                      </span>
+                    </div>
+                  } @empty {
+                    <div class="text-center py-8 text-slate-400">
+                      <div class="text-3xl mb-2">📤</div>
+                      <p>沒有可用的發送帳號</p>
+                      <p class="text-sm text-slate-500">請在帳號管理中添加並設置為「發送」角色</p>
+                    </div>
+                  }
+                </div>
+              </div>
+              
+              <!-- AI 模型狀態 -->
+              <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
+                <div class="flex items-center justify-between mb-4">
+                  <div class="flex items-center gap-3">
+                    <span class="text-2xl">🧠</span>
+                    <div>
+                      <h3 class="font-semibold text-white">AI 模型</h3>
+                      <p class="text-sm text-slate-400">當前使用的 AI 模型</p>
+                    </div>
+                  </div>
+                  <button (click)="activeTab.set('models')"
+                          class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 text-sm">
+                    配置模型 →
+                  </button>
+                </div>
+                
+                @if (aiService.defaultModel()) {
+                  <div class="flex items-center gap-4 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                    <div class="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center text-2xl">
+                      {{ getProviderIcon(aiService.defaultModel()!.provider) }}
+                    </div>
+                    <div class="flex-1">
+                      <div class="font-medium text-white">{{ aiService.defaultModel()!.modelName }}</div>
+                      <div class="text-sm text-slate-400">{{ getProviderName(aiService.defaultModel()!.provider) }}</div>
+                    </div>
+                    <span class="flex items-center gap-1 text-emerald-400">
+                      <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                      已連接
+                    </span>
+                  </div>
+                } @else {
+                  <div class="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                    <div class="flex items-center gap-3">
+                      <span class="text-2xl">⚠️</span>
+                      <div>
+                        <div class="font-medium text-amber-400">未配置 AI 模型</div>
+                        <div class="text-sm text-slate-400">請先添加 AI 模型才能使用自動聊天功能</div>
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+              
+              <!-- 保存按鈕 -->
+              <div class="flex justify-end">
+                <button (click)="saveQuickSettings()"
+                        class="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium rounded-xl hover:from-purple-400 hover:to-pink-400 transition-all shadow-lg">
+                  💾 保存設置
+                </button>
+              </div>
+            </div>
+          }
           @case ('models') {
             <!-- 模型配置 -->
             <div class="max-w-4xl mx-auto space-y-6">
@@ -531,8 +718,15 @@ type AITab = 'models' | 'knowledge' | 'strategy' | 'rules' | 'multi-role' | 'sta
 export class AICenterComponent {
   aiService = inject(AICenterService);
   
-  activeTab = signal<AITab>('models');
+  activeTab = signal<AITab>('quick');  // 默認顯示快速設置
   showAddModel = signal(false);
+  
+  // 快速設置狀態
+  autoChatEnabled = signal(false);
+  autoChatMode = signal<'full' | 'semi' | 'assist'>('full');
+  autoGreetingEnabled = signal(true);
+  autoReplyEnabled = signal(true);
+  senderAccounts = signal<{phone: string; username?: string; avatar?: string; sentToday?: number; dailyLimit?: number}[]>([]);
   
   // 新模型表單
   newModelProvider = signal<AIProvider>('openai');
@@ -540,6 +734,7 @@ export class AICenterComponent {
   newModelApiKey = '';
   
   tabs = [
+    { id: 'quick' as const, icon: '⚡', label: '快速設置' },
     { id: 'models' as const, icon: '🤖', label: '模型配置' },
     { id: 'knowledge' as const, icon: '📚', label: '知識庫' },
     { id: 'strategy' as const, icon: '💬', label: '對話策略' },
@@ -622,5 +817,74 @@ export class AICenterComponent {
   
   setStyle(style: ConversationStyle) {
     this.aiService.updateConversationStrategy({ style });
+  }
+  
+  // ========== 快速設置方法 ==========
+  
+  toggleAutoChat() {
+    this.autoChatEnabled.update(v => !v);
+  }
+  
+  setAutoChatMode(mode: 'full' | 'semi' | 'assist') {
+    this.autoChatMode.set(mode);
+  }
+  
+  toggleAutoGreeting() {
+    this.autoGreetingEnabled.update(v => !v);
+  }
+  
+  toggleAutoReply() {
+    this.autoReplyEnabled.update(v => !v);
+  }
+  
+  saveQuickSettings() {
+    // 發送設置到後端
+    const settings = {
+      auto_chat_enabled: this.autoChatEnabled() ? 1 : 0,
+      auto_chat_mode: this.autoChatMode(),
+      auto_greeting: this.autoGreetingEnabled() ? 1 : 0,
+      auto_reply: this.autoReplyEnabled() ? 1 : 0
+    };
+    
+    // 保存到 localStorage
+    localStorage.setItem('ai_auto_chat_enabled', String(this.autoChatEnabled()));
+    localStorage.setItem('ai_auto_chat_mode', this.autoChatMode());
+    localStorage.setItem('ai_auto_greeting', String(this.autoGreetingEnabled()));
+    localStorage.setItem('ai_auto_reply', String(this.autoReplyEnabled()));
+    
+    // 發送到後端（通過 window 事件）
+    window.dispatchEvent(new CustomEvent('save-ai-settings', { detail: settings }));
+    
+    // 顯示成功提示
+    alert('設置已保存！');
+  }
+  
+  loadQuickSettings() {
+    // 從 localStorage 加載設置
+    const enabled = localStorage.getItem('ai_auto_chat_enabled');
+    const mode = localStorage.getItem('ai_auto_chat_mode') as 'full' | 'semi' | 'assist' | null;
+    const greeting = localStorage.getItem('ai_auto_greeting');
+    const reply = localStorage.getItem('ai_auto_reply');
+    
+    if (enabled !== null) this.autoChatEnabled.set(enabled === 'true');
+    if (mode) this.autoChatMode.set(mode);
+    if (greeting !== null) this.autoGreetingEnabled.set(greeting === 'true');
+    if (reply !== null) this.autoReplyEnabled.set(reply === 'true');
+  }
+  
+  ngOnInit() {
+    this.loadQuickSettings();
+    this.loadSenderAccounts();
+  }
+  
+  loadSenderAccounts() {
+    // 從後端獲取發送帳號（通過 window 事件）
+    window.dispatchEvent(new CustomEvent('get-sender-accounts'));
+    
+    // 監聽回調
+    window.addEventListener('sender-accounts-loaded', ((event: CustomEvent) => {
+      const accounts = event.detail || [];
+      this.senderAccounts.set(accounts);
+    }) as EventListener, { once: true });
   }
 }

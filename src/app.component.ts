@@ -4340,6 +4340,44 @@ export class AppComponent implements OnDestroy, OnInit {
       this.cdr.detectChanges();
     };
     window.addEventListener('membership-updated', this.membershipUpdateHandler);
+    
+    // 監聽 AI 設置保存事件（從 AI 中心組件發出）
+    window.addEventListener('save-ai-settings', ((event: CustomEvent) => {
+      const settings = event.detail;
+      console.log('[AppComponent] 收到 AI 設置保存事件:', settings);
+      
+      // 更新本地狀態
+      if (settings.auto_chat_enabled !== undefined) {
+        this.aiAutoChatEnabled.set(settings.auto_chat_enabled === 1);
+      }
+      if (settings.auto_chat_mode) {
+        this.aiAutoChatMode.set(settings.auto_chat_mode);
+      }
+      if (settings.auto_greeting !== undefined) {
+        this.aiAutoGreeting.set(settings.auto_greeting === 1);
+      }
+      
+      // 發送到後端
+      this.ipcService.send('update-ai-chat-settings', { settings });
+      this.toastService.success('AI 設置已保存', 2000);
+    }) as EventListener);
+    
+    // 監聯發送帳號請求事件
+    window.addEventListener('get-sender-accounts', (() => {
+      // 獲取發送帳號並回傳
+      const accounts = this.accounts() as any[];
+      const senderAccounts = accounts
+        .filter(a => a.role === 'Sender' && a.status === 'Online')
+        .map(a => ({
+          phone: a.phone,
+          username: a.username || a.first_name || a.phone,
+          avatar: a.avatar,
+          sentToday: a.sentToday || a.dailySendCount || 0,
+          dailyLimit: a.dailySendLimit || 50
+        }));
+      
+      window.dispatchEvent(new CustomEvent('sender-accounts-loaded', { detail: senderAccounts }));
+    }) as EventListener);
   }
   
   // 檢查是否首次運行

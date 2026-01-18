@@ -70,7 +70,6 @@ from user_tracker import init_user_tracker, get_user_tracker
 from user_analytics import init_user_analytics, get_user_analytics
 from campaign_orchestrator import init_campaign_orchestrator, get_campaign_orchestrator
 from multi_channel_stats import init_multi_channel_stats, get_multi_channel_stats
-from multi_role_manager import init_multi_role_manager, get_multi_role_manager
 from script_engine import init_script_engine, get_script_engine
 from collaboration_coordinator import init_collaboration_coordinator, get_collaboration_coordinator
 

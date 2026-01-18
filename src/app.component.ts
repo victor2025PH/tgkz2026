@@ -116,6 +116,7 @@ export class AppComponent implements OnDestroy, OnInit {
   leadDetailView: WritableSignal<LeadDetailView> = signal('sendMessage');
   leadsViewMode: WritableSignal<LeadsViewMode> = signal('kanban');
   leadStatusFilter = signal<string>('all');  // 當前篩選的 Lead 狀態
+  leadSourceFilter = signal<string>('all');  // 數據來源篩選
   leadSortBy = signal<'intent' | 'time' | 'name'>('time');  // 排序方式
   showLeadsViewMenu = signal(false);  // 視圖下拉菜單
   showLeadsActionMenu = signal(false);  // 操作下拉菜單
@@ -3855,14 +3856,20 @@ export class AppComponent implements OnDestroy, OnInit {
   
   // 過濾和排序後的 Leads
   filteredLeads = computed(() => {
-    const filter = this.leadStatusFilter();
+    const statusFilter = this.leadStatusFilter();
+    const sourceFilter = this.leadSourceFilter();
     const sortBy = this.leadSortBy();
     
     let result = this.displayLeads();
     
     // 按狀態篩選
-    if (filter !== 'all') {
-      result = result.filter(lead => lead.status === filter);
+    if (statusFilter !== 'all') {
+      result = result.filter(lead => lead.status === statusFilter);
+    }
+    
+    // 按來源類型篩選
+    if (sourceFilter !== 'all') {
+      result = result.filter(lead => lead.sourceType === sourceFilter);
     }
     
     // 排序
@@ -3875,6 +3882,17 @@ export class AppComponent implements OnDestroy, OnInit {
         return (a.username || '').localeCompare(b.username || '');
       }
     });
+  });
+  
+  // 各來源類型的計數
+  leadsBySource = computed(() => {
+    const leads = this.leads();
+    return {
+      group_extract: leads.filter(l => l.sourceType === 'group_extract').length,
+      keyword_trigger: leads.filter(l => l.sourceType === 'keyword_trigger').length,
+      import: leads.filter(l => l.sourceType === 'import').length,
+      unknown: leads.filter(l => !l.sourceType || l.sourceType === 'unknown').length
+    };
   });
 
   // --- Funnel Stats & User Management ---
@@ -7895,6 +7913,19 @@ export class AppComponent implements OnDestroy, OnInit {
   
   // 將後端數據映射為前端 Lead 格式（蛇形 -> 駝峰）
   mapLeadFromBackend(l: any): CapturedLead {
+    // 判斷數據來源類型
+    let sourceType: 'group_extract' | 'keyword_trigger' | 'import' | 'unknown' = 'unknown';
+    const notes = l.notes || '';
+    const triggeredKeyword = l.triggered_keyword || l.triggeredKeyword || '';
+    
+    if (notes.includes('觸發詞') || triggeredKeyword) {
+      sourceType = 'keyword_trigger';
+    } else if (l.extracted_by_phone || l.source_chat_id) {
+      sourceType = 'group_extract';
+    } else if (notes.includes('導入') || notes.includes('import')) {
+      sourceType = 'import';
+    }
+    
     return {
       id: l.id,
       userId: l.user_id || l.userId || '',
@@ -7902,7 +7933,7 @@ export class AppComponent implements OnDestroy, OnInit {
       firstName: l.first_name || l.firstName || '',
       lastName: l.last_name || l.lastName || '',
       sourceGroup: l.source_chat_title || l.sourceGroup || l.source_group || '',
-      triggeredKeyword: l.notes || l.triggeredKeyword || l.triggered_keyword || '',
+      triggeredKeyword: notes || triggeredKeyword || '',
       timestamp: new Date(l.created_at || l.timestamp || l.extracted_at || Date.now()),
       status: (l.status || l.response_status || 'New') as LeadStatus,
       onlineStatus: (l.online_status || l.onlineStatus || 'hidden') as OnlineStatus,
@@ -7911,7 +7942,8 @@ export class AppComponent implements OnDestroy, OnInit {
       doNotContact: !!l.doNotContact || !!l.do_not_contact,
       campaignId: l.campaignId || l.campaign_id,
       intentScore: l.intent_score || l.intentScore || 0,
-      intentLevel: l.intent_level || l.intentLevel || 'none'
+      intentLevel: l.intent_level || l.intentLevel || 'none',
+      sourceType: l.source_type || l.sourceType || sourceType
     };
   }
   

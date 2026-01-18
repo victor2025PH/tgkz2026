@@ -4142,6 +4142,49 @@
                     搜索中...
                 </div>
             }
+            
+            <!-- 數據來源篩選 -->
+            <div class="flex items-center gap-2 mt-3">
+              <span class="text-xs text-slate-500">來源：</span>
+              <button (click)="leadSourceFilter.set('all')"
+                      class="text-xs px-3 py-1 rounded-full transition-all"
+                      [class.bg-slate-700]="leadSourceFilter() === 'all'"
+                      [class.text-white]="leadSourceFilter() === 'all'"
+                      [class.bg-slate-800/50]="leadSourceFilter() !== 'all'"
+                      [class.text-slate-400]="leadSourceFilter() !== 'all'">
+                全部
+              </button>
+              <button (click)="leadSourceFilter.set('group_extract')"
+                      class="text-xs px-3 py-1 rounded-full transition-all flex items-center gap-1"
+                      [class.bg-purple-500/30]="leadSourceFilter() === 'group_extract'"
+                      [class.text-purple-400]="leadSourceFilter() === 'group_extract'"
+                      [class.ring-1]="leadSourceFilter() === 'group_extract'"
+                      [class.ring-purple-500]="leadSourceFilter() === 'group_extract'"
+                      [class.bg-slate-800/50]="leadSourceFilter() !== 'group_extract'"
+                      [class.text-slate-400]="leadSourceFilter() !== 'group_extract'">
+                📥 群提取 <span class="opacity-70">({{ leadsBySource().group_extract }})</span>
+              </button>
+              <button (click)="leadSourceFilter.set('keyword_trigger')"
+                      class="text-xs px-3 py-1 rounded-full transition-all flex items-center gap-1"
+                      [class.bg-cyan-500/30]="leadSourceFilter() === 'keyword_trigger'"
+                      [class.text-cyan-400]="leadSourceFilter() === 'keyword_trigger'"
+                      [class.ring-1]="leadSourceFilter() === 'keyword_trigger'"
+                      [class.ring-cyan-500]="leadSourceFilter() === 'keyword_trigger'"
+                      [class.bg-slate-800/50]="leadSourceFilter() !== 'keyword_trigger'"
+                      [class.text-slate-400]="leadSourceFilter() !== 'keyword_trigger'">
+                🔑 關鍵詞 <span class="opacity-70">({{ leadsBySource().keyword_trigger }})</span>
+              </button>
+              <button (click)="leadSourceFilter.set('import')"
+                      class="text-xs px-3 py-1 rounded-full transition-all flex items-center gap-1"
+                      [class.bg-emerald-500/30]="leadSourceFilter() === 'import'"
+                      [class.text-emerald-400]="leadSourceFilter() === 'import'"
+                      [class.ring-1]="leadSourceFilter() === 'import'"
+                      [class.ring-emerald-500]="leadSourceFilter() === 'import'"
+                      [class.bg-slate-800/50]="leadSourceFilter() !== 'import'"
+                      [class.text-slate-400]="leadSourceFilter() !== 'import'">
+                📤 導入 <span class="opacity-70">({{ leadsBySource().import }})</span>
+              </button>
+            </div>
             @if(leadSearchResults().length > 0 && leadSearchQuery()) {
                 <div class="mt-2 text-sm text-cyan-400">
                     找到 {{ leadSearchResults().length }} 个结果

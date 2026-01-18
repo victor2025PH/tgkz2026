@@ -75,6 +75,8 @@ export interface Interaction {
 
 export type OnlineStatus = 'Online' | 'Offline' | 'Recently' | 'Unknown';
 
+export type LeadSourceType = 'group_extract' | 'keyword_trigger' | 'import' | 'unknown';
+
 export interface CapturedLead {
   id: number;
   userId: string;
@@ -92,6 +94,7 @@ export interface CapturedLead {
   campaignId?: number;
   intentScore?: number;       // 意圖分數 (0-100)
   intentLevel?: string;       // 意圖等級 (hot/warm/neutral/cold/none)
+  sourceType?: LeadSourceType; // 數據來源類型
 }
 
 export interface LogEntry {

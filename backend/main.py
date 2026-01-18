@@ -2653,6 +2653,19 @@ class BackendService:
             elif command == "get-ab-test-results":
                 await self.handle_get_ab_test_results(payload)
 
+            # 數據驅動命令 (Phase D)
+            elif command == "analyze-attribution":
+                await self.handle_analyze_attribution(payload)
+            
+            elif command == "analyze-account-roi":
+                await self.handle_analyze_account_roi(payload)
+            
+            elif command == "analyze-time-effectiveness":
+                await self.handle_analyze_time_effectiveness(payload)
+            
+            elif command == "predict-lead-conversion":
+                await self.handle_predict_lead_conversion(payload)
+
             else:
                 self.send_log(f"Unknown command: {command}", "warning")
         
@@ -15007,6 +15020,82 @@ class BackendService:
         except Exception as e:
             print(f"[Backend] Error getting A/B test results: {e}", file=sys.stderr)
             self.send_event("ab-test-results", {"success": False, "error": str(e)})
+
+    # ==================== 數據驅動 Handlers (Phase D) ====================
+    
+    async def handle_analyze_attribution(self, payload: Dict[str, Any]):
+        """分析轉化歸因"""
+        try:
+            from conversion_attribution import analyze_attribution
+            
+            result = await analyze_attribution(
+                model=payload.get("model", "linear"),
+                days=payload.get("days", 30)
+            )
+            
+            self.send_event("attribution-analysis", {
+                "success": True,
+                **result
+            })
+        except Exception as e:
+            print(f"[Backend] Error analyzing attribution: {e}", file=sys.stderr)
+            self.send_event("attribution-analysis", {"success": False, "error": str(e)})
+    
+    async def handle_analyze_account_roi(self, payload: Dict[str, Any]):
+        """分析帳號 ROI"""
+        try:
+            from account_roi import analyze_account_roi
+            
+            result = await analyze_account_roi(
+                rank_by=payload.get("rankBy", "efficiency")
+            )
+            
+            self.send_event("account-roi-analysis", {
+                "success": True,
+                **result
+            })
+        except Exception as e:
+            print(f"[Backend] Error analyzing account ROI: {e}", file=sys.stderr)
+            self.send_event("account-roi-analysis", {"success": False, "error": str(e)})
+    
+    async def handle_analyze_time_effectiveness(self, payload: Dict[str, Any]):
+        """分析時段效果"""
+        try:
+            from time_analysis import analyze_time_effectiveness
+            
+            result = await analyze_time_effectiveness()
+            
+            self.send_event("time-analysis", {
+                "success": True,
+                **result
+            })
+        except Exception as e:
+            print(f"[Backend] Error analyzing time effectiveness: {e}", file=sys.stderr)
+            self.send_event("time-analysis", {"success": False, "error": str(e)})
+    
+    async def handle_predict_lead_conversion(self, payload: Dict[str, Any]):
+        """預測 Lead 轉化"""
+        try:
+            from predictive_analytics import predict_lead_conversion
+            
+            result = await predict_lead_conversion(
+                lead_id=payload.get("leadId", 0),
+                intent_score=payload.get("intentScore", 0),
+                interaction_count=payload.get("interactionCount", 0),
+                days_since_first_contact=payload.get("daysSinceFirstContact", 0),
+                days_since_last_contact=payload.get("daysSinceLastContact", 0),
+                replied=payload.get("replied", False),
+                reply_speed_minutes=payload.get("replySpeedMinutes", 0),
+                source_type=payload.get("sourceType", "unknown")
+            )
+            
+            self.send_event("lead-prediction", {
+                "success": True,
+                **result
+            })
+        except Exception as e:
+            print(f"[Backend] Error predicting lead conversion: {e}", file=sys.stderr)
+            self.send_event("lead-prediction", {"success": False, "error": str(e)})
 
     # ==================== Resource Discovery Handlers ====================
     

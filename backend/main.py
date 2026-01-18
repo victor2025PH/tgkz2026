@@ -7583,16 +7583,21 @@ class BackendService:
             
             # ========== 結束新增 ==========
             
+            # 使用從 Telegram 獲取的群組標題（如果有的話）
+            group_title = name  # 預設使用傳入的 name（通常是 URL）
+            if membership_status and membership_status.get("chat_title"):
+                group_title = membership_status.get("chat_title")
+            
             # Check if group already exists
             existing = await db.get_group_by_url(url)
             if existing:
                 # Update existing group
-                group_id = await db.add_group(url, name, keyword_set_ids)
-                await db.add_log(f"Group '{name}' updated (URL already exists)", "info")
+                group_id = await db.add_group(url, group_title, keyword_set_ids)
+                await db.add_log(f"Group '{group_title}' updated (URL already exists)", "info")
             else:
                 # Add new group
-                group_id = await db.add_group(url, name, keyword_set_ids)
-                await db.add_log(f"Group '{name}' added", "success")
+                group_id = await db.add_group(url, group_title, keyword_set_ids)
+                await db.add_log(f"Group '{group_title}' added", "success")
             await self.send_groups_update()
         
         except ValidationError as e:

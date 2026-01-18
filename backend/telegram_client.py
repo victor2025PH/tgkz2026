@@ -2146,6 +2146,18 @@ class TelegramClientManager:
                             "message": f"[監控] ✓✓ 關鍵詞匹配成功: '{matched_keyword}' 在群組 {group_url or chat_id}",
                             "type": "success"
                         })
+                        
+                        # 發送實時匹配事件到前端
+                        self.event_callback("keyword-matched", {
+                            "keyword": matched_keyword,
+                            "groupUrl": group_url,
+                            "groupName": chat_title,
+                            "userId": str(user.id),
+                            "username": safe_get_username(user),
+                            "firstName": sanitize_text(user.first_name) if user.first_name else "",
+                            "messagePreview": sanitize_text(text[:100]) if text else "",
+                            "timestamp": message.date.isoformat() if message.date else None
+                        })
                     print(f"[TelegramClient] KEYWORD MATCHED: '{matched_keyword}'", file=sys.stderr)
                     
                     # Capture lead - 使用安全的文本處理

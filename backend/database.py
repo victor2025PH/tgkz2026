@@ -2949,6 +2949,107 @@ class Database:
         except Exception as e:
             print(f"Error getting leads paginated: {e}")
             return []
+    
+    async def check_lead_and_dnc(self, user_id) -> tuple:
+        """檢查用戶是否已存在於 Lead 列表及是否在黑名單中
+        
+        Args:
+            user_id: 用戶 ID
+            
+        Returns:
+            tuple: (existing_lead, is_dnc) - 現有 Lead 記錄和是否在黑名單中
+        """
+        try:
+            # 查詢現有 Lead
+            existing_lead = await self.fetch_one(
+                'SELECT * FROM extracted_members WHERE user_id = ?',
+                (str(user_id),)
+            )
+            
+            # 檢查是否在黑名單中（response_status = 'blocked' 或 contacted = -1 表示不要聯繫）
+            is_dnc = False
+            if existing_lead:
+                is_dnc = (
+                    existing_lead.get('response_status') == 'blocked' or 
+                    existing_lead.get('contacted') == -1
+                )
+            
+            return (existing_lead, is_dnc)
+        except Exception as e:
+            import sys
+            print(f"Error checking lead and DNC: {e}", file=sys.stderr)
+            return (None, False)
+    
+    async def add_lead(self, lead_data: Dict) -> int:
+        """添加新的潛在客戶
+        
+        Args:
+            lead_data: Lead 數據字典
+            
+        Returns:
+            int: 新創建的 Lead ID
+        """
+        try:
+            user_id = str(lead_data.get('userId', ''))
+            username = lead_data.get('username', '')
+            first_name = lead_data.get('firstName', '')
+            last_name = lead_data.get('lastName', '')
+            source_group = lead_data.get('sourceGroup', '')
+            triggered_keyword = lead_data.get('triggeredKeyword', '')
+            online_status = lead_data.get('onlineStatus', 'Unknown')
+            
+            await self.execute('''
+                INSERT INTO extracted_members 
+                (user_id, username, first_name, last_name, source_chat_title, notes, online_status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    username = COALESCE(excluded.username, username),
+                    first_name = COALESCE(excluded.first_name, first_name),
+                    last_name = COALESCE(excluded.last_name, last_name),
+                    updated_at = CURRENT_TIMESTAMP
+            ''', (user_id, username, first_name, last_name, source_group, f'觸發詞: {triggered_keyword}', online_status))
+            
+            # 獲取插入的 ID
+            result = await self.fetch_one(
+                'SELECT id FROM extracted_members WHERE user_id = ?',
+                (user_id,)
+            )
+            return result['id'] if result else 0
+        except Exception as e:
+            import sys
+            print(f"Error adding lead: {e}", file=sys.stderr)
+            return 0
+    
+    async def add_interaction(self, lead_id: int, action: str, details: str) -> bool:
+        """添加 Lead 互動記錄
+        
+        Args:
+            lead_id: Lead ID
+            action: 動作類型
+            details: 詳細信息
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            # 更新 Lead 的備註（追加互動記錄）
+            current = await self.fetch_one(
+                'SELECT notes FROM extracted_members WHERE id = ?',
+                (lead_id,)
+            )
+            current_notes = current.get('notes', '') if current else ''
+            import datetime
+            new_note = f"\n[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}] {action}: {details}"
+            
+            await self.execute(
+                'UPDATE extracted_members SET notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                (current_notes + new_note, lead_id)
+            )
+            return True
+        except Exception as e:
+            import sys
+            print(f"Error adding interaction: {e}", file=sys.stderr)
+            return False
 
     async def get_user_profile(self, user_id: str) -> Optional[Dict]:
         """根據 user_id 獲取用戶資料"""

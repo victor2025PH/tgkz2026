@@ -711,6 +711,26 @@ export class AutomationCenterComponent implements OnInit {
   realMonitoredGroups = input<any[]>([]);  // 後端返回的群組數據
   realAccounts = input<any[]>([]);  // 後端返回的帳號數據
   
+  // 實時匹配數據
+  realtimeMatches = input<{
+    keyword: string;
+    groupUrl: string;
+    groupName: string;
+    userId: string;
+    username: string;
+    firstName: string;
+    messagePreview: string;
+    timestamp: string;
+  }[]>([]);
+  
+  // 今日統計
+  todayStats = input<{
+    matchCount: number;
+    newLeads: number;
+    messagesSent: number;
+    conversions: number;
+  }>({ matchCount: 0, newLeads: 0, messagesSent: 0, conversions: 0 });
+  
   // 輸出
   startMonitoringClick = output<void>();
   stopMonitoringClick = output<void>();
@@ -872,17 +892,40 @@ export class AutomationCenterComponent implements OnInit {
     this.hasGroupBindings()
   );
   
-  // 實時統計數據 (模擬數據，後續可從後端獲取)
-  realtimeStats = computed<RealtimeStats>(() => ({
-    matchesToday: this.keywordSets().reduce((sum, s) => sum + (s.stats?.matchesToday || 0), 0),
-    matchesYesterday: Math.floor(this.keywordSets().reduce((sum, s) => sum + (s.stats?.matchesToday || 0), 0) * 0.8),
-    leadsToday: this.monitorGroups().reduce((sum, g) => sum + (g.stats?.leadsToday || 0), 0),
-    leadsYesterday: Math.floor(this.monitorGroups().reduce((sum, g) => sum + (g.stats?.leadsToday || 0), 0) * 0.9),
-    repliestoday: Math.floor(this.monitorGroups().reduce((sum, g) => sum + (g.stats?.leadsToday || 0), 0) * 0.3),
-    repliesYesterday: 0,
-    conversionsToday: this.monitorGroups().reduce((sum, g) => sum + (g.stats?.conversions || 0), 0),
-    conversionsYesterday: 0
-  }));
+  // 實時統計數據 - 使用從 app.component 傳入的真實數據
+  realtimeStats = computed<RealtimeStats>(() => {
+    const stats = this.todayStats();
+    return {
+      matchesToday: stats.matchCount,
+      matchesYesterday: 0,  // TODO: 從後端獲取歷史數據
+      leadsToday: stats.newLeads,
+      leadsYesterday: 0,
+      repliestoday: stats.messagesSent,
+      repliesYesterday: 0,
+      conversionsToday: stats.conversions,
+      conversionsYesterday: 0
+    };
+  });
+  
+  // 同步實時匹配數據到 matchedMessages
+  private syncRealtimeMatches = effect(() => {
+    const matches = this.realtimeMatches();
+    if (matches && matches.length > 0) {
+      const converted: MatchedMessage[] = matches.map((m, idx) => ({
+        id: `match-${idx}-${m.timestamp}`,
+        timestamp: new Date(m.timestamp),
+        senderName: m.username || m.firstName || '未知用戶',
+        senderId: m.userId,
+        groupName: m.groupName || m.groupUrl,
+        groupId: m.groupUrl,  // 使用 URL 作為 groupId
+        text: m.messagePreview,
+        matchedKeyword: m.keyword,
+        keywordSetName: m.keyword,  // 暫時使用關鍵詞作為詞集名稱
+        isNew: idx === 0
+      }));
+      this.matchedMessages.set(converted);
+    }
+  });
   
   availableKeywordSetsForGroup = computed<AvailableKeywordSetForGroup[]>(() => 
     this.keywordSets().map(s => ({

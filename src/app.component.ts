@@ -638,6 +638,26 @@ export class AppComponent implements OnDestroy, OnInit {
   leads: WritableSignal<CapturedLead[]> = signal([]);
   logs: WritableSignal<LogEntry[]> = signal([]);
   
+  // 實時匹配數據
+  realtimeMatches: WritableSignal<{
+    keyword: string;
+    groupUrl: string;
+    groupName: string;
+    userId: string;
+    username: string;
+    firstName: string;
+    messagePreview: string;
+    timestamp: string;
+  }[]> = signal([]);
+  
+  // 今日統計
+  todayStats = signal({
+    matchCount: 0,
+    newLeads: 0,
+    messagesSent: 0,
+    conversions: 0
+  });
+  
   // --- Chat History State ---
   chatList: WritableSignal<any[]> = signal([]);
   chatHistory: WritableSignal<any[]> = signal([]);
@@ -4772,8 +4792,40 @@ export class AppComponent implements OnDestroy, OnInit {
         this.leads.update(leads => [lead, ...leads]);
     });
     
+    // 關鍵詞匹配事件 - 實時更新匹配面板
+    this.ipcService.on('keyword-matched', (data: {
+      keyword: string;
+      groupUrl: string;
+      groupName: string;
+      userId: string;
+      username: string;
+      firstName: string;
+      messagePreview: string;
+      timestamp: string;
+    }) => {
+      console.log('[Frontend] Keyword matched event:', data);
+      
+      // 添加到實時匹配列表（最多保留 50 條）
+      this.realtimeMatches.update(matches => {
+        const newMatches = [data, ...matches];
+        return newMatches.slice(0, 50);
+      });
+      
+      // 更新今日統計
+      this.todayStats.update(s => ({
+        ...s,
+        matchCount: s.matchCount + 1
+      }));
+    });
+    
     this.ipcService.on('lead-captured', (lead: CapturedLead) => {
         console.log('[Frontend] Lead captured event received:', lead);
+        
+        // 更新今日統計
+        this.todayStats.update(s => ({
+          ...s,
+          newLeads: s.newLeads + 1
+        }));
         
         // 顯示桌面通知
         this.showNotification(

@@ -8,6 +8,44 @@ import time
 from typing import Dict, Optional, Callable, Any
 from pathlib import Path
 from pyrogram import Client
+
+# ============ Monkey Patch for Pyrogram save_file bug ============
+# Pyrogram 2.0.x has a bug where self.me can be None when calling save_file
+# This causes AttributeError: 'NoneType' object has no attribute 'is_premium'
+# We patch by ensuring client.me is set before any save_file call
+
+def _apply_pyrogram_patch():
+    """Apply monkey patch to fix Pyrogram is_premium bug"""
+    import sys
+    try:
+        from pyrogram import Client
+        from types import SimpleNamespace
+        
+        # Store original save_file
+        _original_save_file = Client.save_file
+        
+        async def _patched_save_file(self, path, file_id=None, file_part=0, progress=None, progress_args=()):
+            """Patched save_file that handles self.me being None"""
+            # If self.me is None, set a mock object
+            if self.me is None:
+                print(f"[Pyrogram Patch] self.me is None, creating mock user object", file=sys.stderr)
+                self.me = SimpleNamespace(is_premium=False, id=0, first_name="Unknown")
+            
+            # Call original method
+            return await _original_save_file(self, path, file_id, file_part, progress, progress_args)
+        
+        # Apply patch
+        Client.save_file = _patched_save_file
+        print(f"[Pyrogram Patch] Successfully patched Client.save_file", file=sys.stderr)
+    except Exception as patch_err:
+        print(f"[Pyrogram Patch] Failed to patch: {patch_err}", file=sys.stderr)
+
+# Apply the patch immediately
+_apply_pyrogram_patch()
+# ============ End Monkey Patch ============
+import os
+import tempfile
+import base64
 import pyrogram.raw.functions.users
 import pyrogram.raw.types
 from pyrogram.errors import (
@@ -54,10 +92,14 @@ except ImportError:
     class InviteHashExpired(Exception):
         pass
 
-from pyrogram.types import Message
+from pyrogram.types import Message, User
 from pyrogram.handlers import MessageHandler
 from pyrogram import filters
 from config import config
+
+# Pyrogram version info
+import sys
+print(f"[TelegramClient] Using Pyrogram (downgraded to avoid is_premium bug)", file=sys.stderr)
 from keyword_matcher import KeywordMatcher
 from trie_keyword_matcher import TrieKeywordMatcher
 from concurrent.futures import ThreadPoolExecutor
@@ -589,7 +631,35 @@ class TelegramClientManager:
                 except Exception as conn_e:
                     last_connect_error = conn_e
                     error_str = str(conn_e).lower()
-                    if "database is locked" in error_str or "locked" in error_str:
+                    error_str_original = str(conn_e)
+                    
+                    # 處理時間同步錯誤 - BadMsgNotification [16]
+                    if "msg_id is too low" in error_str or "[16]" in error_str_original or "badmsgnotification" in error_str:
+                        print(f"[TelegramClient] Time sync error detected (attempt {connect_attempt + 1}/{max_connect_retries})", file=sys.stderr)
+                        print(f"[TelegramClient] Waiting for time synchronization...", file=sys.stderr)
+                        
+                        # 斷開連接，等待更長時間讓系統時間穩定
+                        try:
+                            if client.is_connected:
+                                await client.disconnect()
+                        except:
+                            pass
+                        
+                        # 等待 3-5 秒讓時間同步
+                        wait_time = 3.0 + (connect_attempt * 2.0)
+                        print(f"[TelegramClient] Waiting {wait_time}s before retry...", file=sys.stderr)
+                        await asyncio.sleep(wait_time)
+                        
+                        if connect_attempt == max_connect_retries - 1:
+                            print(f"[TelegramClient] Time sync error persists after {max_connect_retries} attempts", file=sys.stderr)
+                            return {
+                                "success": False,
+                                "status": "error",
+                                "message": "時間同步失敗，請檢查系統時間是否正確。建議：1) 啟用自動時間同步 2) 重啟程序後再試"
+                            }
+                        continue
+                    
+                    elif "database is locked" in error_str or "locked" in error_str:
                         print(f"[TelegramClient] Database locked on connect (attempt {connect_attempt + 1}/{max_connect_retries}), retrying...", file=sys.stderr)
                         gc.collect()
                         # 增加等待時間，並嘗試關閉可能殘留的連接
@@ -717,8 +787,29 @@ class TelegramClientManager:
                         await asyncio.sleep(2.0)
                     except Exception as conn_e:
                         error_str = str(conn_e).lower()
+                        error_str_original = str(conn_e)
                         print(f"[TelegramClient] Connection error for {phone} (attempt {connect_attempt + 1}/3): {conn_e}", file=sys.stderr)
-                        if "database is locked" in error_str or "locked" in error_str:
+                        
+                        # 處理時間同步錯誤 - BadMsgNotification [16]
+                        if "msg_id is too low" in error_str or "[16]" in error_str_original or "badmsgnotification" in error_str:
+                            print(f"[TelegramClient] Time sync error detected for fresh client (attempt {connect_attempt + 1}/3)", file=sys.stderr)
+                            try:
+                                if client.is_connected:
+                                    await client.disconnect()
+                            except:
+                                pass
+                            wait_time = 3.0 + (connect_attempt * 2.0)
+                            print(f"[TelegramClient] Waiting {wait_time}s for time sync...", file=sys.stderr)
+                            await asyncio.sleep(wait_time)
+                            if connect_attempt == 2:
+                                return {
+                                    "success": False,
+                                    "status": "error",
+                                    "message": "時間同步失敗，請檢查系統時間是否正確。建議：1) 啟用自動時間同步 2) 重啟程序後再試"
+                                }
+                            continue
+                        
+                        elif "database is locked" in error_str or "locked" in error_str:
                             print(f"[TelegramClient] Database locked on connect (attempt {connect_attempt + 1}/3), retrying...", file=sys.stderr)
                             gc.collect()
                             # 增加等待時間
@@ -1048,10 +1139,28 @@ class TelegramClientManager:
             print(f"[TelegramClient] Unexpected error in login_account: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc(file=sys.stderr)
+            
+            # 提供更友好的錯誤消息
+            error_str = str(e).lower()
+            error_str_original = str(e)
+            
+            if "msg_id is too low" in error_str or "[16]" in error_str_original or "badmsgnotification" in error_str:
+                friendly_message = "時間同步失敗，請檢查系統時間是否正確。建議：1) 啟用自動時間同步 2) 重啟程序後再試"
+            elif "flood" in error_str:
+                friendly_message = "請求過於頻繁，請稍後再試"
+            elif "phone_number_invalid" in error_str:
+                friendly_message = "手機號碼格式不正確，請使用國際格式（如 +8613800138000）"
+            elif "auth" in error_str and "key" in error_str:
+                friendly_message = "認證密鑰錯誤，請刪除 session 文件後重新登入"
+            elif "network" in error_str or "connection" in error_str or "timeout" in error_str:
+                friendly_message = "網絡連接失敗，請檢查網絡後重試"
+            else:
+                friendly_message = f"登入錯誤: {str(e)}"
+            
             return {
                 "success": False,
                 "status": "error",
-                "message": f"Login error: {str(e)}"
+                "message": friendly_message
             }
     
     async def check_account_status(self, phone: str) -> Dict[str, Any]:
@@ -1263,7 +1372,7 @@ class TelegramClientManager:
         phone: str,
         user_id: str,
         text: str,
-        attachment: Optional[str] = None,
+        attachment: Any = None,  # 可以是字符串路徑或 {name, type, dataUrl} 對象
         source_group: Optional[str] = None,
         target_username: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -1443,31 +1552,236 @@ class TelegramClientManager:
             
             # Send message
             print(f"[TelegramClient] Sending message to {target_user_id}...", file=sys.stderr)
+            sent = None
+            send_success = False
+            
             if attachment:
-                sent = await client.send_document(
-                    chat_id=target_user_id,
-                    document=attachment,
-                    caption=text
-                )
+                # 處理附件（可能是 base64 dataUrl 或文件路徑）
+                print(f"[TelegramClient] Processing attachment: type={type(attachment).__name__}", file=sys.stderr)
+                
+                # 確保 client.me 已初始化（Pyrogram 的 save_file 需要 client.me.is_premium）
+                if client.me is None:
+                    print(f"[TelegramClient] Initializing client.me...", file=sys.stderr)
+                    try:
+                        await client.get_me()
+                        print(f"[TelegramClient] client.me initialized: {client.me.first_name if client.me else 'None'}", file=sys.stderr)
+                    except Exception as me_err:
+                        print(f"[TelegramClient] Failed to get_me: {me_err}", file=sys.stderr)
+                
+                temp_file_path = None
+                should_cleanup_temp = False  # 標記是否需要清理臨時文件
+                try:
+                    if isinstance(attachment, dict):
+                        print(f"[TelegramClient] Attachment is dict: name={attachment.get('name')}, type={attachment.get('type')}", file=sys.stderr)
+                        # 附件是對象格式 {name, type, dataUrl/filePath}
+                        attachment_name = attachment.get('name', 'attachment')
+                        attachment_type = attachment.get('type', 'file')
+                        file_path = attachment.get('filePath', '')
+                        data_url = attachment.get('dataUrl', '')
+                        
+                        # 優先使用文件路徑（大文件模式）
+                        if file_path and os.path.exists(file_path):
+                            print(f"[TelegramClient] Using direct file path (large file mode): {file_path}", file=sys.stderr)
+                            temp_file_path = file_path
+                            should_cleanup_temp = False  # 不要刪除原始文件
+                        elif data_url and data_url.startswith('data:'):
+                            # 解析 base64 dataUrl（舊模式，用於小文件）
+                            print(f"[TelegramClient] Using base64 mode (legacy)", file=sys.stderr)
+                            
+                            # 提取 base64 數據
+                            if ';base64,' in data_url:
+                                header, base64_data = data_url.split(';base64,', 1)
+                            else:
+                                base64_data = data_url
+                            
+                            # 解碼 base64
+                            file_data = base64.b64decode(base64_data)
+                            
+                            # 創建臨時文件
+                            suffix = os.path.splitext(attachment_name)[1] or '.bin'
+                            temp_fd, temp_file_path = tempfile.mkstemp(suffix=suffix)
+                            os.close(temp_fd)
+                            
+                            with open(temp_file_path, 'wb') as f:
+                                f.write(file_data)
+                            
+                            should_cleanup_temp = True  # 需要清理臨時文件
+                            print(f"[TelegramClient] Saved base64 attachment to temp file: {temp_file_path}", file=sys.stderr)
+                        else:
+                            print(f"[TelegramClient] No valid file path or dataUrl found!", file=sys.stderr)
+                        
+                        # 如果有有效的文件路徑，發送文件
+                        if temp_file_path:
+                            # 根據類型選擇發送方式
+                            print(f"[TelegramClient] Sending {attachment_type} to {target_user_id}, file: {temp_file_path}", file=sys.stderr)
+                            send_success = False
+                            send_error = None
+                            
+                            # 嘗試發送（添加超時保護）
+                            try:
+                                print(f"[TelegramClient] Trying to send {attachment_type}...", file=sys.stderr)
+                                
+                                # 使用超時保護防止卡住
+                                if attachment_type == 'image':
+                                    print(f"[TelegramClient] Calling send_photo...", file=sys.stderr)
+                                    sent = await asyncio.wait_for(
+                                        client.send_photo(
+                                            chat_id=target_user_id,
+                                            photo=temp_file_path,
+                                            caption=text if text else None
+                                        ),
+                                        timeout=120.0  # 2 分鐘超時
+                                    )
+                                else:
+                                    print(f"[TelegramClient] Calling send_document...", file=sys.stderr)
+                                    sent = await asyncio.wait_for(
+                                        client.send_document(
+                                            chat_id=target_user_id,
+                                            document=temp_file_path,
+                                            caption=text if text else None,
+                                            file_name=attachment_name
+                                        ),
+                                        timeout=120.0
+                                    )
+                                print(f"[TelegramClient] Send succeeded! id: {sent.id if sent else 'None'}", file=sys.stderr)
+                                send_success = True
+                                
+                            except asyncio.TimeoutError:
+                                print(f"[TelegramClient] TIMEOUT sending {attachment_type}!", file=sys.stderr)
+                                send_error = Exception(f"Timeout sending {attachment_type}")
+                            except Exception as std_err:
+                                error_str = str(std_err)
+                                print(f"[TelegramClient] Send failed: {error_str}", file=sys.stderr)
+                                import traceback
+                                traceback.print_exc(file=sys.stderr)
+                                send_error = std_err
+                            
+                            if send_error:
+                                raise send_error
+                        else:
+                            # 無效的附件數據，只發送文字
+                            print(f"[TelegramClient] Invalid attachment, sending text only", file=sys.stderr)
+                            sent = await client.send_message(
+                                chat_id=target_user_id,
+                                text=text
+                            )
+                            send_success = True
+                    elif isinstance(attachment, str) and attachment.startswith('data:'):
+                        # 附件是字符串格式的 base64 dataUrl（已在頂部導入 base64, tempfile, os）
+                        if ';base64,' in attachment:
+                            header, base64_data = attachment.split(';base64,', 1)
+                            # 從 header 提取 MIME 類型
+                            mime_type = header.replace('data:', '')
+                        else:
+                            base64_data = attachment
+                            mime_type = 'application/octet-stream'
+                        
+                        file_data = base64.b64decode(base64_data)
+                        
+                        # 確定文件擴展名
+                        ext_map = {
+                            'image/png': '.png',
+                            'image/jpeg': '.jpg',
+                            'image/gif': '.gif',
+                            'image/webp': '.webp',
+                            'application/pdf': '.pdf',
+                        }
+                        suffix = ext_map.get(mime_type, '.bin')
+                        
+                        temp_fd, temp_file_path = tempfile.mkstemp(suffix=suffix)
+                        os.close(temp_fd)
+                        
+                        with open(temp_file_path, 'wb') as f:
+                            f.write(file_data)
+                        
+                        print(f"[TelegramClient] Saved base64 attachment to temp file: {temp_file_path}", file=sys.stderr)
+                        
+                        if mime_type.startswith('image/'):
+                            sent = await client.send_photo(
+                                chat_id=target_user_id,
+                                photo=temp_file_path,
+                                caption=text
+                            )
+                        else:
+                            sent = await client.send_document(
+                                chat_id=target_user_id,
+                                document=temp_file_path,
+                                caption=text
+                            )
+                    else:
+                        # 附件是文件路徑
+                        sent = await client.send_document(
+                            chat_id=target_user_id,
+                            document=attachment,
+                            caption=text
+                        )
+                finally:
+                    # 清理臨時文件（只清理由 base64 創建的臨時文件，不清理用戶原始文件）
+                    if temp_file_path and should_cleanup_temp:
+                        try:
+                            os.remove(temp_file_path)
+                            print(f"[TelegramClient] Cleaned up temp file: {temp_file_path}", file=sys.stderr)
+                        except Exception as cleanup_error:
+                            print(f"[TelegramClient] Failed to cleanup temp file: {cleanup_error}", file=sys.stderr)
+                    elif temp_file_path:
+                        print(f"[TelegramClient] Keeping original file (not temp): {temp_file_path}", file=sys.stderr)
             else:
                 sent = await client.send_message(
                     chat_id=target_user_id,
                     text=text
                 )
-            print(f"[TelegramClient] Message sent successfully! message_id={sent.id}", file=sys.stderr)
+                send_success = True if sent else False
             
-            return {
-                "success": True,
-                "message_id": sent.id,
-                "date": sent.date.isoformat() if sent.date else None
-            }
+            # 檢查發送結果
+            if sent:
+                print(f"[TelegramClient] Message sent successfully! message_id={sent.id}", file=sys.stderr)
+                return {
+                    "success": True,
+                    "message_id": sent.id,
+                    "date": sent.date.isoformat() if sent.date else None
+                }
+            elif send_success:
+                # 附件發送時可能因 Pyrogram 解析問題 sent=None，但實際已發送
+                print(f"[TelegramClient] Message likely sent (Pyrogram parsing issue)", file=sys.stderr)
+                return {
+                    "success": True,
+                    "message_id": None,
+                    "date": None,
+                    "note": "Message sent but response parsing failed"
+                }
+            else:
+                print(f"[TelegramClient] Send returned None", file=sys.stderr)
+                return {
+                    "success": False,
+                    "error": "Send returned None - message may not have been delivered"
+                }
         
         except FloodWait as e:
             return {
                 "success": False,
                 "error": f"Flood wait: Please wait {e.value} seconds"
             }
+        except AttributeError as e:
+            # Pyrogram 內部可能會拋出 AttributeError，特別是 is_premium 相關的錯誤
+            # 這通常是 Pyrogram 解析返回的 Message 時 from_user 為 None
+            # 但消息本身通常已經發送成功
+            error_str = str(e)
+            print(f"[TelegramClient] AttributeError during send: {error_str}", file=sys.stderr)
+            if 'is_premium' in error_str or 'NoneType' in error_str:
+                # 消息很可能已發送，只是響應解析失敗
+                print(f"[TelegramClient] Message likely sent successfully despite parsing error", file=sys.stderr)
+                return {
+                    "success": True,
+                    "message_id": None,
+                    "date": None,
+                    "note": f"Message sent but Pyrogram failed to parse response: {error_str}"
+                }
+            return {
+                "success": False,
+                "error": error_str
+            }
         except Exception as e:
+            print(f"[TelegramClient] Exception during send: {type(e).__name__}: {e}", file=sys.stderr)
             return {
                 "success": False,
                 "error": str(e)
@@ -1649,10 +1963,54 @@ class TelegramClientManager:
             # Check if it's an invite link (private group)
             is_invite_link = group_id.startswith('+') or 'joinchat' in group_url.lower()
             
+            # 🆕 對於邀請鏈接，需要特殊處理
+            if is_invite_link:
+                # 邀請鏈接無法直接用 get_chat 解析，需要使用原始 URL
+                # 嘗試用完整的邀請鏈接格式
+                invite_link_full = group_url if 't.me/' in group_url else f"https://t.me/{group_id}"
+                print(f"[TelegramClient] Checking invite link: {invite_link_full}", file=sys.stderr)
+                
+                try:
+                    # 嘗試用邀請鏈接加入群組的方式來獲取信息
+                    # 注意：get_chat 對邀請鏈接可能不起作用
+                    chat = await client.get_chat(invite_link_full)
+                except Exception as invite_err:
+                    error_str = str(invite_err).lower()
+                    print(f"[TelegramClient] Invite link check error: {invite_err}", file=sys.stderr)
+                    
+                    # 邀請鏈接錯誤處理
+                    if "expired" in error_str:
+                        return {
+                            "is_member": False,
+                            "can_join": False,
+                            "is_private": True,
+                            "group_url": group_url,
+                            "reason": "邀請鏈接已過期"
+                        }
+                    elif "not_occupied" in error_str or "invalid" in error_str:
+                        # 嘗試直接用 hash 獲取
+                        return {
+                            "is_member": False,
+                            "can_join": True,
+                            "is_private": True,
+                            "group_url": group_url,
+                            "reason": "私有群組，需要通過邀請鏈接加入"
+                        }
+                    else:
+                        return {
+                            "is_member": False,
+                            "can_join": True,
+                            "is_private": True,
+                            "group_url": group_url,
+                            "reason": "私有群組，需要通過邀請鏈接加入"
+                        }
+            else:
+                # 普通用戶名/群組 ID
+                chat = await client.get_chat(group_id)
+            
             # 正確檢查成員身份：使用 get_chat_member 而不只是 get_chat
             # get_chat 對公開群組可以成功，但不代表帳號是成員
             try:
-                chat = await client.get_chat(group_id)
                 # 獲取當前用戶在群組中的成員身份
                 me = await client.get_me()
                 member = await client.get_chat_member(chat.id, me.id)

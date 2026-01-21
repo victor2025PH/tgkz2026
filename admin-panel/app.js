@@ -1,12 +1,23 @@
 /**
  * TG-AI智控王 管理後台
  * Vue 3 應用 v2.0
+ * 
+ * 配置說明：
+ * - 本地部署：API_BASE = '/api'（默認）
+ * - GitHub Pages：需要設置 localStorage['api_server'] = 'https://your-server.com'
  */
 
 const { createApp, ref, computed, onMounted, watch, reactive } = Vue;
 
-// API 基礎URL
-const API_BASE = '/api';
+// API 基礎URL（支持從 localStorage 讀取遠程服務器地址）
+const API_SERVER = localStorage.getItem('api_server') || '';
+const API_BASE = API_SERVER ? `${API_SERVER}/api` : '/api';
+
+// 如果未配置服務器且不是本地訪問，顯示配置提示
+if (!API_SERVER && !window.location.hostname.match(/localhost|127\.0\.0\.1/)) {
+    console.warn('⚠️ 未配置 API 服務器地址，請在瀏覽器控制台執行：');
+    console.warn('localStorage.setItem("api_server", "https://your-api-server.com")');
+}
 
 // ============ 工具函數 ============
 

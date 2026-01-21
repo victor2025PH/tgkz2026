@@ -635,7 +635,7 @@ export const PROXY_TYPES = [
 
               <!-- 快捷操作（帶文字标签） -->
               <div class="card-actions" (click)="$event.stopPropagation()">
-                @if ((account.status === 'Offline' || account.status === 'Banned') && !isLoggingIn(account.id)) {
+                @if (canLogin(account) && !isLoggingIn(account.id)) {
                   <button (click)="onLogin(account)" class="action-btn login" title="登入账号">
                     <span class="action-icon">▶️</span>
                     <span class="action-label">登入</span>
@@ -715,7 +715,7 @@ export const PROXY_TYPES = [
                   </td>
                   <td>{{ account.dailySendCount || 0 }}/{{ account.dailySendLimit || 50 }}</td>
                   <td class="actions-cell" (click)="$event.stopPropagation()">
-                    @if (account.status === 'Offline' || account.status === 'Banned') {
+                    @if (canLogin(account)) {
                       <button (click)="onLogin(account)" class="table-action login" title="登入账号">▶️</button>
                     }
                     @if (account.status === 'Online') {
@@ -906,7 +906,7 @@ export const PROXY_TYPES = [
 
         <!-- 操作按钮 -->
         <div class="detail-actions-grid">
-          @if ((selectedAccount()!.status === 'Offline' || selectedAccount()!.status === 'Banned') && !isLoggingIn(selectedAccount()!.id)) {
+          @if (canLogin(selectedAccount()!) && !isLoggingIn(selectedAccount()!.id)) {
             <button (click)="onLogin(selectedAccount()!)" class="action-btn-sm primary">▶️ 登入</button>
           }
           @if (isLoggingIn(selectedAccount()!.id) || selectedAccount()!.status === 'Logging in...' || selectedAccount()!.status === 'Waiting Code' || selectedAccount()!.status === 'Waiting 2FA') {
@@ -4431,6 +4431,30 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   // 檢查帳號是否正在登入
+  /**
+   * 判斷帳號是否可以登入
+   * 包括：Offline, Banned, Error, error, Proxy Error 等狀態
+   */
+  canLogin(account: Account): boolean {
+    const loginAllowedStatuses = [
+      'Offline', 
+      'Banned', 
+      'Error', 
+      'error',
+      'Proxy Error',
+      'Session Expired',
+      'Auth Error'
+    ];
+    // 不是在線狀態且不是登入中狀態
+    const isNotOnline = account.status !== 'Online';
+    const isNotLoggingIn = !['Logging in...', 'Waiting Code', 'Waiting 2FA'].includes(account.status);
+    // 狀態在允許登入列表中，或者狀態包含 'error'（不區分大小寫）
+    const isAllowedStatus = loginAllowedStatuses.includes(account.status) || 
+                           account.status.toLowerCase().includes('error') ||
+                           account.status.toLowerCase().includes('offline');
+    return isNotOnline && isNotLoggingIn && isAllowedStatus;
+  }
+
   isLoggingIn(accountId: number): boolean {
     return this.loggingInAccounts().has(accountId);
   }

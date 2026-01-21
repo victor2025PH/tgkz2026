@@ -24,6 +24,7 @@ from pyrogram.errors import (
     FloodWait, PeerIdInvalid, UsernameNotOccupied,
     UsernameInvalid, UserBannedInChannel
 )
+from pyrogram.raw import functions, types as raw_types
 
 
 @dataclass
@@ -62,19 +63,32 @@ class JisoSearchResult:
         }
     
     def _infer_chat_type(self) -> str:
-        """根據各種線索推斷資源類型
+        """根據各種線索推斷資源類型 - 🆕 增強版
         
         重要：類型判斷應該優先使用 Telegram API 驗證結果
         這裡的推斷僅作為備選方案
         """
         # 如果已經有明確的類型（不是默認值），直接返回
-        if self.chat_type and self.chat_type != "supergroup":
+        if self.chat_type and self.chat_type not in ["supergroup", "group"]:
             return self.chat_type
         
-        title_lower = (self.title or "").lower()
+        title = self.title or ""
+        title_lower = title.lower()
         username_lower = (self.username or "").lower()
         description_lower = (self.description or "").lower()
         link = self.link or ""
+        
+        # 🆕 從標題 emoji 判斷類型（Bot 返回的結果通常帶有這些 emoji）
+        channel_emojis = ['📢', '📣', '📺', '🔊', '📡', '🎬', '📻']  # 頻道相關
+        group_emojis = ['👥', '💬', '🏠', '🗣️', '👨‍👩‍👧‍👦', '👪']  # 群組相關
+        
+        for emoji in channel_emojis:
+            if emoji in title:
+                return "channel"
+        
+        for emoji in group_emojis:
+            if emoji in title:
+                return "supergroup"
         
         # 1. 從 username 判斷機器人（最可靠）
         if username_lower.endswith("_bot") or username_lower.endswith("bot"):
@@ -90,7 +104,7 @@ class JisoSearchResult:
         # 頻道通常有這些特徵：
         # - 標題明確包含"頻道"/"频道"/"channel"
         # - 描述中提到"訂閱"/"订阅"/"subscribe"
-        channel_strong_keywords = ['頻道', '频道', 'channel']
+        channel_strong_keywords = ['頻道', '频道', 'channel', '廣播', '广播', '直播']
         channel_description_keywords = ['訂閱', '订阅', 'subscribe', 'subscribers']
         
         is_likely_channel = False
@@ -130,17 +144,18 @@ class JisoSearchResult:
 @dataclass
 class JisoConfig:
     """极搜配置"""
-    # 主力 Bot（并行搜索）
+    # 🆕 主力 Bot（並行搜索）- 2026-01 更新
     primary_bots: List[str] = field(default_factory=lambda: [
-        "smss",                # 神马搜索（主力，稳定，有分页，支持點擊獲取詳情）
-        "TGDBsearchbot_bot",   # TelegramDB（備選，可能返回真實鏈接）
-        "jisou",               # 极搜（主力，有分页）
+        "smss",                # 神馬搜索（中文搜索最佳，用戶名必須是 smss）
+        "jisou",               # 極搜主號
+        "jisou2",              # 極搜備份2
+        "jisou3",              # 極搜備份3
     ])
     
     # 备用 Bot（主力都失败时才用）
     backup_bots: List[str] = field(default_factory=lambda: [
-        "jisou1",              # 极搜1（备用）
-        "jisou3",              # 极搜3（备用，有图片验证码）
+        "TGDBsearchbot_bot",   # TelegramDB（備選）
+        "SearcheeBot",         # 搜索Bot（備選）
     ])
     
     # 用户自定义 Bot（从数据库加载）
@@ -410,33 +425,163 @@ class JisoSearchService:
     
     # ==================== Bot 管理 ====================
     
-    async def _resolve_bot(self, client: Client, bot_username: str) -> Optional[Any]:
-        """解析 Bot 用户"""
+    async def _resolve_bot(self, client: Client, bot_username: str, force_check: bool = False) -> Optional[Any]:
+        """解析 Bot 用户 - 🆕 使用底層 API 確保成功
+        
+        Args:
+            client: Pyrogram 客戶端
+            bot_username: Bot 用戶名
+            force_check: 是否強制重新檢測（忽略緩存）
+        """
         try:
-            # 检查缓存
             cache_key = f"{client.phone_number}_{bot_username}"
             now = time.time()
             
-            if cache_key in self._bot_availability:
-                if now - self._last_bot_check.get(cache_key, 0) < 600:  # 10分钟缓存
-                    if not self._bot_availability[cache_key]:
-                        return None
+            # 🆕 強制檢測模式：跳過緩存
+            if not force_check:
+                # 检查缓存（縮短到 3 分鐘）
+                if cache_key in self._bot_availability:
+                    if now - self._last_bot_check.get(cache_key, 0) < 180:  # 3分钟缓存
+                        if not self._bot_availability[cache_key]:
+                            self.log(f"Bot @{bot_username} 緩存顯示不可用，跳過", "debug")
+                            return None
+            else:
+                self.log(f"強制重新檢測 Bot @{bot_username}", "info")
             
-            # 尝试解析 Bot
-            peer = await client.resolve_peer(bot_username)
-            self._bot_availability[cache_key] = True
-            self._last_bot_check[cache_key] = now
-            return peer
+            # 🆕 使用底層 API 解析 Bot（不依賴 Pyrogram 的內部緩存）
+            try:
+                resolved = await client.invoke(
+                    functions.contacts.ResolveUsername(username=bot_username)
+                )
+                if resolved and resolved.users:
+                    user = resolved.users[0]
+                    peer = raw_types.InputPeerUser(
+                        user_id=user.id,
+                        access_hash=user.access_hash
+                    )
+                    self._bot_availability[cache_key] = True
+                    self._last_bot_check[cache_key] = now
+                    self.log(f"✅ Bot @{bot_username} 解析成功（底層 API）", "debug")
+                    return peer
+                else:
+                    raise Exception("No users found")
+            except Exception as raw_error:
+                self.log(f"底層 API 解析 @{bot_username} 失敗: {raw_error}", "debug")
+                # 嘗試自動激活
+                activated = await self._auto_activate_bot(client, bot_username)
+                if activated:
+                    # 激活後再次嘗試底層 API
+                    await asyncio.sleep(1.0)  # 等待激活生效
+                    try:
+                        resolved = await client.invoke(
+                            functions.contacts.ResolveUsername(username=bot_username)
+                        )
+                        if resolved and resolved.users:
+                            user = resolved.users[0]
+                            peer = raw_types.InputPeerUser(
+                                user_id=user.id,
+                                access_hash=user.access_hash
+                            )
+                            self._bot_availability[cache_key] = True
+                            self._last_bot_check[cache_key] = time.time()
+                            self.log(f"✅ Bot @{bot_username} 激活後解析成功！", "success")
+                            return peer
+                    except Exception as retry_error:
+                        self.log(f"激活後仍無法解析 @{bot_username}: {retry_error}", "warning")
             
-        except (UsernameNotOccupied, UsernameInvalid, PeerIdInvalid) as e:
-            self.log(f"Bot @{bot_username} 不可用: {e}", "warning")
             cache_key = f"{client.phone_number}_{bot_username}"
             self._bot_availability[cache_key] = False
             self._last_bot_check[cache_key] = time.time()
             return None
+            
         except Exception as e:
             self.log(f"解析 Bot @{bot_username} 失败: {e}", "error")
             return None
+    
+    async def _auto_activate_bot(self, client: Client, bot_username: str) -> bool:
+        """🆕 自動激活 Bot - 使用底層 API 發送 /start 建立聯繫"""
+        try:
+            self.log(f"🤖 自動激活 Bot @{bot_username}...")
+            
+            # 方法 1：使用底層 API 解析用戶名
+            try:
+                resolved = await client.invoke(
+                    functions.contacts.ResolveUsername(username=bot_username)
+                )
+                
+                if resolved and resolved.users:
+                    user = resolved.users[0]
+                    peer = raw_types.InputPeerUser(
+                        user_id=user.id,
+                        access_hash=user.access_hash
+                    )
+                    
+                    # 發送 /start 消息
+                    await client.invoke(
+                        functions.messages.SendMessage(
+                            peer=peer,
+                            message="/start",
+                            random_id=random.randint(1, 2**63 - 1)
+                        )
+                    )
+                    await asyncio.sleep(2.0)  # 等待 Bot 響應
+                    self.log(f"✅ 已向 @{bot_username} 發送 /start（底層 API）", "success")
+                    return True
+                else:
+                    self.log(f"❌ @{bot_username} 解析失敗：用戶不存在", "warning")
+                    return False
+                    
+            except Exception as resolve_error:
+                self.log(f"底層 API 失敗: {resolve_error}，嘗試備用方法...", "debug")
+                
+                # 方法 2：嘗試通過搜索找到 Bot
+                try:
+                    async for dialog in client.get_dialogs():
+                        if dialog.chat and dialog.chat.username:
+                            if dialog.chat.username.lower() == bot_username.lower():
+                                await client.send_message(dialog.chat.id, "/start")
+                                await asyncio.sleep(2.0)
+                                self.log(f"✅ 通過對話列表找到 @{bot_username}", "success")
+                                return True
+                except Exception as dialog_error:
+                    self.log(f"對話列表搜索失敗: {dialog_error}", "debug")
+                
+                return False
+                
+        except Exception as e:
+            self.log(f"❌ 激活 @{bot_username} 失敗: {e}", "warning")
+            return False
+    
+    async def initialize_search_bots(self, client: Client) -> Dict[str, bool]:
+        """🆕 初始化所有搜索 Bot（帳號登錄後自動調用）"""
+        results = {}
+        bots_to_init = ["smss", "jisou3"]  # 主要的中文搜索 Bot
+        
+        self.log("🚀 開始初始化搜索 Bot...", "info")
+        
+        for bot_username in bots_to_init:
+            try:
+                # 先嘗試解析
+                peer = await client.resolve_peer(bot_username)
+                results[bot_username] = True
+                self.log(f"  ✅ @{bot_username} 已就緒", "success")
+            except:
+                # 解析失敗，嘗試激活
+                activated = await self._auto_activate_bot(client, bot_username)
+                results[bot_username] = activated
+                if activated:
+                    self.log(f"  ✅ @{bot_username} 已激活", "success")
+                else:
+                    self.log(f"  ⚠️ @{bot_username} 激活失敗", "warning")
+        
+        self.log(f"🏁 Bot 初始化完成: {sum(results.values())}/{len(results)} 個成功", "info")
+        return results
+    
+    def clear_bot_cache(self):
+        """🆕 清除所有 Bot 可用性緩存"""
+        self._bot_availability.clear()
+        self._last_bot_check.clear()
+        self.log("🧹 已清除所有 Bot 可用性緩存", "info")
     
     async def _get_available_bot(self, client: Client) -> Optional[str]:
         """获取可用的 Bot"""
@@ -459,14 +604,14 @@ class JisoSearchService:
     # ==================== 消息解析 ====================
     
     def _parse_member_count(self, text: str) -> int:
-        """解析成员数量"""
+        """解析成员数量 - 🆕 支持 620.4k 格式"""
         if not text:
             return 0
         
         text = text.strip().lower()
         
-        # 匹配数字
-        match = re.search(r'([\d,.]+)\s*([kmw万千])?', text)
+        # 🆕 優化：支持更多格式如 "620.4k", "1.3m", "13.3k" 等
+        match = re.search(r'([\d,.]+)\s*([kmw万千百億亿])?', text)
         if not match:
             return 0
         
@@ -491,23 +636,49 @@ class JisoSearchService:
         """从文本中提取用户名"""
         if not text:
             return None
+        
+        # 🔑 搜索機器人的 username 列表（需要排除）
+        search_bot_usernames = [
+            'smss', 'jisou', 'jisou2', 'jisou3', 'jiso', 
+            'woaiso', 'woaiso2', 'woaisou', 'qunxian', 'cnyes',
+            'chengzibot', 'shenmaso', 'telebotso', 'sousuo',
+            'qunzu', 'qunzubot', 'qunzuobot'
+        ]
+        
+        # 🔑 檢查是否為消息鏈接格式（t.me/username/messageId）
+        # 消息鏈接中的 username 通常是 bot 或頻道，不是群組
+        message_link_match = re.search(r't\.me/([a-zA-Z][a-zA-Z0-9_]{3,})/\d+', text)
+        if message_link_match:
+            # 這是消息鏈接，不提取 username
+            return None
 
         # 从 URL 提取: t.me/username 或 https://t.me/username
         # 注意：排除邀請鏈接（+開頭）和 joinchat
-        url_match = re.search(r't\.me/([a-zA-Z][a-zA-Z0-9_]{3,})', text)
+        url_match = re.search(r't\.me/([a-zA-Z][a-zA-Z0-9_]{3,})(?:\?|$)', text)
         if url_match:
             username = url_match.group(1)
             # 排除 joinchat 鏈接
-            if username.lower() != 'joinchat':
-                return username
+            if username.lower() == 'joinchat':
+                return None
+            # 🔑 排除搜索機器人 username
+            if username.lower() in search_bot_usernames or username.lower().endswith('bot'):
+                return None
+            return username
 
         # 从 @ 提取: @username
         at_match = re.search(r'@([a-zA-Z][a-zA-Z0-9_]{3,})', text)
         if at_match:
-            return at_match.group(1)
+            username = at_match.group(1)
+            # 🔑 排除搜索機器人 username
+            if username.lower() in search_bot_usernames or username.lower().endswith('bot'):
+                return None
+            return username
 
         # 纯用户名（以字母开头，至少4个字符）
         if re.match(r'^[a-zA-Z][a-zA-Z0-9_]{3,}$', text):
+            # 🔑 排除搜索機器人 username
+            if text.lower() in search_bot_usernames or text.lower().endswith('bot'):
+                return None
             return text
 
         return None
@@ -727,15 +898,38 @@ class JisoSearchService:
                     member_count=self._parse_member_count(match.group(3)) if match.group(3) else 0
                 ))
         
-        # 格式5: 神马搜索格式 - 数字. emoji 标题 数字k
-        # 例如: 2.💗 丘比特【婚恋交友】 火种巴豆 大黄蜂 F... 14.7k
-        # 例如: 3.💗 大黄蜂 火种 丘比特（婚恋交友定制） ... 14.1k
-        smss_pattern = r'(\d+)[.、]\s*[^\w\s]?\s*(.+?)\s+(\d+(?:\.\d+)?[kKmMwW万千])\s*$'
+        # 🆕 格式5: 神马搜索新格式 - 2026-01 更新
+        # 例如: 1. 🏠 [0:53] 柬埔寨租房金边租房
+        # 例如: 2. 📁 学会租房看过来租房手册指南帮助小白掌...
+        # 例如: 7. 🏠 [0:40] 以租房为由带你投资理财的就是诈骗租房...
+        smss_new_pattern = r'^(\d+)[.、]\s*([^\w\s])\s*(?:\[[\d:]+\]\s*)?(.+?)(?:\s*\.{2,})?$'
         for line in text.split('\n'):
             line = line.strip()
             if not line:
                 continue
-            match = re.match(smss_pattern, line)
+            match = re.match(smss_new_pattern, line)
+            if match:
+                emoji = match.group(2)
+                title = match.group(3).strip()
+                # 移除末尾的省略号
+                title = re.sub(r'\.{2,}$', '', title).strip()
+                
+                if title and len(title) > 2 and not any(r.title == title for r in results):
+                    results.append(JisoSearchResult(
+                        title=title,
+                        member_count=0,  # 神馬搜索新格式不顯示成員數
+                        username=self._extract_username(title)
+                    ))
+                    self.log(f"  📋 解析到神馬結果: {title}", "debug")
+        
+        # 舊格式備用: 数字. emoji 标题 数字k
+        # 例如: 2.💗 丘比特【婚恋交友】 火种巴豆 大黄蜂 F... 14.7k
+        smss_old_pattern = r'(\d+)[.、]\s*[^\w\s]?\s*(.+?)\s+(\d+(?:\.\d+)?[kKmMwW万千])\s*$'
+        for line in text.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            match = re.match(smss_old_pattern, line)
             if match:
                 title = match.group(2).strip()
                 # 移除开头的emoji
@@ -919,14 +1113,36 @@ class JisoSearchService:
                 # 從 URL 中提取 username
                 username = self._extract_username(url)
                 
-                # 從文本中提取成員數（如果在附近）
+                # 🆕 優化：從多個位置提取成員數
                 member_count = 0
-                # 查找文本後面的成員數（如 "1.3k"）
-                # 使用 UTF-16 安全的方式獲取上下文
-                context = self._utf16_slice(text, offset + length, 20)
-                member_match = re.search(r'[\s\.]+(\d+(?:\.\d+)?[kKmMwW万千]?)', context)
+                chat_type = "supergroup"  # 默認類型
+                
+                # 方法1：查找鏈接文本後面的成員數（如 "群名 1.3k"）
+                context_after = self._utf16_slice(text, offset + length, 30)
+                member_match = re.search(r'[\s\.·]*(\d+(?:\.\d+)?[kKmMwW万千]?)(?:\s*人)?', context_after)
                 if member_match:
                     member_count = self._parse_member_count(member_match.group(1))
+                
+                # 方法2：從鏈接文本本身提取成員數（如 "求職招聘 620.4k"）
+                if member_count == 0:
+                    in_text_match = re.search(r'(\d+(?:\.\d+)?[kKmMwW万千]?)(?:\s*人)?$', link_text.strip())
+                    if in_text_match:
+                        member_count = self._parse_member_count(in_text_match.group(1))
+                
+                # 方法3：查找鏈接文本前面的成員數（有些 Bot 格式是 "620.4k 群名"）
+                if member_count == 0 and offset > 10:
+                    context_before = self._utf16_slice(text, max(0, offset - 15), 15)
+                    before_match = re.search(r'(\d+(?:\.\d+)?[kKmMwW万千]?)\s*$', context_before)
+                    if before_match:
+                        member_count = self._parse_member_count(before_match.group(1))
+                
+                # 🆕 識別類型：從 emoji 和關鍵詞判斷
+                if any(emoji in link_text for emoji in ['📢', '📣', '📺', '🔊']):
+                    chat_type = "channel"
+                elif any(kw in link_text.lower() for kw in ['頻道', '频道', 'channel']):
+                    chat_type = "channel"
+                elif any(emoji in link_text for emoji in ['👥', '💬', '🏠', '🗣️']):
+                    chat_type = "supergroup"
                 
                 # 清理標題
                 title = link_text.strip()
@@ -934,6 +1150,8 @@ class JisoSearchService:
                 title = re.sub(r'^\d+[.、)\s]*', '', title)
                 # 移除開頭的 emoji
                 title = re.sub(r'^[\U0001F300-\U0001F9FF\U00002600-\U000027BF]+\s*', '', title)
+                # 移除末尾的成員數（如 "群名 620.4k" → "群名"）
+                title = re.sub(r'\s+\d+(?:\.\d+)?[kKmMwW万千]?(?:\s*人)?$', '', title)
                 title = title.strip()
                 
                 if title and len(title) > 1:
@@ -942,10 +1160,12 @@ class JisoSearchService:
                         username=username,
                         link=url,
                         member_count=member_count,
+                        chat_type=chat_type,
                         details_fetched=True  # 已經有真實鏈接了
                     )
                     results.append(result)
-                    self.log(f"    ✓ TextLink: {title[:30]}... → {url}")
+                    type_label = "📢頻道" if chat_type == "channel" else "👥群組"
+                    self.log(f"    ✓ TextLink: {title[:30]}... ({member_count}人 {type_label}) → {url}")
         
         return results
     
@@ -1586,6 +1806,35 @@ class JisoSearchService:
         
         return results
     
+    def _filter_relevant_results(self, results: List[JisoSearchResult], keyword: str) -> List[JisoSearchResult]:
+        """🆕 過濾無關結果 - 結果必須包含搜索關鍵詞"""
+        if not keyword or not results:
+            return results
+        
+        keyword_lower = keyword.lower()
+        # 分割關鍵詞（支持空格分隔的多關鍵詞）
+        keywords = [k.strip().lower() for k in keyword.split() if k.strip()]
+        
+        relevant = []
+        for result in results:
+            title = (result.title or "").lower()
+            description = (result.description or "").lower()
+            username = (result.username or "").lower()
+            
+            # 檢查是否至少包含一個關鍵詞
+            is_relevant = False
+            for kw in keywords:
+                if kw in title or kw in description or kw in username:
+                    is_relevant = True
+                    break
+            
+            if is_relevant:
+                relevant.append(result)
+            else:
+                self.log(f"  ❌ 過濾無關結果: '{result.title}' (不包含 '{keyword}')", "debug")
+        
+        return relevant
+    
     def _deduplicate_results(self, results: List[JisoSearchResult]) -> List[JisoSearchResult]:
         """去重结果"""
         seen = {}
@@ -1702,7 +1951,9 @@ class JisoSearchService:
         seen: set[int] = set()
         
         try:
-            async for m in client.get_chat_history(bot_username, limit=limit):
+            # 🆕 使用 bot_id 代替 bot_username 避免解析問題
+            chat_id = bot_id if bot_id else bot_username
+            async for m in client.get_chat_history(chat_id, limit=limit):
                 if not m.from_user:
                     continue
                 if m.from_user.id == my_id:
@@ -1786,14 +2037,16 @@ class JisoSearchService:
     
     async def _auto_enter_search_mode(self, client: Client, bot_username: str, bot_id: int, my_id: int) -> None:
         """
-        自动把 Bot 从 /start 菜单状态带到“可输入关键词搜索”的状态。
+        自动把 Bot 从 /start 菜单状态带到"可输入关键词搜索"的状态。
         - inline keyboard: 自动点 callback 按钮
         - reply keyboard: 自动发送按钮文本
         注意：不依赖 conversation（当前环境不支持）。
         """
         try:
             start_ts = time.time()
-            await client.send_message(bot_username, "/start")
+            # 🆕 使用 bot_id 代替 bot_username
+            chat_id = bot_id if bot_id else bot_username
+            await client.send_message(chat_id, "/start")
             await asyncio.sleep(2.5)  # 等久一点让 Bot 回复
             
             # 在 10 秒内等待 Bot 出现带按钮的消息
@@ -1836,7 +2089,8 @@ class JisoSearchService:
             reply_text = self._pick_best_reply_keyboard_text(latest)
             if reply_text:
                 self.log(f"自动发送 @{bot_username} 菜单按钮文本: {reply_text!r}")
-                await client.send_message(bot_username, reply_text)
+                # 🆕 使用 bot_id
+                await client.send_message(chat_id, reply_text)
                 await asyncio.sleep(2.0)
                 return
         except Exception as e:
@@ -1884,10 +2138,30 @@ class JisoSearchService:
             # 获取当前用户 ID
             me = await client.get_me()
             my_id = me.id
-            bot_user = await client.get_users(bot_username)
-            bot_id = bot_user.id if bot_user else 0
             
-            # 自动点击 /start 菜单，进入“搜索输入”模式（如果 Bot 有按钮）
+            # 🆕 使用底層 API 解析 Bot 用戶名
+            bot_id = 0
+            bot_peer = None
+            try:
+                resolved = await client.invoke(
+                    functions.contacts.ResolveUsername(username=bot_username)
+                )
+                if resolved and resolved.users:
+                    bot_user = resolved.users[0]
+                    bot_id = bot_user.id
+                    bot_peer = raw_types.InputPeerUser(
+                        user_id=bot_user.id,
+                        access_hash=bot_user.access_hash
+                    )
+                    self.log(f"✅ Bot @{bot_username} 解析成功 (ID: {bot_id})")
+                else:
+                    self.log(f"❌ Bot @{bot_username} 解析失敗", "warning")
+                    return []
+            except Exception as resolve_error:
+                self.log(f"❌ 解析 @{bot_username} 失敗: {resolve_error}", "warning")
+                return []
+            
+            # 自动点击 /start 菜单，进入"搜索输入"模式（如果 Bot 有按钮）
             await self._auto_enter_search_mode(client, bot_username, bot_id, my_id)
             
             # 通过轮询聊天记录等待 Bot 回复（兼容编辑旧消息）
@@ -1899,8 +2173,29 @@ class JisoSearchService:
             for q in query_variants:
                 send_ts = time.time()
                 self.log(f"向 @{bot_username} 发送查询: {q!r}")
-                sent = await client.send_message(bot_username, q)
-                sent_id = sent.id
+                
+                # 🆕 使用底層 API 發送消息
+                try:
+                    result = await client.invoke(
+                        functions.messages.SendMessage(
+                            peer=bot_peer,
+                            message=q,
+                            random_id=random.randint(1, 2**63 - 1)
+                        )
+                    )
+                    # 從結果中提取消息 ID
+                    sent_id = 0
+                    if hasattr(result, 'updates'):
+                        for update in result.updates:
+                            if hasattr(update, 'id'):
+                                sent_id = update.id
+                                break
+                    elif hasattr(result, 'id'):
+                        sent_id = result.id
+                    self.log(f"✅ 消息已發送 (ID: {sent_id})")
+                except Exception as send_error:
+                    self.log(f"❌ 發送消息失敗: {send_error}", "error")
+                    continue
                 
                 max_wait = self.config.response_timeout
                 check_interval = 3.0  # 增加间隔，避免触发 FloodWait
@@ -1996,6 +2291,18 @@ class JisoSearchService:
         self.log(f"开始极搜搜索: '{keyword}'")
         self.emit_progress("starting", f"开始搜索 '{keyword}'...")
         
+        # 🆕 首次搜索時清除 Bot 可用性緩存（確保 smss 等 Bot 被重新檢測）
+        if not hasattr(self, '_search_count'):
+            self._search_count = 0
+        self._search_count += 1
+        if self._search_count == 1:
+            self.clear_bot_cache()
+            self.log("🔄 首次搜索，已清除 Bot 緩存")
+        
+        # 🆕 自動初始化標記（每個帳號只初始化一次）
+        if not hasattr(self, '_initialized_accounts'):
+            self._initialized_accounts = set()
+        
         # 检查缓存
         cached = self._get_cached_results(keyword)
         if cached:
@@ -2044,13 +2351,26 @@ class JisoSearchService:
         self.log(f"使用账号: {selected_phone}")
         self.emit_progress("searching", f"使用账号 {selected_phone} 搜索中...")
         
+        # 🆕 自動初始化搜索 Bot（每個帳號只初始化一次，用戶無感知）
+        if selected_phone not in self._initialized_accounts:
+            self.log(f"🤖 首次使用此帳號搜索，自動初始化搜索 Bot...")
+            self.emit_progress("initializing", "正在準備搜索環境...")
+            try:
+                init_results = await self.initialize_search_bots(client)
+                self._initialized_accounts.add(selected_phone)
+                success_count = sum(1 for v in init_results.values() if v)
+                self.log(f"✅ 搜索環境準備完成（{success_count}/{len(init_results)} 個 Bot 就緒）")
+            except Exception as init_error:
+                self.log(f"⚠️ 初始化警告（不影響搜索）: {init_error}", "warning")
+                self._initialized_accounts.add(selected_phone)  # 避免重複嘗試
+        
         all_results = []
         all_messages = []  # 保存消息用於獲取詳情
         tried_bots = []
         successful_bot = None
         
-        # 辅助函数：尝试单个 Bot
-        async def try_bot(bot_username: str, is_primary: bool) -> Tuple[List[JisoSearchResult], List[Message]]:
+        # 辅助函数：尝试单个 Bot（🆕 支持自動翻頁）
+        async def try_bot(bot_username: str, is_primary: bool, max_pages: int = 3) -> Tuple[List[JisoSearchResult], List[Message]]:
             bot_type = "主力" if is_primary else "备用"
             
             # 检查 Bot 是否可用
@@ -2069,6 +2389,8 @@ class JisoSearchService:
                 
                 # 解析所有消息
                 bot_results = []
+                all_messages_collected = list(messages)
+                
                 for msg in messages:
                     results = self._parse_message(msg)
                     if results:
@@ -2077,12 +2399,98 @@ class JisoSearchService:
                             self.log(f"    - {r.title} ({r.member_count}人)")
                     bot_results.extend(results)
                 
+                # 🆕 自動翻頁：檢測並點擊「下一頁」按鈕
+                if bot_results and messages:
+                    current_page = 1
+                    while current_page < max_pages:
+                        # 找到最後一條有按鈕的消息
+                        last_msg_with_buttons = None
+                        for msg in reversed(messages):
+                            if msg.reply_markup and hasattr(msg.reply_markup, 'inline_keyboard'):
+                                last_msg_with_buttons = msg
+                                break
+                        
+                        if not last_msg_with_buttons:
+                            break
+                        
+                        # 查找「下一頁」按鈕
+                        next_page_btn = None
+                        for row_idx, row in enumerate(last_msg_with_buttons.reply_markup.inline_keyboard):
+                            for col_idx, btn in enumerate(row):
+                                btn_text = (btn.text or "").lower()
+                                # 檢測翻頁按鈕關鍵詞
+                                if any(kw in btn_text for kw in ['下一页', '下一頁', 'next', '➡️', '▶️', '>>', '›', '»', '更多']):
+                                    next_page_btn = (row_idx, col_idx, btn.text)
+                                    break
+                            if next_page_btn:
+                                break
+                        
+                        if not next_page_btn:
+                            self.log(f"  沒有找到下一頁按鈕，停止翻頁")
+                            break
+                        
+                        # 點擊下一頁
+                        current_page += 1
+                        self.log(f"  📄 翻到第 {current_page} 頁...")
+                        self.emit_progress("searching", f"翻頁中 ({current_page}/{max_pages})...")
+                        
+                        try:
+                            row_idx, col_idx, btn_text = next_page_btn
+                            await last_msg_with_buttons.click(row_idx, col_idx)
+                            await asyncio.sleep(2.0)  # 等待 Bot 響應
+                            
+                            # 獲取 Bot ID
+                            bot_id = 0
+                            try:
+                                resolved = await client.invoke(
+                                    functions.contacts.ResolveUsername(username=bot_username)
+                                )
+                                if resolved and resolved.users:
+                                    bot_id = resolved.users[0].id
+                            except:
+                                pass
+                            
+                            # 收集新消息
+                            me = await client.get_me()
+                            new_messages = await self._collect_bot_messages(
+                                client=client,
+                                bot_username=bot_username,
+                                bot_id=bot_id,
+                                my_id=me.id,
+                                since_ts=time.time() - 5,
+                                limit=10
+                            )
+                            
+                            if new_messages:
+                                messages = new_messages
+                                all_messages_collected.extend(new_messages)
+                                
+                                # 解析新結果
+                                page_results = []
+                                for msg in new_messages:
+                                    results = self._parse_message(msg)
+                                    page_results.extend(results)
+                                
+                                if page_results:
+                                    self.log(f"  第 {current_page} 頁解析出 {len(page_results)} 個結果")
+                                    bot_results.extend(page_results)
+                                else:
+                                    self.log(f"  第 {current_page} 頁沒有新結果，停止翻頁")
+                                    break
+                            else:
+                                self.log(f"  翻頁後沒有收到新消息")
+                                break
+                                
+                        except Exception as page_error:
+                            self.log(f"  翻頁失敗: {page_error}", "warning")
+                            break
+                
                 if bot_results:
-                    self.log(f"[{bot_type}] @{bot_username} 返回了 {len(bot_results)} 个结果")
+                    self.log(f"[{bot_type}] @{bot_username} 返回了 {len(bot_results)} 个结果（{current_page} 頁）")
                 else:
                     self.log(f"[{bot_type}] @{bot_username} 没有返回可解析结果")
                 
-                return bot_results, messages
+                return bot_results, all_messages_collected
                 
             except FloodWait as e:
                 self.log(f"[{bot_type}] @{bot_username} 触发限制，等待 {e.value} 秒...")
@@ -2166,8 +2574,20 @@ class JisoSearchService:
         else:
             self.log("大部分結果已有鏈接，跳過驗證")
         
+        # 🆕 過濾無關結果（必須包含搜索關鍵詞）
+        filtered_results = self._filter_relevant_results(all_results, keyword)
+        if len(filtered_results) < len(all_results):
+            self.log(f"🔍 過濾無關結果: {len(all_results)} → {len(filtered_results)}")
+        
         # 去重
-        unique_results = self._deduplicate_results(all_results)
+        unique_results = self._deduplicate_results(filtered_results)
+        
+        # 🆕 獲取前 10 個結果的真實詳情（成員數、類型）
+        if unique_results:
+            try:
+                await self.fetch_batch_details(client, unique_results, max_count=10)
+            except Exception as e:
+                self.log(f"獲取詳情時出錯: {e}", "warning")
         
         # 統計有鏈接的結果數量
         linked_count = sum(1 for r in unique_results if r.link or r.username)
@@ -2214,6 +2634,83 @@ class JisoSearchService:
             "bot": bot_username,
             "reason": None if bot_username else "没有可用的搜索 Bot"
         }
+    
+    async def fetch_resource_details(self, client: Client, result: JisoSearchResult) -> JisoSearchResult:
+        """
+        🆕 使用 Telegram API 獲取資源真實詳情（成員數、類型等）
+        """
+        if not result.username and not result.link:
+            return result
+        
+        try:
+            # 獲取 username
+            username = result.username
+            if not username and result.link:
+                username = self._extract_username(result.link)
+            
+            if not username:
+                return result
+            
+            # 使用 Telegram API 獲取詳情
+            chat = await client.get_chat(username)
+            
+            if chat:
+                # 更新成員數
+                if hasattr(chat, 'members_count') and chat.members_count:
+                    result.member_count = chat.members_count
+                    self.log(f"  📊 獲取到真實成員數: {chat.members_count}")
+                
+                # 更新類型
+                chat_type_str = str(chat.type).lower() if hasattr(chat, 'type') else ""
+                if 'channel' in chat_type_str:
+                    result.chat_type = 'channel'
+                elif 'supergroup' in chat_type_str:
+                    result.chat_type = 'supergroup'
+                elif 'group' in chat_type_str:
+                    result.chat_type = 'group'
+                
+                # 更新描述
+                if hasattr(chat, 'description') and chat.description:
+                    result.description = chat.description[:200]
+                
+                # 更新標題（如果更準確）
+                if hasattr(chat, 'title') and chat.title:
+                    result.title = chat.title
+                
+                self.log(f"  ✅ 獲取詳情成功: {result.title} ({result.member_count}人, {result.chat_type})")
+                
+        except Exception as e:
+            # 忽略錯誤，保持原始數據
+            self.log(f"  ⚠️ 獲取詳情失敗: {e}", "warning")
+        
+        return result
+    
+    async def fetch_batch_details(self, client: Client, results: List[JisoSearchResult], max_count: int = 10) -> List[JisoSearchResult]:
+        """
+        🆕 批量獲取資源詳情（優化版：限制數量，避免限流）
+        """
+        if not results:
+            return results
+        
+        # 只對有 username 的結果獲取詳情
+        to_fetch = [r for r in results if r.username or r.link][:max_count]
+        
+        if not to_fetch:
+            return results
+        
+        self.log(f"=== 獲取前 {len(to_fetch)} 個結果的真實詳情 ===")
+        self.emit_progress("fetching_details", f"正在獲取詳情 (0/{len(to_fetch)})...")
+        
+        for i, result in enumerate(to_fetch):
+            try:
+                await self.fetch_resource_details(client, result)
+                self.emit_progress("fetching_details", f"正在獲取詳情 ({i+1}/{len(to_fetch)})...")
+                await asyncio.sleep(0.5)  # 避免限流
+            except Exception as e:
+                self.log(f"  獲取詳情失敗: {e}", "warning")
+        
+        self.log(f"=== 詳情獲取完成 ===")
+        return results
 
 
 # 创建全局实例

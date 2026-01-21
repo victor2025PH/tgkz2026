@@ -1,0 +1,76 @@
+{
+  "timestamp": "2026-01-18T23:07:42.248869",
+  "phase": "第五階段：群組與資源功能測試",
+  "checks": [
+    {
+      "name": "已發現資源",
+      "status": "pass",
+      "details": "共 76 個資源"
+    },
+    {
+      "name": "發現日誌",
+      "status": "pass",
+      "details": "共 41 條日誌"
+    },
+    {
+      "name": "提取成員",
+      "status": "pass",
+      "details": "共 172 人"
+    },
+    {
+      "name": "提取日誌",
+      "status": "pass",
+      "details": "共 4 條日誌"
+    },
+    {
+      "name": "標籤定義",
+      "status": "pass",
+      "details": "共 7 個標籤"
+    },
+    {
+      "name": "用戶標籤",
+      "status": "pass",
+      "details": "共 360 條關聯"
+    },
+    {
+      "name": "搜索渠道",
+      "status": "warning",
+      "details": "共 0 個渠道"
+    },
+    {
+      "name": "頻道討論區",
+      "status": "pass",
+      "details": "共 0 個"
+    },
+    {
+      "name": "討論消息",
+      "status": "pass",
+      "details": "共 0 條"
+    },
+    {
+      "name": "營銷活動",
+      "status": "warning",
+      "details": "共 0 個活動"
+    },
+    {
+      "name": "系統日誌",
+      "status": "pass",
+      "details": "共 264 條"
+    }
+  ],
+  "warnings": [],
+  "errors": [],
+  "summary": {
+    "discovered_resources_count": 76,
+    "discovery_logs_count": 41,
+    "extracted_members_count": 172,
+    "extraction_logs_count": 4,
+    "tag_definitions_count": 7,
+    "user_tags_count": 360,
+    "search_channels_count": 0,
+    "channel_discussions_count": 0,
+    "discussion_messages_count": 0,
+    "marketing_campaigns_count": 0,
+    "logs_count": 264
+  }
+}

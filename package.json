@@ -1,6 +1,6 @@
 {
   "name": "tg-ai-smartking",
-  "version": "1.0.3",
+  "version": "1.2.0",
   "description": "A modern dashboard to manage and automate Telegram marketing campaigns.",
   "main": "electron.js",
   "author": "Your Company",

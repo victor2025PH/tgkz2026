@@ -1,6 +1,7 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { GoogleGenAI } from '@google/genai';
 import { CapturedLead } from './models';
+import { ElectronIpcService } from './electron-ipc.service';
 
 // In a real Applet environment, this would be provided.
 declare const process: {
@@ -16,30 +17,68 @@ declare const process: {
 export class GeminiService {
   private genAI: GoogleGenAI | null = null;
   private apiKey: string = '';
+  private ipc = inject(ElectronIpcService);
+  private isInitialized = false;
   
   constructor() {
-    // Try to get API key from environment variable first
-    const envApiKey = process?.env?.API_KEY;
-    if (envApiKey) {
-      this.setApiKey(envApiKey);
-    } else {
-      // Try to get from localStorage
-      const savedKey = localStorage.getItem('ai_api_key');
-      if (savedKey) {
-        this.setApiKey(savedKey);
-      } else {
+    // 優先從後端數據庫加載 API Key
+    this.loadApiKeyFromBackend();
+  }
+  
+  /**
+   * 從後端數據庫加載 API Key
+   */
+  private loadApiKeyFromBackend(): void {
+    // 首先嘗試從 localStorage 快速加載（作為緩存）
+    const cachedKey = localStorage.getItem('ai_api_key');
+    if (cachedKey) {
+      this.setApiKeyInternal(cachedKey);
+    }
+    
+    // 然後從後端獲取最新的配置
+    this.ipc.on('ai-settings-loaded', (data: any) => {
+      if (data?.geminiApiKey) {
+        this.setApiKeyInternal(data.geminiApiKey);
+        // 同步到 localStorage 作為緩存
+        localStorage.setItem('ai_api_key', data.geminiApiKey);
+        console.log('[GeminiService] API key loaded from backend');
+      }
+    });
+    
+    // 請求加載 AI 設置
+    this.ipc.send('get-ai-settings', {});
+    
+    // 如果沒有找到任何 key，顯示警告
+    setTimeout(() => {
+      if (!this.isConfigured()) {
         console.warn('Gemini API Key not found. AI features will be disabled until configured.');
       }
-    }
+    }, 2000);
   }
-
-  setApiKey(apiKey: string) {
+  
+  /**
+   * 內部設置 API Key（不保存到後端）
+   */
+  private setApiKeyInternal(apiKey: string): void {
     if (!apiKey) return;
     this.apiKey = apiKey;
     this.genAI = new GoogleGenAI({ apiKey });
-    // Save to localStorage for persistence
+    this.isInitialized = true;
+  }
+
+  /**
+   * 設置 API Key 並保存到後端數據庫
+   */
+  setApiKey(apiKey: string) {
+    if (!apiKey) return;
+    this.setApiKeyInternal(apiKey);
+    
+    // 保存到 localStorage 作為緩存
     localStorage.setItem('ai_api_key', apiKey);
-    console.log('[GeminiService] API key configured successfully');
+    
+    // 保存到後端數據庫進行持久化
+    this.ipc.send('save-ai-settings', { geminiApiKey: apiKey });
+    console.log('[GeminiService] API key configured and saved to backend');
   }
 
   isConfigured(): boolean {

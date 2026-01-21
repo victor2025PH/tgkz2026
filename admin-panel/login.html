@@ -52,6 +52,26 @@
     <div class="particle" style="top: 80%; left: 40%; animation-delay: 5s; width: 12px; height: 12px;"></div>
     
     <div id="app" class="relative z-10">
+        <!-- 服務器配置對話框 -->
+        <div v-if="showServerConfig" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div class="glass rounded-2xl p-6 border border-gray-700 w-[400px]">
+                <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                    <span class="mr-2">⚙️</span>
+                    配置 API 服務器
+                </h3>
+                <p class="text-gray-400 text-sm mb-4">
+                    檢測到您正在通過 GitHub Pages 訪問，請配置 API 服務器地址：
+                </p>
+                <input type="text" v-model="serverUrl" 
+                       class="w-full bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-3 text-white mb-4 focus:outline-none focus:border-purple-500"
+                       placeholder="https://your-api-server.com">
+                <button @click="saveServerConfig" 
+                        class="w-full gradient-bg hover:opacity-90 text-white font-medium py-3 rounded-lg transition-all">
+                    保存配置
+                </button>
+            </div>
+        </div>
+        
         <div class="w-[420px]">
             <!-- Logo -->
             <div class="text-center mb-8">
@@ -141,7 +161,11 @@
     
     <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
     <script>
-        const { createApp, ref } = Vue;
+        const { createApp, ref, onMounted } = Vue;
+        
+        // API 服務器配置
+        const API_SERVER = localStorage.getItem('api_server') || '';
+        const API_BASE = API_SERVER ? `${API_SERVER}/api` : '/api';
         
         createApp({
             setup() {
@@ -151,13 +175,29 @@
                 const showPassword = ref(false);
                 const isLoading = ref(false);
                 const error = ref('');
+                const showServerConfig = ref(false);
+                const serverUrl = ref(API_SERVER);
+                
+                // 檢查是否需要配置服務器
+                onMounted(() => {
+                    if (!API_SERVER && !window.location.hostname.match(/localhost|127\.0\.0\.1/)) {
+                        showServerConfig.value = true;
+                    }
+                });
+                
+                const saveServerConfig = () => {
+                    if (serverUrl.value) {
+                        localStorage.setItem('api_server', serverUrl.value.replace(/\/+$/, ''));
+                        window.location.reload();
+                    }
+                };
                 
                 const handleLogin = async () => {
                     error.value = '';
                     isLoading.value = true;
                     
                     try {
-                        const response = await fetch('/api/admin/login', {
+                        const response = await fetch(`${API_BASE}/admin/login`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -193,6 +233,9 @@
                     showPassword,
                     isLoading,
                     error,
+                    showServerConfig,
+                    serverUrl,
+                    saveServerConfig,
                     handleLogin
                 };
             }

@@ -98,8 +98,51 @@ type MultiRoleTab = 'dashboard' | 'library' | 'roles' | 'scenarios' | 'scripts' 
       <div class="flex-1 overflow-y-auto p-4">
         @switch (activeTab()) {
           @case ('dashboard') {
-            <!-- 監控儀表板 -->
-            <app-collaboration-dashboard></app-collaboration-dashboard>
+            <!-- 監控儀表板 + AI 策劃入口 -->
+            <div class="space-y-6">
+              <!-- AI 一鍵策劃卡片 -->
+              <div class="bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-cyan-500/20 rounded-2xl border border-purple-500/30 p-6">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-3">
+                      <span class="text-2xl">🤖</span>
+                      AI 智能策劃
+                      <span class="px-2 py-0.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs rounded-full">NEW</span>
+                    </h2>
+                    <p class="text-slate-400 mt-1">告訴 AI 你的目標，自動生成最佳角色組合和執行策略</p>
+                  </div>
+                  <button (click)="openAIPlanner()"
+                          class="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium rounded-xl hover:opacity-90 transition-opacity flex items-center gap-2">
+                    <span>🚀</span>
+                    開始策劃
+                  </button>
+                </div>
+                
+                <!-- 快速目標選擇 -->
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <span class="text-sm text-slate-500">快速選擇：</span>
+                  <button (click)="quickAIPlan('促進首單成交')" 
+                          class="px-3 py-1.5 bg-slate-700/50 text-slate-300 text-sm rounded-lg hover:bg-slate-700 transition-colors">
+                    💰 促進首單
+                  </button>
+                  <button (click)="quickAIPlan('挽回流失客戶')"
+                          class="px-3 py-1.5 bg-slate-700/50 text-slate-300 text-sm rounded-lg hover:bg-slate-700 transition-colors">
+                    💝 挽回流失
+                  </button>
+                  <button (click)="quickAIPlan('提升社群活躍度')"
+                          class="px-3 py-1.5 bg-slate-700/50 text-slate-300 text-sm rounded-lg hover:bg-slate-700 transition-colors">
+                    🎉 社群活躍
+                  </button>
+                  <button (click)="quickAIPlan('處理售後問題')"
+                          class="px-3 py-1.5 bg-slate-700/50 text-slate-300 text-sm rounded-lg hover:bg-slate-700 transition-colors">
+                    🔧 售後服務
+                  </button>
+                </div>
+              </div>
+              
+              <!-- 原有的監控儀表板 -->
+              <app-collaboration-dashboard></app-collaboration-dashboard>
+            </div>
           }
           
           @case ('library') {
@@ -243,8 +286,13 @@ type MultiRoleTab = 'dashboard' | 'library' | 'roles' | 'scenarios' | 'scripts' 
                           <span class="px-2 py-1 bg-slate-600 text-slate-300 text-xs rounded">
                             {{ script.stages.length }} 個階段
                           </span>
-                          <button class="text-purple-400 hover:text-purple-300 text-sm">
+                          <button (click)="editScript(script)"
+                                  class="text-purple-400 hover:text-purple-300 text-sm">
                             編輯
+                          </button>
+                          <button (click)="deleteScript(script)"
+                                  class="text-red-400 hover:text-red-300 text-sm">
+                            刪除
                           </button>
                         </div>
                       </div>
@@ -325,11 +373,24 @@ type MultiRoleTab = 'dashboard' | 'library' | 'roles' | 'scenarios' | 'scripts' 
                   </button>
                 </div>
                 
-                <div class="text-center py-12 text-slate-400">
-                  <div class="text-5xl mb-4">🏠</div>
-                  <p class="text-lg mb-2">暫無協作群組</p>
-                  <p class="text-sm">當觸發多角色協作時，系統會自動建立協作群組</p>
-                </div>
+                @if (multiRoleService.roles().length === 0) {
+                  <div class="text-center py-12 text-slate-400">
+                    <div class="text-5xl mb-4">🏠</div>
+                    <p class="text-lg mb-2">暫無協作群組</p>
+                    <p class="text-sm mb-4">當觸發多角色協作時，系統會自動建立協作群組</p>
+                    <p class="text-xs text-slate-500">💡 提示：先在「我的角色」中添加角色並綁定帳號</p>
+                  </div>
+                } @else {
+                  <div class="text-center py-12 text-slate-400">
+                    <div class="text-5xl mb-4">🏠</div>
+                    <p class="text-lg mb-2">暫無協作群組</p>
+                    <p class="text-sm mb-4">您已有 {{ multiRoleService.roles().length }} 個角色就緒</p>
+                    <button (click)="showCreateGroupDialog.set(true)"
+                            class="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-400 transition-colors">
+                      + 創建協作群組
+                    </button>
+                  </div>
+                }
               </div>
             </div>
           }
@@ -556,6 +617,225 @@ type MultiRoleTab = 'dashboard' | 'library' | 'roles' | 'scenarios' | 'scripts' 
           (cancelled)="onScriptEditorCancelled()">
         </app-script-editor>
       }
+      
+      <!-- AI 策劃對話框 -->
+      @if (showAIPlannerDialog()) {
+        <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div class="bg-slate-900 rounded-2xl w-full max-w-2xl shadow-2xl border border-purple-500/30 overflow-hidden">
+            <!-- 頭部 -->
+            <div class="p-6 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-b border-slate-700/50">
+              <div class="flex items-center justify-between">
+                <h2 class="text-xl font-bold text-white flex items-center gap-3">
+                  <span class="text-2xl">🤖</span>
+                  AI 智能策劃
+                </h2>
+                <button (click)="closeAIPlanner()"
+                        class="text-slate-400 hover:text-white p-2 hover:bg-slate-800 rounded-lg">
+                  ✕
+                </button>
+              </div>
+            </div>
+            
+            <!-- 內容 -->
+            <div class="p-6 space-y-6">
+              @if (aiPlannerStatus() === 'idle') {
+                <!-- 輸入目標 -->
+                <div>
+                  <label class="text-sm text-slate-400 block mb-2">🎯 告訴 AI 你想達成什麼目標</label>
+                  <textarea rows="3"
+                            [(ngModel)]="aiPlannerGoal"
+                            placeholder="例如：把對產品有興趣但還在猶豫的客戶轉化成付費用戶..."
+                            class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                  </textarea>
+                </div>
+                
+                <!-- 預設目標快捷選擇 -->
+                <div>
+                  <label class="text-sm text-slate-400 block mb-2">或選擇常見目標</label>
+                  <div class="grid grid-cols-2 gap-3">
+                    <button (click)="aiPlannerGoal = '把猶豫不決的潛在客戶轉化為付費用戶'"
+                            class="p-3 bg-slate-800 rounded-xl text-left hover:bg-slate-700 transition-colors border border-slate-700">
+                      <div class="text-lg mb-1">💰</div>
+                      <div class="text-sm text-white font-medium">促進首單成交</div>
+                      <div class="text-xs text-slate-400">多角色配合促進猶豫客戶下單</div>
+                    </button>
+                    <button (click)="aiPlannerGoal = '挽回已流失的老客戶，讓他們重新購買'"
+                            class="p-3 bg-slate-800 rounded-xl text-left hover:bg-slate-700 transition-colors border border-slate-700">
+                      <div class="text-lg mb-1">💝</div>
+                      <div class="text-sm text-white font-medium">挽回流失客戶</div>
+                      <div class="text-xs text-slate-400">關懷回訪 + 特別優惠</div>
+                    </button>
+                    <button (click)="aiPlannerGoal = '讓社群更活躍，增加用戶互動和粘性'"
+                            class="p-3 bg-slate-800 rounded-xl text-left hover:bg-slate-700 transition-colors border border-slate-700">
+                      <div class="text-lg mb-1">🎉</div>
+                      <div class="text-sm text-white font-medium">提升社群活躍</div>
+                      <div class="text-xs text-slate-400">話題引導 + 互動激勵</div>
+                    </button>
+                    <button (click)="aiPlannerGoal = '高效處理客戶售後問題，提升滿意度'"
+                            class="p-3 bg-slate-800 rounded-xl text-left hover:bg-slate-700 transition-colors border border-slate-700">
+                      <div class="text-lg mb-1">🔧</div>
+                      <div class="text-sm text-white font-medium">售後問題處理</div>
+                      <div class="text-xs text-slate-400">快速響應 + 滿意度跟進</div>
+                    </button>
+                  </div>
+                </div>
+              }
+              
+              @if (aiPlannerStatus() === 'planning') {
+                <!-- 策劃中動畫 -->
+                <div class="text-center py-8">
+                  <div class="inline-block animate-spin text-4xl mb-4">🤖</div>
+                  <p class="text-white font-medium">AI 正在為您策劃最佳方案...</p>
+                  <p class="text-slate-400 text-sm mt-2">分析目標 → 選擇角色 → 設計流程</p>
+                </div>
+              }
+              
+              @if (aiPlannerStatus() === 'ready' && aiPlanResult()) {
+                <!-- 策劃結果 -->
+                <div class="space-y-4">
+                  <div class="p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
+                    <div class="flex items-center gap-2 text-green-400 mb-2">
+                      <span>✓</span>
+                      <span class="font-medium">策劃完成！</span>
+                    </div>
+                    <p class="text-slate-300">{{ aiPlanResult()?.strategy }}</p>
+                  </div>
+                  
+                  <!-- 推薦角色 -->
+                  <div>
+                    <h4 class="text-sm text-slate-400 mb-3">📋 推薦角色組合</h4>
+                    <div class="grid grid-cols-3 gap-3">
+                      @for (role of aiPlanResult()?.recommendedRoles; track role.type) {
+                        <div class="p-3 bg-slate-800 rounded-lg text-center">
+                          <div class="text-2xl mb-1">{{ role.icon }}</div>
+                          <div class="text-sm text-white font-medium">{{ role.name }}</div>
+                          <div class="text-xs text-slate-400">{{ role.purpose }}</div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                  
+                  <!-- 建議流程 -->
+                  <div>
+                    <h4 class="text-sm text-slate-400 mb-3">🎬 執行流程</h4>
+                    <div class="space-y-2">
+                      @for (step of aiPlanResult()?.suggestedFlow; track step.step) {
+                        <div class="flex items-center gap-3 p-2 bg-slate-800 rounded-lg">
+                          <div class="w-6 h-6 rounded-full bg-purple-500/30 text-purple-400 text-sm flex items-center justify-center">
+                            {{ step.step }}
+                          </div>
+                          <div class="flex-1 text-sm text-slate-300">{{ step.action }}</div>
+                          <div class="text-xs text-slate-500">{{ step.role }}</div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                  
+                  <!-- 預估成功率 -->
+                  <div class="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                    <span class="text-slate-400">預估成功率</span>
+                    <span class="text-lg font-bold text-green-400">{{ aiPlanResult()?.estimatedSuccessRate }}%</span>
+                  </div>
+                </div>
+              }
+            </div>
+            
+            <!-- 底部按鈕 -->
+            <div class="p-6 border-t border-slate-700/50 flex gap-3">
+              @if (aiPlannerStatus() === 'idle') {
+                <button (click)="closeAIPlanner()"
+                        class="flex-1 py-3 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600 transition-colors">
+                  取消
+                </button>
+                <button (click)="startAIPlanning()"
+                        [disabled]="!aiPlannerGoal.trim()"
+                        class="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
+                  🤖 開始策劃
+                </button>
+              }
+              @if (aiPlannerStatus() === 'ready') {
+                <button (click)="resetAIPlanner()"
+                        class="flex-1 py-3 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600 transition-colors">
+                  重新策劃
+                </button>
+                <button (click)="applyAIPlan()"
+                        class="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium rounded-xl hover:opacity-90 transition-opacity">
+                  ✓ 應用方案
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+      }
+      
+      <!-- 新建劇本對話框 -->
+      @if (showNewScriptDialog()) {
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div class="bg-slate-800 rounded-2xl w-full max-w-md p-6 shadow-xl border border-slate-700">
+            <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <span>📜</span> 新建劇本
+            </h3>
+            
+            <div class="space-y-4">
+              <div>
+                <label class="text-sm text-slate-400 block mb-2">劇本名稱 *</label>
+                <input type="text"
+                       [(ngModel)]="newScriptName"
+                       placeholder="如：新客戶轉化劇本"
+                       class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500">
+              </div>
+              
+              <div>
+                <label class="text-sm text-slate-400 block mb-2">劇本描述</label>
+                <textarea rows="3"
+                          [(ngModel)]="newScriptDescription"
+                          placeholder="描述這個劇本的使用場景和目標..."
+                          class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 resize-none">
+                </textarea>
+              </div>
+              
+              <!-- 快速選擇模板 -->
+              <div>
+                <label class="text-sm text-slate-400 block mb-2">或從模板創建</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <button (click)="createFromTemplate('high_intent')"
+                          class="p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 transition-colors">
+                    <div class="text-lg mb-1">🎯</div>
+                    <div class="text-sm text-white">高意向轉化</div>
+                  </button>
+                  <button (click)="createFromTemplate('product_demo')"
+                          class="p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 transition-colors">
+                    <div class="text-lg mb-1">📦</div>
+                    <div class="text-sm text-white">產品演示</div>
+                  </button>
+                  <button (click)="createFromTemplate('customer_support')"
+                          class="p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 transition-colors">
+                    <div class="text-lg mb-1">🔧</div>
+                    <div class="text-sm text-white">售後服務</div>
+                  </button>
+                  <button (click)="createFromTemplate('community')"
+                          class="p-3 bg-slate-700/50 rounded-lg text-left hover:bg-slate-700 transition-colors">
+                    <div class="text-lg mb-1">🎉</div>
+                    <div class="text-sm text-white">社群活躍</div>
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div class="flex gap-3 mt-6">
+              <button (click)="cancelAddScript()"
+                      class="flex-1 py-2.5 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors">
+                取消
+              </button>
+              <button (click)="confirmAddScript()"
+                      [disabled]="!newScriptName.trim()"
+                      class="flex-1 py-2.5 bg-purple-500 text-white rounded-lg hover:bg-purple-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                創建劇本
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `
 })
@@ -566,6 +846,7 @@ export class MultiRoleCenterComponent {
   
   activeTab = signal<MultiRoleTab>('dashboard');
   showAddRole = signal(false);
+  showCreateGroupDialog = signal(false);
   
   // 編輯器狀態
   showRoleEditor = signal(false);
@@ -601,6 +882,17 @@ export class MultiRoleCenterComponent {
   newRoleName = '';
   newRoleDescription = '';
   newRolePrompt = '';
+  
+  // AI 策劃
+  showAIPlannerDialog = signal(false);
+  aiPlannerGoal = '';
+  aiPlannerStatus = signal<'idle' | 'planning' | 'ready'>('idle');
+  aiPlanResult = signal<{
+    strategy: string;
+    recommendedRoles: { type: string; name: string; icon: string; purpose: string }[];
+    suggestedFlow: { step: number; action: string; role: string }[];
+    estimatedSuccessRate: number;
+  } | null>(null);
   
   // 設置
   autoGroupNameTemplate = 'VIP專屬服務群 - {客戶名}';
@@ -726,6 +1018,12 @@ export class MultiRoleCenterComponent {
     this.editingScript.set(null);
   }
   
+  deleteScript(script: ScriptTemplate) {
+    if (confirm(`確定要刪除劇本「${script.name}」嗎？`)) {
+      this.multiRoleService.deleteScript(script.id);
+    }
+  }
+  
   // 預設角色和場景處理
   onPresetRoleAdded(role: RoleDefinition) {
     this.multiRoleService.addRole({
@@ -800,15 +1098,257 @@ export class MultiRoleCenterComponent {
     this.autoGroupService.markAsConverted(group.id);
   }
   
+  // 新建劇本對話框
+  showNewScriptDialog = signal(false);
+  newScriptName = '';
+  newScriptDescription = '';
+  
   addScript() {
-    const name = prompt('請輸入劇本名稱：');
-    if (name) {
-      this.multiRoleService.addScript({ name });
+    // 打開新建劇本對話框（替代 prompt）
+    this.newScriptName = '';
+    this.newScriptDescription = '';
+    this.showNewScriptDialog.set(true);
+  }
+  
+  confirmAddScript() {
+    if (this.newScriptName.trim()) {
+      const scriptId = this.multiRoleService.addScript({ 
+        name: this.newScriptName.trim(),
+        description: this.newScriptDescription.trim()
+      });
+      this.showNewScriptDialog.set(false);
+      // 可選：自動打開劇本編輯器
+      if (scriptId) {
+        const script = this.multiRoleService.scripts().find(s => s.id === scriptId);
+        if (script) {
+          this.editScript(script);
+        }
+      }
     }
   }
   
+  cancelAddScript() {
+    this.showNewScriptDialog.set(false);
+  }
+  
   useTemplate(type: string) {
-    // TODO: 加載預設模板
+    this.createFromTemplate(type);
+  }
+  
+  createFromTemplate(templateType: string) {
+    // 預設劇本模板
+    const templates: Record<string, { name: string; description: string; stages: any[] }> = {
+      'high_intent': {
+        name: '高意向客戶轉化',
+        description: '專家介紹 + 老客戶背書 + 客服促單的經典轉化流程',
+        stages: [
+          { id: 'stage_1', name: '專業介紹', order: 1, trigger: { type: 'manual' as const }, messages: [] },
+          { id: 'stage_2', name: '老客戶背書', order: 2, trigger: { type: 'time' as const, delaySeconds: 120 }, messages: [] },
+          { id: 'stage_3', name: '促單跟進', order: 3, trigger: { type: 'message' as const }, messages: [] }
+        ]
+      },
+      'product_demo': {
+        name: '產品演示推薦',
+        description: '功能展示 + 使用場景 + 效果分享的產品推介流程',
+        stages: [
+          { id: 'stage_1', name: '功能展示', order: 1, trigger: { type: 'manual' as const }, messages: [] },
+          { id: 'stage_2', name: '場景應用', order: 2, trigger: { type: 'time' as const, delaySeconds: 180 }, messages: [] },
+          { id: 'stage_3', name: '效果見證', order: 3, trigger: { type: 'time' as const, delaySeconds: 120 }, messages: [] }
+        ]
+      },
+      'customer_support': {
+        name: '售後問題處理',
+        description: '問題記錄 + 技術排查 + 滿意度確認的售後服務流程',
+        stages: [
+          { id: 'stage_1', name: '問題記錄', order: 1, trigger: { type: 'message' as const }, messages: [] },
+          { id: 'stage_2', name: '技術排查', order: 2, trigger: { type: 'time' as const, delaySeconds: 60 }, messages: [] },
+          { id: 'stage_3', name: '滿意確認', order: 3, trigger: { type: 'time' as const, delaySeconds: 300 }, messages: [] }
+        ]
+      },
+      'community': {
+        name: '社群活躍引導',
+        description: '話題發起 + 互動響應 + 價值總結的社群運營流程',
+        stages: [
+          { id: 'stage_1', name: '話題發起', order: 1, trigger: { type: 'time' as const }, messages: [] },
+          { id: 'stage_2', name: '互動響應', order: 2, trigger: { type: 'time' as const, delaySeconds: 60 }, messages: [] },
+          { id: 'stage_3', name: '價值總結', order: 3, trigger: { type: 'time' as const, delaySeconds: 300 }, messages: [] }
+        ]
+      }
+    };
+    
+    const template = templates[templateType];
+    if (template) {
+      const scriptId = this.multiRoleService.addScript({
+        name: template.name,
+        description: template.description,
+        stages: template.stages
+      });
+      this.showNewScriptDialog.set(false);
+      
+      // 自動打開編輯器
+      if (scriptId) {
+        const script = this.multiRoleService.scripts().find(s => s.id === scriptId);
+        if (script) {
+          this.editScript(script);
+        }
+      }
+    }
+  }
+  
+  // ========== AI 策劃功能 ==========
+  
+  openAIPlanner() {
+    this.aiPlannerGoal = '';
+    this.aiPlannerStatus.set('idle');
+    this.aiPlanResult.set(null);
+    this.showAIPlannerDialog.set(true);
+  }
+  
+  closeAIPlanner() {
+    this.showAIPlannerDialog.set(false);
+  }
+  
+  quickAIPlan(goal: string) {
+    this.aiPlannerGoal = goal;
+    this.openAIPlanner();
+    // 自動開始策劃
+    setTimeout(() => this.startAIPlanning(), 100);
+  }
+  
+  async startAIPlanning() {
+    if (!this.aiPlannerGoal.trim()) return;
+    
+    this.aiPlannerStatus.set('planning');
+    
+    // 模擬 AI 策劃過程（實際應調用後端 AI）
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // 根據目標生成策劃結果
+    const goal = this.aiPlannerGoal.toLowerCase();
+    let result;
+    
+    if (goal.includes('成交') || goal.includes('付費') || goal.includes('購買') || goal.includes('首單')) {
+      result = {
+        strategy: '採用「信任建立 + 價值展示 + 限時促單」三段式策略，通過老客戶背書建立信任，專家展示價值，最後由促銷專員提供限時優惠促成成交。',
+        recommendedRoles: [
+          { type: 'loyal_customer', name: '老用戶', icon: '❤️', purpose: '分享真實體驗' },
+          { type: 'expert', name: '產品專家', icon: '🎓', purpose: '專業價值展示' },
+          { type: 'sales', name: '促銷專員', icon: '💰', purpose: '限時優惠促單' }
+        ],
+        suggestedFlow: [
+          { step: 1, action: '老用戶自然分享使用體驗，建立信任', role: '老用戶' },
+          { step: 2, action: '產品專家詳細介紹功能和價值', role: '產品專家' },
+          { step: 3, action: '根據客戶反饋解答疑慮', role: '產品專家' },
+          { step: 4, action: '提供限時優惠，營造緊迫感', role: '促銷專員' }
+        ],
+        estimatedSuccessRate: 65
+      };
+    } else if (goal.includes('流失') || goal.includes('挽回')) {
+      result = {
+        strategy: '採用「關懷回訪 + 問題解決 + 特別優惠」策略，先表達關心了解離開原因，針對性解決問題，最後提供誠意優惠促進回歸。',
+        recommendedRoles: [
+          { type: 'callback', name: '回訪專員', icon: '📞', purpose: '真誠關懷回訪' },
+          { type: 'support', name: '客服經理', icon: '🎧', purpose: '解決問題' },
+          { type: 'director', name: '區域總監', icon: '👑', purpose: '特別挽留' }
+        ],
+        suggestedFlow: [
+          { step: 1, action: '真誠關懷，了解離開原因', role: '回訪專員' },
+          { step: 2, action: '針對問題提供解決方案', role: '客服經理' },
+          { step: 3, action: '高層出面表達誠意', role: '區域總監' },
+          { step: 4, action: '提供專屬回歸優惠', role: '區域總監' }
+        ],
+        estimatedSuccessRate: 45
+      };
+    } else if (goal.includes('社群') || goal.includes('活躍')) {
+      result = {
+        strategy: '採用「話題引導 + 互動響應 + 價值輸出」策略，通過多個活躍成員配合帶動討論氛圍，最後由意見領袖總結價值。',
+        recommendedRoles: [
+          { type: 'community', name: '社群管家', icon: '🏠', purpose: '發起話題' },
+          { type: 'member1', name: '熱心群友A', icon: '😄', purpose: '積極互動' },
+          { type: 'member2', name: '熱心群友B', icon: '🤗', purpose: '補充討論' },
+          { type: 'leader', name: '意見領袖', icon: '🎤', purpose: '價值總結' }
+        ],
+        suggestedFlow: [
+          { step: 1, action: '社群管家發起有價值的話題', role: '社群管家' },
+          { step: 2, action: '熱心群友積極響應討論', role: '熱心群友A' },
+          { step: 3, action: '更多成員參與互動', role: '熱心群友B' },
+          { step: 4, action: '意見領袖總結討論價值', role: '意見領袖' }
+        ],
+        estimatedSuccessRate: 80
+      };
+    } else {
+      result = {
+        strategy: '採用「需求了解 + 方案展示 + 跟進服務」通用策略，先了解客戶需求，提供定制化方案，持續跟進直到目標達成。',
+        recommendedRoles: [
+          { type: 'account', name: '客戶經理', icon: '💼', purpose: '了解需求' },
+          { type: 'expert', name: '方案專家', icon: '📊', purpose: '設計方案' },
+          { type: 'support', name: '服務專員', icon: '🎧', purpose: '持續跟進' }
+        ],
+        suggestedFlow: [
+          { step: 1, action: '客戶經理深入了解需求', role: '客戶經理' },
+          { step: 2, action: '方案專家設計定制方案', role: '方案專家' },
+          { step: 3, action: '解答疑問，調整方案', role: '方案專家' },
+          { step: 4, action: '服務專員持續跟進', role: '服務專員' }
+        ],
+        estimatedSuccessRate: 55
+      };
+    }
+    
+    this.aiPlanResult.set(result);
+    this.aiPlannerStatus.set('ready');
+  }
+  
+  resetAIPlanner() {
+    this.aiPlannerStatus.set('idle');
+    this.aiPlanResult.set(null);
+  }
+  
+  applyAIPlan() {
+    const result = this.aiPlanResult();
+    if (!result) return;
+    
+    // 1. 添加推薦的角色
+    for (const roleConfig of result.recommendedRoles) {
+      const existingRole = this.multiRoleService.roles().find(r => r.name === roleConfig.name);
+      if (!existingRole) {
+        this.multiRoleService.addRole({
+          name: roleConfig.name,
+          type: 'custom',
+          personality: {
+            description: roleConfig.purpose,
+            speakingStyle: 'friendly',
+            traits: []
+          },
+          aiConfig: {
+            useGlobalAI: true,
+            customPrompt: `你是${roleConfig.name}，負責${roleConfig.purpose}。請用專業但友好的方式與客戶交流。`,
+            responseLength: 'medium',
+            emojiFrequency: 'low',
+            typingSpeed: 'medium'
+          },
+          responsibilities: [roleConfig.purpose]
+        });
+      }
+    }
+    
+    // 2. 創建對應的劇本
+    const stages = result.suggestedFlow.map((step, index) => ({
+      id: `stage_${index + 1}`,
+      name: step.action.substring(0, 20) + '...',
+      order: step.step,
+      trigger: { type: index === 0 ? 'manual' as const : 'time' as const, delaySeconds: 120 },
+      messages: []
+    }));
+    
+    this.multiRoleService.addScript({
+      name: `AI 策劃 - ${this.aiPlannerGoal.substring(0, 15)}...`,
+      description: result.strategy,
+      stages
+    });
+    
+    // 3. 關閉對話框並切換到角色標籤
+    this.closeAIPlanner();
+    this.activeTab.set('roles');
   }
   
   saveSettings() {

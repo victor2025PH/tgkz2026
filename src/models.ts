@@ -62,6 +62,8 @@ export interface MonitoredGroup {
     url: string;
     name: string;
     keywordSetIds: number[];
+    telegram_id?: string;  // Telegram 群組 ID
+    member_count?: number; // 成員數量
 }
 
 export type LeadStatus = 'New' | 'Contacted' | 'Replied' | 'Follow-up' | 'Closed-Won' | 'Closed-Lost';
@@ -152,7 +154,9 @@ export interface Alert {
 export interface Attachment {
     name: string;
     type: 'image' | 'file';
-    dataUrl: string; // base64 encoded
+    dataUrl?: string; // base64 encoded (舊方式，用於小文件)
+    filePath?: string; // 本地文件路徑（新方式，用於大文件）
+    fileSize?: number; // 文件大小（字節）
 }
 
 export interface GenerationState {
@@ -161,7 +165,8 @@ export interface GenerationState {
     generatedMessage: string;
     error: string | null;
     customPrompt: string;
-    attachment: Attachment | null;
+    attachment: Attachment | null; // 保持向後兼容
+    attachments: Attachment[]; // 多文件支持
 }
 
 export interface MessageTemplate {

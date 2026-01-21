@@ -244,9 +244,12 @@ export class ResourceLibraryService {
   
   private setupIpcListeners() {
     // 監聽資源列表更新
-    this.ipcService.on('resources-loaded', (data: Resource[]) => {
-      this._resources.set(data);
-      this.updateStats();
+    this.ipcService.on('resources-list', (data: any) => {
+      console.log('[ResourceLibrary] Received resources-list:', data);
+      if (data.success) {
+        this._resources.set(data.resources || []);
+        this.updateStats();
+      }
       this._isLoading.set(false);
     });
     
@@ -292,7 +295,7 @@ export class ResourceLibraryService {
     if (filter) {
       this._filter.set(filter);
     }
-    this.ipcService.send('load-resources', { filter: this._filter() });
+    this.ipcService.send('get-resources', { filter: this._filter() });
   }
   
   /**

@@ -266,7 +266,7 @@ class QueuedMessage:
     phone: str
     user_id: str
     text: str
-    attachment: Optional[str] = None
+    attachment: Optional[Any] = None  # 可以是字符串路徑或 {name, type, dataUrl} 對象
     source_group: Optional[str] = None  # 源群組（用於獲取用戶信息）
     target_username: Optional[str] = None  # 目標用戶名（作為備選）
     priority: MessagePriority = MessagePriority.NORMAL
@@ -462,7 +462,7 @@ class MessageQueue:
         self,
         user_id: str,
         text: str,
-        attachment: Optional[str] = None,
+        attachment: Optional[Any] = None,  # 可以是字符串路徑或 {name, type, dataUrl} 對象
         source_group: Optional[str] = None,
         target_username: Optional[str] = None,
         priority: MessagePriority = MessagePriority.NORMAL,
@@ -508,7 +508,7 @@ class MessageQueue:
         phone: str,
         user_id: str,
         text: str,
-        attachment: Optional[str] = None,
+        attachment: Optional[Any] = None,  # 可以是字符串路徑或 {name, type, dataUrl} 對象
         source_group: Optional[str] = None,
         target_username: Optional[str] = None,
         priority: MessagePriority = MessagePriority.NORMAL,
@@ -522,6 +522,7 @@ class MessageQueue:
         Args:
             source_group: Source group ID/URL (used to resolve user)
             target_username: Target username (fallback if user_id fails)
+            attachment: File path or {name, type, dataUrl} object
         
         Returns:
             Message ID
@@ -647,12 +648,14 @@ class MessageQueue:
                         )
                         if not should_send:
                             # 不应该现在发送，等待一段时间
+                            print(f"[MessageQueue] Optimizer: should_send=False, waiting 60s for message {message.id}", file=sys.stderr)
                             await asyncio.sleep(60)  # 等待 1 分钟
                             continue
                     except Exception as e:
                         print(f"Error checking send time: {e}", file=sys.stderr)
                 
                 # Process message outside lock
+                print(f"[MessageQueue] Processing message {message.id}, attachment={type(message.attachment).__name__ if message.attachment else 'None'}", file=sys.stderr)
                 await self._process_message(message)
                 
             except Exception as e:
@@ -691,16 +694,18 @@ class MessageQueue:
             try:
                 await self.database.increment_queue_message_attempts(message.id)
             except Exception as e:
-                import sys
                 print(f"Error updating message attempts in database: {e}", file=sys.stderr)
         
         try:
             # Check rate limit
+            print(f"[MessageQueue] Checking rate limit for {message.phone}...", file=sys.stderr)
             rate_limiter = self.rate_limiters[message.phone]
             can_send, wait_seconds = await rate_limiter.can_send()
+            print(f"[MessageQueue] Rate limit check: can_send={can_send}, wait_seconds={wait_seconds}", file=sys.stderr)
             
             if not can_send:
                 # Wait and retry
+                print(f"[MessageQueue] Rate limited, waiting {wait_seconds}s...", file=sys.stderr)
                 await self._update_message_status(message, MessageStatus.RETRYING)
                 await asyncio.sleep(wait_seconds or 1)
                 await self._update_message_status(message, MessageStatus.PENDING)
@@ -712,11 +717,15 @@ class MessageQueue:
                 try:
                     send_interval = self.optimizer.calculate_send_interval(message.phone)
                     if send_interval > 0:
+                        print(f"[MessageQueue] Optimizer send interval: {send_interval}s", file=sys.stderr)
                         await asyncio.sleep(send_interval)
                 except Exception as e:
                     print(f"Error calculating send interval: {e}", file=sys.stderr)
+            else:
+                print(f"[MessageQueue] No optimizer, proceeding directly", file=sys.stderr)
             
             # Send message
+            print(f"[MessageQueue] Calling send_callback for message {message.id}...", file=sys.stderr)
             result = await self.send_callback(
                 message.phone,
                 message.user_id,
@@ -725,6 +734,7 @@ class MessageQueue:
                 message.source_group,
                 message.target_username
             )
+            print(f"[MessageQueue] send_callback returned: {result}", file=sys.stderr)
             
             # Record send
             await rate_limiter.record_send()
@@ -763,7 +773,6 @@ class MessageQueue:
                     try:
                         await message.callback(message, result)
                     except Exception as e:
-                        import sys
                         print(f"Error in message callback: {e}", file=sys.stderr)
                 
                 # Remove from queue (but keep in database for history)

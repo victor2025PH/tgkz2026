@@ -256,19 +256,19 @@ export class DiagnosticService {
       });
     }
     
-    // 步驟5: 活動配置檢查
+    // 步驟5: 觸發規則檢查
     const activeCampaigns = campaigns.filter((c: any) => c.isActive);
     
     const campaignStep: ConfigStep = {
       id: 'campaign',
-      title: '自動活動',
-      description: '配置自動化活動',
+      title: '觸發規則',
+      description: '配置觸發規則',
       icon: '⚡',
       status: activeCampaigns.length >= 1 ? 'completed' : 'pending',
       isRequired: false,
       count: activeCampaigns.length,
       targetCount: 1,
-      tips: ['活動定義觸發後的動作', '可設置延遲和條件']
+      tips: ['規則定義觸發後的動作', '可設置延遲和條件']
     };
     steps.push(campaignStep);
     
@@ -276,11 +276,11 @@ export class DiagnosticService {
       issues.push({
         code: 'NO_ACTIVE_CAMPAIGN',
         severity: 'info',
-        title: '無活躍活動',
-        description: `有 ${campaigns.length} 個活動，但都未啟用`,
-        fix: '啟用至少一個活動以實現自動響應',
-        actionLabel: '管理活動',
-        actionView: 'automation'
+        title: '無活躍規則',
+        description: `有 ${campaigns.length} 條規則，但都未啟用`,
+        fix: '啟用至少一條規則以實現自動響應',
+        actionLabel: '管理規則',
+        actionView: 'trigger-rules'
       });
     }
     

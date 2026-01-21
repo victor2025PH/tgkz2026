@@ -1,0 +1,86 @@
+{
+  "timestamp": "2026-01-18T23:09:50.095493",
+  "phase": "第六階段：數據分析與批量操作測試",
+  "checks": [
+    {
+      "name": "批量操作",
+      "status": "pass",
+      "details": "共 0 條記錄"
+    },
+    {
+      "name": "每日統計",
+      "status": "warning",
+      "details": "共 0 天記錄"
+    },
+    {
+      "name": "廣告發送日誌",
+      "status": "pass",
+      "details": "共 0 條"
+    },
+    {
+      "name": "用戶追蹤",
+      "status": "pass",
+      "details": "共 0 人"
+    },
+    {
+      "name": "追蹤日誌",
+      "status": "pass",
+      "details": "共 0 條"
+    },
+    {
+      "name": "活動記錄",
+      "status": "warning",
+      "details": "共 0 個"
+    },
+    {
+      "name": "活動日誌",
+      "status": "pass",
+      "details": "共 0 條"
+    },
+    {
+      "name": "帳號角色",
+      "status": "warning",
+      "details": "共 0 個配置"
+    },
+    {
+      "name": "系統設置",
+      "status": "pass",
+      "details": "共 14 項設置"
+    },
+    {
+      "name": "數據庫版本",
+      "status": "pass",
+      "details": "當前版本: v3"
+    },
+    {
+      "name": "tgai_server.db 完整性",
+      "status": "pass",
+      "details": "數據庫完整"
+    },
+    {
+      "name": "tgmatrix.db 完整性",
+      "status": "pass",
+      "details": "數據庫完整"
+    },
+    {
+      "name": "數據庫大小",
+      "status": "pass",
+      "details": "總計 0.91 MB"
+    }
+  ],
+  "warnings": [],
+  "errors": [],
+  "summary": {
+    "batch_operations_count": 0,
+    "stats_daily_count": 0,
+    "ad_send_logs_count": 0,
+    "tracked_users_count": 0,
+    "tracking_logs_count": 0,
+    "campaigns_count": 0,
+    "campaign_logs_count": 0,
+    "account_roles_count": 0,
+    "settings_count": 14,
+    "db_version": 3,
+    "total_db_size_kb": 936.0
+  }
+}

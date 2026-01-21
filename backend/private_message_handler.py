@@ -62,12 +62,23 @@ class PrivateMessageHandler:
         async def handle_private_message(client_instance: Client, message: Message):
             """處理私信消息"""
             try:
+                # 🔑 安全獲取消息文本（處理 Unicode 編碼問題）
+                try:
+                    raw_text = message.text or message.caption or ''
+                except (UnicodeDecodeError, UnicodeEncodeError) as e:
+                    print(f"[PrivateMessageHandler] Unicode 編碼錯誤: {e}", file=sys.stderr)
+                    raw_text = ''
+                
                 # 記錄所有接收到的消息（用於調試）
                 print(f"[PrivateMessageHandler] === 收到消息 ===", file=sys.stderr)
                 print(f"[PrivateMessageHandler] Chat Type: {message.chat.type.name}", file=sys.stderr)
                 print(f"[PrivateMessageHandler] Outgoing: {message.outgoing}", file=sys.stderr)
-                print(f"[PrivateMessageHandler] From User: {message.from_user.username if message.from_user else 'None'}", file=sys.stderr)
-                print(f"[PrivateMessageHandler] Text: {(message.text or message.caption or '')[:50]}", file=sys.stderr)
+                try:
+                    from_user_name = message.from_user.username if message.from_user else 'None'
+                except:
+                    from_user_name = 'Error'
+                print(f"[PrivateMessageHandler] From User: {from_user_name}", file=sys.stderr)
+                print(f"[PrivateMessageHandler] Text: {sanitize_text(raw_text)[:50]}", file=sys.stderr)
                 
                 # 只處理私信（非群組消息）
                 if message.chat.type.name != "PRIVATE":
@@ -88,7 +99,8 @@ class PrivateMessageHandler:
                 username = safe_get_username(user)
                 first_name = sanitize_text(user.first_name) if user.first_name else ""
                 last_name = sanitize_text(user.last_name) if user.last_name else ""
-                message_text = sanitize_text(message.text or message.caption or "")
+                # 🔑 使用已安全獲取的 raw_text
+                message_text = sanitize_text(raw_text)
                 
                 if not message_text:
                     return

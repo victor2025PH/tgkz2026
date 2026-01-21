@@ -1,0 +1,354 @@
+{
+  "test_time": "2026-01-18T21:28:34.119046",
+  "system_info": {
+    "platform": "Windows",
+    "platform_version": "10.0.26200",
+    "python_version": "3.13.9",
+    "working_directory": "C:\\tgkz2026\\backend\\tests",
+    "database_path": "C:\\tgkz2026\\backend\\data\\tg_bot.db",
+    "database_exists": false
+  },
+  "database_test": {
+    "status": "ERROR",
+    "tables_checked": 0,
+    "issues_count": 0,
+    "issues": [],
+    "tables": {}
+  },
+  "ipc_test": {
+    "status": "WARNING",
+    "total_tests": 17,
+    "passed": 6,
+    "failed": 0,
+    "errors": 11,
+    "pass_rate": 35.3,
+    "modules": {
+      "賬戶管理": {
+        "passed": 1,
+        "failed": 1
+      },
+      "潛在客戶": {
+        "passed": 3,
+        "failed": 0
+      },
+      "自動化中心": {
+        "passed": 0,
+        "failed": 4
+      },
+      "營銷活動": {
+        "passed": 0,
+        "failed": 2
+      },
+      "廣告發送": {
+        "passed": 0,
+        "failed": 2
+      },
+      "用戶追蹤": {
+        "passed": 0,
+        "failed": 1
+      },
+      "資源發現": {
+        "passed": 0,
+        "failed": 1
+      },
+      "設置": {
+        "passed": 1,
+        "failed": 0
+      },
+      "運行日誌": {
+        "passed": 1,
+        "failed": 0
+      }
+    }
+  },
+  "frontend_check": {
+    "files": {
+      "src/app.component.ts": true,
+      "src/app.component.html": true,
+      "src/models.ts": true,
+      "src/i18n.service.ts": true,
+      "src/multi-role/multi-role-center.component.ts": true,
+      "src/multi-role/preset-roles.ts": true,
+      "src/multi-role/preset-scenarios.ts": true,
+      "src/automation/automation-center.component.ts": true,
+      "electron.js": true,
+      "package.json": true,
+      "dist/index.html": true
+    },
+    "missing_count": 0,
+    "build_exists": true
+  },
+  "summary": {
+    "overall_status": "ERROR",
+    "database_status": "ERROR",
+    "ipc_status": "WARNING",
+    "frontend_missing": 0,
+    "total_time_seconds": 28.970693
+  },
+  "menu_modules": {
+    "會員中心": {
+      "frontend": "membership",
+      "backend_methods": [
+        "check_license"
+      ],
+      "database_tables": [
+        "settings"
+      ]
+    },
+    "儀表盤": {
+      "frontend": "dashboard",
+      "backend_methods": [
+        "get_initial_state",
+        "get_dashboard_stats"
+      ],
+      "database_tables": [
+        "accounts",
+        "extracted_members",
+        "logs"
+      ]
+    },
+    "賬戶管理": {
+      "frontend": "accounts",
+      "backend_methods": [
+        "get_all_accounts",
+        "add_account",
+        "delete_account"
+      ],
+      "database_tables": [
+        "accounts"
+      ]
+    },
+    "資源發現": {
+      "frontend": "discovery",
+      "backend_methods": [
+        "search_groups",
+        "join_group",
+        "get_groups"
+      ],
+      "database_tables": [
+        "groups"
+      ]
+    },
+    "自動化中心": {
+      "frontend": "automation",
+      "backend_methods": [
+        "get_keyword_sets",
+        "get_monitored_groups",
+        "get_queue_status"
+      ],
+      "database_tables": [
+        "keyword_sets",
+        "keywords",
+        "monitored_groups",
+        "message_queue"
+      ]
+    },
+    "潛在客戶": {
+      "frontend": "leads",
+      "backend_methods": [
+        "get_all_leads",
+        "delete_lead",
+        "update_lead_status"
+      ],
+      "database_tables": [
+        "extracted_members"
+      ]
+    },
+    "客戶培育": {
+      "frontend": "nurturing",
+      "backend_methods": [
+        "get_nurturing_plans"
+      ],
+      "database_tables": [
+        "nurturing_plans",
+        "nurturing_steps"
+      ]
+    },
+    "數據分析": {
+      "frontend": "analytics",
+      "backend_methods": [
+        "get_analytics_data",
+        "get_conversion_funnel"
+      ],
+      "database_tables": [
+        "extracted_members",
+        "campaigns",
+        "message_logs"
+      ]
+    },
+    "分析中心": {
+      "frontend": "analysis-center",
+      "backend_methods": [
+        "get_ai_insights",
+        "get_account_health"
+      ],
+      "database_tables": [
+        "accounts",
+        "alerts"
+      ]
+    },
+    "廣告發送": {
+      "frontend": "ads",
+      "backend_methods": [
+        "get_ad_templates",
+        "get_ad_schedules"
+      ],
+      "database_tables": [
+        "ad_templates",
+        "ad_schedules",
+        "ad_send_logs"
+      ]
+    },
+    "用戶追蹤": {
+      "frontend": "tracking",
+      "backend_methods": [
+        "get_tracked_users"
+      ],
+      "database_tables": [
+        "tracked_users",
+        "user_tracking_logs"
+      ]
+    },
+    "營銷活動": {
+      "frontend": "campaigns",
+      "backend_methods": [
+        "get_campaigns",
+        "execute_campaign"
+      ],
+      "database_tables": [
+        "campaigns",
+        "campaign_logs"
+      ]
+    },
+    "多角色協作": {
+      "frontend": "multi-role",
+      "backend_methods": [
+        "get_multi_roles",
+        "get_scripts",
+        "start_collaboration"
+      ],
+      "database_tables": [
+        "multi_roles",
+        "scripts",
+        "collaboration_groups"
+      ]
+    },
+    "AI 中心": {
+      "frontend": "ai-center",
+      "backend_methods": [
+        "get_ai_settings",
+        "detect_ollama"
+      ],
+      "database_tables": [
+        "ai_settings",
+        "knowledge_base"
+      ]
+    },
+    "運行日誌": {
+      "frontend": "logs",
+      "backend_methods": [
+        "get_logs"
+      ],
+      "database_tables": [
+        "logs"
+      ]
+    },
+    "設置": {
+      "frontend": "settings",
+      "backend_methods": [
+        "get_all_settings",
+        "save_settings"
+      ],
+      "database_tables": [
+        "settings"
+      ]
+    }
+  },
+  "menu_modules_status": {
+    "會員中心": {
+      "status": "✅ 完整",
+      "missing_tables": []
+    },
+    "儀表盤": {
+      "status": "⚠️ 部分缺失: accounts",
+      "missing_tables": [
+        "accounts"
+      ]
+    },
+    "賬戶管理": {
+      "status": "❌ 缺失",
+      "missing_tables": [
+        "accounts"
+      ]
+    },
+    "資源發現": {
+      "status": "❌ 缺失",
+      "missing_tables": [
+        "groups"
+      ]
+    },
+    "自動化中心": {
+      "status": "✅ 完整",
+      "missing_tables": []
+    },
+    "潛在客戶": {
+      "status": "✅ 完整",
+      "missing_tables": []
+    },
+    "客戶培育": {
+      "status": "❌ 缺失",
+      "missing_tables": [
+        "nurturing_plans",
+        "nurturing_steps"
+      ]
+    },
+    "數據分析": {
+      "status": "⚠️ 部分缺失: message_logs",
+      "missing_tables": [
+        "message_logs"
+      ]
+    },
+    "分析中心": {
+      "status": "❌ 缺失",
+      "missing_tables": [
+        "accounts",
+        "alerts"
+      ]
+    },
+    "廣告發送": {
+      "status": "✅ 完整",
+      "missing_tables": []
+    },
+    "用戶追蹤": {
+      "status": "✅ 完整",
+      "missing_tables": []
+    },
+    "營銷活動": {
+      "status": "✅ 完整",
+      "missing_tables": []
+    },
+    "多角色協作": {
+      "status": "❌ 缺失",
+      "missing_tables": [
+        "multi_roles",
+        "scripts",
+        "collaboration_groups"
+      ]
+    },
+    "AI 中心": {
+      "status": "❌ 缺失",
+      "missing_tables": [
+        "ai_settings",
+        "knowledge_base"
+      ]
+    },
+    "運行日誌": {
+      "status": "✅ 完整",
+      "missing_tables": []
+    },
+    "設置": {
+      "status": "✅ 完整",
+      "missing_tables": []
+    }
+  }
+}

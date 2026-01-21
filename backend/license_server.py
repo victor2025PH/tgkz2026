@@ -88,13 +88,23 @@ class LicenseServer:
             # 獲取客戶端標識
             client_ip = self._get_client_ip(request)
             current_time = int(time.time())
-            window_key = f"{client_ip}:{current_time // self._request_window}"
+            window_timestamp = current_time // self._request_window
+            # 使用 | 作為分隔符，避免與 IP 地址中的 : 衝突
+            window_key = f"{client_ip}|{window_timestamp}"
             
             # 清理過期的計數
-            expired_keys = [k for k in self._request_counts 
-                          if int(k.split(':')[1]) < current_time // self._request_window - 1]
-            for k in expired_keys:
-                del self._request_counts[k]
+            try:
+                expired_keys = []
+                for k in self._request_counts:
+                    if '|' in k:
+                        parts = k.rsplit('|', 1)
+                        if len(parts) == 2 and parts[1].isdigit():
+                            if int(parts[1]) < window_timestamp - 1:
+                                expired_keys.append(k)
+                for k in expired_keys:
+                    del self._request_counts[k]
+            except Exception:
+                pass  # 忽略清理過程中的錯誤
             
             # 檢查限流
             count = self._request_counts.get(window_key, 0)
@@ -259,6 +269,54 @@ class LicenseServer:
         
         # 舊版兼容路由
         self.app.router.add_post('/api/admin/users/extend', self.handle_admin_extend_user_legacy)
+        
+        # ============ 靜態文件服務（管理後台）============
+        self._setup_static_routes()
+    
+    def _setup_static_routes(self):
+        """設置管理後台靜態文件服務"""
+        admin_panel_path = Path(__file__).parent.parent / 'admin-panel'
+        
+        if admin_panel_path.exists():
+            # 根路徑重定向到 login.html
+            async def index_handler(request):
+                return web.HTTPFound('/login.html')
+            
+            # 靜態文件處理
+            async def static_handler(request):
+                file_name = request.match_info.get('filename', 'index.html')
+                file_path = admin_panel_path / file_name
+                
+                if not file_path.exists():
+                    return web.HTTPNotFound()
+                
+                # 根據擴展名設置 Content-Type
+                content_types = {
+                    '.html': 'text/html; charset=utf-8',
+                    '.js': 'application/javascript; charset=utf-8',
+                    '.css': 'text/css; charset=utf-8',
+                    '.json': 'application/json; charset=utf-8',
+                    '.png': 'image/png',
+                    '.jpg': 'image/jpeg',
+                    '.ico': 'image/x-icon',
+                    '.svg': 'image/svg+xml',
+                }
+                
+                ext = file_path.suffix.lower()
+                content_type = content_types.get(ext, 'text/plain')
+                
+                with open(file_path, 'rb') as f:
+                    content = f.read()
+                
+                return web.Response(body=content, content_type=content_type)
+            
+            self.app.router.add_get('/', index_handler)
+            self.app.router.add_get('/index.html', static_handler)
+            self.app.router.add_get('/login.html', static_handler)
+            self.app.router.add_get('/app.js', static_handler)
+            self.app.router.add_get('/{filename}', static_handler)
+            
+            print(f"📂 Admin panel: {admin_panel_path}")
     
     # ============ 工具方法 ============
     

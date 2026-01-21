@@ -12,7 +12,7 @@
  * 7. 刪除確認彈窗
  */
 
-import { Component, signal, computed, inject, OnInit, input, output, effect } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, OnDestroy, input, output, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ResourceLibraryComponent } from './resource-library.component';
@@ -714,8 +714,9 @@ interface DrawerState {
     </div>
   `
 })
-export class AutomationCenterComponent implements OnInit {
+export class AutomationCenterComponent implements OnInit, OnDestroy {
   private resourceService = inject(ResourceLibraryService);
+  private tabSwitchListener: ((e: Event) => void) | null = null;
   
   // 輸入
   isMonitoring = input(false);
@@ -755,6 +756,8 @@ export class AutomationCenterComponent implements OnInit {
   saveGroupConfig = output<{ groupId: number; keywordSetIds: number[] }>();
   // 關鍵詞集保存事件
   saveKeywordSetConfig = output<{ setId: number; keywords: string[] }>();
+  // 成員提取事件
+  extractMembersEvent = output<{ groupId: string; groupName: string; groupUrl?: string; memberCount: number }>();
   
   // 狀態
   activeTab = signal<AutomationTab>('monitor');
@@ -1025,6 +1028,24 @@ export class AutomationCenterComponent implements OnInit {
   
   ngOnInit() {
     this.updateResourceBadge();
+    
+    // 監聽 Tab 切換事件（從其他頁面跳轉過來時使用）
+    this.tabSwitchListener = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        const tab = customEvent.detail as AutomationTab;
+        if (['monitor', 'resources', 'rules', 'settings'].includes(tab)) {
+          this.activeTab.set(tab);
+        }
+      }
+    };
+    window.addEventListener('switch-automation-tab', this.tabSwitchListener);
+  }
+  
+  ngOnDestroy() {
+    if (this.tabSwitchListener) {
+      window.removeEventListener('switch-automation-tab', this.tabSwitchListener);
+    }
   }
   
   // === 基礎操作 ===
@@ -1285,8 +1306,16 @@ export class AutomationCenterComponent implements OnInit {
   }
   
   extractGroupMembers(group: GroupDetailData) {
-    // TODO: 實現成員提取邏輯
     console.log('Extract members from:', group.name);
+    // 發出成員提取事件到父組件
+    this.extractMembersEvent.emit({
+      groupId: group.id,
+      groupName: group.name,
+      groupUrl: group.url,
+      memberCount: group.memberCount
+    });
+    // 關閉抽屜
+    this.closeGroupDrawer();
   }
   
   viewGroupMessages(group: GroupDetailData) {

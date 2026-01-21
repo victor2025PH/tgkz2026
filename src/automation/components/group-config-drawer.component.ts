@@ -18,6 +18,7 @@ import { SlideDrawerComponent } from './slide-drawer.component';
 export interface GroupDetailData {
   id: string;
   name: string;
+  url?: string;  // 群組 URL（如 @username 或 t.me/xxx）
   memberCount: number;
   isMonitoring: boolean;
   linkedKeywordSets: string[];
@@ -27,6 +28,9 @@ export interface GroupDetailData {
   groupLink?: string;
   activityLevel?: 'low' | 'medium' | 'high';
   dailyMessages?: number;
+  // 🆕 成員身份狀態
+  isMember?: boolean;  // 帳號是否已加入群組
+  memberCheckError?: string;  // 成員檢查錯誤信息
   // 統計
   stats?: {
     matchesToday: number;
@@ -112,6 +116,24 @@ export interface AvailableKeywordSetForGroup {
                 }
               </div>
             </div>
+            
+            <!-- 🆕 未加入群組警告 -->
+            @if (group()!.memberCount === 0 || group()!.isMember === false) {
+              <div class="mt-3 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                <div class="flex items-start gap-2">
+                  <span class="text-lg">⚠️</span>
+                  <div>
+                    <div class="text-sm font-medium text-orange-400">帳號可能未加入此群組</div>
+                    <div class="text-xs text-slate-400 mt-1">
+                      監控功能需要帳號先加入群組。請前往「資源中心」使用「加入監控」功能。
+                    </div>
+                    @if (group()!.memberCheckError) {
+                      <div class="text-xs text-red-400 mt-1">{{ group()!.memberCheckError }}</div>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
           </div>
           
           <!-- 綁定關鍵詞集 -->

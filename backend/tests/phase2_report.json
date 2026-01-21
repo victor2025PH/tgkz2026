@@ -1,0 +1,82 @@
+{
+  "timestamp": "2026-01-18T22:25:15.990488",
+  "phase": "第二階段：帳號管理與遠程 API 對接測試",
+  "checks": [
+    {
+      "name": "帳號在線狀態",
+      "status": "pass",
+      "details": "3/3 在線"
+    },
+    {
+      "name": "帳號健康狀態",
+      "status": "pass",
+      "details": "3/3 健康"
+    },
+    {
+      "name": "Session 文件",
+      "status": "pass",
+      "details": "找到 3 個 session 文件"
+    },
+    {
+      "name": "必要數據表",
+      "status": "pass",
+      "details": "所有表都存在: ['accounts', 'chat_history']"
+    },
+    {
+      "name": "chat_history 插入測試",
+      "status": "pass",
+      "details": "成功插入測試記錄"
+    },
+    {
+      "name": "遠程 API: 首頁",
+      "status": "pass",
+      "details": "狀態碼: 200"
+    },
+    {
+      "name": "遠程 API: 健康檢查",
+      "status": "pass",
+      "details": "狀態碼: 200"
+    },
+    {
+      "name": "遠程 API: 管理後台",
+      "status": "pass",
+      "details": "狀態碼: 200"
+    },
+    {
+      "name": "API URL 配置",
+      "status": "warning",
+      "details": "未找到明確的 API URL 配置"
+    },
+    {
+      "name": "Electron: 後端進程啟動",
+      "status": "pass",
+      "details": "已配置"
+    },
+    {
+      "name": "Electron: IPC 通信",
+      "status": "pass",
+      "details": "已配置"
+    },
+    {
+      "name": "Electron: 主窗口創建",
+      "status": "pass",
+      "details": "已配置"
+    },
+    {
+      "name": "Preload 腳本",
+      "status": "pass",
+      "details": "preload.js 存在"
+    }
+  ],
+  "warnings": [],
+  "errors": [],
+  "summary": {
+    "total_accounts": 3,
+    "online_accounts": 3,
+    "healthy_accounts": 3,
+    "proxy_configured": 0,
+    "ai_enabled": 0,
+    "session_files": 3,
+    "api_urls_found": 0
+  }
+}

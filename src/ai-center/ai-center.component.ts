@@ -281,19 +281,84 @@ type AITab = 'quick' | 'models' | 'knowledge' | 'strategy' | 'rules' | 'multi-ro
           @case ('models') {
             <!-- 模型配置 -->
             <div class="max-w-4xl mx-auto space-y-6">
-              <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
-                <div class="flex items-center justify-between mb-6">
+              
+              <!-- 本地 AI 區域 (推薦) -->
+              <div class="bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 rounded-xl border border-emerald-500/30 p-6">
+                <div class="flex items-center justify-between mb-4">
                   <h3 class="font-semibold text-white flex items-center gap-2">
-                    <span>🤖</span> AI 模型配置
+                    <span>🦙</span> 本地 AI
+                    <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-full">推薦 - 免費無限</span>
                   </h3>
-                  <button (click)="showAddModel.set(true)"
-                          class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors">
-                    + 添加模型
+                  <button (click)="showAddLocalModel.set(true)"
+                          class="px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition-colors">
+                    + 添加本地 AI
                   </button>
                 </div>
                 
-                <div class="space-y-4">
-                  @for (model of aiService.models(); track model.id) {
+                <div class="space-y-3">
+                  @for (model of localModels(); track model.id) {
+                    <div class="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl">
+                      <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                          <span class="text-2xl">🦙</span>
+                        </div>
+                        <div>
+                          <div class="font-medium text-white">{{ $any(model).displayName || model.modelName }}</div>
+                          <div class="text-xs text-slate-400 truncate max-w-xs">{{ model.apiEndpoint }}</div>
+                        </div>
+                      </div>
+                      
+                      <div class="flex items-center gap-3">
+                        @if (model.isConnected) {
+                          <span class="flex items-center gap-1 text-emerald-400 text-sm">
+                            <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                            已連接
+                          </span>
+                        } @else {
+                          <span class="text-amber-400 text-sm">未測試</span>
+                        }
+                        
+                        <button (click)="testModel(model)"
+                                class="px-3 py-1 bg-slate-600 text-slate-300 rounded-lg text-sm hover:bg-slate-500">
+                          測試
+                        </button>
+                        <button (click)="setAsDefault(model)"
+                                class="px-3 py-1 text-sm rounded-lg transition-colors"
+                                [class]="aiService.defaultModel()?.id === model.id ? 'bg-emerald-500 text-white' : 'bg-slate-600 text-slate-300 hover:bg-slate-500'">
+                          {{ aiService.defaultModel()?.id === model.id ? '默認' : '設為默認' }}
+                        </button>
+                        <button (click)="deleteModel(model)"
+                                class="text-red-400 hover:text-red-300 p-1">
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  } @empty {
+                    <div class="text-center py-6 text-slate-400">
+                      <p class="text-sm mb-3">使用本地 Ollama 可免費無限調用 AI</p>
+                      <button (click)="showAddLocalModel.set(true)"
+                              class="px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30">
+                        🦙 快速配置本地 AI
+                      </button>
+                    </div>
+                  }
+                </div>
+              </div>
+              
+              <!-- 雲端 AI 區域 -->
+              <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="font-semibold text-white flex items-center gap-2">
+                    <span>☁️</span> 雲端 AI
+                  </h3>
+                  <button (click)="showAddModel.set(true)"
+                          class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors">
+                    + 添加雲端模型
+                  </button>
+                </div>
+                
+                <div class="space-y-3">
+                  @for (model of cloudModels(); track model.id) {
                     <div class="flex items-center justify-between p-4 bg-slate-700/50 rounded-xl hover:bg-slate-700 transition-colors">
                       <div class="flex items-center gap-4">
                         <div class="w-12 h-12 rounded-xl flex items-center justify-center"
@@ -303,44 +368,42 @@ type AITab = 'quick' | 'models' | 'knowledge' | 'strategy' | 'rules' | 'multi-ro
                           <span class="text-2xl">{{ getProviderIcon(model.provider) }}</span>
                         </div>
                         <div>
-                          <div class="font-medium text-white">{{ model.modelName }}</div>
+                          <div class="font-medium text-white">{{ $any(model).displayName || model.modelName }}</div>
                           <div class="text-sm text-slate-400">{{ getProviderName(model.provider) }}</div>
                         </div>
                       </div>
                       
-                      <div class="flex items-center gap-4">
-                        <div class="flex items-center gap-2">
-                          @if (model.isConnected) {
-                            <span class="flex items-center gap-1 text-emerald-400 text-sm">
-                              <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                              已連接
-                            </span>
-                          } @else {
-                            <span class="text-slate-500 text-sm">未連接</span>
-                          }
-                        </div>
+                      <div class="flex items-center gap-3">
+                        @if (model.isConnected) {
+                          <span class="flex items-center gap-1 text-emerald-400 text-sm">
+                            <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                            已連接
+                          </span>
+                        } @else {
+                          <span class="text-slate-500 text-sm">未連接</span>
+                        }
                         
                         <button (click)="testModel(model)"
                                 class="px-3 py-1 bg-slate-600 text-slate-300 rounded-lg text-sm hover:bg-slate-500">
                           測試
                         </button>
-                        
-                        <button (click)="editModel(model)"
-                                class="text-slate-400 hover:text-white">
-                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                          </svg>
+                        <button (click)="setAsDefault(model)"
+                                class="px-3 py-1 text-sm rounded-lg transition-colors"
+                                [class]="aiService.defaultModel()?.id === model.id ? 'bg-purple-500 text-white' : 'bg-slate-600 text-slate-300 hover:bg-slate-500'">
+                          {{ aiService.defaultModel()?.id === model.id ? '默認' : '設為默認' }}
+                        </button>
+                        <button (click)="deleteModel(model)"
+                                class="text-red-400 hover:text-red-300 p-1">
+                          ✕
                         </button>
                       </div>
                     </div>
                   } @empty {
-                    <div class="text-center py-12 text-slate-400">
-                      <div class="text-5xl mb-4">🤖</div>
-                      <p class="text-lg mb-2">尚未配置 AI 模型</p>
-                      <p class="text-sm mb-4">添加 OpenAI、Claude 或 Gemini 模型開始使用 AI 功能</p>
+                    <div class="text-center py-6 text-slate-400">
+                      <p class="text-sm mb-3">添加 OpenAI、Claude 或 Gemini 等雲端模型</p>
                       <button (click)="showAddModel.set(true)"
-                              class="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-400 transition-colors">
-                        + 添加第一個模型
+                              class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30">
+                        + 添加雲端模型
                       </button>
                     </div>
                   }
@@ -349,36 +412,60 @@ type AITab = 'quick' | 'models' | 'knowledge' | 'strategy' | 'rules' | 'multi-ro
                 <!-- 模型用途分配 -->
                 @if (aiService.models().length > 0) {
                   <div class="mt-6 pt-6 border-t border-slate-700/50">
-                    <h4 class="text-sm font-medium text-white mb-4">模型用途分配</h4>
+                    <div class="flex items-center justify-between mb-4">
+                      <h4 class="text-sm font-medium text-white">模型用途分配</h4>
+                      @if (isSavingUsage()) {
+                        <span class="text-xs text-emerald-400 flex items-center gap-1">
+                          <span class="animate-spin">⟳</span> 保存中...
+                        </span>
+                      } @else if (usageSaved()) {
+                        <span class="text-xs text-emerald-400 flex items-center gap-1">
+                          ✓ 已保存
+                        </span>
+                      }
+                    </div>
                     <div class="grid grid-cols-3 gap-4">
                       <div>
                         <label class="text-xs text-slate-400 block mb-2">意圖識別</label>
-                        <select class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white">
+                        <select class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                                [value]="aiService.modelUsage().intentRecognition"
+                                (change)="onModelUsageChange('intentRecognition', $event)">
                           <option value="">選擇模型</option>
                           @for (model of aiService.models(); track model.id) {
-                            <option [value]="model.id">{{ model.modelName }}</option>
+                            <option [value]="model.id" [selected]="model.id === aiService.modelUsage().intentRecognition">
+                              {{ $any(model).displayName || model.modelName }}
+                            </option>
                           }
                         </select>
                       </div>
                       <div>
                         <label class="text-xs text-slate-400 block mb-2">日常對話</label>
-                        <select class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white">
+                        <select class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                                [value]="aiService.modelUsage().dailyChat"
+                                (change)="onModelUsageChange('dailyChat', $event)">
                           <option value="">選擇模型</option>
                           @for (model of aiService.models(); track model.id) {
-                            <option [value]="model.id">{{ model.modelName }}</option>
+                            <option [value]="model.id" [selected]="model.id === aiService.modelUsage().dailyChat">
+                              {{ $any(model).displayName || model.modelName }}
+                            </option>
                           }
                         </select>
                       </div>
                       <div>
                         <label class="text-xs text-slate-400 block mb-2">多角色劇本</label>
-                        <select class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white">
+                        <select class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                                [value]="aiService.modelUsage().multiRoleScript"
+                                (change)="onModelUsageChange('multiRoleScript', $event)">
                           <option value="">選擇模型</option>
                           @for (model of aiService.models(); track model.id) {
-                            <option [value]="model.id">{{ model.modelName }}</option>
+                            <option [value]="model.id" [selected]="model.id === aiService.modelUsage().multiRoleScript">
+                              {{ $any(model).displayName || model.modelName }}
+                            </option>
                           }
                         </select>
                       </div>
                     </div>
+                    <p class="text-xs text-slate-500 mt-3">💡 選擇後自動保存，不同用途可以使用不同的 AI 模型</p>
                   </div>
                 }
               </div>
@@ -654,11 +741,11 @@ type AITab = 'quick' | 'models' | 'knowledge' | 'strategy' | 'rules' | 'multi-ro
         }
       </div>
       
-      <!-- 添加模型對話框 -->
+      <!-- 添加雲端模型對話框 -->
       @if (showAddModel()) {
         <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
           <div class="bg-slate-800 rounded-2xl w-full max-w-md p-6 shadow-xl border border-slate-700">
-            <h3 class="text-xl font-bold text-white mb-6">添加 AI 模型</h3>
+            <h3 class="text-xl font-bold text-white mb-6">添加雲端 AI 模型</h3>
             
             <div class="space-y-4">
               <div>
@@ -683,18 +770,30 @@ type AITab = 'quick' | 'models' | 'knowledge' | 'strategy' | 'rules' | 'multi-ro
               </div>
               
               <div>
-                <label class="text-sm text-slate-400 block mb-2">模型名稱</label>
-                <input type="text" 
-                       [(ngModel)]="newModelName"
-                       placeholder="如 gpt-4, claude-3-opus"
+                <label class="text-sm text-slate-400 block mb-2">選擇模型 *</label>
+                <select [(ngModel)]="newModelName"
+                        class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white">
+                  <option value="">請選擇模型</option>
+                  @for (model of currentPresetModels(); track model.name) {
+                    <option [value]="model.name">{{ model.displayName }}</option>
+                  }
+                </select>
+                <p class="text-xs text-slate-500 mt-1">💡 模型名稱將自動格式化，無需擔心大小寫</p>
+              </div>
+              
+              <div>
+                <label class="text-sm text-slate-400 block mb-2">API Key *</label>
+                <input type="password" 
+                       [(ngModel)]="newModelApiKey"
+                       placeholder="sk-..."
                        class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500">
               </div>
               
               <div>
-                <label class="text-sm text-slate-400 block mb-2">API Key</label>
-                <input type="password" 
-                       [(ngModel)]="newModelApiKey"
-                       placeholder="sk-..."
+                <label class="text-sm text-slate-400 block mb-2">顯示名稱 (可選)</label>
+                <input type="text" 
+                       [(ngModel)]="newModelDisplayName"
+                       placeholder="如 我的 GPT-4"
                        class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500">
               </div>
             </div>
@@ -707,6 +806,72 @@ type AITab = 'quick' | 'models' | 'knowledge' | 'strategy' | 'rules' | 'multi-ro
               <button (click)="saveNewModel()"
                       class="flex-1 py-2.5 bg-purple-500 text-white rounded-lg hover:bg-purple-400 transition-colors">
                 添加
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+      
+      <!-- 添加本地 AI 對話框 -->
+      @if (showAddLocalModel()) {
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div class="bg-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-xl border border-emerald-500/30">
+            <h3 class="text-xl font-bold text-white mb-2 flex items-center gap-2">
+              🦙 添加本地 AI
+            </h3>
+            <p class="text-slate-400 text-sm mb-6">配置 Ollama 或其他本地 AI 服務</p>
+            
+            <div class="space-y-4">
+              <div>
+                <label class="text-sm text-slate-400 block mb-2">API 端點 *</label>
+                <input type="text" 
+                       [(ngModel)]="localModelEndpoint"
+                       placeholder="https://your-ollama.ts.net/api/chat"
+                       class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500">
+                <p class="text-xs text-slate-500 mt-1">
+                  💡 使用 Tailscale Funnel 可實現遠程訪問本地 Ollama
+                </p>
+              </div>
+              
+              <div>
+                <label class="text-sm text-slate-400 block mb-2">模型名稱 *</label>
+                <input type="text" 
+                       [(ngModel)]="localModelName"
+                       placeholder="qwen2.5, llama3.2, mistral"
+                       class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500">
+                <p class="text-xs text-slate-500 mt-1">
+                  在 Ollama 中運行 <code class="text-emerald-400">ollama list</code> 查看可用模型
+                </p>
+              </div>
+              
+              <div>
+                <label class="text-sm text-slate-400 block mb-2">顯示名稱 (可選)</label>
+                <input type="text" 
+                       [(ngModel)]="localModelDisplayName"
+                       placeholder="我的本地 AI"
+                       class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500">
+              </div>
+              
+              <!-- 測試連接按鈕 -->
+              <button (click)="testLocalConnection()"
+                      [disabled]="isTestingLocal()"
+                      class="w-full py-2.5 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-colors flex items-center justify-center gap-2">
+                @if (isTestingLocal()) {
+                  <span class="animate-spin">⟳</span> 正在測試連接...
+                } @else {
+                  🔗 測試連接
+                }
+              </button>
+            </div>
+            
+            <div class="flex gap-3 mt-6">
+              <button (click)="showAddLocalModel.set(false)"
+                      class="flex-1 py-2.5 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors">
+                取消
+              </button>
+              <button (click)="saveLocalModel()"
+                      class="flex-1 py-2.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-400 transition-colors">
+                保存
               </button>
             </div>
           </div>
@@ -732,6 +897,20 @@ export class AICenterComponent {
   newModelProvider = signal<AIProvider>('openai');
   newModelName = '';
   newModelApiKey = '';
+  newModelEndpoint = '';
+  newModelDisplayName = '';
+  
+  // 本地 AI 配置
+  showAddLocalModel = signal(false);
+  localModelEndpoint = 'https://ms-defysomwqybz.tail05a567.ts.net/api/chat';
+  localModelName = 'huihui_ai/qwen2.5-abliterate';
+  localModelDisplayName = '我的本地 AI';
+  isTestingLocal = signal(false);
+  
+  // 模型用途分配保存狀態
+  isSavingUsage = signal(false);
+  usageSaved = signal(false);
+  private usageSaveTimeout: any = null;
   
   tabs = [
     { id: 'quick' as const, icon: '⚡', label: '快速設置' },
@@ -748,6 +927,33 @@ export class AICenterComponent {
     { id: 'claude' as const, name: 'Claude', icon: '🟣' },
     { id: 'gemini' as const, name: 'Gemini', icon: '🔵' }
   ];
+  
+  // 預設模型列表（按供應商分類）- 使用正確的 API 模型名稱
+  presetModels: Record<string, { name: string; displayName: string }[]> = {
+    'openai': [
+      { name: 'gpt-4o', displayName: 'GPT-4o (推薦)' },
+      { name: 'gpt-4o-mini', displayName: 'GPT-4o Mini (經濟)' },
+      { name: 'gpt-4-turbo', displayName: 'GPT-4 Turbo' },
+      { name: 'gpt-3.5-turbo', displayName: 'GPT-3.5 Turbo (快速)' },
+    ],
+    'claude': [
+      { name: 'claude-3-5-sonnet-latest', displayName: 'Claude 3.5 Sonnet (推薦)' },
+      { name: 'claude-3-opus-latest', displayName: 'Claude 3 Opus (強大)' },
+      { name: 'claude-3-haiku-20240307', displayName: 'Claude 3 Haiku (快速)' },
+    ],
+    'gemini': [
+      { name: 'gemini-1.5-flash-latest', displayName: 'Gemini 1.5 Flash (推薦)' },
+      { name: 'gemini-1.5-pro-latest', displayName: 'Gemini 1.5 Pro (強大)' },
+      { name: 'gemini-2.0-flash-exp', displayName: 'Gemini 2.0 Flash (實驗)' },
+    ]
+  };
+  
+  // 當前供應商的預設模型
+  currentPresetModels = computed(() => this.presetModels[this.newModelProvider()] || []);
+  
+  // 本地 AI 模型
+  localModels = this.aiService.localModels;
+  cloudModels = this.aiService.cloudModels;
   
   conversationStyles = [
     { id: 'professional' as const, icon: '👔', label: '專業正式' },
@@ -792,12 +998,86 @@ export class AICenterComponent {
     this.aiService.addModel({
       provider: this.newModelProvider(),
       modelName: this.newModelName,
-      apiKey: this.newModelApiKey
+      apiKey: this.newModelApiKey,
+      apiEndpoint: this.newModelEndpoint || undefined,
+      displayName: this.newModelDisplayName || this.newModelName
     });
     
     this.showAddModel.set(false);
     this.newModelName = '';
     this.newModelApiKey = '';
+    this.newModelEndpoint = '';
+    this.newModelDisplayName = '';
+  }
+  
+  // ========== 本地 AI 方法 ==========
+  
+  saveLocalModel() {
+    if (!this.localModelEndpoint || !this.localModelName) {
+      alert('請填寫 API 端點和模型名稱');
+      return;
+    }
+    
+    this.aiService.addLocalModel({
+      modelName: this.localModelName,
+      displayName: this.localModelDisplayName || this.localModelName,
+      apiEndpoint: this.localModelEndpoint,
+      isDefault: this.aiService.models().length === 0 // 如果是第一個模型，設為默認
+    });
+    
+    this.showAddLocalModel.set(false);
+    // 重置表單但保留常用值
+    this.localModelDisplayName = '我的本地 AI';
+  }
+  
+  async testLocalConnection() {
+    if (!this.localModelEndpoint || !this.localModelName) {
+      alert('請先填寫 API 端點和模型名稱');
+      return;
+    }
+    
+    this.isTestingLocal.set(true);
+    await this.aiService.testLocalAIConnection(this.localModelEndpoint, this.localModelName);
+    
+    // 測試結果通過事件返回，這裡延遲重置狀態
+    setTimeout(() => this.isTestingLocal.set(false), 3000);
+  }
+  
+  // 模型用途分配變更處理（自動保存）
+  onModelUsageChange(field: 'intentRecognition' | 'dailyChat' | 'multiRoleScript', event: Event) {
+    const select = event.target as HTMLSelectElement;
+    const modelId = select.value;
+    
+    // 更新本地狀態
+    this.aiService.updateModelUsage({ [field]: modelId });
+    
+    // 顯示保存狀態
+    this.isSavingUsage.set(true);
+    this.usageSaved.set(false);
+    
+    // 防抖保存（300ms）
+    if (this.usageSaveTimeout) {
+      clearTimeout(this.usageSaveTimeout);
+    }
+    
+    this.usageSaveTimeout = setTimeout(async () => {
+      await this.aiService.saveModelUsageToBackend();
+      this.isSavingUsage.set(false);
+      this.usageSaved.set(true);
+      
+      // 3 秒後隱藏「已保存」提示
+      setTimeout(() => this.usageSaved.set(false), 3000);
+    }, 300);
+  }
+  
+  deleteModel(model: AIModelConfig) {
+    if (confirm(`確定要刪除模型「${(model as any).displayName || model.modelName}」嗎？`)) {
+      this.aiService.removeModel(model.id);
+    }
+  }
+  
+  setAsDefault(model: AIModelConfig) {
+    this.aiService.setDefaultModel(model.id);
   }
   
   addKnowledgeBase() {

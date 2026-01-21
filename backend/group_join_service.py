@@ -17,8 +17,16 @@ from pyrogram.errors import (
     FloodWait, UserBannedInChannel, InviteHashExpired, 
     InviteHashInvalid, UserAlreadyParticipant, ChannelPrivate,
     UsernameInvalid, UsernameNotOccupied, PeerIdInvalid,
-    ChatAdminRequired, UserKicked, InviteRequestSent
+    ChatAdminRequired, UserKicked
 )
+
+# InviteRequestSent 可能在舊版本中不存在
+try:
+    from pyrogram.errors import InviteRequestSent
+except ImportError:
+    # 創建一個 fallback 類
+    class InviteRequestSent(Exception):
+        pass
 from pyrogram.enums import ChatMemberStatus, ChatType
 from text_utils import sanitize_text, safe_get_name, format_chat_info
 

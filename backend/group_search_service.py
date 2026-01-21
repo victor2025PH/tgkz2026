@@ -22,9 +22,16 @@ from pyrogram.errors import (
     FloodWait, UserBannedInChannel, InviteHashExpired,
     InviteHashInvalid, UserAlreadyParticipant, ChannelPrivate,
     UsernameInvalid, UsernameNotOccupied, PeerIdInvalid,
-    ChatAdminRequired, UserKicked, InviteRequestSent,
+    ChatAdminRequired, UserKicked,
     ChannelInvalid, ChatInvalid, SearchQueryEmpty
 )
+
+# InviteRequestSent 可能在舊版本中不存在
+try:
+    from pyrogram.errors import InviteRequestSent
+except ImportError:
+    class InviteRequestSent(Exception):
+        pass
 from pyrogram.enums import ChatType
 
 from resource_discovery import (
@@ -458,7 +465,9 @@ class GroupSearchService:
     async def search_and_save(self, query: str, phone: str = None,
                              limit: int = 50, keywords: List[str] = None,
                              search_type: str = "all", min_members: int = 0,
-                             language: str = None) -> Dict[str, int]:
+                             language: str = None,
+                             search_session_id: str = "",  # 🆕 搜索會話 ID
+                             search_keyword: str = "") -> Dict[str, int]:  # 🆕 搜索關鍵詞
         """
         搜索並保存結果到資源庫
         
@@ -470,6 +479,8 @@ class GroupSearchService:
             search_type: 類型過濾
             min_members: 最小成員數
             language: 語言過濾
+            search_session_id: 搜索會話 ID（用於區分不同搜索）
+            search_keyword: 搜索關鍵詞（用於顯示）
             
         Returns:
             統計信息 {found, new, updated}
@@ -507,12 +518,16 @@ class GroupSearchService:
             existing = await resource_discovery.get_resource_by_telegram_id(result.telegram_id)
             
             if existing:
-                # 更新現有資源
-                await resource_discovery.update_resource(existing['id'], resource)
+                # 更新現有資源（同時更新 session_id）
+                await resource_discovery.update_resource(existing['id'], resource, 
+                    search_session_id=search_session_id,
+                    search_keyword=search_keyword or query)
                 stats['updated'] += 1
             else:
-                # 添加新資源
-                await resource_discovery.add_resource(resource)
+                # 添加新資源（帶 session_id）
+                await resource_discovery.add_resource(resource, 
+                    search_session_id=search_session_id,
+                    search_keyword=search_keyword or query)
                 stats['new'] += 1
         
         self.log(f"📊 搜索結果: 找到 {stats['found']}, 新增 {stats['new']}, 更新 {stats['updated']}")

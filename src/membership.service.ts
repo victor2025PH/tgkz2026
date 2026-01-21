@@ -62,19 +62,29 @@ export interface FeatureAccess {
   accountManagement: boolean;
   keywordMonitoring: boolean;
   leadCapture: boolean;
-  // VIP 功能
+  // 白銀功能
   aiAutoReply: boolean;
   adBroadcast: boolean;
+  hotLeads: boolean;            // 熱門客戶分析
+  // 黃金功能
+  smartMode: boolean;           // 智能模式儀表盤
+  aiInsights: boolean;          // AI智能洞察
   dataExport: boolean;
   batchOperations: boolean;
-  // SVIP 功能
+  dataInsightsBasic: boolean;   // 基礎數據洞察
+  // 鑽石功能
+  strategyPlanning: boolean;    // 策略規劃 (AI營銷助手)
+  autoExecution: boolean;       // 自動執行 (AI團隊銷售)
+  dataInsightsAdvanced: boolean;// 進階數據洞察
+  abTesting: boolean;           // A/B測試
   multiRole: boolean;
   aiSalesFunnel: boolean;
   advancedAnalytics: boolean;
   smartAntiBlock: boolean;
-  // MVP 功能
+  // 星耀功能
   apiAccess: boolean;
   teamManagement: boolean;
+  // 王者功能
   customBranding: boolean;
   prioritySupport: boolean;
 }
@@ -114,23 +124,37 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
       maxGroups: 3,
       maxKeywordSets: 1,
       dataRetentionDays: 7,
-      platformApiQuota: 0,        // 免費版無平台 API，需自備
+      platformApiQuota: 0,
       platformApiMaxAccounts: 0
     },
     features: {
+      // 基礎功能
       accountManagement: true,
       keywordMonitoring: true,
       leadCapture: true,
+      // 白銀功能
       aiAutoReply: true,
       adBroadcast: false,
+      hotLeads: false,
+      // 黃金功能
+      smartMode: false,
+      aiInsights: false,
       dataExport: false,
       batchOperations: false,
+      dataInsightsBasic: false,
+      // 鑽石功能
+      strategyPlanning: false,
+      autoExecution: false,
+      dataInsightsAdvanced: false,
+      abTesting: false,
       multiRole: false,
       aiSalesFunnel: false,
       advancedAnalytics: false,
       smartAntiBlock: false,
+      // 星耀功能
       apiAccess: false,
       teamManagement: false,
+      // 王者功能
       customBranding: false,
       prioritySupport: false
     }
@@ -139,7 +163,7 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
     name: '白銀精英',
     icon: '🥈',
     rank: 2,
-    monthlyPrice: 4.99,  // USDT 價格
+    monthlyPrice: 4.99,
     yearlyPrice: 49.9,
     quotas: {
       maxAccounts: 5,
@@ -148,23 +172,37 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
       maxGroups: 10,
       maxKeywordSets: 5,
       dataRetentionDays: 30,
-      platformApiQuota: 1,         // 1 個平台 API
-      platformApiMaxAccounts: 3    // 可綁定 3 個帳號
+      platformApiQuota: 1,
+      platformApiMaxAccounts: 3
     },
     features: {
+      // 基礎功能
       accountManagement: true,
       keywordMonitoring: true,
       leadCapture: true,
+      // 白銀功能 ✓
       aiAutoReply: true,
       adBroadcast: true,
+      hotLeads: true,              // 解鎖熱門客戶
+      // 黃金功能
+      smartMode: false,
+      aiInsights: false,
       dataExport: false,
       batchOperations: false,
+      dataInsightsBasic: false,
+      // 鑽石功能
+      strategyPlanning: false,
+      autoExecution: false,
+      dataInsightsAdvanced: false,
+      abTesting: false,
       multiRole: false,
       aiSalesFunnel: false,
       advancedAnalytics: false,
       smartAntiBlock: false,
+      // 星耀功能
       apiAccess: false,
       teamManagement: false,
+      // 王者功能
       customBranding: false,
       prioritySupport: false
     }
@@ -173,32 +211,46 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
     name: '黃金大師',
     icon: '🥇',
     rank: 3,
-    monthlyPrice: 19.9,  // USDT 價格 - 主推產品
+    monthlyPrice: 19.9,  // 主推產品
     yearlyPrice: 199,
     quotas: {
       maxAccounts: 15,
       dailyMessages: 500,
       dailyAiCalls: 300,
-      maxGroups: 50,
+      maxGroups: 30,
       maxKeywordSets: 20,
       dataRetentionDays: 60,
-      platformApiQuota: 3,         // 3 個平台 API
-      platformApiMaxAccounts: 9    // 可綁定 9 個帳號
+      platformApiQuota: 3,
+      platformApiMaxAccounts: 9
     },
     features: {
+      // 基礎功能
       accountManagement: true,
       keywordMonitoring: true,
       leadCapture: true,
+      // 白銀功能 ✓
       aiAutoReply: true,
       adBroadcast: true,
+      hotLeads: true,
+      // 黃金功能 ✓
+      smartMode: true,             // 解鎖智能模式
+      aiInsights: true,            // 解鎖AI智能洞察
       dataExport: true,
       batchOperations: true,
+      dataInsightsBasic: true,     // 解鎖基礎數據洞察
+      // 鑽石功能
+      strategyPlanning: false,
+      autoExecution: false,
+      dataInsightsAdvanced: false,
+      abTesting: false,
       multiRole: false,
       aiSalesFunnel: false,
       advancedAnalytics: false,
       smartAntiBlock: false,
+      // 星耀功能
       apiAccess: false,
       teamManagement: false,
+      // 王者功能
       customBranding: false,
       prioritySupport: false
     }
@@ -207,66 +259,94 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
     name: '鑽石王牌',
     icon: '💎',
     rank: 4,
-    monthlyPrice: 59.9,  // USDT 價格
+    monthlyPrice: 59.9,
     yearlyPrice: 599,
     quotas: {
       maxAccounts: 50,
       dailyMessages: 2000,
       dailyAiCalls: -1,
-      maxGroups: 200,
-      maxKeywordSets: -1,
+      maxGroups: 100,
+      maxKeywordSets: 50,
       dataRetentionDays: 90,
-      platformApiQuota: 10,        // 10 個平台 API
-      platformApiMaxAccounts: 30   // 可綁定 30 個帳號
+      platformApiQuota: 10,
+      platformApiMaxAccounts: 30
     },
     features: {
+      // 基礎功能
       accountManagement: true,
       keywordMonitoring: true,
       leadCapture: true,
+      // 白銀功能 ✓
       aiAutoReply: true,
       adBroadcast: true,
+      hotLeads: true,
+      // 黃金功能 ✓
+      smartMode: true,
+      aiInsights: true,
       dataExport: true,
       batchOperations: true,
+      dataInsightsBasic: true,
+      // 鑽石功能 ✓
+      strategyPlanning: true,      // 解鎖策略規劃
+      autoExecution: true,         // 解鎖自動執行
+      dataInsightsAdvanced: true,  // 解鎖進階數據洞察
+      abTesting: true,             // 解鎖A/B測試
       multiRole: true,
       aiSalesFunnel: true,
       advancedAnalytics: true,
       smartAntiBlock: false,
+      // 星耀功能
       apiAccess: false,
       teamManagement: false,
+      // 王者功能
       customBranding: false,
-      prioritySupport: false
+      prioritySupport: true        // 優先支持
     }
   },
   star: {
     name: '星耀傳說',
     icon: '🌟',
     rank: 5,
-    monthlyPrice: 199,  // USDT 價格
+    monthlyPrice: 199,
     yearlyPrice: 1999,
     quotas: {
       maxAccounts: 100,
-      dailyMessages: -1,
+      dailyMessages: 10000,
       dailyAiCalls: -1,
-      maxGroups: -1,
-      maxKeywordSets: -1,
+      maxGroups: 300,
+      maxKeywordSets: 100,
       dataRetentionDays: 180,
-      platformApiQuota: 30,        // 30 個平台 API
-      platformApiMaxAccounts: 90   // 可綁定 90 個帳號
+      platformApiQuota: 30,
+      platformApiMaxAccounts: 90
     },
     features: {
+      // 基礎功能
       accountManagement: true,
       keywordMonitoring: true,
       leadCapture: true,
+      // 白銀功能 ✓
       aiAutoReply: true,
       adBroadcast: true,
+      hotLeads: true,
+      // 黃金功能 ✓
+      smartMode: true,
+      aiInsights: true,
       dataExport: true,
       batchOperations: true,
+      dataInsightsBasic: true,
+      // 鑽石功能 ✓
+      strategyPlanning: true,
+      autoExecution: true,
+      dataInsightsAdvanced: true,
+      abTesting: true,
       multiRole: true,
       aiSalesFunnel: true,
       advancedAnalytics: true,
       smartAntiBlock: true,
-      apiAccess: false,
-      teamManagement: true,
+      // 星耀功能 ✓
+      apiAccess: true,             // 解鎖API接口
+      teamManagement: true,        // 解鎖團隊管理
+      // 王者功能
       customBranding: false,
       prioritySupport: true
     }
@@ -275,7 +355,7 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
     name: '榮耀王者',
     icon: '👑',
     rank: 6,
-    monthlyPrice: 599,  // USDT 價格
+    monthlyPrice: 599,
     yearlyPrice: 5999,
     quotas: {
       maxAccounts: -1,  // 無限
@@ -284,24 +364,38 @@ const MEMBERSHIP_CONFIG: Record<MembershipLevel, {
       maxGroups: -1,
       maxKeywordSets: -1,
       dataRetentionDays: 365,
-      platformApiQuota: -1,        // 無限平台 API（專屬池）
-      platformApiMaxAccounts: -1   // 無限帳號
+      platformApiQuota: -1,
+      platformApiMaxAccounts: -1
     },
     features: {
+      // 所有功能全部解鎖
       accountManagement: true,
       keywordMonitoring: true,
       leadCapture: true,
+      // 白銀功能 ✓
       aiAutoReply: true,
       adBroadcast: true,
+      hotLeads: true,
+      // 黃金功能 ✓
+      smartMode: true,
+      aiInsights: true,
       dataExport: true,
       batchOperations: true,
+      dataInsightsBasic: true,
+      // 鑽石功能 ✓
+      strategyPlanning: true,
+      autoExecution: true,
+      dataInsightsAdvanced: true,
+      abTesting: true,
       multiRole: true,
       aiSalesFunnel: true,
       advancedAnalytics: true,
       smartAntiBlock: true,
+      // 星耀功能 ✓
       apiAccess: true,
       teamManagement: true,
-      customBranding: true,
+      // 王者功能 ✓
+      customBranding: true,        // 解鎖自定義品牌
       prioritySupport: true
     }
   }
@@ -317,6 +411,12 @@ export class MembershipService {
   private static readonly USAGE_KEY = 'tg-matrix-usage';
   private static readonly TRIAL_DAYS = 7; // 免費試用天數
   
+  // ========== 免登錄完整版配置 ==========
+  // 與 AuthService 保持一致：免登錄模式下默認為榮耀王者
+  private readonly SKIP_LOGIN = true;
+  private readonly DEFAULT_LEVEL: MembershipLevel = 'king';
+  // ========================================
+  
   // 狀態
   private _membership: WritableSignal<MembershipInfo | null> = signal(null);
   private _isLoading: WritableSignal<boolean> = signal(true);
@@ -326,7 +426,9 @@ export class MembershipService {
   isLoading = computed(() => this._isLoading());
   
   level = computed(() => {
-    const rawLevel = this._membership()?.level || 'bronze';
+    // 免登錄模式默認為榮耀王者
+    const defaultLevel = this.SKIP_LOGIN ? this.DEFAULT_LEVEL : 'bronze';
+    const rawLevel = this._membership()?.level || defaultLevel;
     // 確保返回有效的會員等級，處理舊版數據兼容
     if (rawLevel in MEMBERSHIP_CONFIG) {
       return rawLevel as MembershipLevel;
@@ -338,17 +440,19 @@ export class MembershipService {
       'svip': 'diamond',
       'mvp': 'king'
     };
-    return legacyMap[rawLevel] || 'bronze';
+    return legacyMap[rawLevel] || defaultLevel;
   });
-  levelName = computed(() => MEMBERSHIP_CONFIG[this.level()]?.name || '青銅戰士');
-  levelIcon = computed(() => MEMBERSHIP_CONFIG[this.level()]?.icon || '⚔️');
-  levelRank = computed(() => MEMBERSHIP_CONFIG[this.level()]?.rank || 1);
+  levelName = computed(() => MEMBERSHIP_CONFIG[this.level()]?.name || (this.SKIP_LOGIN ? '榮耀王者' : '青銅戰士'));
+  levelIcon = computed(() => MEMBERSHIP_CONFIG[this.level()]?.icon || (this.SKIP_LOGIN ? '👑' : '⚔️'));
+  levelRank = computed(() => MEMBERSHIP_CONFIG[this.level()]?.rank || (this.SKIP_LOGIN ? 6 : 1));
   
   isActive = computed(() => {
     const m = this._membership();
     if (!m) return false;
     if (m.level === 'bronze') return true; // 青銅戰士永遠有效
-    return m.expiresAt ? new Date() < m.expiresAt : false;
+    // 如果沒有設置過期日期，視為永久會員（開發模式或終身會員）
+    if (!m.expiresAt) return true;
+    return new Date() < m.expiresAt;
   });
   
   daysRemaining = computed(() => {
@@ -390,12 +494,22 @@ export class MembershipService {
         parsed.expiresAt = parsed.expiresAt ? new Date(parsed.expiresAt) : undefined;
         parsed.activatedAt = parsed.activatedAt ? new Date(parsed.activatedAt) : undefined;
         
+        // 免登錄模式：自動升級到榮耀王者
+        if (this.SKIP_LOGIN && parsed.level !== this.DEFAULT_LEVEL) {
+          console.log(`[MembershipService] 免登錄模式：從 ${parsed.level} 升級到 ${this.DEFAULT_LEVEL}`);
+          parsed.level = this.DEFAULT_LEVEL;
+          parsed.levelName = MEMBERSHIP_CONFIG[this.DEFAULT_LEVEL].name;
+          parsed.levelIcon = MEMBERSHIP_CONFIG[this.DEFAULT_LEVEL].icon;
+          parsed.expiresAt = new Date(Date.now() + 365 * 100 * 24 * 60 * 60 * 1000); // 100年
+          this.saveMembership(parsed);
+        }
+        
         // 檢查並重置每日用量
         this.checkAndResetDailyUsage(parsed);
         
         this._membership.set(parsed);
       } else {
-        // 首次使用，創建免費會員
+        // 首次使用，創建會員
         this.initializeFreeMembership();
       }
     } catch (e) {
@@ -407,14 +521,21 @@ export class MembershipService {
   }
   
   /**
-   * 初始化免費會員（青銅戰士）
+   * 初始化會員
+   * 免登錄模式：榮耀王者（無限制）
+   * 正常模式：青銅戰士（免費試用）
    */
   private initializeFreeMembership(): void {
+    const level = this.SKIP_LOGIN ? this.DEFAULT_LEVEL : 'bronze';
+    const config = MEMBERSHIP_CONFIG[level];
+    
     const membership: MembershipInfo = {
-      level: 'bronze',
-      levelName: MEMBERSHIP_CONFIG.bronze.name,
-      levelIcon: MEMBERSHIP_CONFIG.bronze.icon,
+      level: level,
+      levelName: config.name,
+      levelIcon: config.icon,
       activatedAt: new Date(),
+      // 免登錄模式：100年後過期（相當於永久）
+      expiresAt: this.SKIP_LOGIN ? new Date(Date.now() + 365 * 100 * 24 * 60 * 60 * 1000) : undefined,
       machineId: this.getMachineId(),
       usage: this.getDefaultUsage(),
       inviteCode: this.generateInviteCode(),
@@ -422,6 +543,7 @@ export class MembershipService {
       inviteRewards: 0
     };
     
+    console.log(`[MembershipService] 初始化會員: ${config.icon} ${config.name}`);
     this.saveMembership(membership);
   }
   
@@ -706,8 +828,8 @@ export class MembershipService {
           '2 個賬戶',
           '每日 20 條消息',
           '每日 10 次 AI',
-          '3 個群組',
-          '基礎功能體驗'
+          '3 個群組 / 1 個關鍵詞集',
+          '基礎監控功能'
         ]
       },
       {
@@ -721,9 +843,9 @@ export class MembershipService {
           '5 個賬戶',
           '每日 100 條消息',
           '每日 50 次 AI',
-          '10 個群組',
-          '廣告發送',
-          '定時發送'
+          '10 個群組 / 5 個關鍵詞集',
+          '廣告發送功能',
+          '熱門客戶分析'
         ]
       },
       {
@@ -736,12 +858,11 @@ export class MembershipService {
         recommended: true,
         features: [
           '15 個賬戶',
-          '每日 500 條消息',
-          '每日 300 次 AI',
-          '50 個群組',
-          '數據導出',
-          '批量操作',
-          '關鍵詞回覆'
+          '每日 500 條消息 / 300 次 AI',
+          '30 個群組 / 20 個關鍵詞集',
+          '🆕 智能模式儀表盤',
+          '🆕 AI 智能洞察',
+          '數據導出 + 批量操作'
         ]
       },
       {
@@ -753,12 +874,11 @@ export class MembershipService {
         quotas: MEMBERSHIP_CONFIG.diamond.quotas,
         features: [
           '50 個賬戶',
-          '每日 2000 條消息',
-          '無限 AI 調用',
-          '200 個群組',
-          '多角色協作',
-          'AI 銷售漏斗',
-          '高級分析'
+          '每日 2000 條消息 / 無限 AI',
+          '100 個群組 / 50 個關鍵詞集',
+          '🆕 AI 策略規劃',
+          '🆕 AI 自動執行',
+          '多角色協作 + A/B測試'
         ]
       },
       {
@@ -770,9 +890,9 @@ export class MembershipService {
         quotas: MEMBERSHIP_CONFIG.star.quotas,
         features: [
           '100 個賬戶',
-          '無限消息',
-          '無限 AI',
-          '無限群組',
+          '每日 10000 條消息 / 無限 AI',
+          '300 個群組 / 100 個關鍵詞集',
+          'API 接口',
           '團隊管理',
           '智能防封',
           '優先支持'
@@ -786,13 +906,12 @@ export class MembershipService {
         yearlyPrice: 5999,
         quotas: MEMBERSHIP_CONFIG.king.quotas,
         features: [
-          '無限賬戶',
-          '無限一切',
-          'API 接口',
+          '無限賬戶 / 消息 / AI',
+          '無限群組 / 關鍵詞集 / 規則',
+          '所有功能全部解鎖',
           '自定義品牌',
           '1對1 專屬顧問',
-          '新功能內測',
-          '尊享特權'
+          '新功能內測體驗'
         ]
       }
     ];

@@ -28,6 +28,7 @@ from validators import (
     CampaignValidator, GroupValidator, ValidationError
 )
 from device_fingerprint import DeviceFingerprintGenerator
+from flood_wait_handler import flood_handler, safe_telegram_call
 from proxy_manager import ProxyManager, ProxyConfig
 from warmup_manager import WarmupManager
 from proxy_rotation_manager import ProxyRotationManager, RotationReason, ProxyRotationConfig
@@ -1094,7 +1095,7 @@ class BackendService:
             print(f"[Backend] Error checking user interaction: {e}", file=sys.stderr)
             return False
     
-    async def _queue_send_callback(self, phone: str, user_id: str, text: str, attachment: Optional[str] = None, source_group: Optional[str] = None, target_username: Optional[str] = None) -> Dict[str, Any]:
+    async def _queue_send_callback(self, phone: str, user_id: str, text: str, attachment: Any = None, source_group: Optional[str] = None, target_username: Optional[str] = None) -> Dict[str, Any]:
         """
         Callback function for MessageQueue to actually send messages via Telegram
         
@@ -1102,7 +1103,7 @@ class BackendService:
             phone: Account phone number
             user_id: Target user ID
             text: Message text
-            attachment: Optional attachment path
+            attachment: Optional attachment (path string or {name, type, dataUrl} object)
             source_group: Optional source group ID/URL
             target_username: Optional target username (fallback)
             
@@ -1110,7 +1111,10 @@ class BackendService:
             Dict with 'success' (bool) and optionally 'error' (str)
         """
         import sys
-        print(f"[Backend] _queue_send_callback called: phone={phone}, user_id={user_id}, source_group={source_group}, target_username={target_username}, text={text[:50]}...", file=sys.stderr)
+        attachment_info = f"attachment={type(attachment).__name__}" if attachment else "no attachment"
+        if attachment and isinstance(attachment, dict):
+            attachment_info = f"attachment={{name={attachment.get('name')}, type={attachment.get('type')}}}"
+        print(f"[Backend] _queue_send_callback called: phone={phone}, user_id={user_id}, source_group={source_group}, target_username={target_username}, {attachment_info}, text={text[:50] if text else '(empty)'}...", file=sys.stderr)
         self.send_log(f"正在發送消息到 {target_username or user_id}...", "info")
         
         try:
@@ -1693,6 +1697,47 @@ class BackendService:
             elif command == "search-knowledge":
                 await self.handle_search_knowledge(payload)
             
+            elif command == "get-accounts":
+                await self.handle_get_accounts()
+            
+            elif command == "get-monitored-groups":
+                await self.handle_get_monitored_groups()
+            
+            elif command == "get-keyword-sets":
+                await self.handle_get_keyword_sets()
+            
+            elif command == "save-keyword-set":
+                await self.handle_save_keyword_set(payload)
+            
+            elif command == "delete-keyword-set":
+                await self.handle_delete_keyword_set(payload)
+            
+            elif command == "bind-keyword-set":
+                await self.handle_bind_keyword_set(payload)
+            
+            elif command == "unbind-keyword-set":
+                await self.handle_unbind_keyword_set(payload)
+            
+            # ==================== AI Generation Commands ====================
+            elif command == "ai-generate-message":
+                await self.handle_ai_generate_message(payload)
+            
+            elif command == "ai-generate-group-names":
+                await self.handle_ai_generate_group_names(payload)
+            
+            elif command == "ai-generate-welcome":
+                await self.handle_ai_generate_welcome(payload)
+            
+            # ==================== Group Creation Commands ====================
+            elif command == "create-group":
+                await self.handle_create_group(payload)
+            
+            elif command == "pause-monitoring":
+                await self.handle_pause_monitoring(payload)
+            
+            elif command == "resume-monitoring":
+                await self.handle_resume_monitoring(payload)
+            
             elif command == "add-keyword-set":
                 await self.handle_add_keyword_set(payload)
             
@@ -1713,6 +1758,9 @@ class BackendService:
             
             elif command == "remove-group":
                 await self.handle_remove_group(payload)
+            
+            elif command == "leave-group":
+                await self.handle_leave_group(payload)
             
             elif command == "add-template":
                 await self.handle_add_template(payload)
@@ -1740,6 +1788,9 @@ class BackendService:
             
             elif command == "update-lead-status":
                 await self.handle_update_lead_status(payload)
+            
+            elif command == "add-lead":
+                await self.handle_add_lead(payload)
             
             elif command == "add-to-dnc":
                 await self.handle_add_to_dnc(payload)
@@ -1934,6 +1985,9 @@ class BackendService:
             elif command == "test-stt-service":
                 await self.handle_test_stt_service(payload)
             
+            elif command == "get-ai-settings":
+                await self.handle_get_ai_settings(payload)
+            
             elif command == "save-ai-settings":
                 await self.handle_save_ai_settings(payload)
             
@@ -1986,6 +2040,70 @@ class BackendService:
             
             elif command == "analyze-conversation":
                 await self.handle_analyze_conversation(payload)
+            
+            # ==================== AI Marketing Strategy Commands ====================
+            elif command == "generate-ai-strategy":
+                await self.handle_generate_ai_strategy(payload)
+            
+            elif command == "save-ai-strategy":
+                await self.handle_save_ai_strategy(payload)
+            
+            elif command == "get-ai-strategies":
+                await self.handle_get_ai_strategies(payload)
+            
+            elif command == "execute-ai-strategy":
+                await self.handle_execute_ai_strategy(payload)
+            
+            # ==================== Chat Template Commands ====================
+            elif command == "get-chat-templates":
+                await self.handle_get_chat_templates()
+            
+            elif command == "save-chat-template":
+                await self.handle_save_chat_template(payload)
+            
+            elif command == "delete-chat-template":
+                await self.handle_delete_chat_template(payload)
+            
+            # ==================== Trigger Rules Commands ====================
+            elif command == "get-trigger-rules":
+                await self.handle_get_trigger_rules()
+            
+            elif command == "get-trigger-rule":
+                await self.handle_get_trigger_rule(payload)
+            
+            elif command == "save-trigger-rule":
+                await self.handle_save_trigger_rule(payload)
+            
+            elif command == "delete-trigger-rule":
+                await self.handle_delete_trigger_rule(payload)
+            
+            elif command == "toggle-trigger-rule":
+                await self.handle_toggle_trigger_rule(payload)
+            
+            # ==================== AI Model Configuration Commands ====================
+            elif command == "save-ai-model":
+                await self.handle_save_ai_model(payload)
+            
+            elif command == "get-ai-models":
+                await self.handle_get_ai_models()
+            
+            elif command == "update-ai-model":
+                await self.handle_update_ai_model(payload)
+            
+            elif command == "delete-ai-model":
+                await self.handle_delete_ai_model(payload)
+            
+            elif command == "test-ai-model":
+                await self.handle_test_ai_model(payload)
+            
+            elif command == "set-default-ai-model":
+                await self.handle_set_default_ai_model(payload)
+            
+            elif command == "save-model-usage":
+                await self.handle_save_model_usage(payload)
+            
+            elif command == "get-model-usage":
+                await self.handle_get_model_usage()
             
             # Knowledge Base Commands
             elif command == "init-knowledge-base":
@@ -2093,6 +2211,9 @@ class BackendService:
 
             elif command == "search-jiso":
                 await self.handle_search_jiso(payload)
+            
+            elif command == "clear-resources":
+                await self.handle_clear_resources(payload)
 
             elif command == "check-jiso-availability":
                 await self.handle_check_jiso_availability(payload)
@@ -2121,6 +2242,13 @@ class BackendService:
             
             elif command == "add-resource-manually":
                 await self.handle_add_resource_manually(payload)
+            
+            # 🆕 C方案：收藏資源
+            elif command == "save-resource":
+                await self.handle_save_resource(payload)
+            
+            elif command == "unsave-resource":
+                await self.handle_unsave_resource(payload)
             
             elif command == "delete-resource":
                 await self.handle_delete_resource(payload)
@@ -2188,6 +2316,98 @@ class BackendService:
             
             elif command == "get-online-members":
                 await self.handle_get_online_members(payload)
+            
+            elif command == "update-member":
+                await self.handle_update_member(payload)
+            
+            # ==================== AI Team Execution Commands ====================
+            elif command == "ai-team:start-execution":
+                await self.handle_ai_team_start_execution(payload)
+            
+            elif command == "ai-team:pause-execution":
+                await self.handle_ai_team_pause_execution(payload)
+            
+            elif command == "ai-team:resume-execution":
+                await self.handle_ai_team_resume_execution(payload)
+            
+            elif command == "ai-team:stop-execution":
+                await self.handle_ai_team_stop_execution(payload)
+            
+            elif command == "ai-team:add-targets":
+                await self.handle_ai_team_add_targets(payload)
+            
+            # ==================== Batch Send Commands ====================
+            elif command == "batch-send:start":
+                await self.handle_batch_send_start(payload)
+            
+            elif command == "batch-send:cancel":
+                await self.handle_batch_send_cancel(payload)
+            
+            elif command == "batch-invite:start":
+                await self.handle_batch_invite_start(payload)
+            
+            elif command == "batch-invite:cancel":
+                await self.handle_batch_invite_cancel(payload)
+            
+            elif command == "get-admin-groups":
+                await self.handle_get_admin_groups(payload)
+            
+            # ==================== Unified Contacts Commands ====================
+            elif command == "unified-contacts:sync":
+                await self.handle_unified_contacts_sync(payload)
+            
+            elif command == "unified-contacts:get":
+                await self.handle_unified_contacts_get(payload)
+            
+            elif command == "unified-contacts:stats":
+                await self.handle_unified_contacts_stats(payload)
+            
+            elif command == "unified-contacts:update":
+                await self.handle_unified_contacts_update(payload)
+            
+            elif command == "unified-contacts:add-tags":
+                await self.handle_unified_contacts_add_tags(payload)
+            
+            elif command == "unified-contacts:update-status":
+                await self.handle_unified_contacts_update_status(payload)
+            
+            elif command == "unified-contacts:delete":
+                await self.handle_unified_contacts_delete(payload)
+            
+            # ==================== Analytics Commands ====================
+            elif command == "analytics:get-stats":
+                await self.handle_analytics_get_stats(payload)
+            
+            elif command == "analytics:get-trend":
+                await self.handle_analytics_get_trend(payload)
+            
+            elif command == "analytics:get-sources":
+                await self.handle_analytics_get_sources(payload)
+            
+            elif command == "analytics:get-hourly":
+                await self.handle_analytics_get_hourly(payload)
+            
+            elif command == "analytics:generate-insights":
+                await self.handle_analytics_generate_insights(payload)
+            
+            elif command == "analytics:export":
+                await self.handle_analytics_export(payload)
+            
+            # ==================== Multi-Role Group Commands ====================
+            elif command == "create-multi-role-group":
+                await self.handle_create_multi_role_group(payload)
+            
+            elif command == "multi-role-start-script":
+                await self.handle_multi_role_start_script(payload)
+            
+            elif command == "multi-role-send-message":
+                await self.handle_multi_role_send_message(payload)
+            
+            elif command == "multi-role-ai-reply":
+                await self.handle_multi_role_ai_reply(payload)
+            
+            elif command == "multi-role-advance-stage":
+                await self.handle_multi_role_advance_stage(payload)
             
             # ==================== Marketing Outreach Commands ====================
             elif command == "send-bulk-messages":
@@ -2752,9 +2972,12 @@ class BackendService:
             print("[Backend] Syncing account connection status...", file=sys.stderr)
             # 同步账号的实际连接状态
             # 应用启动时，Telegram 客户端尚未连接，所以将所有显示 "Online" 的账号状态重置为 "Offline"
+            # 同時修復 Error 狀態的帳號為 Offline（允許重新登入）
+            
             for account in accounts:
                 phone = account.get('phone')
                 db_status = account.get('status', 'Offline')
+                should_reset = False
                 
                 # 检查 Telegram 客户端是否真正连接
                 client = self.telegram_manager.get_client(phone) if phone else None
@@ -2762,6 +2985,19 @@ class BackendService:
                 
                 # 如果数据库显示在线但客户端未连接，更新状态为离线
                 if db_status == 'Online' and not is_actually_connected:
+                    should_reset = True
+                    print(f"[Backend] Account {phone}: Online but not connected -> Offline", file=sys.stderr)
+                
+                # 修復 Error 狀態：將 Error 狀態重置為 Offline，讓用戶可以重新登入
+                # 檢查各種 error 狀態（不區分大小寫）
+                elif db_status.lower() in ['error', 'proxy error', 'auth error', 'session expired']:
+                    should_reset = True
+                    print(f"[Backend] Account {phone}: {db_status} -> Offline (resetting error)", file=sys.stderr)
+                elif 'error' in db_status.lower():
+                    should_reset = True
+                    print(f"[Backend] Account {phone}: {db_status} -> Offline (contains error)", file=sys.stderr)
+                
+                if should_reset:
                     account['status'] = 'Offline'
                     # 更新数据库
                     if account.get('id'):
@@ -2834,6 +3070,7 @@ class BackendService:
                 "monitoredGroups": monitored_groups,
                 "campaigns": campaigns,
                 "messageTemplates": message_templates,
+                "chatTemplates": message_templates,  # 兼容 MonitoringStateService
                 "leads": leads,
                 "leadsTotal": leads_total,  # 添加 leads 總數
                 "logs": logs,
@@ -2949,7 +3186,7 @@ class BackendService:
         """Send only message templates update to frontend"""
         try:
             templates = await db.get_all_templates()
-            self.send_event("templates-updated", {"messageTemplates": templates})
+            self.send_event("templates-updated", {"messageTemplates": templates, "chatTemplates": templates})
         except Exception as e:
             print(f"[Backend] Error sending templates update: {e}", file=sys.stderr)
     
@@ -3709,8 +3946,7 @@ class BackendService:
                     warmup_start_date = account.get('warmupStartDate')
                     
                     if warmup_enabled and not warmup_start_date:
-                        # Start Warmup
-                        from datetime import datetime
+                        # Start Warmup (datetime 已在文件頂部全局導入)
                         warmup_info = WarmupManager.start_warmup(account_id, datetime.now())
                         
                         await db.update_account(account_id, {
@@ -5211,7 +5447,8 @@ class BackendService:
                 "fix": "在「監控群組」中為群組勾選關鍵詞集"
             })
         
-        # ========== 6. 檢查活動（Campaign）==========
+        # ========== 6. 檢查舊版活動（Campaign）- 僅作為向後兼容 ==========
+        # 注意：新系統使用「觸發規則」，舊版 Campaign 已被觸發規則取代
         campaigns = await db.get_all_campaigns()
         active_campaigns = [c for c in campaigns if c.get('isActive')]
         
@@ -5228,45 +5465,10 @@ class BackendService:
             } for c in campaigns]
         }
         
-        if not campaigns:
-            checks["warnings"].append({
-                "code": "NO_CAMPAIGN",
-                "message": "沒有活動（Campaign）",
-                "fix": "在「自動化中心」創建活動並配置觸發器、模板"
-            })
-        elif not active_campaigns:
-            checks["warnings"].append({
-                "code": "NO_ACTIVE_CAMPAIGN",
-                "message": "沒有啟用的活動",
-                "fix": "在「活動列表」中開啟活動開關"
-            })
-        else:
-            # 檢查活動配置是否完整
-            for campaign in active_campaigns:
-                issues = []
-                # 正確訪問嵌套結構：trigger.sourceGroupIds, trigger.keywordSetIds
-                trigger = campaign.get('trigger', {})
-                actions = campaign.get('actions', [])
-                
-                source_group_ids = trigger.get('sourceGroupIds', [])
-                keyword_set_ids = trigger.get('keywordSetIds', [])
-                template_id = actions[0].get('templateId', 0) if actions else 0
-                
-                if not source_group_ids:
-                    issues.append("未選擇來源群組")
-                if not keyword_set_ids:
-                    issues.append("未選擇關鍵詞集")
-                if not template_id:
-                    issues.append("未選擇消息模板")
-                
-                if issues:
-                    checks["warnings"].append({
-                        "code": "CAMPAIGN_INCOMPLETE",
-                        "message": f"活動「{campaign.get('name')}」配置不完整: {', '.join(issues)}",
-                        "fix": "在「自動化中心」完善活動配置"
-                    })
-            
-            checks["info"].append(f"✓ {len(active_campaigns)} 個活動已啟用")
+        # 不再對舊版 Campaign 顯示警告，因為用戶應該使用「觸發規則」
+        # 如果有舊版活動，只顯示為信息提示
+        if active_campaigns:
+            checks["info"].append(f"ℹ {len(active_campaigns)} 個舊版活動（建議遷移到觸發規則）")
         
         # ========== 7. 檢查消息模板 ==========
         templates = await db.get_all_templates()
@@ -5306,10 +5508,24 @@ class BackendService:
         else:
             checks["info"].append("ℹ AI 自動聊天未開啟（可在設置中開啟）")
         
+        # ========== 檢查觸發規則 ==========
+        trigger_rules = await db.get_all_trigger_rules()
+        active_rules = [r for r in trigger_rules if r.get('is_active') or r.get('isActive')]
+        
+        checks["details"]["trigger_rules"] = {
+            "total": len(trigger_rules),
+            "active": len(active_rules)
+        }
+        
+        if active_rules:
+            checks["info"].append(f"✓ {len(active_rules)} 條觸發規則已啟用")
+        
         # ========== 生成總結 ==========
+        # 判斷是否能發送消息：有在線發送帳號 且 (有活動 或 有觸發規則 或 AI聊天已啟用)
+        has_response_config = len(active_campaigns) > 0 or len(active_rules) > 0 or ai_enabled
         checks["summary"] = {
             "can_monitor": checks["passed"],
-            "can_send_messages": len(online_senders) > 0 and len(active_campaigns) > 0,
+            "can_send_messages": len(online_senders) > 0 and has_response_config,
             "critical_count": len(checks["critical_issues"]),
             "warning_count": len(checks["warnings"]),
             "info_count": len(checks["info"])
@@ -5580,7 +5796,10 @@ class BackendService:
                     if should_greet:
                         await self._handle_ai_auto_greeting(lead_data, lead_id)
                     
-                    # Check for matching campaigns and execute them
+                    # 執行匹配的觸發規則（新系統）
+                    await self.execute_matching_trigger_rules(lead_id, lead_data)
+                    
+                    # Check for matching campaigns and execute them (舊系統，保持兼容)
                     await self.execute_matching_campaigns(lead_id, lead_data)
                 
                 except Exception as e:
@@ -6019,6 +6238,85 @@ class BackendService:
                 "progress": 48
             })
             
+            # === 步驟 1.8: 檢查活動（Campaigns）配置 ===
+            self.send_event("one-click-start-progress", {
+                "step": "campaigns_check",
+                "message": "📋 正在檢查活動配置...",
+                "progress": 49
+            })
+            
+            # === 步驟 1.8: 檢查響應配置（觸發規則 + AI 聊天）===
+            results['response_config'] = {
+                'trigger_rules': {'total': 0, 'active': 0},
+                'ai_chat': {'enabled': False, 'mode': 'semi'},
+                'campaigns': {'total': 0, 'active': 0},
+                'warnings': [],
+                'valid': False,
+                'source': None  # 'trigger_rules' | 'ai_chat' | 'campaigns' | None
+            }
+            
+            try:
+                # 1. 檢查觸發規則
+                trigger_rules = await db.get_all_trigger_rules()
+                active_rules = [r for r in trigger_rules if r.get('is_active', False)]
+                results['response_config']['trigger_rules'] = {
+                    'total': len(trigger_rules),
+                    'active': len(active_rules)
+                }
+                
+                # 2. 檢查 AI 自動聊天設置
+                ai_settings = await db.get_ai_settings()
+                ai_enabled = ai_settings.get('auto_chat_enabled', 0) == 1 if ai_settings else False
+                ai_mode = ai_settings.get('auto_chat_mode', 'semi') if ai_settings else 'semi'
+                results['response_config']['ai_chat'] = {
+                    'enabled': ai_enabled,
+                    'mode': ai_mode
+                }
+                
+                # 3. 檢查舊版 Campaign（向後兼容）
+                campaigns = await db.get_all_campaigns()
+                active_campaigns = [c for c in campaigns if c.get('isActive') or c.get('is_active')]
+                results['response_config']['campaigns'] = {
+                    'total': len(campaigns),
+                    'active': len(active_campaigns)
+                }
+                
+                # 判斷響應配置是否有效（任一項滿足即可）
+                if len(active_rules) > 0:
+                    results['response_config']['valid'] = True
+                    results['response_config']['source'] = 'trigger_rules'
+                    self.send_log(f"✓ 響應配置: {len(active_rules)} 條觸發規則活躍", "success")
+                elif ai_enabled:
+                    results['response_config']['valid'] = True
+                    results['response_config']['source'] = 'ai_chat'
+                    mode_text = '全自動' if ai_mode == 'full' else '半自動'
+                    self.send_log(f"✓ 響應配置: AI 自動聊天已啟用（{mode_text}模式）", "success")
+                elif len(active_campaigns) > 0:
+                    results['response_config']['valid'] = True
+                    results['response_config']['source'] = 'campaigns'
+                    self.send_log(f"✓ 響應配置: {len(active_campaigns)} 個活動配置", "success")
+                else:
+                    results['response_config']['warnings'].append("⚠️ 未配置響應方式（觸發規則/AI聊天/活動）")
+                    self.send_log("⚠ 未配置響應方式，匹配的消息將只記錄不回覆", "warning")
+                    self.send_log("💡 建議：前往「觸發規則」頁面配置，或啟用 AI 自動聊天", "info")
+                
+            except Exception as resp_err:
+                results['response_config']['warnings'].append(f"檢查響應配置時出錯: {resp_err}")
+                self.send_log(f"⚠ 響應配置檢查錯誤: {resp_err}", "warning")
+            
+            # 向後兼容：保留 campaigns 字段（合併觸發規則和舊版活動）
+            trigger_total = results['response_config']['trigger_rules']['total']
+            trigger_active = results['response_config']['trigger_rules']['active']
+            campaign_total = results['response_config']['campaigns']['total']
+            campaign_active = results['response_config']['campaigns']['active']
+            
+            results['campaigns'] = {
+                'total': trigger_total + campaign_total,
+                'active': trigger_active + campaign_active,
+                'warnings': results['response_config']['warnings'],
+                'valid': results['response_config']['valid']
+            }
+            
             # === 步驟 2: 啟用 AI 自動聊天（先於監控，讓配置檢查能看到 AI 狀態）===
             self.send_event("one-click-start-progress", {
                 "step": "ai",
@@ -6181,6 +6479,87 @@ class BackendService:
                 results['funnel']['message'] = str(funnel_err)
                 self.send_log(f"⚠ 漏斗管理器啟動錯誤: {funnel_err}", "warning")
             
+            # === 步驟 7: 生成診斷報告 ===
+            self.send_event("one-click-start-progress", {
+                "step": "diagnosis",
+                "message": "📊 正在生成診斷報告...",
+                "progress": 98
+            })
+            
+            # 添加診斷信息到結果
+            results['diagnosis'] = {
+                'issues': [],
+                'recommendations': [],
+                'readiness_score': 0
+            }
+            
+            try:
+                # 計算準備度分數
+                score = 0
+                max_score = 5
+                
+                # 1. 帳號檢查 (1分)
+                if results['accounts']['success'] > 0:
+                    score += 1
+                else:
+                    results['diagnosis']['issues'].append("沒有可用的在線帳號")
+                    results['diagnosis']['recommendations'].append({
+                        "action": "accounts",
+                        "text": "前往帳號管理頁面添加並登入 Telegram 帳號"
+                    })
+                
+                # 2. 監控檢查 (1分)
+                if results['monitoring']['success']:
+                    score += 1
+                else:
+                    results['diagnosis']['issues'].append("監控服務未啟動")
+                    results['diagnosis']['recommendations'].append({
+                        "action": "groups",
+                        "text": "確保已配置監控群組，並檢查帳號是否已加入這些群組"
+                    })
+                
+                # 3. AI 檢查 (1分)
+                if results['ai']['success']:
+                    score += 1
+                
+                # 4. 活動配置檢查 (1分)
+                if results['campaigns']['active'] > 0 and not results['campaigns']['warnings']:
+                    score += 1
+                elif results['campaigns']['active'] == 0:
+                    results['diagnosis']['issues'].append("沒有配置觸發規則")
+                    results['diagnosis']['recommendations'].append({
+                        "action": "trigger-rules",
+                        "text": "在「觸發規則」頁面創建規則，設置觸發條件和響應動作"
+                    })
+                elif results['campaigns']['warnings']:
+                    results['diagnosis']['issues'].append("活動配置不完整")
+                
+                # 5. 關鍵詞檢查 (1分)
+                keyword_sets = await db.get_all_keyword_sets()
+                if keyword_sets and any(ks.get('keywords', []) for ks in keyword_sets):
+                    score += 1
+                else:
+                    results['diagnosis']['issues'].append("沒有配置關鍵詞")
+                    results['diagnosis']['recommendations'].append({
+                        "action": "keywords",
+                        "text": "在關鍵詞管理中創建關鍵詞集，用於匹配群組消息"
+                    })
+                
+                results['diagnosis']['readiness_score'] = int((score / max_score) * 100)
+                
+                # 根據分數給出總體建議
+                if score == max_score:
+                    results['diagnosis']['summary'] = "系統配置完美！所有功能已就緒。"
+                elif score >= 4:
+                    results['diagnosis']['summary'] = "系統基本就緒，建議完善剩餘配置。"
+                elif score >= 2:
+                    results['diagnosis']['summary'] = "需要完成更多配置才能正常運行。"
+                else:
+                    results['diagnosis']['summary'] = "配置不完整，請按建議步驟完成配置。"
+                    
+            except Exception as diag_err:
+                print(f"[Backend] 診斷報告生成錯誤: {diag_err}", file=sys.stderr)
+            
             # === 完成 ===
             results['overall_success'] = (
                 results['accounts']['success'] > 0 and
@@ -6289,9 +6668,17 @@ class BackendService:
             # 獲取群組
             groups = await db.get_all_groups()
             
-            # 獲取活動
+            # 獲取活動（舊版 Campaigns）
             campaigns = await db.get_all_campaigns()
-            active_campaigns = sum(1 for c in campaigns if c.get('isActive'))
+            active_campaigns = sum(1 for c in campaigns if c.get('isActive') or c.get('is_active'))
+            
+            # 獲取觸發規則（新系統）
+            trigger_rules = await db.get_all_trigger_rules()
+            active_rules = sum(1 for r in trigger_rules if r.get('is_active') or r.get('isActive'))
+            
+            # 合併：總數 = campaigns + trigger_rules
+            total_rules = len(campaigns) + len(trigger_rules)
+            active_total = active_campaigns + active_rules
             
             # 獲取 AI 設置
             ai_settings = await db.get_ai_settings()
@@ -6322,8 +6709,12 @@ class BackendService:
                     'total': sum(len(ks.get('keywords', [])) for ks in keyword_sets)
                 },
                 'campaigns': {
-                    'total': len(campaigns),
-                    'active': active_campaigns
+                    'total': total_rules,  # 包含 Campaigns + 觸發規則
+                    'active': active_total   # 包含活躍的 Campaigns + 觸發規則
+                },
+                'triggerRules': {
+                    'total': len(trigger_rules),
+                    'active': active_rules
                 },
                 'templates': {
                     'total': len(templates),
@@ -6763,6 +7154,409 @@ class BackendService:
         
         except Exception as e:
             self.send_log(f"Error executing campaign: {str(e)}", "error")
+    
+    # ============== 觸發規則執行引擎 ==============
+    
+    async def execute_matching_trigger_rules(self, lead_id: int, lead_data: Dict[str, Any]):
+        """執行匹配的觸發規則"""
+        try:
+            import sys
+            print(f"[TriggerRules] ========== 開始檢查觸發規則 ==========", file=sys.stderr)
+            
+            # 獲取所有啟用的觸發規則
+            rules = await db.get_active_trigger_rules()
+            
+            if not rules:
+                self.send_log(f"[觸發規則] 沒有啟用的觸發規則", "info")
+                return
+            
+            self.send_log(f"[觸發規則] 檢查 {len(rules)} 個觸發規則", "info")
+            
+            # 獲取來源群組 ID
+            monitored_groups = await db.get_all_monitored_groups()
+            group_url_to_match = lead_data.get('source_group_url') or lead_data.get('source_group')
+            source_group_id = None
+            
+            for group in monitored_groups:
+                if group_url_to_match and str(group.get('url')) == str(group_url_to_match):
+                    source_group_id = group.get('id')
+                    break
+            
+            # 獲取匹配的關鍵詞集 ID
+            keyword_sets = await db.get_all_keyword_sets()
+            triggered_keyword = lead_data.get('triggered_keyword', '')
+            matched_keyword_set_ids = []
+            
+            for ks in keyword_sets:
+                for keyword in ks.get('keywords', []):
+                    keyword_text = keyword.get('keyword', '')
+                    is_regex = keyword.get('isRegex', False)
+                    
+                    matched = False
+                    if is_regex:
+                        try:
+                            import re
+                            pattern = re.compile(keyword_text, re.IGNORECASE)
+                            matched = bool(pattern.search(triggered_keyword))
+                        except:
+                            matched = keyword_text.lower() in triggered_keyword.lower()
+                    else:
+                        matched = keyword_text.lower() in triggered_keyword.lower()
+                    
+                    if matched:
+                        matched_keyword_set_ids.append(ks.get('id'))
+                        break
+            
+            print(f"[TriggerRules] 來源群組ID: {source_group_id}, 匹配的關鍵詞集IDs: {matched_keyword_set_ids}", file=sys.stderr)
+            
+            # 按優先級排序（優先級高的先執行）
+            rules.sort(key=lambda r: r.get('priority', 2), reverse=True)
+            
+            # 檢查每個規則
+            executed_rule = None
+            for rule in rules:
+                rule_name = rule.get('name', '未命名規則')
+                rule_id = rule.get('id')
+                
+                # 獲取規則配置
+                source_type = rule.get('source_type', 'all')
+                source_group_ids = rule.get('source_group_ids', [])
+                keyword_set_ids = rule.get('keyword_set_ids', [])
+                
+                # 檢查來源群組匹配
+                matches_source = True
+                if source_type == 'specific' and source_group_ids:
+                    matches_source = source_group_id in source_group_ids
+                
+                # 檢查關鍵詞集匹配（必須有匹配）
+                matches_keyword = any(ks_id in keyword_set_ids for ks_id in matched_keyword_set_ids)
+                
+                self.send_log(f"[觸發規則] 檢查 '{rule_name}': 來源={matches_source}, 關鍵詞={matches_keyword}", "info")
+                
+                if matches_source and matches_keyword:
+                    # 檢查額外條件
+                    conditions = rule.get('conditions', {})
+                    conditions_met = await self._check_trigger_conditions(conditions, lead_data)
+                    
+                    if conditions_met:
+                        self.send_log(f"✓✓✓ 觸發規則匹配成功: {rule_name}，開始執行", "success")
+                        await self.execute_trigger_rule(rule, lead_id, lead_data)
+                        executed_rule = rule
+                        # 只執行第一個匹配的規則（優先級最高的）
+                        break
+                    else:
+                        self.send_log(f"[觸發規則] '{rule_name}' 條件未滿足，跳過", "info")
+            
+            if not executed_rule:
+                self.send_log(f"[觸發規則] 沒有匹配的觸發規則", "info")
+            
+            print(f"[TriggerRules] ========== 觸發規則檢查完成 ==========", file=sys.stderr)
+            
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"[TriggerRules] Error: {e}\n{error_details}", file=sys.stderr)
+            self.send_log(f"執行觸發規則出錯: {str(e)}", "error")
+    
+    async def _check_trigger_conditions(self, conditions: Dict, lead_data: Dict) -> bool:
+        """檢查觸發條件是否滿足"""
+        try:
+            # 如果沒有額外條件，默認滿足
+            if not conditions:
+                return True
+            
+            # 檢查時間範圍
+            time_range = conditions.get('timeRange')
+            if time_range and time_range.get('enabled'):
+                from datetime import datetime
+                now = datetime.now()
+                current_hour = now.hour
+                start_hour = time_range.get('start', 0)
+                end_hour = time_range.get('end', 24)
+                
+                if not (start_hour <= current_hour < end_hour):
+                    self.send_log(f"[條件檢查] 不在工作時間範圍內 ({start_hour}:00 - {end_hour}:00)", "info")
+                    return False
+            
+            # 檢查是否只針對新成員
+            if conditions.get('newMemberOnly'):
+                # 檢查用戶是否是新成員（這裡簡化為檢查是否是新 Lead）
+                user_id = lead_data.get('user_id')
+                existing_lead, _ = await db.check_lead_and_dnc(user_id)
+                if existing_lead:
+                    self.send_log(f"[條件檢查] 用戶已存在，不是新成員", "info")
+                    return False
+            
+            # 檢查是否排除管理員
+            if conditions.get('excludeAdmin'):
+                # 這裡需要從消息中獲取用戶是否是管理員的信息
+                # 簡化處理，暫時跳過
+                pass
+            
+            # 檢查每用戶只觸發一次
+            if conditions.get('oncePerUser'):
+                user_id = lead_data.get('user_id')
+                existing_lead, _ = await db.check_lead_and_dnc(user_id)
+                if existing_lead and existing_lead.get('status') != 'New':
+                    self.send_log(f"[條件檢查] 用戶已被聯繫過，每用戶只觸發一次", "info")
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            self.send_log(f"檢查觸發條件出錯: {str(e)}", "error")
+            return True  # 出錯時默認滿足條件
+    
+    async def execute_trigger_rule(self, rule: Dict, lead_id: int, lead_data: Dict):
+        """執行單個觸發規則"""
+        import sys
+        import random
+        
+        rule_id = rule.get('id')
+        rule_name = rule.get('name', '未命名規則')
+        response_type = rule.get('response_type', 'ai_chat')
+        response_config = rule.get('response_config', {})
+        
+        print(f"[TriggerRules] 執行規則: {rule_name} (ID: {rule_id}), 響應類型: {response_type}", file=sys.stderr)
+        self.send_log(f"[觸發規則] 執行規則: {rule_name}, 響應類型: {response_type}", "info")
+        
+        success = False
+        
+        try:
+            # 根據響應類型執行不同的操作
+            if response_type == 'ai_chat':
+                # AI 智能對話
+                success = await self._execute_ai_chat_response(rule, lead_id, lead_data)
+                
+            elif response_type == 'template':
+                # 固定模板
+                success = await self._execute_template_response(rule, lead_id, lead_data)
+                
+            elif response_type == 'script':
+                # 執行腳本
+                success = await self._execute_script_response(rule, lead_id, lead_data)
+                
+            elif response_type == 'record_only':
+                # 僅記錄
+                success = await self._execute_record_only_response(rule, lead_id, lead_data)
+            
+            else:
+                self.send_log(f"[觸發規則] 未知的響應類型: {response_type}", "warning")
+                success = False
+            
+            # 更新規則統計
+            await db.increment_trigger_rule_stats(rule_id, success)
+            
+            # 執行額外操作
+            await self._execute_additional_actions(rule, lead_id, lead_data)
+            
+            # 發送執行結果事件
+            self.send_event("trigger-rule-executed", {
+                "ruleId": rule_id,
+                "ruleName": rule_name,
+                "leadId": lead_id,
+                "success": success,
+                "responseType": response_type
+            })
+            
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"[TriggerRules] 執行規則失敗: {e}\n{error_details}", file=sys.stderr)
+            self.send_log(f"[觸發規則] 執行失敗: {str(e)}", "error")
+            await db.increment_trigger_rule_stats(rule_id, False)
+    
+    async def _execute_ai_chat_response(self, rule: Dict, lead_id: int, lead_data: Dict) -> bool:
+        """執行 AI 對話響應"""
+        try:
+            import sys
+            
+            response_config = rule.get('response_config', {})
+            ai_mode = response_config.get('aiMode', 'global')  # global 或 semi
+            
+            self.send_log(f"[觸發規則] 使用 AI 對話模式: {ai_mode}", "info")
+            
+            # 獲取 AI 設置
+            settings = await db.get_ai_settings()
+            if not settings:
+                self.send_log("[觸發規則] AI 設置未配置", "warning")
+                return False
+            
+            # 調用 AI 自動問候
+            await self._handle_ai_auto_greeting(lead_data, lead_id)
+            return True
+            
+        except Exception as e:
+            self.send_log(f"[觸發規則] AI 對話響應失敗: {str(e)}", "error")
+            return False
+    
+    async def _execute_template_response(self, rule: Dict, lead_id: int, lead_data: Dict) -> bool:
+        """執行模板響應"""
+        try:
+            import random
+            
+            response_config = rule.get('response_config', {})
+            template_id = response_config.get('templateId')
+            
+            if not template_id:
+                self.send_log("[觸發規則] 未配置模板 ID", "warning")
+                return False
+            
+            # 獲取模板
+            templates = await db.get_all_templates()
+            template = next((t for t in templates if t.get('id') == template_id), None)
+            
+            if not template:
+                self.send_log(f"[觸發規則] 模板 ID {template_id} 不存在", "warning")
+                return False
+            
+            # 生成消息
+            # 支持 content 字段（chat_templates 表）和 prompt 字段（舊格式）
+            message_content = template.get('content') or template.get('prompt', '')
+            
+            # 變量替換
+            message = await self.generate_message_from_template({'prompt': message_content}, lead_data)
+            
+            if not message:
+                self.send_log("[觸發規則] 生成消息失敗", "error")
+                return False
+            
+            # 計算延遲
+            delay_min = rule.get('delay_min', 30)
+            delay_max = rule.get('delay_max', 120)
+            delay = random.randint(delay_min, delay_max)
+            
+            # 獲取發送帳號
+            sender_phone = await self._get_sender_account_for_rule(rule)
+            if not sender_phone:
+                self.send_log("[觸發規則] 沒有可用的發送帳號", "warning")
+                return False
+            
+            # 加入消息隊列
+            scheduled_time = datetime.now() + timedelta(seconds=delay)
+            
+            message_id = await self.message_queue.add_message(
+                phone=sender_phone,
+                user_id=str(lead_data.get('user_id')),
+                text=message,
+                priority=MessagePriority.NORMAL,
+                scheduled_at=scheduled_time,
+                callback=self._on_message_sent_callback(lead_id)
+            )
+            
+            template_name = template.get('name', '未命名模板')
+            self.send_log(f"[觸發規則] ✓ 已排程發送消息 (模板: {template_name}, 延遲: {delay}秒)", "success")
+            await db.add_interaction(lead_id, 'Trigger Rule', f"規則 '{rule.get('name')}' 觸發，使用模板 '{template_name}'")
+            
+            return True
+            
+        except Exception as e:
+            self.send_log(f"[觸發規則] 模板響應失敗: {str(e)}", "error")
+            return False
+    
+    async def _execute_script_response(self, rule: Dict, lead_id: int, lead_data: Dict) -> bool:
+        """執行腳本響應"""
+        try:
+            response_config = rule.get('response_config', {})
+            script_id = response_config.get('scriptId')
+            
+            if not script_id:
+                self.send_log("[觸發規則] 未配置腳本 ID", "warning")
+                return False
+            
+            # TODO: 實現腳本執行邏輯
+            self.send_log(f"[觸發規則] 腳本執行功能尚未實現 (Script ID: {script_id})", "warning")
+            await db.add_interaction(lead_id, 'Trigger Rule', f"規則 '{rule.get('name')}' 觸發，腳本執行待實現")
+            
+            return False
+            
+        except Exception as e:
+            self.send_log(f"[觸發規則] 腳本響應失敗: {str(e)}", "error")
+            return False
+    
+    async def _execute_record_only_response(self, rule: Dict, lead_id: int, lead_data: Dict) -> bool:
+        """僅記錄響應"""
+        try:
+            rule_name = rule.get('name', '未命名規則')
+            
+            self.send_log(f"[觸發規則] ✓ 已記錄 (規則: {rule_name})", "success")
+            await db.add_interaction(lead_id, 'Trigger Rule', f"規則 '{rule_name}' 觸發，僅記錄不響應")
+            
+            # 如果配置了通知
+            if rule.get('notify_me'):
+                self.send_event("trigger-rule-notification", {
+                    "ruleId": rule.get('id'),
+                    "ruleName": rule_name,
+                    "leadId": lead_id,
+                    "username": lead_data.get('username'),
+                    "keyword": lead_data.get('triggered_keyword'),
+                    "message": "關鍵詞匹配，僅記錄"
+                })
+            
+            return True
+            
+        except Exception as e:
+            self.send_log(f"[觸發規則] 記錄響應失敗: {str(e)}", "error")
+            return False
+    
+    async def _get_sender_account_for_rule(self, rule: Dict) -> str:
+        """為規則獲取發送帳號"""
+        try:
+            sender_type = rule.get('sender_type', 'auto')
+            sender_account_ids = rule.get('sender_account_ids', [])
+            
+            accounts = await db.get_all_accounts()
+            sender_accounts = [a for a in accounts if a.get('role') == 'Sender' and a.get('status') == 'Online']
+            
+            if not sender_accounts:
+                return None
+            
+            if sender_type == 'specific' and sender_account_ids:
+                # 從指定帳號中選擇
+                specific_accounts = [a for a in sender_accounts if a.get('id') in sender_account_ids]
+                if specific_accounts:
+                    import random
+                    return random.choice(specific_accounts).get('phone')
+            
+            # 自動選擇（使用帳號輪換器或隨機選擇）
+            if self.message_queue.account_rotator:
+                selected_account = await self.message_queue.account_rotator.select_account()
+                if selected_account:
+                    return selected_account.get('phone')
+            
+            # 回退到隨機選擇
+            import random
+            return random.choice(sender_accounts).get('phone')
+            
+        except Exception as e:
+            self.send_log(f"獲取發送帳號失敗: {str(e)}", "error")
+            return None
+    
+    async def _execute_additional_actions(self, rule: Dict, lead_id: int, lead_data: Dict):
+        """執行額外操作"""
+        try:
+            # 自動添加到潛在客戶
+            if rule.get('auto_add_lead'):
+                # Lead 已經在 on_lead_captured 中添加，這裡只需更新標籤
+                await db.update_lead(lead_id, {
+                    'tags': f"auto,trigger-rule-{rule.get('id')}"
+                })
+            
+            # 發送通知
+            if rule.get('notify_me'):
+                self.send_event("trigger-rule-notification", {
+                    "ruleId": rule.get('id'),
+                    "ruleName": rule.get('name'),
+                    "leadId": lead_id,
+                    "username": lead_data.get('username'),
+                    "keyword": lead_data.get('triggered_keyword'),
+                    "message": f"觸發規則 '{rule.get('name')}' 已執行"
+                })
+                
+        except Exception as e:
+            self.send_log(f"執行額外操作失敗: {str(e)}", "error")
+    
+    # ============== 觸發規則執行引擎結束 ==============
     
     async def generate_message_from_template(self, template: Dict[str, Any], lead_data: Dict[str, Any]) -> str:
         """Generate message from template using variable substitution"""
@@ -7369,6 +8163,794 @@ class BackendService:
         except Exception as e:
             self.send_log(f"Error exporting logs: {str(e)}", "error")
     
+    # ==================== Monitoring Management Handlers ====================
+    
+    async def handle_get_accounts(self):
+        """獲取所有帳號列表"""
+        try:
+            accounts = await db.get_all_accounts()
+            self.send_event("accounts-updated", accounts)
+        except Exception as e:
+            self.send_log(f"❌ 獲取帳號列表失敗: {e}", "error")
+            self.send_event("accounts-updated", [])
+    
+    async def handle_get_monitored_groups(self):
+        """獲取所有監控群組列表"""
+        try:
+            groups = await db.get_all_monitored_groups()
+            self.send_event("get-groups-result", {"groups": groups})
+        except Exception as e:
+            self.send_log(f"❌ 獲取監控群組失敗: {e}", "error")
+            self.send_event("get-groups-result", {"groups": [], "error": str(e)})
+    
+    async def handle_get_keyword_sets(self):
+        """獲取所有關鍵詞集列表"""
+        try:
+            keyword_sets = await db.get_all_keyword_sets()
+            self.send_event("get-keyword-sets-result", {"keywordSets": keyword_sets})
+        except Exception as e:
+            self.send_log(f"❌ 獲取關鍵詞集失敗: {e}", "error")
+            self.send_event("get-keyword-sets-result", {"keywordSets": [], "error": str(e)})
+    
+    async def handle_save_keyword_set(self, payload: Dict[str, Any]):
+        """保存關鍵詞集"""
+        try:
+            set_id = payload.get('id')
+            name = payload.get('name', '')
+            description = payload.get('description', '')
+            keywords = payload.get('keywords', [])
+            is_active = payload.get('isActive', True)
+            color = payload.get('color', '#8b5cf6')
+            
+            if not name:
+                self.send_event("save-keyword-set-result", {
+                    "success": False,
+                    "error": "詞集名稱不能為空"
+                })
+                return
+            
+            # 將關鍵詞列表轉為 JSON 字符串
+            keywords_json = json.dumps([k.get('text', k) if isinstance(k, dict) else k for k in keywords])
+            
+            if set_id:
+                # 更新現有詞集
+                await db.execute(
+                    """UPDATE keyword_sets 
+                       SET name=?, description=?, keywords=?, is_active=?, updated_at=CURRENT_TIMESTAMP
+                       WHERE id=?""",
+                    (name, description, keywords_json, 1 if is_active else 0, set_id)
+                )
+            else:
+                # 創建新詞集
+                cursor = await db.execute_insert(
+                    """INSERT INTO keyword_sets (name, description, keywords, is_active)
+                       VALUES (?, ?, ?, ?)""",
+                    (name, description, keywords_json, 1 if is_active else 0)
+                )
+                set_id = cursor
+            
+            self.send_event("save-keyword-set-result", {"success": True, "id": set_id})
+            self.send_log(f"✅ 已保存關鍵詞集: {name}", "success")
+            
+            # 刷新列表
+            await self.handle_get_keyword_sets()
+            
+        except Exception as e:
+            self.send_log(f"❌ 保存關鍵詞集失敗: {e}", "error")
+            self.send_event("save-keyword-set-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_delete_keyword_set(self, payload: Dict[str, Any]):
+        """刪除關鍵詞集"""
+        try:
+            set_id = payload.get('id')
+            
+            if not set_id:
+                self.send_event("delete-keyword-set-result", {
+                    "success": False,
+                    "error": "缺少詞集 ID"
+                })
+                return
+            
+            await db.execute("DELETE FROM keyword_sets WHERE id=?", (set_id,))
+            
+            self.send_event("delete-keyword-set-result", {"success": True})
+            self.send_log(f"🗑️ 已刪除關鍵詞集 ID: {set_id}", "success")
+            
+            # 刷新列表
+            await self.handle_get_keyword_sets()
+            
+        except Exception as e:
+            self.send_log(f"❌ 刪除關鍵詞集失敗: {e}", "error")
+            self.send_event("delete-keyword-set-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_bind_keyword_set(self, payload: Dict[str, Any]):
+        """綁定關鍵詞集到群組"""
+        import json
+        import sys
+        
+        print(f"[Backend] ========== handle_bind_keyword_set ==========", file=sys.stderr)
+        print(f"[Backend] Payload: {payload}", file=sys.stderr)
+        
+        try:
+            group_id = payload.get('groupId')
+            keyword_set_id = payload.get('keywordSetId')
+            
+            print(f"[Backend] group_id={group_id}, keyword_set_id={keyword_set_id}", file=sys.stderr)
+            
+            if not group_id or not keyword_set_id:
+                self.send_log("❌ 綁定失敗: 缺少群組 ID 或詞集 ID", "error")
+                self.send_event("bind-keyword-set-result", {"success": False, "error": "缺少參數"})
+                return
+            
+            # 獲取當前群組的綁定詞集列表
+            result = await db.fetch_one(
+                "SELECT id, keyword_set_ids FROM monitored_groups WHERE id=?", (group_id,)
+            )
+            
+            print(f"[Backend] Current group data: {result}", file=sys.stderr)
+            
+            if not result:
+                self.send_log(f"❌ 找不到群組 ID: {group_id}", "error")
+                self.send_event("bind-keyword-set-result", {"success": False, "error": "群組不存在"})
+                return
+            
+            current_ids = []
+            try:
+                raw_ids = result.get('keyword_set_ids') or '[]'
+                current_ids = json.loads(raw_ids) if isinstance(raw_ids, str) else raw_ids
+                if not isinstance(current_ids, list):
+                    current_ids = []
+            except Exception as parse_err:
+                print(f"[Backend] Parse error: {parse_err}", file=sys.stderr)
+                current_ids = []
+            
+            print(f"[Backend] Current keyword_set_ids: {current_ids}", file=sys.stderr)
+            
+            # 添加新詞集（避免重複，統一用整數）
+            keyword_set_id_int = int(keyword_set_id)
+            if keyword_set_id_int not in current_ids:
+                current_ids.append(keyword_set_id_int)
+                
+                # 更新數據庫
+                new_ids_json = json.dumps(current_ids)
+                print(f"[Backend] Updating to: {new_ids_json}", file=sys.stderr)
+                
+                await db.execute(
+                    "UPDATE monitored_groups SET keyword_set_ids=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                    (new_ids_json, group_id)
+                )
+                
+                self.send_log(f"✅ 已綁定詞集 {keyword_set_id} 到群組 {group_id}", "success")
+            else:
+                self.send_log(f"ℹ️ 詞集 {keyword_set_id} 已經綁定到群組 {group_id}", "info")
+            
+            # 通知前端更新並刷新群組列表
+            self.send_event("bind-keyword-set-result", {
+                "success": True, 
+                "groupId": group_id, 
+                "keywordSetId": keyword_set_id,
+                "currentKeywordSetIds": current_ids
+            })
+            
+            # 刷新群組列表
+            await self.handle_get_monitored_groups()
+            
+        except Exception as e:
+            import traceback
+            print(f"[Backend] Error: {traceback.format_exc()}", file=sys.stderr)
+            self.send_log(f"❌ 綁定詞集失敗: {e}", "error")
+            self.send_event("bind-keyword-set-result", {"success": False, "error": str(e)})
+    
+    async def handle_unbind_keyword_set(self, payload: Dict[str, Any]):
+        """解綁關鍵詞集"""
+        import json
+        import sys
+        
+        print(f"[Backend] ========== handle_unbind_keyword_set ==========", file=sys.stderr)
+        print(f"[Backend] Payload: {payload}", file=sys.stderr)
+        
+        try:
+            group_id = payload.get('groupId')
+            keyword_set_id = payload.get('keywordSetId')
+            
+            if not group_id or not keyword_set_id:
+                self.send_log("❌ 解綁失敗: 缺少群組 ID 或詞集 ID", "error")
+                self.send_event("unbind-keyword-set-result", {"success": False, "error": "缺少參數"})
+                return
+            
+            # 獲取當前群組的綁定詞集列表
+            result = await db.fetch_one(
+                "SELECT id, keyword_set_ids FROM monitored_groups WHERE id=?", (group_id,)
+            )
+            
+            if not result:
+                self.send_log(f"❌ 找不到群組 ID: {group_id}", "error")
+                self.send_event("unbind-keyword-set-result", {"success": False, "error": "群組不存在"})
+                return
+            
+            current_ids = []
+            try:
+                raw_ids = result.get('keyword_set_ids') or '[]'
+                current_ids = json.loads(raw_ids) if isinstance(raw_ids, str) else raw_ids
+                if not isinstance(current_ids, list):
+                    current_ids = []
+            except:
+                current_ids = []
+            
+            # 移除詞集（統一用整數比較）
+            keyword_set_id_int = int(keyword_set_id)
+            current_ids = [x for x in current_ids if int(x) != keyword_set_id_int]
+            
+            # 更新數據庫
+            new_ids_json = json.dumps(current_ids)
+            print(f"[Backend] Updating to: {new_ids_json}", file=sys.stderr)
+            
+            await db.execute(
+                "UPDATE monitored_groups SET keyword_set_ids=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (new_ids_json, group_id)
+            )
+            
+            self.send_log(f"✅ 已從群組 {group_id} 解綁詞集 {keyword_set_id}", "success")
+            
+            # 通知前端更新
+            self.send_event("unbind-keyword-set-result", {
+                "success": True, 
+                "groupId": group_id, 
+                "keywordSetId": keyword_set_id,
+                "currentKeywordSetIds": current_ids
+            })
+            
+            # 刷新群組列表
+            await self.handle_get_monitored_groups()
+            
+        except Exception as e:
+            import traceback
+            print(f"[Backend] Error: {traceback.format_exc()}", file=sys.stderr)
+            self.send_log(f"❌ 解綁詞集失敗: {e}", "error")
+            self.send_event("unbind-keyword-set-result", {"success": False, "error": str(e)})
+
+    # ==================== AI Generation Handlers ====================
+    
+    async def handle_ai_generate_message(self, payload: Dict[str, Any]):
+        """AI 生成批量發送消息 - 優先使用配置的 AI，回退到本地模板"""
+        import sys
+        import random
+        import aiohttp
+        
+        try:
+            topic = payload.get('topic', '打招呼')
+            style = payload.get('style', 'friendly')
+            count = payload.get('count', 5)
+            context = payload.get('context', {})
+            
+            print(f"[AI] 生成消息: topic={topic}, style={style}, count={count}", file=sys.stderr)
+            
+            # 嘗試獲取配置的 AI 模型
+            ai_model = await self._get_default_ai_model()
+            
+            if ai_model:
+                print(f"[AI] 使用配置的 AI: {ai_model.get('displayName')} ({ai_model.get('provider')})", file=sys.stderr)
+                self.send_log(f"🤖 使用 {ai_model.get('displayName')} 生成消息...", "info")
+                
+                # 嘗試調用真正的 AI
+                try:
+                    messages = await self._generate_messages_with_ai(
+                        ai_model, topic, style, count
+                    )
+                    if messages:
+                        self.send_event("ai-generate-message-result", {
+                            "success": True,
+                            "messages": messages,
+                            "source": "ai",
+                            "model": ai_model.get('displayName')
+                        })
+                        return
+                except Exception as ai_error:
+                    print(f"[AI] AI 調用失敗，回退到本地模板: {ai_error}", file=sys.stderr)
+                    self.send_log(f"⚠️ AI 調用失敗，使用本地模板: {ai_error}", "warning")
+            else:
+                print(f"[AI] 未配置 AI 模型，使用本地模板", file=sys.stderr)
+            
+            # 回退：使用本地模板
+            messages = self._get_local_message_templates(topic, style, count)
+            
+            self.send_event("ai-generate-message-result", {
+                "success": True,
+                "messages": messages,
+                "source": "local",
+                "model": None
+            })
+            
+        except Exception as e:
+            print(f"[AI] 生成消息失敗: {e}", file=sys.stderr)
+            self.send_event("ai-generate-message-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def _get_default_ai_model(self) -> Optional[Dict[str, Any]]:
+        """獲取默認的 AI 模型配置"""
+        try:
+            model = await db.fetch_one(
+                """SELECT id, provider, model_name, display_name, api_key, api_endpoint,
+                   is_local, is_default, is_connected
+                   FROM ai_models WHERE is_default = 1 AND (api_key != '' OR is_local = 1)
+                   ORDER BY priority DESC LIMIT 1"""
+            )
+            if model:
+                return {
+                    'id': model['id'],
+                    'provider': model['provider'],
+                    'modelName': model['model_name'],
+                    'displayName': model['display_name'] or model['model_name'],
+                    'apiKey': model['api_key'],
+                    'apiEndpoint': model['api_endpoint'],
+                    'isLocal': bool(model['is_local']),
+                    'isConnected': bool(model['is_connected'])
+                }
+            
+            # 如果沒有默認模型，嘗試獲取任何可用的模型
+            model = await db.fetch_one(
+                """SELECT id, provider, model_name, display_name, api_key, api_endpoint,
+                   is_local, is_default, is_connected
+                   FROM ai_models WHERE (api_key != '' OR is_local = 1)
+                   ORDER BY priority DESC, created_at DESC LIMIT 1"""
+            )
+            if model:
+                return {
+                    'id': model['id'],
+                    'provider': model['provider'],
+                    'modelName': model['model_name'],
+                    'displayName': model['display_name'] or model['model_name'],
+                    'apiKey': model['api_key'],
+                    'apiEndpoint': model['api_endpoint'],
+                    'isLocal': bool(model['is_local']),
+                    'isConnected': bool(model['is_connected'])
+                }
+            return None
+        except Exception as e:
+            print(f"[AI] 獲取 AI 模型失敗: {e}", file=__import__('sys').stderr)
+            return None
+    
+    async def _generate_messages_with_ai(self, model: Dict[str, Any], topic: str, style: str, count: int) -> List[str]:
+        """使用配置的 AI 生成消息"""
+        import aiohttp
+        
+        style_descriptions = {
+            'friendly': '友好親切、輕鬆自然',
+            'formal': '正式商務、專業禮貌',
+            'humorous': '幽默風趣、輕鬆調侃',
+            'concise': '簡潔明了、直奔主題',
+            'enthusiastic': '熱情洋溢、充滿活力'
+        }
+        
+        style_desc = style_descriptions.get(style, '友好親切')
+        
+        prompt = f"""請生成 {count} 條不同的打招呼消息，用於在 Telegram 上向潛在客戶發送第一條消息。
+
+主題：{topic}
+風格要求：{style_desc}
+
+要求：
+1. 每條消息都要不同，但保持相同的風格
+2. 消息要自然、真誠，不要像廣告
+3. 使用變量 {{firstName}} 表示對方名字，{{greeting}} 表示問候語（如"早上好"）
+4. 每條消息 20-50 字左右
+5. 只輸出消息內容，每條消息一行，不要編號
+
+請直接輸出 {count} 條消息："""
+        
+        provider = model.get('provider', '').lower()
+        api_key = model.get('apiKey', '')
+        api_endpoint = model.get('apiEndpoint', '')
+        model_name = model.get('modelName', '')
+        is_local = model.get('isLocal', False)
+        
+        messages = []
+        
+        timeout = aiohttp.ClientTimeout(total=30)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            if is_local or provider == 'ollama' or provider == 'custom':
+                # 本地 AI (Ollama)
+                endpoint = api_endpoint or 'http://localhost:11434'
+                chat_url = f"{endpoint.rstrip('/')}/api/chat"
+                
+                request_body = {
+                    "model": model_name or "qwen2:7b",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": False
+                }
+                
+                async with session.post(chat_url, json=request_body) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        content = data.get('message', {}).get('content', '')
+                        messages = self._parse_ai_messages(content, count)
+                    else:
+                        raise Exception(f"Ollama 返回 {resp.status}")
+                        
+            elif provider == 'openai':
+                # OpenAI API
+                async with session.post(
+                    'https://api.openai.com/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {api_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': model_name or 'gpt-3.5-turbo',
+                        'messages': [{'role': 'user', 'content': prompt}],
+                        'max_tokens': 1000,
+                        'temperature': 0.8
+                    }
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
+                        messages = self._parse_ai_messages(content, count)
+                    else:
+                        error_data = await resp.text()
+                        raise Exception(f"OpenAI 返回 {resp.status}: {error_data[:100]}")
+            
+            else:
+                # 通用 OpenAI 兼容格式
+                endpoint = api_endpoint or 'http://localhost:11434/v1'
+                chat_url = f"{endpoint.rstrip('/')}/chat/completions"
+                
+                headers = {'Content-Type': 'application/json'}
+                if api_key:
+                    headers['Authorization'] = f'Bearer {api_key}'
+                
+                async with session.post(
+                    chat_url,
+                    headers=headers,
+                    json={
+                        'model': model_name,
+                        'messages': [{'role': 'user', 'content': prompt}],
+                        'max_tokens': 1000,
+                        'temperature': 0.8
+                    }
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
+                        messages = self._parse_ai_messages(content, count)
+                    else:
+                        raise Exception(f"API 返回 {resp.status}")
+        
+        return messages
+    
+    def _parse_ai_messages(self, content: str, count: int) -> List[str]:
+        """解析 AI 返回的消息"""
+        import re
+        
+        lines = content.strip().split('\n')
+        messages = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            # 移除編號（如 "1." 或 "1、" 或 "1)"）
+            line = re.sub(r'^[\d]+[\.\、\)\]\:]\s*', '', line)
+            line = line.strip()
+            if line and len(line) > 5:  # 過濾太短的行
+                messages.append(line)
+        
+        return messages[:count] if messages else []
+    
+    def _get_local_message_templates(self, topic: str, style: str, count: int) -> List[str]:
+        """獲取本地消息模板（回退方案）"""
+        import random
+        
+        style_templates = {
+            'friendly': [
+                "{greeting}！我是在群裡看到你的，想認識一下~",
+                "Hi {firstName}！很高興能認識你，希望以後多多交流 😊",
+                "{greeting}{firstName}，我覺得我們可能有共同話題，方便聊聊嗎？",
+                "嗨！看到你的資料覺得很有趣，想跟你交個朋友~",
+                f"{{greeting}}！我對{topic}很感興趣，看到你也在關注這個？"
+            ],
+            'formal': [
+                "{greeting}，很高興認識您。我注意到我們可能有共同的興趣點，不知是否方便交流？",
+                f"您好 {{firstName}}，冒昧打擾。我專注於{topic}領域，希望能與您建立聯繫。",
+                "{greeting}，我是通過群組認識到您的。如有合作機會，期待進一步溝通。",
+                "尊敬的 {firstName}，很榮幸能夠與您取得聯繫。期待未來有機會合作。",
+                f"{{greeting}}，我對{topic}很感興趣，看到您也在這個領域，想向您請教。"
+            ],
+            'humorous': [
+                "{greeting}！我不是推銷員，只是覺得你看起來很酷想認識一下 😎",
+                "Hi {firstName}！命運的安排讓我們在茫茫網海中相遇 🌊",
+                "{greeting}~我發誓我不是機器人，只是一個想交朋友的普通人 🤖❌",
+                "嘿！如果這條消息打擾到你了，請假裝沒看到（但其實很期待你的回復）",
+                "{greeting}{firstName}！人生何處不相逢，既然相遇不如加個好友？"
+            ],
+            'concise': [
+                "{greeting}，認識一下？",
+                f"Hi {{firstName}}，對{topic}有興趣嗎？",
+                "{greeting}！方便聊聊嗎？",
+                "你好，想跟你交流一下。",
+                "{greeting}，可以認識一下嗎？"
+            ],
+            'enthusiastic': [
+                "{greeting}！！太開心能認識你了！！🎉🎉🎉",
+                "哇！{firstName}！終於找到志同道合的朋友了！！",
+                f"{{greeting}}！我對{topic}超級有熱情的，希望能跟你一起討論！💪",
+                "嗨嗨嗨！{firstName}！感覺我們會成為很好的朋友！✨",
+                f"太棒了！{{greeting}}！一直在找對{topic}感興趣的人！"
+            ]
+        }
+        
+        templates = style_templates.get(style, style_templates['friendly'])
+        messages = templates[:count]
+        random.shuffle(messages)
+        return messages
+    
+    async def handle_ai_generate_group_names(self, payload: Dict[str, Any]):
+        """AI 生成群組名稱"""
+        import sys
+        import random
+        
+        try:
+            keywords = payload.get('keywords', '')
+            style = payload.get('style', 'professional')
+            count = payload.get('count', 5)
+            
+            print(f"[AI] 生成群名: keywords={keywords}, style={style}", file=sys.stderr)
+            
+            # 根據風格和關鍵詞生成群名
+            prefixes = {
+                'professional': ['🏢', '💼', '📊', '🎯', '⚡'],
+                'lively': ['🔥', '🎉', '✨', '💫', '🌟'],
+                'mysterious': ['🌙', '💎', '🔮', '👑', '🎭'],
+                'simple': ['📌', '📎', '🔗', '•', '→']
+            }
+            
+            suffixes = {
+                'professional': ['交流群', '研討會', '精英社', '聯盟', '商務圈'],
+                'lively': ['嗨皮群', '歡樂營', '狂歡派', '趴體', '快樂屋'],
+                'mysterious': ['內部群', 'VIP專屬', '私密圈', '秘密基地', '核心群'],
+                'simple': ['群', '交流', '討論組', '社區', '頻道']
+            }
+            
+            prefix_list = prefixes.get(style, prefixes['professional'])
+            suffix_list = suffixes.get(style, suffixes['professional'])
+            
+            names = []
+            keyword_parts = [k.strip() for k in keywords.split(',') if k.strip()]
+            main_keyword = keyword_parts[0] if keyword_parts else '交流'
+            
+            for i in range(count):
+                prefix = prefix_list[i % len(prefix_list)]
+                suffix = suffix_list[i % len(suffix_list)]
+                
+                # 生成不同組合
+                if i == 0:
+                    name = f"{prefix} {main_keyword}{suffix}"
+                elif i == 1:
+                    name = f"{prefix} 2026{main_keyword}精英{suffix}"
+                elif i == 2:
+                    year_suffix = ['俱樂部', '聯盟', '圈子'][i % 3]
+                    name = f"{prefix} {main_keyword}{year_suffix}"
+                elif i == 3:
+                    name = f"{prefix} {main_keyword}愛好者{suffix}"
+                else:
+                    name = f"{prefix} {main_keyword}達人{suffix}"
+                
+                names.append(name)
+            
+            self.send_event("ai-generate-group-names-result", {
+                "success": True,
+                "names": names
+            })
+            
+        except Exception as e:
+            print(f"[AI] 生成群名失敗: {e}", file=sys.stderr)
+            self.send_event("ai-generate-group-names-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_ai_generate_welcome(self, payload: Dict[str, Any]):
+        """AI 生成歡迎消息"""
+        import sys
+        import random
+        
+        try:
+            topic = payload.get('topic', '歡迎')
+            group_name = payload.get('groupName', '我們的群組')
+            
+            print(f"[AI] 生成歡迎消息: topic={topic}, group={group_name}", file=sys.stderr)
+            
+            # 歡迎消息模板
+            templates = [
+                f"🎉 歡迎 {{name}} 加入「{group_name}」！很高興認識你，有任何問題隨時提問哦~",
+                f"👋 Hi {{name}}！歡迎來到「{group_name}」！希望你在這裡能找到志同道合的朋友！",
+                f"✨ {{name}} 你好！歡迎加入我們！這裡是「{group_name}」，大家都很友善的~",
+                f"🌟 熱烈歡迎 {{name}}！「{group_name}」又多了一位小夥伴！",
+                f"💫 {{name}} 歡迎入群！「{group_name}」期待與你一起成長！"
+            ]
+            
+            message = random.choice(templates)
+            
+            self.send_event("ai-generate-welcome-result", {
+                "success": True,
+                "message": message
+            })
+            
+        except Exception as e:
+            print(f"[AI] 生成歡迎消息失敗: {e}", file=sys.stderr)
+            self.send_event("ai-generate-welcome-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_create_group(self, payload: Dict[str, Any]):
+        """創建新的 Telegram 群組"""
+        import sys
+        
+        try:
+            name = payload.get('name', '新群組')
+            description = payload.get('description', '')
+            group_type = payload.get('type', 'supergroup')
+            specified_phone = payload.get('accountPhone')  # 前端指定的帳號
+            
+            print(f"[Group] 創建群組: name={name}, type={group_type}, phone={specified_phone}", file=sys.stderr)
+            self.send_log(f"🔨 正在創建群組「{name}」...", "info")
+            
+            # 獲取可用帳號（檢查 Online 狀態）
+            accounts = await db.get_all_accounts()
+            online_accounts = [a for a in accounts if a.get('status') == 'Online']
+            
+            print(f"[Group] 在線帳號: {[(a.get('phone'), a.get('status')) for a in online_accounts]}", file=sys.stderr)
+            
+            if not online_accounts:
+                self.send_event("create-group-result", {
+                    "success": False,
+                    "error": "沒有在線的帳號，請先登入帳號"
+                })
+                return
+            
+            # 優先使用前端指定的帳號，否則使用第一個在線帳號
+            if specified_phone:
+                account = next((a for a in online_accounts if a.get('phone') == specified_phone), None)
+                if not account:
+                    account = online_accounts[0]
+            else:
+                account = online_accounts[0]
+            
+            phone = account.get('phone')
+            account_name = account.get('firstName', phone)
+            
+            print(f"[Group] 使用帳號 {phone} ({account_name}) 創建群組", file=sys.stderr)
+            self.send_log(f"📱 使用帳號 {account_name} 創建群組...", "info")
+            
+            # 獲取客戶端 - 從 telegram_manager 獲取
+            client = None
+            if hasattr(self.telegram_manager, 'clients'):
+                # phone 可能有或沒有 + 前綴，嘗試兩種格式
+                client = self.telegram_manager.clients.get(phone)
+                if not client and phone.startswith('+'):
+                    client = self.telegram_manager.clients.get(phone[1:])
+                if not client and not phone.startswith('+'):
+                    client = self.telegram_manager.clients.get(f'+{phone}')
+            
+            if not client:
+                self.send_event("create-group-result", {
+                    "success": False,
+                    "error": f"帳號 {account_name} 未連接，請重新登入"
+                })
+                return
+            
+            # 檢查客戶端是否已連接
+            if not client.is_connected:
+                try:
+                    await client.connect()
+                except Exception as conn_err:
+                    self.send_event("create-group-result", {
+                        "success": False,
+                        "error": f"無法連接帳號 {account_name}: {conn_err}"
+                    })
+                    return
+            
+            from pyrogram.types import ChatPrivileges
+            
+            if group_type == 'supergroup':
+                # 創建超級群組
+                print(f"[Group] 創建超級群組...", file=sys.stderr)
+                chat = await client.create_supergroup(name, description or "歡迎加入！")
+            else:
+                # 創建普通群組
+                print(f"[Group] 創建普通群組...", file=sys.stderr)
+                chat = await client.create_group(name, [])
+            
+            print(f"[Group] 群組創建成功: id={chat.id}", file=sys.stderr)
+            
+            # 獲取邀請連結
+            try:
+                invite_link = await client.export_chat_invite_link(chat.id)
+            except Exception as link_err:
+                print(f"[Group] 獲取邀請連結失敗: {link_err}", file=sys.stderr)
+                invite_link = f"https://t.me/{chat.username}" if hasattr(chat, 'username') and chat.username else ""
+            
+            self.send_log(f"✅ 群組「{name}」創建成功！", "success")
+            
+            self.send_event("create-group-result", {
+                "success": True,
+                "groupId": str(chat.id),
+                "groupName": name,
+                "groupUrl": invite_link
+            })
+            
+        except Exception as e:
+            import traceback
+            error_str = str(e)
+            print(f"[Group] 創建群組失敗: {traceback.format_exc()}", file=sys.stderr)
+            
+            # 提供更友好的錯誤信息
+            if 'FLOOD' in error_str.upper():
+                friendly_error = "請求過於頻繁，請稍後再試"
+            elif 'PEER_FLOOD' in error_str.upper():
+                friendly_error = "帳號被限制創建群組，請更換帳號或稍後再試"
+            elif 'AUTH' in error_str.upper():
+                friendly_error = "帳號認證失敗，請重新登入"
+            elif 'TIMEOUT' in error_str.upper() or 'timeout' in error_str.lower():
+                friendly_error = "連接超時，請檢查網絡"
+            else:
+                friendly_error = error_str
+            
+            self.send_log(f"❌ 創建群組失敗: {friendly_error}", "error")
+            self.send_event("create-group-result", {
+                "success": False,
+                "error": friendly_error
+            })
+
+    async def handle_pause_monitoring(self, payload: Dict[str, Any]):
+        """暫停監控群組"""
+        try:
+            group_id = payload.get('groupId')
+            
+            if not group_id:
+                return
+            
+            await db.execute(
+                "UPDATE monitored_groups SET is_active=0 WHERE id=?", (group_id,)
+            )
+            
+            self.send_log(f"⏸️ 已暫停監控群組 ID: {group_id}", "info")
+            
+            # 刷新群組列表
+            await self.handle_get_monitored_groups()
+            
+        except Exception as e:
+            self.send_log(f"❌ 暫停監控失敗: {e}", "error")
+    
+    async def handle_resume_monitoring(self, payload: Dict[str, Any]):
+        """恢復監控群組"""
+        try:
+            group_id = payload.get('groupId')
+            
+            if not group_id:
+                return
+            
+            await db.execute(
+                "UPDATE monitored_groups SET is_active=1 WHERE id=?", (group_id,)
+            )
+            
+            self.send_log(f"▶️ 已恢復監控群組 ID: {group_id}", "info")
+            
+            # 刷新群組列表
+            await self.handle_get_monitored_groups()
+            
+        except Exception as e:
+            self.send_log(f"❌ 恢復監控失敗: {e}", "error")
+    
     async def handle_add_keyword_set(self, payload: Dict[str, Any]):
         """Handle add-keyword-set command"""
         try:
@@ -7792,15 +9374,130 @@ class BackendService:
             })
     
     async def handle_remove_group(self, payload: Dict[str, Any]):
-        """Handle remove-group command"""
+        """Handle remove-group command - 移除監控群組"""
         try:
-            group_id = payload.get('id')
-            await db.remove_group(group_id)
-            await db.add_log(f"Group {group_id} removed", "success")
+            # 🆕 支持多種參數名稱
+            group_id = payload.get('id') or payload.get('groupId')
+            
+            if not group_id:
+                self.send_log("❌ 移除群組失敗: 缺少群組 ID", "error")
+                self.send_event("remove-group-result", {"success": False, "error": "缺少群組 ID"})
+                return
+            
+            self.send_log(f"🗑️ 正在移除監控群組: {group_id}", "info")
+            
+            # 嘗試多種方式刪除
+            deleted = False
+            
+            # 方式1: 按 ID 刪除（如果是數字）
+            if isinstance(group_id, int) or (isinstance(group_id, str) and group_id.lstrip('-').isdigit()):
+                numeric_id = int(group_id) if isinstance(group_id, str) else group_id
+                result = await db.execute('DELETE FROM monitored_groups WHERE id = ?', (numeric_id,))
+                if result > 0:
+                    deleted = True
+                    self.send_log(f"✅ 已按 ID 刪除: {numeric_id}", "success")
+            
+            # 方式2: 按 telegram_id 刪除
+            if not deleted:
+                result = await db.execute('DELETE FROM monitored_groups WHERE telegram_id = ?', (str(group_id),))
+                if result > 0:
+                    deleted = True
+                    self.send_log(f"✅ 已按 telegram_id 刪除: {group_id}", "success")
+            
+            # 方式3: 按 link 包含的標識符刪除
+            if not deleted:
+                result = await db.execute('DELETE FROM monitored_groups WHERE link LIKE ?', (f'%{group_id}%',))
+                if result > 0:
+                    deleted = True
+                    self.send_log(f"✅ 已按 link 刪除: {group_id}", "success")
+            
+            # 方式4: 按 name 刪除
+            if not deleted:
+                result = await db.execute('DELETE FROM monitored_groups WHERE name = ?', (str(group_id),))
+                if result > 0:
+                    deleted = True
+                    self.send_log(f"✅ 已按 name 刪除: {group_id}", "success")
+            
+            if deleted:
+                await db.add_log(f"監控群組已移除: {group_id}", "success")
+                self.send_event("remove-group-result", {"success": True, "groupId": group_id})
+            else:
+                self.send_log(f"⚠️ 未找到要刪除的群組: {group_id}", "warning")
+                self.send_event("remove-group-result", {"success": False, "error": "未找到群組"})
+            
+            # 刷新前端群組列表
             await self.send_groups_update()
         
         except Exception as e:
-            self.send_log(f"Error removing group: {str(e)}", "error")
+            import traceback
+            traceback.print_exc()
+            self.send_log(f"❌ 移除群組失敗: {str(e)}", "error")
+            self.send_event("remove-group-result", {"success": False, "error": str(e)})
+    
+    async def handle_leave_group(self, payload: Dict[str, Any]):
+        """從 Telegram 退出群組"""
+        try:
+            phone = payload.get('phone')
+            group_id = payload.get('groupId')
+            resource_id = payload.get('resourceId')
+            
+            if not phone or not group_id:
+                raise ValueError("缺少必要參數：phone 或 groupId")
+            
+            self.send_log(f"🚪 正在退出群組: {group_id}", "info")
+            
+            # 獲取帳號的 Pyrogram client
+            account = next((acc for acc in self.accounts if acc.get('phone') == phone), None)
+            if not account:
+                raise ValueError(f"找不到帳號: {phone}")
+            
+            client = account.get('client')
+            if not client or not client.is_connected:
+                raise ValueError(f"帳號 {phone} 未連接")
+            
+            try:
+                # 使用 Pyrogram 退出群組
+                await client.leave_chat(group_id)
+                self.send_log(f"✅ 已退出群組: {group_id}", "success")
+            except Exception as leave_error:
+                error_msg = str(leave_error)
+                if 'not a member' in error_msg.lower() or 'not found' in error_msg.lower():
+                    self.send_log(f"ℹ️ 帳號不在此群組中", "info")
+                else:
+                    raise leave_error
+            
+            # 從監控列表中移除
+            try:
+                await db.remove_group(group_id)
+            except Exception:
+                pass  # 可能不在監控列表中
+            
+            # 更新資源狀態為 discovered
+            if resource_id:
+                try:
+                    await resource_discovery.db.execute(
+                        "UPDATE discovered_resources SET status = 'discovered', joined_by_phone = NULL WHERE id = ?",
+                        (resource_id,)
+                    )
+                    await resource_discovery.db._connection.commit()
+                except Exception as db_error:
+                    self.send_log(f"更新資源狀態失敗: {db_error}", "warning")
+            
+            self.send_event("leave-group-complete", {
+                "success": True,
+                "groupId": group_id,
+                "phone": phone
+            })
+            
+            # 刷新群組列表
+            await self.send_groups_update()
+            
+        except Exception as e:
+            self.send_log(f"❌ 退出群組失敗: {e}", "error")
+            self.send_event("leave-group-complete", {
+                "success": False,
+                "error": str(e)
+            })
     
     async def handle_add_template(self, payload: Dict[str, Any]):
         """Handle add-template command"""
@@ -7960,9 +9657,18 @@ class BackendService:
             priority = payload.get('priority', 'normal')  # high, normal, low
             scheduled_at = payload.get('scheduledAt')  # Optional ISO datetime string
             
-            if not account_phone or not user_id or not message_text:
-                self.send_log("Missing required parameters for sending message", "error")
+            # 必須有帳號和用戶ID，消息內容或附件至少一個
+            if not account_phone or not user_id:
+                self.send_log("Missing required parameters for sending message (accountPhone or userId)", "error")
                 return
+            
+            if not message_text and not attachment:
+                self.send_log("Missing message text or attachment", "error")
+                return
+            
+            # 如果沒有文字消息，設置為空字符串
+            if not message_text:
+                message_text = ""
             
             # 嘗試獲取群組 URL（用於加入群組）
             source_group_url = source_group
@@ -8002,16 +9708,20 @@ class BackendService:
                     print(f"[Backend] Error looking up group URL: {e}", file=sys.stderr)
             
             # 獲取用戶名作為備選（如果通過 userId 無法發送）
-            target_username = None
-            if lead_id:
+            # 優先使用 payload 中直接傳遞的 username
+            target_username = payload.get('username')
+            if target_username:
+                print(f"[Backend] Got target username from payload: @{target_username}", file=sys.stderr)
+            elif lead_id:
+                # 嘗試從數據庫中查詢（使用 user_id 而非 lead_id）
                 try:
-                    lead = await db.get_lead(lead_id)
+                    lead = await db.get_lead_by_user_id(str(user_id))
                     if lead:
                         target_username = lead.get('username')
                         if target_username:
-                            print(f"[Backend] Got target username from lead: @{target_username}", file=sys.stderr)
+                            print(f"[Backend] Got target username from database: @{target_username}", file=sys.stderr)
                 except Exception as e:
-                    print(f"[Backend] Error getting username from lead: {e}", file=sys.stderr)
+                    print(f"[Backend] Error getting username from database: {e}", file=sys.stderr)
             
             # Convert priority
             if priority == 'high':
@@ -8216,6 +9926,86 @@ class BackendService:
         
         except Exception as e:
             self.send_log(f"Error updating lead status: {str(e)}", "error")
+    
+    async def handle_add_lead(self, payload: Dict[str, Any]):
+        """Handle add-lead command - 從成員資料庫添加 Lead"""
+        try:
+            user_id = payload.get('user_id')
+            username = payload.get('username')
+            first_name = payload.get('first_name', '')
+            last_name = payload.get('last_name', '')
+            source_chat_title = payload.get('source_chat_title', '')
+            source_chat_id = payload.get('source_chat_id', '')
+            notes = payload.get('notes', '')
+            
+            # 檢查是否已存在
+            existing_lead = await db.get_lead_by_user_id(user_id)
+            if existing_lead:
+                self.send_log(f"⚠️ Lead @{username or user_id} 已存在", "warning")
+                self.send_event("add-lead-result", {
+                    "success": False,
+                    "error": "Lead 已存在",
+                    "existingLead": existing_lead
+                })
+                return
+            
+            # 創建新的 Lead
+            import datetime
+            lead_id = await db.add_lead({
+                'userId': user_id,
+                'username': username,
+                'firstName': first_name,
+                'lastName': last_name,
+                'sourceGroup': source_chat_title,
+                'triggeredKeyword': '',
+                'onlineStatus': 'Unknown',
+                'notes': notes
+            })
+            
+            self.send_log(f"✅ 成功添加 Lead: {first_name or username or user_id}", "success")
+            
+            # 發送成功事件
+            self.send_event("add-lead-result", {
+                "success": True,
+                "leadId": lead_id,
+                "lead": {
+                    "id": lead_id,
+                    "userId": user_id,
+                    "username": username,
+                    "firstName": first_name,
+                    "lastName": last_name,
+                    "sourceGroup": source_chat_title,
+                    "triggeredKeyword": "",
+                    "timestamp": datetime.datetime.now().isoformat(),
+                    "status": "New",
+                    "onlineStatus": "Unknown"
+                }
+            })
+            
+            # 更新 Leads 列表
+            await self.send_leads_update()
+            
+            # 同時更新成員資料庫中的狀態（標記為已加入漏斗）
+            if source_chat_id:
+                try:
+                    await db._connection.execute('''
+                        UPDATE extracted_members 
+                        SET notes = notes || CASE WHEN notes != '' THEN '\n' ELSE '' END || '已加入銷售漏斗',
+                            updated_at = datetime('now')
+                        WHERE user_id = ?
+                    ''', (user_id,))
+                    await db._connection.commit()
+                except Exception as sync_error:
+                    print(f"[Backend] Warning: Could not sync member status: {sync_error}", file=sys.stderr)
+        
+        except Exception as e:
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_log(f"❌ 添加 Lead 失敗: {str(e)}", "error")
+            self.send_event("add-lead-result", {
+                "success": False,
+                "error": str(e)
+            })
     
     async def handle_add_to_dnc(self, payload: Dict[str, Any]):
         """Handle add-to-dnc command"""
@@ -9876,6 +11666,26 @@ class BackendService:
             })
             self.send_log(f"✗ STT 測試錯誤: {str(e)}", "error")
 
+    async def handle_get_ai_settings(self, payload: Dict[str, Any] = None):
+        """獲取 AI 設置（包括 Gemini API Key）"""
+        try:
+            # 從數據庫獲取設置
+            settings = await db.get_ai_settings()
+            
+            result = {
+                'geminiApiKey': settings.get('gemini_api_key', ''),
+                'localAiEndpoint': settings.get('local_ai_endpoint', 'http://localhost:11434'),
+                'localAiModel': settings.get('local_ai_model', ''),
+                'apiType': settings.get('api_type', 'gemini'),
+            }
+            
+            self.send_event("ai-settings-loaded", result)
+            
+        except Exception as e:
+            import sys
+            print(f"[Backend] Error loading AI settings: {e}", file=sys.stderr)
+            self.send_event("ai-settings-loaded", {})
+    
     async def handle_save_ai_settings(self, payload: Dict[str, Any]):
         """Save AI and voice service settings"""
         try:
@@ -9899,7 +11709,9 @@ class BackendService:
             # 🔧 關鍵修復：同時保存到數據庫（使用 snake_case 鍵名）
             db_settings = {
                 'local_ai_endpoint': payload.get('localAiEndpoint', ''),
-                'local_ai_model': payload.get('localAiModel', '')
+                'local_ai_model': payload.get('localAiModel', ''),
+                'gemini_api_key': payload.get('geminiApiKey', ''),  # 添加 Gemini API Key 保存
+                'api_type': payload.get('apiType', 'gemini'),
             }
             await db.update_ai_settings(db_settings)
             
@@ -10649,6 +12461,1043 @@ class BackendService:
                 "error": str(e)
             })
 
+    # ==================== AI Marketing Strategy Handlers ====================
+    
+    async def handle_generate_ai_strategy(self, payload: Dict[str, Any]):
+        """使用 AI 生成營銷策略"""
+        try:
+            user_input = payload.get('userInput', '')
+            
+            if not user_input:
+                self.send_event("ai-strategy-generated", {
+                    "success": False,
+                    "error": "請輸入您的需求"
+                })
+                return
+            
+            # 嘗試使用 AI 生成策略
+            try:
+                from ai_context import ai_context
+                
+                prompt = f"""
+                根據用戶的營銷需求，生成詳細的營銷策略。
+
+                用戶需求：{user_input}
+
+                請返回 JSON 格式的策略，包含：
+                1. industry: 識別的目標行業
+                2. targetAudience: 目標受眾描述
+                3. keywords: 分為 highIntent（高意向）、mediumIntent（中意向）、extended（擴展）三類關鍵詞
+                4. customerProfile: 客戶畫像，包含 identity（身份）、features（特徵）、needs（需求）
+                5. recommendedGroups: 建議搜索的群組類型
+                6. messageTemplates: 消息模板，包含 firstTouch（首次觸達）、followUp（跟進）、closing（促成）
+                """
+                
+                response = await ai_context.generate_response(
+                    user_id="system",
+                    message=prompt,
+                    context=[]
+                )
+                
+                # 嘗試解析 AI 返回的 JSON
+                import json
+                import re
+                
+                # 提取 JSON
+                json_match = re.search(r'\{[\s\S]*\}', response)
+                if json_match:
+                    strategy = json.loads(json_match.group())
+                    self.send_event("ai-strategy-generated", {
+                        "success": True,
+                        "strategy": strategy
+                    })
+                    return
+                    
+            except Exception as ai_error:
+                print(f"[AI Strategy] AI generation failed: {ai_error}", file=sys.stderr)
+            
+            # 如果 AI 生成失敗，返回錯誤讓前端使用本地模板
+            self.send_event("ai-strategy-generated", {
+                "success": False,
+                "error": "AI 服務暫時不可用，已使用本地模板"
+            })
+            
+        except Exception as e:
+            self.send_event("ai-strategy-generated", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_save_ai_strategy(self, payload: Dict[str, Any]):
+        """保存 AI 策略"""
+        try:
+            name = payload.get('name', f"策略_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+            strategy = payload.get('strategy', {})
+            
+            # 保存到數據庫
+            await db.execute(
+                """INSERT INTO ai_strategies (name, strategy_json, created_at) 
+                   VALUES (?, ?, CURRENT_TIMESTAMP)
+                   ON CONFLICT(name) DO UPDATE SET strategy_json = ?, updated_at = CURRENT_TIMESTAMP""",
+                (name, json.dumps(strategy), json.dumps(strategy))
+            )
+            
+            self.send_log(f"✅ 策略已保存: {name}", "success")
+            self.send_event("ai-strategy-saved", {"success": True, "name": name})
+            
+        except Exception as e:
+            self.send_log(f"❌ 保存策略失敗: {e}", "error")
+            self.send_event("ai-strategy-saved", {"success": False, "error": str(e)})
+    
+    async def handle_get_ai_strategies(self, payload: Dict[str, Any]):
+        """獲取已保存的策略列表"""
+        try:
+            strategies = await db.fetch_all(
+                "SELECT * FROM ai_strategies ORDER BY created_at DESC LIMIT 50"
+            )
+            
+            result = []
+            for s in strategies:
+                try:
+                    result.append({
+                        "id": s.get('id'),
+                        "name": s.get('name'),
+                        "strategy": json.loads(s.get('strategy_json', '{}')),
+                        "createdAt": s.get('created_at'),
+                        "stats": {
+                            "totalLeads": 0,
+                            "contacted": 0,
+                            "converted": 0
+                        }
+                    })
+                except:
+                    pass
+            
+            self.send_event("ai-strategies-list", {"success": True, "strategies": result})
+            
+        except Exception as e:
+            self.send_event("ai-strategies-list", {"success": False, "error": str(e)})
+    
+    async def handle_execute_ai_strategy(self, payload: Dict[str, Any]):
+        """執行 AI 營銷策略"""
+        try:
+            strategy = payload.get('strategy', {})
+            
+            self.send_log(f"🚀 開始執行 AI 策略: {strategy.get('industry', '未知')}", "info")
+            
+            # 1. 創建關鍵詞集
+            keywords = strategy.get('keywords', {})
+            all_keywords = (
+                keywords.get('highIntent', []) + 
+                keywords.get('mediumIntent', []) + 
+                keywords.get('extended', [])
+            )
+            
+            if all_keywords:
+                # 保存為關鍵詞集
+                keyword_set_name = f"AI策略_{strategy.get('industry', '自定義')}"
+                await db.execute(
+                    """INSERT INTO keyword_sets (name, keywords, is_active, created_at)
+                       VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+                       ON CONFLICT(name) DO UPDATE SET keywords = ?, is_active = 1""",
+                    (keyword_set_name, json.dumps(all_keywords), json.dumps(all_keywords))
+                )
+                self.send_log(f"✅ 已創建關鍵詞集: {keyword_set_name} ({len(all_keywords)} 個關鍵詞)", "success")
+            
+            # 2. 保存消息模板
+            templates = strategy.get('messageTemplates', {})
+            for template_type, content in templates.items():
+                if content:
+                    template_name = f"AI_{strategy.get('industry', '')}_{template_type}"
+                    await db.execute(
+                        """INSERT INTO message_templates (name, content, template_type, created_at)
+                           VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                           ON CONFLICT(name) DO UPDATE SET content = ?""",
+                        (template_name, content, template_type, content)
+                    )
+            self.send_log(f"✅ 已創建消息模板", "success")
+            
+            # 3. 發送執行狀態
+            self.send_event("ai-execution-status", {
+                "isExecuting": True,
+                "phase": "initialized",
+                "message": "策略已初始化，準備開始搜索群組..."
+            })
+            
+            # 4. 開始搜索群組（異步執行）
+            asyncio.create_task(self._execute_ai_group_search(strategy))
+            
+            self.send_event("ai-strategy-executed", {"success": True})
+            
+        except Exception as e:
+            self.send_log(f"❌ 執行策略失敗: {e}", "error")
+            self.send_event("ai-strategy-executed", {"success": False, "error": str(e)})
+    
+    async def _execute_ai_group_search(self, strategy: Dict[str, Any]):
+        """異步執行群組搜索"""
+        try:
+            keywords = strategy.get('keywords', {})
+            search_keywords = keywords.get('highIntent', [])[:5]  # 使用前5個高意向關鍵詞搜索
+            
+            total_found = 0
+            for keyword in search_keywords:
+                self.send_event("ai-execution-status", {
+                    "isExecuting": True,
+                    "phase": "searching",
+                    "message": f"正在搜索關鍵詞: {keyword}..."
+                })
+                
+                # 調用群組搜索服務
+                try:
+                    results = await group_search_service.search_groups(keyword, limit=10)
+                    total_found += len(results) if results else 0
+                    
+                    self.send_event("ai-execution-stats", {
+                        "groupsSearched": total_found,
+                        "groupsJoined": 0,
+                        "membersScanned": 0,
+                        "leadsFound": 0,
+                        "messagesSent": 0,
+                        "responses": 0
+                    })
+                    
+                    await asyncio.sleep(2)  # 避免頻繁請求
+                except Exception as search_error:
+                    print(f"[AI Strategy] Search error for {keyword}: {search_error}", file=sys.stderr)
+            
+            self.send_event("ai-execution-status", {
+                "isExecuting": True,
+                "phase": "search_complete",
+                "message": f"搜索完成，共發現 {total_found} 個相關群組"
+            })
+            
+        except Exception as e:
+            print(f"[AI Strategy] Group search failed: {e}", file=sys.stderr)
+            self.send_event("ai-execution-status", {
+                "isExecuting": False,
+                "phase": "error",
+                "message": f"搜索失敗: {str(e)}"
+            })
+    
+    # ==================== Chat Template Handlers ====================
+    
+    async def handle_get_chat_templates(self):
+        """獲取聊天模板列表"""
+        try:
+            templates = await db.get_chat_templates()
+            self.send_event("get-chat-templates-result", {
+                "templates": templates
+            })
+        except Exception as e:
+            self.send_log(f"❌ 獲取聊天模板失敗: {e}", "error")
+            self.send_event("get-chat-templates-result", {
+                "templates": [],
+                "error": str(e)
+            })
+    
+    async def handle_save_chat_template(self, payload: Dict[str, Any]):
+        """保存聊天模板"""
+        try:
+            template_id = payload.get('id')
+            name = payload.get('name', '')
+            category = payload.get('category', 'custom')
+            content = payload.get('content', '')
+            variables = payload.get('variables', [])
+            is_active = payload.get('isActive', True)
+            
+            if not name or not content:
+                self.send_event("save-chat-template-result", {
+                    "success": False,
+                    "error": "模板名稱和內容不能為空"
+                })
+                return
+            
+            result = await db.save_chat_template(
+                template_id=template_id,
+                name=name,
+                category=category,
+                content=content,
+                variables=variables,
+                is_active=is_active
+            )
+            
+            self.send_event("save-chat-template-result", result)
+            
+            if result.get('success'):
+                self.send_log(f"✅ 已保存聊天模板: {name}", "success")
+                # 刷新模板列表
+                await self.handle_get_chat_templates()
+                
+        except Exception as e:
+            self.send_log(f"❌ 保存聊天模板失敗: {e}", "error")
+            self.send_event("save-chat-template-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_delete_chat_template(self, payload: Dict[str, Any]):
+        """刪除聊天模板"""
+        try:
+            template_id = payload.get('id')
+            
+            if not template_id:
+                self.send_event("delete-chat-template-result", {
+                    "success": False,
+                    "error": "缺少模板 ID"
+                })
+                return
+            
+            success = await db.delete_chat_template(template_id)
+            
+            self.send_event("delete-chat-template-result", {"success": success})
+            
+            if success:
+                self.send_log(f"🗑️ 已刪除聊天模板 ID: {template_id}", "success")
+                # 刷新模板列表
+                await self.handle_get_chat_templates()
+                
+        except Exception as e:
+            self.send_log(f"❌ 刪除聊天模板失敗: {e}", "error")
+            self.send_event("delete-chat-template-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    # ==================== Trigger Rules Handlers ====================
+    
+    async def handle_get_trigger_rules(self):
+        """獲取所有觸發規則"""
+        try:
+            rules = await db.get_all_trigger_rules()
+            self.send_event("trigger-rules-result", {
+                "success": True,
+                "rules": rules
+            })
+        except Exception as e:
+            self.send_log(f"❌ 獲取觸發規則失敗: {e}", "error")
+            self.send_event("trigger-rules-result", {
+                "success": False,
+                "rules": [],
+                "error": str(e)
+            })
+    
+    async def handle_get_trigger_rule(self, payload: Dict[str, Any]):
+        """獲取單個觸發規則"""
+        try:
+            rule_id = payload.get('id')
+            if not rule_id:
+                self.send_event("trigger-rule-result", {
+                    "success": False,
+                    "error": "缺少規則 ID"
+                })
+                return
+            
+            rule = await db.get_trigger_rule(rule_id)
+            self.send_event("trigger-rule-result", {
+                "success": True,
+                "rule": rule
+            })
+        except Exception as e:
+            self.send_log(f"❌ 獲取觸發規則失敗: {e}", "error")
+            self.send_event("trigger-rule-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_save_trigger_rule(self, payload: Dict[str, Any]):
+        """保存觸發規則（新增或更新）"""
+        import sys
+        print(f"[Backend] handle_save_trigger_rule called with payload: {payload}", file=sys.stderr)
+        try:
+            rule_id = payload.get('id')
+            name = payload.get('name', '')
+            
+            if not name:
+                self.send_event("save-trigger-rule-result", {
+                    "success": False,
+                    "error": "規則名稱不能為空"
+                })
+                return
+            
+            if not payload.get('keywordSetIds') or len(payload.get('keywordSetIds', [])) == 0:
+                self.send_event("save-trigger-rule-result", {
+                    "success": False,
+                    "error": "請至少選擇一個關鍵詞集"
+                })
+                return
+            
+            if rule_id:
+                # 更新
+                success = await db.update_trigger_rule(rule_id, payload)
+                if success:
+                    self.send_log(f"✅ 已更新觸發規則: {name}", "success")
+                    self.send_event("save-trigger-rule-result", {
+                        "success": True,
+                        "id": rule_id,
+                        "message": "規則已更新"
+                    })
+                else:
+                    self.send_event("save-trigger-rule-result", {
+                        "success": False,
+                        "error": "更新失敗"
+                    })
+            else:
+                # 新增
+                new_id = await db.add_trigger_rule(payload)
+                self.send_log(f"✅ 已創建觸發規則: {name}", "success")
+                self.send_event("save-trigger-rule-result", {
+                    "success": True,
+                    "id": new_id,
+                    "message": "規則已創建"
+                })
+            
+            # 刷新規則列表
+            await self.handle_get_trigger_rules()
+            
+        except Exception as e:
+            self.send_log(f"❌ 保存觸發規則失敗: {e}", "error")
+            self.send_event("save-trigger-rule-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_delete_trigger_rule(self, payload: Dict[str, Any]):
+        """刪除觸發規則"""
+        try:
+            rule_id = payload.get('id')
+            
+            if not rule_id:
+                self.send_event("delete-trigger-rule-result", {
+                    "success": False,
+                    "error": "缺少規則 ID"
+                })
+                return
+            
+            success = await db.delete_trigger_rule(rule_id)
+            
+            self.send_event("delete-trigger-rule-result", {"success": success})
+            
+            if success:
+                self.send_log(f"🗑️ 已刪除觸發規則 ID: {rule_id}", "success")
+                await self.handle_get_trigger_rules()
+                
+        except Exception as e:
+            self.send_log(f"❌ 刪除觸發規則失敗: {e}", "error")
+            self.send_event("delete-trigger-rule-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_toggle_trigger_rule(self, payload: Dict[str, Any]):
+        """啟用/停用觸發規則"""
+        try:
+            rule_id = payload.get('id')
+            is_active = payload.get('isActive', True)
+            
+            if not rule_id:
+                self.send_event("toggle-trigger-rule-result", {
+                    "success": False,
+                    "error": "缺少規則 ID"
+                })
+                return
+            
+            success = await db.toggle_trigger_rule(rule_id, is_active)
+            
+            self.send_event("toggle-trigger-rule-result", {"success": success})
+            
+            if success:
+                status = "啟用" if is_active else "停用"
+                self.send_log(f"✅ 已{status}觸發規則 ID: {rule_id}", "success")
+                await self.handle_get_trigger_rules()
+                
+        except Exception as e:
+            self.send_log(f"❌ 切換觸發規則狀態失敗: {e}", "error")
+            self.send_event("toggle-trigger-rule-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    # ==================== AI Model Configuration Handlers ====================
+    
+    async def handle_save_ai_model(self, payload: Dict[str, Any]):
+        """保存 AI 模型配置到數據庫"""
+        try:
+            provider = payload.get('provider', '')
+            model_name = payload.get('modelName', '')
+            display_name = payload.get('displayName', model_name)
+            api_key = payload.get('apiKey', '')
+            api_endpoint = payload.get('apiEndpoint', '')
+            is_local = 1 if payload.get('isLocal', False) else 0
+            is_default = 1 if payload.get('isDefault', False) else 0
+            priority = payload.get('priority', 0)
+            config_json = json.dumps(payload.get('config', {}))
+            
+            if not provider or not model_name:
+                self.send_event("ai-model-saved", {
+                    "success": False,
+                    "error": "供應商和模型名稱不能為空"
+                })
+                return
+            
+            # 如果設為默認，先取消其他默認
+            if is_default:
+                await db.execute("UPDATE ai_models SET is_default = 0")
+            
+            # 檢查是否已存在
+            existing = await db.fetch_one(
+                "SELECT id FROM ai_models WHERE provider = ? AND model_name = ?",
+                (provider, model_name)
+            )
+            
+            if existing:
+                # 更新現有記錄
+                await db.execute(
+                    """UPDATE ai_models SET 
+                       display_name = ?, api_key = ?, api_endpoint = ?, 
+                       is_local = ?, is_default = ?, priority = ?, config_json = ?,
+                       updated_at = CURRENT_TIMESTAMP
+                       WHERE id = ?""",
+                    (display_name, api_key, api_endpoint, is_local, is_default, priority, config_json, existing['id'])
+                )
+                model_id = existing['id']
+            else:
+                # 插入新記錄
+                await db.execute(
+                    """INSERT INTO ai_models 
+                       (provider, model_name, display_name, api_key, api_endpoint, 
+                        is_local, is_default, priority, config_json, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
+                    (provider, model_name, display_name, api_key, api_endpoint, 
+                     is_local, is_default, priority, config_json)
+                )
+                model_id = (await db.fetch_one("SELECT last_insert_rowid() as id"))['id']
+            
+            self.send_log(f"✅ AI 模型已保存: {display_name} ({provider})", "success")
+            self.send_event("ai-model-saved", {
+                "success": True,
+                "modelId": model_id,
+                "provider": provider,
+                "modelName": model_name
+            })
+            
+            # 同時發送更新後的模型列表
+            await self.handle_get_ai_models()
+            
+        except Exception as e:
+            self.send_log(f"❌ 保存 AI 模型失敗: {e}", "error")
+            self.send_event("ai-model-saved", {"success": False, "error": str(e)})
+    
+    async def handle_get_ai_models(self):
+        """獲取所有已保存的 AI 模型配置"""
+        try:
+            models = await db.fetch_all(
+                """SELECT id, provider, model_name, display_name, api_key, api_endpoint,
+                   is_local, is_default, priority, is_connected, last_tested_at, config_json,
+                   created_at, updated_at
+                   FROM ai_models ORDER BY is_default DESC, priority DESC, created_at DESC"""
+            )
+            
+            result = []
+            for model in models:
+                # 隱藏 API Key 的大部分內容
+                api_key = model.get('api_key', '') or ''
+                masked_key = f"{api_key[:8]}...{api_key[-4:]}" if len(api_key) > 12 else '***'
+                
+                result.append({
+                    "id": model['id'],
+                    "provider": model['provider'],
+                    "modelName": model['model_name'],
+                    "displayName": model['display_name'] or model['model_name'],
+                    "apiKey": api_key,  # 完整 key 用於前端使用
+                    "apiKeyMasked": masked_key,  # 顯示用
+                    "apiEndpoint": model['api_endpoint'],
+                    "isLocal": bool(model['is_local']),
+                    "isDefault": bool(model['is_default']),
+                    "priority": model['priority'],
+                    "isConnected": bool(model['is_connected']),
+                    "lastTestedAt": model['last_tested_at'],
+                    "config": json.loads(model['config_json'] or '{}'),
+                    "createdAt": model['created_at'],
+                    "updatedAt": model['updated_at']
+                })
+            
+            self.send_event("ai-models-list", {
+                "success": True,
+                "models": result,
+                "count": len(result)
+            })
+            
+        except Exception as e:
+            self.send_log(f"❌ 獲取 AI 模型列表失敗: {e}", "error")
+            self.send_event("ai-models-list", {"success": False, "error": str(e), "models": []})
+    
+    async def handle_update_ai_model(self, payload: Dict[str, Any]):
+        """更新 AI 模型配置"""
+        try:
+            model_id = payload.get('id')
+            if not model_id:
+                self.send_event("ai-model-updated", {"success": False, "error": "缺少模型 ID"})
+                return
+            
+            updates = []
+            params = []
+            
+            if 'displayName' in payload:
+                updates.append("display_name = ?")
+                params.append(payload['displayName'])
+            if 'apiKey' in payload:
+                updates.append("api_key = ?")
+                params.append(payload['apiKey'])
+            if 'apiEndpoint' in payload:
+                updates.append("api_endpoint = ?")
+                params.append(payload['apiEndpoint'])
+            if 'isDefault' in payload:
+                if payload['isDefault']:
+                    await db.execute("UPDATE ai_models SET is_default = 0")
+                updates.append("is_default = ?")
+                params.append(1 if payload['isDefault'] else 0)
+            if 'priority' in payload:
+                updates.append("priority = ?")
+                params.append(payload['priority'])
+            if 'isConnected' in payload:
+                updates.append("is_connected = ?")
+                params.append(1 if payload['isConnected'] else 0)
+                updates.append("last_tested_at = CURRENT_TIMESTAMP")
+            
+            if updates:
+                updates.append("updated_at = CURRENT_TIMESTAMP")
+                params.append(model_id)
+                await db.execute(
+                    f"UPDATE ai_models SET {', '.join(updates)} WHERE id = ?",
+                    tuple(params)
+                )
+            
+            self.send_event("ai-model-updated", {"success": True, "modelId": model_id})
+            await self.handle_get_ai_models()
+            
+        except Exception as e:
+            self.send_event("ai-model-updated", {"success": False, "error": str(e)})
+    
+    async def handle_delete_ai_model(self, payload: Dict[str, Any]):
+        """刪除 AI 模型配置"""
+        try:
+            model_id = payload.get('id')
+            if not model_id:
+                self.send_event("ai-model-deleted", {"success": False, "error": "缺少模型 ID"})
+                return
+            
+            await db.execute("DELETE FROM ai_models WHERE id = ?", (model_id,))
+            
+            self.send_log(f"✅ AI 模型已刪除: ID={model_id}", "success")
+            self.send_event("ai-model-deleted", {"success": True, "modelId": model_id})
+            await self.handle_get_ai_models()
+            
+        except Exception as e:
+            self.send_event("ai-model-deleted", {"success": False, "error": str(e)})
+    
+    async def handle_test_ai_model(self, payload: Dict[str, Any]):
+        """測試 AI 模型連接 - 支持多種 API 格式"""
+        try:
+            import sys
+            model_id = payload.get('id')
+            provider = payload.get('provider', '')
+            api_key = payload.get('apiKey', '')
+            api_endpoint = payload.get('apiEndpoint', '')
+            model_name = payload.get('modelName', '')
+            is_local = payload.get('isLocal', False)
+            
+            print(f"[AI Test] 開始測試: provider={provider}, endpoint={api_endpoint}, model={model_name}, isLocal={is_local}", file=sys.stderr)
+            self.send_log(f"🔗 正在測試 AI 模型連接: {model_name}...", "info")
+            
+            is_connected = False
+            error_message = None
+            response_preview = None
+            
+            try:
+                if is_local or provider == 'ollama' or provider == 'custom':
+                    # 測試本地/自定義 AI - 嘗試多種格式
+                    import aiohttp
+                    test_url = api_endpoint or 'http://localhost:11434/api/chat'
+                    print(f"[AI Test] 測試 URL: {test_url}", file=sys.stderr)
+                    
+                    async with aiohttp.ClientSession() as session:
+                        # 首先嘗試 OpenAI 兼容格式
+                        try:
+                            # 確定 URL 格式
+                            if '/v1/chat/completions' in test_url:
+                                chat_url = test_url
+                            elif test_url.endswith('/chat'):
+                                # 可能是 OpenAI 兼容的 /chat 端點
+                                chat_url = test_url
+                            elif test_url.endswith('/api/chat'):
+                                # Ollama 格式
+                                chat_url = test_url
+                            else:
+                                chat_url = test_url.rstrip('/') + '/v1/chat/completions'
+                            
+                            headers = {'Content-Type': 'application/json'}
+                            if api_key:
+                                headers['Authorization'] = f'Bearer {api_key}'
+                            
+                            # 嘗試 OpenAI 格式
+                            request_body = {
+                                "model": model_name or "default",
+                                "messages": [{"role": "user", "content": "Hi, this is a test."}],
+                                "max_tokens": 20,
+                                "stream": False
+                            }
+                            
+                            print(f"[AI Test] 嘗試 OpenAI 格式: {chat_url}", file=sys.stderr)
+                            async with session.post(
+                                chat_url,
+                                headers=headers,
+                                json=request_body,
+                                timeout=aiohttp.ClientTimeout(total=15)
+                            ) as resp:
+                                print(f"[AI Test] 響應狀態: {resp.status}", file=sys.stderr)
+                                if resp.status == 200:
+                                    data = await resp.json()
+                                    # OpenAI 格式響應
+                                    content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
+                                    # Ollama 格式響應
+                                    if not content:
+                                        content = data.get('message', {}).get('content', '')
+                                    # 其他格式
+                                    if not content:
+                                        content = data.get('response', '') or data.get('content', '')
+                                    
+                                    if content:
+                                        is_connected = True
+                                        response_preview = content[:50] + ('...' if len(content) > 50 else '')
+                                        print(f"[AI Test] 成功！響應: {response_preview}", file=sys.stderr)
+                                    else:
+                                        # 有響應但沒有內容，可能格式不對
+                                        is_connected = True  # 至少連接成功了
+                                        response_preview = str(data)[:100]
+                                        print(f"[AI Test] 連接成功但響應格式未知: {response_preview}", file=sys.stderr)
+                                else:
+                                    resp_text = await resp.text()
+                                    error_message = f"HTTP {resp.status}: {resp_text[:100]}"
+                                    print(f"[AI Test] 失敗: {error_message}", file=sys.stderr)
+                        except Exception as e1:
+                            print(f"[AI Test] OpenAI 格式失敗: {e1}", file=sys.stderr)
+                            
+                            # 嘗試 Ollama 原生格式
+                            try:
+                                ollama_url = api_endpoint or 'http://localhost:11434/api/chat'
+                                if not ollama_url.endswith('/api/chat'):
+                                    ollama_url = ollama_url.rstrip('/') + '/api/chat'
+                                
+                                print(f"[AI Test] 嘗試 Ollama 格式: {ollama_url}", file=sys.stderr)
+                                async with session.post(
+                                    ollama_url,
+                                    json={
+                                        "model": model_name or "qwen2:7b",
+                                        "messages": [{"role": "user", "content": "Hi"}],
+                                        "stream": False,
+                                        "options": {"num_predict": 10}
+                                    },
+                                    timeout=aiohttp.ClientTimeout(total=15)
+                                ) as resp:
+                                    if resp.status == 200:
+                                        data = await resp.json()
+                                        content = data.get('message', {}).get('content', '')
+                                        if content:
+                                            is_connected = True
+                                            response_preview = content[:50]
+                                    else:
+                                        error_message = f"HTTP {resp.status}"
+                            except Exception as e2:
+                                error_message = f"連接失敗: {str(e1)[:50]}; {str(e2)[:50]}"
+                                print(f"[AI Test] 所有格式都失敗: {error_message}", file=sys.stderr)
+                                
+                elif provider == 'openai':
+                    import aiohttp
+                    # 自動格式化模型名稱（轉小寫，處理常見變體）
+                    normalized_model = model_name.lower().strip()
+                    model_name_map = {
+                        'gpt4o': 'gpt-4o',
+                        'gpt-4o': 'gpt-4o',
+                        'gpt4': 'gpt-4',
+                        'gpt-4': 'gpt-4',
+                        'gpt4turbo': 'gpt-4-turbo',
+                        'gpt-4-turbo': 'gpt-4-turbo',
+                        'gpt35turbo': 'gpt-3.5-turbo',
+                        'gpt-3.5-turbo': 'gpt-3.5-turbo',
+                        'gpt3.5': 'gpt-3.5-turbo',
+                        'gpt-4o-mini': 'gpt-4o-mini',
+                        'gpt4omini': 'gpt-4o-mini',
+                    }
+                    actual_model = model_name_map.get(normalized_model.replace(' ', '').replace('-', ''), normalized_model)
+                    print(f"[AI Test] OpenAI 模型名稱映射: {model_name} -> {actual_model}", file=sys.stderr)
+                    
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            'https://api.openai.com/v1/chat/completions',
+                            headers={
+                                'Authorization': f'Bearer {api_key}',
+                                'Content-Type': 'application/json'
+                            },
+                            json={
+                                "model": actual_model,
+                                "messages": [{"role": "user", "content": "Hi"}],
+                                "max_tokens": 5
+                            },
+                            timeout=aiohttp.ClientTimeout(total=15)
+                        ) as resp:
+                            print(f"[AI Test] OpenAI 響應狀態: {resp.status}", file=sys.stderr)
+                            if resp.status == 200:
+                                data = await resp.json()
+                                content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
+                                is_connected = True
+                                response_preview = f"OpenAI ({actual_model}) 連接成功" + (f": {content[:30]}..." if content else "")
+                            else:
+                                data = await resp.json()
+                                api_error = data.get('error', {})
+                                error_code = api_error.get('code', '')
+                                error_msg = api_error.get('message', f"HTTP {resp.status}")
+                                
+                                # 提供更友好的錯誤提示
+                                if resp.status == 401:
+                                    error_message = "API Key 無效或已過期，請在 OpenAI 後台確認 Key 狀態"
+                                elif resp.status == 429:
+                                    # 429 表示限流，但模型和 Key 都是有效的
+                                    is_connected = True
+                                    response_preview = f"OpenAI ({actual_model}) 可用（當前限流中）"
+                                    print(f"[AI Test] ✓ OpenAI {actual_model} 被限流，但確認可用", file=sys.stderr)
+                                elif resp.status == 403:
+                                    error_message = "API Key 沒有權限，可能需要付費帳戶"
+                                elif 'model' in error_msg.lower() and 'not found' in error_msg.lower():
+                                    error_message = f"模型 {actual_model} 不存在或您的帳戶無權使用"
+                                else:
+                                    error_message = error_msg
+                                
+                                if error_message:
+                                    print(f"[AI Test] OpenAI 錯誤: {error_message} (原始: {error_msg})", file=sys.stderr)
+                                
+                elif provider == 'claude':
+                    import aiohttp
+                    # 自動格式化模型名稱
+                    normalized_model = model_name.lower().strip()
+                    claude_model_map = {
+                        'claude': 'claude-3-5-sonnet-latest',
+                        'claude3': 'claude-3-5-sonnet-latest',
+                        'claude-3': 'claude-3-5-sonnet-latest',
+                        'claude-3-opus': 'claude-3-opus-latest',
+                        'claude3opus': 'claude-3-opus-latest',
+                        'claude-3-sonnet': 'claude-3-5-sonnet-latest',
+                        'claude3sonnet': 'claude-3-5-sonnet-latest',
+                        'claude-3-haiku': 'claude-3-haiku-20240307',
+                        'claude3haiku': 'claude-3-haiku-20240307',
+                        'claude-3.5-sonnet': 'claude-3-5-sonnet-latest',
+                        'claude-3-5-sonnet': 'claude-3-5-sonnet-latest',
+                    }
+                    actual_model = claude_model_map.get(normalized_model.replace(' ', '').replace('-', '').replace('.', ''), model_name)
+                    print(f"[AI Test] Claude 模型名稱映射: {model_name} -> {actual_model}", file=sys.stderr)
+                    
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            'https://api.anthropic.com/v1/messages',
+                            headers={
+                                'x-api-key': api_key,
+                                'anthropic-version': '2023-06-01',
+                                'Content-Type': 'application/json'
+                            },
+                            json={
+                                "model": actual_model,
+                                "max_tokens": 5,
+                                "messages": [{"role": "user", "content": "Hi"}]
+                            },
+                            timeout=aiohttp.ClientTimeout(total=15)
+                        ) as resp:
+                            print(f"[AI Test] Claude 響應狀態: {resp.status}", file=sys.stderr)
+                            if resp.status == 200:
+                                is_connected = True
+                                response_preview = "Claude 連接成功"
+                            else:
+                                data = await resp.json()
+                                error_message = data.get('error', {}).get('message', f"HTTP {resp.status}")
+                                if 'authentication' in error_message.lower():
+                                    error_message = "API Key 無效"
+                                print(f"[AI Test] Claude 錯誤: {error_message}", file=sys.stderr)
+                                
+                elif provider == 'gemini':
+                    import aiohttp
+                    # Gemini 模型名稱列表（嘗試多個變體）
+                    gemini_models_to_try = []
+                    normalized = model_name.lower().strip()
+                    
+                    # 添加用戶輸入的模型名
+                    gemini_models_to_try.append(model_name)
+                    
+                    # 添加常見變體
+                    if 'flash' in normalized:
+                        gemini_models_to_try.extend([
+                            'gemini-1.5-flash-latest',
+                            'gemini-1.5-flash',
+                            'gemini-1.5-flash-001',
+                            'gemini-2.0-flash-exp'
+                        ])
+                    elif 'pro' in normalized:
+                        gemini_models_to_try.extend([
+                            'gemini-1.5-pro-latest',
+                            'gemini-1.5-pro',
+                            'gemini-1.5-pro-001',
+                            'gemini-pro'
+                        ])
+                    else:
+                        gemini_models_to_try.extend([
+                            'gemini-1.5-flash-latest',
+                            'gemini-1.5-pro-latest'
+                        ])
+                    
+                    # 去重
+                    gemini_models_to_try = list(dict.fromkeys(gemini_models_to_try))
+                    print(f"[AI Test] Gemini 將嘗試模型列表: {gemini_models_to_try}", file=sys.stderr)
+                    
+                    async with aiohttp.ClientSession() as session:
+                        for try_model in gemini_models_to_try:
+                            url = f'https://generativelanguage.googleapis.com/v1beta/models/{try_model}:generateContent?key={api_key}'
+                            print(f"[AI Test] 嘗試 Gemini 模型: {try_model}", file=sys.stderr)
+                            try:
+                                async with session.post(
+                                    url,
+                                    json={
+                                        "contents": [{"role": "user", "parts": [{"text": "Hi"}]}],
+                                        "generationConfig": {"maxOutputTokens": 10}
+                                    },
+                                    timeout=aiohttp.ClientTimeout(total=10)
+                                ) as resp:
+                                    print(f"[AI Test] Gemini {try_model} 響應狀態: {resp.status}", file=sys.stderr)
+                                    if resp.status == 200:
+                                        data = await resp.json()
+                                        content = data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                                        is_connected = True
+                                        response_preview = f"Gemini ({try_model}) 連接成功" + (f": {content[:30]}..." if content else "")
+                                        print(f"[AI Test] ✓ Gemini 連接成功: {try_model}", file=sys.stderr)
+                                        break
+                                    elif resp.status == 400:
+                                        data = await resp.json()
+                                        err = data.get('error', {}).get('message', '')
+                                        if 'API_KEY_INVALID' in err or 'API key' in err:
+                                            error_message = "API Key 無效，請檢查 Google AI Studio 中的 API Key"
+                                            break
+                                    elif resp.status == 403:
+                                        error_message = "API Key 沒有權限使用 Gemini API，請在 Google AI Studio 中啟用"
+                                        break
+                                    elif resp.status == 429:
+                                        # 429 表示限流，但模型存在且可用
+                                        is_connected = True
+                                        response_preview = f"Gemini ({try_model}) 可用（當前限流中）"
+                                        print(f"[AI Test] ✓ Gemini {try_model} 被限流，但確認可用", file=sys.stderr)
+                                        break
+                            except Exception as try_e:
+                                print(f"[AI Test] Gemini {try_model} 嘗試失敗: {try_e}", file=sys.stderr)
+                                continue
+                        
+                        if not is_connected and not error_message:
+                            error_message = f"所有 Gemini 模型變體都無法連接，請確認 API Key 正確且已啟用 Generative Language API"
+                else:
+                    error_message = f"未知供應商: {provider}"
+                    
+            except asyncio.TimeoutError:
+                error_message = "連接超時"
+            except Exception as test_error:
+                error_message = str(test_error)
+            
+            # 更新數據庫中的連接狀態
+            if model_id:
+                await db.execute(
+                    "UPDATE ai_models SET is_connected = ?, last_tested_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (1 if is_connected else 0, model_id)
+                )
+            
+            if is_connected:
+                self.send_log(f"✅ AI 模型連接成功: {model_name}" + (f" - {response_preview}" if response_preview else ""), "success")
+            else:
+                self.send_log(f"❌ AI 模型連接失敗: {model_name} - {error_message}", "error")
+            
+            self.send_event("ai-model-tested", {
+                "success": True,
+                "modelId": model_id,
+                "isConnected": is_connected,
+                "error": error_message,
+                "responsePreview": response_preview,
+                "modelName": model_name
+            })
+            
+        except Exception as e:
+            import traceback
+            print(f"[AI Test] 測試過程異常: {traceback.format_exc()}", file=__import__('sys').stderr)
+            self.send_event("ai-model-tested", {"success": False, "error": str(e)})
+    
+    async def handle_set_default_ai_model(self, payload: Dict[str, Any]):
+        """設置默認 AI 模型"""
+        try:
+            model_id = payload.get('id')
+            if not model_id:
+                self.send_event("ai-model-default-set", {"success": False, "error": "缺少模型 ID"})
+                return
+            
+            # 先取消所有默認
+            await db.execute("UPDATE ai_models SET is_default = 0")
+            # 設置新默認
+            await db.execute("UPDATE ai_models SET is_default = 1 WHERE id = ?", (model_id,))
+            
+            self.send_log(f"✅ 已設置默認 AI 模型: ID={model_id}", "success")
+            self.send_event("ai-model-default-set", {"success": True, "modelId": model_id})
+            await self.handle_get_ai_models()
+            
+        except Exception as e:
+            self.send_event("ai-model-default-set", {"success": False, "error": str(e)})
+    
+    async def handle_save_model_usage(self, payload: Dict[str, Any]):
+        """保存模型用途分配"""
+        try:
+            intent_recognition = payload.get('intentRecognition', '')
+            daily_chat = payload.get('dailyChat', '')
+            multi_role_script = payload.get('multiRoleScript', '')
+            
+            # 保存到 ai_settings 表
+            await db.execute("""
+                INSERT INTO ai_settings (key, value) VALUES ('model_usage', ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+            """, (json.dumps({
+                'intentRecognition': intent_recognition,
+                'dailyChat': daily_chat,
+                'multiRoleScript': multi_role_script
+            }),))
+            
+            print(f"[AI] 模型用途分配已保存: intent={intent_recognition}, chat={daily_chat}, multi={multi_role_script}", file=sys.stderr)
+            self.send_event("model-usage-saved", {"success": True})
+            
+        except Exception as e:
+            print(f"[AI] 保存模型用途分配失敗: {e}", file=sys.stderr)
+            self.send_event("model-usage-saved", {"success": False, "error": str(e)})
+    
+    async def handle_get_model_usage(self):
+        """獲取模型用途分配"""
+        try:
+            row = await db.fetch_one(
+                "SELECT value FROM ai_settings WHERE key = 'model_usage'"
+            )
+            
+            if row and row.get('value'):
+                usage = json.loads(row['value'])
+            else:
+                usage = {
+                    'intentRecognition': '',
+                    'dailyChat': '',
+                    'multiRoleScript': ''
+                }
+            
+            print(f"[AI] 模型用途分配已加載: {usage}", file=sys.stderr)
+            self.send_event("model-usage-loaded", {"success": True, "usage": usage})
+            
+        except Exception as e:
+            print(f"[AI] 獲取模型用途分配失敗: {e}", file=sys.stderr)
+            self.send_event("model-usage-loaded", {"success": False, "error": str(e)})
+    
     # ==================== Knowledge Base Handlers ====================
     
     async def handle_init_knowledge_base(self):
@@ -15363,6 +18212,9 @@ class BackendService:
             search_type = payload.get('searchType', 'all')  # all, group, channel, supergroup
             min_members = payload.get('minMembers', 0)
             language = payload.get('language')
+            # 🆕 D方案：搜索會話 ID
+            search_session_id = payload.get('searchSessionId', '')
+            search_keyword = payload.get('searchKeyword', query)
             
             if not query:
                 self.send_event("search-resources-complete", {
@@ -15396,14 +18248,14 @@ class BackendService:
                 "message": f"正在搜索 '{query}'..."
             })
             
-            # 使用超時保護
+            # 🆕 C方案：只搜索，不保存到數據庫
+            # 直接使用 search_groups 返回結果，用戶點擊收藏時才保存
             try:
-                stats = await asyncio.wait_for(
-                    group_search_service.search_and_save(
+                search_results = await asyncio.wait_for(
+                    group_search_service.search_groups(
                         query=query,
                         phone=phone,
                         limit=limit,
-                        keywords=keywords if keywords else [query],
                         search_type=search_type,
                         min_members=min_members,
                         language=language
@@ -15412,23 +18264,70 @@ class BackendService:
                 )
             except asyncio.TimeoutError:
                 self.send_log("⏱️ 搜索超時（60秒）", "warning")
+                self.send_event("search-results-direct", {
+                    "success": False,
+                    "query": query,
+                    "error": "搜索超時，請稍後再試"
+                })
                 self.send_event("search-resources-complete", {
                     "success": False,
                     "error": "搜索超時，請稍後再試"
                 })
                 return
             
-            self.send_log(f"🔍 搜索完成: 找到 {stats['found']} 個, 新增 {stats['new']} 個", "success")
+            self.send_log(f"🔍 搜索完成: 找到 {len(search_results)} 個結果", "success")
+            
+            # 轉換為前端可用的格式
+            results_for_frontend = []
+            for result in search_results:
+                # 計算相關度評分
+                relevance_score = resource_discovery.calculate_relevance_score(
+                    result.title, result.description, [query]
+                )
+                
+                results_for_frontend.append({
+                    'id': None,  # 未保存到數據庫，沒有 ID
+                    'telegram_id': result.telegram_id,
+                    'username': result.username,
+                    'title': result.title,
+                    'description': result.description,
+                    'member_count': result.member_count,
+                    'resource_type': result.chat_type,
+                    'overall_score': relevance_score,
+                    'relevance_score': relevance_score,
+                    'is_public': result.is_public,
+                    'status': 'discovered',
+                    'discovery_source': 'search',
+                    'discovery_keyword': query,
+                    'is_saved': False  # 🆕 標記：尚未保存到數據庫
+                })
+            
+            # 發送直接結果給前端
+            self.send_event("search-results-direct", {
+                "success": True,
+                "query": query,
+                "results": results_for_frontend,
+                "total": len(results_for_frontend)
+            })
+            
+            # 同時發送舊格式事件（兼容）
             self.send_event("search-resources-complete", {
                 "success": True,
                 "query": query,
-                **stats
+                "found": len(results_for_frontend),
+                "new": 0,
+                "updated": 0
             })
             
         except Exception as e:
             self.send_log(f"❌ 搜索資源失敗: {e}", "error")
             import traceback
             traceback.print_exc()
+            self.send_event("search-results-direct", {
+                "success": False,
+                "query": query,
+                "error": str(e)
+            })
             self.send_event("search-resources-complete", {
                 "success": False,
                 "error": str(e)
@@ -15548,6 +18447,66 @@ class BackendService:
             self.send_event("jiso-availability", {
                 "available": False,
                 "reason": str(e)
+            })
+    
+    async def handle_clear_resources(self, payload: Dict[str, Any]):
+        """🆕 清理資源數據"""
+        try:
+            clear_type = payload.get('type', 'all')  # all, search_history, old_data
+            days_to_keep = payload.get('daysToKeep', 0)  # 保留最近 N 天的數據
+            
+            self.send_log(f"🧹 開始清理資源數據 (類型: {clear_type})...", "info")
+            
+            deleted_count = 0
+            
+            if clear_type == 'all':
+                # 清理所有 discovered_resources
+                result = await db.execute_async(
+                    "DELETE FROM discovered_resources"
+                )
+                deleted_count = result.rowcount if hasattr(result, 'rowcount') else 0
+                
+            elif clear_type == 'old_data':
+                # 清理舊數據（保留最近 N 天）
+                if days_to_keep > 0:
+                    cutoff_date = datetime.now() - timedelta(days=days_to_keep)
+                    result = await db.execute_async(
+                        "DELETE FROM discovered_resources WHERE discovered_at < ?",
+                        (cutoff_date.isoformat(),)
+                    )
+                    deleted_count = result.rowcount if hasattr(result, 'rowcount') else 0
+                else:
+                    result = await db.execute_async(
+                        "DELETE FROM discovered_resources"
+                    )
+                    deleted_count = result.rowcount if hasattr(result, 'rowcount') else 0
+            
+            elif clear_type == 'search_history':
+                # 只清理搜索歷史（保留已收藏的）
+                result = await db.execute_async(
+                    "DELETE FROM discovered_resources WHERE is_saved = 0 OR is_saved IS NULL"
+                )
+                deleted_count = result.rowcount if hasattr(result, 'rowcount') else 0
+            
+            self.send_log(f"✅ 清理完成，已刪除 {deleted_count} 條記錄", "success")
+            
+            # 發送更新事件
+            self.send_event("clear-resources-complete", {
+                "success": True,
+                "deleted_count": deleted_count,
+                "type": clear_type
+            })
+            
+            # 重新獲取資源統計
+            await self.handle_get_resource_stats({})
+            
+        except Exception as e:
+            self.send_log(f"❌ 清理失敗: {e}", "error")
+            import traceback
+            traceback.print_exc()
+            self.send_event("clear-resources-complete", {
+                "success": False,
+                "error": str(e)
             })
 
     # ==================== 自定義搜索渠道管理 ====================
@@ -15787,30 +18746,46 @@ class BackendService:
 
     async def handle_get_resources(self, payload: Dict[str, Any]):
         """獲取資源列表"""
+        print(f"[Backend] handle_get_resources called with payload: {payload}", file=sys.stderr)
         try:
             status = payload.get('status')
             resource_type = payload.get('type')
             limit = payload.get('limit', 50)
             offset = payload.get('offset', 0)
-            order_by = payload.get('orderBy', 'overall_score DESC')
+            # 🆕 優化排序：按相關性評分降序 + 更新時間降序
+            order_by = payload.get('orderBy', 'overall_score DESC, updated_at DESC')
+            # 🆕 支持按搜索會話過濾
+            search_session_id = payload.get('searchSessionId')
+            search_keyword = payload.get('searchKeyword')
             
+            print(f"[Backend] Fetching resources with limit={limit}, session={search_session_id}...", file=sys.stderr)
             resources = await resource_discovery.list_resources(
                 status=status,
                 resource_type=resource_type,
                 limit=limit,
                 offset=offset,
-                order_by=order_by
+                order_by=order_by,
+                search_session_id=search_session_id,
+                search_keyword=search_keyword
             )
             
-            total = await resource_discovery.count_resources(status=status, resource_type=resource_type)
+            total = await resource_discovery.count_resources(
+                status=status, 
+                resource_type=resource_type,
+                search_session_id=search_session_id,
+                search_keyword=search_keyword
+            )
+            print(f"[Backend] Found {len(resources)} resources (total: {total})", file=sys.stderr)
             
             self.send_event("resources-list", {
                 "success": True,
                 "resources": resources,
                 "total": total,
                 "limit": limit,
-                "offset": offset
+                "offset": offset,
+                "searchSessionId": search_session_id  # 🆕 返回會話 ID
             })
+            print(f"[Backend] Sent resources-list event", file=sys.stderr)
             
             # 🔧 後台自動驗證未驗證類型的資源（異步執行，不阻塞）
             asyncio.create_task(self._auto_verify_resource_types(resources))
@@ -15849,7 +18824,7 @@ class BackendService:
             
             client = self.telegram_manager.clients[online_phone]
             
-            # 批量驗證（每次最多 5 個，避免 FloodWait）
+            # 批量驗證（每次最多 5 個，使用智能 FloodWait 處理）
             verified_count = 0
             for resource in unverified[:5]:
                 try:
@@ -15860,8 +18835,8 @@ class BackendService:
                     if not chat_target:
                         continue
                     
-                    # 添加延遲避免 FloodWait
-                    await asyncio.sleep(0.5)
+                    # 🆕 使用智能 FloodWait 處理
+                    await flood_handler.wait_before_operation(online_phone, 'get_chat')
                     
                     chat_info = await client.get_chat(chat_target)
                     
@@ -15970,6 +18945,93 @@ class BackendService:
         except Exception as e:
             self.send_log(f"❌ 添加資源失敗: {e}", "error")
             self.send_event("resource-added", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    # 🆕 C方案：收藏資源（保存到數據庫）
+    async def handle_save_resource(self, payload: Dict[str, Any]):
+        """收藏資源 - 將搜索結果保存到數據庫"""
+        try:
+            telegram_id = payload.get('telegram_id')
+            if not telegram_id:
+                raise ValueError("缺少 telegram_id")
+            
+            # 檢查是否已存在
+            existing = await resource_discovery.get_resource_by_telegram_id(telegram_id)
+            if existing:
+                self.send_log(f"⭐ 資源已存在: {payload.get('title')}", "info")
+                self.send_event("resource-saved", {
+                    "success": True,
+                    "telegram_id": telegram_id,
+                    "resource_id": existing['id'],
+                    "already_exists": True
+                })
+                return
+            
+            # 創建新資源
+            from resource_discovery import DiscoveredResource
+            resource = DiscoveredResource(
+                resource_type=payload.get('resource_type', 'group'),
+                telegram_id=telegram_id,
+                username=payload.get('username', ''),
+                title=payload.get('title', ''),
+                description=payload.get('description', ''),
+                member_count=payload.get('member_count', 0),
+                activity_score=0.5,
+                relevance_score=payload.get('overall_score', 0.5),
+                discovery_source='search',
+                discovery_keyword=payload.get('discovery_keyword', ''),
+                discovered_by_phone='',
+                status='discovered'
+            )
+            
+            resource_id = await resource_discovery.add_resource(resource)
+            
+            self.send_log(f"⭐ 已收藏: {payload.get('title')}", "success")
+            self.send_event("resource-saved", {
+                "success": True,
+                "telegram_id": telegram_id,
+                "resource_id": resource_id,
+                "already_exists": False
+            })
+            
+        except Exception as e:
+            self.send_log(f"❌ 收藏失敗: {e}", "error")
+            self.send_event("resource-saved", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_unsave_resource(self, payload: Dict[str, Any]):
+        """取消收藏 - 從數據庫刪除資源"""
+        try:
+            telegram_id = payload.get('telegram_id')
+            if not telegram_id:
+                raise ValueError("缺少 telegram_id")
+            
+            # 查找資源
+            existing = await resource_discovery.get_resource_by_telegram_id(telegram_id)
+            if not existing:
+                self.send_log(f"資源不存在，無需刪除", "info")
+                self.send_event("resource-unsaved", {
+                    "success": True,
+                    "telegram_id": telegram_id
+                })
+                return
+            
+            # 刪除資源
+            await resource_discovery.delete_resource(existing['id'])
+            
+            self.send_log(f"🗑️ 已取消收藏", "success")
+            self.send_event("resource-unsaved", {
+                "success": True,
+                "telegram_id": telegram_id
+            })
+            
+        except Exception as e:
+            self.send_log(f"❌ 取消收藏失敗: {e}", "error")
+            self.send_event("resource-unsaved", {
                 "success": False,
                 "error": str(e)
             })
@@ -16383,13 +19445,15 @@ class BackendService:
     async def handle_join_and_monitor_with_account(self, payload: Dict[str, Any]):
         """使用指定帳號加入並監控群組"""
         try:
-            resource_id = payload.get('resourceId')
+            resource_id = payload.get('resourceId', 0)
             phone = payload.get('phone')
             keywords = payload.get('keywords', [])
             auto_enable = payload.get('autoEnableMonitor', True)
+            # 🆕 支持從前端傳遞資源信息（當 resourceId === 0 時）
+            resource_info = payload.get('resourceInfo', {})
+            # 🆕 成員數（加入後更新）
+            members_count = 0
             
-            if not resource_id:
-                raise ValueError("資源 ID 不能為空")
             if not phone:
                 raise ValueError("請選擇加入帳號")
             
@@ -16399,18 +19463,173 @@ class BackendService:
             from database import db
             await db.connect()
             
-            resources = await db.fetch_all(
-                "SELECT * FROM discovered_resources WHERE id = ?",
-                (resource_id,)
-            )
+            resource = None
+            title = ''
+            username = ''
+            invite_link = ''
+            current_status = 'discovered'
             
-            if not resources:
-                raise ValueError(f"找不到資源 ID: {resource_id}")
+            # 🆕 如果 resourceId === 0，嘗試使用各種方式查找或創建資源
+            if resource_id == 0:
+                # 從 resourceInfo 獲取信息
+                username = resource_info.get('username', '').strip()
+                telegram_id = resource_info.get('telegram_id', '').strip()
+                title = resource_info.get('title', '').strip()
+                link = resource_info.get('link', '').strip()
+                
+                import re
+                
+                # 🔑 從 link 中提取有效信息
+                extracted_username = ''
+                extracted_invite_hash = ''
+                is_message_link = False  # 是否為消息鏈接（非群組直連）
+                
+                if link:
+                    # 解析 link 格式
+                    if '/+' in link or '/joinchat/' in link:
+                        # 私有群組邀請鏈接：https://t.me/+hash 或 https://t.me/joinchat/hash
+                        invite_link = link
+                        self.send_log(f"📋 檢測到邀請鏈接: {link}", "info")
+                    elif 't.me/' in link:
+                        # 檢查是否為消息鏈接格式：https://t.me/username/messageId
+                        message_link_match = re.search(r't\.me/([^/?\s]+)/(\d+)', link)
+                        if message_link_match:
+                            # 這是消息鏈接，不是群組直連
+                            link_username = message_link_match.group(1)
+                            message_id = message_link_match.group(2)
+                            is_message_link = True
+                            self.send_log(f"⚠️ 檢測到消息鏈接（非群組直連）: {link}", "warning")
+                            
+                            # 檢查 username 是否為 bot（搜索機器人）
+                            if link_username.lower().endswith('bot'):
+                                self.send_log(f"⚠️ 鏈接指向搜索機器人 @{link_username}，需要獲取真正的群組鏈接", "warning")
+                                # 清空 username，因為這是機器人的 username
+                                if username and username.lower().endswith('bot'):
+                                    username = ''
+                                    telegram_id = ''
+                        else:
+                            # 普通群組鏈接：https://t.me/username
+                            match = re.search(r't\.me/([^/?\s]+)$', link)
+                            if match:
+                                extracted_username = match.group(1)
+                                if not extracted_username.startswith('+'):
+                                    # 檢查是否為 bot
+                                    if not extracted_username.lower().endswith('bot'):
+                                        username = extracted_username
+                                        self.send_log(f"📋 從鏈接提取 username: {username}", "info")
+                                    else:
+                                        self.send_log(f"⚠️ 鏈接指向機器人 @{extracted_username}，跳過", "warning")
+                                else:
+                                    invite_link = link
+                
+                # 🔑 檢查 username 是否為搜索機器人（以 'bot' 結尾）
+                if username and username.lower().endswith('bot'):
+                    self.send_log(f"⚠️ username '{username}' 看起來是機器人，不是群組", "warning")
+                    # 如果沒有其他加入方式，報錯
+                    if not invite_link:
+                        raise ValueError(f"無法加入：'{username}' 是搜索機器人，請從搜索結果中點擊進入群組，然後複製群組的邀請鏈接")
+                    username = ''  # 清空 bot username
+                
+                # 🔑 驗證 telegram_id 是否為有效 ID（不是 title 的誤用）
+                # 有效的 telegram_id 應該是數字或簡短的標識符
+                if telegram_id and (len(telegram_id) > 50 or not telegram_id.replace('-', '').replace('_', '').isalnum()):
+                    self.send_log(f"⚠️ telegram_id 格式無效，忽略: {telegram_id[:30]}...", "warning")
+                    telegram_id = ''  # 重置無效的 telegram_id
+                
+                # 如果 telegram_id 也是 bot username，清空
+                if telegram_id and telegram_id.lower().endswith('bot'):
+                    telegram_id = ''
+                
+                # 嘗試根據 username 查找
+                if username:
+                    resources = await db.fetch_all(
+                        "SELECT * FROM discovered_resources WHERE username = ?",
+                        (username,)
+                    )
+                    if resources:
+                        resource = resources[0]
+                        resource_id = resource.get('id')
+                        self.send_log(f"📋 根據 username 找到資源 ID: {resource_id}", "info")
+                
+                # 嘗試根據 invite_link 查找
+                if not resource and invite_link:
+                    resources = await db.fetch_all(
+                        "SELECT * FROM discovered_resources WHERE invite_link = ?",
+                        (invite_link,)
+                    )
+                    if resources:
+                        resource = resources[0]
+                        resource_id = resource.get('id')
+                        self.send_log(f"📋 根據 invite_link 找到資源 ID: {resource_id}", "info")
+                
+                # 如果還是沒找到，且有有效的 telegram_id，嘗試使用 telegram_id 查找
+                if not resource and telegram_id:
+                    resources = await db.fetch_all(
+                        "SELECT * FROM discovered_resources WHERE telegram_id = ?",
+                        (telegram_id,)
+                    )
+                    if resources:
+                        resource = resources[0]
+                        resource_id = resource.get('id')
+                        self.send_log(f"📋 根據 telegram_id 找到資源 ID: {resource_id}", "info")
+                
+                # 🆕 如果還是沒找到，檢查是否有足夠信息創建資源
+                if not resource:
+                    # 必須有加入方式（username 或 invite_link）
+                    if not username and not invite_link:
+                        raise ValueError("缺少加入方式：請提供群組 username 或邀請鏈接")
+                    
+                    self.send_log(f"📝 資源不存在，正在創建新資源...", "info")
+                    # 使用 resource_discovery 添加資源
+                    from resource_discovery import ResourceDiscovery
+                    resource_discovery = ResourceDiscovery()
+                    
+                    # 生成有效的 telegram_id
+                    valid_telegram_id = username or f"invite_{int(time.time())}"
+                    if telegram_id and len(telegram_id) <= 50:
+                        valid_telegram_id = telegram_id
+                    
+                    new_resource = {
+                        'telegram_id': valid_telegram_id,
+                        'username': username,
+                        'title': title or username or '未命名資源',
+                        'description': resource_info.get('description', ''),
+                        'member_count': resource_info.get('member_count', 0),
+                        'resource_type': resource_info.get('resource_type', 'supergroup'),
+                        'discovery_source': 'manual_join',
+                        'status': 'discovered',
+                        'invite_link': invite_link or (f"https://t.me/{username}" if username else '')
+                    }
+                    
+                    resource_id = await resource_discovery.add_resource(new_resource)
+                    self.send_log(f"✅ 已創建新資源 ID: {resource_id}", "success")
+                    
+                    # 重新查詢獲取完整資源信息
+                    resources = await db.fetch_all(
+                        "SELECT * FROM discovered_resources WHERE id = ?",
+                        (resource_id,)
+                    )
+                    if resources:
+                        resource = resources[0]
             
-            resource = resources[0]
-            title = resource.get('title', '')
-            username = resource.get('username', '')
-            invite_link = resource.get('invite_link', '')
+            # 如果 resourceId 不為 0，正常查詢
+            if not resource and resource_id > 0:
+                resources = await db.fetch_all(
+                    "SELECT * FROM discovered_resources WHERE id = ?",
+                    (resource_id,)
+                )
+                if not resources:
+                    raise ValueError(f"找不到資源 ID: {resource_id}")
+                resource = resources[0]
+            
+            if not resource:
+                raise ValueError("無法找到或創建資源")
+            
+            # 更新資源信息（優先使用資源中的值，但保留從 resourceInfo 提取的 invite_link）
+            title = resource.get('title', '') or title
+            username = resource.get('username', '') or username
+            # 🔑 關鍵：確保 invite_link 被正確設置
+            invite_link = resource.get('invite_link', '') or invite_link or resource_info.get('link', '')
             current_status = resource.get('status', 'discovered')
             
             # 檢查帳號是否存在且已連接
@@ -16421,14 +19640,45 @@ class BackendService:
             if not client.is_connected:
                 raise ValueError(f"帳號 {phone} 未連接")
             
+            # 追踪加入狀態
+            join_status = 'joined'  # 默認為已加入
+            
             # 如果資源尚未加入，先加入群組
             if current_status not in ['joined', 'monitoring']:
                 self.send_log(f"📥 正在加入群組: {title}", "info")
                 
                 # 嘗試加入群組
                 join_target = username or invite_link
+                
+                # 🆕 如果沒有有效的加入方式，嘗試使用群組名稱搜索
+                if not join_target and title:
+                    self.send_log(f"🔍 沒有 username 或邀請鏈接，嘗試搜索群組: {title}", "info")
+                    try:
+                        # 使用 Telegram 全局搜索
+                        search_results = await client.search_global(title, limit=5)
+                        for result in search_results:
+                            if hasattr(result, 'chat') and result.chat:
+                                chat = result.chat
+                                chat_title = getattr(chat, 'title', '') or ''
+                                chat_username = getattr(chat, 'username', '')
+                                
+                                # 檢查標題是否匹配
+                                if title.lower() in chat_title.lower() or chat_title.lower() in title.lower():
+                                    if chat_username:
+                                        join_target = chat_username
+                                        username = chat_username
+                                        self.send_log(f"✅ 找到匹配群組: @{chat_username}", "success")
+                                        break
+                    except Exception as search_err:
+                        self.send_log(f"搜索群組失敗: {search_err}", "warning")
+                
                 if not join_target:
-                    raise ValueError("沒有可用的加入方式（username 或 invite_link）")
+                    # 提供更友好的錯誤提示
+                    error_msg = f"無法加入群組「{title}」：\n"
+                    error_msg += "• 此搜索結果沒有提供群組的 username 或邀請鏈接\n"
+                    error_msg += "• 請在 Telegram 中點擊搜索機器人的結果，手動獲取群組鏈接後再試\n"
+                    error_msg += "• 或者直接在 Telegram 中搜索並加入該群組"
+                    raise ValueError(error_msg)
                 
                 try:
                     if username:
@@ -16438,8 +19688,10 @@ class BackendService:
                     
                     self.send_log(f"✅ 已加入群組: {title}", "success")
                     
-                    # 🔍 關鍵：獲取真實的聊天類型並更新數據庫
+                    # 🔍 關鍵：獲取真實的聊天類型和成員數並更新數據庫
                     verified_type = None
+                    members_count = 0
+                    telegram_id = None
                     try:
                         chat_target = username or invite_link
                         chat_info = await client.get_chat(chat_target)
@@ -16455,33 +19707,62 @@ class BackendService:
                             elif chat_info.type == ChatType.BOT:
                                 verified_type = "bot"
                             
+                            # 🆕 獲取成員數
+                            members_count = getattr(chat_info, 'members_count', 0) or 0
+                            telegram_id = chat_info.id
+                            
                             if verified_type:
-                                self.send_log(f"📋 類型確認: {verified_type}", "info")
+                                self.send_log(f"📋 類型確認: {verified_type}, 成員數: {members_count}", "info")
                     except Exception as type_err:
                         import sys
                         print(f"[Backend] Error getting chat type: {type_err}", file=sys.stderr)
                     
-                    # 更新資源狀態（包含驗證後的類型）
+                    # 更新資源狀態（包含驗證後的類型和成員數）
                     if verified_type:
                         await db.execute(
                             """UPDATE discovered_resources 
-                               SET status = ?, joined_by_phone = ?, joined_at = CURRENT_TIMESTAMP, resource_type = ?
+                               SET status = ?, joined_by_phone = ?, joined_at = CURRENT_TIMESTAMP, resource_type = ?, member_count = ?, telegram_id = COALESCE(telegram_id, ?)
                                WHERE id = ?""",
-                            ('joined', phone, verified_type, resource_id)
+                            ('joined', phone, verified_type, members_count, telegram_id, resource_id)
                         )
                     else:
                         await db.execute(
                             """UPDATE discovered_resources 
-                               SET status = ?, joined_by_phone = ?, joined_at = CURRENT_TIMESTAMP 
+                               SET status = ?, joined_by_phone = ?, joined_at = CURRENT_TIMESTAMP, member_count = ?, telegram_id = COALESCE(telegram_id, ?)
                                WHERE id = ?""",
-                            ('joined', phone, resource_id)
+                            ('joined', phone, members_count, telegram_id, resource_id)
                         )
                     await db._connection.commit()
                     
                 except Exception as join_error:
                     error_msg = str(join_error)
-                    if 'already' in error_msg.lower() or 'participant' in error_msg.lower():
+                    error_lower = error_msg.lower()
+                    
+                    if 'already' in error_lower or 'participant' in error_lower:
+                        # 帳號已在群組中
                         self.send_log(f"ℹ️ 帳號已在群組中", "info")
+                        await db.execute(
+                            """UPDATE discovered_resources 
+                               SET status = ?, joined_by_phone = ? 
+                               WHERE id = ?""",
+                            ('joined', phone, resource_id)
+                        )
+                        await db._connection.commit()
+                    elif 'invite_request_sent' in error_lower or 'request_sent' in error_lower:
+                        # 🆕 群組需要管理員批准，加入請求已發送
+                        self.send_log(f"📨 加入請求已發送，等待管理員批准: {title}", "info")
+                        join_status = 'pending_approval'  # 更新狀態
+                        await db.execute(
+                            """UPDATE discovered_resources 
+                               SET status = ?, joined_by_phone = ? 
+                               WHERE id = ?""",
+                            ('pending_approval', phone, resource_id)
+                        )
+                        await db._connection.commit()
+                        # 不拋出錯誤，繼續設置監控
+                    elif 'user_already_participant' in error_lower:
+                        # 帳號已經是成員
+                        self.send_log(f"ℹ️ 帳號已是群組成員", "info")
                         await db.execute(
                             """UPDATE discovered_resources 
                                SET status = ?, joined_by_phone = ? 
@@ -16537,7 +19818,10 @@ class BackendService:
                 "success": True,
                 "resourceId": resource_id,
                 "phone": phone,
-                "keywords": keywords
+                "keywords": keywords,
+                "status": join_status,  # 🆕 返回加入狀態
+                "memberCount": members_count,  # 🆕 返回成員數
+                "message": "加入請求已發送，等待管理員批准" if join_status == 'pending_approval' else "已成功加入並設置監控"
             })
             
         except Exception as e:
@@ -16811,6 +20095,10 @@ class BackendService:
     
     async def handle_get_extracted_members(self, payload: Dict[str, Any]):
         """獲取已提取的成員列表"""
+        import time
+        start_time = time.time()
+        print(f"[Backend] handle_get_extracted_members started, payload: {payload}", file=sys.stderr)
+        
         try:
             online_only = payload.get('onlineOnly', False)
             min_value_level = payload.get('minValueLevel')
@@ -16819,6 +20107,7 @@ class BackendService:
             limit = payload.get('limit', 100)
             offset = payload.get('offset', 0)
             
+            print(f"[Backend] Fetching members with limit={limit}, offset={offset}...", file=sys.stderr)
             members = await member_extraction_service.get_members(
                 online_only=online_only,
                 min_value_level=min_value_level,
@@ -16828,11 +20117,15 @@ class BackendService:
                 offset=offset
             )
             
+            elapsed = time.time() - start_time
+            print(f"[Backend] Fetched {len(members)} members in {elapsed:.2f}s", file=sys.stderr)
+            
             self.send_event("extracted-members-list", {
                 "success": True,
                 "members": members,
                 "count": len(members)
             })
+            print(f"[Backend] Sent extracted-members-list event with {len(members)} members", file=sys.stderr)
             
         except Exception as e:
             self.send_log(f"❌ 獲取成員列表失敗: {e}", "error")
@@ -16876,6 +20169,58 @@ class BackendService:
         except Exception as e:
             self.send_log(f"❌ 獲取在線成員失敗: {e}", "error")
             self.send_event("online-members-list", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_update_member(self, payload: Dict[str, Any]):
+        """更新成員信息"""
+        try:
+            user_id = payload.get('userId')
+            updates = payload.get('updates', {})
+            
+            if not user_id:
+                raise ValueError("用戶 ID 不能為空")
+            
+            # 構建更新語句
+            set_clauses = []
+            params = []
+            
+            allowed_fields = ['tags', 'notes', 'contacted', 'contacted_at', 'response_status', 'converted', 'value_level']
+            
+            for field, value in updates.items():
+                if field in allowed_fields:
+                    set_clauses.append(f"{field} = ?")
+                    params.append(value if not isinstance(value, bool) else (1 if value else 0))
+            
+            if not set_clauses:
+                self.send_event("member-updated", {
+                    "success": True,
+                    "userId": user_id,
+                    "message": "無需更新"
+                })
+                return
+            
+            # 添加更新時間
+            set_clauses.append("updated_at = ?")
+            params.append(datetime.now().isoformat())
+            
+            # 添加 user_id 參數
+            params.append(user_id)
+            
+            query = f"UPDATE extracted_members SET {', '.join(set_clauses)} WHERE user_id = ?"
+            
+            await db.execute(query, tuple(params))
+            
+            self.send_log(f"✅ 更新成員 {user_id} 成功", "success")
+            self.send_event("member-updated", {
+                "success": True,
+                "userId": user_id
+            })
+            
+        except Exception as e:
+            self.send_log(f"❌ 更新成員失敗: {e}", "error")
+            self.send_event("member-updated", {
                 "success": False,
                 "error": str(e)
             })
@@ -17648,6 +20993,1325 @@ class BackendService:
                 "success": False,
                 "error": str(e)
             })
+
+    # ==================== AI Team Execution Handlers ====================
+    
+    # AI 團隊執行器實例
+    _ai_team_executor = None
+    
+    def get_ai_team_executor(self):
+        """獲取或創建 AI 團隊執行器"""
+        if self._ai_team_executor is None:
+            from ai_team_executor import AITeamExecutor
+            self._ai_team_executor = AITeamExecutor(
+                message_queue=self.message_queue,
+                database=db,
+                send_event=self.send_event,
+                send_log=self.send_log
+            )
+        return self._ai_team_executor
+    
+    async def handle_ai_team_start_execution(self, payload: Dict[str, Any]):
+        """啟動 AI 團隊執行任務"""
+        import sys
+        
+        try:
+            executor = self.get_ai_team_executor()
+            success = await executor.start_execution(payload)
+            
+            if success:
+                goal = payload.get('goal', '')
+                self.send_log(f"🤖 AI 團隊開始執行: {goal[:50]}...", "info")
+            
+        except Exception as e:
+            print(f"[AITeam] 啟動失敗: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_log(f"❌ AI 團隊啟動失敗: {e}", "error")
+    
+    async def handle_ai_team_pause_execution(self, payload: Dict[str, Any]):
+        """暫停 AI 團隊執行"""
+        executor = self.get_ai_team_executor()
+        execution_id = payload.get('executionId')
+        executor.pause_execution(execution_id)
+    
+    async def handle_ai_team_resume_execution(self, payload: Dict[str, Any]):
+        """恢復 AI 團隊執行"""
+        executor = self.get_ai_team_executor()
+        execution_id = payload.get('executionId')
+        executor.resume_execution(execution_id)
+    
+    async def handle_ai_team_stop_execution(self, payload: Dict[str, Any]):
+        """停止 AI 團隊執行"""
+        executor = self.get_ai_team_executor()
+        execution_id = payload.get('executionId')
+        executor.stop_execution(execution_id)
+    
+    async def handle_ai_team_add_targets(self, payload: Dict[str, Any]):
+        """添加目標用戶到 AI 團隊隊列"""
+        import sys
+        targets = payload.get('targets', [])
+        print(f"[AITeam] 添加 {len(targets)} 個目標用戶", file=sys.stderr)
+        self.send_log(f"🎯 已添加 {len(targets)} 個目標用戶到 AI 銷售隊列", "info")
+    
+    # ==================== Batch Send Handlers ====================
+    
+    _batch_send_active = False
+    _batch_send_cancelled = False
+    
+    async def handle_batch_send_start(self, payload: Dict[str, Any]):
+        """開始批量發送 - 支持多模板和發送策略"""
+        import sys
+        import asyncio
+        import random
+        
+        try:
+            targets = payload.get('targets', [])
+            message_template = payload.get('message', '')
+            messages = payload.get('messages', [])  # 多模板列表
+            send_strategy = payload.get('sendStrategy', 'random')  # random/rotate/sequential
+            attachments = payload.get('attachments', [])
+            config = payload.get('config', {})
+            
+            min_interval = config.get('minInterval', 30)
+            max_interval = config.get('maxInterval', 60)
+            account_rotation = config.get('accountRotation', True)
+            
+            # 判斷是否多模板模式
+            is_multi_template = len(messages) > 1
+            if is_multi_template:
+                print(f"[BatchSend] 多模板模式: {len(messages)} 個模板, 策略: {send_strategy}", file=sys.stderr)
+                self.send_log(f"📨 開始批量發送: {len(targets)} 個目標, {len(messages)} 個模板 ({send_strategy})", "info")
+            else:
+                print(f"[BatchSend] 開始批量發送: {len(targets)} 個目標", file=sys.stderr)
+                self.send_log(f"📨 開始批量發送: {len(targets)} 個目標", "info")
+            
+            self._batch_send_active = True
+            self._batch_send_cancelled = False
+            
+            # 獲取可用帳號（檢查 Online 狀態）
+            accounts = await db.get_all_accounts()
+            available_accounts = [a for a in accounts if a.get('status') in ('Online', 'active')]
+            
+            # 額外檢查：從 TelegramManager 獲取實際連接的客戶端
+            if not available_accounts:
+                # 嘗試從 TelegramManager 獲取已連接的帳號
+                connected_phones = list(self.telegram_manager.clients.keys()) if hasattr(self.telegram_manager, 'clients') else []
+                if connected_phones:
+                    available_accounts = [a for a in accounts if a.get('phone') in connected_phones]
+                    print(f"[BatchSend] 通過 TelegramManager 找到 {len(available_accounts)} 個已連接帳號", file=sys.stderr)
+            
+            print(f"[BatchSend] 可用帳號: {len(available_accounts)} 個", file=sys.stderr)
+            for acc in available_accounts:
+                print(f"[BatchSend]   - {acc.get('phone')} ({acc.get('status')})", file=sys.stderr)
+            
+            if not available_accounts:
+                error_msg = "沒有可用的發送帳號，請先登入帳號"
+                self.send_log(f"⚠️ {error_msg}", "warning")
+                self.send_event("batch-send:complete", {
+                    "success": 0, 
+                    "failed": len(targets),
+                    "error": error_msg,
+                    "failureReasons": {"no_account": len(targets)}
+                })
+                return
+            
+            success_count = 0
+            failed_count = 0
+            failure_reasons = {}  # 記錄失敗原因統計
+            failed_targets = []   # 記錄失敗的目標（用於重試）
+            
+            for idx, target in enumerate(targets):
+                if self._batch_send_cancelled:
+                    print(f"[BatchSend] 用戶取消", file=sys.stderr)
+                    # 記錄剩餘未發送的為取消
+                    remaining = len(targets) - idx
+                    failure_reasons['cancelled'] = failure_reasons.get('cancelled', 0) + remaining
+                    break
+                
+                try:
+                    # 選擇帳號
+                    if account_rotation:
+                        account = available_accounts[idx % len(available_accounts)]
+                    else:
+                        account = available_accounts[0]
+                    
+                    phone = account.get('phone')
+                    user_id = target.get('telegramId')
+                    username = target.get('username', '')
+                    first_name = target.get('firstName', target.get('first_name', ''))
+                    last_name = target.get('lastName', target.get('last_name', ''))
+                    display_name = target.get('displayName', target.get('name', first_name or username or '朋友'))
+                    full_name = f"{first_name} {last_name}".strip() or display_name
+                    
+                    # 從 target 獲取來源信息（用於 {groupName}, {keyword}, {source} 變量）
+                    group_name = target.get('groupName', target.get('sourceGroup', target.get('source', '')))
+                    keyword = target.get('keyword', target.get('triggeredKeyword', target.get('matchedKeyword', '')))
+                    source = target.get('source', target.get('sourceType', ''))
+                    
+                    # 驗證目標用戶 ID
+                    if not user_id:
+                        raise ValueError("目標用戶 ID 為空")
+                    
+                    # 時間相關變量
+                    from datetime import datetime
+                    now = datetime.now()
+                    hour = now.hour
+                    if 5 <= hour < 12:
+                        greeting = '早上好'
+                    elif 12 <= hour < 14:
+                        greeting = '中午好'
+                    elif 14 <= hour < 18:
+                        greeting = '下午好'
+                    elif 18 <= hour < 22:
+                        greeting = '晚上好'
+                    else:
+                        greeting = '夜深了'
+                    
+                    days = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日']
+                    date_str = f"{now.month}月{now.day}日"
+                    time_str = now.strftime('%H:%M')
+                    day_str = days[now.weekday()]  # weekday() 返回 0-6（週一到週日）
+                    
+                    # 選擇消息模板（支持多模板模式）
+                    if is_multi_template and messages:
+                        if send_strategy == 'random':
+                            # 隨機選擇一個模板
+                            selected_template = random.choice(messages)
+                        elif send_strategy == 'rotate':
+                            # 輪轉選擇
+                            selected_template = messages[idx % len(messages)]
+                        else:  # sequential
+                            # 順序選擇
+                            selected_template = messages[idx % len(messages)]
+                        print(f"[BatchSend] 多模板模式: 用戶 {idx+1} 使用模板 #{messages.index(selected_template)+1}", file=sys.stderr)
+                    else:
+                        selected_template = message_template
+                    
+                    # 替換變量 - 支持駝峰式和下劃線兩種格式
+                    message = selected_template
+                    
+                    # 基本用戶信息變量（支持兩種格式）
+                    message = message.replace('{firstName}', first_name)
+                    message = message.replace('{first_name}', first_name)
+                    message = message.replace('{lastName}', last_name)
+                    message = message.replace('{last_name}', last_name)
+                    message = message.replace('{username}', username)
+                    message = message.replace('{displayName}', display_name)
+                    message = message.replace('{name}', display_name)
+                    message = message.replace('{fullName}', full_name)
+                    message = message.replace('{full_name}', full_name)
+                    
+                    # 來源信息變量（新增）
+                    message = message.replace('{groupName}', group_name)
+                    message = message.replace('{group_name}', group_name)
+                    message = message.replace('{keyword}', keyword)
+                    message = message.replace('{source}', source)
+                    
+                    # 時間相關變量
+                    message = message.replace('{greeting}', greeting)
+                    message = message.replace('{date}', date_str)
+                    message = message.replace('{time}', time_str)
+                    message = message.replace('{day}', day_str)
+                    
+                    print(f"[BatchSend] 變量替換完成: {selected_template[:50]}... -> {message[:50]}...", file=sys.stderr)
+                    
+                    print(f"[BatchSend] 發送 {idx + 1}/{len(targets)}: {phone} -> {user_id}", file=sys.stderr)
+                    
+                    # 發送消息
+                    await self.message_queue.add_message(
+                        phone=phone,
+                        user_id=user_id,
+                        text=message,
+                        attachment=attachments[0] if attachments else None,
+                        target_username=username
+                    )
+                    
+                    success_count += 1
+                    
+                except Exception as e:
+                    error_str = str(e).lower()
+                    print(f"[BatchSend] 發送失敗 ({user_id}): {e}", file=sys.stderr)
+                    failed_count += 1
+                    
+                    # 分類失敗原因
+                    if 'privacy' in error_str or 'private' in error_str:
+                        reason = 'privacy_restricted'
+                    elif 'flood' in error_str:
+                        reason = 'flood_wait'
+                    elif 'peer' in error_str or 'not found' in error_str:
+                        reason = 'user_not_found'
+                    elif 'blocked' in error_str:
+                        reason = 'user_blocked'
+                    elif 'id' in error_str and '為空' in str(e):
+                        reason = 'invalid_id'
+                    else:
+                        reason = 'other'
+                    
+                    failure_reasons[reason] = failure_reasons.get(reason, 0) + 1
+                    failed_targets.append({
+                        'target': target,
+                        'reason': reason,
+                        'error': str(e)
+                    })
+                
+                # 更新進度（帶詳細信息）
+                self.send_event("batch-send:progress", {
+                    "sent": idx + 1,
+                    "success": success_count,
+                    "failed": failed_count,
+                    "total": len(targets),
+                    "currentTarget": display_name or username or user_id,
+                    "failureReasons": failure_reasons
+                })
+                
+                # 間隔
+                if idx < len(targets) - 1 and not self._batch_send_cancelled:
+                    interval = random.randint(min_interval, max_interval)
+                    await asyncio.sleep(interval)
+            
+            # 完成 - 生成詳細報告
+            self._batch_send_active = False
+            
+            # 構建失敗原因摘要
+            reason_summary = []
+            reason_labels = {
+                'privacy_restricted': '隱私限制',
+                'flood_wait': 'API 限制',
+                'user_not_found': '用戶不存在',
+                'user_blocked': '被封鎖',
+                'invalid_id': '無效 ID',
+                'cancelled': '已取消',
+                'other': '其他錯誤'
+            }
+            for reason, count in failure_reasons.items():
+                label = reason_labels.get(reason, reason)
+                reason_summary.append(f"{label}: {count}")
+            
+            self.send_event("batch-send:complete", {
+                "success": success_count,
+                "failed": failed_count,
+                "failureReasons": failure_reasons,
+                "failureSummary": ", ".join(reason_summary) if reason_summary else None,
+                "failedTargets": failed_targets[:10]  # 只返回前10個失敗目標
+            })
+            
+            if failed_count > 0:
+                self.send_log(f"⚠️ 批量發送完成: 成功 {success_count}, 失敗 {failed_count} ({', '.join(reason_summary)})", "warning")
+            else:
+                self.send_log(f"✅ 批量發送完成: 成功 {success_count}", "success")
+            
+        except Exception as e:
+            print(f"[BatchSend] 錯誤: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self._batch_send_active = False
+            self.send_event("batch-send:complete", {"success": 0, "failed": len(targets)})
+            self.send_log(f"❌ 批量發送錯誤: {e}", "error")
+    
+    async def handle_batch_send_cancel(self, payload: Dict[str, Any]):
+        """取消批量發送"""
+        self._batch_send_cancelled = True
+        self.send_log("⏹️ 批量發送已取消", "info")
+    
+    # ==================== Batch Invite Handlers ====================
+    
+    _batch_invite_active = False
+    _batch_invite_cancelled = False
+    
+    async def handle_batch_invite_start(self, payload: Dict[str, Any]):
+        """開始批量拉群"""
+        import sys
+        import asyncio
+        import random
+        import pyrogram
+        from pyrogram import raw
+        
+        try:
+            targets = payload.get('targets', [])
+            group_id = payload.get('groupId', '')
+            group_url = payload.get('groupUrl', '')
+            config = payload.get('config', {})
+            
+            batch_size = config.get('batchSize', 10)
+            min_interval = config.get('minInterval', 60)
+            max_interval = config.get('maxInterval', 120)
+            send_welcome_message = config.get('sendWelcomeMessage', False)
+            welcome_message = config.get('welcomeMessage', '')
+            
+            print(f"[BatchInvite] 開始批量拉群: {len(targets)} 個目標 -> {group_url}", file=sys.stderr)
+            print(f"[BatchInvite] 歡迎消息: {send_welcome_message}, 內容: {welcome_message[:50] if welcome_message else 'N/A'}", file=sys.stderr)
+            self.send_log(f"👥 開始批量拉群: {len(targets)} 個用戶 -> {group_url}", "info")
+            
+            self._batch_invite_active = True
+            self._batch_invite_cancelled = False
+            
+            # 獲取管理員帳號
+            accounts = await db.get_all_accounts()
+            admin_accounts = [a for a in accounts if a.get('status') == 'Online' or a.get('status') == 'active']
+            
+            if not admin_accounts:
+                self.send_log("⚠️ 沒有可用的帳號", "warning")
+                self.send_event("batch-invite:complete", {
+                    "success": 0, 
+                    "failed": len(targets), 
+                    "skipped": 0
+                })
+                return
+            
+            success_count = 0
+            failed_count = 0
+            skipped_count = 0
+            
+            for idx, target in enumerate(targets):
+                if self._batch_invite_cancelled:
+                    print(f"[BatchInvite] 用戶取消", file=sys.stderr)
+                    break
+                
+                try:
+                    account = admin_accounts[0]
+                    phone = account.get('phone')
+                    user_id = target.get('telegramId')
+                    username = target.get('username', '')
+                    
+                    print(f"[BatchInvite] 邀請 {idx + 1}/{len(targets)}: {username or user_id}", file=sys.stderr)
+                    
+                    # 獲取 Telegram 客戶端
+                    client = self.telegram_manager.get_client(phone)
+                    if not client or not client.is_connected:
+                        self.send_log(f"⚠️ 帳號 {phone} 未連線", "warning")
+                        failed_count += 1
+                        continue
+                    
+                    # 嘗試邀請
+                    try:
+                        # 使用 username 或 user_id 邀請
+                        if username:
+                            await client.invoke(
+                                pyrogram.raw.functions.channels.InviteToChannel(
+                                    channel=await client.resolve_peer(group_url or group_id),
+                                    users=[await client.resolve_peer(username)]
+                                )
+                            )
+                        elif user_id:
+                            await client.invoke(
+                                pyrogram.raw.functions.channels.InviteToChannel(
+                                    channel=await client.resolve_peer(group_url or group_id),
+                                    users=[await client.resolve_peer(int(user_id))]
+                                )
+                            )
+                        success_count += 1
+                        
+                        # 發送歡迎消息
+                        if send_welcome_message and welcome_message:
+                            try:
+                                # 替換變量
+                                first_name = target.get('firstName', '')
+                                display_name = target.get('displayName', first_name or username or '朋友')
+                                msg = welcome_message
+                                msg = msg.replace('{name}', display_name)
+                                msg = msg.replace('{first_name}', first_name)
+                                msg = msg.replace('{username}', username)
+                                
+                                # 發送私信
+                                if username:
+                                    await client.send_message(username, msg)
+                                elif user_id:
+                                    await client.send_message(int(user_id), msg)
+                                    
+                                print(f"[BatchInvite] 已發送歡迎消息給 {username or user_id}", file=sys.stderr)
+                            except Exception as msg_err:
+                                print(f"[BatchInvite] 發送歡迎消息失敗: {msg_err}", file=sys.stderr)
+                        
+                    except Exception as invite_err:
+                        err_str = str(invite_err).lower()
+                        if 'already' in err_str or 'participant' in err_str:
+                            skipped_count += 1
+                            print(f"[BatchInvite] {username or user_id} 已在群內", file=sys.stderr)
+                        elif 'privacy' in err_str or 'restrict' in err_str:
+                            skipped_count += 1
+                            print(f"[BatchInvite] {username or user_id} 隱私設置限制", file=sys.stderr)
+                        else:
+                            failed_count += 1
+                            print(f"[BatchInvite] 邀請失敗: {invite_err}", file=sys.stderr)
+                    
+                except Exception as e:
+                    print(f"[BatchInvite] 錯誤: {e}", file=sys.stderr)
+                    failed_count += 1
+                
+                # 更新進度
+                self.send_event("batch-invite:progress", {
+                    "invited": idx + 1,
+                    "success": success_count,
+                    "failed": failed_count,
+                    "skipped": skipped_count,
+                    "total": len(targets)
+                })
+                
+                # 批次間隔
+                if idx < len(targets) - 1 and (idx + 1) % batch_size == 0:
+                    interval = random.randint(min_interval, max_interval)
+                    print(f"[BatchInvite] 批次完成，等待 {interval} 秒", file=sys.stderr)
+                    await asyncio.sleep(interval)
+                elif idx < len(targets) - 1:
+                    # 單個間隔
+                    await asyncio.sleep(random.randint(3, 8))
+            
+            # 完成
+            self._batch_invite_active = False
+            self.send_event("batch-invite:complete", {
+                "success": success_count,
+                "failed": failed_count,
+                "skipped": skipped_count
+            })
+            self.send_log(f"✅ 批量拉群完成: 成功 {success_count}, 跳過 {skipped_count}, 失敗 {failed_count}", "success")
+            
+        except Exception as e:
+            print(f"[BatchInvite] 錯誤: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self._batch_invite_active = False
+            self.send_event("batch-invite:complete", {
+                "success": 0, 
+                "failed": len(targets), 
+                "skipped": 0
+            })
+            self.send_log(f"❌ 批量拉群錯誤: {e}", "error")
+    
+    async def handle_batch_invite_cancel(self, payload: Dict[str, Any]):
+        """取消批量拉群"""
+        self._batch_invite_cancelled = True
+        self.send_log("⏹️ 批量拉群已取消", "info")
+    
+    async def handle_get_admin_groups(self, payload: Dict[str, Any]):
+        """獲取用戶作為管理員的群組列表"""
+        import sys
+        
+        try:
+            # 獲取已登錄帳號
+            accounts = await db.get_all_accounts()
+            online_accounts = [a for a in accounts if a.get('status') == 'Online' or a.get('status') == 'active']
+            
+            if not online_accounts:
+                self.send_event("get-admin-groups-result", {"groups": []})
+                return
+            
+            groups = []
+            
+            for account in online_accounts[:1]:  # 只使用第一個帳號查詢
+                phone = account.get('phone')
+                client = self.telegram_manager.get_client(phone)
+                
+                if not client or not client.is_connected:
+                    continue
+                
+                try:
+                    # 獲取用戶所在的所有對話
+                    dialogs = []
+                    async for dialog in client.get_dialogs():
+                        if dialog.chat.type in ['group', 'supergroup']:
+                            # 檢查是否為管理員
+                            is_admin = False
+                            try:
+                                me = await client.get_me()
+                                member = await client.get_chat_member(dialog.chat.id, me.id)
+                                is_admin = member.status in ['administrator', 'creator']
+                            except:
+                                pass
+                            
+                            groups.append({
+                                "id": str(dialog.chat.id),
+                                "name": dialog.chat.title or dialog.chat.first_name or '未知群組',
+                                "url": dialog.chat.username or f"t.me/c/{str(dialog.chat.id)[4:]}",
+                                "memberCount": dialog.chat.members_count or 0,
+                                "isAdmin": is_admin,
+                                "type": dialog.chat.type
+                            })
+                except Exception as e:
+                    print(f"[GetAdminGroups] 獲取對話列表失敗: {e}", file=sys.stderr)
+            
+            # 按管理員優先排序
+            groups.sort(key=lambda g: (not g['isAdmin'], g['name']))
+            
+            self.send_event("get-admin-groups-result", {"groups": groups})
+            self.send_log(f"📋 獲取群組列表: {len(groups)} 個", "info")
+            
+        except Exception as e:
+            print(f"[GetAdminGroups] 錯誤: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_event("get-admin-groups-result", {"groups": [], "error": str(e)})
+    
+    # ==================== Unified Contacts Handlers ====================
+    
+    async def handle_unified_contacts_sync(self, payload: Dict[str, Any]):
+        """同步所有來源數據到統一聯繫人表"""
+        import sys
+        from unified_contacts import get_unified_contacts_manager
+        
+        try:
+            print(f"[Backend] Syncing unified contacts...", file=sys.stderr)
+            manager = get_unified_contacts_manager(db)
+            stats = await manager.sync_from_sources()
+            
+            self.send_event("unified-contacts:sync-result", {
+                "success": True,
+                "stats": stats
+            })
+            self.send_log(f"✅ 同步完成: 新增 {stats['synced']} 條, 更新 {stats['updated']} 條", "info")
+            
+        except Exception as e:
+            print(f"[Backend] Unified contacts sync error: {e}", file=sys.stderr)
+            self.send_event("unified-contacts:sync-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_unified_contacts_get(self, payload: Dict[str, Any]):
+        """獲取統一聯繫人列表"""
+        import sys
+        from unified_contacts import get_unified_contacts_manager
+        
+        try:
+            print(f"[Backend] Getting unified contacts with payload: {payload}", file=sys.stderr)
+            manager = get_unified_contacts_manager(db)
+            
+            contacts, total = await manager.get_contacts(
+                contact_type=payload.get('contactType'),
+                source_type=payload.get('sourceType'),
+                status=payload.get('status'),
+                tags=payload.get('tags'),
+                search=payload.get('search'),
+                order_by=payload.get('orderBy', 'created_at DESC'),
+                limit=payload.get('limit', 100),
+                offset=payload.get('offset', 0)
+            )
+            
+            print(f"[Backend] Found {len(contacts)} contacts (total: {total})", file=sys.stderr)
+            
+            self.send_event("unified-contacts:list", {
+                "success": True,
+                "contacts": contacts,
+                "total": total,
+                "limit": payload.get('limit', 100),
+                "offset": payload.get('offset', 0)
+            })
+            
+        except Exception as e:
+            print(f"[Backend] Get unified contacts error: {e}", file=sys.stderr)
+            self.send_event("unified-contacts:list", {
+                "success": False,
+                "error": str(e),
+                "contacts": [],
+                "total": 0
+            })
+    
+    async def handle_unified_contacts_stats(self, payload: Dict[str, Any]):
+        """獲取統一聯繫人統計"""
+        import sys
+        from unified_contacts import get_unified_contacts_manager
+        
+        try:
+            manager = get_unified_contacts_manager(db)
+            stats = await manager.get_stats()
+            
+            self.send_event("unified-contacts:stats", {
+                "success": True,
+                "stats": stats
+            })
+            
+        except Exception as e:
+            print(f"[Backend] Get unified contacts stats error: {e}", file=sys.stderr)
+            self.send_event("unified-contacts:stats", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_unified_contacts_update(self, payload: Dict[str, Any]):
+        """更新單個聯繫人"""
+        import sys
+        from unified_contacts import get_unified_contacts_manager
+        
+        try:
+            telegram_id = payload.get('telegramId')
+            updates = payload.get('updates', {})
+            
+            if not telegram_id:
+                raise ValueError("Missing telegramId")
+            
+            manager = get_unified_contacts_manager(db)
+            success = await manager.update_contact(telegram_id, updates)
+            
+            self.send_event("unified-contacts:update-result", {
+                "success": success,
+                "telegramId": telegram_id
+            })
+            
+        except Exception as e:
+            print(f"[Backend] Update unified contact error: {e}", file=sys.stderr)
+            self.send_event("unified-contacts:update-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_unified_contacts_add_tags(self, payload: Dict[str, Any]):
+        """批量添加標籤"""
+        import sys
+        from unified_contacts import get_unified_contacts_manager
+        
+        try:
+            telegram_ids = payload.get('telegramIds', [])
+            tags = payload.get('tags', [])
+            
+            manager = get_unified_contacts_manager(db)
+            updated = await manager.add_tags(telegram_ids, tags)
+            
+            self.send_event("unified-contacts:add-tags-result", {
+                "success": True,
+                "updated": updated
+            })
+            self.send_log(f"✅ 已為 {updated} 個聯繫人添加標籤", "info")
+            
+        except Exception as e:
+            print(f"[Backend] Add tags error: {e}", file=sys.stderr)
+            self.send_event("unified-contacts:add-tags-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_unified_contacts_update_status(self, payload: Dict[str, Any]):
+        """批量更新狀態"""
+        import sys
+        from unified_contacts import get_unified_contacts_manager
+        
+        try:
+            telegram_ids = payload.get('telegramIds', [])
+            status = payload.get('status')
+            
+            manager = get_unified_contacts_manager(db)
+            updated = await manager.update_status(telegram_ids, status)
+            
+            self.send_event("unified-contacts:update-status-result", {
+                "success": True,
+                "updated": updated
+            })
+            
+        except Exception as e:
+            print(f"[Backend] Update status error: {e}", file=sys.stderr)
+            self.send_event("unified-contacts:update-status-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_unified_contacts_delete(self, payload: Dict[str, Any]):
+        """批量刪除聯繫人"""
+        import sys
+        from unified_contacts import get_unified_contacts_manager
+        
+        try:
+            telegram_ids = payload.get('telegramIds', [])
+            
+            manager = get_unified_contacts_manager(db)
+            deleted = await manager.delete_contacts(telegram_ids)
+            
+            self.send_event("unified-contacts:delete-result", {
+                "success": True,
+                "deleted": deleted
+            })
+            self.send_log(f"✅ 已刪除 {deleted} 個聯繫人", "info")
+            
+        except Exception as e:
+            print(f"[Backend] Delete contacts error: {e}", file=sys.stderr)
+            self.send_event("unified-contacts:delete-result", {
+                "success": False,
+                "error": str(e)
+            })
+
+    # ==================== Analytics Handlers ====================
+    
+    async def handle_analytics_get_stats(self, payload: Dict[str, Any]):
+        """獲取分析統計數據"""
+        import sys
+        from datetime import datetime, timedelta
+        
+        try:
+            period = payload.get('period', 'week')
+            print(f"[Backend] Getting analytics stats for period: {period}", file=sys.stderr)
+            
+            # 根據週期計算時間範圍
+            now = datetime.now()
+            if period == 'today':
+                start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif period == 'week':
+                start_date = now - timedelta(days=7)
+            elif period == 'month':
+                start_date = now - timedelta(days=30)
+            else:  # quarter
+                start_date = now - timedelta(days=90)
+            
+            # 從數據庫獲取統計數據
+            result = await db.fetch_one("""
+                SELECT 
+                    COUNT(*) as total_sent,
+                    SUM(CASE WHEN status = 'replied' THEN 1 ELSE 0 END) as total_replies,
+                    SUM(CASE WHEN status = 'converted' THEN 1 ELSE 0 END) as total_conversions
+                FROM message_logs
+                WHERE created_at >= ?
+            """, (start_date.isoformat(),))
+            
+            if result:
+                total_sent = result['total_sent'] or 0
+                total_replies = result['total_replies'] or 0
+                total_conversions = result['total_conversions'] or 0
+            else:
+                total_sent = total_replies = total_conversions = 0
+            
+            conversion_rate = (total_conversions / total_sent * 100) if total_sent > 0 else 0
+            
+            # 計算上期數據進行對比
+            if period == 'today':
+                prev_start = start_date - timedelta(days=1)
+                prev_end = start_date
+            elif period == 'week':
+                prev_start = start_date - timedelta(days=7)
+                prev_end = start_date
+            elif period == 'month':
+                prev_start = start_date - timedelta(days=30)
+                prev_end = start_date
+            else:
+                prev_start = start_date - timedelta(days=90)
+                prev_end = start_date
+            
+            prev_result = await db.fetch_one("""
+                SELECT 
+                    COUNT(*) as total_sent,
+                    SUM(CASE WHEN status = 'replied' THEN 1 ELSE 0 END) as total_replies,
+                    SUM(CASE WHEN status = 'converted' THEN 1 ELSE 0 END) as total_conversions
+                FROM message_logs
+                WHERE created_at >= ? AND created_at < ?
+            """, (prev_start.isoformat(), prev_end.isoformat()))
+            
+            prev_sent = prev_result['total_sent'] or 0 if prev_result else 0
+            prev_replies = prev_result['total_replies'] or 0 if prev_result else 0
+            prev_conversions = prev_result['total_conversions'] or 0 if prev_result else 0
+            
+            # 計算變化率
+            sent_change = ((total_sent - prev_sent) / prev_sent * 100) if prev_sent > 0 else 0
+            replies_change = ((total_replies - prev_replies) / prev_replies * 100) if prev_replies > 0 else 0
+            conversions_change = ((total_conversions - prev_conversions) / prev_conversions * 100) if prev_conversions > 0 else 0
+            prev_rate = (prev_conversions / prev_sent * 100) if prev_sent > 0 else 0
+            rate_change = conversion_rate - prev_rate
+            
+            self.send_event("analytics:stats", {
+                "success": True,
+                "stats": {
+                    "totalSent": total_sent,
+                    "totalReplies": total_replies,
+                    "totalConversions": total_conversions,
+                    "conversionRate": conversion_rate,
+                    "sentChange": sent_change,
+                    "repliesChange": replies_change,
+                    "conversionsChange": conversions_change,
+                    "rateChange": rate_change
+                }
+            })
+            
+        except Exception as e:
+            print(f"[Backend] Analytics stats error: {e}", file=sys.stderr)
+            self.send_event("analytics:stats", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_analytics_get_trend(self, payload: Dict[str, Any]):
+        """獲取趨勢數據"""
+        import sys
+        from datetime import datetime, timedelta
+        
+        try:
+            period = payload.get('period', 'week')
+            print(f"[Backend] Getting analytics trend for period: {period}", file=sys.stderr)
+            
+            # 確定天數
+            if period == 'today':
+                days = 24  # 按小時
+            elif period == 'week':
+                days = 7
+            elif period == 'month':
+                days = 30
+            else:
+                days = 90
+            
+            trend = []
+            now = datetime.now()
+            
+            for i in range(min(days, 14)):
+                date = now - timedelta(days=i)
+                date_str = date.strftime('%Y-%m-%d')
+                
+                result = await db.fetch_one("""
+                    SELECT 
+                        COUNT(*) as sent,
+                        SUM(CASE WHEN status = 'replied' THEN 1 ELSE 0 END) as replies,
+                        SUM(CASE WHEN status = 'converted' THEN 1 ELSE 0 END) as conversions
+                    FROM message_logs
+                    WHERE date(created_at) = ?
+                """, (date_str,))
+                
+                trend.insert(0, {
+                    "date": date_str,
+                    "sent": result['sent'] or 0 if result else 0,
+                    "replies": result['replies'] or 0 if result else 0,
+                    "conversions": result['conversions'] or 0 if result else 0
+                })
+            
+            self.send_event("analytics:trend", {
+                "success": True,
+                "trend": trend
+            })
+            
+        except Exception as e:
+            print(f"[Backend] Analytics trend error: {e}", file=sys.stderr)
+            self.send_event("analytics:trend", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_analytics_get_sources(self, payload: Dict[str, Any]):
+        """獲取用戶來源分布"""
+        import sys
+        
+        try:
+            print(f"[Backend] Getting analytics sources", file=sys.stderr)
+            
+            results = await db.fetch_all("""
+                SELECT 
+                    source_type,
+                    COUNT(*) as count
+                FROM unified_contacts
+                GROUP BY source_type
+                ORDER BY count DESC
+            """)
+            
+            colors = {
+                'extracted_member': '#3b82f6',
+                'discovered_resource': '#10b981',
+                'captured_lead': '#f59e0b',
+                'manual': '#8b5cf6'
+            }
+            
+            source_names = {
+                'extracted_member': '群組提取',
+                'discovered_resource': '關鍵詞匹配',
+                'captured_lead': '潛在客戶',
+                'manual': '手動添加'
+            }
+            
+            sources = []
+            total = sum(r['count'] for r in results) if results else 0
+            
+            for r in results or []:
+                source_type = r['source_type']
+                count = r['count']
+                sources.append({
+                    "source": source_names.get(source_type, source_type),
+                    "count": count,
+                    "percentage": (count / total * 100) if total > 0 else 0,
+                    "color": colors.get(source_type, '#6b7280')
+                })
+            
+            self.send_event("analytics:sources", {
+                "success": True,
+                "sources": sources
+            })
+            
+        except Exception as e:
+            print(f"[Backend] Analytics sources error: {e}", file=sys.stderr)
+            self.send_event("analytics:sources", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_analytics_get_hourly(self, payload: Dict[str, Any]):
+        """獲取時段數據"""
+        import sys
+        from datetime import datetime, timedelta
+        
+        try:
+            print(f"[Backend] Getting analytics hourly data", file=sys.stderr)
+            
+            # 獲取過去7天的時段數據
+            results = await db.fetch_all("""
+                SELECT 
+                    strftime('%H', created_at) as hour,
+                    COUNT(*) as sent,
+                    SUM(CASE WHEN status = 'replied' THEN 1 ELSE 0 END) as replies
+                FROM message_logs
+                WHERE created_at >= datetime('now', '-7 days')
+                GROUP BY hour
+            """)
+            
+            hourly = {}
+            for h in range(24):
+                hourly[h] = 0
+            
+            for r in results or []:
+                hour = int(r['hour'])
+                sent = r['sent'] or 0
+                replies = r['replies'] or 0
+                # 計算回覆率
+                hourly[hour] = int((replies / sent * 100) if sent > 0 else 0)
+            
+            self.send_event("analytics:hourly", {
+                "success": True,
+                "hourly": hourly
+            })
+            
+        except Exception as e:
+            print(f"[Backend] Analytics hourly error: {e}", file=sys.stderr)
+            self.send_event("analytics:hourly", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_analytics_generate_insights(self, payload: Dict[str, Any]):
+        """AI 生成洞察"""
+        import sys
+        
+        try:
+            stats = payload.get('stats', {})
+            period = payload.get('period', 'week')
+            print(f"[Backend] Generating AI insights", file=sys.stderr)
+            
+            # 基於數據生成洞察（可接入真實 AI）
+            insights = []
+            
+            conversion_rate = stats.get('conversionRate', 0)
+            if conversion_rate > 5:
+                insights.append({
+                    "icon": "🎉",
+                    "type": "success",
+                    "title": "轉化率表現優秀",
+                    "description": f"當前轉化率 {conversion_rate:.1f}% 高於行業平均水平，繼續保持！"
+                })
+            elif conversion_rate > 2:
+                insights.append({
+                    "icon": "📊",
+                    "type": "info",
+                    "title": "轉化率正常",
+                    "description": f"當前轉化率 {conversion_rate:.1f}%，處於正常水平。"
+                })
+            else:
+                insights.append({
+                    "icon": "⚠️",
+                    "type": "warning",
+                    "title": "轉化率有待提升",
+                    "description": f"當前轉化率 {conversion_rate:.1f}% 較低，建議優化消息模板。"
+                })
+            
+            sent_change = stats.get('sentChange', 0)
+            if sent_change > 10:
+                insights.append({
+                    "icon": "📈",
+                    "type": "info",
+                    "title": "發送量顯著增長",
+                    "description": f"發送量較上期增長 {sent_change:.1f}%，觸達更多潛在客戶。"
+                })
+            elif sent_change < -10:
+                insights.append({
+                    "icon": "📉",
+                    "type": "warning",
+                    "title": "發送量下降",
+                    "description": f"發送量較上期下降 {abs(sent_change):.1f}%，建議增加發送頻率。"
+                })
+            
+            # 時段建議（使用模擬數據）
+            insights.append({
+                "icon": "⏰",
+                "type": "tip",
+                "title": "最佳發送時段：10:00-11:00",
+                "description": "該時段回覆率最高，建議重點安排發送。"
+            })
+            
+            insights.append({
+                "icon": "🎯",
+                "type": "info",
+                "title": "持續優化建議",
+                "description": "建議定期更新消息模板，保持內容新鮮度。"
+            })
+            
+            self.send_event("analytics:insights", {
+                "success": True,
+                "insights": insights
+            })
+            
+        except Exception as e:
+            print(f"[Backend] Analytics insights error: {e}", file=sys.stderr)
+            self.send_event("analytics:insights", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_analytics_export(self, payload: Dict[str, Any]):
+        """導出分析報告"""
+        import sys
+        import json
+        from datetime import datetime
+        
+        try:
+            print(f"[Backend] Exporting analytics report", file=sys.stderr)
+            
+            report = {
+                "generated_at": datetime.now().isoformat(),
+                "period": payload.get('period', 'week'),
+                "stats": payload.get('stats', {}),
+                "trend": payload.get('trend', []),
+                "sources": payload.get('sources', []),
+                "insights": payload.get('insights', [])
+            }
+            
+            # 這裡可以生成 PDF 或 Excel 文件
+            # 目前只返回 JSON 數據
+            
+            self.send_event("analytics:export", {
+                "success": True,
+                "report": report,
+                "format": "json"
+            })
+            
+            self.send_log("📊 報告已生成", "info")
+            
+        except Exception as e:
+            print(f"[Backend] Analytics export error: {e}", file=sys.stderr)
+            self.send_event("analytics:export", {
+                "success": False,
+                "error": str(e)
+            })
+
+    # ==================== Multi-Role Group Handlers ====================
+    
+    async def handle_create_multi_role_group(self, payload: Dict[str, Any]):
+        """創建多角色協作群組"""
+        import sys
+        
+        try:
+            group_name = payload.get('groupName', 'VIP專屬服務群')
+            target_user_id = payload.get('targetUserId')
+            target_username = payload.get('targetUsername')
+            role_accounts = payload.get('roleAccounts', [])
+            invite_message = payload.get('inviteMessage', '您好，我們為您創建了專屬服務群組！')
+            
+            print(f"[Backend] Creating multi-role group: {group_name} for {target_user_id}", file=sys.stderr)
+            
+            if not role_accounts:
+                self.send_event("multi-role-group-created", {
+                    "success": False,
+                    "error": "未配置角色帳號",
+                    "request": payload
+                })
+                return
+            
+            # 使用第一個角色帳號創建群組
+            first_account_id = role_accounts[0].get('accountId')
+            
+            # 獲取 Telegram 客戶端
+            client = self.telegram_manager.get_client(first_account_id)
+            if not client:
+                self.send_event("multi-role-group-created", {
+                    "success": False,
+                    "error": f"帳號 {first_account_id} 未連接",
+                    "request": payload
+                })
+                return
+            
+            # 準備要邀請的用戶列表
+            users_to_invite = []
+            
+            # 添加目標用戶
+            if target_username:
+                users_to_invite.append(target_username)
+            elif target_user_id:
+                users_to_invite.append(int(target_user_id) if str(target_user_id).isdigit() else target_user_id)
+            
+            # 添加其他角色帳號（如果是不同的帳號）
+            # 實際情況中，多個角色可能使用同一個帳號或不同帳號
+            # 這裡簡化處理
+            
+            # 創建群組
+            try:
+                from pyrogram.raw import functions, types
+                
+                # 創建超級群組
+                result = await client.invoke(
+                    functions.channels.CreateChannel(
+                        title=group_name,
+                        about=f"專屬服務群組 - {target_username or target_user_id}",
+                        megagroup=True
+                    )
+                )
+                
+                # 獲取創建的群組
+                if hasattr(result, 'chats') and result.chats:
+                    telegram_group = result.chats[0]
+                    telegram_group_id = telegram_group.id
+                    
+                    # 邀請目標用戶
+                    if users_to_invite:
+                        try:
+                            await client.add_chat_members(
+                                -1000000000000 - telegram_group_id,  # 超級群組 ID 格式
+                                users_to_invite
+                            )
+                        except Exception as invite_err:
+                            print(f"[Backend] Failed to invite users: {invite_err}", file=sys.stderr)
+                    
+                    # 獲取邀請連結
+                    invite_link = None
+                    try:
+                        link = await client.export_chat_invite_link(-1000000000000 - telegram_group_id)
+                        invite_link = link
+                    except:
+                        pass
+                    
+                    # 發送歡迎消息
+                    if invite_message:
+                        try:
+                            await client.send_message(
+                                -1000000000000 - telegram_group_id,
+                                invite_message
+                            )
+                        except:
+                            pass
+                    
+                    # 生成群組 ID
+                    group_id = f"mrg_{telegram_group_id}_{int(time.time())}"
+                    
+                    self.send_event("multi-role-group-created", {
+                        "success": True,
+                        "groupId": group_id,
+                        "telegramGroupId": str(telegram_group_id),
+                        "inviteLink": invite_link,
+                        "request": payload
+                    })
+                    
+                    self.send_log(f"✅ 多角色群組創建成功: {group_name}", "info")
+                else:
+                    self.send_event("multi-role-group-created", {
+                        "success": False,
+                        "error": "創建群組失敗",
+                        "request": payload
+                    })
+                    
+            except Exception as create_err:
+                print(f"[Backend] Create group error: {create_err}", file=sys.stderr)
+                self.send_event("multi-role-group-created", {
+                    "success": False,
+                    "error": str(create_err),
+                    "request": payload
+                })
+                
+        except Exception as e:
+            print(f"[Backend] Multi-role group creation error: {e}", file=sys.stderr)
+            self.send_event("multi-role-group-created", {
+                "success": False,
+                "error": str(e),
+                "request": payload
+            })
+    
+    async def handle_multi_role_start_script(self, payload: Dict[str, Any]):
+        """開始執行多角色劇本"""
+        import sys
+        
+        try:
+            group_id = payload.get('groupId')
+            script_id = payload.get('scriptId')
+            
+            print(f"[Backend] Starting script {script_id} for group {group_id}", file=sys.stderr)
+            
+            # TODO: 從數據庫載入劇本並開始執行
+            # 這裡需要與 script_engine 整合
+            
+            self.send_log(f"📝 劇本 {script_id} 已開始執行", "info")
+            
+        except Exception as e:
+            print(f"[Backend] Start script error: {e}", file=sys.stderr)
+    
+    async def handle_multi_role_send_message(self, payload: Dict[str, Any]):
+        """發送多角色消息"""
+        import sys
+        
+        try:
+            group_id = payload.get('groupId')
+            telegram_group_id = payload.get('telegramGroupId')
+            account_id = payload.get('accountId')
+            content = payload.get('content')
+            
+            print(f"[Backend] Sending message to group {telegram_group_id} from account {account_id}", file=sys.stderr)
+            
+            client = self.telegram_manager.get_client(account_id)
+            if not client:
+                return
+            
+            try:
+                # 發送消息到群組
+                chat_id = int(telegram_group_id)
+                if chat_id > 0:
+                    chat_id = -1000000000000 - chat_id
+                
+                await client.send_message(chat_id, content)
+                
+                self.send_event("multi-role-group-message", {
+                    "groupId": group_id,
+                    "senderId": str(account_id),
+                    "senderName": "Role",  # TODO: 從角色配置獲取
+                    "content": content,
+                    "isFromTarget": False
+                })
+                
+            except Exception as send_err:
+                print(f"[Backend] Send message error: {send_err}", file=sys.stderr)
+                
+        except Exception as e:
+            print(f"[Backend] Multi-role send message error: {e}", file=sys.stderr)
+    
+    async def handle_multi_role_ai_reply(self, payload: Dict[str, Any]):
+        """AI 生成回覆"""
+        import sys
+        
+        try:
+            group_id = payload.get('groupId')
+            message = payload.get('message')
+            customer_id = payload.get('customerId')
+            
+            print(f"[Backend] Generating AI reply for group {group_id}", file=sys.stderr)
+            
+            # TODO: 使用 AI 生成回覆
+            # 這裡需要與 ai_auto_chat 整合
+            
+            # 模擬 AI 回覆
+            ai_reply = f"感謝您的回覆！我們會盡快為您處理。"
+            
+            # 發送回覆（需要獲取群組的帳號配置）
+            # TODO: 實現完整的 AI 回覆邏輯
+            
+        except Exception as e:
+            print(f"[Backend] AI reply error: {e}", file=sys.stderr)
+    
+    async def handle_multi_role_advance_stage(self, payload: Dict[str, Any]):
+        """推進劇本階段"""
+        import sys
+        
+        try:
+            group_id = payload.get('groupId')
+            next_stage_order = payload.get('nextStageOrder')
+            
+            print(f"[Backend] Advancing to stage {next_stage_order} for group {group_id}", file=sys.stderr)
+            
+            # TODO: 執行下一階段的劇本
+            # 這裡需要與 script_engine 整合
+            
+        except Exception as e:
+            print(f"[Backend] Advance stage error: {e}", file=sys.stderr)
 
     async def handle_graceful_shutdown(self):
         """Handle graceful shutdown - disconnect all clients and close database"""

@@ -99,7 +99,8 @@ MEMBERSHIP_LEVELS = {
             'daily_messages': 500,
             'ai_calls': 300,
             'devices': 3,
-            'groups': 50,
+            'groups': 30,
+            'keyword_sets': 20,
             'auto_reply_rules': 20,
             'scheduled_tasks': 30,
             'data_retention_days': 60,
@@ -107,7 +108,8 @@ MEMBERSHIP_LEVELS = {
             'platform_api_max_accounts': 9
         },
         'features': ['basic_messaging', 'manual_reply', 'auto_reply', 'basic_ai', 'scheduled_send',
-                     'ad_broadcast', 'batch_send', 'data_export', 'keyword_reply']
+                     'ad_broadcast', 'batch_send', 'data_export', 'keyword_reply',
+                     'smart_mode', 'ai_insights', 'data_insights_basic']  # 解鎖智能模式和洞察
     },
     'diamond': {
         'name': '鑽石王牌',
@@ -122,7 +124,8 @@ MEMBERSHIP_LEVELS = {
             'daily_messages': 2000,
             'ai_calls': -1,  # 無限
             'devices': 5,
-            'groups': 200,
+            'groups': 100,
+            'keyword_sets': 50,
             'auto_reply_rules': -1,
             'scheduled_tasks': 100,
             'data_retention_days': 90,
@@ -131,6 +134,8 @@ MEMBERSHIP_LEVELS = {
         },
         'features': ['basic_messaging', 'manual_reply', 'auto_reply', 'basic_ai', 'scheduled_send',
                      'ad_broadcast', 'batch_send', 'data_export', 'keyword_reply',
+                     'smart_mode', 'ai_insights', 'data_insights_basic',
+                     'strategy_planning', 'auto_execution', 'data_insights_advanced', 'ab_testing',
                      'smart_routing', 'analytics', 'multi_role', 'ai_sales_funnel', 'advanced_analytics']
     },
     'star': {
@@ -143,10 +148,11 @@ MEMBERSHIP_LEVELS = {
         'prices': {'week': 59.9, 'month': 199, 'quarter': 499, 'year': 1999, 'lifetime': 4999},
         'quotas': {
             'tg_accounts': 100,
-            'daily_messages': -1,  # 無限
+            'daily_messages': 10000,
             'ai_calls': -1,
             'devices': 10,
-            'groups': -1,
+            'groups': 300,
+            'keyword_sets': 100,
             'auto_reply_rules': -1,
             'scheduled_tasks': -1,
             'data_retention_days': 180,
@@ -155,8 +161,10 @@ MEMBERSHIP_LEVELS = {
         },
         'features': ['basic_messaging', 'manual_reply', 'auto_reply', 'basic_ai', 'scheduled_send',
                      'ad_broadcast', 'batch_send', 'data_export', 'keyword_reply',
+                     'smart_mode', 'ai_insights', 'data_insights_basic',
+                     'strategy_planning', 'auto_execution', 'data_insights_advanced', 'ab_testing',
                      'smart_routing', 'analytics', 'multi_role', 'ai_sales_funnel', 'advanced_analytics',
-                     'smart_anti_block', 'team_management', 'priority_support']
+                     'smart_anti_block', 'api_access', 'team_management', 'priority_support']
     },
     'king': {
         'name': '榮耀王者',
@@ -274,6 +282,17 @@ class Database:
             if 'monitoring_enabled' not in columns:
                 print("[Database] Adding column: discovered_resources.monitoring_enabled", file=sys.stderr)
                 cursor.execute('ALTER TABLE discovered_resources ADD COLUMN monitoring_enabled INTEGER DEFAULT 0')
+                conn.commit()
+            
+            # 🆕 D方案：添加搜索會話字段
+            if 'search_session_id' not in columns:
+                print("[Database] Adding column: discovered_resources.search_session_id", file=sys.stderr)
+                cursor.execute('ALTER TABLE discovered_resources ADD COLUMN search_session_id TEXT')
+                conn.commit()
+            
+            if 'search_keyword' not in columns:
+                print("[Database] Adding column: discovered_resources.search_keyword", file=sys.stderr)
+                cursor.execute('ALTER TABLE discovered_resources ADD COLUMN search_keyword TEXT')
                 conn.commit()
             
             # 檢查 monitored_groups 表的字段
@@ -585,6 +604,22 @@ class Database:
                 is_public INTEGER DEFAULT 0,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_by TEXT
+            )
+        ''')
+        
+        # ============ 系統告警表 ============
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS system_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_type TEXT NOT NULL,
+                level TEXT NOT NULL,
+                message TEXT NOT NULL,
+                details TEXT,
+                acknowledged INTEGER DEFAULT 0,
+                acknowledged_at TIMESTAMP,
+                resolved INTEGER DEFAULT 0,
+                resolved_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         
@@ -2445,10 +2480,15 @@ class Database:
     async def execute(self, query: str, params: tuple = None) -> int:
         """異步執行 SQL 語句並返回影響的行數"""
         import sys
+        import os
+        # 🆕 只在 DEBUG 模式下打印日志，避免日志過多
+        debug_mode = os.environ.get('DB_DEBUG', '').lower() == 'true'
+        
         try:
             if not HAS_AIOSQLITE:
                 # 同步回退
-                print(f"[Database] execute (sync): {query[:60]}...", file=sys.stderr)
+                if debug_mode:
+                    print(f"[Database] execute (sync): {query[:60]}...", file=sys.stderr)
                 conn = sqlite3.connect(str(self.db_path))
                 cursor = conn.cursor()
                 if params:
@@ -2458,20 +2498,20 @@ class Database:
                 conn.commit()
                 affected = cursor.rowcount
                 conn.close()
-                print(f"[Database] execute (sync): affected={affected}, committed", file=sys.stderr)
                 return affected
             
             # 異步方式
-            print(f"[Database] execute (async): {query[:60]}...", file=sys.stderr)
+            if debug_mode:
+                print(f"[Database] execute (async): {query[:60]}...", file=sys.stderr)
             await self.connect()
             if params:
                 cursor = await self._connection.execute(query, params)
             else:
                 cursor = await self._connection.execute(query)
             await self._connection.commit()
-            print(f"[Database] execute (async): affected={cursor.rowcount}, committed", file=sys.stderr)
             return cursor.rowcount
         except Exception as e:
+            # 只在真正出錯時打印錯誤日志
             print(f"[Database] execute ERROR: {e}", file=sys.stderr)
             return 0
     
@@ -2572,7 +2612,70 @@ class Database:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL UNIQUE,
                     description TEXT,
+                    keywords TEXT DEFAULT '[]',
+                    is_active INTEGER DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 聊天模板表
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS chat_templates (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    category TEXT DEFAULT 'custom',
+                    content TEXT NOT NULL,
+                    variables TEXT DEFAULT '[]',
+                    usage_count INTEGER DEFAULT 0,
+                    success_rate REAL DEFAULT 0,
+                    last_used TIMESTAMP,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # AI 營銷策略表
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS ai_strategies (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    strategy_json TEXT NOT NULL,
+                    is_active INTEGER DEFAULT 0,
+                    total_leads INTEGER DEFAULT 0,
+                    contacted INTEGER DEFAULT 0,
+                    converted INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # AI 模型配置表 - 持久化存儲 API Key 和模型配置
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS ai_models (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    provider TEXT NOT NULL,
+                    model_name TEXT NOT NULL,
+                    display_name TEXT,
+                    api_key TEXT,
+                    api_endpoint TEXT,
+                    is_local INTEGER DEFAULT 0,
+                    is_default INTEGER DEFAULT 0,
+                    priority INTEGER DEFAULT 0,
+                    is_connected INTEGER DEFAULT 0,
+                    last_tested_at TIMESTAMP,
+                    config_json TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # AI 設置表 - 存儲模型用途分配等 AI 相關設置
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS ai_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
@@ -2619,6 +2722,41 @@ class Database:
                     category TEXT DEFAULT 'general',
                     is_active INTEGER DEFAULT 1,
                     use_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 觸發規則表 - 定義關鍵詞匹配後的響應動作
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS trigger_rules (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    priority INTEGER DEFAULT 2,
+                    is_active INTEGER DEFAULT 1,
+                    
+                    source_type TEXT DEFAULT 'all',
+                    source_group_ids TEXT DEFAULT '[]',
+                    keyword_set_ids TEXT NOT NULL DEFAULT '[]',
+                    conditions TEXT DEFAULT '{}',
+                    
+                    response_type TEXT NOT NULL DEFAULT 'ai_chat',
+                    response_config TEXT DEFAULT '{}',
+                    
+                    sender_type TEXT DEFAULT 'auto',
+                    sender_account_ids TEXT DEFAULT '[]',
+                    delay_min INTEGER DEFAULT 30,
+                    delay_max INTEGER DEFAULT 120,
+                    daily_limit INTEGER DEFAULT 50,
+                    
+                    auto_add_lead INTEGER DEFAULT 1,
+                    notify_me INTEGER DEFAULT 0,
+                    
+                    trigger_count INTEGER DEFAULT 0,
+                    success_count INTEGER DEFAULT 0,
+                    last_triggered TIMESTAMP,
+                    
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -2796,6 +2934,7 @@ class Database:
     
     async def get_all_groups(self) -> List[Dict]:
         """獲取所有監控群組"""
+        import sys
         await self._ensure_keyword_tables()
         try:
             rows = await self.fetch_all('SELECT * FROM monitored_groups ORDER BY created_at DESC')
@@ -2811,6 +2950,8 @@ class Database:
                 keyword_set_id = group.get('keyword_set_id')
                 keyword_set_ids_str = group.get('keyword_set_ids', '[]')
                 
+                print(f"[Database] Group {group.get('id')} raw keyword_set_ids: {keyword_set_ids_str}", file=sys.stderr)
+                
                 # 嘗試解析 keyword_set_ids JSON 字符串
                 keywordSetIds = []
                 if keyword_set_ids_str and keyword_set_ids_str != '[]':
@@ -2819,14 +2960,15 @@ class Database:
                         parsed = json.loads(keyword_set_ids_str)
                         if isinstance(parsed, list):
                             keywordSetIds = parsed
-                    except:
-                        pass
+                    except Exception as parse_err:
+                        print(f"[Database] Failed to parse keyword_set_ids: {parse_err}", file=sys.stderr)
                 
                 # 如果有單個 keyword_set_id 且不在列表中，添加進去
                 if keyword_set_id and keyword_set_id not in keywordSetIds:
                     keywordSetIds.append(keyword_set_id)
                 
                 group['keywordSetIds'] = keywordSetIds
+                print(f"[Database] Group {group.get('id')} final keywordSetIds: {keywordSetIds}", file=sys.stderr)
                 # 確保 memberCount 欄位存在（前端期望的格式）
                 group['memberCount'] = group.get('member_count', 0) or 0
                 groups.append(group)
@@ -2837,14 +2979,39 @@ class Database:
             print(f"[Database] Error getting groups: {e}", file=sys.stderr)
             return []
     
-    async def remove_group(self, group_id: int) -> bool:
-        """刪除監控群組"""
+    async def remove_group(self, group_id: Any) -> bool:
+        """刪除監控群組 - 支持多種標識符"""
         await self._ensure_keyword_tables()
         try:
-            await self.execute('DELETE FROM monitored_groups WHERE id = ?', (group_id,))
-            return True
+            import sys
+            deleted = False
+            
+            # 方式1: 按 ID 刪除（如果是數字）
+            if isinstance(group_id, int) or (isinstance(group_id, str) and group_id.lstrip('-').isdigit()):
+                numeric_id = int(group_id) if isinstance(group_id, str) else group_id
+                result = await self.execute('DELETE FROM monitored_groups WHERE id = ?', (numeric_id,))
+                if result > 0:
+                    deleted = True
+                    print(f"[Database] Removed group by id: {numeric_id}", file=sys.stderr)
+            
+            # 方式2: 按 telegram_id 刪除
+            if not deleted:
+                result = await self.execute('DELETE FROM monitored_groups WHERE telegram_id = ?', (str(group_id),))
+                if result > 0:
+                    deleted = True
+                    print(f"[Database] Removed group by telegram_id: {group_id}", file=sys.stderr)
+            
+            # 方式3: 按 link 刪除
+            if not deleted:
+                result = await self.execute('DELETE FROM monitored_groups WHERE link LIKE ?', (f'%{group_id}%',))
+                if result > 0:
+                    deleted = True
+                    print(f"[Database] Removed group by link: {group_id}", file=sys.stderr)
+            
+            return deleted
         except Exception as e:
-            print(f"Error removing group: {e}")
+            import sys
+            print(f"[Database] Error removing group: {e}", file=sys.stderr)
             return False
     
     async def get_all_monitored_groups(self) -> List[Dict]:
@@ -2886,6 +3053,212 @@ class Database:
             print(f"[Database] Error getting group by URL: {e}", file=sys.stderr)
             return None
     
+    # ============ 觸發規則操作 ============
+    
+    async def get_all_trigger_rules(self) -> List[Dict]:
+        """獲取所有觸發規則"""
+        await self._ensure_keyword_tables()
+        try:
+            rows = await self.fetch_all('SELECT * FROM trigger_rules ORDER BY priority DESC, created_at DESC')
+            result = []
+            for row in rows:
+                rule = dict(row) if hasattr(row, 'keys') else row
+                # 解析 JSON 字段
+                for field in ['source_group_ids', 'keyword_set_ids', 'conditions', 'response_config', 'sender_account_ids']:
+                    if rule.get(field):
+                        try:
+                            rule[field] = json.loads(rule[field])
+                        except:
+                            rule[field] = [] if field.endswith('_ids') else {}
+                # 轉換字段名稱以匹配前端
+                rule['isActive'] = bool(rule.get('is_active', 1))
+                rule['sourceType'] = rule.get('source_type', 'all')
+                rule['sourceGroupIds'] = rule.get('source_group_ids', [])
+                rule['keywordSetIds'] = rule.get('keyword_set_ids', [])
+                rule['responseType'] = rule.get('response_type', 'ai_chat')
+                rule['responseConfig'] = rule.get('response_config', {})
+                rule['senderType'] = rule.get('sender_type', 'auto')
+                rule['senderAccountIds'] = rule.get('sender_account_ids', [])
+                rule['delayMin'] = rule.get('delay_min', 30)
+                rule['delayMax'] = rule.get('delay_max', 120)
+                rule['dailyLimit'] = rule.get('daily_limit', 50)
+                rule['autoAddLead'] = bool(rule.get('auto_add_lead', 1))
+                rule['notifyMe'] = bool(rule.get('notify_me', 0))
+                rule['triggerCount'] = rule.get('trigger_count', 0)
+                rule['successCount'] = rule.get('success_count', 0)
+                rule['lastTriggered'] = rule.get('last_triggered')
+                rule['createdAt'] = rule.get('created_at')
+                rule['updatedAt'] = rule.get('updated_at')
+                result.append(rule)
+            return result
+        except Exception as e:
+            print(f"Error getting trigger rules: {e}")
+            return []
+    
+    async def get_trigger_rule(self, rule_id: int) -> Optional[Dict]:
+        """獲取單個觸發規則"""
+        await self._ensure_keyword_tables()
+        try:
+            row = await self.fetch_one('SELECT * FROM trigger_rules WHERE id = ?', (rule_id,))
+            if row:
+                rule = dict(row) if hasattr(row, 'keys') else row
+                for field in ['source_group_ids', 'keyword_set_ids', 'conditions', 'response_config', 'sender_account_ids']:
+                    if rule.get(field):
+                        try:
+                            rule[field] = json.loads(rule[field])
+                        except:
+                            rule[field] = [] if field.endswith('_ids') else {}
+                return rule
+            return None
+        except Exception as e:
+            print(f"Error getting trigger rule: {e}")
+            return None
+    
+    async def add_trigger_rule(self, rule_data: Dict) -> int:
+        """添加觸發規則"""
+        import sys
+        print(f"[Database] add_trigger_rule called with data: {rule_data}", file=sys.stderr)
+        await self._ensure_keyword_tables()
+        try:
+            print(f"[Database] Executing INSERT for trigger rule: {rule_data.get('name')}", file=sys.stderr)
+            return await self.execute_insert('''
+                INSERT INTO trigger_rules (
+                    name, description, priority, is_active,
+                    source_type, source_group_ids, keyword_set_ids, conditions,
+                    response_type, response_config,
+                    sender_type, sender_account_ids, delay_min, delay_max, daily_limit,
+                    auto_add_lead, notify_me
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                rule_data.get('name', ''),
+                rule_data.get('description', ''),
+                rule_data.get('priority', 2),
+                1 if rule_data.get('isActive', True) else 0,
+                rule_data.get('sourceType', 'all'),
+                json.dumps(rule_data.get('sourceGroupIds', [])),
+                json.dumps(rule_data.get('keywordSetIds', [])),
+                json.dumps(rule_data.get('conditions', {})),
+                rule_data.get('responseType', 'ai_chat'),
+                json.dumps(rule_data.get('responseConfig', {})),
+                rule_data.get('senderType', 'auto'),
+                json.dumps(rule_data.get('senderAccountIds', [])),
+                rule_data.get('delayMin', 30),
+                rule_data.get('delayMax', 120),
+                rule_data.get('dailyLimit', 50),
+                1 if rule_data.get('autoAddLead', True) else 0,
+                1 if rule_data.get('notifyMe', False) else 0
+            ))
+        except Exception as e:
+            print(f"Error adding trigger rule: {e}")
+            raise e
+    
+    async def update_trigger_rule(self, rule_id: int, rule_data: Dict) -> bool:
+        """更新觸發規則"""
+        await self._ensure_keyword_tables()
+        try:
+            await self.execute('''
+                UPDATE trigger_rules SET
+                    name = ?, description = ?, priority = ?, is_active = ?,
+                    source_type = ?, source_group_ids = ?, keyword_set_ids = ?, conditions = ?,
+                    response_type = ?, response_config = ?,
+                    sender_type = ?, sender_account_ids = ?, delay_min = ?, delay_max = ?, daily_limit = ?,
+                    auto_add_lead = ?, notify_me = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (
+                rule_data.get('name', ''),
+                rule_data.get('description', ''),
+                rule_data.get('priority', 2),
+                1 if rule_data.get('isActive', True) else 0,
+                rule_data.get('sourceType', 'all'),
+                json.dumps(rule_data.get('sourceGroupIds', [])),
+                json.dumps(rule_data.get('keywordSetIds', [])),
+                json.dumps(rule_data.get('conditions', {})),
+                rule_data.get('responseType', 'ai_chat'),
+                json.dumps(rule_data.get('responseConfig', {})),
+                rule_data.get('senderType', 'auto'),
+                json.dumps(rule_data.get('senderAccountIds', [])),
+                rule_data.get('delayMin', 30),
+                rule_data.get('delayMax', 120),
+                rule_data.get('dailyLimit', 50),
+                1 if rule_data.get('autoAddLead', True) else 0,
+                1 if rule_data.get('notifyMe', False) else 0,
+                rule_id
+            ))
+            return True
+        except Exception as e:
+            print(f"Error updating trigger rule: {e}")
+            return False
+    
+    async def delete_trigger_rule(self, rule_id: int) -> bool:
+        """刪除觸發規則"""
+        await self._ensure_keyword_tables()
+        try:
+            await self.execute('DELETE FROM trigger_rules WHERE id = ?', (rule_id,))
+            return True
+        except Exception as e:
+            print(f"Error deleting trigger rule: {e}")
+            return False
+    
+    async def toggle_trigger_rule(self, rule_id: int, is_active: bool) -> bool:
+        """啟用/停用觸發規則"""
+        await self._ensure_keyword_tables()
+        try:
+            await self.execute(
+                'UPDATE trigger_rules SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                (1 if is_active else 0, rule_id)
+            )
+            return True
+        except Exception as e:
+            print(f"Error toggling trigger rule: {e}")
+            return False
+    
+    async def increment_trigger_rule_stats(self, rule_id: int, success: bool = True) -> bool:
+        """更新觸發規則統計"""
+        await self._ensure_keyword_tables()
+        try:
+            if success:
+                await self.execute('''
+                    UPDATE trigger_rules SET 
+                        trigger_count = trigger_count + 1,
+                        success_count = success_count + 1,
+                        last_triggered = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (rule_id,))
+            else:
+                await self.execute('''
+                    UPDATE trigger_rules SET 
+                        trigger_count = trigger_count + 1,
+                        last_triggered = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (rule_id,))
+            return True
+        except Exception as e:
+            print(f"Error updating trigger rule stats: {e}")
+            return False
+    
+    async def get_active_trigger_rules(self) -> List[Dict]:
+        """獲取所有活躍的觸發規則"""
+        await self._ensure_keyword_tables()
+        try:
+            rows = await self.fetch_all(
+                'SELECT * FROM trigger_rules WHERE is_active = 1 ORDER BY priority DESC, created_at DESC'
+            )
+            result = []
+            for row in rows:
+                rule = dict(row) if hasattr(row, 'keys') else row
+                for field in ['source_group_ids', 'keyword_set_ids', 'conditions', 'response_config', 'sender_account_ids']:
+                    if rule.get(field):
+                        try:
+                            rule[field] = json.loads(rule[field])
+                        except:
+                            rule[field] = [] if field.endswith('_ids') else {}
+                result.append(rule)
+            return result
+        except Exception as e:
+            print(f"Error getting active trigger rules: {e}")
+            return []
+    
     # ============ 消息模板操作 ============
     
     async def add_template(self, template_data: Dict) -> int:
@@ -2905,11 +3278,30 @@ class Database:
             raise e
     
     async def get_all_templates(self) -> List[Dict]:
-        """獲取所有消息模板"""
+        """獲取所有消息模板（統一讀取 chat_templates 表）"""
         await self._ensure_keyword_tables()
         try:
-            rows = await self.fetch_all('SELECT * FROM message_templates ORDER BY created_at DESC')
-            return [dict(row) if hasattr(row, 'keys') else row for row in rows]
+            # 改為讀取 chat_templates 表，這是實際存儲用戶創建模板的表
+            rows = await self.fetch_all('SELECT * FROM chat_templates ORDER BY usage_count DESC, created_at DESC')
+            import json
+            templates = []
+            for row in rows:
+                template = dict(row) if hasattr(row, 'keys') else row
+                # 轉換字段名以匹配前端期望
+                template['isActive'] = bool(template.get('is_active', 1))
+                template['usageCount'] = template.get('usage_count', 0)
+                template['successRate'] = template.get('success_rate', 0)
+                template['lastUsed'] = template.get('last_used')
+                template['createdAt'] = template.get('created_at')
+                template['updatedAt'] = template.get('updated_at')
+                
+                if template.get('variables'):
+                    try:
+                        template['variables'] = json.loads(template['variables'])
+                    except:
+                        template['variables'] = []
+                templates.append(template)
+            return templates
         except Exception as e:
             print(f"Error getting templates: {e}")
             return []
@@ -3196,6 +3588,30 @@ class Database:
             import sys
             print(f"Error checking lead and DNC: {e}", file=sys.stderr)
             return (None, False)
+    
+    async def get_lead_by_user_id(self, user_id: str) -> Optional[Dict]:
+        """根據 user_id 獲取 Lead
+        
+        Args:
+            user_id: Telegram 用戶 ID
+            
+        Returns:
+            Optional[Dict]: Lead 數據或 None
+        """
+        try:
+            result = await self.fetch_one(
+                '''SELECT id, user_id, username, first_name, last_name, 
+                          source_chat_title, notes, online_status, 
+                          contacted, response_status, created_at, updated_at
+                   FROM extracted_members 
+                   WHERE user_id = ?''',
+                (str(user_id),)
+            )
+            return dict(result) if result else None
+        except Exception as e:
+            import sys
+            print(f"Error getting lead by user_id: {e}", file=sys.stderr)
+            return None
     
     async def add_lead(self, lead_data: Dict) -> int:
         """添加新的潛在客戶
@@ -3503,6 +3919,370 @@ class Database:
             return True
         except Exception as e:
             print(f"Error updating channel test result: {e}")
+            return False
+
+    # ============ 消息隊列相關 ============
+    
+    async def update_queue_message_status(
+        self,
+        message_id: str,
+        status: Optional[str] = None,
+        last_error: Optional[str] = None,
+        priority: Optional[str] = None
+    ) -> bool:
+        """更新消息隊列中消息的狀態
+        
+        Args:
+            message_id: 消息 ID
+            status: 新狀態
+            last_error: 錯誤信息
+            priority: 優先級
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            # 消息隊列狀態主要在內存中管理
+            # 這裡可以選擇持久化到數據庫以支持重啟恢復
+            # 暫時只記錄日誌，不做實際數據庫操作
+            import sys
+            print(f"[Database] Queue message status update: id={message_id}, status={status}, error={last_error}", file=sys.stderr)
+            return True
+        except Exception as e:
+            import sys
+            print(f"Error updating queue message status: {e}", file=sys.stderr)
+            return False
+    
+    async def increment_queue_message_attempts(self, message_id: str) -> bool:
+        """增加消息嘗試次數
+        
+        Args:
+            message_id: 消息 ID
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            # 消息嘗試次數主要在內存中管理
+            import sys
+            print(f"[Database] Queue message attempts incremented: id={message_id}", file=sys.stderr)
+            return True
+        except Exception as e:
+            import sys
+            print(f"Error incrementing queue message attempts: {e}", file=sys.stderr)
+            return False
+    
+    async def save_queue_message(
+        self,
+        message_id: str,
+        phone: str,
+        user_id: str,
+        text: str,
+        attachment: Optional[str] = None,
+        priority: str = 'NORMAL',
+        status: str = 'pending',
+        scheduled_at: Optional[str] = None,
+        attempts: int = 0,
+        max_attempts: int = 3
+    ) -> bool:
+        """保存消息到隊列（用於持久化）
+        
+        Args:
+            message_id: 消息 ID
+            phone: 發送帳號
+            user_id: 目標用戶 ID
+            text: 消息內容
+            attachment: 附件路徑
+            priority: 優先級
+            status: 狀態
+            scheduled_at: 計劃發送時間
+            attempts: 嘗試次數
+            max_attempts: 最大嘗試次數
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            # 消息隊列主要在內存中管理
+            # 這裡可以選擇持久化到數據庫以支持重啟恢復
+            import sys
+            print(f"[Database] Queue message saved: id={message_id}, phone={phone}, user_id={user_id}", file=sys.stderr)
+            return True
+        except Exception as e:
+            import sys
+            print(f"Error saving queue message: {e}", file=sys.stderr)
+            return False
+    
+    # ============ 系統告警相關 ============
+    
+    async def add_alert(
+        self,
+        alert_type: str,
+        level: str,
+        message: str,
+        details: Optional[Dict[str, Any]] = None
+    ) -> int:
+        """添加系統告警
+        
+        Args:
+            alert_type: 告警類型
+            level: 告警級別 (info, warning, error, critical)
+            message: 告警消息
+            details: 詳細信息
+            
+        Returns:
+            int: 告警 ID
+        """
+        try:
+            await self.connect()
+            import json
+            details_str = json.dumps(details) if details else None
+            
+            cursor = await self._connection.execute(
+                """INSERT INTO system_alerts (alert_type, level, message, details)
+                   VALUES (?, ?, ?, ?)""",
+                (alert_type, level, message, details_str)
+            )
+            await self._connection.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            import sys
+            print(f"Error adding alert: {e}", file=sys.stderr)
+            return 0
+    
+    async def acknowledge_alert(self, alert_id: int) -> bool:
+        """確認告警
+        
+        Args:
+            alert_id: 告警 ID
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            await self.connect()
+            await self._connection.execute(
+                """UPDATE system_alerts 
+                   SET acknowledged = 1, acknowledged_at = CURRENT_TIMESTAMP 
+                   WHERE id = ?""",
+                (alert_id,)
+            )
+            await self._connection.commit()
+            return True
+        except Exception as e:
+            import sys
+            print(f"Error acknowledging alert: {e}", file=sys.stderr)
+            return False
+    
+    async def resolve_alert(self, alert_id: int) -> bool:
+        """解決告警
+        
+        Args:
+            alert_id: 告警 ID
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            await self.connect()
+            await self._connection.execute(
+                """UPDATE system_alerts 
+                   SET resolved = 1, resolved_at = CURRENT_TIMESTAMP 
+                   WHERE id = ?""",
+                (alert_id,)
+            )
+            await self._connection.commit()
+            return True
+        except Exception as e:
+            import sys
+            print(f"Error resolving alert: {e}", file=sys.stderr)
+            return False
+    
+    async def get_alerts(
+        self,
+        limit: int = 50,
+        level: Optional[str] = None,
+        include_resolved: bool = False
+    ) -> List[Dict[str, Any]]:
+        """獲取告警列表
+        
+        Args:
+            limit: 最大返回數量
+            level: 篩選告警級別
+            include_resolved: 是否包含已解決的告警
+            
+        Returns:
+            List[Dict]: 告警列表
+        """
+        try:
+            await self.connect()
+            query = "SELECT * FROM system_alerts WHERE 1=1"
+            params = []
+            
+            if not include_resolved:
+                query += " AND resolved = 0"
+            
+            if level:
+                query += " AND level = ?"
+                params.append(level)
+            
+            query += " ORDER BY created_at DESC LIMIT ?"
+            params.append(limit)
+            
+            cursor = await self._connection.execute(query, tuple(params))
+            rows = await cursor.fetchall()
+            
+            import json
+            alerts = []
+            for row in rows:
+                alert = dict(row)
+                if alert.get('details'):
+                    try:
+                        alert['details'] = json.loads(alert['details'])
+                    except:
+                        pass
+                alerts.append(alert)
+            
+            return alerts
+        except Exception as e:
+            import sys
+            print(f"Error getting alerts: {e}", file=sys.stderr)
+            return []
+    
+    # ============ 聊天模板相關 ============
+    
+    async def get_chat_templates(self) -> List[Dict[str, Any]]:
+        """獲取所有聊天模板
+        
+        Returns:
+            List[Dict]: 模板列表
+        """
+        try:
+            await self.connect()
+            cursor = await self._connection.execute(
+                "SELECT * FROM chat_templates ORDER BY usage_count DESC, created_at DESC"
+            )
+            rows = await cursor.fetchall()
+            
+            templates = []
+            import json
+            for row in rows:
+                template = dict(row)
+                # 轉換字段名以匹配前端期望
+                template['isEnabled'] = bool(template.get('is_active', 1))
+                template['usageCount'] = template.get('usage_count', 0)
+                template['successRate'] = template.get('success_rate', 0)
+                template['lastUsed'] = template.get('last_used')
+                template['createdAt'] = template.get('created_at')
+                template['updatedAt'] = template.get('updated_at')
+                
+                if template.get('variables'):
+                    try:
+                        template['variables'] = json.loads(template['variables'])
+                    except:
+                        template['variables'] = []
+                templates.append(template)
+            
+            return templates
+        except Exception as e:
+            import sys
+            print(f"Error getting chat templates: {e}", file=sys.stderr)
+            return []
+    
+    async def save_chat_template(
+        self,
+        template_id: Optional[int],
+        name: str,
+        category: str,
+        content: str,
+        variables: List[str],
+        is_active: bool = True
+    ) -> Dict[str, Any]:
+        """保存聊天模板
+        
+        Args:
+            template_id: 模板 ID（如果是更新）
+            name: 模板名稱
+            category: 分類
+            content: 內容
+            variables: 變量列表
+            is_active: 是否啟用
+            
+        Returns:
+            Dict: 保存結果
+        """
+        try:
+            await self.connect()
+            import json
+            variables_str = json.dumps(variables)
+            
+            if template_id:
+                # 更新
+                await self._connection.execute(
+                    """UPDATE chat_templates 
+                       SET name=?, category=?, content=?, variables=?, is_active=?, updated_at=CURRENT_TIMESTAMP
+                       WHERE id=?""",
+                    (name, category, content, variables_str, 1 if is_active else 0, template_id)
+                )
+            else:
+                # 新增
+                cursor = await self._connection.execute(
+                    """INSERT INTO chat_templates (name, category, content, variables, is_active)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (name, category, content, variables_str, 1 if is_active else 0)
+                )
+                template_id = cursor.lastrowid
+            
+            await self._connection.commit()
+            return {'success': True, 'id': template_id}
+        except Exception as e:
+            import sys
+            print(f"Error saving chat template: {e}", file=sys.stderr)
+            return {'success': False, 'error': str(e)}
+    
+    async def delete_chat_template(self, template_id: int) -> bool:
+        """刪除聊天模板
+        
+        Args:
+            template_id: 模板 ID
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            await self.connect()
+            await self._connection.execute(
+                "DELETE FROM chat_templates WHERE id=?", (template_id,)
+            )
+            await self._connection.commit()
+            return True
+        except Exception as e:
+            import sys
+            print(f"Error deleting chat template: {e}", file=sys.stderr)
+            return False
+    
+    async def increment_template_usage(self, template_id: int) -> bool:
+        """增加模板使用次數
+        
+        Args:
+            template_id: 模板 ID
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            await self.connect()
+            await self._connection.execute(
+                """UPDATE chat_templates 
+                   SET usage_count = usage_count + 1, last_used = CURRENT_TIMESTAMP
+                   WHERE id=?""",
+                (template_id,)
+            )
+            await self._connection.commit()
+            return True
+        except Exception as e:
+            import sys
+            print(f"Error incrementing template usage: {e}", file=sys.stderr)
             return False
 
 

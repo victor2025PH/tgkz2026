@@ -58,7 +58,7 @@ import {
             
             <!-- 參與角色 -->
             <div class="flex items-center gap-1 mb-3">
-              @for (role of scenario.roles.slice(0, 3); track role.roleType) {
+              @for (role of scenario.roles.slice(0, 3); track $index) {
                 <div class="w-7 h-7 rounded-full bg-slate-700/50 flex items-center justify-center text-sm"
                      [title]="getRoleLabel(role.roleType)">
                   {{ getRoleEmoji(role.roleType) }}
@@ -116,7 +116,7 @@ import {
                   <span>👥</span> 參與角色
                 </h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  @for (role of scenario.roles; track role.roleType) {
+                  @for (role of scenario.roles; track $index) {
                     <div class="bg-slate-800/50 rounded-lg p-3">
                       <div class="flex items-center gap-2 mb-2">
                         <span class="text-xl">{{ getRoleEmoji(role.roleType) }}</span>

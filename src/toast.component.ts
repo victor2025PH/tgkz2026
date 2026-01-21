@@ -1,6 +1,6 @@
 /**
  * Toast Notification Component
- * Displays toast notifications
+ * 增強版 - 支持操作按鈕、進度條、下一步提示
  */
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -11,57 +11,91 @@ import { ToastService, Toast } from './toast.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+    <div class="fixed top-4 right-4 z-50 space-y-3 max-w-md">
       @for(toast of toasts(); track toast.id) {
         <div 
-          class="toast-item flex items-start gap-3 p-4 rounded-lg shadow-lg backdrop-blur-sm border animate-slide-in"
-          [class.bg-green-500/90]="toast.type === 'success'"
-          [class.bg-red-500/90]="toast.type === 'error'"
-          [class.bg-yellow-500/90]="toast.type === 'warning'"
-          [class.bg-blue-500/90]="toast.type === 'info'"
-          [class.border-green-400]="toast.type === 'success'"
-          [class.border-red-400]="toast.type === 'error'"
-          [class.border-yellow-400]="toast.type === 'warning'"
-          [class.border-blue-400]="toast.type === 'info'">
-          <!-- Icon -->
-          <div class="flex-shrink-0 mt-0.5">
-            @switch(toast.type) {
-              @case('success') {
-                <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
+          class="toast-item rounded-xl shadow-2xl backdrop-blur-md border animate-slide-in overflow-hidden"
+          [class.bg-emerald-500/95]="toast.type === 'success'"
+          [class.bg-red-500/95]="toast.type === 'error'"
+          [class.bg-amber-500/95]="toast.type === 'warning'"
+          [class.bg-blue-500/95]="toast.type === 'info'"
+          [class.bg-slate-700/95]="toast.type === 'progress'"
+          [class.border-emerald-400/50]="toast.type === 'success'"
+          [class.border-red-400/50]="toast.type === 'error'"
+          [class.border-amber-400/50]="toast.type === 'warning'"
+          [class.border-blue-400/50]="toast.type === 'info'"
+          [class.border-slate-600/50]="toast.type === 'progress'">
+          
+          <!-- 主內容 -->
+          <div class="flex items-start gap-3 p-4">
+            <!-- Icon -->
+            <div class="flex-shrink-0 text-xl">
+              {{ toast.icon || getDefaultIcon(toast.type) }}
+            </div>
+            
+            <!-- Message -->
+            <div class="flex-1 min-w-0">
+              @if (toast.title) {
+                <div class="font-semibold text-white mb-0.5">{{ toast.title }}</div>
               }
-              @case('error') {
-                <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div class="text-white text-sm">
+                {{ toast.message }}
+              </div>
+              
+              <!-- 下一步提示 -->
+              @if (toast.nextStep) {
+                <button 
+                  (click)="handleNextStep(toast)"
+                  class="mt-2 text-xs text-white/90 hover:text-white flex items-center gap-1 transition-colors">
+                  <span>→</span>
+                  <span class="underline">{{ toast.nextStep.label }}</span>
+                </button>
+              }
+              
+              <!-- 操作按鈕 -->
+              @if (toast.actions && toast.actions.length > 0) {
+                <div class="flex items-center gap-2 mt-3">
+                  @for (action of toast.actions; track action.label) {
+                    <button 
+                      (click)="handleAction(toast, action)"
+                      class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                      [class.bg-white]="action.variant === 'primary'"
+                      [class.text-slate-900]="action.variant === 'primary'"
+                      [class.hover:bg-white/90]="action.variant === 'primary'"
+                      [class.bg-white/20]="action.variant === 'secondary' || !action.variant"
+                      [class.text-white]="action.variant === 'secondary' || !action.variant"
+                      [class.hover:bg-white/30]="action.variant === 'secondary' || !action.variant"
+                      [class.bg-red-600]="action.variant === 'danger'"
+                      [class.text-white]="action.variant === 'danger'"
+                      [class.hover:bg-red-700]="action.variant === 'danger'">
+                      {{ action.label }}
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+            
+            <!-- Close button -->
+            @if (toast.dismissible !== false) {
+              <button 
+                (click)="dismiss(toast.id)"
+                class="flex-shrink-0 text-white/60 hover:text-white transition-colors p-1 -mr-1 -mt-1">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              }
-              @case('warning') {
-                <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              }
-              @case('info') {
-                <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              }
+              </button>
             }
           </div>
           
-          <!-- Message -->
-          <div class="flex-1 text-white text-sm font-medium">
-            {{ toast.message }}
-          </div>
-          
-          <!-- Close button -->
-          <button 
-            (click)="dismiss(toast.id)"
-            class="flex-shrink-0 text-white/80 hover:text-white transition-colors">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <!-- 進度條 -->
+          @if (toast.type === 'progress' && toast.progress !== undefined) {
+            <div class="h-1 bg-slate-600">
+              <div 
+                class="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300"
+                [style.width.%]="toast.progress">
+              </div>
+            </div>
+          }
         </div>
       }
     </div>
@@ -69,17 +103,17 @@ import { ToastService, Toast } from './toast.service';
   styles: [`
     @keyframes slide-in {
       from {
-        transform: translateX(100%);
+        transform: translateX(100%) scale(0.95);
         opacity: 0;
       }
       to {
-        transform: translateX(0);
+        transform: translateX(0) scale(1);
         opacity: 1;
       }
     }
     
     .animate-slide-in {
-      animation: slide-in 0.3s ease-out;
+      animation: slide-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
   `]
 })
@@ -90,8 +124,30 @@ export class ToastComponent {
     return this.toastService.getToasts();
   }
   
+  getDefaultIcon(type: string): string {
+    const icons: Record<string, string> = {
+      success: '✅',
+      error: '❌',
+      warning: '⚠️',
+      info: 'ℹ️',
+      progress: '⏳'
+    };
+    return icons[type] || 'ℹ️';
+  }
+  
   dismiss(id: string): void {
     this.toastService.dismiss(id);
   }
+  
+  handleNextStep(toast: Toast): void {
+    if (toast.nextStep) {
+      toast.nextStep.action();
+      this.dismiss(toast.id);
+    }
+  }
+  
+  handleAction(toast: Toast, action: { label: string; handler: () => void }): void {
+    action.handler();
+    this.dismiss(toast.id);
+  }
 }
-

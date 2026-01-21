@@ -662,6 +662,11 @@ function startPythonBackend() {
                         console.log('[Backend] ★★★ Forwarding accounts-updated to frontend ★★★');
                         console.log('[Backend] accounts-updated count:', Array.isArray(event.payload) ? event.payload.length : 'not array');
                     }
+                    // Debug logging for trigger-rule events
+                    if (event.event === 'save-trigger-rule-result' || event.event === 'trigger-rules-result') {
+                        console.log(`[Backend] ★★★ Forwarding ${event.event} to frontend ★★★`);
+                        console.log(`[Backend] ${event.event} payload:`, JSON.stringify(event.payload).substring(0, 200));
+                    }
                     mainWindow.webContents.send(event.event, event.payload);
                 }
             } catch (e) {
@@ -852,6 +857,8 @@ const passThroughChannels = [
     // Batch Operations Commands
     'get-batch-tasks', 'create-batch-task', 'start-batch-task', 'stop-batch-task', 'delete-batch-task',
     'get-batch-history', 'get-batch-stats', 'batch-send-messages', 'batch-manage-accounts',
+    // Batch Send/Invite Commands
+    'batch-send:start', 'batch-send:cancel', 'batch-invite:start', 'batch-invite:cancel', 'get-admin-groups',
     // Ad Manager Commands
     'get-ad-templates', 'add-ad-template', 'update-ad-template', 'delete-ad-template',
     'get-ad-schedules', 'add-ad-schedule', 'update-ad-schedule', 'delete-ad-schedule',
@@ -872,6 +879,8 @@ const passThroughChannels = [
     // Script Engine Commands
     'get-scripts', 'create-script', 'update-script', 'delete-script',
     'get-script-stats', 'execute-script',
+    // Trigger Rules Commands
+    'get-trigger-rules', 'get-trigger-rule', 'save-trigger-rule', 'delete-trigger-rule', 'toggle-trigger-rule',
     // Collaboration Coordinator Commands
     'get-collab-groups', 'create-collab-group', 'update-collab-group',
     'delete-collab-group', 'start-collab-session', 'stop-collab-session', 'get-collab-stats',
@@ -880,6 +889,9 @@ const passThroughChannels = [
     'batch-analyze-links', 'get-analysis-history',
     // Ollama / Local AI Commands
     'get-ollama-models', 'test-ollama-connection', 'ollama-generate',
+    // AI Model Management Commands
+    'save-ai-model', 'get-ai-models', 'update-ai-model', 'delete-ai-model', 'test-ai-model', 'set-default-ai-model',
+    'save-model-usage', 'get-model-usage',
     // QR Login Commands (Phase 1)
     'qr-login-create', 'qr-login-status', 'qr-login-refresh', 'qr-login-submit-2fa', 'qr-login-cancel',
     // IP Binding Commands (Phase 2)
@@ -898,7 +910,7 @@ const passThroughChannels = [
     // AI Personas
     'save-personas', 'get-personas',
     // Member Extraction Commands
-    'extract-members', 'get-extracted-members', 'get-member-stats', 'get-online-members',
+    'extract-members', 'get-extracted-members', 'get-member-stats', 'get-online-members', 'update-member',
     // Group Message Commands
     'send-group-message', 'schedule-message',
     // Resource Commands
@@ -913,12 +925,28 @@ const passThroughChannels = [
     'batch-update-leads', 'batch-tag-leads', 'batch-export-leads',
     'undo-batch-operation', 'get-batch-operation-history', 'get-all-tags',
     // Lead to Group Integration
-    'invite-lead-to-collab-group', 'create-collab-group-for-lead'
+    'invite-lead-to-collab-group', 'create-collab-group-for-lead',
+    // Chat Template Commands
+    'get-chat-templates', 'save-chat-template', 'delete-chat-template',
+    // Keyword Set Commands (新增)
+    'save-keyword-set', 'delete-keyword-set', 'bind-keyword-set', 'unbind-keyword-set', 'get-keyword-sets',
+    // AI Message Generation Commands (批量發送/拉群優化)
+    'ai-generate-message', 'ai-generate-group-names', 'ai-generate-welcome',
+    // Group Creation Commands
+    'create-group'
 ];
 
 passThroughChannels.forEach(channel => {
     ipcMain.on(channel, (event, data) => {
-        console.log(`[IPC] Received '${channel}':`, data);
+        // 🆕 優化日誌格式：只在有數據時顯示數據摘要
+        if (data !== undefined && data !== null) {
+            const dataPreview = typeof data === 'object' 
+                ? JSON.stringify(data).substring(0, 100) + (JSON.stringify(data).length > 100 ? '...' : '')
+                : data;
+            console.log(`[IPC] → ${channel}:`, dataPreview);
+        } else {
+            console.log(`[IPC] → ${channel}`);
+        }
         sendToPython(channel, data);
     });
 });
@@ -1050,6 +1078,74 @@ ipcMain.on('load-accounts-from-excel', async (event) => {
 ipcMain.on('reload-sessions-and-accounts', (event) => {
     console.log('[IPC] Received: reload-sessions-and-accounts');
     sendToPython('reload-sessions-and-accounts');
+});
+
+// ==================== 文件選擇 API ====================
+// 用於選擇要發送的附件文件，直接傳遞文件路徑而非 base64
+
+ipcMain.handle('select-file-for-attachment', async (event, options = {}) => {
+    console.log('[IPC] Received: select-file-for-attachment');
+    const { type = 'file', multiple = false } = options;
+    
+    let filters;
+    if (type === 'image') {
+        filters = [
+            { name: '圖片', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'] }
+        ];
+    } else {
+        filters = [
+            { name: '所有文件', extensions: ['*'] }
+        ];
+    }
+    
+    const properties = multiple ? ['openFile', 'multiSelections'] : ['openFile'];
+    
+    const result = await dialog.showOpenDialog(mainWindow, {
+        title: type === 'image' ? '選擇圖片' : '選擇文件',
+        properties: properties,
+        filters: filters
+    });
+    
+    if (result.canceled || !result.filePaths.length) {
+        return { success: false, canceled: true };
+    }
+    
+    // 支持多文件選擇
+    const files = result.filePaths.map(filePath => {
+        const fileName = path.basename(filePath);
+        const stats = fs.statSync(filePath);
+        const fileSize = stats.size;
+        const ext = path.extname(filePath).toLowerCase();
+        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+        const isImage = imageExtensions.includes(ext);
+        
+        return {
+            filePath: filePath,
+            fileName: fileName,
+            fileSize: fileSize,
+            fileType: isImage ? 'image' : 'file'
+        };
+    });
+    
+    console.log(`[IPC] Files selected: ${files.length} files`);
+    
+    // 如果是單文件模式，返回單個對象（向後兼容）
+    if (!multiple) {
+        const file = files[0];
+        return {
+            success: true,
+            filePath: file.filePath,
+            fileName: file.fileName,
+            fileSize: file.fileSize,
+            fileType: file.fileType
+        };
+    }
+    
+    // 多文件模式返回數組
+    return {
+        success: true,
+        files: files
+    };
 });
 
 ipcMain.on('import-session', async (event, options = {}) => {

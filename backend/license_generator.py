@@ -48,42 +48,42 @@ class LicenseGenerator:
         'Y': {'name': '年卡', 'days': 365},
     }
     
-    # 價格表（月卡價格為基準）
+    # 價格表 (USDT)，與 database.py MEMBERSHIP_LEVELS 對齊
     PRICES = {
-        'silver': {'1': 19, '2': 49, '3': 129, 'Y': 399},
-        'gold': {'1': 39, '2': 99, '3': 249, 'Y': 799},
-        'diamond': {'1': 79, '2': 199, '3': 499, 'Y': 1599},
-        'star': {'1': 149, '2': 399, '3': 999, 'Y': 2999},
-        'king': {'1': 399, '2': 999, '3': 2499, 'Y': 6999},
+        'silver': {'1': 1.99, '2': 4.99, '3': 12.99, 'Y': 49.9},      # 入門級
+        'gold': {'1': 6.99, '2': 19.9, '3': 49.9, 'Y': 199},          # 主力產品
+        'diamond': {'1': 19.9, '2': 59.9, '3': 149, 'Y': 599},        # 專業級
+        'star': {'1': 59.9, '2': 199, '3': 499, 'Y': 1999},           # 團隊級
+        'king': {'1': 199, '2': 599, '3': 1499, 'Y': 5999},           # 企業級
     }
     
-    # 卡密類型配置（向後兼容 + 新格式）
+    # 卡密類型配置（向後兼容 + 新格式）- 價格單位: USDT
     LICENSE_TYPES = {
-        # 白銀
-        'B1': {'name': '白銀周卡', 'level': 'silver', 'days': 7, 'price': 19},
-        'B2': {'name': '白銀月卡', 'level': 'silver', 'days': 30, 'price': 49},
-        'B3': {'name': '白銀季卡', 'level': 'silver', 'days': 90, 'price': 129},
-        'BY': {'name': '白銀年卡', 'level': 'silver', 'days': 365, 'price': 399},
-        # 黃金
-        'G1': {'name': '黃金周卡', 'level': 'gold', 'days': 7, 'price': 39},
-        'G2': {'name': '黃金月卡', 'level': 'gold', 'days': 30, 'price': 99},
-        'G3': {'name': '黃金季卡', 'level': 'gold', 'days': 90, 'price': 249},
-        'GY': {'name': '黃金年卡', 'level': 'gold', 'days': 365, 'price': 799},
-        # 鑽石
-        'D1': {'name': '鑽石周卡', 'level': 'diamond', 'days': 7, 'price': 79},
-        'D2': {'name': '鑽石月卡', 'level': 'diamond', 'days': 30, 'price': 199},
-        'D3': {'name': '鑽石季卡', 'level': 'diamond', 'days': 90, 'price': 499},
-        'DY': {'name': '鑽石年卡', 'level': 'diamond', 'days': 365, 'price': 1599},
-        # 星耀
-        'S1': {'name': '星耀周卡', 'level': 'star', 'days': 7, 'price': 149},
-        'S2': {'name': '星耀月卡', 'level': 'star', 'days': 30, 'price': 399},
-        'S3': {'name': '星耀季卡', 'level': 'star', 'days': 90, 'price': 999},
-        'SY': {'name': '星耀年卡', 'level': 'star', 'days': 365, 'price': 2999},
-        # 王者
-        'K1': {'name': '王者周卡', 'level': 'king', 'days': 7, 'price': 399},
-        'K2': {'name': '王者月卡', 'level': 'king', 'days': 30, 'price': 999},
-        'K3': {'name': '王者季卡', 'level': 'king', 'days': 90, 'price': 2499},
-        'KY': {'name': '王者年卡', 'level': 'king', 'days': 365, 'price': 6999},
+        # 白銀精英
+        'B1': {'name': '白銀周卡', 'level': 'silver', 'days': 7, 'price': 1.99},
+        'B2': {'name': '白銀月卡', 'level': 'silver', 'days': 30, 'price': 4.99},
+        'B3': {'name': '白銀季卡', 'level': 'silver', 'days': 90, 'price': 12.99},
+        'BY': {'name': '白銀年卡', 'level': 'silver', 'days': 365, 'price': 49.9},
+        # 黃金大師
+        'G1': {'name': '黃金周卡', 'level': 'gold', 'days': 7, 'price': 6.99},
+        'G2': {'name': '黃金月卡', 'level': 'gold', 'days': 30, 'price': 19.9},
+        'G3': {'name': '黃金季卡', 'level': 'gold', 'days': 90, 'price': 49.9},
+        'GY': {'name': '黃金年卡', 'level': 'gold', 'days': 365, 'price': 199},
+        # 鑽石王牌
+        'D1': {'name': '鑽石周卡', 'level': 'diamond', 'days': 7, 'price': 19.9},
+        'D2': {'name': '鑽石月卡', 'level': 'diamond', 'days': 30, 'price': 59.9},
+        'D3': {'name': '鑽石季卡', 'level': 'diamond', 'days': 90, 'price': 149},
+        'DY': {'name': '鑽石年卡', 'level': 'diamond', 'days': 365, 'price': 599},
+        # 星耀傳說
+        'S1': {'name': '星耀周卡', 'level': 'star', 'days': 7, 'price': 59.9},
+        'S2': {'name': '星耀月卡', 'level': 'star', 'days': 30, 'price': 199},
+        'S3': {'name': '星耀季卡', 'level': 'star', 'days': 90, 'price': 499},
+        'SY': {'name': '星耀年卡', 'level': 'star', 'days': 365, 'price': 1999},
+        # 榮耀王者
+        'K1': {'name': '王者周卡', 'level': 'king', 'days': 7, 'price': 199},
+        'K2': {'name': '王者月卡', 'level': 'king', 'days': 30, 'price': 599},
+        'K3': {'name': '王者季卡', 'level': 'king', 'days': 90, 'price': 1499},
+        'KY': {'name': '王者年卡', 'level': 'king', 'days': 365, 'price': 5999},
     }
     
     def __init__(self, storage_path: Optional[Path] = None):

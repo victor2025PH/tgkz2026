@@ -93,33 +93,39 @@ export class LicenseClientService implements OnDestroy {
   lastHeartbeat = signal<Date | null>(null);
   offlineGracePeriod = 7 * 24 * 60 * 60 * 1000;  // 7天離線寬限期
   
-  // 產品列表（USDT 定價）
+  // 產品列表（USDT 定價）- 與 database.py 和 license_generator.py 對齊
   // 所有價格均為 USDT (TRC20)
   readonly products: ProductInfo[] = [
-    // 白銀精英 - 入門級
-    { id: 'silver_month', level: 'silver', levelName: '白銀精英', levelIcon: '🥈', duration: 'month', durationName: '月卡', price: 9.9 },
-    { id: 'silver_quarter', level: 'silver', levelName: '白銀精英', levelIcon: '🥈', duration: 'quarter', durationName: '季卡', price: 24.9 },
-    { id: 'silver_year', level: 'silver', levelName: '白銀精英', levelIcon: '🥈', duration: 'year', durationName: '年卡', price: 79 },
+    // 白銀精英 - 入門級（低門檻）
+    { id: 'silver_week', level: 'silver', levelName: '白銀精英', levelIcon: '🥈', duration: 'week', durationName: '周卡', price: 1.99 },
+    { id: 'silver_month', level: 'silver', levelName: '白銀精英', levelIcon: '🥈', duration: 'month', durationName: '月卡', price: 4.99 },
+    { id: 'silver_quarter', level: 'silver', levelName: '白銀精英', levelIcon: '🥈', duration: 'quarter', durationName: '季卡', price: 12.99 },
+    { id: 'silver_year', level: 'silver', levelName: '白銀精英', levelIcon: '🥈', duration: 'year', durationName: '年卡', price: 49.9 },
     
-    // 黃金大師 - 專業級
-    { id: 'gold_month', level: 'gold', levelName: '黃金大師', levelIcon: '🥇', duration: 'month', durationName: '月卡', price: 29.9 },
-    { id: 'gold_quarter', level: 'gold', levelName: '黃金大師', levelIcon: '🥇', duration: 'quarter', durationName: '季卡', price: 74.9 },
-    { id: 'gold_year', level: 'gold', levelName: '黃金大師', levelIcon: '🥇', duration: 'year', durationName: '年卡', price: 249 },
+    // 黃金大師 - 主力產品（性價比最高）
+    { id: 'gold_week', level: 'gold', levelName: '黃金大師', levelIcon: '🥇', duration: 'week', durationName: '周卡', price: 6.99 },
+    { id: 'gold_month', level: 'gold', levelName: '黃金大師', levelIcon: '🥇', duration: 'month', durationName: '月卡', price: 19.9 },
+    { id: 'gold_quarter', level: 'gold', levelName: '黃金大師', levelIcon: '🥇', duration: 'quarter', durationName: '季卡', price: 49.9 },
+    { id: 'gold_year', level: 'gold', levelName: '黃金大師', levelIcon: '🥇', duration: 'year', durationName: '年卡', price: 199 },
     
-    // 鑽石王牌 - 企業級
-    { id: 'diamond_month', level: 'diamond', levelName: '鑽石王牌', levelIcon: '💎', duration: 'month', durationName: '月卡', price: 99.9 },
-    { id: 'diamond_quarter', level: 'diamond', levelName: '鑽石王牌', levelIcon: '💎', duration: 'quarter', durationName: '季卡', price: 249 },
-    { id: 'diamond_year', level: 'diamond', levelName: '鑽石王牌', levelIcon: '💎', duration: 'year', durationName: '年卡', price: 899 },
+    // 鑽石王牌 - 專業級
+    { id: 'diamond_week', level: 'diamond', levelName: '鑽石王牌', levelIcon: '💎', duration: 'week', durationName: '周卡', price: 19.9 },
+    { id: 'diamond_month', level: 'diamond', levelName: '鑽石王牌', levelIcon: '💎', duration: 'month', durationName: '月卡', price: 59.9 },
+    { id: 'diamond_quarter', level: 'diamond', levelName: '鑽石王牌', levelIcon: '💎', duration: 'quarter', durationName: '季卡', price: 149 },
+    { id: 'diamond_year', level: 'diamond', levelName: '鑽石王牌', levelIcon: '💎', duration: 'year', durationName: '年卡', price: 599 },
     
     // 星耀傳說 - 團隊級
-    { id: 'star_month', level: 'star', levelName: '星耀傳說', levelIcon: '🌟', duration: 'month', durationName: '月卡', price: 299 },
-    { id: 'star_quarter', level: 'star', levelName: '星耀傳說', levelIcon: '🌟', duration: 'quarter', durationName: '季卡', price: 749 },
-    { id: 'star_year', level: 'star', levelName: '星耀傳說', levelIcon: '🌟', duration: 'year', durationName: '年卡', price: 2499 },
+    { id: 'star_week', level: 'star', levelName: '星耀傳說', levelIcon: '🌟', duration: 'week', durationName: '周卡', price: 59.9 },
+    { id: 'star_month', level: 'star', levelName: '星耀傳說', levelIcon: '🌟', duration: 'month', durationName: '月卡', price: 199 },
+    { id: 'star_quarter', level: 'star', levelName: '星耀傳說', levelIcon: '🌟', duration: 'quarter', durationName: '季卡', price: 499 },
+    { id: 'star_year', level: 'star', levelName: '星耀傳說', levelIcon: '🌟', duration: 'year', durationName: '年卡', price: 1999 },
     
-    // 榮耀王者 - 無限尊享
-    { id: 'king_month', level: 'king', levelName: '榮耀王者', levelIcon: '👑', duration: 'month', durationName: '月卡', price: 999 },
-    { id: 'king_year', level: 'king', levelName: '榮耀王者', levelIcon: '👑', duration: 'year', durationName: '年卡', price: 7999 },
-    { id: 'king_lifetime', level: 'king', levelName: '榮耀王者', levelIcon: '👑', duration: 'lifetime', durationName: '終身', price: 19999 },
+    // 榮耀王者 - 企業級（無限尊享）
+    { id: 'king_week', level: 'king', levelName: '榮耀王者', levelIcon: '👑', duration: 'week', durationName: '周卡', price: 199 },
+    { id: 'king_month', level: 'king', levelName: '榮耀王者', levelIcon: '👑', duration: 'month', durationName: '月卡', price: 599 },
+    { id: 'king_quarter', level: 'king', levelName: '榮耀王者', levelIcon: '👑', duration: 'quarter', durationName: '季卡', price: 1499 },
+    { id: 'king_year', level: 'king', levelName: '榮耀王者', levelIcon: '👑', duration: 'year', durationName: '年卡', price: 5999 },
+    { id: 'king_lifetime', level: 'king', levelName: '榮耀王者', levelIcon: '👑', duration: 'lifetime', durationName: '終身', price: 14999 },
   ];
   
   constructor() {

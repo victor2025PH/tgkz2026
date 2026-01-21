@@ -135,15 +135,23 @@ class ResourceDiscoverySystem:
     
     # ==================== 資源管理 ====================
     
-    async def add_resource(self, resource: DiscoveredResource) -> int:
-        """添加新資源"""
+    async def add_resource(self, resource: DiscoveredResource, 
+                          search_session_id: str = "", search_keyword: str = "") -> int:
+        """添加新資源
+        
+        Args:
+            resource: 資源對象
+            search_session_id: 搜索會話 ID（用於區分不同搜索）
+            search_keyword: 搜索關鍵詞
+        """
         await self.initialize()
         
         # 檢查是否已存在
         existing = await self.get_resource_by_telegram_id(resource.telegram_id)
         if existing:
-            # 更新現有資源
-            return await self.update_resource(existing['id'], resource)
+            # 更新現有資源（同時更新 session_id）
+            return await self.update_resource(existing['id'], resource, 
+                search_session_id=search_session_id, search_keyword=search_keyword)
         
         # 計算評分
         resource.overall_score = self._calculate_overall_score(resource)
@@ -154,8 +162,9 @@ class ResourceDiscoverySystem:
                 member_count, activity_score, relevance_score, overall_score,
                 discovery_source, discovery_keyword, discovered_by_phone,
                 status, is_public, has_discussion, discussion_id, invite_link,
-                tags, notes, metadata, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                tags, notes, metadata, created_at, updated_at,
+                search_session_id, search_keyword
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         
         now = datetime.now().isoformat()
@@ -181,7 +190,9 @@ class ResourceDiscoverySystem:
             resource.notes,
             json.dumps(resource.metadata),
             now,
-            now
+            now,
+            search_session_id,  # 🆕 搜索會話 ID
+            search_keyword  # 🆕 搜索關鍵詞
         )
         
         resource_id = await db.execute(query, params)
@@ -189,37 +200,78 @@ class ResourceDiscoverySystem:
         self.log(f"➕ 新增資源: {resource.title} ({resource.telegram_id})")
         return resource_id
     
-    async def update_resource(self, resource_id: int, resource: DiscoveredResource) -> int:
-        """更新資源"""
+    async def update_resource(self, resource_id: int, resource: DiscoveredResource,
+                             search_session_id: str = "", search_keyword: str = "") -> int:
+        """更新資源
+        
+        Args:
+            resource_id: 資源 ID
+            resource: 資源對象
+            search_session_id: 搜索會話 ID（可選，更新時設置）
+            search_keyword: 搜索關鍵詞（可選）
+        """
         resource.overall_score = self._calculate_overall_score(resource)
         
-        query = """
-            UPDATE discovered_resources SET
-                resource_type = ?, username = ?, title = ?, description = ?,
-                member_count = ?, activity_score = ?, relevance_score = ?, overall_score = ?,
-                is_public = ?, has_discussion = ?, discussion_id = ?,
-                tags = ?, notes = ?, metadata = ?, updated_at = ?
-            WHERE id = ?
-        """
-        
-        params = (
-            resource.resource_type,
-            resource.username,
-            resource.title,
-            resource.description,
-            resource.member_count,
-            resource.activity_score,
-            resource.relevance_score,
-            resource.overall_score,
-            1 if resource.is_public else 0,
-            1 if resource.has_discussion else 0,
-            resource.discussion_id,
-            json.dumps(resource.tags),
-            resource.notes,
-            json.dumps(resource.metadata),
-            datetime.now().isoformat(),
-            resource_id
-        )
+        # 如果提供了 session_id，也更新它
+        if search_session_id:
+            query = """
+                UPDATE discovered_resources SET
+                    resource_type = ?, username = ?, title = ?, description = ?,
+                    member_count = ?, activity_score = ?, relevance_score = ?, overall_score = ?,
+                    is_public = ?, has_discussion = ?, discussion_id = ?,
+                    tags = ?, notes = ?, metadata = ?, updated_at = ?,
+                    search_session_id = ?, search_keyword = ?
+                WHERE id = ?
+            """
+            
+            params = (
+                resource.resource_type,
+                resource.username,
+                resource.title,
+                resource.description,
+                resource.member_count,
+                resource.activity_score,
+                resource.relevance_score,
+                resource.overall_score,
+                1 if resource.is_public else 0,
+                1 if resource.has_discussion else 0,
+                resource.discussion_id,
+                json.dumps(resource.tags),
+                resource.notes,
+                json.dumps(resource.metadata),
+                datetime.now().isoformat(),
+                search_session_id,
+                search_keyword,
+                resource_id
+            )
+        else:
+            query = """
+                UPDATE discovered_resources SET
+                    resource_type = ?, username = ?, title = ?, description = ?,
+                    member_count = ?, activity_score = ?, relevance_score = ?, overall_score = ?,
+                    is_public = ?, has_discussion = ?, discussion_id = ?,
+                    tags = ?, notes = ?, metadata = ?, updated_at = ?
+                WHERE id = ?
+            """
+            
+            params = (
+                resource.resource_type,
+                resource.username,
+                resource.title,
+                resource.description,
+                resource.member_count,
+                resource.activity_score,
+                resource.relevance_score,
+                resource.overall_score,
+                1 if resource.is_public else 0,
+                1 if resource.has_discussion else 0,
+                resource.discussion_id,
+                json.dumps(resource.tags),
+                resource.notes,
+                json.dumps(resource.metadata),
+                datetime.now().isoformat(),
+                resource_id
+            )
         
         await db.execute(query, params)
         self.log(f"📝 更新資源: {resource.title}")
@@ -285,8 +337,19 @@ class ResourceDiscoverySystem:
     
     async def list_resources(self, status: str = None, resource_type: str = None,
                             limit: int = 50, offset: int = 0,
-                            order_by: str = "overall_score DESC") -> List[Dict]:
-        """列出資源（只返回有公開鏈接的資源）"""
+                            order_by: str = "overall_score DESC, updated_at DESC",
+                            search_session_id: str = None, search_keyword: str = None) -> List[Dict]:
+        """列出資源（只返回有公開鏈接的資源）
+        
+        Args:
+            status: 狀態過濾
+            resource_type: 類型過濾
+            limit: 最大返回數
+            offset: 偏移量
+            order_by: 排序方式
+            search_session_id: 🆕 搜索會話 ID 過濾（只返回該會話的結果）
+            search_keyword: 🆕 搜索關鍵詞過濾
+        """
         conditions = []
         params = []
         
@@ -301,6 +364,16 @@ class ResourceDiscoverySystem:
             conditions.append("resource_type = ?")
             params.append(resource_type)
         
+        # 🆕 按搜索會話過濾
+        if search_session_id:
+            conditions.append("search_session_id = ?")
+            params.append(search_session_id)
+        
+        # 🆕 按搜索關鍵詞過濾
+        if search_keyword:
+            conditions.append("search_keyword = ?")
+            params.append(search_keyword)
+        
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         
         query = f"""
@@ -314,8 +387,16 @@ class ResourceDiscoverySystem:
         results = await db.fetch_all(query, tuple(params))
         return [self._row_to_dict(r) for r in results]
     
-    async def count_resources(self, status: str = None, resource_type: str = None) -> int:
-        """統計資源數量（只統計有公開鏈接的資源）"""
+    async def count_resources(self, status: str = None, resource_type: str = None,
+                             search_session_id: str = None, search_keyword: str = None) -> int:
+        """統計資源數量（只統計有公開鏈接的資源）
+        
+        Args:
+            status: 狀態過濾
+            resource_type: 類型過濾
+            search_session_id: 🆕 搜索會話 ID 過濾
+            search_keyword: 🆕 搜索關鍵詞過濾
+        """
         conditions = []
         params = []
         
@@ -329,6 +410,16 @@ class ResourceDiscoverySystem:
         if resource_type:
             conditions.append("resource_type = ?")
             params.append(resource_type)
+        
+        # 🆕 按搜索會話過濾
+        if search_session_id:
+            conditions.append("search_session_id = ?")
+            params.append(search_session_id)
+        
+        # 🆕 按搜索關鍵詞過濾
+        if search_keyword:
+            conditions.append("search_keyword = ?")
+            params.append(search_keyword)
         
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         

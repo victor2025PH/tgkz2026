@@ -2223,9 +2223,9 @@ class TelegramClientManager:
             try:
                 # Try to resolve URL to chat_id
                 if isinstance(group_url, (int, str)) and str(group_url).lstrip('-').isdigit():
-                    # Already a chat ID
+                    # Already a chat ID - 確保存儲為整數類型
                     chat_id = int(group_url)
-                    monitored_chat_ids.add(chat_id)
+                    monitored_chat_ids.add(chat_id)  # 使用整數類型
                     chat_id_to_url_map[chat_id] = str(group_url)
                     print(f"[TelegramClient] URL is numeric chat ID: {chat_id}", file=sys.stderr)
                 else:
@@ -2382,55 +2382,51 @@ class TelegramClientManager:
                 chat_type = str(message.chat.type) if message.chat else "unknown"
                 message_text = message.text or message.caption or "(no text)"
                 
-                # ALWAYS log every received message for debugging
-                print(f"[TelegramClient] ========== MESSAGE RECEIVED ==========", file=sys.stderr)
-                print(f"[TelegramClient] Chat ID: {chat_id}", file=sys.stderr)
-                print(f"[TelegramClient] Chat Title: {chat_title}", file=sys.stderr)
-                print(f"[TelegramClient] Chat Type: {chat_type}", file=sys.stderr)
-                print(f"[TelegramClient] Message: {message_text[:100]}...", file=sys.stderr)
-                print(f"[TelegramClient] Outgoing: {message.outgoing}", file=sys.stderr)
-                print(f"[TelegramClient] From User: {message.from_user.username if message.from_user else 'None'}", file=sys.stderr)
-                print(f"[TelegramClient] =====================================", file=sys.stderr)
+                # 標準化 Chat ID 為整數類型以確保正確比較
+                if chat_id is not None:
+                    chat_id = int(chat_id)
                 
-                # Also send to frontend log
-                if self.event_callback:
-                    self.event_callback("log-entry", {
-                        "message": f"[調試] 收到消息: Chat={chat_id} ({chat_title}), Type={chat_type}, Text={message_text[:50]}...",
-                        "type": "info"
-                    })
+                # 快速檢查是否在監控列表中（在詳細日誌之前）
+                mon_info = self.monitoring_info.get(phone, {})
+                mon_chat_ids = mon_info.get('chat_ids', set())
+                # 確保監控列表中的 ID 也是整數
+                mon_chat_ids_normalized = {int(cid) for cid in mon_chat_ids if cid is not None}
                 
-                # Get monitoring info for this phone
+                is_monitored = chat_id in mon_chat_ids_normalized
+                
+                # 只在調試模式或監控消息時輸出詳細日誌
+                if is_monitored:
+                    print(f"[TelegramClient] ========== MESSAGE RECEIVED ==========", file=sys.stderr)
+                    print(f"[TelegramClient] Chat ID: {chat_id}", file=sys.stderr)
+                    print(f"[TelegramClient] Chat Title: {chat_title}", file=sys.stderr)
+                    print(f"[TelegramClient] Chat Type: {chat_type}", file=sys.stderr)
+                    print(f"[TelegramClient] Message: {message_text[:100]}...", file=sys.stderr)
+                    print(f"[TelegramClient] Outgoing: {message.outgoing}", file=sys.stderr)
+                    print(f"[TelegramClient] From User: {message.from_user.username if message.from_user else 'None'}", file=sys.stderr)
+                    print(f"[TelegramClient] =====================================", file=sys.stderr)
+                
+                # 快速過濾：如果不在監控列表中，靜默返回（不輸出冗長日誌）
+                if not is_monitored:
+                    # 只在首次收到來自新群組的消息時記錄一次
+                    return
+                
+                # 獲取完整的監控信息
                 if phone not in self.monitoring_info:
                     print(f"[TelegramClient] No monitoring info for {phone}", file=sys.stderr)
                     return
                 
-                mon_info = self.monitoring_info[phone]
-                mon_chat_ids = mon_info.get('chat_ids', set())
                 url_map = mon_info.get('chat_id_to_url_map', {})
                 kw_sets = mon_info.get('keyword_sets', [])
                 lead_callback = mon_info.get('on_lead_captured')
                 
-                print(f"[TelegramClient] Configured monitored chat IDs: {mon_chat_ids}", file=sys.stderr)
-                print(f"[TelegramClient] Current chat ID: {chat_id}", file=sys.stderr)
-                print(f"[TelegramClient] Is in monitored list: {chat_id in mon_chat_ids}", file=sys.stderr)
-                
-                # Log if message is from monitored group
-                if chat_id in mon_chat_ids:
-                    group_url = url_map.get(chat_id, f"Chat ID: {chat_id}")
-                    if self.event_callback:
-                        self.event_callback("log-entry", {
-                            "message": f"[監控] ✓ 收到監控群組消息: {chat_title} ({group_url})",
-                            "type": "success"
-                        })
-                    print(f"[TelegramClient] ✓✓✓ Message IS from monitored group: {chat_id}", file=sys.stderr)
-                else:
-                    if self.event_callback:
-                        self.event_callback("log-entry", {
-                            "message": f"[監控] ✗ 消息來自未監控群組: {chat_title} (ID: {chat_id})，配置的群組: {list(mon_chat_ids)}",
-                            "type": "warning"
-                        })
-                    print(f"[TelegramClient] ✗✗✗ Message NOT from monitored group. Monitored: {mon_chat_ids}, Got: {chat_id}", file=sys.stderr)
-                    return
+                # 記錄監控群組的消息
+                group_url = url_map.get(chat_id, f"Chat ID: {chat_id}")
+                if self.event_callback:
+                    self.event_callback("log-entry", {
+                        "message": f"[監控] ✓ 收到監控群組消息: {chat_title} ({group_url})",
+                        "type": "success"
+                    })
+                print(f"[TelegramClient] ✓✓✓ Message IS from monitored group: {chat_id}", file=sys.stderr)
                 
                 # Skip messages sent by ourselves (outgoing messages)
                 if message.outgoing:

@@ -445,6 +445,8 @@ export class ResourceCenterComponent implements OnInit, OnDestroy {
   viewDetailEvent = output<UnifiedContact>();
   batchSendEvent = output<UnifiedContact[]>();
   sendToAISalesEvent = output<UnifiedContact[]>();
+  // 🆕 狀態同步事件 - 通知父組件同步到發送控制台
+  statusChangedEvent = output<{ contacts: UnifiedContact[]; status: string }>();
   
   // Tab 配置
   tabs = [
@@ -480,10 +482,17 @@ export class ResourceCenterComponent implements OnInit, OnDestroy {
   selectedBatchTags = signal<Set<string>>(new Set());
   
   ngOnInit() {
-    // 初始載入 - 只載入數據，不自動同步
-    // 用戶需要手動點擊「同步數據」按鈕
+    // 初始載入
     this.contactsService.loadContacts();
     this.contactsService.loadStats();
+    
+    // 🆕 如果數據為空，自動觸發同步
+    setTimeout(() => {
+      if (this.contactsService.stats().total === 0 && !this.contactsService.isSyncing()) {
+        console.log('[ResourceCenter] No data found, auto-syncing...');
+        this.syncData();
+      }
+    }, 1500);
   }
   
   ngOnDestroy() {
@@ -652,9 +661,17 @@ export class ResourceCenterComponent implements OnInit, OnDestroy {
   
   // 批量狀態
   applyBatchStatus(status: ContactStatus) {
+    // 獲取選中的聯繫人以便同步
+    const selectedContacts = this.contactsService.selectedContacts();
+    
     this.contactsService.updateSelectedStatus(status);
     this.showBatchStatusDialog.set(false);
     this.toast.success('狀態已更新', 2000);
+    
+    // 🆕 發射事件通知父組件同步到發送控制台
+    if (selectedContacts.length > 0) {
+      this.statusChangedEvent.emit({ contacts: selectedContacts, status });
+    }
   }
   
   // 刪除確認

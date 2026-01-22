@@ -60,6 +60,15 @@
   (closeDialog)="closeBatchInviteDialog()"
   (inviteComplete)="handleBatchInviteComplete($event)">
 </app-batch-invite-dialog>
+
+<!-- 成員提取配置對話框 -->
+<app-member-extraction-dialog
+  [isOpen]="showMemberExtractionDialog()"
+  [group]="memberExtractionGroup()"
+  (closeDialog)="closeMemberExtractionDialog()"
+  (startExtractionEvent)="handleMemberExtractionStart($event)">
+</app-member-extraction-dialog>
+
 <app-membership-dialog></app-membership-dialog>
 <app-payment></app-payment>
 <app-upgrade-prompt></app-upgrade-prompt>
@@ -84,8 +93,10 @@
   <!-- 主應用界面（已認證） -->
   <div class="flex h-screen" style="background-color: var(--bg-primary); color: var(--text-primary);">
     
-    <!-- Onboarding -->
-    <app-onboarding></app-onboarding>
+    <!-- Onboarding 新手引导 -->
+    <app-onboarding #onboardingRef
+                    (navigateEvent)="handleOnboardingNavigate($event)">
+    </app-onboarding>
     
     <!-- Progress Dialog -->
     <app-progress-dialog
@@ -387,6 +398,7 @@
         
         <!-- 帳號管理 -->
         <a (click)="changeView('accounts')" 
+           data-tour="accounts"
            class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1"
            [class.active]="view === 'accounts' || view === 'add-account' || view === 'api-credentials'"
            [style.background-color]="(view === 'accounts' || view === 'add-account' || view === 'api-credentials') ? 'var(--sidebar-item-active)' : 'transparent'"
@@ -395,7 +407,19 @@
            <span>{{ t('accounts') }}</span>
         </a>
         
-        <!-- 📦 資源中心 (融合版：搜索發現 + 資源管理 + 統計) -->
+        <!-- 🔍 搜索發現 (獨立頁面) -->
+        <a (click)="changeView('search-discovery')" 
+           data-tour="search-discovery"
+           class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1 relative"
+           [class.active]="view === 'search-discovery'"
+           [style.background-color]="view === 'search-discovery' ? 'rgba(6, 182, 212, 0.2)' : 'transparent'"
+           [style.color]="view === 'search-discovery' ? '#22d3ee' : 'var(--sidebar-text)'">
+           <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+           <span>搜索發現</span>
+           <span class="absolute right-2 px-1.5 py-0.5 text-[10px] bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-full font-bold">NEW</span>
+        </a>
+        
+        <!-- 📦 資源中心 (我的資源 + 統計) -->
         <a (click)="changeView('resource-center')" 
            class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1 relative"
            [class.active]="view === 'resource-center' || view === 'resources'"
@@ -403,7 +427,6 @@
            [style.color]="(view === 'resource-center' || view === 'resources') ? '#22d3ee' : 'var(--sidebar-text)'">
            <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
            <span>資源中心</span>
-           <span class="absolute right-2 px-1.5 py-0.5 text-[10px] bg-cyan-500/30 text-cyan-400 rounded-full font-bold">融合</span>
         </a>
         
         <!-- 📤 發送控制台 -->
@@ -504,6 +527,7 @@
         
         <!-- 1️⃣ AI 營銷助手 (第一步：策劃) - 鑽石功能 -->
         <a (click)="changeView('ai-assistant')" 
+           data-tour="ai-assistant"
            class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 cursor-pointer mb-1.5 relative group"
            [class.active]="view === 'ai-assistant'"
            [class.opacity-50]="!membershipService.hasFeature('strategyPlanning')"
@@ -677,6 +701,13 @@
     
     <!-- 側邊欄底部 -->
     <div class="mt-auto p-4 space-y-4">
+        <!-- 🆕 帮助按钮 - 打开新手引导 -->
+        <button (click)="openOnboarding()"
+                class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 border border-cyan-500/30 hover:border-cyan-500/50 text-cyan-400 rounded-xl transition-all text-sm font-medium group">
+          <span class="text-lg group-hover:animate-bounce">❓</span>
+          <span>使用帮助</span>
+        </button>
+        
         <div>
           <label class="block text-sm font-medium mb-2" style="color: var(--sidebar-group-title);">{{ t('language') }}</label>
           <app-language-switcher-compact></app-language-switcher-compact>
@@ -2748,24 +2779,38 @@
                 <!-- 可選擇的關鍵詞集列表 -->
                 <div class="space-y-2 max-h-48 overflow-y-auto mb-3 bg-slate-700/30 rounded-lg p-2">
                   @for (set of keywordSets(); track set.id) {
-                    <label class="flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-all"
+                    <label class="flex items-center justify-between p-2.5 rounded-lg transition-all"
+                           [class.cursor-pointer]="set.keywords?.length > 0"
+                           [class.cursor-not-allowed]="!set.keywords?.length"
+                           [class.opacity-50]="!set.keywords?.length"
                            [class.bg-cyan-500/20]="isKeywordSetSelected(set.id)"
                            [class.border]="isKeywordSetSelected(set.id)"
                            [class.border-cyan-500/50]="isKeywordSetSelected(set.id)"
                            [class.bg-slate-700/50]="!isKeywordSetSelected(set.id)"
-                           [class.hover:bg-slate-700]="!isKeywordSetSelected(set.id)"
+                           [class.hover:bg-slate-700]="!isKeywordSetSelected(set.id) && set.keywords?.length > 0"
                            (click)="toggleKeywordSetSelection(set.id); $event.preventDefault()">
                       <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold bg-orange-500/20 text-orange-400">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold"
+                             [class.bg-orange-500/20]="set.keywords?.length > 0"
+                             [class.text-orange-400]="set.keywords?.length > 0"
+                             [class.bg-red-500/20]="!set.keywords?.length"
+                             [class.text-red-400]="!set.keywords?.length">
                           {{ set.name.substring(0, 2) }}
                         </div>
                         <div>
-                          <div class="text-sm font-medium text-white">{{ set.name }}</div>
+                          <div class="text-sm font-medium" [class.text-white]="set.keywords?.length > 0" [class.text-slate-400]="!set.keywords?.length">
+                            {{ set.name }}
+                            @if (!set.keywords?.length) {
+                              <span class="text-xs text-red-400 ml-1">（空）</span>
+                            }
+                          </div>
                           <div class="text-xs text-slate-400">
                             {{ set.keywords?.length || 0 }} 個關鍵詞
                             @if (set.keywords && set.keywords.length > 0) {
                               <span class="text-slate-500 ml-1">·</span>
                               <span class="text-slate-500">{{ getKeywordPreview(set.keywords) }}</span>
+                            } @else {
+                              <span class="text-red-400/70 ml-1">· 請先添加關鍵詞</span>
                             }
                           </div>
                         </div>
@@ -3292,12 +3337,198 @@
                   </div>
                 </div>
                 
+                <!-- 🆕 增強的提取類型選擇面板 -->
                 <div class="bg-slate-700/30 rounded-xl p-4 mb-4 border border-slate-600">
-                  <h4 class="text-sm font-medium text-white mb-3 flex items-center gap-2">
-                    <span>⚙️</span> 提取設置
-                  </h4>
-
-                  <div class="grid grid-cols-2 gap-4 mb-4">
+                  <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-sm font-medium text-white flex items-center gap-2">
+                      <span>📋</span> 選擇提取類型
+                    </h4>
+                    @if (getActiveFilterCount() > 0) {
+                      <button (click)="clearAllFilters()" class="text-xs text-slate-400 hover:text-white">
+                        清除篩選 ({{ getActiveFilterCount() }})
+                      </button>
+                    }
+                  </div>
+                  
+                  <!-- ⚡ 快捷預設 -->
+                  <div class="mb-4">
+                    <label class="block text-xs text-slate-400 mb-2">⚡ 快捷選擇</label>
+                    <div class="flex flex-wrap gap-2">
+                      @for (preset of extractPresets; track preset.id) {
+                        <button (click)="applyExtractPreset(preset.id)"
+                                class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                                [class]="selectedPreset() === preset.id 
+                                  ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/30' 
+                                  : 'bg-slate-600/50 text-slate-300 hover:bg-slate-600'">
+                          {{ preset.name }}
+                        </button>
+                      }
+                    </div>
+                  </div>
+                  
+                  <!-- 詳細篩選選項 - 可展開 -->
+                  <div class="space-y-3">
+                    <!-- 👥 用戶類型 -->
+                    <div class="bg-slate-700/50 rounded-lg p-3">
+                      <label class="block text-xs text-slate-400 mb-2">👥 用戶類型</label>
+                      <div class="flex flex-wrap gap-2">
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().userTypes.chinese 
+                                 ? 'bg-red-500/30 text-red-300 border border-red-500/50' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().userTypes.chinese" 
+                                 (change)="toggleUserType('chinese')" class="hidden">
+                          <span class="text-sm">🇨🇳 華人用戶</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().userTypes.overseas 
+                                 ? 'bg-blue-500/30 text-blue-300 border border-blue-500/50' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().userTypes.overseas" 
+                                 (change)="toggleUserType('overseas')" class="hidden">
+                          <span class="text-sm">🌍 海外用戶</span>
+                        </label>
+                      </div>
+                    </div>
+                    
+                    <!-- 🕐 活躍度 -->
+                    <div class="bg-slate-700/50 rounded-lg p-3">
+                      <label class="block text-xs text-slate-400 mb-2">🕐 活躍度（可多選）</label>
+                      <div class="flex flex-wrap gap-2">
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().activityFilters.onlineNow 
+                                 ? 'bg-green-500/30 text-green-300 border border-green-500/50' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().activityFilters.onlineNow" 
+                                 (change)="toggleActivityFilter('onlineNow')" class="hidden">
+                          <span class="text-sm">🟢 現在在線</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().activityFilters.within3Days 
+                                 ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-500/50' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().activityFilters.within3Days" 
+                                 (change)="toggleActivityFilter('within3Days')" class="hidden">
+                          <span class="text-sm">🔵 3天內上線</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().activityFilters.within7Days 
+                                 ? 'bg-yellow-500/30 text-yellow-300 border border-yellow-500/50' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().activityFilters.within7Days" 
+                                 (change)="toggleActivityFilter('within7Days')" class="hidden">
+                          <span class="text-sm">🟡 7天內上線</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().activityFilters.within30Days 
+                                 ? 'bg-orange-500/30 text-orange-300 border border-orange-500/50' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().activityFilters.within30Days" 
+                                 (change)="toggleActivityFilter('within30Days')" class="hidden">
+                          <span class="text-sm">🟠 30天內上線</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().activityFilters.longOffline 
+                                 ? 'bg-slate-500/30 text-slate-300 border border-slate-500/50' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().activityFilters.longOffline" 
+                                 (change)="toggleActivityFilter('longOffline')" class="hidden">
+                          <span class="text-sm">⚪ 長期離線</span>
+                        </label>
+                      </div>
+                    </div>
+                    
+                    <!-- 💎 帳號特徵 -->
+                    <div class="bg-slate-700/50 rounded-lg p-3">
+                      <label class="block text-xs text-slate-400 mb-2">💎 帳號特徵（可多選）</label>
+                      <div class="flex flex-wrap gap-2">
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().accountFeatures.premium 
+                                 ? 'bg-yellow-500/30 text-yellow-300 border border-yellow-500/50' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().accountFeatures.premium" 
+                                 (change)="toggleAccountFeature('premium')" class="hidden">
+                          <span class="text-sm">💎 Premium</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().accountFeatures.hasUsername 
+                                 ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-500/50' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().accountFeatures.hasUsername" 
+                                 (change)="toggleAccountFeature('hasUsername')" class="hidden">
+                          <span class="text-sm">📛 有用戶名</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().accountFeatures.hasPhoto 
+                                 ? 'bg-green-500/30 text-green-300 border border-green-500/50' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().accountFeatures.hasPhoto" 
+                                 (change)="toggleAccountFeature('hasPhoto')" class="hidden">
+                          <span class="text-sm">📷 有頭像</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().accountFeatures.activeAccount 
+                                 ? 'bg-orange-500/30 text-orange-300 border border-orange-500/50' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().accountFeatures.activeAccount" 
+                                 (change)="toggleAccountFeature('activeAccount')" class="hidden">
+                          <span class="text-sm">🔥 活躍號</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().accountFeatures.newAccount 
+                                 ? 'bg-purple-500/30 text-purple-300 border border-purple-500/50' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().accountFeatures.newAccount" 
+                                 (change)="toggleAccountFeature('newAccount')" class="hidden">
+                          <span class="text-sm">🆕 新號</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().accountFeatures.verified 
+                                 ? 'bg-blue-500/30 text-blue-300 border border-blue-500/50' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().accountFeatures.verified" 
+                                 (change)="toggleAccountFeature('verified')" class="hidden">
+                          <span class="text-sm">✅ 已認證</span>
+                        </label>
+                      </div>
+                    </div>
+                    
+                    <!-- 🚫 排除項 -->
+                    <div class="bg-slate-700/50 rounded-lg p-3">
+                      <label class="block text-xs text-slate-400 mb-2">🚫 排除項</label>
+                      <div class="flex flex-wrap gap-2">
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().excludeFilters.bots 
+                                 ? 'bg-red-500/20 text-red-300 border border-red-500/30' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().excludeFilters.bots" 
+                                 (change)="toggleExcludeFilter('bots')" class="hidden">
+                          <span class="text-sm">🤖 排除 Bot</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().excludeFilters.scam 
+                                 ? 'bg-red-500/20 text-red-300 border border-red-500/30' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().excludeFilters.scam" 
+                                 (change)="toggleExcludeFilter('scam')" class="hidden">
+                          <span class="text-sm">⚠️ 排除詐騙</span>
+                        </label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                               [class]="memberExtractConfig().excludeFilters.deleted 
+                                 ? 'bg-red-500/20 text-red-300 border border-red-500/30' 
+                                 : 'bg-slate-600/30 text-slate-400 border border-transparent hover:bg-slate-600/50'">
+                          <input type="checkbox" [checked]="memberExtractConfig().excludeFilters.deleted" 
+                                 (change)="toggleExcludeFilter('deleted')" class="hidden">
+                          <span class="text-sm">🗑️ 排除已刪除</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- 提取數量和運行模式 -->
+                <div class="bg-slate-700/30 rounded-xl p-4 mb-4 border border-slate-600">
+                  <div class="grid grid-cols-2 gap-4">
                     <!-- 提取數量 -->
                     <div>
                       <label class="block text-xs text-slate-400 mb-2">📊 提取數量</label>
@@ -3305,72 +3536,43 @@
                         <label class="flex items-center gap-2 cursor-pointer">
                           <input type="radio" name="extractLimit" [checked]="memberExtractConfig().limit === 100" 
                                  (change)="setMemberExtractLimit(100)" class="text-cyan-500">
-                          <span class="text-sm text-slate-300">快速提取 (100人)</span>
+                          <span class="text-sm text-slate-300">快速 (100人)</span>
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer">
                           <input type="radio" name="extractLimit" [checked]="memberExtractConfig().limit === 500" 
                                  (change)="setMemberExtractLimit(500)" class="text-cyan-500">
-                          <span class="text-sm text-slate-300">標準提取 (500人)</span>
+                          <span class="text-sm text-slate-300">標準 (500人)</span>
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer">
                           <input type="radio" name="extractLimit" [checked]="memberExtractConfig().limit === 0" 
                                  (change)="setMemberExtractLimit(0)" class="text-cyan-500">
-                          <span class="text-sm text-slate-300">完整提取 (全部)</span>
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                          <input type="radio" name="extractLimit" [checked]="memberExtractConfig().limit === -1" 
-                                 (change)="setMemberExtractLimit(-1)" class="text-cyan-500">
-                          <span class="text-sm text-slate-300">自定義:</span>
-                          <input type="number" [(ngModel)]="memberExtractConfig().customLimit" min="1" max="10000"
-                                 class="w-20 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm">
+                          <span class="text-sm text-slate-300">全部</span>
                         </label>
                       </div>
                     </div>
                     
-                    <!-- 智能篩選 -->
+                    <!-- 運行模式 -->
                     <div>
-                      <label class="block text-xs text-slate-400 mb-2">🔍 智能篩選</label>
-                      <div class="space-y-2">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" [(ngModel)]="memberExtractConfig().onlineOnly" class="rounded text-cyan-500">
-                          <span class="text-sm text-slate-300">🟢 只提取在線/最近上線</span>
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" [(ngModel)]="memberExtractConfig().chineseOnly" class="rounded text-cyan-500">
-                          <span class="text-sm text-slate-300">🇨🇳 只提取華人用戶</span>
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" [(ngModel)]="memberExtractConfig().premiumOnly" class="rounded text-cyan-500">
-                          <span class="text-sm text-slate-300">⭐ 只提取 Premium 用戶</span>
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" [(ngModel)]="memberExtractConfig().hasUsername" class="rounded text-cyan-500">
-                          <span class="text-sm text-slate-300">📛 只提取有用戶名的</span>
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" [(ngModel)]="memberExtractConfig().excludeBots" class="rounded text-cyan-500">
-                          <span class="text-sm text-slate-300">🤖 排除 Bot</span>
-                        </label>
-                      </div>
+                      <label class="block text-xs text-slate-400 mb-2">⚙️ 運行模式</label>
+                      <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" [(ngModel)]="memberExtractConfig().backgroundMode" class="rounded text-cyan-500">
+                        <span class="text-sm text-slate-300">📤 後台運行</span>
+                      </label>
+                      <p class="text-xs text-slate-500 mt-1">可關閉彈窗，完成後通知</p>
                     </div>
                   </div>
-                  
-                  <!-- 運行模式 -->
-                  <div class="pt-3 border-t border-slate-600">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" [(ngModel)]="memberExtractConfig().backgroundMode" class="rounded text-cyan-500">
-                      <span class="text-sm text-slate-300">📤 後台運行（可關閉彈窗，完成後通知）</span>
-                    </label>
-                  </div>
-                  
-                  <!-- 開始提取按鈕 -->
-                  <div class="mt-4">
-                    <button (click)="startMemberExtraction()"
-                            class="w-full px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-xl font-medium flex items-center justify-center gap-2">
-                      <span>🚀</span>
-                      <span>開始提取成員</span>
-                    </button>
-                  </div>
+                </div>
+                
+                <!-- 開始提取按鈕 -->
+                <div>
+                  <button (click)="startMemberExtraction()"
+                          class="w-full px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20">
+                    <span>🚀</span>
+                    <span>開始提取成員</span>
+                    @if (getActiveFilterCount() > 0) {
+                      <span class="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">{{ getActiveFilterCount() }} 項篩選</span>
+                    }
+                  </button>
                 </div>
               } @else {
                 <!-- 進度條區域 -->
@@ -3526,12 +3728,10 @@
                         <th class="p-2 w-10">
                           <input type="checkbox" [checked]="isAllMembersSelected()" (change)="toggleSelectAllMembersList()" class="form-checkbox rounded text-blue-500">
                         </th>
-                        <th class="p-2">ID</th>
+                        <th class="p-2">評級</th>
                         <th class="p-2">用戶</th>
                         <th class="p-2">用戶名</th>
-                        <th class="p-2">電話</th>
                         <th class="p-2">狀態</th>
-                        <th class="p-2">信息</th>
                         <th class="p-2">標籤</th>
                         <th class="p-2">操作</th>
                       </tr>
@@ -3539,34 +3739,50 @@
                     <tbody>
                       @for (member of getFilteredMembers(); track member.user_id) {
                         <tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
+                          <!-- 複選框 -->
                           <td class="p-2">
                             <input type="checkbox" [checked]="selectedMemberIds().includes(member.user_id)"
                                    (change)="toggleMemberIdSelection(member.user_id)" class="form-checkbox rounded text-blue-500">
                           </td>
+                          <!-- 🆕 質量評級 -->
                           <td class="p-2">
-                            <span class="text-slate-400 text-xs font-mono">{{ member.user_id }}</span>
+                            @switch (calculateMemberValueLevel(member)) {
+                              @case ('S') {
+                                <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/30" title="S級 - 高價值活躍用戶">S</span>
+                              }
+                              @case ('A') {
+                                <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-500/30" title="A級 - 優質用戶">A</span>
+                              }
+                              @case ('B') {
+                                <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 text-white text-xs font-bold" title="B級 - 普通活躍用戶">B</span>
+                              }
+                              @case ('C') {
+                                <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-yellow-500/30 text-yellow-400 text-xs font-bold" title="C級 - 低活躍用戶">C</span>
+                              }
+                              @default {
+                                <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-600/50 text-slate-400 text-xs font-bold" title="D級 - 不活躍/風險用戶">D</span>
+                              }
+                            }
                           </td>
+                          <!-- 用戶信息 -->
                           <td class="p-2">
                             <div class="flex items-center gap-2">
-                              <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
+                              <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0"
                                    [class]="member.has_photo ? 'bg-gradient-to-br from-blue-500 to-purple-500' : 'bg-slate-600'">
                                 {{ (member.first_name || '?').charAt(0) }}
                               </div>
-                              <div>
+                              <div class="min-w-0">
                                 <div class="text-white text-sm flex items-center gap-1">
-                                  {{ member.first_name }} {{ member.last_name }}
+                                  <span class="truncate max-w-[120px]">{{ member.first_name }} {{ member.last_name }}</span>
                                   @if (isChineseMember(member)) {
-                                    <span class="text-xs">🇨🇳</span>
+                                    <span class="text-xs flex-shrink-0">🇨🇳</span>
                                   }
                                 </div>
-                                @if (member.bio) {
-                                  <div class="text-xs text-slate-500 truncate max-w-[150px]" [title]="member.bio">
-                                    📝 {{ member.bio }}
-                                  </div>
-                                }
+                                <div class="text-xs text-slate-500 font-mono">ID: {{ member.user_id }}</div>
                               </div>
                             </div>
                           </td>
+                          <!-- 用戶名 -->
                           <td class="p-2">
                             @if (member.username) {
                               <span class="text-cyan-400 text-sm">&#64;{{ member.username }}</span>
@@ -3574,13 +3790,7 @@
                               <span class="text-slate-500 text-sm">-</span>
                             }
                           </td>
-                          <td class="p-2">
-                            @if (member.phone) {
-                              <span class="text-green-400 text-xs font-mono">{{ member.phone }}</span>
-                            } @else {
-                              <span class="text-slate-500 text-xs">-</span>
-                            }
-                          </td>
+                          <!-- 狀態 -->
                           <td class="p-2">
                             <span class="px-2 py-0.5 rounded text-xs"
                                   [class]="member.online_status === 'online' ? 'bg-green-500/20 text-green-400' : 
@@ -3590,26 +3800,11 @@
                                  member.online_status === 'recently' ? '🟡 最近' : '⚪ 離線' }}
                             </span>
                           </td>
-                          <td class="p-2">
-                            <div class="flex flex-col gap-0.5 text-xs">
-                              @if (member.language_code) {
-                                <span class="text-slate-400">🌐 {{ member.language_code }}</span>
-                              }
-                              @if (member.dc_id) {
-                                <span class="text-slate-400">DC{{ member.dc_id }}</span>
-                              }
-                              @if (member.chat_member_status && member.chat_member_status !== 'member') {
-                                <span class="text-orange-400">{{ member.chat_member_status }}</span>
-                              }
-                            </div>
-                          </td>
+                          <!-- 標籤 -->
                           <td class="p-2">
                             <div class="flex items-center gap-1 flex-wrap">
-                              @if (isChineseMember(member)) {
-                                <span class="px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded text-xs" title="華人">🇨🇳</span>
-                              }
                               @if (member.is_premium) {
-                                <span class="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs" title="Premium">⭐</span>
+                                <span class="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs" title="Premium">💎</span>
                               }
                               @if (member.is_verified) {
                                 <span class="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs" title="已認證">✓</span>
@@ -3620,14 +3815,12 @@
                               @if (member.is_scam) {
                                 <span class="px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded text-xs" title="詐騙">⚠️</span>
                               }
-                              @if (member.is_deleted) {
-                                <span class="px-1.5 py-0.5 bg-slate-500/20 text-slate-400 rounded text-xs" title="已刪除">🗑️</span>
-                              }
                               @if (member.has_photo) {
                                 <span class="px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded text-xs" title="有頭像">📷</span>
                               }
                             </div>
                           </td>
+                          <!-- 操作 -->
                           <td class="p-2">
                             <div class="flex items-center gap-1">
                               @if (member.username) {
@@ -3637,6 +3830,11 @@
                                   💬
                                 </button>
                               }
+                              <button (click)="addMemberToFunnel(member)"
+                                      class="px-2 py-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded text-xs"
+                                      title="加入漏斗">
+                                🎯
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -3646,23 +3844,199 @@
                 }
               </div>
               
-              <!-- 批量操作欄 -->
+              <!-- 🆕 增強的批量操作欄 -->
               @if (selectedMemberIds().length > 0) {
-                <div class="mt-4 p-3 bg-purple-500/10 border border-purple-500/30 rounded-xl flex items-center justify-between">
-                  <span class="text-sm text-purple-400">已選擇 {{ selectedMemberIds().length }} 個成員</span>
-                  <div class="flex items-center gap-2">
+                <div class="mt-4 p-4 bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/30 rounded-xl">
+                  <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm text-white font-medium">
+                      ✓ 已選擇 <span class="text-cyan-400">{{ selectedMemberIds().length }}</span> 個成員
+                    </span>
+                    <button (click)="clearMemberSelection()" class="text-xs text-slate-400 hover:text-white">
+                      清除選擇
+                    </button>
+                  </div>
+                  <div class="flex items-center gap-2 flex-wrap">
                     <button (click)="batchSendPrivateMessage()"
-                            class="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-lg text-sm">
-                      💬 批量私信
+                            class="px-3 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-lg text-sm flex items-center gap-1.5 transition-all">
+                      <span>💬</span> 批量私信
+                    </button>
+                    <button (click)="batchAddToFunnel()"
+                            class="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm flex items-center gap-1.5 transition-all">
+                      <span>🎯</span> 加入漏斗
                     </button>
                     <button (click)="batchAddFriend()"
-                            class="px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm">
-                      ➕ 批量加好友
+                            class="px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm flex items-center gap-1.5 transition-all">
+                      <span>➕</span> 批量加好友
+                    </button>
+                    <button (click)="exportSelectedMembersToCSV()"
+                            class="px-3 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg text-sm flex items-center gap-1.5 transition-all">
+                      <span>📥</span> 導出選中
+                    </button>
+                  </div>
+                </div>
+              } @else if (memberListData().length > 0 && memberExtractStarted() && !memberListLoading()) {
+                <!-- 🆕 快速操作提示 -->
+                <div class="mt-4 p-3 bg-slate-700/30 border border-slate-600/30 rounded-xl flex items-center justify-between">
+                  <span class="text-xs text-slate-400">💡 選擇成員後可進行批量營銷操作</span>
+                  <div class="flex items-center gap-2">
+                    <button (click)="selectHighValueMembers()"
+                            class="px-2 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded text-xs">
+                      選擇 S/A 級
+                    </button>
+                    <button (click)="selectOnlineMembers()"
+                            class="px-2 py-1 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded text-xs">
+                      選擇在線
+                    </button>
+                    <button (click)="selectAllMembersInList()"
+                            class="px-2 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs">
+                      全選
                     </button>
                   </div>
                 </div>
               }
               } <!-- 關閉非頻道的 @else -->
+            </div>
+          </div>
+        }
+
+        <!-- 🆕 📊 提取結果摘要對話框 -->
+        @if (showExtractionSummaryDialog()) {
+          <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[70]" (click)="closeExtractionSummaryDialog()">
+            <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-2xl w-full max-w-xl mx-4 overflow-hidden border border-emerald-500/30" (click)="$event.stopPropagation()">
+              
+              <!-- 成功標題 -->
+              <div class="bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 p-6 text-center border-b border-emerald-500/30">
+                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 flex items-center justify-center animate-pulse">
+                  <span class="text-3xl">✅</span>
+                </div>
+                <h2 class="text-xl font-bold text-white mb-1">提取完成！</h2>
+                <p class="text-slate-400 text-sm">
+                  {{ extractionSummary().groupName }}
+                </p>
+                @if (extractionSummary().duration > 0) {
+                  <p class="text-slate-500 text-xs mt-1">
+                    ⏱️ 耗時 {{ extractionSummary().duration }} 秒
+                  </p>
+                }
+              </div>
+              
+              <!-- 核心統計 -->
+              <div class="p-6">
+                <!-- 總數統計 -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                  <div class="bg-slate-700/50 rounded-xl p-4 text-center">
+                    <div class="text-3xl font-bold text-white mb-1">{{ extractionSummary().totalExtracted }}</div>
+                    <div class="text-sm text-slate-400">已提取成員</div>
+                  </div>
+                  <div class="bg-slate-700/50 rounded-xl p-4 text-center">
+                    <div class="text-3xl font-bold text-slate-500 mb-1">{{ extractionSummary().totalInGroup | number }}</div>
+                    <div class="text-sm text-slate-400">群組總人數</div>
+                  </div>
+                </div>
+                
+                <!-- 📊 成員質量分布 -->
+                <div class="mb-6">
+                  <h3 class="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+                    <span>📊</span> 成員質量分布
+                  </h3>
+                  <div class="grid grid-cols-5 gap-2 mb-3">
+                    <div class="text-center">
+                      <div class="text-lg font-bold text-emerald-400">{{ extractionSummary().valueLevelDistribution.S }}</div>
+                      <div class="text-xs text-slate-400">S級</div>
+                    </div>
+                    <div class="text-center">
+                      <div class="text-lg font-bold text-cyan-400">{{ extractionSummary().valueLevelDistribution.A }}</div>
+                      <div class="text-xs text-slate-400">A級</div>
+                    </div>
+                    <div class="text-center">
+                      <div class="text-lg font-bold text-blue-400">{{ extractionSummary().valueLevelDistribution.B }}</div>
+                      <div class="text-xs text-slate-400">B級</div>
+                    </div>
+                    <div class="text-center">
+                      <div class="text-lg font-bold text-yellow-400">{{ extractionSummary().valueLevelDistribution.C }}</div>
+                      <div class="text-xs text-slate-400">C級</div>
+                    </div>
+                    <div class="text-center">
+                      <div class="text-lg font-bold text-slate-400">{{ extractionSummary().valueLevelDistribution.D }}</div>
+                      <div class="text-xs text-slate-400">D級</div>
+                    </div>
+                  </div>
+                  <!-- 評級進度條 -->
+                  <div class="flex h-3 rounded-full overflow-hidden bg-slate-700">
+                    <div class="bg-emerald-500 transition-all" [style.width.%]="getValueLevelPercent('S')"></div>
+                    <div class="bg-cyan-500 transition-all" [style.width.%]="getValueLevelPercent('A')"></div>
+                    <div class="bg-blue-500 transition-all" [style.width.%]="getValueLevelPercent('B')"></div>
+                    <div class="bg-yellow-500 transition-all" [style.width.%]="getValueLevelPercent('C')"></div>
+                    <div class="bg-slate-500 transition-all" [style.width.%]="getValueLevelPercent('D')"></div>
+                  </div>
+                </div>
+                
+                <!-- 🎯 成員特徵統計 -->
+                <div class="mb-6">
+                  <h3 class="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+                    <span>🎯</span> 成員特徵
+                  </h3>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div class="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                      <span class="text-sm text-slate-400">🟢 在線</span>
+                      <span class="font-medium text-green-400">{{ extractionSummary().onlineCount }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                      <span class="text-sm text-slate-400">⏰ 最近活躍</span>
+                      <span class="font-medium text-blue-400">{{ extractionSummary().recentlyCount }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                      <span class="text-sm text-slate-400">💎 Premium</span>
+                      <span class="font-medium text-yellow-400">{{ extractionSummary().premiumCount }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                      <span class="text-sm text-slate-400">🇨🇳 華人</span>
+                      <span class="font-medium text-red-400">{{ extractionSummary().chineseCount }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                      <span class="text-sm text-slate-400">📛 有用戶名</span>
+                      <span class="font-medium text-purple-400">{{ extractionSummary().hasUsernameCount }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                      <span class="text-sm text-slate-400">🤖 Bot</span>
+                      <span class="font-medium text-slate-500">{{ extractionSummary().botCount }}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- 💡 智能建議 -->
+                <div class="p-4 bg-cyan-500/10 rounded-xl border border-cyan-500/30 mb-6">
+                  <h4 class="text-sm font-medium text-cyan-400 mb-2 flex items-center gap-2">
+                    <span>💡</span> 智能建議
+                  </h4>
+                  <ul class="text-sm text-slate-300 space-y-1">
+                    @if (extractionSummary().valueLevelDistribution.S + extractionSummary().valueLevelDistribution.A > extractionSummary().totalExtracted * 0.3) {
+                      <li>✨ 群組質量優秀！S/A級成員佔比超過30%</li>
+                    }
+                    @if (extractionSummary().premiumCount > 0) {
+                      <li>💎 發現 {{ extractionSummary().premiumCount }} 個 Premium 用戶，建議優先觸達</li>
+                    }
+                    @if (extractionSummary().chineseCount > extractionSummary().totalExtracted * 0.3) {
+                      <li>🇨🇳 華人用戶佔比高，適合中文營銷</li>
+                    }
+                    @if (extractionSummary().onlineCount + extractionSummary().recentlyCount > 0) {
+                      <li>🟢 {{ extractionSummary().onlineCount + extractionSummary().recentlyCount }} 個活躍用戶，回覆率較高</li>
+                    }
+                  </ul>
+                </div>
+                
+                <!-- 操作按鈕 -->
+                <div class="flex gap-3">
+                  <button (click)="closeExtractionSummaryDialog()" 
+                          class="flex-1 px-4 py-2.5 bg-slate-600 hover:bg-slate-500 text-white rounded-lg transition-colors">
+                    繼續查看成員
+                  </button>
+                  <button (click)="goToMemberDatabaseFromSummary()"
+                          class="flex-1 px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2">
+                    <span>📁</span> 前往成員資料庫
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         }
@@ -4208,6 +4582,335 @@
           (batchSendMessageEvent)="handleMemberBatchSendMessage($event)">
         </app-member-database>
       }
+      @case ('search-discovery') {
+        <!-- 🔍 搜索發現 (獨立頁面) -->
+        <app-search-discovery
+          class="block h-full"
+          [resources]="discoveredResources()"
+          [isSearching]="isSearchingResources()"
+          [selectedAccount]="getSelectedResourceAccount()"
+          [availableAccounts]="getResourceDiscoveryAccounts()"
+          [historyKeywords]="searchHistoryKeywords()"
+          [currentKeyword]="currentSearchKeyword()"
+          [searchError]="{ hasError: searchError().hasError, message: searchError().message }"
+          [savedResourceIds]="savedResources()"
+          (searchEvent)="handleSearchDiscoverySearch($event)"
+          (selectAccountEvent)="handleSearchDiscoverySelectAccount($event)"
+          (saveResourceEvent)="saveResource($event)"
+          (unsaveResourceEvent)="unsaveResource($event)"
+          (joinResourceEvent)="openJoinAndMonitorDialog($event)"
+          (extractMembersEvent)="openMemberListDialog($event)"
+          (clearResultsEvent)="clearDiscoveredResources()">
+        </app-search-discovery>
+        
+        <!-- 🚀 加入並監控對話框 (搜索發現視圖) -->
+        @if (showJoinMonitorDialog()) {
+          <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]" (click)="closeJoinMonitorDialog()">
+            <div class="bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 border border-cyan-500/30 max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                  <span>🚀</span> 
+                  @if (joinMonitorResource()?.status === 'joined') {
+                    設置監控
+                  } @else {
+                    加入並監控
+                  }
+                </h3>
+                <button (click)="closeJoinMonitorDialog()" class="text-slate-400 hover:text-white">✕</button>
+              </div>
+
+              <!-- 目標群組信息 -->
+              @if (joinMonitorResource(); as resource) {
+                <div class="bg-slate-700/50 rounded-lg p-4 mb-4">
+                  <div class="flex items-start gap-3">
+                    <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center text-2xl">
+                      {{ resource.resource_type === 'channel' ? '📢' : '👥' }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium text-white truncate">{{ resource.title }}</div>
+                      <div class="text-sm text-slate-400">
+                        {{ formatMemberCount(resource.member_count) }} 成員
+                        @if (resource.username) {
+                          <span class="mx-1">·</span>
+                          <span class="text-cyan-400">&#64;{{ resource.username }}</span>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <!-- 選擇帳號 -->
+              @if (joinMonitorResource()?.status !== 'joined' && joinMonitorResource()?.status !== 'monitoring') {
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-slate-300 mb-2">
+                    <span>📱</span> 選擇加入帳號
+                  </label>
+                  <div class="space-y-2 max-h-48 overflow-y-auto">
+                    @for (account of accountQuotas(); track account.phone) {
+                      <label class="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors border-2"
+                             [class.border-cyan-500]="joinMonitorSelectedPhone() === account.phone"
+                             [class.border-transparent]="joinMonitorSelectedPhone() !== account.phone">
+                        <input type="radio"
+                               [value]="account.phone"
+                               [checked]="joinMonitorSelectedPhone() === account.phone"
+                               (change)="joinMonitorSelectedPhone.set(account.phone)"
+                               class="text-cyan-500">
+                        <div class="flex-1">
+                          <div class="flex items-center gap-2">
+                            <span class="font-medium text-white">{{ account.nickname }}</span>
+                            @if (account.isRecommended) {
+                              <span class="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">⭐ 推薦</span>
+                            }
+                          </div>
+                          <div class="text-xs text-slate-400">
+                            {{ account.phone }} · 已加入 {{ account.joinedGroups }} 個群組 · 今日剩餘 {{ account.dailyLimit - account.dailyUsed }} 個配額
+                          </div>
+                        </div>
+                      </label>
+                    } @empty {
+                      <div class="text-center py-4 text-slate-500">
+                        <div class="text-2xl mb-2">📵</div>
+                        <div>沒有可用的帳號</div>
+                        <div class="text-xs">請先添加並連接 Telegram 帳號</div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              } @else {
+                <!-- 已加入群組：顯示監控帳號選擇器 -->
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-slate-300 mb-2">
+                    <span>📱</span> 監控帳號
+                  </label>
+                  @if (joinMonitorResource()?.joined_by_phone) {
+                    <div class="p-3 bg-green-500/10 border border-green-500/30 rounded-lg flex items-center justify-between">
+                      <div class="text-sm text-green-400 flex items-center gap-2">
+                        <span>✅</span>
+                        <span>{{ joinMonitorResource()?.joined_by_phone }}</span>
+                      </div>
+                      <button (click)="showChangeMonitorAccount.set(true)"
+                              class="text-xs text-cyan-400 hover:text-cyan-300">
+                        更換帳號
+                      </button>
+                    </div>
+                    
+                    <!-- 更換帳號選擇器 -->
+                    @if (showChangeMonitorAccount()) {
+                      <div class="mt-2 space-y-2 max-h-32 overflow-y-auto bg-slate-700/30 rounded-lg p-2">
+                        @for (account of getAvailableAccountsForMonitor(); track account.phone) {
+                          <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all"
+                                 [class.bg-cyan-500/20]="joinMonitorSelectedPhone() === account.phone"
+                                 [class.hover:bg-slate-700]="joinMonitorSelectedPhone() !== account.phone"
+                                 (click)="selectMonitorAccount(account.phone)">
+                            <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                            <span class="text-sm text-white">{{ account.phone }}</span>
+                            @if (account.phone === joinMonitorResource()?.joined_by_phone) {
+                              <span class="text-xs text-slate-400">(當前)</span>
+                            }
+                          </label>
+                        }
+                      </div>
+                      <div class="mt-2 text-xs text-orange-400">
+                        ⚠️ 更換帳號需要重新加入群組
+                      </div>
+                    }
+                  } @else {
+                    <div class="p-3 bg-slate-700/30 border border-slate-600/30 rounded-lg">
+                      <span class="text-sm text-slate-400">帳號信息未知</span>
+                    </div>
+                  }
+                </div>
+              }
+
+              <!-- 🔑 選擇關鍵詞集 -->
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-slate-300 mb-2">
+                  <span>🔑</span> 選擇關鍵詞集
+                </label>
+                
+                <div class="space-y-2 max-h-48 overflow-y-auto mb-3 bg-slate-700/30 rounded-lg p-2">
+                  @for (set of keywordSets(); track set.id) {
+                    <label class="flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-all"
+                           [class.bg-cyan-500/20]="isKeywordSetSelected(set.id)"
+                           [class.border]="isKeywordSetSelected(set.id)"
+                           [class.border-cyan-500/50]="isKeywordSetSelected(set.id)"
+                           [class.bg-slate-700/50]="!isKeywordSetSelected(set.id)"
+                           [class.hover:bg-slate-700]="!isKeywordSetSelected(set.id)"
+                           (click)="toggleKeywordSetSelection(set.id); $event.preventDefault()">
+                      <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold bg-orange-500/20 text-orange-400">
+                          {{ set.name.substring(0, 2) }}
+                        </div>
+                        <div>
+                          <div class="text-sm font-medium text-white">{{ set.name }}</div>
+                          <div class="text-xs text-slate-400">
+                            {{ set.keywords?.length || 0 }} 個關鍵詞
+                            @if (set.keywords && set.keywords.length > 0) {
+                              <span class="text-slate-500 ml-1">·</span>
+                              <span class="text-slate-500">{{ getKeywordPreview(set.keywords) }}</span>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      <div class="w-5 h-5 rounded-full flex items-center justify-center transition-colors"
+                           [class.bg-cyan-500]="isKeywordSetSelected(set.id)"
+                           [class.text-white]="isKeywordSetSelected(set.id)"
+                           [class.bg-slate-600]="!isKeywordSetSelected(set.id)">
+                        @if (isKeywordSetSelected(set.id)) {
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                          </svg>
+                        }
+                      </div>
+                    </label>
+                  } @empty {
+                    <div class="text-center py-4 text-slate-500">
+                      <div class="text-2xl mb-1">🔑</div>
+                      <div class="text-sm">還沒有關鍵詞集</div>
+                    </div>
+                  }
+                </div>
+                
+                <div class="flex items-center justify-between">
+                  <div class="text-xs text-slate-400">
+                    @if (joinMonitorSelectedKeywordSetIds().length > 0) {
+                      <span class="text-cyan-400">✓ 已選擇 {{ joinMonitorSelectedKeywordSetIds().length }} 個詞集</span>
+                    } @else {
+                      <span>請選擇要綁定的關鍵詞集</span>
+                    }
+                  </div>
+                  <button (click)="openQuickCreateKeywordSet()"
+                          class="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
+                    <span>+</span> 快速創建詞集
+                  </button>
+                </div>
+              </div>
+              
+              <!-- 快速創建關鍵詞集子對話框 -->
+              @if (showQuickCreateKeywordSet()) {
+                <div class="mb-4 p-4 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 rounded-xl border border-cyan-500/30">
+                  <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-sm font-medium text-white flex items-center gap-2">
+                      <span>➕</span> 快速創建關鍵詞集
+                    </h4>
+                    <button (click)="closeQuickCreateKeywordSet()" class="text-slate-400 hover:text-white text-sm">✕</button>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <input type="text"
+                           [(ngModel)]="quickCreateKeywordSetName"
+                           placeholder="詞集名稱，如：支付相關"
+                           class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:border-cyan-500 text-sm">
+                  </div>
+                  
+                  <div class="flex flex-wrap gap-2 mb-2">
+                    @for (keyword of quickCreateKeywordSetKeywords(); track keyword) {
+                      <span class="inline-flex items-center gap-1 px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded-lg text-xs">
+                        {{ keyword }}
+                        <button (click)="removeQuickKeyword(keyword)" class="hover:text-cyan-200">✕</button>
+                      </span>
+                    } @empty {
+                      <span class="text-xs text-slate-500">添加關鍵詞到此詞集</span>
+                    }
+                  </div>
+                  
+                  <div class="flex gap-2 mb-2">
+                    <input type="text"
+                           [(ngModel)]="quickCreateKeywordSetNewKeyword"
+                           (keyup.enter)="addQuickKeyword()"
+                           placeholder="輸入關鍵詞，回車添加"
+                           class="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:border-cyan-500 text-xs">
+                    <button (click)="addQuickKeyword()" class="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-xs">
+                      添加
+                    </button>
+                  </div>
+                  
+                  @if (getRecommendedKeywords().length > 0) {
+                    <div class="flex items-center gap-2 flex-wrap mb-3">
+                      <span class="text-xs text-slate-500">💡 推薦：</span>
+                      @for (keyword of getRecommendedKeywords(); track keyword) {
+                        <button (click)="addQuickRecommendedKeyword(keyword)"
+                                class="px-2 py-0.5 bg-slate-600 hover:bg-slate-500 text-slate-300 rounded text-xs">
+                          + {{ keyword }}
+                        </button>
+                      }
+                    </div>
+                  }
+                  
+                  <button (click)="executeQuickCreateKeywordSet()"
+                          [disabled]="!quickCreateKeywordSetName.trim() || quickCreateKeywordSetKeywords().length === 0"
+                          class="w-full px-3 py-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 
+                                 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed
+                                 flex items-center justify-center gap-2">
+                    <span>✨</span> 創建並綁定
+                  </button>
+                </div>
+              }
+
+              <!-- 選項 -->
+              <div class="mb-4">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox"
+                         [checked]="joinMonitorAutoEnable()"
+                         (change)="joinMonitorAutoEnable.set(!joinMonitorAutoEnable())"
+                         class="rounded text-cyan-500">
+                  <span class="text-sm text-slate-300">加入後自動啟用監控</span>
+                </label>
+              </div>
+
+              <!-- 🔴 危險操作區域（僅已加入群組顯示） -->
+              @if (joinMonitorResource()?.status === 'joined' || joinMonitorResource()?.status === 'monitoring') {
+                <div class="mb-4 p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
+                  <div class="text-xs text-red-400 mb-2 flex items-center gap-1">
+                    <span>⚠️</span> 危險操作
+                  </div>
+                  <div class="flex gap-2">
+                    @if (joinMonitorResource()?.status === 'monitoring') {
+                      <button (click)="stopMonitoringGroup(joinMonitorResource())"
+                              class="flex-1 px-3 py-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 
+                                     rounded-lg text-xs font-medium border border-orange-500/30 
+                                     flex items-center justify-center gap-1.5 transition-all">
+                        <span>⏸</span>
+                        <span>停止監控</span>
+                      </button>
+                    }
+                    <button (click)="confirmLeaveGroup(joinMonitorResource())"
+                            class="flex-1 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 
+                                   rounded-lg text-xs font-medium border border-red-500/30 
+                                   flex items-center justify-center gap-1.5 transition-all">
+                      <span>🚪</span>
+                      <span>退出群組</span>
+                    </button>
+                  </div>
+                </div>
+              }
+
+              <!-- 操作按鈕 -->
+              <div class="flex gap-3">
+                <button (click)="closeJoinMonitorDialog()" 
+                        class="flex-1 px-4 py-2.5 bg-slate-600 hover:bg-slate-500 text-white rounded-lg">
+                  取消
+                </button>
+                <button (click)="executeJoinAndMonitor()"
+                        [disabled]="isJoiningResource() || (!joinMonitorSelectedPhone() && joinMonitorResource()?.status !== 'joined')"
+                        class="flex-1 px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 text-white rounded-lg font-medium disabled:opacity-50 flex items-center justify-center gap-2">
+                  @if (isJoiningResource()) {
+                    <span class="animate-spin">⏳</span>
+                    <span>處理中...</span>
+                  } @else if (joinMonitorResource()?.status === 'joined' || joinMonitorResource()?.status === 'monitoring') {
+                    <span>🔍</span>
+                    <span>保存監控設置</span>
+                  } @else {
+                    <span>🚀</span>
+                    <span>加入並監控</span>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+      }
       @case ('resource-center') {
         <!-- 📦 資源中心 (融合版) -->
         <div class="h-full flex flex-col">
@@ -4235,11 +4938,6 @@
             
             <!-- Tab 導航 -->
             <div class="flex gap-1 bg-slate-800/50 p-1 rounded-xl w-fit">
-              <button (click)="resourceCenterTab.set('discovery')" 
-                      [class]="resourceCenterTab() === 'discovery' ? 'bg-cyan-500 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'"
-                      class="px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 font-medium">
-                <span>🔍</span> 搜索發現
-              </button>
               <button (click)="resourceCenterTab.set('manage')" 
                       [class]="resourceCenterTab() === 'manage' ? 'bg-cyan-500 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'"
                       class="px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 font-medium">
@@ -4250,464 +4948,18 @@
                       class="px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 font-medium">
                 <span>📊</span> 數據統計
               </button>
+              <!-- 🆕 快捷入口：跳轉到獨立的搜索發現頁面 -->
+              <button (click)="changeView('search-discovery')" 
+                      class="px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 font-medium text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 border border-transparent hover:border-cyan-500/30">
+                <span>🔍</span> 去搜索發現
+                <span class="text-xs">→</span>
+              </button>
             </div>
           </div>
           
           <!-- Tab 內容區 -->
           <div class="flex-1 overflow-hidden">
             @switch (resourceCenterTab()) {
-              @case ('discovery') {
-                <!-- 🔍 搜索發現 Tab -->
-                <div class="h-full overflow-y-auto p-6">
-                  <!-- 🆕 重新設計的統計卡片 -->
-                  <div class="grid grid-cols-5 gap-4 mb-6">
-                    <!-- 當前搜索結果 -->
-                    <div class="bg-gradient-to-br from-cyan-500/20 to-blue-500/10 border border-cyan-500/30 p-4 rounded-xl text-center">
-                      <div class="text-3xl mb-2">🔍</div>
-                      <div class="text-2xl font-bold text-cyan-400">{{ discoveredResources().length }}</div>
-                      <div class="text-sm text-slate-400">當前搜索</div>
-                    </div>
-                    <!-- 已收藏 -->
-                    <div class="bg-gradient-to-br from-yellow-500/20 to-orange-500/10 border border-yellow-500/30 p-4 rounded-xl text-center">
-                      <div class="text-3xl mb-2">⭐</div>
-                      <div class="text-2xl font-bold text-yellow-400">{{ resourceStats().total_resources }}</div>
-                      <div class="text-sm text-slate-400">已收藏</div>
-                    </div>
-                    <!-- 今日發現 -->
-                    <div class="bg-gradient-to-br from-green-500/20 to-emerald-500/10 border border-green-500/30 p-4 rounded-xl text-center">
-                      <div class="text-3xl mb-2">🆕</div>
-                      <div class="text-2xl font-bold text-green-400">{{ resourceStats().today_discovered }}</div>
-                      <div class="text-sm text-slate-400">今日發現</div>
-                    </div>
-                    <!-- 待加入 -->
-                    <div class="bg-gradient-to-br from-purple-500/20 to-pink-500/10 border border-purple-500/30 p-4 rounded-xl text-center">
-                      <div class="text-3xl mb-2">📋</div>
-                      <div class="text-2xl font-bold text-purple-400">{{ resourceStats().pending_joins }}</div>
-                      <div class="text-sm text-slate-400">待加入</div>
-                    </div>
-                    <!-- 已加入 -->
-                    <div class="bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 p-4 rounded-xl text-center">
-                      <div class="text-3xl mb-2">✅</div>
-                      <div class="text-2xl font-bold text-emerald-400">{{ resourceStats().joined_count }}</div>
-                      <div class="text-sm text-slate-400">已加入</div>
-                    </div>
-                  </div>
-                  
-                  <!-- 🆕 數據管理提示 -->
-                  @if (resourceStats().total_resources > 50 && discoveredResources().length === 0) {
-                    <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6 flex items-center justify-between">
-                      <div class="flex items-center gap-3">
-                        <span class="text-2xl">💡</span>
-                        <div>
-                          <div class="text-amber-400 font-medium">您有 {{ resourceStats().total_resources }} 條歷史數據</div>
-                          <div class="text-sm text-slate-400">可以清理舊數據以保持系統整潔</div>
-                        </div>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <button (click)="toggleShowHistory(true)" class="px-4 py-2 bg-slate-600/50 hover:bg-slate-600 text-slate-300 rounded-lg text-sm">
-                          📜 查看歷史
-                        </button>
-                        <button (click)="clearHistoryData('all')" class="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm">
-                          🧹 一鍵清理
-                        </button>
-                      </div>
-                    </div>
-                  }
-                  
-                  <!-- 搜索操作區 -->
-                  <div class="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6 mb-6">
-                    <!-- 帳號選擇 + 狀態 -->
-                    <div class="flex items-center gap-4 mb-4">
-                      <span class="text-slate-400 text-sm">使用帳號:</span>
-                      @if (getSelectedResourceAccount(); as account) {
-                        <div class="relative">
-                          <button (click)="showResourceAccountSelector.set(!showResourceAccountSelector())"
-                                  class="flex items-center gap-2 px-3 py-2 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg border border-slate-600/50">
-                            <span class="w-2 h-2 rounded-full" [class.bg-green-400]="account.status === 'Online'" [class.bg-slate-400]="account.status !== 'Online'"></span>
-                            <span class="font-mono text-sm text-white">{{ account.phone }}</span>
-                            <span class="text-slate-400 text-xs">▼</span>
-                          </button>
-                          @if (showResourceAccountSelector()) {
-                            <div class="absolute top-full left-0 mt-1 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50">
-                              <div class="max-h-60 overflow-y-auto p-1">
-                                @for (acc of getResourceDiscoveryAccounts(); track acc.id) {
-                                  <button (click)="selectResourceAccount(acc.id)"
-                                          class="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-700/50 rounded-lg">
-                                    <span class="w-2 h-2 rounded-full bg-green-400"></span>
-                                    <span class="font-mono text-sm text-white flex-1">{{ acc.phone }}</span>
-                                  </button>
-                                }
-                              </div>
-                            </div>
-                          }
-                        </div>
-                      } @else {
-                        <span class="text-red-400 text-sm px-3 py-2 bg-red-500/10 rounded-lg">⚠️ 無可用帳號</span>
-                      }
-                      
-                      <!-- 🆕 系統狀態提示（自動初始化，用戶無需操作） -->
-                      <div class="h-6 w-px bg-slate-600"></div>
-                      
-                      @if (isSearchingResources()) {
-                        <span class="px-3 py-1.5 rounded-lg text-sm bg-blue-500/20 text-blue-400">
-                          🔄 搜索中...
-                        </span>
-                      } @else if (getOnlineAccountsCount() > 0) {
-                        <span class="px-3 py-1.5 rounded-lg text-sm bg-green-500/20 text-green-400">
-                          ✅ 系統就緒
-                        </span>
-                      }
-                    </div>
-                    
-                    <!-- 🆕 C方案：增強的搜索框 -->
-                    <div class="flex gap-3 mb-4">
-                      <div class="flex-1 relative">
-                        <input type="text" [(ngModel)]="resourceSearchQuery" 
-                               (keyup.enter)="searchResources()"
-                               (focus)="showSearchSuggestions.set(true)"
-                               (blur)="hideSearchSuggestions()"
-                               placeholder="輸入關鍵詞搜索群組和頻道..."
-                               class="w-full bg-slate-700/50 border border-slate-600 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-cyan-500/50">
-                        
-                        <!-- 搜索建議下拉菜單 -->
-                        @if (showSearchSuggestions() && !isSearchingResources()) {
-                          <div class="absolute top-full left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
-                            <!-- 歷史搜索 -->
-                            @if (searchHistoryKeywords().length > 0) {
-                              <div class="p-2 border-b border-slate-700">
-                                <div class="text-xs text-slate-500 px-2 mb-1">最近搜索</div>
-                                <div class="flex flex-wrap gap-1">
-                                  @for (kw of searchHistoryKeywords().slice(0, 5); track kw) {
-                                    <button (mousedown)="searchFromHistory(kw)" 
-                                            class="px-2 py-1 bg-slate-700/50 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-400 rounded text-xs transition-all">
-                                      🕐 {{ kw }}
-                                    </button>
-                                  }
-                                </div>
-                              </div>
-                            }
-                            
-                            <!-- 熱門搜索 -->
-                            <div class="p-2">
-                              <div class="text-xs text-slate-500 px-2 mb-1">🔥 熱門搜索</div>
-                              <div class="flex flex-wrap gap-1">
-                                @for (kw of hotSearchKeywords(); track kw) {
-                                  <button (mousedown)="searchFromHistory(kw)" 
-                                          class="px-2 py-1 bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 hover:text-orange-200 rounded text-xs transition-all">
-                                    {{ kw }}
-                                  </button>
-                                }
-                              </div>
-                            </div>
-                          </div>
-                        }
-                      </div>
-                      <button (click)="showSearchOptions.set(!showSearchOptions())" 
-                              class="px-4 py-3 bg-slate-600/50 hover:bg-slate-600 text-slate-300 rounded-lg">
-                        ⚙️
-                      </button>
-                      <button (click)="searchResources()" [disabled]="isSearchingResources()"
-                              class="px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg font-medium disabled:opacity-50">
-                        {{ isSearchingResources() ? '🔍 搜索中...' : '🔍 搜索' }}
-                      </button>
-                    </div>
-                    
-                    <!-- 🆕 優化後的搜索渠道選擇 -->
-                    <div class="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
-                      <div class="flex items-center justify-between mb-3">
-                        <div class="flex items-center gap-2">
-                          <span class="text-lg">🔗</span>
-                          <span class="font-medium text-white">搜索渠道</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                          <span class="text-xs text-slate-500">推薦組合：官方 + 中文</span>
-                          <button (click)="selectedSearchSources.set(['telegram', 'jiso'])" 
-                                  class="text-xs px-2 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded">
-                            一鍵設置
-                          </button>
-                        </div>
-                      </div>
-                      <div class="grid grid-cols-4 gap-3">
-                        <!-- 官方搜索 -->
-                        <label class="relative flex flex-col p-3 bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-700/50 border-2 transition-all"
-                               [class.border-cyan-500]="selectedSearchSources().includes('telegram')"
-                               [class.border-slate-700]="!selectedSearchSources().includes('telegram')">
-                          <div class="flex items-center gap-2">
-                            <input type="checkbox" [checked]="selectedSearchSources().includes('telegram')" (change)="toggleSearchSource('telegram')" class="rounded text-cyan-500">
-                            <span>📱 官方搜索</span>
-                          </div>
-                          <div class="text-xs text-slate-500 mt-1 ml-6">全球覆蓋</div>
-                          <span class="absolute top-1 right-1 text-xs px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded">穩定</span>
-                        </label>
-                        <!-- 中文搜索 -->
-                        <label class="relative flex flex-col p-3 bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-700/50 border-2 transition-all"
-                               [class.border-cyan-500]="selectedSearchSources().includes('jiso')"
-                               [class.border-slate-700]="!selectedSearchSources().includes('jiso')">
-                          <div class="flex items-center gap-2">
-                            <input type="checkbox" [checked]="selectedSearchSources().includes('jiso')" (change)="toggleSearchSource('jiso')" class="rounded text-cyan-500">
-                            <span>🔍 中文搜索</span>
-                          </div>
-                          <div class="text-xs text-slate-500 mt-1 ml-6">神馬/極搜</div>
-                          <span class="absolute top-1 right-1 text-xs px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded">推薦</span>
-                        </label>
-                        <!-- TGStat -->
-                        <label class="relative flex flex-col p-3 bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-700/50 border-2 transition-all opacity-50"
-                               [class.border-cyan-500]="selectedSearchSources().includes('tgstat')"
-                               [class.border-slate-700]="!selectedSearchSources().includes('tgstat')">
-                          <div class="flex items-center gap-2">
-                            <input type="checkbox" [checked]="selectedSearchSources().includes('tgstat')" (change)="toggleSearchSource('tgstat')" class="rounded text-cyan-500">
-                            <span>📊 TGStat</span>
-                          </div>
-                          <div class="text-xs text-slate-500 mt-1 ml-6">統計平台</div>
-                          <span class="absolute top-1 right-1 text-xs px-1.5 py-0.5 bg-slate-600 text-slate-400 rounded">開發中</span>
-                        </label>
-                        <!-- 本地索引 -->
-                        <label class="relative flex flex-col p-3 bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-700/50 border-2 transition-all"
-                               [class.border-cyan-500]="selectedSearchSources().includes('local')"
-                               [class.border-slate-700]="!selectedSearchSources().includes('local')">
-                          <div class="flex items-center gap-2">
-                            <input type="checkbox" [checked]="selectedSearchSources().includes('local')" (change)="toggleSearchSource('local')" class="rounded text-cyan-500">
-                            <span>💾 本地索引</span>
-                          </div>
-                          <div class="text-xs text-slate-500 mt-1 ml-6">{{ resourceStats().total_resources }} 條</div>
-                          @if (resourceStats().total_resources > 0) {
-                            <span class="absolute top-1 right-1 text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">可用</span>
-                          }
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <!-- 搜索結果篩選和列表 -->
-                  <div class="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4">
-                    <!-- 🆕 當前搜索狀態欄 -->
-                    @if (currentSearchKeyword()) {
-                      <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-700/50">
-                        <div class="flex items-center gap-2">
-                          <span class="text-slate-400 text-sm">當前搜索：</span>
-                          <span class="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-full text-sm font-medium">
-                            🔍 {{ currentSearchKeyword() }}
-                          </span>
-                          <span class="text-slate-500 text-xs">({{ discoveredResources().length }} 結果)</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                          <button (click)="toggleSearchHistoryMode()" 
-                                  class="px-3 py-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700/50 text-sm flex items-center gap-1">
-                            <span>📜</span>
-                            {{ showSearchHistory() ? '返回當前' : '查看歷史' }}
-                          </button>
-                        </div>
-                      </div>
-                    }
-                    
-                    <!-- 🆕 歷史搜索關鍵詞 -->
-                    @if (searchHistoryKeywords().length > 0 && !currentSearchKeyword()) {
-                      <div class="mb-4 pb-3 border-b border-slate-700/50">
-                        <div class="flex items-center gap-2 mb-2">
-                          <span class="text-slate-400 text-sm">📜 歷史搜索：</span>
-                          <button (click)="clearAllSearchHistory()" 
-                                  class="text-red-400 hover:text-red-300 text-xs underline ml-auto">
-                            清空歷史
-                          </button>
-                        </div>
-                        <div class="flex flex-wrap gap-2">
-                          @for (keyword of searchHistoryKeywords().slice(0, 5); track keyword) {
-                            <button (click)="searchFromHistory(keyword)" 
-                                    class="px-3 py-1.5 bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 rounded-lg text-sm transition-all">
-                              {{ keyword }}
-                            </button>
-                          }
-                        </div>
-                      </div>
-                    }
-                    
-                    <div class="flex items-center justify-between mb-4">
-                      <div class="flex items-center gap-3">
-                        <select [ngModel]="resourceSearchType()" (ngModelChange)="resourceSearchType.set($event)"
-                                class="bg-slate-700/50 border border-slate-600 rounded-lg py-2 px-3 text-white text-sm">
-                          <option value="all">全部類型</option>
-                          <option value="group">群組</option>
-                          <option value="channel">頻道</option>
-                        </select>
-                        <span class="text-slate-400 text-sm">
-                          共 <span class="font-bold text-cyan-400">{{ discoveredResources().length }}</span> 個結果
-                        </span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <!-- 🆕 C方案：批量收藏 -->
-                        <button (click)="batchSaveResources()" 
-                                class="px-3 py-1.5 bg-yellow-500/20 text-yellow-400 rounded-lg hover:bg-yellow-500/30 text-sm flex items-center gap-1"
-                                title="收藏選中的資源">
-                          ⭐ 批量收藏
-                        </button>
-                        <button (click)="clearDiscoveredResources()" 
-                                class="px-3 py-1.5 bg-slate-600/50 text-slate-300 rounded-lg hover:bg-slate-600 text-sm"
-                                title="清空當前搜索結果">
-                          🗑️ 清空
-                        </button>
-                        <button (click)="showResourceBatchMenu.set(!showResourceBatchMenu())" class="px-3 py-1.5 bg-slate-600/50 text-slate-300 rounded-lg hover:bg-slate-600 text-sm">
-                          📦 批量操作
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <!-- 🆕 C方案：重新設計的搜索結果列表 -->
-                    @if (discoveredResources().length === 0) {
-                      <div class="text-center py-16">
-                        <!-- 🆕 錯誤狀態顯示 -->
-                        @if (searchError().hasError) {
-                          <div class="max-w-md mx-auto">
-                            <div class="text-6xl mb-4">⚠️</div>
-                            <p class="text-red-400 text-xl mb-2">搜索失敗</p>
-                            <p class="text-slate-400 mb-4">{{ searchError().details || searchError().message }}</p>
-                            
-                            <!-- 解決建議 -->
-                            @if (searchError().suggestions.length > 0) {
-                              <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-left mb-6">
-                                <div class="text-slate-300 font-medium mb-2 flex items-center gap-2">
-                                  💡 解決建議：
-                                </div>
-                                <ul class="text-sm text-slate-400 space-y-1">
-                                  @for (suggestion of searchError().suggestions; track suggestion) {
-                                    <li class="flex items-start gap-2">
-                                      <span class="text-cyan-400">•</span>
-                                      <span>{{ suggestion }}</span>
-                                    </li>
-                                  }
-                                </ul>
-                              </div>
-                            }
-                            
-                            <div class="flex justify-center gap-3">
-                              <button (click)="searchResources()" class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg">
-                                🔄 重試搜索
-                              </button>
-                              <button (click)="searchError.set({ hasError: false, message: '', details: '', suggestions: [] })" 
-                                      class="px-4 py-2 bg-slate-600/50 hover:bg-slate-600 text-slate-300 rounded-lg">
-                                ✕ 關閉
-                              </button>
-                            </div>
-                          </div>
-                        } @else {
-                          <!-- 正常空狀態 -->
-                          <div class="text-6xl mb-4">🔍</div>
-                          <p class="text-slate-300 text-xl mb-2">暫無搜索結果</p>
-                          <p class="text-slate-500 mb-6">輸入關鍵詞開始搜索群組和頻道</p>
-                          <!-- 熱門搜索建議 -->
-                          <div class="flex flex-wrap justify-center gap-2">
-                            <span class="text-slate-500 text-sm">熱門搜索：</span>
-                            @for (keyword of ['支付', 'USDT', '交易', '招聯', '代購']; track keyword) {
-                              <button (click)="searchFromHistory(keyword)" 
-                                      class="px-3 py-1 bg-slate-700/50 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-400 rounded-full text-sm transition-all">
-                              {{ keyword }}
-                            </button>
-                          }
-                        </div>
-                        }
-                      </div>
-                    } @else {
-                      <div class="space-y-3 max-h-[calc(100vh-480px)] min-h-[400px] overflow-y-auto pr-2">
-                        @for (resource of discoveredResources(); track resource.telegram_id) {
-                          <div class="group flex items-start gap-4 p-4 bg-gradient-to-r from-slate-800/80 to-slate-800/40 rounded-xl border border-slate-700/50 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/10 transition-all duration-300">
-                            <!-- 收藏按鈕 -->
-                            <button (click)="isResourceSaved(resource) ? unsaveResource(resource) : saveResource(resource)"
-                                    class="mt-1 p-2 rounded-lg transition-all"
-                                    [class]="isResourceSaved(resource) ? 'bg-yellow-500/20 text-yellow-400' : 'bg-slate-700/50 text-slate-400 hover:bg-yellow-500/20 hover:text-yellow-400'"
-                                    [title]="isResourceSaved(resource) ? '取消收藏' : '收藏此資源'">
-                              {{ isResourceSaved(resource) ? '⭐' : '☆' }}
-                            </button>
-                            
-                            <div class="flex-1 min-w-0">
-                              <!-- 標題行 -->
-                              <div class="flex items-center gap-2 mb-2">
-                                <span class="px-2.5 py-1 text-xs rounded-full font-medium" 
-                                      [class]="resource.resource_type === 'channel' ? 'bg-purple-500/30 text-purple-300' : 'bg-blue-500/30 text-blue-300'">
-                                  {{ resource.resource_type === 'channel' ? '📢 頻道' : '👥 群組' }}
-                                </span>
-                                <h4 class="font-semibold text-white truncate flex-1">{{ resource.title }}</h4>
-                                @if (resource.username) {
-                                  <a [href]="'https://t.me/' + resource.username" target="_blank" 
-                                     class="text-cyan-400 text-sm hover:underline">
-                                    @{{ resource.username }}
-                                  </a>
-                                }
-                              </div>
-                              
-                              <!-- 描述（如果有） -->
-                              @if (resource.description) {
-                                <p class="text-slate-400 text-sm mb-2 line-clamp-2">{{ resource.description }}</p>
-                              }
-                              
-                              <!-- 統計信息 -->
-                              <div class="flex items-center gap-4 text-sm">
-                                <span class="flex items-center gap-1 text-slate-400">
-                                  <span class="text-lg">👥</span>
-                                  <span class="font-medium text-white">{{ resource.member_count | number }}</span>
-                                  成員
-                                </span>
-                                
-                                <!-- 相關度評分 -->
-                                <span class="flex items-center gap-1">
-                                  @if ((resource.overall_score || 0) >= 0.7) {
-                                    <span class="text-yellow-400">⭐⭐⭐</span>
-                                    <span class="text-yellow-400 font-medium">高度相關</span>
-                                  } @else if ((resource.overall_score || 0) >= 0.5) {
-                                    <span class="text-yellow-400">⭐⭐</span>
-                                    <span class="text-slate-400">中度相關</span>
-                                  } @else {
-                                    <span class="text-yellow-400">⭐</span>
-                                    <span class="text-slate-500">低度相關</span>
-                                  }
-                                </span>
-                                
-                                <!-- 來源標記 -->
-                                @if (resource.is_saved) {
-                                  <span class="px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs">✓ 已收藏</span>
-                                } @else {
-                                  <span class="px-2 py-0.5 bg-slate-700/50 text-slate-400 rounded text-xs">🆕 搜索結果</span>
-                                }
-                              </div>
-                            </div>
-                            
-                            <!-- 操作按鈕 -->
-                            <div class="flex flex-col gap-2">
-                              @if (resource.status === 'joined' || resource.status === 'monitoring') {
-                                <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm text-center">
-                                  ✅ 已加入
-                                </span>
-                              } @else {
-                                <button (click)="openJoinAndMonitorDialog(resource)" 
-                                        class="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg text-sm font-medium transition-all shadow-lg shadow-cyan-500/20">
-                                  🚀 加入
-                                </button>
-                              }
-                              <!-- 🆕 根據狀態顯示不同的提取成員按鈕 -->
-                              @if (isChannel(resource)) {
-                                <button [disabled]="true"
-                                        class="px-4 py-2 bg-slate-500/20 text-slate-500 rounded-lg text-sm cursor-not-allowed"
-                                        title="頻道無法提取成員">
-                                  👥 成員 🔒
-                                </button>
-                              } @else if (resource.status === 'joined' || resource.status === 'monitoring') {
-                                <button (click)="openMemberListDialog(resource)" 
-                                        class="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm transition-all">
-                                  👥 提取成員
-                                </button>
-                              } @else {
-                                <button [disabled]="true"
-                                        class="px-4 py-2 bg-slate-500/20 text-slate-500 rounded-lg text-sm cursor-not-allowed"
-                                        title="需要先加入群組">
-                                  👥 成員 <span class="text-orange-400 text-xs">需加入</span>
-                                </button>
-                              }
-                            </div>
-                          </div>
-                        }
-                      </div>
-                    }
-                  </div>
-                </div>
-              }
               @case ('manage') {
                 <!-- 👥 我的資源 Tab -->
                 <app-resource-center 
@@ -4715,7 +4967,8 @@
                   (sendMessageEvent)="handleResourceSendMessage($event)"
                   (viewDetailEvent)="handleResourceViewDetail($event)"
                   (batchSendEvent)="handleResourceBatchSend($event)"
-                  (sendToAISalesEvent)="handleResourceSendToAISales($event)">
+                  (sendToAISalesEvent)="handleResourceSendToAISales($event)"
+                  (statusChangedEvent)="handleResourceStatusChanged($event)">
                 </app-resource-center>
               }
               @case ('stats') {
@@ -9777,7 +10030,11 @@
       
       @case ('monitoring-groups') {
         <!-- 監控群組管理 -->
-        <app-monitoring-groups class="block h-full -m-4"></app-monitoring-groups>
+        <app-monitoring-groups #monitoringGroupsRef 
+                               class="block h-full -m-4"
+                               (extractMembersEvent)="openMemberExtractionDialog($event)"
+                               (configAction)="handleMonitoringConfigAction($event)">
+        </app-monitoring-groups>
       }
       
       @case ('keyword-sets') {

@@ -675,9 +675,20 @@ function startPythonBackend() {
         });
     });
     
-    // Handle stderr (errors from Python)
+    // Handle stderr (Python uses stderr for all logging)
     pythonProcess.stderr.on('data', (data) => {
-        console.error('[Backend] Error:', data.toString());
+        const message = data.toString().trim();
+        if (!message) return;
+        
+        // 區分真正的錯誤和普通日誌
+        // 只有包含 "Error"、"Exception"、"Traceback" 等關鍵字才標記為錯誤
+        const isError = /\b(Error|Exception|Traceback|CRITICAL|FATAL|failed|Failed)\b/i.test(message);
+        
+        if (isError) {
+            console.error('[electron]', message);
+        } else {
+            console.log('[electron]', message);
+        }
     });
     
     // Handle process exit

@@ -437,6 +437,94 @@ export class UnifiedContactsService {
     }
   }
   
+  // ==================== 成員提取同步 ====================
+  
+  /**
+   * 從成員提取結果導入聯繫人
+   * 將提取的成員自動同步到統一聯繫人庫
+   */
+  importFromExtraction(
+    members: Array<{
+      telegramId: string;
+      username?: string;
+      firstName?: string;
+      lastName?: string;
+      displayName: string;
+      phone?: string;
+      isBot: boolean;
+      isPremium: boolean;
+      isVerified: boolean;
+      onlineStatus: string;
+      lastSeen?: string;
+      isChinese?: boolean;
+      activityScore?: number;
+      valueLevel?: string;
+    }>,
+    source: {
+      sourceType: SourceType;
+      sourceName: string;
+      sourceId?: string;
+    }
+  ): void {
+    if (!members.length) return;
+    
+    console.log('[UnifiedContacts] Importing from extraction:', members.length, 'members from', source.sourceName);
+    
+    // 發送到後端處理
+    this.ipc.send('unified-contacts:import-members', {
+      members: members.map(m => ({
+        telegram_id: m.telegramId,
+        username: m.username,
+        first_name: m.firstName,
+        last_name: m.lastName,
+        display_name: m.displayName,
+        phone: m.phone,
+        is_bot: m.isBot,
+        is_premium: m.isPremium,
+        is_verified: m.isVerified,
+        online_status: m.onlineStatus,
+        last_seen: m.lastSeen,
+        is_chinese: m.isChinese,
+        activity_score: m.activityScore,
+        value_level: m.valueLevel
+      })),
+      sourceType: source.sourceType,
+      sourceName: source.sourceName,
+      sourceId: source.sourceId
+    });
+  }
+  
+  /**
+   * 更新聯繫人狀態（從發送控制台接收）
+   * 當用戶從發送控制台發送消息後，更新聯繫人狀態
+   */
+  updateContactStatus(telegramId: string, status: ContactStatus): void {
+    console.log('[UnifiedContacts] Updating single contact status:', telegramId, status);
+    this.updateContact(telegramId, { status });
+  }
+  
+  /**
+   * 同步發送控制台的目標列表
+   * 返回所有可發送的用戶聯繫人
+   */
+  getSendTargets(): UnifiedContact[] {
+    return this._contacts().filter(c => c.contact_type === 'user' && !c.is_bot);
+  }
+  
+  /**
+   * 標記聯繫人為已聯繫
+   */
+  markAsContacted(telegramIds: string[]): void {
+    this.updateStatus(telegramIds, 'contacted');
+  }
+  
+  /**
+   * 獲取指定來源的聯繫人數量
+   */
+  getCountBySource(sourceType: SourceType): number {
+    return this._contacts().filter(c => c.source_type === sourceType).length;
+  }
+  
   /**
    * 獲取狀態標籤顏色
    */

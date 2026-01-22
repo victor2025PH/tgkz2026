@@ -1,5 +1,18 @@
 {
-  "name": "TG-Matrix: AI Telegram Outreach",
-  "description": "A modern dashboard to manage and automate Telegram marketing campaigns. Configure monitoring of groups for keywords, capture potential leads, and use Gemini AI to generate personalized outreach messages.",
+  "name": "TG-AI智控王",
+  "version": "2.0.0-beta.1",
+  "releaseType": "beta",
+  "releaseDate": "2026-01-22",
+  "description": "TG-AI智控王 - 智能Telegram营销系统。全功能测试版，包含AI智能营销、多账号管理、群组搜索、自动化监控等全部功能。",
+  "features": [
+    "多账号管理和协作",
+    "群组/频道搜索发现",
+    "AI智能营销策略",
+    "自动化监控和回复",
+    "数据分析和洞察",
+    "批量操作和导出"
+  ],
+  "membershipLevel": "king",
+  "membershipNote": "测试版默认开放全部功能（榮耀王者等级）",
   "requestFramePermissions": []
 }

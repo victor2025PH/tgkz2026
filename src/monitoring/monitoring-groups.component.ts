@@ -270,10 +270,56 @@ import { ConfirmDialogService } from '../confirm-dialog.service';
 
               <!-- 快捷操作 -->
               <div class="space-y-2">
+                <!-- 🆕 提取進度顯示 -->
+                @if (extractionProgress().isExtracting && extractionProgress().groupId === selectedGroup()!.id) {
+                  <div class="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/30 mb-2">
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-sm text-emerald-400 flex items-center gap-2">
+                        <span class="animate-pulse">⏳</span> 正在提取成員...
+                      </span>
+                      <span class="text-xs text-slate-400">
+                        {{ extractionProgress().extracted }} / {{ extractionProgress().total }}
+                      </span>
+                    </div>
+                    <div class="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
+                      <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-300"
+                           [style.width.%]="getExtractionPercent()">
+                      </div>
+                    </div>
+                    <div class="text-xs text-slate-500 mt-1">{{ extractionProgress().status }}</div>
+                  </div>
+                }
+                
+                <!-- 🆕 提取完成顯示 -->
+                @if (extractionResult().completed && extractionResult().groupId === selectedGroup()!.id) {
+                  <div class="p-3 bg-emerald-500/20 rounded-xl border border-emerald-500/30 mb-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm text-emerald-400 flex items-center gap-2">
+                        <span>✅</span> 提取完成
+                      </span>
+                      <span class="text-emerald-300 font-medium">{{ extractionResult().count }} 人</span>
+                    </div>
+                    <div class="flex items-center gap-2 mt-2 text-xs">
+                      <span class="text-slate-400">🟢 {{ extractionResult().online }}</span>
+                      <span class="text-slate-400">⏰ {{ extractionResult().recently }}</span>
+                      <span class="text-slate-400">💎 {{ extractionResult().premium }}</span>
+                    </div>
+                    <button (click)="clearExtractionResult()"
+                            class="mt-2 text-xs text-slate-500 hover:text-slate-400">
+                      關閉提示
+                    </button>
+                  </div>
+                }
+                
                 <div class="relative group/extract">
                   <button (click)="extractMembers()"
-                          class="w-full px-4 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg transition-colors flex items-center justify-center gap-2">
-                    <span>👥</span> 提取群成員
+                          [disabled]="extractionProgress().isExtracting"
+                          class="w-full px-4 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    @if (extractionProgress().isExtracting && extractionProgress().groupId === selectedGroup()!.id) {
+                      <span class="animate-spin">⏳</span> 提取中...
+                    } @else {
+                      <span>👥</span> 提取群成員
+                    }
                   </button>
                   <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-700 text-xs text-slate-300 rounded-lg opacity-0 group-hover/extract:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
                     💡 需要群組管理員權限才能提取成員
@@ -311,6 +357,38 @@ export class MonitoringGroupsComponent implements OnInit {
 
   // 本地狀態
   selectedGroup = signal<MonitoringGroup | null>(null);
+  
+  // 🆕 提取進度狀態
+  extractionProgress = signal<{
+    isExtracting: boolean;
+    groupId: string;
+    extracted: number;
+    total: number;
+    status: string;
+  }>({
+    isExtracting: false,
+    groupId: '',
+    extracted: 0,
+    total: 0,
+    status: ''
+  });
+  
+  // 🆕 提取結果狀態
+  extractionResult = signal<{
+    completed: boolean;
+    groupId: string;
+    count: number;
+    online: number;
+    recently: number;
+    premium: number;
+  }>({
+    completed: false,
+    groupId: '',
+    count: 0,
+    online: 0,
+    recently: 0,
+    premium: 0
+  });
 
   // 計算可綁定的詞集
   availableKeywordSets = computed(() => {
@@ -354,6 +432,71 @@ export class MonitoringGroupsComponent implements OnInit {
       }
     });
     this.listeners.push(cleanup2);
+    
+    // 🆕 監聽成員提取進度
+    const cleanup3 = this.ipcService.on('members-extraction-progress', (data: { resourceId: number, extracted: number, total: number, status: string }) => {
+      const selected = this.selectedGroup();
+      if (selected && String(selected.id) === String(data.resourceId)) {
+        this.extractionProgress.set({
+          isExtracting: true,
+          groupId: String(data.resourceId),
+          extracted: data.extracted,
+          total: data.total,
+          status: data.status
+        });
+      }
+    });
+    this.listeners.push(cleanup3);
+    
+    // 🆕 監聽成員提取完成
+    const cleanup4 = this.ipcService.on('members-extracted', (data: { success: boolean, resourceId?: number, members?: any[], error?: string }) => {
+      const selected = this.selectedGroup();
+      if (data.success && data.members && selected && String(selected.id) === String(data.resourceId)) {
+        // 計算統計
+        let online = 0, recently = 0, premium = 0;
+        for (const m of data.members) {
+          if (m.online_status === 'online') online++;
+          else if (m.online_status === 'recently') recently++;
+          if (m.is_premium) premium++;
+        }
+        
+        // 停止進度顯示
+        this.extractionProgress.set({
+          isExtracting: false,
+          groupId: '',
+          extracted: 0,
+          total: 0,
+          status: ''
+        });
+        
+        // 顯示結果
+        this.extractionResult.set({
+          completed: true,
+          groupId: String(data.resourceId),
+          count: data.members.length,
+          online,
+          recently,
+          premium
+        });
+        
+        // 10秒後自動隱藏結果
+        setTimeout(() => {
+          if (this.extractionResult().groupId === String(data.resourceId)) {
+            this.clearExtractionResult();
+          }
+        }, 10000);
+      } else if (data.error) {
+        // 提取失敗
+        this.extractionProgress.set({
+          isExtracting: false,
+          groupId: '',
+          extracted: 0,
+          total: 0,
+          status: ''
+        });
+      }
+    });
+    this.listeners.push(cleanup4);
   }
 
   // 帳號相關方法
@@ -444,14 +587,53 @@ export class MonitoringGroupsComponent implements OnInit {
     this.toastService.info(`已從 ${group.name} 解綁詞集`);
   }
 
+  /**
+   * 打開提取成員配置對話框
+   * 不再直接提取，而是先讓用戶配置篩選條件
+   */
   extractMembers() {
     const group = this.selectedGroup();
     if (!group) return;
 
+    // 🆕 發出事件打開配置對話框，而不是直接提取
     this.extractMembersEvent.emit(group);
+  }
+  
+  /**
+   * 執行成員提取（帶配置）
+   * 由父組件在用戶確認配置後調用
+   */
+  executeExtraction(config: {
+    limit: number;
+    filters: {
+      onlineStatus: 'all' | 'online' | 'recently' | 'offline';
+      hasChinese: boolean | null;
+      hasUsername: boolean | null;
+      isPremium: boolean | null;
+      excludeBots: boolean;
+      excludeAdmins: boolean;
+    };
+    advanced: {
+      autoSaveToResources: boolean;
+      skipDuplicates: boolean;
+    };
+  }) {
+    const group = this.selectedGroup();
+    if (!group) return;
+    
+    // 設置提取進度初始狀態
+    this.extractionProgress.set({
+      isExtracting: true,
+      groupId: group.id,
+      extracted: 0,
+      total: config.limit === -1 ? (group.memberCount || 0) : config.limit,
+      status: '正在連接...'
+    });
+    
+    // 清除之前的結果
+    this.clearExtractionResult();
     
     // 從 URL 中提取 username 或 chat_id
-    // 支持格式：https://t.me/username 或 https://t.me/+inviteHash
     let chatId = '';
     if (group.url) {
       const match = group.url.match(/t\.me\/([+\w]+)/);
@@ -460,13 +642,47 @@ export class MonitoringGroupsComponent implements OnInit {
       }
     }
     
+    // 發送提取命令（帶篩選條件）
     this.ipcService.send('extract-members', {
-      chatId: chatId || group.url,  // 後端期望的參數名
+      chatId: chatId || group.url,
       username: chatId,
-      resourceId: group.id,  // 資源 ID 作為備用
-      groupName: group.name
+      resourceId: group.id,
+      groupName: group.name,
+      // 🆕 傳遞篩選配置
+      limit: config.limit === -1 ? undefined : config.limit,
+      filters: {
+        bots: !config.filters.excludeBots,
+        offline: config.filters.onlineStatus === 'offline',
+        online: config.filters.onlineStatus === 'online',
+        chinese: config.filters.hasChinese,
+        hasUsername: config.filters.hasUsername,
+        isPremium: config.filters.isPremium,
+        excludeAdmins: config.filters.excludeAdmins
+      },
+      autoSave: config.advanced.autoSaveToResources,
+      skipDuplicates: config.advanced.skipDuplicates
     });
+    
     this.toastService.info(`🔄 正在提取 ${group.name} 的成員...`);
+  }
+  
+  // 🆕 計算提取進度百分比
+  getExtractionPercent(): number {
+    const progress = this.extractionProgress();
+    if (progress.total === 0) return 0;
+    return Math.min(100, Math.round((progress.extracted / progress.total) * 100));
+  }
+  
+  // 🆕 清除提取結果顯示
+  clearExtractionResult() {
+    this.extractionResult.set({
+      completed: false,
+      groupId: '',
+      count: 0,
+      online: 0,
+      recently: 0,
+      premium: 0
+    });
   }
 
   copyGroupLink() {

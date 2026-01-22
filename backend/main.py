@@ -18874,7 +18874,38 @@ class BackendService:
                             })
                             
                 except Exception as e:
-                    print(f"[Backend] Auto-verify error for resource {resource.get('id')}: {e}", file=sys.stderr)
+                    error_str = str(e).lower()
+                    resource_id = resource.get('id')
+                    username = resource.get('username', 'unknown')
+                    
+                    # 錯誤分類和處理
+                    if 'username not found' in error_str or 'not found' in error_str:
+                        # 用戶名不存在：標記為無效
+                        await db.execute(
+                            "UPDATE discovered_resources SET status = 'invalid', type_verified = 1, notes = ? WHERE id = ?",
+                            (f"用戶名不存在: {username}", resource_id)
+                        )
+                        await db._connection.commit()
+                        # 只在調試時輸出（避免日誌過多）
+                        print(f"[Backend] Resource {resource_id}: Username not found ({username})", file=sys.stderr)
+                    elif 'floodwait' in error_str:
+                        # FloodWait：跳過，稍後重試
+                        print(f"[Backend] FloodWait during verification, skipping remaining", file=sys.stderr)
+                        break  # 停止本次驗證，避免觸發更多限制
+                    elif 'peer_flood' in error_str or 'flood' in error_str:
+                        # 觸發 Flood 限制，停止驗證
+                        print(f"[Backend] Flood limit hit, stopping verification", file=sys.stderr)
+                        break
+                    elif 'forbidden' in error_str or 'access' in error_str:
+                        # 權限問題：標記需要手動驗證
+                        await db.execute(
+                            "UPDATE discovered_resources SET notes = ? WHERE id = ?",
+                            (f"需要手動驗證: 權限不足", resource_id)
+                        )
+                        await db._connection.commit()
+                    else:
+                        # 其他錯誤：只記錄日誌
+                        print(f"[Backend] Auto-verify error for resource {resource_id}: {e}", file=sys.stderr)
                     continue
             
             if verified_count > 0:
@@ -20066,6 +20097,16 @@ class BackendService:
                 result['extracted'] = len(filtered_members)
                 
                 self.send_log(f"✅ 提取完成: {len(filtered_members)} 成員 (總計: {len(members)})", "success")
+                
+                # 🆕 自動同步到統一聯繫人表
+                try:
+                    from unified_contacts import get_unified_contacts_manager
+                    manager = get_unified_contacts_manager(db)
+                    sync_stats = await manager.sync_from_sources()
+                    print(f"[Backend] Auto-synced to unified_contacts: {sync_stats}", file=sys.stderr)
+                    self.send_log(f"✅ 已同步到資源中心: 新增 {sync_stats['synced']}，更新 {sync_stats['updated']}", "info")
+                except Exception as sync_err:
+                    print(f"[Backend] Auto-sync error: {sync_err}", file=sys.stderr)
             else:
                 self.send_log(f"❌ 提取失敗: {result['error']}", "error")
             

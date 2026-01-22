@@ -69,7 +69,8 @@ type ResourceTab = 'all' | 'users' | 'groups' | 'channels';
       
       <!-- 統計卡片 -->
       <div class="p-4 border-b border-slate-700/30">
-        <div class="grid grid-cols-5 gap-4">
+        <!-- 第一行：類型統計 -->
+        <div class="grid grid-cols-5 gap-4 mb-4">
           <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
             <div class="text-slate-400 text-sm mb-1">📊 總數</div>
             <div class="text-2xl font-bold text-white">{{ contactsService.stats().total }}</div>
@@ -89,6 +90,36 @@ type ResourceTab = 'all' | 'users' | 'groups' | 'channels';
           <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
             <div class="text-slate-400 text-sm mb-1">🆕 本週新增</div>
             <div class="text-2xl font-bold text-emerald-400">+{{ contactsService.stats().recent_added }}</div>
+          </div>
+        </div>
+        
+        <!-- 🆕 第二行：來源分布 -->
+        <div class="flex items-center gap-6 text-sm">
+          <span class="text-slate-500">來源分布：</span>
+          <div class="flex items-center gap-1">
+            <span class="text-blue-400">👥</span>
+            <span class="text-slate-300">群組提取</span>
+            <span class="font-semibold text-blue-400 ml-1">{{ contactsService.stats().by_source?.['member'] || 0 }}</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-orange-400">🎯</span>
+            <span class="text-slate-300">營銷漏斗</span>
+            <span class="font-semibold text-orange-400 ml-1">{{ contactsService.stats().by_source?.['lead'] || 0 }}</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-green-400">🔍</span>
+            <span class="text-slate-300">資源發現</span>
+            <span class="font-semibold text-green-400 ml-1">{{ contactsService.stats().by_source?.['resource'] || 0 }}</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-purple-400">✋</span>
+            <span class="text-slate-300">手動添加</span>
+            <span class="font-semibold text-purple-400 ml-1">{{ contactsService.stats().by_source?.['manual'] || 0 }}</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-cyan-400">📥</span>
+            <span class="text-slate-300">批量導入</span>
+            <span class="font-semibold text-cyan-400 ml-1">{{ contactsService.stats().by_source?.['import'] || 0 }}</span>
           </div>
         </div>
       </div>
@@ -260,12 +291,15 @@ type ResourceTab = 'all' | 'users' | 'groups' | 'channels';
                       </span>
                     </td>
                     <td class="p-3">
-                      <div class="text-sm text-slate-400">
-                        {{ getSourceLabel(contact.source_type) }}
+                      <div class="flex items-center gap-1">
+                        <span class="text-sm">{{ getSourceIcon(contact.source_type) }}</span>
+                        <span class="text-sm px-1.5 py-0.5 rounded" [class]="getSourceColor(contact.source_type)">
+                          {{ getSourceLabel(contact.source_type) }}
+                        </span>
                       </div>
                       @if (contact.source_name) {
-                        <div class="text-xs text-slate-500 truncate max-w-32">
-                          {{ contact.source_name }}
+                        <div class="text-xs text-slate-500 truncate max-w-32 mt-0.5">
+                          📍 {{ contact.source_name }}
                         </div>
                       }
                     </td>
@@ -708,13 +742,38 @@ export class ResourceCenterComponent implements OnInit, OnDestroy {
     }
   }
   
-  getSourceLabel(source: SourceType): string {
+  getSourceLabel(source: SourceType | string): string {
     switch (source) {
       case 'member': return '群組提取';
       case 'resource': return '資源發現';
+      case 'lead': return '營銷漏斗';  // 🆕 發送控制台的 leads
       case 'manual': return '手動添加';
       case 'import': return '批量導入';
-      default: return source;
+      default: return source || '未知';
+    }
+  }
+  
+  // 🆕 獲取來源圖標
+  getSourceIcon(source: SourceType | string): string {
+    switch (source) {
+      case 'member': return '👥';
+      case 'resource': return '🔍';
+      case 'lead': return '🎯';
+      case 'manual': return '✋';
+      case 'import': return '📥';
+      default: return '📋';
+    }
+  }
+  
+  // 🆕 獲取來源顏色
+  getSourceColor(source: SourceType | string): string {
+    switch (source) {
+      case 'member': return 'text-blue-400 bg-blue-500/20';
+      case 'resource': return 'text-green-400 bg-green-500/20';
+      case 'lead': return 'text-orange-400 bg-orange-500/20';
+      case 'manual': return 'text-purple-400 bg-purple-500/20';
+      case 'import': return 'text-cyan-400 bg-cyan-500/20';
+      default: return 'text-slate-400 bg-slate-500/20';
     }
   }
 }

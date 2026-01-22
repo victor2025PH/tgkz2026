@@ -21,8 +21,33 @@ from pathlib import Path
 SOURCE_TYPES = {
     'member': '群組成員',
     'resource': '資源發現',
+    'lead': '營銷漏斗',      # 🆕 發送控制台的 leads
     'manual': '手動添加',
     'import': '批量導入'
+}
+
+# 🆕 Lead狀態 → Contact狀態 映射
+LEAD_STATUS_MAPPING = {
+    'New': 'new',
+    'Contacted': 'contacted',
+    'Replied': 'interested',
+    'Interested': 'interested',
+    'Follow-up': 'negotiating',
+    'Negotiating': 'negotiating',
+    'Closed-Won': 'converted',
+    'Closed-Lost': 'lost',
+    'Unsubscribed': 'blocked'
+}
+
+# 🆕 Contact狀態 → Lead狀態 映射（反向）
+CONTACT_STATUS_TO_LEAD = {
+    'new': 'New',
+    'contacted': 'Contacted',
+    'interested': 'Interested',
+    'negotiating': 'Follow-up',
+    'converted': 'Closed-Won',
+    'lost': 'Closed-Lost',
+    'blocked': 'Unsubscribed'
 }
 
 # 聯繫人狀態
@@ -157,7 +182,7 @@ class UnifiedContactsManager:
         """
         await self.initialize()
         
-        stats = {'synced': 0, 'updated': 0, 'errors': 0, 'from_members': 0, 'from_resources': 0}
+        stats = {'synced': 0, 'updated': 0, 'errors': 0, 'from_members': 0, 'from_resources': 0, 'from_leads': 0}
         now = datetime.now().isoformat()
         
         try:
@@ -370,6 +395,166 @@ class UnifiedContactsManager:
                     
                 except Exception as e:
                     print(f"[UnifiedContacts] Sync resource error: {e}", file=sys.stderr)
+                    stats['errors'] += 1
+            
+            # 3. 🆕 同步 leads (發送控制台數據)
+            try:
+                leads = await self.db.fetch_all('''
+                    SELECT * FROM leads ORDER BY timestamp DESC
+                ''')
+                print(f"[UnifiedContacts] Found {len(leads)} leads to sync", file=sys.stderr)
+            except Exception as e:
+                print(f"[UnifiedContacts] Leads table query error: {e}", file=sys.stderr)
+                leads = []
+            
+            for lead in leads:
+                try:
+                    # leads 表使用 userId 欄位
+                    user_id = lead.get('userId') or lead.get('user_id')
+                    if not user_id:
+                        continue
+                    
+                    telegram_id = str(user_id)
+                    
+                    # 構建顯示名稱
+                    first_name = lead.get('firstName', '') or lead.get('first_name', '') or ''
+                    last_name = lead.get('lastName', '') or lead.get('last_name', '') or ''
+                    display_name = f"{first_name} {last_name}".strip() or lead.get('username') or telegram_id
+                    
+                    # 解析標籤
+                    tags = lead.get('tags', '[]')
+                    if isinstance(tags, str):
+                        try:
+                            tags = json.loads(tags)
+                        except:
+                            tags = []
+                    
+                    # 狀態映射：Lead狀態 → Contact狀態
+                    lead_status = lead.get('status', 'New')
+                    status = LEAD_STATUS_MAPPING.get(lead_status, 'new')
+                    
+                    # 來源信息
+                    source_type = lead.get('sourceType', 'lead')
+                    if source_type == 'group_extract':
+                        source_type = 'member'
+                    elif source_type == 'keyword_trigger':
+                        source_type = 'lead'
+                    else:
+                        source_type = 'lead'
+                    
+                    source_name = lead.get('sourceChatTitle') or lead.get('sourceGroup') or '發送控制台'
+                    source_id = lead.get('sourceChatId') or lead.get('campaignId')
+                    
+                    # 計算互動數據
+                    interaction_history = lead.get('interactionHistory', [])
+                    if isinstance(interaction_history, str):
+                        try:
+                            interaction_history = json.loads(interaction_history)
+                        except:
+                            interaction_history = []
+                    message_count = len(interaction_history) if isinstance(interaction_history, list) else 0
+                    
+                    # 獲取最後聯繫時間
+                    last_contact_at = None
+                    if interaction_history and len(interaction_history) > 0:
+                        last_interaction = interaction_history[-1] if isinstance(interaction_history, list) else None
+                        if last_interaction and isinstance(last_interaction, dict):
+                            last_contact_at = last_interaction.get('timestamp')
+                    
+                    # 嘗試插入或更新
+                    existing = await self.db.fetch_one(
+                        'SELECT id, source_type FROM unified_contacts WHERE telegram_id = ?',
+                        (telegram_id,)
+                    )
+                    
+                    if existing:
+                        # 更新現有記錄，但保留更有價值的狀態
+                        # 如果來源是 lead 且現有狀態較新，則更新
+                        await self.db.execute('''
+                            UPDATE unified_contacts SET
+                                username = COALESCE(?, username),
+                                display_name = COALESCE(?, display_name),
+                                first_name = COALESCE(?, first_name),
+                                last_name = COALESCE(?, last_name),
+                                phone = COALESCE(?, phone),
+                                source_type = CASE 
+                                    WHEN source_type = 'member' THEN source_type 
+                                    ELSE ? 
+                                END,
+                                source_id = COALESCE(?, source_id),
+                                source_name = COALESCE(?, source_name),
+                                status = CASE 
+                                    WHEN status IN ('new', 'contacted') THEN ? 
+                                    ELSE status 
+                                END,
+                                tags = CASE 
+                                    WHEN tags = '[]' OR tags IS NULL THEN ? 
+                                    ELSE tags 
+                                END,
+                                message_count = CASE 
+                                    WHEN ? > message_count THEN ? 
+                                    ELSE message_count 
+                                END,
+                                last_contact_at = COALESCE(?, last_contact_at),
+                                bio = COALESCE(?, bio),
+                                updated_at = ?,
+                                synced_at = ?
+                            WHERE telegram_id = ?
+                        ''', (
+                            lead.get('username'),
+                            display_name,
+                            first_name,
+                            last_name,
+                            lead.get('phone'),
+                            source_type,
+                            str(source_id) if source_id else None,
+                            source_name,
+                            status,
+                            json.dumps(tags) if isinstance(tags, list) else tags,
+                            message_count,
+                            message_count,
+                            last_contact_at,
+                            lead.get('bio'),
+                            now,
+                            now,
+                            telegram_id
+                        ))
+                        stats['updated'] += 1
+                    else:
+                        # 插入新記錄
+                        await self.db.execute('''
+                            INSERT INTO unified_contacts (
+                                telegram_id, username, display_name, first_name, last_name, phone,
+                                contact_type, source_type, source_id, source_name,
+                                status, tags, message_count, last_contact_at, bio,
+                                created_at, updated_at, synced_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            telegram_id,
+                            lead.get('username'),
+                            display_name,
+                            first_name,
+                            last_name,
+                            lead.get('phone'),
+                            'user',
+                            source_type,
+                            str(source_id) if source_id else None,
+                            source_name,
+                            status,
+                            json.dumps(tags) if isinstance(tags, list) else tags,
+                            message_count,
+                            last_contact_at,
+                            lead.get('bio'),
+                            lead.get('timestamp', now),
+                            now,
+                            now
+                        ))
+                        stats['synced'] += 1
+                    
+                    stats['from_leads'] += 1
+                    
+                except Exception as e:
+                    print(f"[UnifiedContacts] Sync lead error: {e}", file=sys.stderr)
                     stats['errors'] += 1
             
             print(f"[UnifiedContacts] Sync completed: {stats}", file=sys.stderr)
@@ -636,6 +821,146 @@ class UnifiedContactsManager:
         except Exception as e:
             print(f"[UnifiedContacts] Get by id error: {e}", file=sys.stderr)
             return None
+    
+    # ==================== 🆕 雙向同步方法 ====================
+    
+    async def sync_status_to_leads(self, telegram_ids: List[str], contact_status: str) -> int:
+        """
+        將資源中心的狀態同步到發送控制台 (leads 表)
+        
+        Args:
+            telegram_ids: 要同步的 telegram_id 列表
+            contact_status: 資源中心的狀態
+        
+        Returns:
+            更新的記錄數
+        """
+        try:
+            # 將 Contact 狀態轉換為 Lead 狀態
+            lead_status = CONTACT_STATUS_TO_LEAD.get(contact_status)
+            if not lead_status:
+                print(f"[UnifiedContacts] Unknown contact status: {contact_status}", file=sys.stderr)
+                return 0
+            
+            updated = 0
+            for tid in telegram_ids:
+                try:
+                    # 更新 leads 表
+                    await self.db.execute('''
+                        UPDATE leads SET status = ? WHERE userId = ? OR CAST(userId AS TEXT) = ?
+                    ''', (lead_status, tid, tid))
+                    updated += 1
+                except Exception as e:
+                    print(f"[UnifiedContacts] Sync to leads error for {tid}: {e}", file=sys.stderr)
+            
+            print(f"[UnifiedContacts] Synced {updated} contacts status to leads: {contact_status} -> {lead_status}", file=sys.stderr)
+            return updated
+            
+        except Exception as e:
+            print(f"[UnifiedContacts] Sync to leads error: {e}", file=sys.stderr)
+            return 0
+    
+    async def sync_from_lead(self, lead_data: Dict[str, Any]) -> bool:
+        """
+        單筆同步：從 leads 表同步到 unified_contacts
+        當發送控制台有新 lead 時調用
+        
+        Args:
+            lead_data: Lead 數據
+        
+        Returns:
+            是否成功
+        """
+        await self.initialize()
+        now = datetime.now().isoformat()
+        
+        try:
+            user_id = lead_data.get('userId') or lead_data.get('user_id')
+            if not user_id:
+                return False
+            
+            telegram_id = str(user_id)
+            
+            first_name = lead_data.get('firstName', '') or ''
+            last_name = lead_data.get('lastName', '') or ''
+            display_name = f"{first_name} {last_name}".strip() or lead_data.get('username') or telegram_id
+            
+            lead_status = lead_data.get('status', 'New')
+            status = LEAD_STATUS_MAPPING.get(lead_status, 'new')
+            
+            existing = await self.db.fetch_one(
+                'SELECT id FROM unified_contacts WHERE telegram_id = ?',
+                (telegram_id,)
+            )
+            
+            if existing:
+                await self.db.execute('''
+                    UPDATE unified_contacts SET
+                        username = COALESCE(?, username),
+                        display_name = COALESCE(?, display_name),
+                        status = ?,
+                        updated_at = ?,
+                        synced_at = ?
+                    WHERE telegram_id = ?
+                ''', (
+                    lead_data.get('username'),
+                    display_name,
+                    status,
+                    now,
+                    now,
+                    telegram_id
+                ))
+            else:
+                await self.db.execute('''
+                    INSERT INTO unified_contacts (
+                        telegram_id, username, display_name, first_name, last_name,
+                        contact_type, source_type, status,
+                        created_at, updated_at, synced_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    telegram_id,
+                    lead_data.get('username'),
+                    display_name,
+                    first_name,
+                    last_name,
+                    'user',
+                    'lead',
+                    status,
+                    now,
+                    now,
+                    now
+                ))
+            
+            return True
+            
+        except Exception as e:
+            print(f"[UnifiedContacts] Sync from lead error: {e}", file=sys.stderr)
+            return False
+    
+    async def update_status_with_sync(self, telegram_ids: List[str], new_status: str, sync_to_leads: bool = True) -> Dict[str, int]:
+        """
+        更新狀態並同步到 leads 表
+        
+        Args:
+            telegram_ids: telegram_id 列表
+            new_status: 新狀態
+            sync_to_leads: 是否同步到 leads 表
+        
+        Returns:
+            {contacts_updated: int, leads_updated: int}
+        """
+        result = {'contacts_updated': 0, 'leads_updated': 0}
+        
+        # 更新 unified_contacts
+        contacts_updated = await self.update_status(telegram_ids, new_status)
+        result['contacts_updated'] = contacts_updated
+        
+        # 同步到 leads 表
+        if sync_to_leads:
+            leads_updated = await self.sync_status_to_leads(telegram_ids, new_status)
+            result['leads_updated'] = leads_updated
+        
+        return result
 
 
 # 全局實例（需要在初始化時設置 db）

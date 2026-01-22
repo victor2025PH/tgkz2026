@@ -16,7 +16,7 @@ import { ElectronIpcService } from '../electron-ipc.service';
 export type ContactType = 'user' | 'group' | 'channel';
 
 // 來源類型
-export type SourceType = 'member' | 'resource' | 'manual' | 'import';
+export type SourceType = 'member' | 'resource' | 'lead' | 'manual' | 'import';
 
 // 聯繫人狀態
 export type ContactStatus = 'new' | 'contacted' | 'interested' | 'negotiating' | 'converted' | 'lost' | 'blocked';

@@ -2374,6 +2374,10 @@ class BackendService:
             elif command == "unified-contacts:delete":
                 await self.handle_unified_contacts_delete(payload)
             
+            # 🆕 資源中心狀態同步到 Leads
+            elif command == "sync-resource-status-to-leads":
+                await self.handle_sync_resource_status_to_leads(payload)
+            
             # ==================== Analytics Commands ====================
             elif command == "analytics:get-stats":
                 await self.handle_analytics_get_stats(payload)
@@ -9915,7 +9919,7 @@ class BackendService:
             })
     
     async def handle_update_lead_status(self, payload: Dict[str, Any]):
-        """Handle update-lead-status command"""
+        """Handle update-lead-status command (帶雙向同步)"""
         try:
             lead_id = payload.get('leadId')
             new_status = payload.get('newStatus')
@@ -9923,6 +9927,21 @@ class BackendService:
             await db.add_interaction(lead_id, 'Status Change', f"Status changed to {new_status}")
             await db.add_log(f"Lead {lead_id} status updated to {new_status}", "success")
             await self.send_leads_update()
+            
+            # 🆕 同步到統一聯繫人表
+            try:
+                # 獲取 lead 的 userId
+                lead = await db.get_lead_by_id(lead_id)
+                if lead:
+                    user_id = str(lead.get('userId', lead.get('user_id', '')))
+                    if user_id:
+                        from unified_contacts import get_unified_contacts_manager, LEAD_STATUS_MAPPING
+                        manager = get_unified_contacts_manager(db)
+                        contact_status = LEAD_STATUS_MAPPING.get(new_status, 'new')
+                        await manager.update_status([user_id], contact_status)
+                        print(f"[Backend] Synced lead status to unified_contacts: {user_id} -> {contact_status}", file=sys.stderr)
+            except Exception as sync_error:
+                print(f"[Backend] Warning: Could not sync status to unified_contacts: {sync_error}", file=sys.stderr)
         
         except Exception as e:
             self.send_log(f"Error updating lead status: {str(e)}", "error")
@@ -9997,6 +10016,23 @@ class BackendService:
                     await db._connection.commit()
                 except Exception as sync_error:
                     print(f"[Backend] Warning: Could not sync member status: {sync_error}", file=sys.stderr)
+            
+            # 🆕 同步到統一聯繫人表
+            try:
+                from unified_contacts import get_unified_contacts_manager
+                manager = get_unified_contacts_manager(db)
+                await manager.sync_from_lead({
+                    'userId': user_id,
+                    'username': username,
+                    'firstName': first_name,
+                    'lastName': last_name,
+                    'status': 'New',
+                    'sourceChatTitle': source_chat_title,
+                    'sourceChatId': source_chat_id
+                })
+                print(f"[Backend] Synced new lead to unified_contacts: {user_id}", file=sys.stderr)
+            except Exception as sync_error:
+                print(f"[Backend] Warning: Could not sync to unified_contacts: {sync_error}", file=sys.stderr)
         
         except Exception as e:
             import traceback
@@ -21721,21 +21757,29 @@ class BackendService:
             })
     
     async def handle_unified_contacts_update_status(self, payload: Dict[str, Any]):
-        """批量更新狀態"""
+        """批量更新狀態 (帶雙向同步)"""
         import sys
         from unified_contacts import get_unified_contacts_manager
         
         try:
             telegram_ids = payload.get('telegramIds', [])
             status = payload.get('status')
+            sync_to_leads = payload.get('syncToLeads', True)  # 🆕 是否同步到 leads
             
             manager = get_unified_contacts_manager(db)
-            updated = await manager.update_status(telegram_ids, status)
+            
+            # 🆕 使用帶同步的更新方法
+            result = await manager.update_status_with_sync(telegram_ids, status, sync_to_leads)
             
             self.send_event("unified-contacts:update-status-result", {
                 "success": True,
-                "updated": updated
+                "updated": result['contacts_updated'],
+                "leads_updated": result['leads_updated']  # 🆕 返回 leads 更新數
             })
+            
+            # 🆕 如果有同步到 leads，通知前端更新 leads 列表
+            if result['leads_updated'] > 0:
+                await self.send_leads_update()
             
         except Exception as e:
             print(f"[Backend] Update status error: {e}", file=sys.stderr)
@@ -21764,6 +21808,58 @@ class BackendService:
         except Exception as e:
             print(f"[Backend] Delete contacts error: {e}", file=sys.stderr)
             self.send_event("unified-contacts:delete-result", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_sync_resource_status_to_leads(self, payload: Dict[str, Any]):
+        """
+        🆕 從資源中心同步狀態到發送控制台 (leads 表)
+        當用戶在資源中心修改聯繫人狀態時調用
+        """
+        import sys
+        from unified_contacts import CONTACT_STATUS_TO_LEAD
+        
+        try:
+            telegram_ids = payload.get('telegramIds', [])
+            lead_status = payload.get('status')  # 已經是 Lead 狀態格式
+            
+            if not telegram_ids or not lead_status:
+                self.send_event("sync-resource-status-to-leads-result", {
+                    "success": False,
+                    "error": "Missing telegramIds or status"
+                })
+                return
+            
+            print(f"[Backend] Syncing resource status to leads: {len(telegram_ids)} contacts -> {lead_status}", file=sys.stderr)
+            
+            updated = 0
+            for tid in telegram_ids:
+                try:
+                    # 更新 leads 表中對應的記錄
+                    await db._connection.execute('''
+                        UPDATE leads SET status = ? 
+                        WHERE userId = ? OR CAST(userId AS TEXT) = ?
+                    ''', (lead_status, tid, tid))
+                    updated += 1
+                except Exception as e:
+                    print(f"[Backend] Error updating lead {tid}: {e}", file=sys.stderr)
+            
+            await db._connection.commit()
+            
+            self.send_event("sync-resource-status-to-leads-result", {
+                "success": True,
+                "updated": updated
+            })
+            
+            # 刷新前端的 leads 列表
+            if updated > 0:
+                await self.send_leads_update()
+                self.send_log(f"✅ 已同步 {updated} 個聯繫人狀態到發送控制台", "info")
+            
+        except Exception as e:
+            print(f"[Backend] Sync resource status to leads error: {e}", file=sys.stderr)
+            self.send_event("sync-resource-status-to-leads-result", {
                 "success": False,
                 "error": str(e)
             })

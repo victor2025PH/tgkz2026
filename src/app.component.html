@@ -4968,7 +4968,8 @@
                   (viewDetailEvent)="handleResourceViewDetail($event)"
                   (batchSendEvent)="handleResourceBatchSend($event)"
                   (sendToAISalesEvent)="handleResourceSendToAISales($event)"
-                  (statusChangedEvent)="handleResourceStatusChanged($event)">
+                  (statusChangedEvent)="handleResourceStatusChanged($event)"
+                  (refreshDataEvent)="refreshLeadsData()">
                 </app-resource-center>
               }
               @case ('stats') {

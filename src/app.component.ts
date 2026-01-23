@@ -6968,8 +6968,12 @@ export class AppComponent implements OnDestroy, OnInit {
     this.ipcService.on('leads-updated', (data: {leads: any[], total?: number}) => {
         const total = data.total ?? data.leads?.length ?? 0;
         console.log('[Frontend] Received leads-updated:', data.leads?.length || 0, 'total:', total);
-        this.leads.set((data.leads || []).map((l: any) => this.mapLeadFromBackend(l)));
+        const mappedLeads = (data.leads || []).map((l: any) => this.mapLeadFromBackend(l));
+        this.leads.set(mappedLeads);
         this.leadsTotal.set(total);
+        
+        // 🆕 同時更新資源中心，使用同一份數據
+        this.contactsService.importLeadsDirectly(mappedLeads);
     });
     
     // 漏斗統計事件
@@ -8843,9 +8847,14 @@ export class AppComponent implements OnDestroy, OnInit {
         if (state.isMonitoring !== undefined) {
             this.isMonitoring.set(state.isMonitoring);
         }
-        this.leads.set((state.leads || []).map((l: any) => this.mapLeadFromBackend(l)));
+        const mappedLeads = (state.leads || []).map((l: any) => this.mapLeadFromBackend(l));
+        this.leads.set(mappedLeads);
         // 設置 leads 總數（如果後端提供了 total，則使用；否則使用 leads 數組長度）
         this.leadsTotal.set(state.leadsTotal ?? state.leads?.length ?? 0);
+        
+        // 🆕 同時更新資源中心，使用同一份 leads 數據
+        this.contactsService.importLeadsDirectly(mappedLeads);
+        
         this.logs.set((state.logs || []).map((l: LogEntry) => ({...l, timestamp: new Date(l.timestamp)})));
         
         // Load settings
@@ -13269,6 +13278,15 @@ export class AppComponent implements OnDestroy, OnInit {
     });
     
     console.log('[Frontend] Status synced for', event.contacts.length, 'contacts');
+  }
+  
+  /**
+   * 🆕 刷新 Leads 數據（資源中心請求刷新時調用）
+   */
+  refreshLeadsData(): void {
+    console.log('[Frontend] Refreshing leads data for resource center...');
+    this.ipcService.send('get-leads', {});
+    this.toastService.info('正在刷新數據...', 1500);
   }
   
   /**

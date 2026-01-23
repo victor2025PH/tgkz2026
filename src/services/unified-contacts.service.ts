@@ -541,6 +541,114 @@ export class UnifiedContactsService {
     return option?.label || status;
   }
   
+  // ==================== 🆕 直接從 Leads 導入（前端同步） ====================
+  
+  /**
+   * Lead 狀態映射到 Contact 狀態
+   */
+  private mapLeadStatus(leadStatus: string): ContactStatus {
+    const mapping: Record<string, ContactStatus> = {
+      'New': 'new',
+      'Contacted': 'contacted',
+      'Replied': 'interested',
+      'Interested': 'interested',
+      'Follow-up': 'negotiating',
+      'Negotiating': 'negotiating',
+      'Closed-Won': 'converted',
+      'Closed-Lost': 'lost',
+      'Unsubscribed': 'blocked'
+    };
+    return mapping[leadStatus] || 'new';
+  }
+  
+  /**
+   * 直接從前端 leads 數據導入到資源中心
+   * 這樣就不需要後端同步，數據保持一致
+   */
+  importLeadsDirectly(leads: any[]): void {
+    console.log('[UnifiedContacts] Importing leads directly:', leads.length);
+    
+    if (!leads || leads.length === 0) {
+      return;
+    }
+    
+    // 將 leads 轉換為 UnifiedContact 格式
+    const contacts: UnifiedContact[] = leads.map((lead, index) => ({
+      id: lead.id || index,
+      telegram_id: String(lead.userId || lead.user_id || ''),
+      username: lead.username || '',
+      display_name: lead.firstName || lead.username || String(lead.userId || ''),
+      first_name: lead.firstName || '',
+      last_name: lead.lastName || '',
+      phone: lead.phone || '',
+      
+      contact_type: 'user' as ContactType,
+      source_type: (lead.sourceType === 'group_extract' ? 'member' : 'lead') as SourceType,
+      source_id: lead.sourceChatId || lead.campaignId?.toString() || '',
+      source_name: lead.sourceGroup || lead.sourceChatTitle || '發送控制台',
+      
+      status: this.mapLeadStatus(lead.status || 'New'),
+      tags: lead.tags || [],
+      
+      ai_score: lead.aiScore || 0.5,
+      activity_score: lead.activityScore || 0.5,
+      value_level: lead.valueLevel || 'C',
+      
+      is_online: lead.onlineStatus === 'Online',
+      last_seen: lead.lastSeen,
+      
+      is_bot: false,
+      is_premium: lead.isPremium || false,
+      is_verified: lead.isVerified || false,
+      member_count: 0,
+      
+      message_count: (lead.interactionHistory || []).length,
+      last_contact_at: lead.lastContactAt,
+      last_message_at: lead.lastMessageAt,
+      
+      bio: lead.bio || '',
+      notes: lead.notes || '',
+      metadata: {},
+      
+      created_at: lead.timestamp || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      synced_at: new Date().toISOString()
+    }));
+    
+    // 更新聯繫人列表
+    this._contacts.set(contacts);
+    this._total.set(contacts.length);
+    
+    // 更新統計
+    const byStatus: Record<string, number> = {};
+    const bySource: Record<string, number> = {};
+    
+    contacts.forEach(c => {
+      byStatus[c.status] = (byStatus[c.status] || 0) + 1;
+      bySource[c.source_type] = (bySource[c.source_type] || 0) + 1;
+    });
+    
+    this._stats.set({
+      total: contacts.length,
+      users: contacts.length,
+      groups: 0,
+      channels: 0,
+      by_status: byStatus,
+      by_source: bySource,
+      recent_added: contacts.filter(c => {
+        const created = new Date(c.created_at);
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        return created >= weekAgo;
+      }).length
+    });
+    
+    this._isLoading.set(false);
+    this._isSyncing.set(false);
+    
+    console.log('[UnifiedContacts] Imported', contacts.length, 'contacts from leads');
+  }
+  
   /**
    * 清理
    */

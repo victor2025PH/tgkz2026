@@ -481,6 +481,8 @@ export class ResourceCenterComponent implements OnInit, OnDestroy {
   sendToAISalesEvent = output<UnifiedContact[]>();
   // 🆕 狀態同步事件 - 通知父組件同步到發送控制台
   statusChangedEvent = output<{ contacts: UnifiedContact[]; status: string }>();
+  // 🆕 請求刷新數據事件
+  refreshDataEvent = output<void>();
   
   // Tab 配置
   tabs = [
@@ -565,8 +567,9 @@ export class ResourceCenterComponent implements OnInit, OnDestroy {
   
   // 同步數據
   syncData() {
-    this.contactsService.syncFromSources();
-    this.toast.info('正在同步數據...', 2000);
+    // 🆕 請求父組件刷新 leads 數據，這會自動更新資源中心
+    this.refreshDataEvent.emit();
+    this.toast.info('正在刷新數據...', 2000);
   }
   
   // 搜索

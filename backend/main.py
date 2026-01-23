@@ -3203,9 +3203,13 @@ class BackendService:
             print(f"[Backend] Error sending campaigns update: {e}", file=sys.stderr)
     
     async def send_leads_update(self):
-        """Send only leads update to frontend"""
+        """Send only leads update to frontend（🆕 包含 total）"""
         try:
-            leads = await db.get_all_leads()
+            # 🆕 使用 get_leads_with_total 獲取完整數據和總數
+            data = await db.get_leads_with_total()
+            leads = data.get('leads', [])
+            total = data.get('total', len(leads))
+            
             for lead in leads:
                 if isinstance(lead.get('timestamp'), str):
                     pass
@@ -3216,7 +3220,8 @@ class BackendService:
                         pass
                     else:
                         interaction['timestamp'] = datetime.fromisoformat(interaction['timestamp']).isoformat() + "Z"
-            self.send_event("leads-updated", {"leads": leads})
+            
+            self.send_event("leads-updated", {"leads": leads, "total": total})
         except Exception as e:
             print(f"[Backend] Error sending leads update: {e}", file=sys.stderr)
     

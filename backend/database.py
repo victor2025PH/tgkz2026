@@ -3348,27 +3348,30 @@ class Database:
             print(f"Error removing campaign: {e}")
             return False
     
-    async def get_all_leads(self, limit: int = 50) -> List[Dict]:
-        """獲取潛在客戶（優化：初始載入減少數量）"""
+    async def get_all_leads(self, limit: int = 500) -> List[Dict]:
+        """獲取潛在客戶（🆕 增加默認限制到 500）"""
         import sys
         try:
-            results = await self.fetch_all(f'SELECT * FROM extracted_members ORDER BY created_at DESC LIMIT {limit}')
+            results = await self.fetch_all(f'SELECT * FROM leads ORDER BY timestamp DESC LIMIT {limit}')
             print(f"[Database] get_all_leads: Returning {len(results)} records (limit={limit})", file=sys.stderr)
             return results
         except Exception as e:
             print(f"Error getting leads: {e}", file=sys.stderr)
             return []
     
-    async def get_leads_with_total(self, limit: int = 50) -> Dict:
-        """獲取潛在客戶及總數"""
+    async def get_leads_with_total(self, limit: int = 500) -> Dict:
+        """獲取潛在客戶及總數（🆕 增加默認限制到 500，確保返回所有數據）"""
         import sys
         try:
             # 獲取總數
-            count_result = await self.fetch_one('SELECT COUNT(*) as total FROM extracted_members')
+            count_result = await self.fetch_one('SELECT COUNT(*) as total FROM leads')
             total_count = count_result['total'] if count_result else 0
             
-            # 獲取記錄
-            results = await self.fetch_all(f'SELECT * FROM extracted_members ORDER BY created_at DESC LIMIT {limit}')
+            # 🆕 如果 limit 大於總數，使用總數作為 limit
+            actual_limit = min(limit, max(total_count, 500))
+            
+            # 獲取記錄（🆕 從 leads 表而非 extracted_members）
+            results = await self.fetch_all(f'SELECT * FROM leads ORDER BY timestamp DESC LIMIT {actual_limit}')
             print(f"[Database] get_leads_with_total: Total={total_count}, Returning {len(results)} records", file=sys.stderr)
             
             return {

@@ -3352,7 +3352,8 @@ class Database:
         """獲取潛在客戶（🆕 增加默認限制到 500）"""
         import sys
         try:
-            results = await self.fetch_all(f'SELECT * FROM leads ORDER BY timestamp DESC LIMIT {limit}')
+            # 從 extracted_members 表讀取（這是實際存儲客戶數據的表）
+            results = await self.fetch_all(f'SELECT * FROM extracted_members ORDER BY created_at DESC LIMIT {limit}')
             print(f"[Database] get_all_leads: Returning {len(results)} records (limit={limit})", file=sys.stderr)
             return results
         except Exception as e:
@@ -3363,15 +3364,15 @@ class Database:
         """獲取潛在客戶及總數（🆕 增加默認限制到 500，確保返回所有數據）"""
         import sys
         try:
-            # 獲取總數
-            count_result = await self.fetch_one('SELECT COUNT(*) as total FROM leads')
+            # 獲取總數（從 extracted_members 表）
+            count_result = await self.fetch_one('SELECT COUNT(*) as total FROM extracted_members')
             total_count = count_result['total'] if count_result else 0
             
-            # 🆕 如果 limit 大於總數，使用總數作為 limit
-            actual_limit = min(limit, max(total_count, 500))
+            # 🆕 如果總數小於 limit，則返回所有數據
+            actual_limit = max(limit, total_count)
             
-            # 獲取記錄（🆕 從 leads 表而非 extracted_members）
-            results = await self.fetch_all(f'SELECT * FROM leads ORDER BY timestamp DESC LIMIT {actual_limit}')
+            # 獲取記錄（從 extracted_members 表）
+            results = await self.fetch_all(f'SELECT * FROM extracted_members ORDER BY created_at DESC LIMIT {actual_limit}')
             print(f"[Database] get_leads_with_total: Total={total_count}, Returning {len(results)} records", file=sys.stderr)
             
             return {

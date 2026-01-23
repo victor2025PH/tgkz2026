@@ -1,0 +1,63 @@
+# TG-AI智控王 開發規範
+
+## 語言與回應
+- 始終使用**繁體中文**回覆
+- 代碼註釋可用簡體中文或英文
+
+## 技術棧
+- **前端**: Angular 21 + TypeScript (Standalone Components)
+- **後端**: Python 3.11+ / FastAPI + Pyrogram (Telegram API)
+- **桌面**: Electron 28
+- **資料庫**: SQLite (tgmatrix.db + tgai_server.db)
+- **通訊**: Electron IPC (stdin/stdout JSON)
+
+## 代碼風格
+- Python: `snake_case`，類名 `PascalCase`
+- TypeScript: `camelCase`，類名/組件 `PascalCase`
+- 資料庫欄位: `snake_case`
+
+## API 規範
+後端所有響應必須遵循統一格式：
+```python
+{"success": True/False, "data": ..., "error": "錯誤訊息"}
+```
+
+## 資料庫注意事項
+- **N+1 問題**: 列表查詢必須使用 JOIN 或批量獲取，禁止循環內單獨查詢
+- **事務**: 多表更新必須使用 `with db.get_connection() as conn:` 包裹
+- **索引**: 新增查詢條件欄位時考慮是否需要索引
+- **分頁**: 返回大量數據時必須支持 `limit/offset`，並返回 `total` 計數
+
+## Telegram/Pyrogram 特別注意
+- **FloodWait**: 所有 Telegram API 調用必須通過 `safe_telegram_call()` 包裹
+- **Session 文件鎖定**: 操作 session 文件前檢查鎖定狀態，使用 `try-finally` 確保釋放
+- **API_ID/API_HASH**: 絕對禁止硬編碼，必須從 config 讀取
+- **帳號狀態**: 操作前驗證帳號是否已連線 (`client.is_connected()`)
+
+## 前端 UI 規範
+- 所有操作需提供 Loading 狀態反饋
+- 列表為空時顯示空狀態提示
+- 錯誤使用 Toast 通知用戶
+- `@for` 循環必須使用唯一的 `track` 表達式，避免 NG0955 錯誤
+
+## 錯誤處理
+- 後端: 使用 `handle_error()` 統一處理，記錄足夠的上下文
+- 前端: 捕獲所有 API 錯誤，不讓錯誤靜默失敗
+- 日誌: 關鍵操作記錄 INFO，異常記錄 ERROR + 堆棧
+
+## 安全紅線
+- 不在前端存儲敏感憑證
+- 所有用戶輸入必須驗證 (使用 `validators.py` 中的驗證器)
+- 帳號操作需驗證用戶權限和配額
+
+## 已知問題區域（修改時特別小心）
+- `telegram_client.py`: Session 管理、連線狀態
+- `message_queue.py`: 並發控制、隊列狀態
+- `search-discovery.component.ts`: 資源列表渲染
+- `database.py`: 遷移兼容性
+
+## 測試建議
+修改功能後，簡述如何手動測試，包括：
+1. 正常流程
+2. 邊界情況（空值、超長文本、並發）
+3. 錯誤恢復（斷網、API 失敗）

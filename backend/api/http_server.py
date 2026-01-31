@@ -45,6 +45,18 @@ class HttpApiServer:
     
     def _setup_middleware(self):
         """設置中間件"""
+        # 嘗試使用完整的中間件堆棧
+        try:
+            from api.middleware import create_middleware_stack
+            middlewares = create_middleware_stack()
+            for mw in middlewares:
+                self.app.middlewares.append(mw)
+            logger.info(f"Loaded {len(middlewares)} middlewares")
+            return
+        except Exception as e:
+            logger.warning(f"Failed to load middleware stack: {e}, using fallback")
+        
+        # 降級：基本錯誤處理中間件
         @web.middleware
         async def error_middleware(request, handler):
             try:
@@ -145,6 +157,12 @@ class HttpApiServer:
         # 設置
         self.app.router.add_get('/api/v1/settings', self.get_settings)
         self.app.router.add_post('/api/v1/settings', self.save_settings)
+        
+        # 使用量統計
+        self.app.router.add_get('/api/v1/usage', self.get_usage_stats)
+        self.app.router.add_get('/api/v1/usage/today', self.get_today_usage)
+        self.app.router.add_get('/api/v1/usage/history', self.get_usage_history)
+        self.app.router.add_get('/api/v1/quota', self.get_quota_status)
         
         # 初始狀態
         self.app.router.add_get('/api/v1/initial-state', self.get_initial_state)
@@ -569,6 +587,104 @@ class HttpApiServer:
         data = await request.json()
         result = await self._execute_command('save-settings', data)
         return self._json_response(result)
+    
+    # ==================== 使用量統計 ====================
+    
+    async def get_usage_stats(self, request):
+        """獲取使用量摘要"""
+        try:
+            from core.usage_tracker import get_usage_tracker
+            tracker = get_usage_tracker()
+            
+            # 從租戶上下文獲取用戶 ID
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '未登入'
+                }, 401)
+            
+            summary = await tracker.get_usage_summary(user_id)
+            return self._json_response({'success': True, 'data': summary})
+        except Exception as e:
+            logger.error(f"Get usage stats error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_today_usage(self, request):
+        """獲取今日使用量"""
+        try:
+            from core.usage_tracker import get_usage_tracker
+            tracker = get_usage_tracker()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '未登入'
+                }, 401)
+            
+            stats = await tracker.get_today_usage(user_id)
+            return self._json_response({'success': True, 'data': stats.to_dict()})
+        except Exception as e:
+            logger.error(f"Get today usage error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_usage_history(self, request):
+        """獲取使用量歷史"""
+        try:
+            from core.usage_tracker import get_usage_tracker
+            tracker = get_usage_tracker()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '未登入'
+                }, 401)
+            
+            days = int(request.query.get('days', '30'))
+            history = await tracker.get_usage_history(user_id, days)
+            return self._json_response({'success': True, 'data': history})
+        except Exception as e:
+            logger.error(f"Get usage history error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_quota_status(self, request):
+        """獲取配額狀態"""
+        try:
+            from core.usage_tracker import get_usage_tracker
+            tracker = get_usage_tracker()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '未登入'
+                }, 401)
+            
+            # 獲取各類配額狀態
+            api_quota = await tracker.check_quota('api_calls', user_id)
+            accounts_quota = await tracker.check_quota('accounts', user_id)
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'api_calls': api_quota,
+                    'accounts': accounts_quota,
+                    'subscription_tier': tenant.subscription_tier if tenant else 'free'
+                }
+            })
+        except Exception as e:
+            logger.error(f"Get quota status error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
     
     async def get_initial_state(self, request):
         """獲取初始狀態"""

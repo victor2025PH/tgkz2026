@@ -22,10 +22,31 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # 數據庫
+      - DATABASE_PATH=/app/data/tgmatrix.db
       - DATABASE_URL=sqlite:///./data/tgmatrix.db
       - REDIS_URL=redis://redis:6379/0
+      
+      # 安全
       - SECRET_KEY=${SECRET_KEY:-tgmatrix-secret-key-2026}
-      - DEBUG=false
+      - JWT_SECRET=${JWT_SECRET:-tgmatrix-jwt-secret-2026}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      
+      # 模式
+      - DEBUG=${DEBUG:-false}
+      - ELECTRON_MODE=false
+      
+      # 郵件配置
+      - EMAIL_PROVIDER=${EMAIL_PROVIDER:-smtp}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - EMAIL_FROM=${EMAIL_FROM:-noreply@tg-matrix.com}
+      - EMAIL_FROM_NAME=${EMAIL_FROM_NAME:-TG-Matrix}
+      
+      # 其他
+      - TZ=Asia/Shanghai
     depends_on:
       - redis
     restart: always
@@ -33,6 +54,11 @@ services:
       - ./data:/app/data
       - ./data/sessions:/app/sessions
       - ./data/logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Redis 緩存
   redis:

@@ -348,7 +348,7 @@ import { MonitoringStateService } from '../../monitoring/monitoring-state.servic
                 </div>
                 @if (log.matchInfo.keywords && log.matchInfo.keywords.length > 0) {
                   <div class="mt-1 flex flex-wrap gap-1">
-                    @for (kw of log.matchInfo.keywords; track kw) {
+                    @for (kw of log.matchInfo.keywords; track $index) {
                       <span class="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded">
                         {{ kw }}
                       </span>

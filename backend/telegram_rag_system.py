@@ -129,11 +129,13 @@ class TelegramRAGSystem:
         self.embedding_model = None
         self.use_neural_embedding = False
         
-        # 緩存
+        # 緩存 - 🔧 Phase 1 優化：添加大小限制
         self._embedding_cache: Dict[str, np.ndarray] = {}
         self._knowledge_cache: Dict[str, List[KnowledgeItem]] = {}
         self._cache_ttl = 300  # 5分鐘
         self._cache_timestamps: Dict[str, datetime] = {}
+        self._max_embedding_cache_size = 500  # 最多緩存 500 個嵌入
+        self._max_knowledge_cache_size = 200  # 最多緩存 200 個知識查詢
         
         # 配置
         self.min_question_length = 5
@@ -152,13 +154,14 @@ class TelegramRAGSystem:
                 "type": level
             })
     
-    async def initialize(self, use_chromadb: bool = True, use_neural: bool = True):
+    async def initialize(self, use_chromadb: bool = True, use_neural: bool = False):
         """
         初始化 RAG 系統
         
         Args:
             use_chromadb: 是否使用 ChromaDB（否則用 SQLite）
             use_neural: 是否使用神經網絡嵌入（否則用簡單哈希）
+                       🔧 Phase 1 優化：默認 False 節省 300-500MB 內存
         """
         if self.is_initialized:
             return True
@@ -197,15 +200,28 @@ class TelegramRAGSystem:
             persist_dir = os.path.join(os.path.dirname(__file__), "chroma_rag_db")
             os.makedirs(persist_dir, exist_ok=True)
             
+            # 🔧 Phase 3 優化：ChromaDB 設置優化
+            chroma_settings = Settings(
+                anonymized_telemetry=False,
+                allow_reset=False,
+                is_persistent=True,
+            )
+            
             # 嘗試使用 PersistentClient（新版）
             try:
-                self.chroma_client = chromadb.PersistentClient(path=persist_dir)
-            except AttributeError:
+                self.chroma_client = chromadb.PersistentClient(
+                    path=persist_dir,
+                    settings=chroma_settings
+                )
+            except (AttributeError, TypeError):
                 # 降級到舊版 API
-                self.chroma_client = chromadb.Client(Settings(
-                    persist_directory=persist_dir,
-                    anonymized_telemetry=False
-                ))
+                try:
+                    self.chroma_client = chromadb.PersistentClient(path=persist_dir)
+                except AttributeError:
+                    self.chroma_client = chromadb.Client(Settings(
+                        persist_directory=persist_dir,
+                        anonymized_telemetry=False
+                    ))
             
             self.collection = self.chroma_client.get_or_create_collection(
                 name="telegram_rag",
@@ -213,7 +229,13 @@ class TelegramRAGSystem:
             )
             
             self.use_chromadb = True
-            self.log(f"✓ ChromaDB 已初始化，現有 {self.collection.count()} 條知識")
+            count = self.collection.count()
+            self.log(f"✓ ChromaDB 已初始化，現有 {count} 條知識")
+            
+            # 🔧 Phase 3 優化：如果數據量過大，提示清理
+            if count > 10000:
+                self.log(f"⚠️ ChromaDB 數據量較大 ({count})，建議定期清理", "warning")
+            
         except Exception as e:
             self.log(f"ChromaDB 初始化失敗: {e}，降級為 SQLite", "warning")
             self.use_chromadb = False
@@ -271,6 +293,55 @@ class TelegramRAGSystem:
             )
         """)
         
+        # 🆕 知識缺口追蹤表
+        await db._connection.execute("""
+            CREATE TABLE IF NOT EXISTS rag_knowledge_gaps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                query TEXT NOT NULL,
+                query_hash TEXT UNIQUE,
+                hit_count INTEGER DEFAULT 1,
+                best_similarity REAL DEFAULT 0,
+                suggested_answer TEXT,
+                suggested_type TEXT DEFAULT 'faq',
+                status TEXT DEFAULT 'pending',
+                resolved_knowledge_id INTEGER,
+                user_context TEXT,
+                source_type TEXT DEFAULT 'user',
+                category TEXT DEFAULT 'general',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 🔧 Phase 8: 確保舊表有新增的列（兼容現有數據）
+        for col_name, col_def in [
+            ('source_type', "TEXT DEFAULT 'user'"),
+            ('category', "TEXT DEFAULT 'general'")
+        ]:
+            try:
+                await db._connection.execute(f"""
+                    ALTER TABLE rag_knowledge_gaps ADD COLUMN {col_name} {col_def}
+                """)
+                self.log(f"✓ 添加列 rag_knowledge_gaps.{col_name}")
+            except Exception as col_err:
+                if 'duplicate column' not in str(col_err).lower():
+                    pass  # 列已存在或其他非致命錯誤
+        
+        # 🆕 知識效果追蹤表
+        await db._connection.execute("""
+            CREATE TABLE IF NOT EXISTS rag_knowledge_effectiveness (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                knowledge_id INTEGER NOT NULL,
+                conversation_id TEXT,
+                was_helpful INTEGER DEFAULT 0,
+                led_to_conversion INTEGER DEFAULT 0,
+                response_time_ms INTEGER,
+                user_continued INTEGER DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (knowledge_id) REFERENCES rag_knowledge(id)
+            )
+        """)
+        
         # 創建索引
         try:
             await db._connection.execute(
@@ -281,6 +352,12 @@ class TelegramRAGSystem:
             )
             await db._connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_rag_knowledge_score ON rag_knowledge(success_score DESC)"
+            )
+            await db._connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rag_gaps_status ON rag_knowledge_gaps(status)"
+            )
+            await db._connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rag_gaps_count ON rag_knowledge_gaps(hit_count DESC)"
             )
         except:
             pass
@@ -300,6 +377,13 @@ class TelegramRAGSystem:
             embedding = self.embedding_model.encode(text, convert_to_numpy=True)
         else:
             embedding = self._simple_embedding(text)
+        
+        # 🔧 Phase 1 優化：緩存大小限制（LRU 淘汰）
+        if len(self._embedding_cache) >= self._max_embedding_cache_size:
+            # 移除最舊的 20% 條目
+            keys_to_remove = list(self._embedding_cache.keys())[:self._max_embedding_cache_size // 5]
+            for key in keys_to_remove:
+                del self._embedding_cache[key]
         
         # 緩存結果
         self._embedding_cache[cache_key] = embedding
@@ -676,8 +760,17 @@ class TelegramRAGSystem:
         source_account: str = '',
         success_score: float = 0.5
     ) -> Optional[int]:
-        """保存知識到數據庫"""
+        """保存知識到數據庫（🆕 P0: 增強去重邏輯）"""
         try:
+            # 🆕 P0: 基本驗證
+            if not question or not answer:
+                self.log("知識保存失敗: 問題或答案為空", "warning")
+                return None
+            
+            if len(question.strip()) < 3 or len(answer.strip()) < 5:
+                self.log("知識保存失敗: 內容過短", "warning")
+                return None
+            
             # 生成嵌入
             combined_text = f"{question} {answer}"
             embedding = self._compute_embedding(combined_text)
@@ -685,10 +778,30 @@ class TelegramRAGSystem:
             # 生成唯一 ID
             embedding_id = hashlib.md5(combined_text.encode()).hexdigest()
             
+            # 🆕 P0: 先檢查 embedding_id 是否已存在（精確去重）
+            existing_by_id = await db._connection.execute("""
+                SELECT id, question, answer FROM rag_knowledge WHERE embedding_id = ?
+            """, (embedding_id,))
+            existing_row = await existing_by_id.fetchone()
+            
+            if existing_row:
+                # 完全相同的內容已存在，更新評分即可
+                self.log(f"知識已存在 (ID={existing_row['id']})，更新評分", "info")
+                await db._connection.execute("""
+                    UPDATE rag_knowledge 
+                    SET success_score = (success_score + ?) / 2,
+                        use_count = use_count + 1,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (success_score, existing_row['id']))
+                await db._connection.commit()
+                return existing_row['id']
+            
             # 檢查是否已存在相似知識
             existing = await self._find_similar_knowledge(question, threshold=0.85)
             if existing:
                 # 更新現有知識的評分
+                self.log(f"發現相似知識 (ID={existing.id})，更新評分", "info")
                 await db._connection.execute("""
                     UPDATE rag_knowledge 
                     SET success_score = (success_score + ?) / 2,
@@ -702,21 +815,28 @@ class TelegramRAGSystem:
             # 提取關鍵詞
             keywords = self._extract_keywords(question + ' ' + answer)
             
-            # 保存到 SQLite
-            cursor = await db._connection.execute("""
-                INSERT INTO rag_knowledge 
-                (knowledge_type, question, answer, context, keywords,
-                 source_user_id, source_chat_id, source_account,
-                 success_score, embedding, embedding_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                knowledge_type.value, question, answer, context,
-                ','.join(keywords), source_user_id, source_chat_id,
-                source_account, success_score, embedding.tobytes(), embedding_id
-            ))
-            
-            knowledge_id = cursor.lastrowid
-            await db._connection.commit()
+            # 🆕 P0: 使用 INSERT OR REPLACE 避免 UNIQUE 錯誤
+            try:
+                cursor = await db._connection.execute("""
+                    INSERT OR REPLACE INTO rag_knowledge 
+                    (knowledge_type, question, answer, context, keywords,
+                     source_user_id, source_chat_id, source_account,
+                     success_score, embedding, embedding_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    knowledge_type.value, question, answer, context,
+                    ','.join(keywords), source_user_id, source_chat_id,
+                    source_account, success_score, embedding.tobytes(), embedding_id
+                ))
+                
+                knowledge_id = cursor.lastrowid
+                await db._connection.commit()
+            except Exception as insert_err:
+                # 🆕 P0: 捕獲任何插入錯誤，嘗試更新
+                if 'UNIQUE constraint' in str(insert_err):
+                    self.log(f"知識已存在，跳過: {question[:30]}...", "info")
+                    return None
+                raise insert_err
             
             # 同時保存到 ChromaDB（如果可用）
             if self.use_chromadb and self.collection:
@@ -833,6 +953,11 @@ class TelegramRAGSystem:
             if results:
                 for r in results[:limit]:
                     await self._increment_use_count(r.item.id)
+            
+            # 🆕 5. 追蹤知識缺口
+            best_sim = results[0].similarity if results else 0
+            if best_sim < 0.6:  # 低於 60% 匹配度視為潛在缺口
+                await self._track_knowledge_gap(query, best_sim)
             
             return results[:limit]
             
@@ -1333,6 +1458,366 @@ class TelegramRAGSystem:
             context=context,
             success_score=0.7  # 手動添加的知識給較高的初始分數
         )
+    
+    # ==================== 🆕 知識缺口管理 ====================
+    
+    async def _track_knowledge_gap(self, query: str, best_similarity: float, source_type: str = 'user'):
+        """
+        追蹤知識缺口
+        🆕 P0: 入口過濾 - 只記錄真實用戶問題
+        """
+        try:
+            # 🆕 P0-2: 過濾系統生成的 prompt（不是真實用戶問題）
+            system_keywords = [
+                # 最常見的系統 prompt（精確匹配開頭）
+                '根據以下客戶問題', '根据以下客户问题',
+                '為以下客戶問題生成', '为以下客户问题生成',
+                # 通用 AI 指令
+                '根據以下', '根据以下', '生成一個', '生成一个',
+                '生成 5 條', '生成5條', '生成 5 条', '生成5条',
+                '業務描述:', '業務描述：', '业务描述:', '业务描述：',
+                'JSON 格式', '（JSON', '(JSON',
+                '條產品知識', '条产品知识', '條銷售話術', '条销售话术',
+                '條常見問答', '条常见问答', '要求：', '要求:',
+                '請用繁體', '请用简体', '專業、友好', '专业、友好',
+                '適合客服使用', '适合客服使用', '回答要簡潔', '回答要简洁',
+                '你是專業的', '你是专业的', '語氣友好', '语气友好'
+            ]
+            
+            query_lower = query.lower().strip()
+            
+            # 檢查是否為系統 prompt
+            for kw in system_keywords:
+                if kw.lower() in query_lower:
+                    self.log(f"過濾系統 prompt: {query[:50]}...", "debug")
+                    return  # 不記錄系統 prompt
+            
+            # 🆕 P0-2: 過濾過長的內容（超過 200 字可能是文檔而非問題）
+            if len(query) > 200:
+                self.log(f"過濾過長內容: {len(query)} 字", "debug")
+                return
+            
+            # 🆕 P0-2: 過濾過短的內容（少於 3 字無意義）
+            if len(query.strip()) < 3:
+                return
+            
+            query_hash = hashlib.md5(query_lower.encode()).hexdigest()
+            
+            # 嘗試更新現有缺口
+            cursor = await db._connection.execute("""
+                UPDATE rag_knowledge_gaps 
+                SET hit_count = hit_count + 1,
+                    best_similarity = MAX(best_similarity, ?),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE query_hash = ?
+            """, (best_similarity, query_hash))
+            
+            if cursor.rowcount == 0:
+                # 🆕 P1: 自動分類問題
+                category = self._classify_question(query)
+                
+                # 新增缺口（帶分類和來源類型）
+                await db._connection.execute("""
+                    INSERT OR IGNORE INTO rag_knowledge_gaps 
+                    (query, query_hash, best_similarity, hit_count, source_type, category)
+                    VALUES (?, ?, ?, 1, ?, ?)
+                """, (query[:200], query_hash, best_similarity, source_type, category))
+            
+            await db._connection.commit()
+            
+        except Exception as e:
+            self.log(f"追蹤缺口失敗: {e}", "warning")
+    
+    def _classify_question(self, query: str) -> str:
+        """🆕 P1: 自動分類問題"""
+        query_lower = query.lower()
+        
+        # 價格類
+        price_keywords = ['費率', '價格', '多少錢', '收費', '成本', '佣金', '返點', '手續費']
+        if any(kw in query_lower for kw in price_keywords):
+            return 'price'
+        
+        # 流程類
+        process_keywords = ['怎麼', '如何', '步驟', '流程', '對接', '接入', '開戶', '申請']
+        if any(kw in query_lower for kw in process_keywords):
+            return 'process'
+        
+        # 產品類
+        product_keywords = ['支持', '通道', '產品', '功能', '服務', 'h5', '微信', '支付寶']
+        if any(kw in query_lower for kw in product_keywords):
+            return 'product'
+        
+        # 售後類
+        support_keywords = ['投訴', '退款', '問題', '故障', '錯誤', '失敗']
+        if any(kw in query_lower for kw in support_keywords):
+            return 'support'
+        
+        return 'other'
+    
+    async def get_knowledge_gaps(
+        self, 
+        status: str = 'pending',
+        limit: int = 50,
+        min_hits: int = 1  # 🆕 P0-2: 降低門檻，顯示所有缺口
+    ) -> List[Dict[str, Any]]:
+        """獲取知識缺口列表"""
+        try:
+            cursor = await db._connection.execute("""
+                SELECT * FROM rag_knowledge_gaps
+                WHERE status = ? AND hit_count >= ?
+                ORDER BY hit_count DESC, created_at DESC
+                LIMIT ?
+            """, (status, min_hits, limit))
+            
+            rows = await cursor.fetchall()
+            
+            gaps = []
+            for row in rows:
+                gaps.append({
+                    'id': row['id'],
+                    'query': row['query'],
+                    'hitCount': row['hit_count'],
+                    'bestSimilarity': row['best_similarity'],
+                    'suggestedAnswer': row['suggested_answer'],
+                    'suggestedType': row['suggested_type'],
+                    'status': row['status'],
+                    'createdAt': row['created_at'],
+                    'updatedAt': row['updated_at']
+                })
+            
+            return gaps
+            
+        except Exception as e:
+            self.log(f"獲取缺口失敗: {e}", "error")
+            return []
+    
+    async def suggest_gap_answer(self, gap_id: int) -> Optional[str]:
+        """使用 AI 為缺口生成建議答案"""
+        try:
+            cursor = await db._connection.execute(
+                "SELECT query FROM rag_knowledge_gaps WHERE id = ?",
+                (gap_id,)
+            )
+            row = await cursor.fetchone()
+            
+            if not row:
+                return None
+            
+            query = row['query']
+            
+            # 嘗試使用 AI 生成答案
+            # 這裡返回一個佔位符，實際會在 main.py 中調用 AI
+            return f"[AI 建議] 針對問題「{query[:50]}...」的回答..."
+            
+        except Exception as e:
+            self.log(f"生成建議失敗: {e}", "error")
+            return None
+    
+    async def resolve_gap(
+        self, 
+        gap_id: int, 
+        knowledge_type: str,
+        question: str,
+        answer: str
+    ) -> Optional[int]:
+        """解決知識缺口 - 添加知識並標記已解決"""
+        try:
+            # 1. 添加知識
+            kt = KnowledgeType(knowledge_type) if knowledge_type else KnowledgeType.FAQ
+            knowledge_id = await self._save_knowledge(
+                knowledge_type=kt,
+                question=question,
+                answer=answer,
+                success_score=0.7
+            )
+            
+            if knowledge_id:
+                # 2. 標記缺口已解決
+                await db._connection.execute("""
+                    UPDATE rag_knowledge_gaps 
+                    SET status = 'resolved',
+                        resolved_knowledge_id = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (knowledge_id, gap_id))
+                await db._connection.commit()
+                
+                self.log(f"✓ 解決了知識缺口 #{gap_id}")
+            
+            return knowledge_id
+            
+        except Exception as e:
+            self.log(f"解決缺口失敗: {e}", "error")
+            return None
+    
+    async def ignore_gap(self, gap_id: int) -> bool:
+        """忽略知識缺口"""
+        try:
+            await db._connection.execute("""
+                UPDATE rag_knowledge_gaps 
+                SET status = 'ignored',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (gap_id,))
+            await db._connection.commit()
+            return True
+        except:
+            return False
+    
+    async def get_health_report(self) -> Dict[str, Any]:
+        """🆕 獲取知識庫健康度報告"""
+        try:
+            report = {
+                'overallScore': 0,
+                'completeness': {'score': 0, 'details': {}},
+                'effectiveness': {'score': 0, 'details': {}},
+                'freshness': {'score': 0, 'details': {}},
+                'gaps': {'count': 0, 'topGaps': []},
+                'suggestions': []
+            }
+            
+            # 1. 完整性評分
+            cursor = await db._connection.execute("""
+                SELECT knowledge_type, COUNT(*) as count
+                FROM rag_knowledge WHERE is_active = 1
+                GROUP BY knowledge_type
+            """)
+            type_counts = {row['knowledge_type']: row['count'] for row in await cursor.fetchall()}
+            
+            recommended = {
+                'qa': 10, 'faq': 15, 'product': 10, 
+                'script': 10, 'objection': 10, 'greeting': 5, 'closing': 5
+            }
+            
+            completeness_score = 0
+            completeness_details = {}
+            for ktype, rec_count in recommended.items():
+                actual = type_counts.get(ktype, 0)
+                ratio = min(1.0, actual / rec_count)
+                completeness_score += ratio
+                completeness_details[ktype] = {
+                    'actual': actual,
+                    'recommended': rec_count,
+                    'ratio': round(ratio * 100)
+                }
+            
+            completeness_score = round((completeness_score / len(recommended)) * 100)
+            report['completeness'] = {
+                'score': completeness_score,
+                'details': completeness_details
+            }
+            
+            # 2. 效果評分
+            cursor = await db._connection.execute("""
+                SELECT 
+                    AVG(success_score) as avg_score,
+                    SUM(use_count) as total_uses,
+                    SUM(feedback_positive) as positive,
+                    SUM(feedback_negative) as negative
+                FROM rag_knowledge WHERE is_active = 1
+            """)
+            eff = await cursor.fetchone()
+            
+            avg_score = eff['avg_score'] or 0.5
+            total_feedback = (eff['positive'] or 0) + (eff['negative'] or 0)
+            satisfaction = (eff['positive'] or 0) / max(1, total_feedback)
+            
+            effectiveness_score = round((avg_score * 0.6 + satisfaction * 0.4) * 100)
+            report['effectiveness'] = {
+                'score': effectiveness_score,
+                'details': {
+                    'avgScore': round(avg_score, 2),
+                    'totalUses': eff['total_uses'] or 0,
+                    'satisfaction': round(satisfaction * 100),
+                    'positiveFeedback': eff['positive'] or 0,
+                    'negativeFeedback': eff['negative'] or 0
+                }
+            }
+            
+            # 3. 時效性評分
+            cursor = await db._connection.execute("""
+                SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN updated_at > datetime('now', '-7 days') THEN 1 ELSE 0 END) as recent,
+                    SUM(CASE WHEN updated_at < datetime('now', '-30 days') THEN 1 ELSE 0 END) as stale
+                FROM rag_knowledge WHERE is_active = 1
+            """)
+            fresh = await cursor.fetchone()
+            
+            total = fresh['total'] or 1
+            recent_ratio = (fresh['recent'] or 0) / total
+            stale_ratio = (fresh['stale'] or 0) / total
+            
+            freshness_score = round((1 - stale_ratio * 0.5) * 100)
+            report['freshness'] = {
+                'score': freshness_score,
+                'details': {
+                    'total': total,
+                    'recentlyUpdated': fresh['recent'] or 0,
+                    'stale': fresh['stale'] or 0,
+                    'staleRatio': round(stale_ratio * 100)
+                }
+            }
+            
+            # 4. 知識缺口
+            cursor = await db._connection.execute("""
+                SELECT COUNT(*) as count FROM rag_knowledge_gaps WHERE status = 'pending'
+            """)
+            gap_count = (await cursor.fetchone())['count']
+            
+            top_gaps = await self.get_knowledge_gaps(limit=5, min_hits=1)
+            report['gaps'] = {
+                'count': gap_count,
+                'topGaps': top_gaps
+            }
+            
+            # 5. 計算總分
+            report['overallScore'] = round(
+                completeness_score * 0.3 +
+                effectiveness_score * 0.4 +
+                freshness_score * 0.3
+            )
+            
+            # 6. 生成建議
+            suggestions = []
+            
+            if completeness_score < 70:
+                low_types = [k for k, v in completeness_details.items() if v['ratio'] < 50]
+                if low_types:
+                    suggestions.append({
+                        'type': 'completeness',
+                        'priority': 'high',
+                        'message': f"建議添加更多「{', '.join(low_types)}」類型的知識"
+                    })
+            
+            if gap_count > 5:
+                suggestions.append({
+                    'type': 'gaps',
+                    'priority': 'high',
+                    'message': f"有 {gap_count} 個未解決的知識缺口，建議優先處理"
+                })
+            
+            if fresh['stale'] > 5:
+                suggestions.append({
+                    'type': 'freshness',
+                    'priority': 'medium',
+                    'message': f"有 {fresh['stale']} 條知識超過 30 天未更新"
+                })
+            
+            if effectiveness_score < 60:
+                suggestions.append({
+                    'type': 'effectiveness',
+                    'priority': 'medium',
+                    'message': "知識效果評分較低，建議審查低分知識"
+                })
+            
+            report['suggestions'] = suggestions
+            
+            return report
+            
+        except Exception as e:
+            self.log(f"生成健康報告失敗: {e}", "error")
+            return {'error': str(e), 'overallScore': 0}
 
 
 # 創建全局實例

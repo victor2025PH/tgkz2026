@@ -116,8 +116,13 @@ class PrivateMessageHandler:
                 
                 self.log(f"收到私信: 用戶 {user_id} (@{username}) 發送: {message_text[:50]}...")
                 
-                # 檢查是否在 DNC 列表
-                is_dnc = await db.is_dnc(user_id)
+                # 🔧 P0 修復: 檢查是否在 DNC 列表（使用正確的方法）
+                try:
+                    existing_lead, is_dnc = await db.check_lead_and_dnc(user_id)
+                except Exception as dnc_err:
+                    print(f"[PrivateMessageHandler] DNC 檢查失敗: {dnc_err}", file=sys.stderr)
+                    is_dnc = False
+                
                 if is_dnc:
                     self.log(f"用戶 {user_id} 在 DNC 列表，跳過處理", "warning")
                     print(f"[PrivateMessageHandler] 用戶在 DNC 列表，跳過", file=sys.stderr)

@@ -100,10 +100,38 @@ class AIQualityChecker:
         if not original_message:
             return True  # 如果沒有原始消息，無法檢查相關性
         
-        # 簡單的關鍵詞匹配檢查
-        # 可以後續改用更複雜的語義相似度檢查
         original_lower = original_message.lower()
         response_lower = response.lower()
+        
+        # 🔧 FIX: 新增問題回答檢查
+        # 如果用戶在問問題，回復不應該也是問句
+        question_indicators = ['什么', '什麼', '怎么', '怎麼', '吗', '嗎', '哪', '谁', '誰', '多少', '为什么', '為什麼', '?', '？']
+        user_asking = any(q in original_lower for q in question_indicators)
+        
+        if user_asking:
+            # 用戶在問問題，檢查回復是否也是問句（不好的模式）
+            response_also_question = response.strip().endswith('?') or response.strip().endswith('？')
+            # 如果回復主要是反問，且很短，這是不好的
+            if response_also_question and len(response) < 30:
+                return False
+        
+        # 🔧 FIX: 檢查常見的答非所問模式
+        evasive_patterns = [
+            '我想知道你', '告訴我你', '你最近', '趣事', '你有什么感興趣',
+            '有什麼我可以幫助', '需要什麼幫助'
+        ]
+        for pattern in evasive_patterns:
+            if pattern in response_lower and pattern not in original_lower:
+                # 回復中有這些模式但用戶沒有問這些，可能是答非所問
+                return False
+        
+        # 🔧 FIX: 如果用戶問"你有什么"類問題，回復應該包含業務信息
+        if '你有' in original_lower or '有什么' in original_lower or '有什麼' in original_lower:
+            # 應該回復業務相關內容
+            business_keywords = ['支付', '付款', '兌換', '收款', '轉帳', '匯款', '服務', '業務', '費率', 'usdt', 'u']
+            has_business_info = any(kw in response_lower for kw in business_keywords)
+            if not has_business_info:
+                return False
         
         # 提取原始消息中的關鍵詞（簡單方法：非停用詞）
         stop_words = {'的', '了', '是', '在', '有', '和', '就', '不', '人', '都', '一', '一個', '上', '也', '很', '到', '說', '要', '去', '你', '會', '著', '沒有', '看', '好', '自己', '這'}

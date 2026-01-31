@@ -247,7 +247,7 @@ class FullTextSearchEngine:
         offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
-        搜索 Lead
+        搜索 Lead - 支持 FTS 和 LIKE 雙模式
         
         Args:
             query: 搜索查詢
@@ -260,68 +260,167 @@ class FullTextSearchEngine:
         Returns:
             匹配的 Lead 列表
         """
-        await self._init_fts()
+        # 🆕 先嘗試 FTS 搜索，失敗或無結果時回退到 LIKE
+        results = await self._search_leads_fts(query, status, date_from, date_to, limit, offset)
         
-        # 構建 FTS 查詢
-        fts_query = self._build_fts_query(query)
+        if not results:
+            print(f"[FullTextSearch] FTS returned 0 results, falling back to LIKE search", file=sys.stderr)
+            results = await self._search_leads_like(query, status, date_from, date_to, limit, offset)
         
-        # 構建 SQL 查詢
-        sql = """
-            SELECT l.id, l.user_id as userId, l.username, l.first_name, l.last_name,
-                   l.source_group, l.triggered_keyword, l.status, l.timestamp,
-                   rank
-            FROM leads l
-            JOIN leads_fts fts ON l.id = fts.rowid
-            WHERE leads_fts MATCH ?
-        """
-        
-        params = [fts_query]
-        
-        if status:
-            sql += " AND l.status = ?"
-            params.append(status)
-        
-        if date_from:
-            sql += " AND l.timestamp >= ?"
-            params.append(date_from.isoformat())
-        
-        if date_to:
-            sql += " AND l.timestamp <= ?"
-            params.append(date_to.isoformat())
-        
-        sql += " ORDER BY rank, l.timestamp DESC LIMIT ? OFFSET ?"
-        params.extend([limit, offset])
-        
-        # 執行查詢
-        conn = await aiosqlite.connect(self.db_path)
-        conn.row_factory = aiosqlite.Row
-        
+        return results
+    
+    async def _search_leads_fts(
+        self,
+        query: str,
+        status: Optional[str] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """FTS5 全文搜索"""
         try:
-            async with conn.execute(sql, params) as cursor:
-                rows = await cursor.fetchall()
-                
-                results = []
-                for row in rows:
-                    results.append({
-                        'id': row['id'],
-                        'userId': row['user_id'],  # user_id from DB column, mapped to userId for frontend
-                        'username': row['username'],
-                        'first_name': row['first_name'],
-                        'last_name': row['last_name'],
-                        'source_group': row['source_group'],
-                        'triggered_keyword': row['triggered_keyword'],
-                        'status': row['status'],
-                        'timestamp': row['timestamp'],
-                        'relevance_score': row['rank'] if 'rank' in row.keys() else 0
-                    })
-                
-                return results
+            await self._init_fts()
+            
+            # 構建 FTS 查詢
+            fts_query = self._build_fts_query(query)
+            
+            # 構建 SQL 查詢
+            sql = """
+                SELECT l.id, l.user_id as userId, l.username, l.first_name, l.last_name,
+                       l.source_group, l.triggered_keyword, l.status, l.timestamp,
+                       rank
+                FROM leads l
+                JOIN leads_fts fts ON l.id = fts.rowid
+                WHERE leads_fts MATCH ?
+            """
+            
+            params = [fts_query]
+            
+            if status:
+                sql += " AND l.status = ?"
+                params.append(status)
+            
+            if date_from:
+                sql += " AND l.timestamp >= ?"
+                params.append(date_from.isoformat())
+            
+            if date_to:
+                sql += " AND l.timestamp <= ?"
+                params.append(date_to.isoformat())
+            
+            sql += " ORDER BY rank, l.timestamp DESC LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
+            
+            # 執行查詢
+            conn = await aiosqlite.connect(self.db_path)
+            conn.row_factory = aiosqlite.Row
+            
+            try:
+                async with conn.execute(sql, params) as cursor:
+                    rows = await cursor.fetchall()
+                    
+                    results = []
+                    for row in rows:
+                        results.append({
+                            'id': row['id'],
+                            'userId': row['userId'],
+                            'username': row['username'],
+                            'first_name': row['first_name'],
+                            'last_name': row['last_name'],
+                            'source_group': row['source_group'],
+                            'triggered_keyword': row['triggered_keyword'],
+                            'status': row['status'],
+                            'timestamp': row['timestamp'],
+                            'relevance_score': row['rank'] if 'rank' in row.keys() else 0
+                        })
+                    
+                    return results
+                    
+            finally:
+                await conn.close()
                 
         except Exception as e:
-            print(f"[FullTextSearch] Error searching leads: {e}", file=sys.stderr)
+            print(f"[FullTextSearch] FTS search error: {e}", file=sys.stderr)
             return []
-        finally:
-            await conn.close()
+    
+    async def _search_leads_like(
+        self,
+        query: str,
+        status: Optional[str] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """🆕 LIKE 模糊搜索回退"""
+        try:
+            # 構建 LIKE 查詢
+            like_pattern = f"%{query}%"
+            
+            sql = """
+                SELECT id, user_id as userId, username, first_name, last_name,
+                       source_group, triggered_keyword, status, timestamp
+                FROM leads
+                WHERE (
+                    username LIKE ? OR
+                    first_name LIKE ? OR
+                    last_name LIKE ? OR
+                    source_group LIKE ? OR
+                    triggered_keyword LIKE ? OR
+                    CAST(user_id AS TEXT) LIKE ?
+                )
+            """
+            
+            params = [like_pattern, like_pattern, like_pattern, like_pattern, like_pattern, like_pattern]
+            
+            if status:
+                sql += " AND status = ?"
+                params.append(status)
+            
+            if date_from:
+                sql += " AND timestamp >= ?"
+                params.append(date_from.isoformat())
+            
+            if date_to:
+                sql += " AND timestamp <= ?"
+                params.append(date_to.isoformat())
+            
+            sql += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
+            
+            # 執行查詢
+            conn = await aiosqlite.connect(self.db_path)
+            conn.row_factory = aiosqlite.Row
+            
+            try:
+                async with conn.execute(sql, params) as cursor:
+                    rows = await cursor.fetchall()
+                    
+                    results = []
+                    for row in rows:
+                        results.append({
+                            'id': row['id'],
+                            'userId': row['userId'],
+                            'username': row['username'],
+                            'first_name': row['first_name'],
+                            'last_name': row['last_name'],
+                            'source_group': row['source_group'],
+                            'triggered_keyword': row['triggered_keyword'],
+                            'status': row['status'],
+                            'timestamp': row['timestamp'],
+                            'relevance_score': 0  # LIKE 搜索無相關性評分
+                        })
+                    
+                    print(f"[FullTextSearch] LIKE search found {len(results)} results for '{query}'", file=sys.stderr)
+                    return results
+                    
+            finally:
+                await conn.close()
+                
+        except Exception as e:
+            print(f"[FullTextSearch] LIKE search error: {e}", file=sys.stderr)
+            return []
     
     def _build_fts_query(self, query: str) -> str:
         """

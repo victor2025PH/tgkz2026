@@ -30,10 +30,13 @@ except ImportError:
     HAS_AIOSQLITE = False
     aiosqlite = None
 
-# 數據庫路徑
-DB_PATH = Path(__file__).parent / "data" / "tgai_server.db"
+# 🆕 從 config 導入持久化數據庫路徑
+from config import DATABASE_DIR, DATABASE_PATH
+
+# 數據庫路徑 - 使用用戶數據目錄（打包後會從環境變量獲取）
+DB_PATH = DATABASE_DIR / "tgai_server.db"
 # 帳號管理數據庫路徑（TG-Matrix 主數據庫）
-ACCOUNTS_DB_PATH = Path(__file__).parent / "data" / "tgmatrix.db"
+ACCOUNTS_DB_PATH = DATABASE_PATH  # 使用 config.py 中的路徑
 
 
 # ============ 會員等級配置 (價格單位: USDT) ============
@@ -223,13 +226,21 @@ class Database:
         if not HAS_AIOSQLITE:
             raise ImportError("aiosqlite is required for async database operations. Install it with: pip install aiosqlite")
         if self._connection is None:
-            self._connection = await aiosqlite.connect(str(self.db_path))
+            # 🆕 設置超時時間，避免 database is locked 錯誤
+            self._connection = await aiosqlite.connect(str(self.db_path), timeout=30.0)
             self._connection.row_factory = aiosqlite.Row
+            # 🆕 啟用 WAL 模式（減少鎖競爭，提高並發性能）
+            await self._connection.execute("PRAGMA journal_mode=WAL")
+            await self._connection.execute("PRAGMA synchronous=NORMAL")  # 平衡性能和安全性
+            await self._connection.execute("PRAGMA cache_size=-64000")  # 64MB 緩存
+            await self._connection.execute("PRAGMA busy_timeout=30000")  # 🆕 30秒等待鎖釋放
     
     async def initialize(self):
         """異步初始化（用於遷移系統）"""
         await self.connect()
-        # 異步初始化邏輯（如果需要）
+        # 🔧 性能優化：在啟動時一次性創建所有表
+        await self._ensure_keyword_tables()
+        await self._ensure_knowledge_tables()  # 🆕 確保知識庫表存在
     
     async def close(self):
         """關閉異步連接"""
@@ -238,9 +249,14 @@ class Database:
             self._connection = None
     
     def get_connection(self) -> sqlite3.Connection:
-        """獲取數據庫連接"""
-        conn = sqlite3.connect(self.db_path)
+        """獲取數據庫連接（帶鎖競爭保護）"""
+        # 🆕 設置超時時間，避免 database is locked 錯誤
+        conn = sqlite3.connect(self.db_path, timeout=30.0)  # 30秒超時
         conn.row_factory = sqlite3.Row
+        # 🆕 啟用 WAL 模式（減少鎖競爭）
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA busy_timeout=30000")  # 30秒等待鎖釋放
         return conn
     
     def _migrate_db(self):
@@ -340,6 +356,90 @@ class Database:
                     cursor.execute("ALTER TABLE extracted_members ADD COLUMN auto_tags TEXT DEFAULT '[]'")
                     conn.commit()
                 
+                # 🔧 FIX: 添加缺失的 bio 和 has_photo 列
+                if 'bio' not in em_columns:
+                    print("[Database] Adding column: extracted_members.bio", file=sys.stderr)
+                    cursor.execute('ALTER TABLE extracted_members ADD COLUMN bio TEXT')
+                    conn.commit()
+                
+                if 'has_photo' not in em_columns:
+                    print("[Database] Adding column: extracted_members.has_photo", file=sys.stderr)
+                    cursor.execute('ALTER TABLE extracted_members ADD COLUMN has_photo INTEGER DEFAULT 0')
+                    conn.commit()
+            
+            # 🔧 FIX: 創建 leads 表（如果不存在）
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='leads'")
+            if not cursor.fetchone():
+                print("[Database] Creating table: leads", file=sys.stderr)
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS leads (
+                        id INTEGER PRIMARY KEY,
+                        telegram_id TEXT,
+                        username TEXT,
+                        first_name TEXT,
+                        last_name TEXT,
+                        source TEXT,
+                        status TEXT DEFAULT 'new',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                conn.commit()
+            
+            # 🔧 FIX: unified_contacts 表遷移
+            cursor.execute("PRAGMA table_info(unified_contacts)")
+            uc_columns = [col[1] for col in cursor.fetchall()]
+            
+            if uc_columns:  # 表存在
+                uc_migrations = [
+                    ('source_type', "TEXT DEFAULT 'extracted'"),
+                    ('source_id', "TEXT"),
+                    ('source_group_name', "TEXT"),
+                    ('contact_type', "TEXT DEFAULT 'lead'"),
+                    ('activity_score', "REAL DEFAULT 0.5"),
+                    ('ai_score', "REAL DEFAULT 0"),
+                    ('intent_score', "INTEGER DEFAULT 0"),
+                    ('intent_level', "TEXT DEFAULT 'none'"),
+                    ('online_status', "TEXT DEFAULT 'hidden'"),
+                    ('last_online', "TIMESTAMP"),
+                    ('contacted', "INTEGER DEFAULT 0"),
+                    ('contacted_at', "TIMESTAMP"),
+                    ('response_status', "TEXT DEFAULT 'none'"),
+                    ('auto_tags', "TEXT DEFAULT '[]'"),
+                    ('discovered_at', "TIMESTAMP"),
+                    # 🔧 FIX: 添加同步所需的列
+                    ('display_name', "TEXT"),
+                    ('source_name', "TEXT"),
+                    ('last_seen', "TIMESTAMP"),
+                    ('synced_at', "TIMESTAMP"),
+                ]
+                
+                for col_name, col_def in uc_migrations:
+                    if col_name not in uc_columns:
+                        print(f"[Database] Adding column: unified_contacts.{col_name}", file=sys.stderr)
+                        cursor.execute(f'ALTER TABLE unified_contacts ADD COLUMN {col_name} {col_def}')
+                        conn.commit()
+            
+            # ============ funnel_stages 表遷移 ============
+            cursor.execute("PRAGMA table_info(funnel_stages)")
+            fs_columns = cursor.fetchall()
+            fs_column_names = [col[1] for col in fs_columns]
+            
+            if fs_column_names:  # 表存在
+                # 檢查並記錄 phone 列的 NOT NULL 狀態
+                for col in fs_columns:
+                    if col[1] == 'phone' and col[3] == 1:  # col[3] 是 notnull 標記
+                        print("[Database] Warning: funnel_stages.phone has NOT NULL constraint - will use default value", file=sys.stderr)
+                
+                if 'reason' not in fs_column_names:
+                    print("[Database] Adding column: funnel_stages.reason", file=sys.stderr)
+                    cursor.execute('ALTER TABLE funnel_stages ADD COLUMN reason TEXT')
+                    conn.commit()
+                
+                if 'updated_at' not in fs_column_names:
+                    print("[Database] Adding column: funnel_stages.updated_at", file=sys.stderr)
+                    cursor.execute('ALTER TABLE funnel_stages ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
+                    conn.commit()
+                
         except Exception as e:
             print(f"[Database] Migration warning: {e}", file=sys.stderr)
         finally:
@@ -348,6 +448,9 @@ class Database:
     def _init_db(self):
         """初始化數據庫表"""
         conn = sqlite3.connect(self.db_path)
+        # 🆕 啟用 WAL 模式
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
         cursor = conn.cursor()
         
         # ============ 用戶表 ============
@@ -606,6 +709,48 @@ class Database:
                 updated_by TEXT
             )
         ''')
+        
+        # ============ 🆕 AI 知識庫表 ============
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ai_knowledge_base (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL DEFAULT 'general',
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                keywords TEXT,
+                priority INTEGER DEFAULT 1,
+                is_active INTEGER DEFAULT 1,
+                use_count INTEGER DEFAULT 0,
+                last_used_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # 創建知識庫索引
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_knowledge_category ON ai_knowledge_base(category)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_knowledge_active ON ai_knowledge_base(is_active)')
+        
+        # ============ 🆕 對話效果追蹤表 ============
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS conversation_effectiveness (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                ai_message TEXT NOT NULL,
+                user_response TEXT,
+                response_time_seconds INTEGER,
+                is_positive_response INTEGER DEFAULT 0,
+                is_continued_conversation INTEGER DEFAULT 0,
+                triggered_keyword TEXT,
+                source_group TEXT,
+                effectiveness_score REAL DEFAULT 0,
+                learned INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_conv_eff_user ON conversation_effectiveness(user_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_conv_eff_learned ON conversation_effectiveness(learned)')
         
         # ============ 系統告警表 ============
         cursor.execute('''
@@ -972,6 +1117,112 @@ class Database:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # ============ 統一聯繫人表（唯一定義） ============
+        # 注意：此表是資源中心的核心數據表，整合來自多個來源的聯繫人
+        # 數據來源：extracted_members, discovered_resources, collected_users
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS unified_contacts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                
+                -- 核心標識
+                telegram_id TEXT UNIQUE NOT NULL,
+                username TEXT,
+                display_name TEXT,
+                first_name TEXT,
+                last_name TEXT,
+                phone TEXT,
+                
+                -- 類型：user/group/channel
+                contact_type TEXT DEFAULT 'user',
+                
+                -- 來源信息
+                source_type TEXT DEFAULT 'member',
+                source_id TEXT,
+                source_name TEXT,
+                source_group_id TEXT,
+                source_group_title TEXT,
+                source_group_name TEXT,
+                source TEXT DEFAULT 'keyword_match',
+                matched_keywords TEXT DEFAULT '[]',
+                
+                -- 狀態和標籤
+                status TEXT DEFAULT 'new',
+                funnel_stage TEXT DEFAULT 'awareness',
+                tags TEXT DEFAULT '[]',
+                
+                -- 評分
+                ai_score REAL DEFAULT 0.5,
+                activity_score REAL DEFAULT 0.5,
+                value_level TEXT DEFAULT 'C',
+                intent_score INTEGER DEFAULT 0,
+                intent_level TEXT DEFAULT 'none',
+                lead_score INTEGER DEFAULT 0,
+                quality_score INTEGER DEFAULT 0,
+                interest_level INTEGER DEFAULT 1,
+                
+                -- 在線狀態
+                is_online INTEGER DEFAULT 0,
+                online_status TEXT DEFAULT 'hidden',
+                last_seen TIMESTAMP,
+                last_online TIMESTAMP,
+                
+                -- 屬性
+                is_bot INTEGER DEFAULT 0,
+                is_premium INTEGER DEFAULT 0,
+                is_verified INTEGER DEFAULT 0,
+                has_photo INTEGER DEFAULT 0,
+                member_count INTEGER DEFAULT 0,
+                account_age_days INTEGER,
+                
+                -- 風險評估
+                ad_risk_score REAL DEFAULT 0,
+                is_ad_account INTEGER,
+                is_blacklisted INTEGER DEFAULT 0,
+                risk_factors TEXT DEFAULT '{}',
+                
+                -- 互動統計
+                message_count INTEGER DEFAULT 0,
+                interactions_count INTEGER DEFAULT 0,
+                messages_sent INTEGER DEFAULT 0,
+                messages_received INTEGER DEFAULT 0,
+                last_contact_at TIMESTAMP,
+                last_message_at TIMESTAMP,
+                last_interaction_at TEXT,
+                
+                -- 營銷狀態
+                contacted INTEGER DEFAULT 0,
+                contacted_at TIMESTAMP,
+                response_status TEXT DEFAULT 'none',
+                auto_tags TEXT DEFAULT '[]',
+                
+                -- 分配信息
+                assigned_account_phone TEXT,
+                assigned_at TEXT,
+                captured_by_account TEXT,
+                
+                -- 元數據
+                bio TEXT,
+                notes TEXT DEFAULT '',
+                custom_fields TEXT DEFAULT '{}',
+                metadata TEXT DEFAULT '{}',
+                
+                -- 時間戳（captured_at 不設 NOT NULL，避免同步失敗）
+                captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                discovered_at TIMESTAMP,
+                synced_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                deleted_at TEXT,
+                deleted_by TEXT
+            )
+        ''')
+        
+        # 創建 unified_contacts 索引
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_unified_contacts_telegram_id ON unified_contacts(telegram_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_unified_contacts_status ON unified_contacts(status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_unified_contacts_source_type ON unified_contacts(source_type)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_unified_contacts_created_at ON unified_contacts(created_at DESC)')
         
         # ============ 成員提取日誌表 ============
         cursor.execute('''
@@ -1877,6 +2128,271 @@ class Database:
             print(f"[Database] Error updating AI settings: {e}", file=sys.stderr)
             return False
     
+    # ============ 🆕 AI 知識庫 Methods ============
+    
+    async def get_knowledge_items(self, category: str = None, active_only: bool = True) -> List[Dict]:
+        """獲取知識庫條目"""
+        try:
+            where_clauses = []
+            params = []
+            
+            if active_only:
+                where_clauses.append("is_active = 1")
+            if category:
+                where_clauses.append("category = ?")
+                params.append(category)
+            
+            where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+            
+            rows = await self.fetch_all(f'''
+                SELECT * FROM ai_knowledge_base 
+                WHERE {where_sql}
+                ORDER BY priority DESC, use_count DESC
+            ''', tuple(params))
+            
+            return [dict(row) if hasattr(row, 'keys') else row for row in rows]
+        except Exception as e:
+            import sys
+            print(f"[Database] Error getting knowledge items: {e}", file=sys.stderr)
+            return []
+    
+    async def add_knowledge_item(self, title: str, content: str, 
+                                  category: str = 'general', keywords: str = None,
+                                  priority: int = 1) -> int:
+        """添加知識庫條目"""
+        try:
+            await self.execute('''
+                INSERT INTO ai_knowledge_base (title, content, category, keywords, priority)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (title, content, category, keywords, priority))
+            
+            # 獲取新插入的 ID
+            row = await self.fetch_one("SELECT last_insert_rowid() as id")
+            return row['id'] if row else 0
+        except Exception as e:
+            import sys
+            print(f"[Database] Error adding knowledge item: {e}", file=sys.stderr)
+            return 0
+    
+    async def update_knowledge_item(self, item_id: int, updates: Dict) -> bool:
+        """更新知識庫條目"""
+        try:
+            set_clauses = []
+            params = []
+            
+            for key, value in updates.items():
+                if key in ['title', 'content', 'category', 'keywords', 'priority', 'is_active']:
+                    set_clauses.append(f"{key} = ?")
+                    params.append(value)
+            
+            if not set_clauses:
+                return False
+            
+            set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+            params.append(item_id)
+            
+            await self.execute(f'''
+                UPDATE ai_knowledge_base 
+                SET {", ".join(set_clauses)}
+                WHERE id = ?
+            ''', tuple(params))
+            
+            return True
+        except Exception as e:
+            import sys
+            print(f"[Database] Error updating knowledge item: {e}", file=sys.stderr)
+            return False
+    
+    async def delete_knowledge_item(self, item_id: int) -> bool:
+        """刪除知識庫條目"""
+        try:
+            await self.execute("DELETE FROM ai_knowledge_base WHERE id = ?", (item_id,))
+            return True
+        except Exception as e:
+            import sys
+            print(f"[Database] Error deleting knowledge item: {e}", file=sys.stderr)
+            return False
+    
+    async def search_knowledge(self, query: str, limit: int = 5) -> List[Dict]:
+        """搜索知識庫"""
+        try:
+            # 簡單的關鍵詞匹配搜索
+            search_term = f"%{query}%"
+            rows = await self.fetch_all('''
+                SELECT * FROM ai_knowledge_base 
+                WHERE is_active = 1 
+                  AND (title LIKE ? OR content LIKE ? OR keywords LIKE ?)
+                ORDER BY priority DESC, use_count DESC
+                LIMIT ?
+            ''', (search_term, search_term, search_term, limit))
+            
+            return [dict(row) if hasattr(row, 'keys') else row for row in rows]
+        except Exception as e:
+            import sys
+            print(f"[Database] Error searching knowledge: {e}", file=sys.stderr)
+            return []
+    
+    async def increment_knowledge_use(self, item_id: int):
+        """增加知識條目使用次數"""
+        try:
+            await self.execute('''
+                UPDATE ai_knowledge_base 
+                SET use_count = use_count + 1, last_used_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (item_id,))
+        except Exception as e:
+            pass
+    
+    # ============ 🆕 對話效果追蹤 Methods ============
+    
+    async def track_ai_response(self, user_id: str, ai_message: str, 
+                                 triggered_keyword: str = None, source_group: str = None) -> int:
+        """記錄 AI 回覆，等待用戶響應"""
+        try:
+            await self.execute('''
+                INSERT INTO conversation_effectiveness 
+                (user_id, ai_message, triggered_keyword, source_group)
+                VALUES (?, ?, ?, ?)
+            ''', (user_id, ai_message, triggered_keyword, source_group))
+            
+            row = await self.fetch_one("SELECT last_insert_rowid() as id")
+            return row['id'] if row else 0
+        except Exception as e:
+            import sys
+            print(f"[Database] Error tracking AI response: {e}", file=sys.stderr)
+            return 0
+    
+    async def update_response_effectiveness(self, user_id: str, user_response: str):
+        """當用戶回覆時，更新效果評估"""
+        try:
+            # 找到最近的未評估記錄
+            record = await self.fetch_one('''
+                SELECT id, ai_message, created_at FROM conversation_effectiveness
+                WHERE user_id = ? AND user_response IS NULL
+                ORDER BY created_at DESC LIMIT 1
+            ''', (user_id,))
+            
+            if not record:
+                return
+            
+            record_id = record['id']
+            created_at = record['created_at']
+            
+            # 計算響應時間
+            from datetime import datetime
+            try:
+                if isinstance(created_at, str):
+                    created_time = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                else:
+                    created_time = created_at
+                response_time = int((datetime.now() - created_time.replace(tzinfo=None)).total_seconds())
+            except:
+                response_time = 0
+            
+            # 簡單評估響應質量
+            response_lower = user_response.lower()
+            positive_indicators = ['好', '可以', '行', '嗯', '对', '是', 'yes', 'ok', 'good', '谢谢', '謝謝', '了解', '明白']
+            negative_indicators = ['不', '没', '沒', '算了', '再说', '再見', 'no', 'bye']
+            
+            is_positive = any(ind in response_lower for ind in positive_indicators)
+            is_negative = any(ind in response_lower for ind in negative_indicators)
+            is_continued = len(user_response) > 5  # 回覆有內容表示對話繼續
+            
+            # 計算效果分數
+            score = 0.5  # 基礎分
+            if is_positive:
+                score += 0.3
+            if is_negative:
+                score -= 0.3
+            if is_continued:
+                score += 0.2
+            if response_time < 60:  # 快速回覆加分
+                score += 0.1
+            
+            score = max(0, min(1, score))  # 限制在 0-1
+            
+            await self.execute('''
+                UPDATE conversation_effectiveness
+                SET user_response = ?,
+                    response_time_seconds = ?,
+                    is_positive_response = ?,
+                    is_continued_conversation = ?,
+                    effectiveness_score = ?
+                WHERE id = ?
+            ''', (user_response, response_time, 1 if is_positive else 0, 1 if is_continued else 0, score, record_id))
+            
+            # 如果效果很好，標記為可學習
+            if score >= 0.8:
+                await self.execute('''
+                    UPDATE conversation_effectiveness SET learned = 0 WHERE id = ?
+                ''', (record_id,))
+            
+            import sys
+            print(f"[Database] Response effectiveness updated: user={user_id}, score={score}", file=sys.stderr)
+            
+        except Exception as e:
+            import sys
+            print(f"[Database] Error updating effectiveness: {e}", file=sys.stderr)
+    
+    async def get_effective_responses(self, min_score: float = 0.7, limit: int = 20) -> List[Dict]:
+        """獲取高效的回覆用於學習"""
+        try:
+            rows = await self.fetch_all('''
+                SELECT * FROM conversation_effectiveness
+                WHERE effectiveness_score >= ? AND user_response IS NOT NULL
+                ORDER BY effectiveness_score DESC
+                LIMIT ?
+            ''', (min_score, limit))
+            
+            return [dict(row) if hasattr(row, 'keys') else row for row in rows]
+        except Exception as e:
+            import sys
+            print(f"[Database] Error getting effective responses: {e}", file=sys.stderr)
+            return []
+    
+    async def learn_from_effective_responses(self) -> int:
+        """從高效回覆中自動學習，加入知識庫"""
+        try:
+            # 獲取未學習的高效回覆
+            rows = await self.fetch_all('''
+                SELECT * FROM conversation_effectiveness
+                WHERE effectiveness_score >= 0.8 AND learned = 0 AND user_response IS NOT NULL
+                LIMIT 10
+            ''')
+            
+            learned_count = 0
+            for row in rows:
+                row_dict = dict(row) if hasattr(row, 'keys') else row
+                ai_message = row_dict.get('ai_message', '')
+                triggered_keyword = row_dict.get('triggered_keyword', '')
+                
+                if ai_message and len(ai_message) > 10:
+                    # 添加到知識庫
+                    await self.add_knowledge_item(
+                        title=f"高效回覆 - {triggered_keyword or '通用'}",
+                        content=ai_message,
+                        category='learned_responses',
+                        keywords=triggered_keyword,
+                        priority=2  # 學習到的內容優先級稍高
+                    )
+                    
+                    # 標記為已學習
+                    await self.execute('''
+                        UPDATE conversation_effectiveness SET learned = 1 WHERE id = ?
+                    ''', (row_dict.get('id'),))
+                    
+                    learned_count += 1
+            
+            if learned_count > 0:
+                import sys
+                print(f"[Database] Learned {learned_count} effective responses", file=sys.stderr)
+            
+            return learned_count
+        except Exception as e:
+            import sys
+            print(f"[Database] Error learning from responses: {e}", file=sys.stderr)
+            return 0
+    
     # ============ API Credential Logs (Phase 2) ============
     
     def add_credential_log(
@@ -2239,6 +2755,56 @@ class Database:
         except Exception as e:
             print(f"Error updating account {account_id}: {e}")
             return False
+    
+    async def batch_update_account_status(self, account_ids: List[int], status: str) -> int:
+        """
+        🆕 批量更新帳號狀態（優化性能）
+        使用單一 SQL 語句更新多個帳號，避免多次數據庫調用
+        
+        Args:
+            account_ids: 要更新的帳號 ID 列表
+            status: 新狀態值
+            
+        Returns:
+            更新的帳號數量
+        """
+        if not account_ids:
+            return 0
+            
+        try:
+            accounts_db_path = self._get_accounts_db_path()
+            if not accounts_db_path.exists():
+                return 0
+            
+            # 使用 IN 子句一次性更新所有帳號
+            placeholders = ','.join(['?' for _ in account_ids])
+            values = [status] + account_ids
+            
+            if not HAS_AIOSQLITE:
+                conn = sqlite3.connect(str(accounts_db_path))
+                cursor = conn.cursor()
+                cursor.execute(f'''
+                    UPDATE accounts 
+                    SET status = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id IN ({placeholders})
+                ''', values)
+                conn.commit()
+                count = cursor.rowcount
+                conn.close()
+                return count
+            
+            async with aiosqlite.connect(str(accounts_db_path)) as conn:
+                cursor = await conn.execute(f'''
+                    UPDATE accounts 
+                    SET status = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id IN ({placeholders})
+                ''', values)
+                await conn.commit()
+                return cursor.rowcount
+                
+        except Exception as e:
+            print(f"Error batch updating account status: {e}")
+            return 0
     
     async def get_account(self, account_id: int) -> Optional[Dict]:
         """根據 ID 獲取帳號"""
@@ -2603,8 +3169,15 @@ class Database:
     
     # ============ 關鍵詞集操作 ============
     
+    # 🔧 性能優化：使用標誌位確保表只創建一次
+    _keyword_tables_initialized = False
+    
     async def _ensure_keyword_tables(self):
-        """確保關鍵詞相關表存在"""
+        """確保關鍵詞相關表存在（只執行一次）"""
+        # 🔧 性能優化：如果已初始化，直接返回
+        if Database._keyword_tables_initialized:
+            return
+        
         try:
             # 關鍵詞集表
             await self.execute('''
@@ -2613,11 +3186,28 @@ class Database:
                     name TEXT NOT NULL UNIQUE,
                     description TEXT,
                     keywords TEXT DEFAULT '[]',
+                    match_mode TEXT DEFAULT 'fuzzy',
                     is_active INTEGER DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+            
+            # 🔧 遷移：添加 match_mode 字段（如果不存在）
+            # 使用更可靠的方法：直接嘗試 SELECT 該列
+            try:
+                # 如果列不存在，這個查詢會失敗
+                await self.fetch_one("SELECT match_mode FROM keyword_sets LIMIT 1")
+            except Exception as check_error:
+                # 列不存在，嘗試添加
+                error_str = str(check_error).lower()
+                if 'no such column' in error_str or 'no column' in error_str:
+                    try:
+                        await self.execute('ALTER TABLE keyword_sets ADD COLUMN match_mode TEXT DEFAULT "fuzzy"')
+                        import sys
+                        print("[Database] Added match_mode column to keyword_sets", file=sys.stderr)
+                    except Exception:
+                        pass  # 可能同時有其他進程添加了，忽略
             
             # 聊天模板表
             await self.execute('''
@@ -2706,6 +3296,8 @@ class Database:
                     keywords TEXT DEFAULT '',
                     is_active INTEGER DEFAULT 1,
                     member_count INTEGER DEFAULT 0,
+                    resource_type TEXT DEFAULT 'group',
+                    can_extract_members INTEGER DEFAULT 1,
                     last_active TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -2762,8 +3354,187 @@ class Database:
                 )
             ''')
             
+            # ==================== 收集用戶與廣告識別相關表 ====================
+            
+            # 收集的用戶表 - 存儲從群組收集的活躍用戶
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS collected_users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    telegram_id TEXT UNIQUE NOT NULL,
+                    username TEXT,
+                    first_name TEXT,
+                    last_name TEXT,
+                    bio TEXT,
+                    phone TEXT,
+                    
+                    -- 廣告風險評估
+                    ad_risk_score REAL DEFAULT 0,
+                    risk_factors TEXT DEFAULT '{}',
+                    is_ad_account INTEGER DEFAULT NULL,
+                    is_blacklisted INTEGER DEFAULT 0,
+                    
+                    -- 帳號特徵
+                    has_photo INTEGER DEFAULT 0,
+                    is_premium INTEGER DEFAULT 0,
+                    is_verified INTEGER DEFAULT 0,
+                    is_bot INTEGER DEFAULT 0,
+                    account_age_days INTEGER,
+                    
+                    -- 來源信息
+                    source_groups TEXT DEFAULT '[]',
+                    collected_by TEXT,
+                    
+                    -- 活躍度統計
+                    message_count INTEGER DEFAULT 0,
+                    groups_count INTEGER DEFAULT 0,
+                    first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_message_at TIMESTAMP,
+                    
+                    -- 評分
+                    value_level TEXT DEFAULT 'C',
+                    activity_score REAL DEFAULT 0.5,
+                    
+                    -- 營銷狀態
+                    contacted INTEGER DEFAULT 0,
+                    contacted_at TIMESTAMP,
+                    response_status TEXT DEFAULT 'none',
+                    
+                    -- 標籤和備註
+                    tags TEXT DEFAULT '[]',
+                    notes TEXT,
+                    
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 用戶消息樣本表 - 存儲用戶的消息樣本用於分析
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS user_messages_sample (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_telegram_id TEXT NOT NULL,
+                    group_id TEXT,
+                    group_name TEXT,
+                    message_text TEXT,
+                    message_time TIMESTAMP,
+                    
+                    -- 內容分析結果
+                    contains_link INTEGER DEFAULT 0,
+                    contains_contact INTEGER DEFAULT 0,
+                    ad_keywords_matched TEXT DEFAULT '[]',
+                    content_risk_score REAL DEFAULT 0,
+                    
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_telegram_id) REFERENCES collected_users(telegram_id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # 廣告識別規則表 - 存儲可配置的識別規則
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS ad_detection_rules (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    rule_name TEXT NOT NULL,
+                    rule_type TEXT NOT NULL,
+                    rule_config TEXT NOT NULL,
+                    weight REAL DEFAULT 0.1,
+                    is_active INTEGER DEFAULT 1,
+                    match_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 廣告關鍵詞表 - 存儲廣告識別關鍵詞
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS ad_keywords (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    keyword TEXT NOT NULL UNIQUE,
+                    category TEXT DEFAULT 'general',
+                    risk_weight REAL DEFAULT 0.1,
+                    match_count INTEGER DEFAULT 0,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 創建索引
+            try:
+                await self.execute('CREATE INDEX IF NOT EXISTS idx_collected_users_telegram_id ON collected_users(telegram_id)')
+                await self.execute('CREATE INDEX IF NOT EXISTS idx_collected_users_ad_risk ON collected_users(ad_risk_score)')
+                await self.execute('CREATE INDEX IF NOT EXISTS idx_collected_users_value_level ON collected_users(value_level)')
+                await self.execute('CREATE INDEX IF NOT EXISTS idx_user_messages_user_id ON user_messages_sample(user_telegram_id)')
+            except Exception:
+                pass  # 索引可能已存在
+            
+            # 🔧 性能優化：標記為已初始化
+            Database._keyword_tables_initialized = True
+            
         except Exception as e:
             print(f"Error creating keyword tables: {e}")
+            # 即使出錯也標記為已嘗試，避免重複嘗試
+            Database._keyword_tables_initialized = True
+    
+    # 🆕 知識庫表初始化標誌
+    _knowledge_tables_initialized = False
+    
+    async def _ensure_knowledge_tables(self):
+        """🆕 確保知識庫相關表存在（只執行一次）"""
+        if Database._knowledge_tables_initialized:
+            return
+        
+        try:
+            import sys
+            print("[Database] Ensuring knowledge tables exist...", file=sys.stderr)
+            
+            # AI 知識庫表
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS ai_knowledge_base (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    category TEXT NOT NULL DEFAULT 'general',
+                    title TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    keywords TEXT,
+                    priority INTEGER DEFAULT 1,
+                    is_active INTEGER DEFAULT 1,
+                    use_count INTEGER DEFAULT 0,
+                    last_used_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 創建索引
+            await self.execute('CREATE INDEX IF NOT EXISTS idx_knowledge_category ON ai_knowledge_base(category)')
+            await self.execute('CREATE INDEX IF NOT EXISTS idx_knowledge_active ON ai_knowledge_base(is_active)')
+            
+            # 對話效果追蹤表
+            await self.execute('''
+                CREATE TABLE IF NOT EXISTS conversation_effectiveness (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    ai_message TEXT NOT NULL,
+                    user_response TEXT,
+                    response_time_seconds INTEGER,
+                    is_positive_response INTEGER DEFAULT 0,
+                    is_continued_conversation INTEGER DEFAULT 0,
+                    triggered_keyword TEXT,
+                    source_group TEXT,
+                    effectiveness_score REAL DEFAULT 0,
+                    learned INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            await self.execute('CREATE INDEX IF NOT EXISTS idx_conv_eff_user ON conversation_effectiveness(user_id)')
+            await self.execute('CREATE INDEX IF NOT EXISTS idx_conv_eff_learned ON conversation_effectiveness(learned)')
+            
+            Database._knowledge_tables_initialized = True
+            print("[Database] ✓ Knowledge tables created/verified", file=sys.stderr)
+            
+        except Exception as e:
+            print(f"[Database] Error creating knowledge tables: {e}", file=sys.stderr)
+            Database._knowledge_tables_initialized = True
     
     async def add_keyword_set(self, name: str, description: str = '') -> int:
         """添加關鍵詞集"""
@@ -2778,34 +3549,179 @@ class Database:
             raise e
     
     async def get_all_keyword_sets(self) -> List[Dict]:
-        """獲取所有關鍵詞集"""
+        """獲取所有關鍵詞集
+        
+        🔧 修復：同時從兩個來源讀取關鍵詞並合併：
+        1. keyword_sets.keywords JSON 字段（新格式）
+        2. keywords 關聯表（舊格式）
+        
+        🔧 格式統一：同時包含 'keyword' 和 'text' 字段，確保匹配器和前端都能使用
+        """
         await self._ensure_keyword_tables()
+        import sys
+        
         try:
             rows = await self.fetch_all('SELECT * FROM keyword_sets ORDER BY created_at DESC')
-            # 為每個關鍵詞集添加關鍵詞列表
             result = []
+            
             for row in rows:
-                row_dict = dict(row) if hasattr(row, 'keys') else row
-                keywords = await self.get_keywords_by_set(row_dict['id'])
-                row_dict['keywords'] = keywords
+                row_dict = dict(row) if hasattr(row, 'keys') else {
+                    'id': row[0], 'name': row[1], 'description': row[2],
+                    'keywords': row[3], 'match_mode': row[4] if len(row) > 4 else 'fuzzy',
+                    'is_active': row[5] if len(row) > 5 else 1,
+                    'created_at': row[6] if len(row) > 6 else None,
+                    'updated_at': row[7] if len(row) > 7 else None
+                }
+                
+                set_id = row_dict['id']
+                all_keywords = []
+                seen_texts = set()  # 用於去重
+                
+                # ========== 來源 1: 從 JSON 字段解析 ==========
+                keywords_raw = row_dict.get('keywords', '[]')
+                try:
+                    if isinstance(keywords_raw, str):
+                        json_keywords = json.loads(keywords_raw) if keywords_raw else []
+                    else:
+                        json_keywords = keywords_raw or []
+                except (json.JSONDecodeError, TypeError):
+                    json_keywords = []
+                
+                for i, kw in enumerate(json_keywords):
+                    if isinstance(kw, dict):
+                        text = kw.get('text', kw.get('keyword', ''))
+                    elif isinstance(kw, str):
+                        text = kw
+                    else:
+                        continue
+                    
+                    if text and text not in seen_texts:
+                        seen_texts.add(text)
+                        all_keywords.append({
+                            'id': kw.get('id', f"kw-{set_id}-{i}") if isinstance(kw, dict) else f"kw-{set_id}-{i}",
+                            'keyword': text,  # 🔧 匹配器使用
+                            'text': text,     # 🔧 前端顯示使用
+                            'isRegex': kw.get('isRegex', False) if isinstance(kw, dict) else False,
+                            'matchCount': kw.get('matchCount', 0) if isinstance(kw, dict) else 0
+                        })
+                
+                # ========== 來源 2: 從 keywords 關聯表讀取（舊數據） ==========
+                try:
+                    table_keywords = await self.fetch_all(
+                        'SELECT * FROM keywords WHERE keyword_set_id = ?',
+                        (set_id,)
+                    )
+                    for j, tk in enumerate(table_keywords):
+                        tk_dict = dict(tk) if hasattr(tk, 'keys') else {
+                            'id': tk[0], 'keyword_set_id': tk[1], 'keyword': tk[2],
+                            'match_type': tk[3] if len(tk) > 3 else 'contains'
+                        }
+                        text = tk_dict.get('keyword', '')
+                        if text and text not in seen_texts:
+                            seen_texts.add(text)
+                            all_keywords.append({
+                                'id': f"kw-table-{tk_dict.get('id', j)}",
+                                'keyword': text,  # 🔧 匹配器使用
+                                'text': text,     # 🔧 前端顯示使用
+                                'isRegex': tk_dict.get('match_type') == 'regex',
+                                'matchCount': 0
+                            })
+                except Exception as table_err:
+                    # keywords 表可能不存在，忽略錯誤
+                    pass
+                
+                row_dict['keywords'] = all_keywords
                 result.append(row_dict)
+            
+            print(f"[Database] get_all_keyword_sets: returning {len(result)} sets", file=sys.stderr)
+            for s in result:
+                kw_texts = [k.get('text', k.get('keyword', '')) for k in s.get('keywords', [])]
+                print(f"[Database]   - {s.get('name')}: {len(s.get('keywords', []))} keywords: {kw_texts[:5]}{'...' if len(kw_texts) > 5 else ''}", file=sys.stderr)
+            
             return result
         except Exception as e:
-            print(f"Error getting keyword sets: {e}")
+            print(f"[Database] Error getting keyword sets: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
             return []
     
     async def get_keyword_set(self, set_id: int) -> Optional[Dict]:
-        """獲取單個關鍵詞集"""
+        """獲取單個關鍵詞集
+        
+        🔧 修復：同時從 JSON 字段和 keywords 表讀取並合併
+        """
         await self._ensure_keyword_tables()
+        import sys
+        
         try:
             row = await self.fetch_one('SELECT * FROM keyword_sets WHERE id = ?', (set_id,))
             if row:
-                row_dict = dict(row) if hasattr(row, 'keys') else row
-                row_dict['keywords'] = await self.get_keywords_by_set(set_id)
+                row_dict = dict(row) if hasattr(row, 'keys') else {
+                    'id': row[0], 'name': row[1], 'description': row[2],
+                    'keywords': row[3], 'match_mode': row[4] if len(row) > 4 else 'fuzzy',
+                    'is_active': row[5] if len(row) > 5 else 1
+                }
+                
+                all_keywords = []
+                seen_texts = set()
+                
+                # 來源 1: JSON 字段
+                keywords_raw = row_dict.get('keywords', '[]')
+                try:
+                    if isinstance(keywords_raw, str):
+                        json_keywords = json.loads(keywords_raw) if keywords_raw else []
+                    else:
+                        json_keywords = keywords_raw or []
+                except (json.JSONDecodeError, TypeError):
+                    json_keywords = []
+                
+                for i, kw in enumerate(json_keywords):
+                    if isinstance(kw, dict):
+                        text = kw.get('text', kw.get('keyword', ''))
+                    elif isinstance(kw, str):
+                        text = kw
+                    else:
+                        continue
+                    
+                    if text and text not in seen_texts:
+                        seen_texts.add(text)
+                        all_keywords.append({
+                            'id': kw.get('id', f"kw-{set_id}-{i}") if isinstance(kw, dict) else f"kw-{set_id}-{i}",
+                            'keyword': text,
+                            'text': text,
+                            'isRegex': kw.get('isRegex', False) if isinstance(kw, dict) else False,
+                            'matchCount': kw.get('matchCount', 0) if isinstance(kw, dict) else 0
+                        })
+                
+                # 來源 2: keywords 關聯表
+                try:
+                    table_keywords = await self.fetch_all(
+                        'SELECT * FROM keywords WHERE keyword_set_id = ?',
+                        (set_id,)
+                    )
+                    for j, tk in enumerate(table_keywords):
+                        tk_dict = dict(tk) if hasattr(tk, 'keys') else {
+                            'id': tk[0], 'keyword_set_id': tk[1], 'keyword': tk[2],
+                            'match_type': tk[3] if len(tk) > 3 else 'contains'
+                        }
+                        text = tk_dict.get('keyword', '')
+                        if text and text not in seen_texts:
+                            seen_texts.add(text)
+                            all_keywords.append({
+                                'id': f"kw-table-{tk_dict.get('id', j)}",
+                                'keyword': text,
+                                'text': text,
+                                'isRegex': tk_dict.get('match_type') == 'regex',
+                                'matchCount': 0
+                            })
+                except Exception:
+                    pass
+                
+                row_dict['keywords'] = all_keywords
                 return row_dict
             return None
         except Exception as e:
-            print(f"Error getting keyword set: {e}")
+            print(f"[Database] Error getting keyword set {set_id}: {e}", file=sys.stderr)
             return None
     
     async def remove_keyword_set(self, set_id: int) -> bool:
@@ -2971,6 +3887,9 @@ class Database:
                 print(f"[Database] Group {group.get('id')} final keywordSetIds: {keywordSetIds}", file=sys.stderr)
                 # 確保 memberCount 欄位存在（前端期望的格式）
                 group['memberCount'] = group.get('member_count', 0) or 0
+                # 🆕 添加群組類型和提取權限（前端期望的格式）
+                group['resourceType'] = group.get('resource_type', 'group') or 'group'
+                group['canExtractMembers'] = bool(group.get('can_extract_members', 1))
                 groups.append(group)
             
             return groups
@@ -3059,6 +3978,13 @@ class Database:
         """獲取所有觸發規則"""
         await self._ensure_keyword_tables()
         try:
+            # 🔧 FIX: 執行 WAL checkpoint 確保讀取最新數據
+            await self.connect()
+            try:
+                await self._connection.execute("PRAGMA wal_checkpoint(PASSIVE)")
+            except Exception:
+                pass  # 忽略 checkpoint 錯誤，繼續查詢
+            
             rows = await self.fetch_all('SELECT * FROM trigger_rules ORDER BY priority DESC, created_at DESC')
             result = []
             for row in rows:
@@ -3349,50 +4275,139 @@ class Database:
             return False
     
     async def get_all_leads(self, limit: int = 500) -> List[Dict]:
-        """獲取潛在客戶（🆕 增加默認限制到 500）"""
+        """獲取潛在客戶（🔧 FIX: 從 unified_contacts 讀取）"""
         import sys
         try:
-            # 從 extracted_members 表讀取（這是實際存儲客戶數據的表）
-            results = await self.fetch_all(f'SELECT * FROM extracted_members ORDER BY created_at DESC LIMIT {limit}')
-            print(f"[Database] get_all_leads: Returning {len(results)} records (limit={limit})", file=sys.stderr)
+            # 🔧 FIX: 優先從 unified_contacts 表讀取（與資源中心同步）
+            results = await self.fetch_all(f'''
+                SELECT 
+                    id, telegram_id as user_id, username, first_name, last_name, phone,
+                    display_name, contact_type, source_type, source_id as source_chat_id, 
+                    source_name as source_chat_title, status, tags, ai_score, activity_score,
+                    value_level, is_online, last_seen, is_premium, is_verified,
+                    created_at, updated_at
+                FROM unified_contacts 
+                WHERE contact_type = 'user'
+                ORDER BY created_at DESC 
+                LIMIT {limit}
+            ''')
+            print(f"[Database] get_all_leads: Returning {len(results)} records from unified_contacts (limit={limit})", file=sys.stderr)
             return results
         except Exception as e:
             print(f"Error getting leads: {e}", file=sys.stderr)
-            return []
+            # 備用：嘗試從舊表讀取
+            try:
+                results = await self.fetch_all(f'SELECT * FROM extracted_members ORDER BY created_at DESC LIMIT {limit}')
+                return results
+            except:
+                return []
     
-    async def get_leads_with_total(self, limit: int = 500) -> Dict:
-        """獲取潛在客戶及總數（🆕 增加默認限制到 500，確保返回所有數據）"""
+    async def get_leads_with_total(self, limit: int = 500, initial_load: bool = False) -> Dict:
+        """
+        獲取潛在客戶及總數
+        
+        Args:
+            limit: 最大返回數量
+            initial_load: 🆕 是否為初始加載（true 時只返回 limit 條，用於快速啟動）
+        """
         import sys
         try:
-            # 獲取總數（從 extracted_members 表）
-            count_result = await self.fetch_one('SELECT COUNT(*) as total FROM extracted_members')
+            # 🔧 FIX: 從 unified_contacts 表讀取（與資源中心同步）
+            count_result = await self.fetch_one("SELECT COUNT(*) as total FROM unified_contacts WHERE contact_type = 'user'")
             total_count = count_result['total'] if count_result else 0
             
-            # 🆕 如果總數小於 limit，則返回所有數據
-            actual_limit = max(limit, total_count)
+            # 🆕 初始加載時只返回 limit 條，否則返回所有
+            if initial_load:
+                actual_limit = limit
+            else:
+                actual_limit = max(limit, total_count)
             
-            # 獲取記錄（從 extracted_members 表）
-            results = await self.fetch_all(f'SELECT * FROM extracted_members ORDER BY created_at DESC LIMIT {actual_limit}')
-            print(f"[Database] get_leads_with_total: Total={total_count}, Returning {len(results)} records", file=sys.stderr)
+            # 🔧 FIX: 從 unified_contacts 讀取並轉換字段名
+            results = await self.fetch_all(f'''
+                SELECT 
+                    id, telegram_id as user_id, username, first_name, last_name, phone,
+                    display_name, contact_type, source_type, source_id as source_chat_id, 
+                    source_name as source_chat_title, status, tags, ai_score, activity_score,
+                    value_level, is_online, last_seen, is_premium, is_verified,
+                    created_at, updated_at
+                FROM unified_contacts 
+                WHERE contact_type = 'user'
+                ORDER BY created_at DESC 
+                LIMIT {actual_limit}
+            ''')
+            print(f"[Database] get_leads_with_total: Total={total_count}, Returning {len(results)} records from unified_contacts (initial_load={initial_load})", file=sys.stderr)
             
             return {
                 'leads': results,
-                'total': total_count
+                'total': total_count,
+                'hasMore': len(results) < total_count
             }
         except Exception as e:
             print(f"Error getting leads with total: {e}", file=sys.stderr)
-            return {'leads': [], 'total': 0}
+            return {'leads': [], 'total': 0, 'hasMore': False}
     
-    async def get_leads_paginated(self, limit: int = 50, offset: int = 0) -> List[Dict]:
-        """分頁獲取潛在客戶"""
+    async def get_leads_paginated(self, limit: int = 50, offset: int = 0, status: str = None, search: str = None) -> Dict:
+        """
+        🆕 分頁獲取潛在客戶（帶篩選和總數）
+        🔧 FIX: 改為從 unified_contacts 讀取
+        
+        Args:
+            limit: 每頁數量
+            offset: 偏移量
+            status: 狀態篩選
+            search: 搜索關鍵詞
+            
+        Returns:
+            Dict: { leads: [...], total: N, page: P, pageSize: S }
+        """
+        import sys
         try:
-            return await self.fetch_all(
-                'SELECT * FROM extracted_members ORDER BY created_at DESC LIMIT ? OFFSET ?',
-                (limit, offset)
-            )
+            # 🔧 FIX: 從 unified_contacts 讀取
+            base_query = "FROM unified_contacts WHERE contact_type = 'user'"
+            params = []
+            
+            if status and status != 'all':
+                base_query += ' AND status = ?'
+                params.append(status)
+            
+            if search:
+                base_query += ' AND (username LIKE ? OR first_name LIKE ? OR display_name LIKE ? OR telegram_id LIKE ?)'
+                search_term = f'%{search}%'
+                params.extend([search_term, search_term, search_term, search_term])
+            
+            # 獲取總數
+            count_result = await self.fetch_one(f'SELECT COUNT(*) as total {base_query}', tuple(params))
+            total = count_result['total'] if count_result else 0
+            
+            # 獲取分頁數據（轉換字段名以兼容前端）
+            data_query = f'''
+                SELECT 
+                    id, telegram_id as user_id, username, first_name, last_name, phone,
+                    display_name, contact_type, source_type, source_id as source_chat_id, 
+                    source_name as source_chat_title, status, tags, ai_score, activity_score,
+                    value_level, is_online, last_seen, is_premium, is_verified,
+                    created_at, updated_at
+                {base_query} 
+                ORDER BY created_at DESC 
+                LIMIT ? OFFSET ?
+            '''
+            params.extend([limit, offset])
+            leads = await self.fetch_all(data_query, tuple(params))
+            
+            page = (offset // limit) + 1 if limit > 0 else 1
+            
+            print(f"[Database] get_leads_paginated: total={total}, page={page}, returning {len(leads)} records", file=sys.stderr)
+            
+            return {
+                'leads': leads,
+                'total': total,
+                'page': page,
+                'pageSize': limit,
+                'hasMore': offset + len(leads) < total
+            }
         except Exception as e:
-            print(f"Error getting leads paginated: {e}")
-            return []
+            print(f"Error getting leads paginated: {e}", file=sys.stderr)
+            return {'leads': [], 'total': 0, 'page': 1, 'pageSize': limit, 'hasMore': False}
     
     async def get_lead(self, lead_id: int) -> Optional[Dict]:
         """獲取單個 Lead"""
@@ -4163,6 +5178,12 @@ class Database:
         """
         try:
             await self.connect()
+            # 🔧 FIX: 執行 WAL checkpoint 確保讀取最新數據
+            try:
+                await self._connection.execute("PRAGMA wal_checkpoint(PASSIVE)")
+            except Exception:
+                pass  # 忽略 checkpoint 錯誤，繼續查詢
+            
             cursor = await self._connection.execute(
                 "SELECT * FROM chat_templates ORDER BY usage_count DESC, created_at DESC"
             )
@@ -4288,6 +5309,717 @@ class Database:
             import sys
             print(f"Error incrementing template usage: {e}", file=sys.stderr)
             return False
+    
+    # ========== 聊天記錄管理 ==========
+    
+    async def add_chat_message(
+        self,
+        user_id: int,
+        role: str,  # 'user' or 'assistant'
+        content: str,
+        account_phone: str = None,
+        source_group: str = None,
+        message_id: str = None
+    ) -> Optional[int]:
+        """添加聊天記錄
+        
+        Args:
+            user_id: 用戶 ID
+            role: 消息角色 ('user' 或 'assistant')
+            content: 消息內容
+            account_phone: 帳號手機號
+            source_group: 來源群組
+            message_id: Telegram 消息 ID
+            
+        Returns:
+            int: 記錄 ID，失敗返回 None
+        """
+        try:
+            await self.connect()
+            
+            # 確保表存在
+            await self._connection.execute('''
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT,
+                    account_phone TEXT,
+                    source_group TEXT,
+                    message_id TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 創建索引
+            await self._connection.execute('''
+                CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id 
+                ON chat_messages(user_id)
+            ''')
+            
+            cursor = await self._connection.execute(
+                '''INSERT INTO chat_messages (user_id, role, content, account_phone, source_group, message_id)
+                   VALUES (?, ?, ?, ?, ?, ?)''',
+                (user_id, role, content, account_phone, source_group, message_id)
+            )
+            await self._connection.commit()
+            
+            return cursor.lastrowid
+        except Exception as e:
+            import sys
+            print(f"[Database] Error adding chat message: {e}", file=sys.stderr)
+            return None
+    
+    async def get_chat_messages(
+        self,
+        user_id: int,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[Dict]:
+        """獲取聊天記錄
+        
+        Args:
+            user_id: 用戶 ID
+            limit: 返回數量限制
+            offset: 偏移量
+            
+        Returns:
+            List[Dict]: 聊天記錄列表
+        """
+        try:
+            await self.connect()
+            
+            cursor = await self._connection.execute(
+                '''SELECT * FROM chat_messages 
+                   WHERE user_id = ?
+                   ORDER BY created_at DESC
+                   LIMIT ? OFFSET ?''',
+                (user_id, limit, offset)
+            )
+            rows = await cursor.fetchall()
+            
+            messages = []
+            for row in rows:
+                messages.append(dict(row))
+            
+            return messages
+        except Exception as e:
+            import sys
+            print(f"[Database] Error getting chat messages: {e}", file=sys.stderr)
+            return []
+    
+    # ========== 🔧 P2 優化: 話題追蹤管理 ==========
+    
+    async def get_covered_topics(self, user_id: str, limit: int = 10) -> List[Dict]:
+        """獲取用戶已涵蓋的話題"""
+        try:
+            await self.connect()
+            
+            cursor = await self._connection.execute("""
+                SELECT topic_name, depth_level, key_points, last_user_question, 
+                       last_ai_response, covered_at
+                FROM conversation_topics
+                WHERE user_id = ?
+                ORDER BY covered_at DESC
+                LIMIT ?
+            """, (str(user_id), limit))
+            
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+        except Exception as e:
+            import sys
+            print(f"[Database] Error getting covered topics: {e}", file=sys.stderr)
+            return []
+    
+    async def update_topic(
+        self,
+        user_id: str,
+        topic_name: str,
+        depth_level: int = 1,
+        key_points: List[str] = None,
+        last_question: str = None,
+        last_response: str = None
+    ) -> bool:
+        """更新或創建話題記錄"""
+        try:
+            await self.connect()
+            
+            # 確保表存在
+            await self._connection.execute("""
+                CREATE TABLE IF NOT EXISTS conversation_topics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    topic_name TEXT NOT NULL,
+                    covered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    depth_level INTEGER DEFAULT 1,
+                    key_points TEXT,
+                    last_user_question TEXT,
+                    last_ai_response TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            import json
+            key_points_json = json.dumps(key_points or [])
+            
+            # UPSERT: 如果存在則更新，否則插入
+            await self._connection.execute("""
+                INSERT INTO conversation_topics 
+                (user_id, topic_name, depth_level, key_points, last_user_question, last_ai_response, covered_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id, topic_name) DO UPDATE SET
+                    depth_level = MAX(depth_level, excluded.depth_level),
+                    key_points = excluded.key_points,
+                    last_user_question = excluded.last_user_question,
+                    last_ai_response = excluded.last_ai_response,
+                    covered_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (str(user_id), topic_name, depth_level, key_points_json, last_question, last_response))
+            
+            await self._connection.commit()
+            return True
+        except Exception as e:
+            import sys
+            print(f"[Database] Error updating topic: {e}", file=sys.stderr)
+            return False
+    
+    async def get_topic_depth(self, user_id: str, topic_name: str) -> int:
+        """獲取特定話題的深入程度"""
+        try:
+            await self.connect()
+            
+            cursor = await self._connection.execute("""
+                SELECT depth_level FROM conversation_topics
+                WHERE user_id = ? AND topic_name = ?
+            """, (str(user_id), topic_name))
+            
+            row = await cursor.fetchone()
+            return row['depth_level'] if row else 0
+        except Exception as e:
+            return 0
+    
+    # ========== 銷售漏斗管理 ==========
+    
+    async def update_funnel_stage(
+        self,
+        user_id: int,
+        stage: str,
+        reason: str = None
+    ) -> bool:
+        """更新用戶的銷售漏斗階段
+        
+        Args:
+            user_id: 用戶 ID
+            stage: 漏斗階段 ('new', 'interested', 'engaged', 'qualified', 'converted', 'replied' 等)
+            reason: 更新原因
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            await self.connect()
+            
+            # 🔧 確保表存在並有正確的約束
+            # 先嘗試創建表（如果不存在）
+            await self._connection.execute('''
+                CREATE TABLE IF NOT EXISTS funnel_stages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    stage TEXT NOT NULL DEFAULT 'new',
+                    reason TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 🔧 確保 user_id 有唯一索引（用於 UPSERT）
+            try:
+                await self._connection.execute('''
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_funnel_stages_user_id 
+                    ON funnel_stages(user_id)
+                ''')
+            except Exception:
+                pass  # 索引可能已存在
+            
+            # 🔧 遷移：添加 reason 列（如果不存在）
+            try:
+                await self._connection.execute("SELECT reason FROM funnel_stages LIMIT 1")
+            except Exception:
+                try:
+                    await self._connection.execute("ALTER TABLE funnel_stages ADD COLUMN reason TEXT")
+                    print("[Database] Added 'reason' column to funnel_stages", file=sys.stderr)
+                except Exception:
+                    pass
+            
+            # 🔧 檢測舊表是否有 phone 列（處理向後兼容）
+            has_phone_column = False
+            try:
+                cursor = await self._connection.execute("PRAGMA table_info(funnel_stages)")
+                columns = await cursor.fetchall()
+                for col in columns:
+                    if col[1] == 'phone':  # col[1] 是列名
+                        has_phone_column = True
+                        break
+            except Exception:
+                pass
+            
+            # 🔧 使用更兼容的 UPSERT 方式
+            # 先嘗試更新，如果沒有更新任何行則插入
+            cursor = await self._connection.execute(
+                '''UPDATE funnel_stages SET stage = ?, reason = ?, updated_at = CURRENT_TIMESTAMP
+                   WHERE user_id = ?''',
+                (stage, reason, user_id)
+            )
+            
+            if cursor.rowcount == 0:
+                # 沒有更新，說明記錄不存在，執行插入
+                if has_phone_column:
+                    # 舊表有 phone 列，插入時提供默認值
+                    await self._connection.execute(
+                        '''INSERT INTO funnel_stages (user_id, stage, reason, phone) VALUES (?, ?, ?, ?)''',
+                        (user_id, stage, reason, 'unknown')
+                    )
+                else:
+                    await self._connection.execute(
+                        '''INSERT INTO funnel_stages (user_id, stage, reason) VALUES (?, ?, ?)''',
+                        (user_id, stage, reason)
+                    )
+            await self._connection.commit()
+            
+            import sys
+            print(f"[Database] Updated funnel stage: user_id={user_id}, stage={stage}", file=sys.stderr)
+            return True
+        except Exception as e:
+            import sys
+            print(f"[Database] Error updating funnel stage: {e}", file=sys.stderr)
+            return False
+    
+    async def get_funnel_stage(
+        self,
+        user_id: int
+    ) -> Optional[Dict]:
+        """獲取用戶的銷售漏斗階段
+        
+        Args:
+            user_id: 用戶 ID
+            
+        Returns:
+            Dict: 漏斗階段信息，不存在返回 None
+        """
+        try:
+            await self.connect()
+            
+            cursor = await self._connection.execute(
+                '''SELECT * FROM funnel_stages WHERE user_id = ?''',
+                (user_id,)
+            )
+            row = await cursor.fetchone()
+            
+            if row:
+                return dict(row)
+            return None
+        except Exception as e:
+            import sys
+            print(f"[Database] Error getting funnel stage: {e}", file=sys.stderr)
+            return None
+    
+    async def get_funnel_statistics(self) -> Dict:
+        """獲取銷售漏斗統計
+            
+        Returns:
+            Dict: 各階段的用戶數量
+        """
+        try:
+            await self.connect()
+            
+            cursor = await self._connection.execute(
+                '''SELECT stage, COUNT(*) as count FROM funnel_stages GROUP BY stage'''
+            )
+            
+            rows = await cursor.fetchall()
+            
+            stats = {
+                'new': 0,
+                'interested': 0,
+                'engaged': 0,
+                'qualified': 0,
+                'converted': 0,
+                'replied': 0,
+                'total': 0
+            }
+            
+            for row in rows:
+                stage = row['stage']
+                count = row['count']
+                if stage in stats:
+                    stats[stage] = count
+                stats['total'] += count
+            
+            return stats
+        except Exception as e:
+            import sys
+            print(f"[Database] Error getting funnel statistics: {e}", file=sys.stderr)
+            return {'new': 0, 'interested': 0, 'engaged': 0, 'qualified': 0, 'converted': 0, 'replied': 0, 'total': 0}
+    
+    # ==================== 收集用戶管理 ====================
+    
+    async def upsert_collected_user(self, user_data: Dict[str, Any]) -> int:
+        """插入或更新收集的用戶
+        
+        Args:
+            user_data: 用戶數據字典
+            
+        Returns:
+            用戶 ID
+        """
+        await self._ensure_keyword_tables()
+        try:
+            telegram_id = str(user_data.get('telegram_id', ''))
+            if not telegram_id:
+                raise ValueError("telegram_id is required")
+            
+            # 檢查是否已存在
+            existing = await self.fetch_one(
+                "SELECT id, message_count, source_groups FROM collected_users WHERE telegram_id = ?",
+                (telegram_id,)
+            )
+            
+            import json
+            
+            if existing:
+                # 更新現有記錄
+                existing_dict = dict(existing) if hasattr(existing, 'keys') else {
+                    'id': existing[0], 'message_count': existing[1], 'source_groups': existing[2]
+                }
+                
+                # 合併來源群組
+                old_groups = json.loads(existing_dict.get('source_groups', '[]') or '[]')
+                new_groups = user_data.get('source_groups', [])
+                if isinstance(new_groups, str):
+                    new_groups = json.loads(new_groups)
+                merged_groups = list(set(old_groups + new_groups))
+                
+                # 更新消息計數
+                new_count = existing_dict.get('message_count', 0) + user_data.get('message_increment', 1)
+                
+                await self.execute('''
+                    UPDATE collected_users SET
+                        username = COALESCE(?, username),
+                        first_name = COALESCE(?, first_name),
+                        last_name = COALESCE(?, last_name),
+                        bio = COALESCE(?, bio),
+                        has_photo = COALESCE(?, has_photo),
+                        is_premium = COALESCE(?, is_premium),
+                        is_verified = COALESCE(?, is_verified),
+                        is_bot = COALESCE(?, is_bot),
+                        source_groups = ?,
+                        message_count = ?,
+                        groups_count = ?,
+                        last_seen_at = CURRENT_TIMESTAMP,
+                        last_message_at = COALESCE(?, last_message_at),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE telegram_id = ?
+                ''', (
+                    user_data.get('username'),
+                    user_data.get('first_name'),
+                    user_data.get('last_name'),
+                    user_data.get('bio'),
+                    user_data.get('has_photo'),
+                    user_data.get('is_premium'),
+                    user_data.get('is_verified'),
+                    user_data.get('is_bot'),
+                    json.dumps(merged_groups),
+                    new_count,
+                    len(merged_groups),
+                    user_data.get('last_message_at'),
+                    telegram_id
+                ))
+                return existing_dict['id']
+            else:
+                # 插入新記錄
+                source_groups = user_data.get('source_groups', [])
+                if isinstance(source_groups, list):
+                    source_groups = json.dumps(source_groups)
+                
+                return await self.execute_insert('''
+                    INSERT INTO collected_users (
+                        telegram_id, username, first_name, last_name, bio,
+                        has_photo, is_premium, is_verified, is_bot,
+                        source_groups, collected_by, message_count, groups_count,
+                        last_message_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    telegram_id,
+                    user_data.get('username', ''),
+                    user_data.get('first_name', ''),
+                    user_data.get('last_name', ''),
+                    user_data.get('bio', ''),
+                    1 if user_data.get('has_photo') else 0,
+                    1 if user_data.get('is_premium') else 0,
+                    1 if user_data.get('is_verified') else 0,
+                    1 if user_data.get('is_bot') else 0,
+                    source_groups,
+                    user_data.get('collected_by', ''),
+                    1,
+                    1,
+                    user_data.get('last_message_at')
+                ))
+        except Exception as e:
+            import sys
+            print(f"[Database] Error upserting collected user: {e}", file=sys.stderr)
+            raise e
+    
+    async def update_user_risk_score(self, telegram_id: str, risk_score: float, risk_factors: Dict, value_level: str) -> bool:
+        """更新用戶的風險評分"""
+        try:
+            import json
+            await self.execute('''
+                UPDATE collected_users SET
+                    ad_risk_score = ?,
+                    risk_factors = ?,
+                    value_level = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE telegram_id = ?
+            ''', (risk_score, json.dumps(risk_factors), value_level, str(telegram_id)))
+            return True
+        except Exception as e:
+            import sys
+            print(f"[Database] Error updating risk score: {e}", file=sys.stderr)
+            return False
+    
+    async def add_user_message_sample(self, telegram_id: str, group_id: str, group_name: str, 
+                                       message_text: str, analysis: Dict) -> int:
+        """添加用戶消息樣本"""
+        await self._ensure_keyword_tables()
+        try:
+            import json
+            return await self.execute_insert('''
+                INSERT INTO user_messages_sample (
+                    user_telegram_id, group_id, group_name, message_text,
+                    contains_link, contains_contact, ad_keywords_matched, content_risk_score,
+                    message_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (
+                str(telegram_id),
+                group_id,
+                group_name,
+                message_text[:1000] if message_text else '',  # 限制長度
+                1 if analysis.get('contains_link') else 0,
+                1 if analysis.get('contains_contact') else 0,
+                json.dumps(analysis.get('ad_keywords_matched', [])),
+                analysis.get('content_risk_score', 0)
+            ))
+        except Exception as e:
+            import sys
+            print(f"[Database] Error adding message sample: {e}", file=sys.stderr)
+            return 0
+    
+    async def get_collected_users(self, filters: Dict = None, limit: int = 100, offset: int = 0) -> List[Dict]:
+        """獲取收集的用戶列表"""
+        await self._ensure_keyword_tables()
+        try:
+            filters = filters or {}
+            
+            where_clauses = ["1=1"]
+            params = []
+            
+            # 風險等級篩選
+            if 'min_risk' in filters:
+                where_clauses.append("ad_risk_score >= ?")
+                params.append(filters['min_risk'])
+            if 'max_risk' in filters:
+                where_clauses.append("ad_risk_score <= ?")
+                params.append(filters['max_risk'])
+            
+            # 價值等級篩選
+            if 'value_levels' in filters and filters['value_levels']:
+                placeholders = ','.join(['?' for _ in filters['value_levels']])
+                where_clauses.append(f"value_level IN ({placeholders})")
+                params.extend(filters['value_levels'])
+            
+            # 排除廣告號
+            if filters.get('exclude_ads'):
+                where_clauses.append("(is_ad_account IS NULL OR is_ad_account = 0)")
+            
+            # 排除黑名單
+            if filters.get('exclude_blacklist'):
+                where_clauses.append("is_blacklisted = 0")
+            
+            # 只看有用戶名的
+            if filters.get('has_username'):
+                where_clauses.append("username IS NOT NULL AND username != ''")
+            
+            # 來源群組篩選
+            if 'source_group' in filters:
+                where_clauses.append("source_groups LIKE ?")
+                params.append(f'%{filters["source_group"]}%')
+            
+            where_sql = " AND ".join(where_clauses)
+            
+            # 排序
+            order_by = filters.get('order_by', 'last_seen_at DESC')
+            
+            query = f'''
+                SELECT * FROM collected_users 
+                WHERE {where_sql}
+                ORDER BY {order_by}
+                LIMIT ? OFFSET ?
+            '''
+            params.extend([limit, offset])
+            
+            rows = await self.fetch_all(query, tuple(params))
+            
+            import json
+            result = []
+            for row in rows:
+                user = dict(row) if hasattr(row, 'keys') else row
+                # 解析 JSON 字段
+                for field in ['source_groups', 'risk_factors', 'tags']:
+                    if user.get(field):
+                        try:
+                            user[field] = json.loads(user[field])
+                        except:
+                            user[field] = []
+                result.append(user)
+            
+            return result
+        except Exception as e:
+            import sys
+            print(f"[Database] Error getting collected users: {e}", file=sys.stderr)
+            return []
+    
+    async def get_collected_users_count(self, filters: Dict = None) -> int:
+        """獲取收集用戶總數"""
+        await self._ensure_keyword_tables()
+        try:
+            filters = filters or {}
+            
+            where_clauses = ["1=1"]
+            params = []
+            
+            if filters.get('exclude_ads'):
+                where_clauses.append("(is_ad_account IS NULL OR is_ad_account = 0)")
+            if filters.get('exclude_blacklist'):
+                where_clauses.append("is_blacklisted = 0")
+            
+            where_sql = " AND ".join(where_clauses)
+            
+            row = await self.fetch_one(
+                f"SELECT COUNT(*) as cnt FROM collected_users WHERE {where_sql}",
+                tuple(params)
+            )
+            return row['cnt'] if row else 0
+        except Exception as e:
+            import sys
+            print(f"[Database] Error getting collected users count: {e}", file=sys.stderr)
+            return 0
+    
+    async def mark_user_as_ad(self, telegram_id: str, is_ad: bool) -> bool:
+        """標記用戶為廣告號"""
+        try:
+            await self.execute(
+                "UPDATE collected_users SET is_ad_account = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?",
+                (1 if is_ad else 0, str(telegram_id))
+            )
+            return True
+        except Exception as e:
+            import sys
+            print(f"[Database] Error marking user as ad: {e}", file=sys.stderr)
+            return False
+    
+    async def blacklist_user(self, telegram_id: str, blacklist: bool) -> bool:
+        """將用戶加入/移出黑名單"""
+        try:
+            await self.execute(
+                "UPDATE collected_users SET is_blacklisted = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?",
+                (1 if blacklist else 0, str(telegram_id))
+            )
+            return True
+        except Exception as e:
+            import sys
+            print(f"[Database] Error blacklisting user: {e}", file=sys.stderr)
+            return False
+    
+    async def get_user_message_samples(self, telegram_id: str, limit: int = 10) -> List[Dict]:
+        """獲取用戶的消息樣本"""
+        try:
+            rows = await self.fetch_all(
+                "SELECT * FROM user_messages_sample WHERE user_telegram_id = ? ORDER BY message_time DESC LIMIT ?",
+                (str(telegram_id), limit)
+            )
+            import json
+            result = []
+            for row in rows:
+                sample = dict(row) if hasattr(row, 'keys') else row
+                if sample.get('ad_keywords_matched'):
+                    try:
+                        sample['ad_keywords_matched'] = json.loads(sample['ad_keywords_matched'])
+                    except:
+                        sample['ad_keywords_matched'] = []
+                result.append(sample)
+            return result
+        except Exception as e:
+            import sys
+            print(f"[Database] Error getting message samples: {e}", file=sys.stderr)
+            return []
+    
+    async def get_collected_users_stats(self) -> Dict:
+        """獲取收集用戶統計"""
+        await self._ensure_keyword_tables()
+        try:
+            stats = {
+                'total': 0,
+                'by_value_level': {'S': 0, 'A': 0, 'B': 0, 'C': 0, 'D': 0},
+                'by_risk': {'low': 0, 'medium': 0, 'high': 0},
+                'ad_accounts': 0,
+                'blacklisted': 0,
+                'with_username': 0,
+                'premium': 0
+            }
+            
+            # 總數
+            row = await self.fetch_one("SELECT COUNT(*) as cnt FROM collected_users")
+            stats['total'] = row['cnt'] if row else 0
+            
+            # 按價值等級
+            rows = await self.fetch_all(
+                "SELECT value_level, COUNT(*) as cnt FROM collected_users GROUP BY value_level"
+            )
+            for row in rows:
+                level = row['value_level'] if hasattr(row, 'keys') else row[0]
+                count = row['cnt'] if hasattr(row, 'keys') else row[1]
+                if level in stats['by_value_level']:
+                    stats['by_value_level'][level] = count
+            
+            # 按風險等級
+            row = await self.fetch_one("SELECT COUNT(*) as cnt FROM collected_users WHERE ad_risk_score < 0.4")
+            stats['by_risk']['low'] = row['cnt'] if row else 0
+            
+            row = await self.fetch_one("SELECT COUNT(*) as cnt FROM collected_users WHERE ad_risk_score >= 0.4 AND ad_risk_score < 0.7")
+            stats['by_risk']['medium'] = row['cnt'] if row else 0
+            
+            row = await self.fetch_one("SELECT COUNT(*) as cnt FROM collected_users WHERE ad_risk_score >= 0.7")
+            stats['by_risk']['high'] = row['cnt'] if row else 0
+            
+            # 其他統計
+            row = await self.fetch_one("SELECT COUNT(*) as cnt FROM collected_users WHERE is_ad_account = 1")
+            stats['ad_accounts'] = row['cnt'] if row else 0
+            
+            row = await self.fetch_one("SELECT COUNT(*) as cnt FROM collected_users WHERE is_blacklisted = 1")
+            stats['blacklisted'] = row['cnt'] if row else 0
+            
+            row = await self.fetch_one("SELECT COUNT(*) as cnt FROM collected_users WHERE username IS NOT NULL AND username != ''")
+            stats['with_username'] = row['cnt'] if row else 0
+            
+            row = await self.fetch_one("SELECT COUNT(*) as cnt FROM collected_users WHERE is_premium = 1")
+            stats['premium'] = row['cnt'] if row else 0
+            
+            return stats
+        except Exception as e:
+            import sys
+            print(f"[Database] Error getting collected users stats: {e}", file=sys.stderr)
+            return {'total': 0, 'by_value_level': {}, 'by_risk': {}, 'ad_accounts': 0, 'blacklisted': 0}
 
 
 # 創建全局實例

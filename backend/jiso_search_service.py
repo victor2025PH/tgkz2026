@@ -27,6 +27,16 @@ from pyrogram.errors import (
 from pyrogram.raw import functions, types as raw_types
 
 
+# ============ 搜索配置常量 ============
+# 這些值可以根據需要調整，避免硬編碼分散在代碼各處
+
+SEARCH_DEFAULT_LIMIT = 50           # 默認搜索結果數量
+MESSAGE_COLLECT_LIMIT = 30          # Bot 消息收集數量（每次從 Bot 獲取的消息數）
+DETAIL_FETCH_BATCH_SIZE = 30        # 詳情獲取批次大小（每次獲取多少個結果的詳情）
+CHAT_HISTORY_LIMIT = 30             # 聊天歷史查詢限制
+DETAIL_FETCH_DELAY = 0.3            # 詳情獲取間隔（秒），避免觸發 FloodWait
+
+
 @dataclass
 class JisoSearchResult:
     """极搜搜索结果"""
@@ -45,18 +55,35 @@ class JisoSearchResult:
     language: Optional[str] = None
     # 新增：更新時間
     updated_at: Optional[str] = None
+    # 🔧 P0: 真實 Telegram ID（從 API 獲取，可為 None）
+    telegram_id: Optional[int] = None
     
     def to_dict(self) -> Dict[str, Any]:
         # 自動推斷類型（如果還是默認值）
         inferred_type = self._infer_chat_type()
         
+        # 🔧 P0: 生成去重 key（僅用於內部去重，不顯示給用戶）
+        dedup_key = None
+        if self.username:
+            dedup_key = f"@{self.username}"
+        elif self.link:
+            dedup_key = self.link
+        else:
+            dedup_key = f"title:{self.title}"
+        
+        # 🔧 P0: 真實 Telegram ID（可能為 None）
+        real_telegram_id = self.telegram_id  # 從 API 獲取的真實 ID
+        
         return {
+            "dedup_key": dedup_key,             # 🔧 去重用（內部使用）
+            "telegram_id": real_telegram_id,    # 🔧 真實 Telegram ID（可為 None）
             "title": self.title,
             "username": self.username,
             "link": self.link or (f"https://t.me/{self.username}" if self.username else None),
             "member_count": self.member_count,
             "description": self.description,
             "chat_type": inferred_type,
+            "type": inferred_type,
             "source": self.source,
             "details_fetched": self.details_fetched,
             "language": self.language
@@ -229,34 +256,101 @@ class JisoSearchService:
     
     # ==================== 验证码处理 ====================
     
-    def _is_captcha_message(self, message: Message) -> bool:
-        """检测消息是否是验证码请求"""
+    def _is_search_result_message(self, message: Message) -> bool:
+        """
+        检测消息是否是搜索结果（非验证码）
+        搜索结果特征：
+        - 包含群组列表格式（成员数如 3.0k、25.9k）
+        - 有翻页按钮（下一页、下一頁、➡、➜）
+        - 包含多个群组名称
+        """
         if not message:
+            return False
+        
+        text = message.text or message.caption or ""
+        text_lower = text.lower()
+        
+        # 特征1: 包含成员数格式（如 3.0k, 25.9k, 2.7k）
+        member_count_pattern = r'\d+(?:\.\d+)?[kKmMwW万千]\s*(?:\n|$|人|成员|成員)'
+        has_member_counts = len(re.findall(member_count_pattern, text)) >= 2
+        
+        # 特征2: 包含翻页按钮
+        has_next_page_btn = False
+        if message.reply_markup and hasattr(message.reply_markup, 'inline_keyboard'):
+            for row in message.reply_markup.inline_keyboard:
+                for btn in row:
+                    btn_text = (btn.text or "").lower()
+                    if any(kw in btn_text for kw in ['下一页', '下一頁', '➡', '➜', 'next', '下页']):
+                        has_next_page_btn = True
+                        break
+        
+        # 特征3: 包含群组列表格式（◇ 开头或数字序号）
+        has_group_list = bool(re.search(r'[◇◆●○•]\s*.+?\s*\d+', text)) or \
+                        bool(re.search(r'\d+[.、]\s*.+\s+\d+(?:\.\d+)?[kK]', text))
+        
+        # 特征4: 包含 Telegram 链接
+        has_tg_links = 't.me/' in text or '@' in text
+        
+        # 如果满足2个以上特征，认为是搜索结果
+        feature_count = sum([has_member_counts, has_next_page_btn, has_group_list, has_tg_links])
+        
+        if feature_count >= 2:
+            self.log(f"  📋 识别为搜索结果消息 (特征数: {feature_count})")
+            return True
+        
+        return False
+    
+    def _is_captcha_message(self, message: Message) -> bool:
+        """
+        检测消息是否是验证码请求
+        更严格的检测逻辑：必须同时满足多个条件
+        """
+        if not message:
+            return False
+        
+        # 🆕 首先检查是否是搜索结果 - 如果是搜索结果，绝对不是验证码
+        if self._is_search_result_message(message):
             return False
         
         text = (message.text or message.caption or "").lower()
         
-        # 验证码关键词
-        captcha_keywords = [
-            "验证", "人机", "计算", "captcha", "verify",
-            "请选择", "请输入", "请点击",
-            "=?", "= ?", "等于多少", "计算结果"
+        # 真正的验证码特征：必须包含明确的验证码请求
+        # 例如：「请输入验证码」「计算结果是多少」「请选择正确答案」
+        captcha_request_patterns = [
+            r'请输入.*(?:验证码|答案|结果)',
+            r'(?:验证码|答案)[是为：:]\s*\?',
+            r'计算.*[=＝].*\?',
+            r'\d+\s*[+\-×÷*/]\s*\d+\s*[=＝]\s*\?',
+            r'请选择.*(?:正确|答案)',
+            r'人机验证',
+            r'captcha',
+            r'请点击.*(?:数字|按钮).*验证',
         ]
         
-        for kw in captcha_keywords:
-            if kw in text:
-                # 同时检查是否有数字按钮（inline keyboard）
-                if message.reply_markup and hasattr(message.reply_markup, 'inline_keyboard'):
-                    # 检查是否有纯数字按钮
-                    has_number_buttons = False
-                    for row in message.reply_markup.inline_keyboard:
-                        for btn in row:
-                            if btn.text and btn.text.strip().isdigit():
-                                has_number_buttons = True
-                                break
-                    if has_number_buttons:
-                        self.log(f"检测到验证码消息: {text[:50]}...")
-                        return True
+        has_captcha_request = False
+        for pattern in captcha_request_patterns:
+            if re.search(pattern, text):
+                has_captcha_request = True
+                break
+        
+        if not has_captcha_request:
+            return False
+        
+        # 还需要有纯数字按钮（用于选择答案）
+        if message.reply_markup and hasattr(message.reply_markup, 'inline_keyboard'):
+            # 检查是否有纯数字按钮（排除翻页按钮）
+            number_buttons = []
+            for row in message.reply_markup.inline_keyboard:
+                for btn in row:
+                    btn_text = (btn.text or "").strip()
+                    # 纯数字且不是翻页按钮
+                    if btn_text.isdigit() and len(btn_text) <= 3:
+                        number_buttons.append(btn_text)
+            
+            # 验证码通常有多个连续数字按钮作为答案选项
+            if len(number_buttons) >= 3:
+                self.log(f"检测到验证码消息: {text[:50]}... (数字按钮: {number_buttons[:5]})")
+                return True
         
         return False
     
@@ -699,14 +793,39 @@ class JisoSearchService:
         return None
     
     def _is_ad_line(self, line: str) -> bool:
-        """检测是否是广告行（只过滤明确标记的广告）"""
+        """
+        检测是否是广告行（只过滤明确标记的广告）
+        
+        🆕 優化：保守過濾，只過濾明確的廣告行
+        """
         if not line:
             return False
         
+        line_stripped = line.strip()
+        line_lower = line_stripped.lower()
+        
+        # 🆕 首先检查是否包含搜索结果特征（成员数）- 不过滤
+        if re.search(r'\d+(?:\.\d+)?[kKmMwW万千]', line):
+            return False
+        
+        # 🆕 如果以 ◇◆● 开头，是搜索结果行，不过滤
+        if line_stripped and line_stripped[0] in '◇◆●○•':
+            return False
+        
+        # 🆕 如果是数字序号开头（如 1. 2. 3.），是搜索结果，不过滤
+        if re.match(r'^\d+[.、]\s*', line_stripped):
+            return False
+        
         # 只过滤明确标记为"广告"的行（通常是 Bot 自己插入的推广）
-        # 例如: "广告 0.1TRX能量租赁..."
-        if line.startswith("广告") or line.startswith("廣告") or line.startswith("广告:") or line.startswith("广告："):
-            return True
+        explicit_ad_starts = [
+            "广告", "廣告", "广告:", "广告：", 
+            "赞助商", "贊助商", "赞助:", "贊助：",
+            "推广", "推廣",
+        ]
+        
+        for prefix in explicit_ad_starts:
+            if line_lower.startswith(prefix):
+                return True
         
         return False
     
@@ -810,8 +929,45 @@ class JisoSearchService:
         if tgdb_results:
             return tgdb_results
         
-        # 先过滤广告
+        # 🆕 先过滤纯广告行（但保留可能是搜索结果的行）
         text = self._filter_ad_lines(text)
+        
+        # 🆕 格式0 (最優先): 神马搜索/极搜 2026 新格式 - ◇ 開頭
+        # 例如: ◇ USDT搬砖 日入8000 + 免费加代理 轻轻...
+        # 例如: ◇ 中華娱乐◇体育◇真人◇电子◇棋牌◇彩票◇捕... 25.9k
+        # 例如: ◇ usdt交流群 3.0k
+        # 例如: ◇ usdt 💰 承兑换汇usdt 💰 兑换线下担保交易所 2.7k
+        diamond_pattern = r'[◇◆●○]\s*(.+?)(?:\s+(\d+(?:\.\d+)?[kKmMwW万千]?))?(?:\s*\n|$)'
+        for match in re.finditer(diamond_pattern, text):
+            title = match.group(1).strip()
+            member_str = match.group(2) if match.group(2) else ""
+            
+            # 清理标题：移除末尾的省略号和多余字符
+            title = re.sub(r'\.{2,}$', '', title).strip()
+            title = re.sub(r'…+$', '', title).strip()
+            
+            # 🆕 从标题中提取成员数（如果标题末尾有数字k）
+            if not member_str:
+                tail_match = re.search(r'\s+(\d+(?:\.\d+)?[kKmMwW万千]?)$', title)
+                if tail_match:
+                    member_str = tail_match.group(1)
+                    title = title[:tail_match.start()].strip()
+            
+            # 提取 @username（如果标题中有）
+            username = self._extract_username(title)
+            
+            if title and len(title) > 2 and not any(r.title == title for r in results):
+                results.append(JisoSearchResult(
+                    title=title,
+                    member_count=self._parse_member_count(member_str) if member_str else 0,
+                    username=username
+                ))
+                self.log(f"  📋 解析到◇格式結果: {title[:30]}... ({member_str or '未知'}人)", "debug")
+        
+        # 如果 ◇ 格式已经解析到结果，可能就是主要格式，直接返回
+        if len(results) >= 3:
+            self.log(f"  ◇格式解析到 {len(results)} 個結果")
+            return results
         
         # 极搜格式（最重要）: emoji + 群组名 + 空格 + 数字k
         # 例如: 🔥 广州仙女宣 61k
@@ -822,7 +978,7 @@ class JisoSearchService:
         for match in re.finditer(jisou_pattern, text):
             title = match.group(1).strip()
             member_str = match.group(2)
-            if title and len(title) > 1:
+            if title and len(title) > 1 and not any(r.title == title for r in results):
                 results.append(JisoSearchResult(
                     title=title,
                     member_count=self._parse_member_count(member_str),
@@ -984,35 +1140,56 @@ class JisoSearchService:
         """解析单条消息"""
         results = []
         
+        # 🆕 記錄消息基本信息
+        text = message.text or message.caption or ""
+        text_preview = text[:100].replace('\n', ' ') if text else "(空消息)"
+        self.log(f"  🔍 開始解析消息#{message.id}: {text_preview}...")
+        
         # 方法1: 優先解析消息實體（TextLink）
         entity_results = self._parse_message_entities(message)
         if entity_results:
-            self.log(f"  從消息實體中提取到 {len(entity_results)} 個帶鏈接的結果")
+            self.log(f"  ✅ 從消息實體中提取到 {len(entity_results)} 個帶鏈接的結果")
             results.extend(entity_results)
         
         # 方法2: 嘗試 HTML 解析（備選）
         if not entity_results:
             html_results = self._parse_html_links(message)
             if html_results:
-                self.log(f"  從 HTML 中提取到 {len(html_results)} 個帶鏈接的結果")
+                self.log(f"  ✅ 從 HTML 中提取到 {len(html_results)} 個帶鏈接的結果")
                 results.extend(html_results)
         
         # 方法3: 解析純文本内容（作為補充）
-        text = message.text or message.caption or ""
         if text:
             text_results = self._parse_text_message(text)
-            # 只添加之前沒有的結果
-            existing_titles = {r.title for r in results}
-            for r in text_results:
-                if r.title not in existing_titles:
-                    results.append(r)
+            if text_results:
+                self.log(f"  ✅ 從純文本中提取到 {len(text_results)} 個結果")
+                # 只添加之前沒有的結果
+                existing_titles = {r.title for r in results}
+                added_count = 0
+                for r in text_results:
+                    if r.title not in existing_titles:
+                        results.append(r)
+                        added_count += 1
+                if added_count > 0:
+                    self.log(f"    新增 {added_count} 個不重複的結果")
         
         # 方法4: 解析内联按钮中的 URL
         button_results = self._parse_inline_buttons(message)
-        existing_usernames = {r.username for r in results if r.username}
-        for r in button_results:
-            if r.username and r.username not in existing_usernames:
-                results.append(r)
+        if button_results:
+            existing_usernames = {r.username for r in results if r.username}
+            added_count = 0
+            for r in button_results:
+                if r.username and r.username not in existing_usernames:
+                    results.append(r)
+                    added_count += 1
+            if added_count > 0:
+                self.log(f"  ✅ 從按鈕中提取到 {added_count} 個新結果")
+        
+        # 🆕 總結解析結果
+        if results:
+            self.log(f"  📊 消息#{message.id} 共解析到 {len(results)} 個結果")
+        else:
+            self.log(f"  ⚠️ 消息#{message.id} 未解析到任何結果")
         
         return results
     
@@ -1170,19 +1347,39 @@ class JisoSearchService:
         return results
     
     def _is_ad_text(self, text: str) -> bool:
-        """檢查是否是廣告文本"""
+        """
+        檢查是否是純廣告文本（不應過濾正常群組名）
+        
+        🆕 優化：只過濾 Bot 自己插入的廣告行，不過濾群組名中的關鍵詞
+        例如「体育交流群」不應被過濾，但「广告 点击购买」應被過濾
+        """
         if not text:
             return True
         
-        text_lower = text.lower()
-        ad_keywords = [
-            '广告', '購買', '购买', '優惠', '优惠', '券', 
-            '世界杯', '代理', '招商', '体育', '體育',
-            '神马搜索', '绑定', '綁定', '拉爆', '返利'
+        text_lower = text.lower().strip()
+        
+        # 🆕 首先检查是否是搜索结果格式 - 如果有成员数，就不是广告
+        if re.search(r'\d+(?:\.\d+)?[kKmMwW万千]\s*$', text):
+            return False
+        
+        # 🆕 如果包含 @username 或 t.me 链接，可能是群组，不过滤
+        if '@' in text or 't.me/' in text:
+            return False
+        
+        # 只過濾明確的廣告標記（通常是 Bot 插入的推廣行）
+        explicit_ad_patterns = [
+            r'^广告[：:\s]',           # 以"广告"开头
+            r'^廣告[：:\s]',           # 以"廣告"开头
+            r'^赞助商[：:\s]',         # 以"赞助商"开头
+            r'^贊助商[：:\s]',         # 以"贊助商"开头
+            r'点击购买广告',           # 购买广告链接
+            r'購買廣告',
+            r'神马搜索\s*绑定',        # Bot 内部功能
+            r'极搜\s*绑定',
         ]
         
-        for kw in ad_keywords:
-            if kw in text_lower:
+        for pattern in explicit_ad_patterns:
+            if re.search(pattern, text_lower):
                 return True
         
         return False
@@ -1501,7 +1698,7 @@ class JisoSearchService:
             try:
                 # 方式1：檢查原消息是否被編輯
                 updated_msg = None
-                async for msg in client.get_chat_history(bot_username, limit=10):
+                async for msg in client.get_chat_history(bot_username, limit=CHAT_HISTORY_LIMIT):
                     if msg.id == message.id:
                         updated_msg = msg
                         break
@@ -1807,7 +2004,15 @@ class JisoSearchService:
         return results
     
     def _filter_relevant_results(self, results: List[JisoSearchResult], keyword: str) -> List[JisoSearchResult]:
-        """🆕 過濾無關結果 - 結果必須包含搜索關鍵詞"""
+        """
+        🆕 過濾無關結果 - 保守過濾，優先保留結果
+        
+        策略：
+        1. 如果結果包含關鍵詞 → 保留
+        2. 如果結果有真實 Telegram 鏈接 → 保留（Bot 搜索到的）
+        3. 如果結果來自可靠來源（有成員數或 username）→ 保留
+        4. 只過濾明顯無關的結果
+        """
         if not keyword or not results:
             return results
         
@@ -1816,22 +2021,45 @@ class JisoSearchService:
         keywords = [k.strip().lower() for k in keyword.split() if k.strip()]
         
         relevant = []
+        filtered_count = 0
+        
         for result in results:
             title = (result.title or "").lower()
             description = (result.description or "").lower()
             username = (result.username or "").lower()
+            link = (result.link or "").lower()
             
-            # 檢查是否至少包含一個關鍵詞
-            is_relevant = False
+            # 檢查是否包含關鍵詞
+            contains_keyword = False
             for kw in keywords:
                 if kw in title or kw in description or kw in username:
-                    is_relevant = True
+                    contains_keyword = True
                     break
             
-            if is_relevant:
+            # 🆕 寬鬆保留策略：以下情況都保留
+            should_keep = False
+            
+            if contains_keyword:
+                # 情況1：包含關鍵詞
+                should_keep = True
+            elif result.link or result.username:
+                # 情況2：有真實鏈接或 username（Bot 搜索到的可靠結果）
+                should_keep = True
+            elif result.member_count and result.member_count > 100:
+                # 情況3：有成員數且 > 100（可能是相關大群）
+                should_keep = True
+            elif result.telegram_id:
+                # 情況4：有真實 Telegram ID
+                should_keep = True
+            
+            if should_keep:
                 relevant.append(result)
             else:
-                self.log(f"  ❌ 過濾無關結果: '{result.title}' (不包含 '{keyword}')", "debug")
+                filtered_count += 1
+                self.log(f"  ❌ 過濾無關結果: '{result.title[:30]}...' (無關鍵詞且無可靠來源)", "debug")
+        
+        if filtered_count > 0:
+            self.log(f"  過濾統計: 保留 {len(relevant)} 個，過濾 {filtered_count} 個")
         
         return relevant
     
@@ -2223,8 +2451,26 @@ class JisoSearchService:
                         if m.id not in seen:
                             seen.add(m.id)
                             
+                            # 🆕 消息類型識別日誌
+                            msg_text = (m.text or m.caption or "")[:80].replace('\n', ' ')
+                            btn_count = 0
+                            if m.reply_markup and hasattr(m.reply_markup, 'inline_keyboard'):
+                                for row in m.reply_markup.inline_keyboard:
+                                    btn_count += len(row)
+                            
+                            # 🆕 先检查是否是搜索结果
+                            is_search_result = self._is_search_result_message(m)
+                            is_captcha = self._is_captcha_message(m)
+                            
+                            if is_search_result:
+                                self.log(f"  📋 消息#{m.id} 類型: 搜索結果 (按鈕數: {btn_count})")
+                            elif is_captcha:
+                                self.log(f"  🔐 消息#{m.id} 類型: 驗證碼 (按鈕數: {btn_count})")
+                            else:
+                                self.log(f"  📝 消息#{m.id} 類型: 普通消息 | {msg_text[:50]}...")
+                            
                             # 检测并处理验证码
-                            if self._is_captcha_message(m):
+                            if is_captcha:
                                 self.log("检测到验证码，尝试自动解决...")
                                 captcha_solved = await self._handle_captcha(client, m)
                                 if captcha_solved:
@@ -2450,7 +2696,7 @@ class JisoSearchService:
                             except:
                                 pass
                             
-                            # 收集新消息
+                            # 收集新消息 - 使用配置常量
                             me = await client.get_me()
                             new_messages = await self._collect_bot_messages(
                                 client=client,
@@ -2458,7 +2704,7 @@ class JisoSearchService:
                                 bot_id=bot_id,
                                 my_id=me.id,
                                 since_ts=time.time() - 5,
-                                limit=10
+                                limit=MESSAGE_COLLECT_LIMIT
                             )
                             
                             if new_messages:
@@ -2574,23 +2820,36 @@ class JisoSearchService:
         else:
             self.log("大部分結果已有鏈接，跳過驗證")
         
-        # 🆕 過濾無關結果（必須包含搜索關鍵詞）
+        # 🆕 添加詳細日誌
+        self.log(f"🔍 搜索結果統計:")
+        self.log(f"  - 原始結果數: {len(all_results)}")
+        for i, r in enumerate(all_results[:5]):
+            self.log(f"    [{i+1}] {r.title[:30]}... (username={r.username}, link={bool(r.link)})")
+        
+        # 🆕 過濾無關結果（寬鬆過濾）
         filtered_results = self._filter_relevant_results(all_results, keyword)
         if len(filtered_results) < len(all_results):
             self.log(f"🔍 過濾無關結果: {len(all_results)} → {len(filtered_results)}")
         
         # 去重
         unique_results = self._deduplicate_results(filtered_results)
+        self.log(f"  - 去重後結果數: {len(unique_results)}")
         
-        # 🆕 獲取前 10 個結果的真實詳情（成員數、類型）
+        # 🔧 P0: 先發送基礎結果（不含詳情），讓前端立即顯示
+        linked_count = sum(1 for r in unique_results if r.link or r.username)
+        self.log(f"基礎搜索完成: 找到 {len(unique_results)} 个结果，正在獲取詳情...")
+        self.emit_progress("basic_results", f"找到 {len(unique_results)} 个結果，正在獲取成員數等詳情...", {
+            "results": [r.to_dict() for r in unique_results[:limit]],
+            "total": len(unique_results),
+            "phase": "basic"
+        })
+        
+        # 🔧 獲取結果的真實詳情（成員數、類型）- 使用配置常量
         if unique_results:
             try:
-                await self.fetch_batch_details(client, unique_results, max_count=10)
+                await self.fetch_batch_details(client, unique_results, max_count=DETAIL_FETCH_BATCH_SIZE)
             except Exception as e:
                 self.log(f"獲取詳情時出錯: {e}", "warning")
-        
-        # 統計有鏈接的結果數量
-        linked_count = sum(1 for r in unique_results if r.link or r.username)
         
         # 缓存结果
         if unique_results:
@@ -2655,6 +2914,11 @@ class JisoSearchService:
             chat = await client.get_chat(username)
             
             if chat:
+                # 🔧 P0: 更新真實 Telegram ID
+                if hasattr(chat, 'id') and chat.id:
+                    result.telegram_id = chat.id
+                    self.log(f"  🆔 獲取到真實 ID: {chat.id}")
+                
                 # 更新成員數
                 if hasattr(chat, 'members_count') and chat.members_count:
                     result.member_count = chat.members_count
@@ -2677,7 +2941,10 @@ class JisoSearchService:
                 if hasattr(chat, 'title') and chat.title:
                     result.title = chat.title
                 
-                self.log(f"  ✅ 獲取詳情成功: {result.title} ({result.member_count}人, {result.chat_type})")
+                # 標記已獲取詳情
+                result.details_fetched = True
+                
+                self.log(f"  ✅ 獲取詳情成功: {result.title} (ID: {result.telegram_id}, {result.member_count}人, {result.chat_type})")
                 
         except Exception as e:
             # 忽略錯誤，保持原始數據
@@ -2687,7 +2954,7 @@ class JisoSearchService:
     
     async def fetch_batch_details(self, client: Client, results: List[JisoSearchResult], max_count: int = 10) -> List[JisoSearchResult]:
         """
-        🆕 批量獲取資源詳情（優化版：限制數量，避免限流）
+        🔧 P1: 批量獲取資源詳情（並行化版本：使用 semaphore 控制並發）
         """
         if not results:
             return results
@@ -2698,18 +2965,36 @@ class JisoSearchService:
         if not to_fetch:
             return results
         
-        self.log(f"=== 獲取前 {len(to_fetch)} 個結果的真實詳情 ===")
+        total_results = len(results)
+        self.log(f"=== 並行獲取 {len(to_fetch)}/{total_results} 個結果的真實詳情 ===")
         self.emit_progress("fetching_details", f"正在獲取詳情 (0/{len(to_fetch)})...")
         
-        for i, result in enumerate(to_fetch):
-            try:
-                await self.fetch_resource_details(client, result)
-                self.emit_progress("fetching_details", f"正在獲取詳情 ({i+1}/{len(to_fetch)})...")
-                await asyncio.sleep(0.5)  # 避免限流
-            except Exception as e:
-                self.log(f"  獲取詳情失敗: {e}", "warning")
+        # 🔧 P1: 使用 Semaphore 控制並發數（避免觸發 FloodWait）
+        CONCURRENT_LIMIT = 5  # 最多同時獲取5個
+        semaphore = asyncio.Semaphore(CONCURRENT_LIMIT)
+        success_count = 0
+        completed_count = 0
         
-        self.log(f"=== 詳情獲取完成 ===")
+        async def fetch_with_semaphore(result: JisoSearchResult) -> bool:
+            nonlocal success_count, completed_count
+            async with semaphore:
+                try:
+                    await self.fetch_resource_details(client, result)
+                    success_count += 1
+                    completed_count += 1
+                    self.emit_progress("fetching_details", f"正在獲取詳情 ({completed_count}/{len(to_fetch)})...")
+                    # 短暫延遲避免限流
+                    await asyncio.sleep(DETAIL_FETCH_DELAY)
+                    return True
+                except Exception as e:
+                    completed_count += 1
+                    self.log(f"  獲取詳情失敗 [{result.username or result.title[:20]}]: {e}", "warning")
+                    return False
+        
+        # 並行執行所有任務
+        await asyncio.gather(*[fetch_with_semaphore(r) for r in to_fetch])
+        
+        self.log(f"=== 詳情獲取完成: {success_count}/{len(to_fetch)} 成功 ===")
         return results
 
 

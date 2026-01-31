@@ -7,14 +7,15 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field, asdict
-from config import BASE_DIR
+from config import BASE_DIR, DATABASE_DIR, DATABASE_PATH, SESSIONS_DIR, LOGS_DIR
 
 
 @dataclass
 class DatabaseConfig:
     """Database configuration"""
-    path: str = str(BASE_DIR / "data" / "tgmatrix.db")
-    backup_dir: str = str(BASE_DIR / "data" / "backups")
+    # 🆕 使用 config.py 中的持久化路徑
+    path: str = str(DATABASE_PATH)
+    backup_dir: str = str(DATABASE_DIR / "backups")
     backup_retention_days: int = 7
     backup_on_startup: bool = True
     backup_interval_hours: int = 24
@@ -25,7 +26,8 @@ class TelegramConfig:
     """Telegram API configuration"""
     api_id: Optional[str] = None
     api_hash: Optional[str] = None
-    sessions_dir: str = str(BASE_DIR / "sessions")
+    # 🆕 使用 config.py 中的持久化路徑
+    sessions_dir: str = str(SESSIONS_DIR)
 
 
 @dataclass
@@ -73,7 +75,8 @@ class LoggingConfig:
     """Logging configuration"""
     level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR
     max_entries: int = 100
-    log_dir: str = str(BASE_DIR / "logs")
+    # 🆕 使用 config.py 中的持久化路徑
+    log_dir: str = str(LOGS_DIR)
     rotate_on_startup: bool = True
     retention_days: int = 30
 

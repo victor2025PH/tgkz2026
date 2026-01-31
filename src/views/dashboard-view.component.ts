@@ -1,0 +1,714 @@
+/**
+ * Dashboard View Component
+ * 儀表板視圖組件 - 完整版
+ * 
+ * 🆕 Phase 28: 使用服務替代 @Input/@Output
+ */
+import { Component, inject, signal, computed, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { I18nService } from '../i18n.service';
+import { MembershipService } from '../membership.service';
+import { ElectronIpcService } from '../electron-ipc.service';
+import { ToastService } from '../toast.service';
+import { AccountManagementService } from '../services/account-management.service';
+import { NavBridgeService, LegacyView } from '../services/nav-bridge.service';
+import { MonitoringManagementService } from '../services/monitoring-management.service';
+import { AutomationWorkflowService } from '../services/automation-workflow.service';
+
+// 子組件導入
+import { SmartDashboardComponent } from '../components/smart-dashboard.component';
+import { QuickWorkflowComponent } from '../quick-workflow.component';
+import { QuickActionsPanelComponent } from '../components/quick-actions-panel.component';
+
+export interface SystemStatus {
+  accounts?: { online: number; total: number };
+  monitoring?: { groups: number; active: boolean };
+  ai?: { enabled: boolean; mode?: string };
+  campaigns?: { active: number; total: number };
+  keywords?: { sets: number };
+  templates?: { active: number; total: number };
+}
+
+@Component({
+  selector: 'app-dashboard-view',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    CommonModule,
+    FormsModule,
+    SmartDashboardComponent,
+    QuickWorkflowComponent,
+    QuickActionsPanelComponent
+  ],
+  template: `
+    <div class="page-content">
+      <!-- 🔍 路由測試標記 -->
+      <div class="bg-green-500 text-white p-4 rounded-lg mb-4 text-center font-bold">
+        ✅ Dashboard 路由已加載！如果您看到這個，說明路由正常工作。
+      </div>
+      <!-- 儀表板模式切換 -->
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-4xl font-bold" style="color: var(--text-primary);">{{ t('dashboard') }}</h2>
+        <div class="flex items-center gap-2 bg-slate-800/50 rounded-xl p-1">
+          <button (click)="switchMode('smart')"
+                  class="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1"
+                  [class.bg-gradient-to-r]="mode() === 'smart'"
+                  [class.from-cyan-500]="mode() === 'smart'"
+                  [class.to-blue-500]="mode() === 'smart'"
+                  [class.text-white]="mode() === 'smart'"
+                  [class.text-slate-400]="mode() !== 'smart'"
+                  [class.opacity-60]="!membershipService.hasFeature('smartMode')"
+                  [title]="!membershipService.hasFeature('smartMode') ? '需要 黃金大師 或以上會員' : ''">
+            🤖 智能模式
+            @if (!membershipService.hasFeature('smartMode')) {
+              <span class="text-xs">🔒</span>
+            }
+          </button>
+          <button (click)="switchMode('classic')"
+                  class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                  [class.bg-slate-700]="mode() === 'classic'"
+                  [class.text-white]="mode() === 'classic'"
+                  [class.text-slate-400]="mode() !== 'classic'">
+            📊 經典模式
+          </button>
+        </div>
+      </div>
+      
+      @if (mode() === 'smart') {
+        <app-smart-dashboard 
+          class="block -mx-8 -mb-8" 
+          style="height: calc(100vh - 140px);"
+          (navigateTo)="navigateTo($event)">
+        </app-smart-dashboard>
+      } @else {
+        <!-- 🆕 P3: 快捷操作面板 -->
+        <app-quick-actions-panel
+          class="mb-6"
+          (startMarketing)="handleQuickStart($event)"
+          (navigateTo)="navigateTo($event)"
+          (viewAlerts)="navigateTo('monitoring')">
+        </app-quick-actions-panel>
+        
+        <!-- 🚀 一鍵運行中心 -->
+        <div class="rounded-xl p-6 mb-8" style="background: linear-gradient(to right, var(--primary-bg), rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1)); border: 1px solid var(--primary); box-shadow: var(--shadow-lg);">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <span class="text-3xl">🚀</span>
+              <h3 class="text-xl font-bold" style="color: var(--text-primary);">一鍵運行中心</h3>
+            </div>
+            <button (click)="refreshStatus()" class="transition-colors" style="color: var(--text-muted);" title="刷新狀態">
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
+          </div>
+          
+          <!-- 快速狀態指示器 -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <!-- 帳號狀態 -->
+            <div class="rounded-lg p-4 text-center relative overflow-hidden" style="background-color: var(--bg-card);">
+              @if (onlineAccountsCount() > 0) {
+                <div class="absolute inset-0 bg-gradient-to-t from-emerald-500/10 to-transparent"></div>
+              }
+              <div class="relative">
+                <div class="text-2xl mb-1">🔑</div>
+                <div class="text-sm" style="color: var(--text-muted);">帳號在線</div>
+                <div class="text-xl font-bold" [style.color]="onlineAccountsCount() > 0 ? 'var(--success)' : 'var(--error)'">
+                  {{ onlineAccountsCount() }}/{{ totalAccountsCount() }}
+                </div>
+              </div>
+            </div>
+            
+            <!-- 監控狀態 -->
+            <div class="rounded-lg p-4 text-center relative overflow-hidden" style="background-color: var(--bg-card);">
+              @if (isMonitoring()) {
+                <div class="absolute inset-0 bg-gradient-to-t from-cyan-500/10 to-transparent"></div>
+              }
+              <div class="relative">
+                <div class="text-2xl mb-1">📡</div>
+                <div class="text-sm" style="color: var(--text-muted);">監控狀態</div>
+                <div class="text-xl font-bold flex items-center justify-center gap-2" [style.color]="isMonitoring() ? 'var(--success)' : 'var(--error)'">
+                  @if (isMonitoring()) {
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  }
+                  {{ isMonitoring() ? '運行中' : '未啟動' }}
+                </div>
+              </div>
+            </div>
+            
+            <!-- AI 聊天狀態 -->
+            <div class="rounded-lg p-4 text-center relative overflow-hidden" style="background-color: var(--bg-card);">
+              @if (status().ai?.enabled) {
+                <div class="absolute inset-0 bg-gradient-to-t from-purple-500/10 to-transparent"></div>
+              }
+              <div class="relative">
+                <div class="text-2xl mb-1">🤖</div>
+                <div class="text-sm" style="color: var(--text-muted);">AI 聊天</div>
+                <div class="text-xl font-bold" [style.color]="status().ai?.enabled ? 'var(--success)' : 'var(--error)'">
+                  {{ status().ai?.enabled ? (status().ai?.mode === 'full' ? '全自動' : '半自動') : '未啟用' }}
+                </div>
+              </div>
+            </div>
+            
+            <!-- 觸發規則狀態 -->
+            <div class="rounded-lg p-4 text-center relative overflow-hidden" style="background-color: var(--bg-card);">
+              @if ((status().campaigns?.active || 0) > 0) {
+                <div class="absolute inset-0 bg-gradient-to-t from-orange-500/10 to-transparent"></div>
+              }
+              <div class="relative">
+                <div class="text-2xl mb-1">⚡</div>
+                <div class="text-sm" style="color: var(--text-muted);">觸發規則</div>
+                <div class="text-xl font-bold" [style.color]="(status().campaigns?.active || 0) > 0 ? 'var(--success)' : 'var(--warning)'">
+                  {{ status().campaigns?.active || 0 }}/{{ status().campaigns?.total || 0 }}
+                </div>
+                @if ((status().campaigns?.active || 0) === 0) {
+                  <div class="text-xs text-yellow-400 mt-1 cursor-pointer hover:underline" (click)="navigateTo('trigger-rules')">
+                    ⚠️ 需配置規則
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+          
+          <!-- 🔧 P1: 增強版一鍵啟動進度 -->
+          @if (starting()) {
+            <div class="bg-slate-800/50 rounded-lg p-4 mb-4 border border-cyan-500/30">
+              <!-- 當前步驟 -->
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="animate-spin h-5 w-5 border-2 border-cyan-500 border-t-transparent rounded-full"></div>
+                  <span class="text-cyan-300 font-medium">{{ startMessage() }}</span>
+                </div>
+                <!-- 🔧 P1: 手動刷新/取消按鈕 -->
+                <button (click)="cancelAndRefresh()" 
+                        class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors flex items-center gap-1"
+                        title="取消並刷新狀態">
+                  <span>✕</span>
+                  <span>取消</span>
+                </button>
+              </div>
+              
+              <!-- 進度條 -->
+              <div class="w-full bg-slate-700 rounded-full h-2.5 mb-3">
+                <div class="bg-gradient-to-r from-cyan-500 to-purple-500 h-2.5 rounded-full transition-all duration-300" [style.width.%]="startProgress()"></div>
+              </div>
+              
+              <!-- 分步指示器 -->
+              <div class="flex justify-between text-xs">
+                <div class="flex items-center gap-1" [class.text-emerald-400]="startProgress() >= 10" [class.text-slate-500]="startProgress() < 10">
+                  <span>{{ startProgress() >= 10 ? '✓' : '○' }}</span>
+                  <span>帳號</span>
+                </div>
+                <div class="flex items-center gap-1" [class.text-emerald-400]="startProgress() >= 40" [class.text-slate-500]="startProgress() < 40">
+                  <span>{{ startProgress() >= 40 ? '✓' : '○' }}</span>
+                  <span>群組</span>
+                </div>
+                <div class="flex items-center gap-1" [class.text-emerald-400]="startProgress() >= 60" [class.text-slate-500]="startProgress() < 60">
+                  <span>{{ startProgress() >= 60 ? '✓' : '○' }}</span>
+                  <span>監控</span>
+                </div>
+                <div class="flex items-center gap-1" [class.text-emerald-400]="startProgress() >= 80" [class.text-slate-500]="startProgress() < 80">
+                  <span>{{ startProgress() >= 80 ? '✓' : '○' }}</span>
+                  <span>AI</span>
+                </div>
+                <div class="flex items-center gap-1" [class.text-emerald-400]="startProgress() >= 100" [class.text-slate-500]="startProgress() < 100">
+                  <span>{{ startProgress() >= 100 ? '✓' : '○' }}</span>
+                  <span>完成</span>
+                </div>
+              </div>
+            </div>
+          }
+          
+          <!-- 一鍵啟動按鈕 -->
+          <div class="flex gap-4">
+            @if (!isMonitoring() || !status().ai?.enabled) {
+              <button 
+                (click)="oneClickStart()" 
+                [disabled]="starting()"
+                class="flex-1 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition duration-200 shadow-lg flex items-center justify-center gap-2">
+                <span class="text-xl">⚡</span>
+                <span>一鍵全部啟動</span>
+              </button>
+            } @else {
+              <button 
+                (click)="oneClickStop()" 
+                class="flex-1 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-bold py-3 px-6 rounded-lg transition duration-200 shadow-lg flex items-center justify-center gap-2">
+                <span class="text-xl">🛑</span>
+                <span>一鍵停止所有</span>
+              </button>
+            }
+          </div>
+        </div>
+        
+        <!-- 🆕 Phase1: 自動化工作流控制 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <!-- 🎯 引導式工作流 -->
+          <div class="rounded-xl p-6" style="background-color: var(--bg-card); border: 1px solid var(--border-color);">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-3">
+                <span class="text-2xl">🎯</span>
+                <h3 class="text-lg font-bold" style="color: var(--text-primary);">引導式工作流</h3>
+              </div>
+            </div>
+            <p class="text-sm mb-4" style="color: var(--text-muted);">
+              關鍵詞觸發 → AI 策劃 → 私聊培育 → 興趣建群 → 組群成交
+            </p>
+            
+            <!-- 工作流狀態 -->
+            @for (workflow of automationWorkflow.workflows(); track workflow.id) {
+              <div class="p-4 rounded-lg mb-3" style="background-color: var(--bg-secondary);">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-2">
+                    <span [class.text-emerald-400]="workflow.enabled" [class.text-slate-500]="!workflow.enabled">
+                      {{ workflow.enabled ? '🟢' : '⚪' }}
+                    </span>
+                    <span class="font-medium" style="color: var(--text-primary);">{{ workflow.name }}</span>
+                  </div>
+                  <button (click)="automationWorkflow.toggleWorkflow(workflow.id, !workflow.enabled)"
+                          class="px-3 py-1 rounded-lg text-sm font-medium transition-colors"
+                          [class.bg-emerald-500]="workflow.enabled"
+                          [class.hover:bg-emerald-600]="workflow.enabled"
+                          [class.text-white]="workflow.enabled"
+                          [class.bg-slate-600]="!workflow.enabled"
+                          [class.hover:bg-slate-500]="!workflow.enabled"
+                          [class.text-slate-300]="!workflow.enabled">
+                    {{ workflow.enabled ? '運行中' : '已暫停' }}
+                  </button>
+                </div>
+                
+                <!-- 統計 -->
+                <div class="flex items-center gap-4 text-xs" style="color: var(--text-muted);">
+                  <span>今日觸發: {{ workflow.stats.todayTriggers }}</span>
+                  <span>進行中: {{ automationWorkflow.activeExecutionCount() }}</span>
+                  <span>轉化: {{ workflow.stats.conversions }}</span>
+                </div>
+                
+                <!-- 工作流步驟預覽 -->
+                <div class="flex items-center gap-1 mt-3 overflow-x-auto pb-1">
+                  @for (step of workflow.steps; track step.id; let i = $index) {
+                    <div class="flex items-center">
+                      <span class="px-2 py-1 text-xs rounded whitespace-nowrap"
+                            style="background-color: var(--bg-tertiary); color: var(--text-secondary);">
+                        {{ getStepIcon(step.type) }} {{ step.name }}
+                      </span>
+                      @if (i < workflow.steps.length - 1) {
+                        <span class="mx-1" style="color: var(--text-muted);">→</span>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+            
+            <!-- 說明 -->
+            <div class="text-xs p-3 rounded-lg" style="background-color: var(--bg-tertiary); color: var(--text-muted);">
+              💡 啟用後，當監控群組觸發關鍵詞時，將自動執行 AI 策劃並開始多角色協作
+            </div>
+          </div>
+          
+          <!-- ⚡ 快速操作 -->
+          <div class="rounded-xl p-6" style="background-color: var(--bg-card); border: 1px solid var(--border-color);">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="text-2xl">⚡</span>
+              <h3 class="text-lg font-bold" style="color: var(--text-primary);">快速操作</h3>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-3">
+              <button (click)="navigateTo('multi-role')" 
+                      class="p-4 rounded-lg text-left transition-colors hover:bg-purple-500/10 border border-transparent hover:border-purple-500/30"
+                      style="background-color: var(--bg-secondary);">
+                <div class="text-xl mb-1">🎭</div>
+                <div class="font-medium text-sm" style="color: var(--text-primary);">手動策劃</div>
+                <div class="text-xs" style="color: var(--text-muted);">開始 AI 多角色協作</div>
+              </button>
+              
+              <button (click)="navigateTo('monitoring-groups')" 
+                      class="p-4 rounded-lg text-left transition-colors hover:bg-cyan-500/10 border border-transparent hover:border-cyan-500/30"
+                      style="background-color: var(--bg-secondary);">
+                <div class="text-xl mb-1">👥</div>
+                <div class="font-medium text-sm" style="color: var(--text-primary);">監控群組</div>
+                <div class="text-xs" style="color: var(--text-muted);">配置監控來源</div>
+              </button>
+              
+              <button (click)="navigateTo('keyword-sets')" 
+                      class="p-4 rounded-lg text-left transition-colors hover:bg-amber-500/10 border border-transparent hover:border-amber-500/30"
+                      style="background-color: var(--bg-secondary);">
+                <div class="text-xl mb-1">🔑</div>
+                <div class="font-medium text-sm" style="color: var(--text-primary);">關鍵詞集</div>
+                <div class="text-xs" style="color: var(--text-muted);">設置觸發詞</div>
+              </button>
+              
+              <button (click)="navigateTo('leads')" 
+                      class="p-4 rounded-lg text-left transition-colors hover:bg-emerald-500/10 border border-transparent hover:border-emerald-500/30"
+                      style="background-color: var(--bg-secondary);">
+                <div class="text-xl mb-1">📋</div>
+                <div class="font-medium text-sm" style="color: var(--text-primary);">查看線索</div>
+                <div class="text-xs" style="color: var(--text-muted);">管理潛在客戶</div>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 快速工作流 -->
+        <app-quick-workflow
+          [systemStatus]="status()"
+          [isMonitoring]="isMonitoring()"
+          (navigateTo)="navigateTo($event)"
+          (startMonitoring)="startMonitoring()"
+          (stopMonitoring)="stopMonitoring()">
+        </app-quick-workflow>
+      }
+    </div>
+  `
+})
+export class DashboardViewComponent implements OnInit, OnDestroy {
+  // 服務注入
+  private i18n = inject(I18nService);
+  private nav = inject(NavBridgeService);
+  private ipc = inject(ElectronIpcService);
+  private toast = inject(ToastService);
+  private accountService = inject(AccountManagementService);
+  public membershipService = inject(MembershipService);
+  public automationWorkflow = inject(AutomationWorkflowService);
+  
+  // 內部狀態
+  mode = signal<'smart' | 'classic'>('classic');
+  starting = signal(false);
+  startProgress = signal(0);
+  startMessage = signal('');
+  // 🔧 P0修復: 使用共享服務的監控狀態，而不是本地 signal
+  private monitoringService = inject(MonitoringManagementService);
+  isMonitoring = computed(() => this.monitoringService.monitoringActive());
+  
+  // 🔧 P1: 啟動超時控制
+  private startTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private readonly START_TIMEOUT_MS = 120000; // 120秒超時
+  
+  // 🔧 P2: 狀態心跳機制
+  private heartbeatIntervalId: ReturnType<typeof setInterval> | null = null;
+  private readonly HEARTBEAT_INTERVAL_MS = 30000; // 30秒心跳
+  
+  private _status = signal<SystemStatus>({});
+  status = this._status.asReadonly();
+  
+  // 🔧 P0: 計算屬性（同時檢查 is_connected 和 status）
+  onlineAccountsCount = computed(() => {
+    const accounts = this.accountService.accounts();
+    // 優先使用 status === 'Online'，其次使用 is_connected
+    return accounts.filter(a => a.status === 'Online' || a.is_connected).length;
+  });
+  
+  totalAccountsCount = computed(() => this.accountService.accounts().length);
+  
+  private ipcCleanup: (() => void)[] = [];
+  
+  ngOnInit(): void {
+    console.log('[DashboardView] Component initialized');
+    this.loadInitialData();
+    this.setupIpcListeners();
+    this.startHeartbeat(); // 🔧 P2: 啟動心跳
+  }
+  
+  ngOnDestroy(): void {
+    this.ipcCleanup.forEach(fn => fn());
+    this.clearStartTimeout(); // 🔧 P1: 清理超時計時器
+    this.stopHeartbeat(); // 🔧 P2: 停止心跳
+  }
+  
+  // 🔧 P2: 啟動狀態心跳
+  private startHeartbeat(): void {
+    this.stopHeartbeat(); // 確保不重複
+    this.heartbeatIntervalId = setInterval(() => {
+      console.log('[DashboardView] 心跳：刷新狀態');
+      this.refreshStatus();
+    }, this.HEARTBEAT_INTERVAL_MS);
+  }
+  
+  // 🔧 P2: 停止狀態心跳
+  private stopHeartbeat(): void {
+    if (this.heartbeatIntervalId) {
+      clearInterval(this.heartbeatIntervalId);
+      this.heartbeatIntervalId = null;
+    }
+  }
+  
+  private loadInitialData(): void {
+    this.refreshStatus();
+  }
+  
+  private setupIpcListeners(): void {
+    const cleanup1 = this.ipc.on('system-status', (data: SystemStatus) => {
+      this._status.set(data);
+    });
+    
+    // 🔧 P0修復: 狀態由 MonitoringManagementService 統一管理
+    // 這裡只保留 toast 通知
+    
+    // 🔧 P0修復: 監聽 monitoring-started 事件（只顯示 toast）
+    const cleanup2c = this.ipc.on('monitoring-started', (data: { success: boolean; message: string }) => {
+      console.log('[DashboardView] 監控已啟動:', data);
+      this.toast.success(data.message || '監控已成功啟動');
+    });
+    
+    // 🔧 P0修復: 監聽 monitoring-start-failed 事件
+    const cleanup2d = this.ipc.on('monitoring-start-failed', (data: { reason: string; message: string; issues?: any[] }) => {
+      console.log('[DashboardView] 監控啟動失敗:', data);
+      
+      // 根據失敗原因顯示不同的提示
+      let errorMsg = data.message || '監控啟動失敗';
+      if (data.reason === 'config_check_failed' && data.issues?.length) {
+        errorMsg = `配置錯誤: ${data.issues[0]?.message || errorMsg}`;
+      } else if (data.reason === 'no_accessible_groups') {
+        errorMsg = '無法訪問監控群組，請確保帳號已加入群組';
+      } else if (data.reason === 'all_accounts_failed') {
+        errorMsg = '所有監控帳號都無法啟動';
+      }
+      
+      this.toast.error(errorMsg, 5000);
+    });
+    
+    // 🔧 P0修復: 監聽 monitoring-stopped 事件（只顯示 toast）
+    const cleanup2e = this.ipc.on('monitoring-stopped', () => {
+      console.log('[DashboardView] 監控已停止');
+      this.toast.info('監控已停止');
+    });
+    
+    // 🔧 P0: 修正事件名稱為 one-click-start-progress（與後端一致）
+    const cleanup3 = this.ipc.on('one-click-start-progress', (data: { step: string; progress: number; message: string }) => {
+      console.log('[DashboardView] 收到一鍵啟動進度:', data);
+      this.startProgress.set(data.progress);
+      this.startMessage.set(data.message);
+      
+      // 如果是完成或錯誤狀態，重置 starting
+      if (data.step === 'complete' || data.step === 'error' || data.progress >= 100) {
+        setTimeout(() => {
+          this.starting.set(false);
+          this.refreshStatus(); // 刷新狀態確保 UI 同步
+        }, 500);
+      }
+    });
+    
+    // 🔧 P0: 監聽一鍵啟動結果事件（確保狀態重置）
+    const cleanup4 = this.ipc.on('one-click-start-result', (data: any) => {
+      console.log('[DashboardView] 收到一鍵啟動結果:', data);
+      this.clearStartTimeout(); // 🔧 P1: 清除超時計時器
+      this.starting.set(false);
+      this.startProgress.set(100);
+      this.startMessage.set(data.overall_success ? '✅ 啟動完成' : '⚠️ 部分啟動失敗');
+      
+      // 🔧 P0修復: 監控狀態由 MonitoringManagementService 統一管理
+      if (data.monitoring?.success !== undefined) {
+        console.log('[DashboardView] 一鍵啟動結果監控狀態:', data.monitoring.success);
+      }
+      
+      // 🔧 P0: 立即刷新狀態（不等待）
+      this.refreshStatus();
+      
+      // 延遲清除消息
+      setTimeout(() => {
+        this.startMessage.set('');
+      }, 3000);
+    });
+    
+    this.ipcCleanup.push(cleanup1, cleanup2c, cleanup2d, cleanup2e, cleanup3, cleanup4);
+  }
+  
+  // 翻譯方法
+  t(key: string, params?: Record<string, string | number>): string {
+    return this.i18n.t(key, params);
+  }
+  
+  // 切換模式
+  switchMode(mode: 'smart' | 'classic'): void {
+    if (mode === 'smart' && !this.membershipService.hasFeature('smartMode')) {
+      this.toast.warning('需要黃金大師或以上會員');
+      return;
+    }
+    this.mode.set(mode);
+  }
+  
+  // 🔧 P0: 修復導航方法，支持對象類型 { view, handler }
+  navigateTo(event: string | { view: string; handler?: string }): void {
+    // 兼容字符串和對象類型
+    const rawView = typeof event === 'string' ? event : event.view;
+    const handler = typeof event === 'string' ? undefined : event.handler;
+    
+    // 視圖名稱映射（QuickWorkflow 使用的名稱 → LegacyView）
+    const viewMap: Record<string, string> = {
+      'resources': 'resource-center',
+      'accounts': 'accounts',
+      'add-account': 'add-account',  // 🔧 P0: 現在有對應的 @case 分支
+      'automation': 'automation',
+      'ads': 'leads',  // 批量發送導向發送控制台
+      'leads': 'leads',
+      'nurturing-analytics': 'nurturing-analytics',
+      'ai-center': 'aiCenter',
+      'multi-role': 'multi-role'
+    };
+    const view = viewMap[rawView] || rawView;
+    
+    console.log('[DashboardView] navigateTo:', { rawView, view, handler });
+    
+    // 先處理 handler（如果有）
+    if (handler) {
+      this.executeHandler(handler);
+    }
+    
+    // 然後導航到視圖（由 AppComponent 的 effect 處理同步）
+    if (view) {
+      this.nav.navigateTo(view as LegacyView);
+    }
+  }
+  
+  // 🔧 P0: 執行 handler 操作
+  private executeHandler(handler: string): void {
+    console.log('[DashboardView] executeHandler:', handler);
+    switch (handler) {
+      // QuickWorkflowComponent 定義的 handler
+      case 'scan-sessions':
+        this.ipc.send('scan-orphan-sessions');
+        this.toast.info('🔍 正在掃描可恢復的 Session...');
+        break;
+      case 'new-campaign':
+        this.ipc.send('open-add-campaign-dialog');
+        this.toast.info('⚡ 正在打開創建活動對話框...');
+        break;
+      case 'export-leads':
+        this.ipc.send('open-export-dialog');
+        this.toast.info('📥 正在打開導出對話框...');
+        break;
+      case 'start-monitoring':
+        this.startMonitoring();
+        break;
+      case 'run-script':
+        this.toast.info('🎬 正在啟動劇本執行...');
+        this.ipc.send('run-multi-role-script');
+        break;
+      // 兼容其他可能的 handler
+      case 'openAddAccountDialog':
+        this.ipc.send('open-add-account-dialog');
+        break;
+      case 'stopMonitoring':
+        this.stopMonitoring();
+        break;
+      default:
+        console.warn('[DashboardView] Unknown handler:', handler);
+        this.toast.info(`正在處理: ${handler}...`);
+    }
+  }
+  
+  // 刷新狀態
+  refreshStatus(): void {
+    this.ipc.send('get-system-status');
+    this.ipc.send('get-monitoring-status');
+  }
+  
+  // 🔧 P0 v2: 一鍵啟動（不在前端阻止，讓後端處理帳號連接）
+  oneClickStart(): void {
+    if (this.starting()) {
+      this.toast.warning('正在啟動中，請稍候...', 2000);
+      return;
+    }
+    
+    // 檢查是否有任何帳號配置
+    const totalAccounts = this.totalAccountsCount();
+    if (totalAccounts === 0) {
+      this.toast.error('❌ 沒有配置任何帳號，請先添加帳號', 4000);
+      return;
+    }
+    
+    this.starting.set(true);
+    this.startProgress.set(0);
+    this.startMessage.set(`🚀 開始啟動 (${totalAccounts} 個帳號)...`);
+    
+    // 🔧 P1: 設置超時自動恢復
+    this.clearStartTimeout();
+    this.startTimeoutId = setTimeout(() => {
+      if (this.starting()) {
+        console.warn('[DashboardView] 一鍵啟動超時，自動恢復');
+        this.starting.set(false);
+        this.startMessage.set('⚠️ 啟動超時，請檢查後端狀態');
+        this.toast.warning('啟動超時，正在刷新狀態...', 3000);
+        this.refreshStatus();
+      }
+    }, this.START_TIMEOUT_MS);
+    
+    // 直接發送啟動命令，後端會嘗試連接所有帳號
+    this.ipc.send('one-click-start', { forceRefresh: true });
+    this.toast.info(`🚀 開始一鍵啟動，後端將自動連接 ${totalAccounts} 個帳號`, 3000);
+  }
+  
+  // 🔧 P1: 清除超時計時器
+  private clearStartTimeout(): void {
+    if (this.startTimeoutId) {
+      clearTimeout(this.startTimeoutId);
+      this.startTimeoutId = null;
+    }
+  }
+  
+  // 🔧 P1: 取消啟動並刷新狀態
+  cancelAndRefresh(): void {
+    console.log('[DashboardView] 用戶取消啟動');
+    this.clearStartTimeout();
+    this.starting.set(false);
+    this.startProgress.set(0);
+    this.startMessage.set('');
+    this.toast.info('已取消，正在刷新狀態...', 2000);
+    this.refreshStatus();
+  }
+  
+  // 一鍵停止
+  oneClickStop(): void {
+    this.ipc.send('one-click-stop');
+    this.toast.info('正在停止所有服務...');
+  }
+  
+  // 啟動監控
+  startMonitoring(): void {
+    this.ipc.send('start-monitoring');
+  }
+  
+  // 停止監控
+  stopMonitoring(): void {
+    this.ipc.send('stop-monitoring');
+  }
+  
+  // 🆕 P3: 處理快捷啟動
+  handleQuickStart(event: { type: string; config: any }): void {
+    console.log('[Dashboard] 快捷啟動:', event);
+    
+    switch (event.type) {
+      case 'immediate':
+        this.toast.info('🚀 正在啟動即時營銷...');
+        this.navigateTo('multi-role');
+        break;
+      case 'smart_schedule':
+        this.toast.info('⏱️ 正在配置智能定時...');
+        this.navigateTo('multi-role');
+        break;
+      case 'preset':
+        this.toast.success(`📌 使用預設配置: ${event.config.presetId}`);
+        this.navigateTo('multi-role');
+        break;
+      case 'recommended':
+        this.toast.success(`💡 使用推薦組合: ${event.config.roleCombo?.comboName}`);
+        this.navigateTo('multi-role');
+        break;
+      default:
+        this.navigateTo('multi-role');
+    }
+  }
+  
+  // 🆕 Phase1: 獲取步驟圖標
+  getStepIcon(stepType: string): string {
+    const icons: Record<string, string> = {
+      'evaluate': '📊',
+      'plan': '🎯',
+      'private_chat': '💬',
+      'detect_interest': '🔍',
+      'create_group': '👥',
+      'group_marketing': '🚀',
+      'record': '📝'
+    };
+    return icons[stepType] || '▶️';
+  }
+}

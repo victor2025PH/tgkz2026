@@ -19,7 +19,8 @@ export type ContactType = 'user' | 'group' | 'channel';
 export type SourceType = 'member' | 'resource' | 'lead' | 'manual' | 'import';
 
 // 聯繫人狀態
-export type ContactStatus = 'new' | 'contacted' | 'interested' | 'negotiating' | 'converted' | 'lost' | 'blocked';
+// 🔧 P1: 擴展狀態類型支持發送控制台
+export type ContactStatus = 'new' | 'contacted' | 'interested' | 'negotiating' | 'converted' | 'lost' | 'blocked' | 'replied' | 'failed';
 
 // 統一聯繫人數據
 export interface UnifiedContact {
@@ -111,7 +112,10 @@ export const STATUS_OPTIONS: { value: ContactStatus; label: string; color: strin
   { value: 'negotiating', label: '洽談中', color: 'bg-purple-500' },
   { value: 'converted', label: '已成交', color: 'bg-emerald-500' },
   { value: 'lost', label: '已流失', color: 'bg-gray-500' },
-  { value: 'blocked', label: '已封鎖', color: 'bg-red-500' }
+  { value: 'blocked', label: '已封鎖', color: 'bg-red-500' },
+  // 🔧 P1: 發送控制台專用狀態
+  { value: 'replied', label: '已回覆', color: 'bg-teal-500' },
+  { value: 'failed', label: '發送失敗', color: 'bg-rose-500' }
 ];
 
 @Injectable({
@@ -147,6 +151,13 @@ export class UnifiedContactsService {
   // 同步狀態
   private _isSyncing = signal(false);
   isSyncing = this._isSyncing.asReadonly();
+  
+  // 🆕 標記：數據是否已從 leads 導入（避免重複請求）
+  private _hasImportedFromLeads = signal(false);
+  hasData = computed(() => this._contacts().length > 0 || this._hasImportedFromLeads());
+  
+  // 🆕 待刪除的 IDs（用於刪除完成後更新本地狀態）
+  private _pendingDeleteIds: Set<string> | undefined;
   
   // 當前篩選
   private _filter = signal<ContactFilter>({});
@@ -190,15 +201,19 @@ export class UnifiedContactsService {
       }
     });
     
-    // 監聽同步結果
+    // 監聯同步結果
     this.ipc.on('unified-contacts:sync-result', (data: any) => {
+      console.log('[UnifiedContacts] ========== SYNC RESULT ==========');
       console.log('[UnifiedContacts] Sync result:', data);
       this._isSyncing.set(false);
       
       if (data.success) {
+        console.log('[UnifiedContacts] Sync successful, stats:', data.stats);
         // 同步完成後重新載入
         this.loadContacts();
         this.loadStats();
+      } else {
+        console.error('[UnifiedContacts] Sync failed:', data.error);
       }
     });
     
@@ -230,9 +245,20 @@ export class UnifiedContactsService {
     this.ipc.on('unified-contacts:delete-result', (data: any) => {
       console.log('[UnifiedContacts] Delete result:', data);
       if (data.success) {
+        // 從本地狀態中移除已刪除的項目
+        const deletedIds = this._pendingDeleteIds || new Set<string>();
+        const currentContacts = this._contacts();
+        const remainingContacts = currentContacts.filter(c => !deletedIds.has(c.telegram_id));
+        
+        this._contacts.set(remainingContacts);
+        this._total.set(remainingContacts.length);
         this._selectedIds.set(new Set());
-        this.loadContacts();
-        this.loadStats();
+        this._pendingDeleteIds = undefined;
+        
+        // 更新統計
+        this.updateLocalStats(remainingContacts);
+        
+        console.log('[UnifiedContacts] Deleted successfully, remaining:', remainingContacts.length);
       }
     });
   }
@@ -241,17 +267,27 @@ export class UnifiedContactsService {
    * 同步所有來源數據
    */
   syncFromSources() {
-    console.log('[UnifiedContacts] Starting sync...');
+    console.log('[UnifiedContacts] ========== SYNC START ==========');
+    console.log('[UnifiedContacts] Sending unified-contacts:sync to backend...');
     this._isSyncing.set(true);
-    this.ipc.send('unified-contacts:sync', {});
     
-    // 添加超時保護：30秒後自動結束同步狀態
+    // 🔧 FIX: 確保發送命令
+    try {
+      this.ipc.send('unified-contacts:sync', {});
+      console.log('[UnifiedContacts] IPC command sent successfully');
+    } catch (e) {
+      console.error('[UnifiedContacts] Failed to send IPC command:', e);
+      this._isSyncing.set(false);
+      return;
+    }
+    
+    // 添加超時保護：60秒後自動結束同步狀態（增加時間）
     setTimeout(() => {
       if (this._isSyncing()) {
-        console.warn('[UnifiedContacts] Sync timeout, resetting state');
+        console.warn('[UnifiedContacts] Sync timeout after 60s, resetting state');
         this._isSyncing.set(false);
       }
-    }, 30000);
+    }, 60000);
   }
   
   /**
@@ -264,11 +300,44 @@ export class UnifiedContactsService {
   }
   
   /**
+   * 🆕 強制重新載入聯繫人（忽略緩存，確保數據最新）
+   */
+  forceReloadContacts(filter?: ContactFilter) {
+    console.log('[UnifiedContacts] Force reload contacts');
+    // 重置導入標記，強制從後端獲取
+    this._hasImportedFromLeads.set(false);
+    
+    const currentFilter = filter || this._filter();
+    this._filter.set(currentFilter);
+    this._isLoading.set(true);
+    
+    // 獲取更多數據（提高限制）
+    this.ipc.send('unified-contacts:get', {
+      contactType: currentFilter.contactType,
+      sourceType: currentFilter.sourceType,
+      status: currentFilter.status,
+      tags: currentFilter.tags,
+      search: currentFilter.search,
+      orderBy: currentFilter.orderBy || 'created_at DESC',
+      limit: 500,  // 獲取更多數據
+      offset: 0
+    });
+  }
+  
+  /**
    * 載入聯繫人列表
+   * 🆕 優化：如果已從 leads 導入數據，則只在前端過濾，不發送後端請求
    */
   loadContacts(filter?: ContactFilter) {
     const currentFilter = filter || this._filter();
     this._filter.set(currentFilter);
+    
+    // 🆕 如果數據已從 leads 導入，直接在前端應用過濾，不請求後端
+    if (this._hasImportedFromLeads() && this._contacts().length > 0) {
+      console.log('[UnifiedContacts] Data already imported from leads, skipping backend request');
+      this._isLoading.set(false);
+      return;
+    }
     
     console.log('[UnifiedContacts] Loading contacts with filter:', currentFilter);
     this._isLoading.set(true);
@@ -295,8 +364,15 @@ export class UnifiedContactsService {
   
   /**
    * 載入統計數據
+   * 🆕 優化：如果已從 leads 導入數據，跳過後端請求
    */
   loadStats() {
+    // 🆕 如果數據已從 leads 導入，統計已在 importLeadsDirectly 中計算
+    if (this._hasImportedFromLeads()) {
+      console.log('[UnifiedContacts] Stats already computed from leads, skipping backend request');
+      return;
+    }
+    
     console.log('[UnifiedContacts] Loading stats...');
     this.ipc.send('unified-contacts:stats', {});
   }
@@ -401,9 +477,39 @@ export class UnifiedContactsService {
    * 批量刪除
    */
   deleteContacts(telegramIds: string[]) {
-    console.log('[UnifiedContacts] Deleting contacts:', telegramIds);
+    console.log('[UnifiedContacts] Deleting contacts:', telegramIds.length);
+    // 保存待刪除的 IDs，用於刪除完成後更新本地狀態
+    this._pendingDeleteIds = new Set(telegramIds);
     this.ipc.send('unified-contacts:delete', {
       telegramIds
+    });
+  }
+  
+  /**
+   * 🆕 更新本地統計（刪除後使用）
+   */
+  private updateLocalStats(contacts: UnifiedContact[]) {
+    const byStatus: Record<string, number> = {};
+    const bySource: Record<string, number> = {};
+    
+    contacts.forEach(c => {
+      byStatus[c.status] = (byStatus[c.status] || 0) + 1;
+      bySource[c.source_type] = (bySource[c.source_type] || 0) + 1;
+    });
+    
+    this._stats.set({
+      total: contacts.length,
+      users: contacts.filter(c => c.contact_type === 'user').length,
+      groups: contacts.filter(c => c.contact_type === 'group').length,
+      channels: contacts.filter(c => c.contact_type === 'channel').length,
+      by_status: byStatus,
+      by_source: bySource,
+      recent_added: contacts.filter(c => {
+        const created = new Date(c.created_at);
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        return created > weekAgo;
+      }).length
     });
   }
   
@@ -646,7 +752,17 @@ export class UnifiedContactsService {
     this._isLoading.set(false);
     this._isSyncing.set(false);
     
+    // 🆕 標記數據已導入
+    this._hasImportedFromLeads.set(true);
+    
     console.log('[UnifiedContacts] Imported', contacts.length, 'contacts from leads');
+  }
+  
+  /**
+   * 🆕 重置導入狀態（用於強制刷新）
+   */
+  resetImportState() {
+    this._hasImportedFromLeads.set(false);
   }
   
   /**

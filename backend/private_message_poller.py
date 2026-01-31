@@ -247,10 +247,11 @@ class PrivateMessagePoller:
             last_name = user.last_name or ""
             display_name = username or first_name or f"User_{user_id}"
             
-            self.log(f"📨 收到私信 [{phone}] @{display_name}: {text[:50]}...")
+            self.log(f"📨 收到私信 [{phone}] @{display_name} (ID:{user_id}): {text[:50]}...")
             
             # 發送前端事件
             if self.event_callback:
+                self.log(f"🔔 發送 private-message-received 事件，userId={user_id}")
                 self.event_callback("private-message-received", {
                     "phone": phone,
                     "userId": user_id,
@@ -260,6 +261,8 @@ class PrivateMessagePoller:
                     "messageId": message.id,
                     "timestamp": datetime.now().isoformat()
                 })
+            else:
+                self.log(f"⚠️ event_callback 未設置，無法發送事件", "warning")
             
             # 檢查 AI 自動回覆設置
             ai_settings = await db.get_ai_settings()
@@ -282,6 +285,12 @@ class PrivateMessagePoller:
                 )
             except Exception as save_err:
                 self.log(f"保存消息錯誤: {save_err}", "warning")
+            
+            # 🆕 更新 AI 回覆效果評估（用於持續學習）
+            try:
+                await db.update_response_effectiveness(user_id, text)
+            except Exception as eff_err:
+                pass  # 效果評估失敗不影響主流程
             
             # 獲取或創建用戶資料
             user_profile = await db.get_user_profile(user_id)
@@ -340,18 +349,15 @@ class PrivateMessagePoller:
             
             self.log(f"🤖 開始為 @{username} 生成 AI 回覆...")
             
-            # 確保 AI 服務已初始化
+            # 🔧 確保 AI 服務已初始化（從 ai_models 表載入）
             if not ai_auto_chat.local_ai_endpoint:
-                # 從數據庫重新載入設置
-                ai_settings = await db.get_ai_settings()
-                if ai_settings:
-                    endpoint = ai_settings.get('local_ai_endpoint', '')
-                    model = ai_settings.get('local_ai_model', '')
-                    if endpoint:
-                        ai_auto_chat.set_ai_config(endpoint, model)
-                        self.log(f"已載入 AI 配置: {endpoint}")
+                await ai_auto_chat.initialize()
+                if ai_auto_chat.local_ai_endpoint:
+                    provider = getattr(ai_auto_chat, 'provider', 'custom')
+                    self.log(f"✓ 已載入 AI 配置: {provider} - {ai_auto_chat.local_ai_model}")
             
-            self.log(f"AI 端點: {ai_auto_chat.local_ai_endpoint or '未配置'}")
+            provider = getattr(ai_auto_chat, 'provider', 'custom')
+            self.log(f"AI 端點: {provider} - {ai_auto_chat.local_ai_endpoint[:50] if ai_auto_chat.local_ai_endpoint else '未配置'}...")
             
             # 生成 AI 回覆（使用 get_suggested_response 方法）
             reply_text = await ai_auto_chat.get_suggested_response(
@@ -390,6 +396,32 @@ class PrivateMessagePoller:
                     )
                 except Exception as save_err:
                     self.log(f"保存 AI 回覆錯誤: {save_err}", "warning")
+                
+                # 🆕 追蹤 AI 回覆效果（用於持續學習）
+                try:
+                    await db.track_ai_response(
+                        user_id=user_id,
+                        ai_message=reply_text,
+                        triggered_keyword=None,  # TODO: 傳遞觸發關鍵詞
+                        source_group=None
+                    )
+                except Exception as track_err:
+                    pass  # 追蹤失敗不影響主流程
+                
+                # 🔧 P1 優化: 提取並保存對話記憶
+                try:
+                    from conversation_memory import get_memory_service
+                    memory_service = get_memory_service()
+                    memories = await memory_service.extract_and_store_memories(
+                        user_id=user_id,
+                        message=user_message,
+                        ai_response=reply_text,
+                        context={'phone': phone, 'username': username}
+                    )
+                    if memories:
+                        self.log(f"✓ 提取並保存 {len(memories)} 條對話記憶")
+                except Exception as mem_err:
+                    self.log(f"對話記憶保存錯誤: {mem_err}", "warning")
                 
                 # 發送前端事件
                 if self.event_callback:
@@ -442,6 +474,19 @@ class PrivateMessagePoller:
                         "phone": phone,
                         "timestamp": datetime.now().isoformat()
                     })
+                
+                # 🔧 P1 優化: 半自動模式也提取記憶（用於下次對話）
+                try:
+                    from conversation_memory import get_memory_service
+                    memory_service = get_memory_service()
+                    await memory_service.extract_and_store_memories(
+                        user_id=user_id,
+                        message=user_message,
+                        ai_response=suggestion,  # 使用建議作為預期回覆
+                        context={'phone': phone, 'mode': 'semi-auto'}
+                    )
+                except Exception:
+                    pass  # 記憶提取失敗不影響主流程
                 
                 self.log(f"✓ AI 建議已生成: {suggestion[:50]}...")
             else:

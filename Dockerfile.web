@@ -1,0 +1,13 @@
+# TG-Matrix Web Frontend Dockerfile
+FROM nginx:alpine
+
+# 複製靜態文件
+COPY dist/ /usr/share/nginx/html/
+
+# 複製 nginx 配置
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# 暴露端口
+EXPOSE 80 443
+
+CMD ["nginx", "-g", "daemon off;"]

@@ -79,7 +79,9 @@ class AccountValidator(Validator):
         if not phone:
             return False, "Phone number is required"
         
-        phone = phone.strip()
+        # Remove spaces, dashes, and parentheses before validation
+        import re as re_module
+        phone = re_module.sub(r'[\s\-\(\)]', '', phone.strip())
         
         if not cls.PHONE_REGEX.match(phone):
             return False, "Phone number must be in format +1234567890 (with country code)"

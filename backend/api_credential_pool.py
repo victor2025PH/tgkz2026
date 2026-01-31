@@ -80,15 +80,51 @@ class ApiCredentialPool:
             try:
                 with open(self.pool_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    self.credentials = [
-                        ApiCredential(**cred) for cred in data.get("credentials", [])
-                    ]
+                    self.credentials = []
+                    for cred in data.get("credentials", []):
+                        # 🆕 清理可能的亂碼名稱
+                        cred['name'] = self._sanitize_name(cred.get('name', ''), cred.get('api_id', ''))
+                        self.credentials.append(ApiCredential(**cred))
                 print(f"[ApiCredentialPool] Loaded {len(self.credentials)} custom credentials", file=sys.stderr)
             except Exception as e:
                 print(f"[ApiCredentialPool] Error loading credentials: {e}", file=sys.stderr)
                 self.credentials = []
         else:
             self.credentials = []
+            
+    def _sanitize_name(self, name: str, api_id: str) -> str:
+        """
+        清理並驗證 API 名稱，處理編碼問題
+        
+        Args:
+            name: 原始名稱
+            api_id: API ID（用於生成備用名稱）
+            
+        Returns:
+            清理後的名稱
+        """
+        if not name:
+            return f"API {api_id}"
+        
+        try:
+            # 嘗試檢測和修復編碼問題
+            # 檢查是否包含常見的亂碼字符
+            import re
+            
+            # 檢測 Unicode 替換字符、控制字符、私用區字符
+            if re.search(r'[\uFFFD\u0000-\u001F\uE000-\uF8FF]', name):
+                return f"API {api_id}"
+            
+            # 檢測 � 符號（顯示為替換字符的文字形式）
+            if '�' in name:
+                return f"API {api_id}"
+            
+            # 嘗試編碼測試 - 如果無法正確編碼為 UTF-8 則視為亂碼
+            name.encode('utf-8').decode('utf-8')
+            
+            return name
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            return f"API {api_id}"
             
     def save(self) -> None:
         """保存憑據池到文件"""
@@ -139,11 +175,14 @@ class ApiCredentialPool:
             print(f"[ApiCredentialPool] Invalid API Hash length: {len(api_hash)}", file=sys.stderr)
             return False
             
+        # 🆕 清理並驗證名稱
+        clean_name = self._sanitize_name(name, api_id) if name else f"API_{api_id[-4:]}"
+        
         # 添加新憑據
         new_cred = ApiCredential(
             api_id=api_id,
             api_hash=api_hash,
-            name=name or f"API_{api_id[-4:]}",
+            name=clean_name,
             source=source,
             created_at=datetime.now().isoformat(),
             is_active=True,

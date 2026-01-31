@@ -10,11 +10,63 @@ const AutoAiSetup = require('./auto-ai-setup');
 // 必须在 app.on('ready') 之前调用
 app.commandLine.appendSwitch('lang', 'zh-CN');
 
+// 🔧 P0: 註冊自定義協議以支持 ES 模塊加載
+// 必須在 app.ready 之前調用
+protocol.registerSchemesAsPrivileged([
+  { 
+    scheme: 'app', 
+    privileges: { 
+      secure: true, 
+      standard: true,
+      supportFetchAPI: true,
+      allowServiceWorkers: true,
+      corsEnabled: true
+    } 
+  }
+]);
+
 // 修復截屏時畫面消失的問題
 // 禁用 GPU 合成器，使用軟體渲染來確保截屏工具可以正常捕獲畫面
 app.commandLine.appendSwitch('disable-gpu-compositing');
 // 啟用離屏渲染以提高兼容性
 app.commandLine.appendSwitch('enable-features', 'CanvasOopRasterization');
+
+// ========== 🔧 Phase 3 優化：內存優化設置 ==========
+// 檢查是否啟用輕量模式
+// 🔧 打包後默認啟用輕量模式以節省用戶電腦內存
+const isPackagedApp = !process.defaultApp && !process.argv.some(arg => arg.includes('node_modules'));
+const LIGHTWEIGHT_MODE = process.env.TG_LIGHTWEIGHT_MODE === 'true' || 
+                         process.argv.includes('--lightweight') ||
+                         isPackagedApp;  // 打包後默認啟用
+
+if (LIGHTWEIGHT_MODE) {
+  console.log('[Electron] ⚡ 輕量模式已啟用 - 減少內存佔用');
+  // 設置環境變量，讓 Python 後端也知道
+  process.env.TG_LIGHTWEIGHT_MODE = 'true';
+  process.env.TG_DISABLE_NEURAL_EMBEDDING = 'true';
+}
+
+// 減少 V8 堆內存限制（默認較高）
+// 開發模式下限制為 512MB，生產模式為 1GB
+const maxOldSpaceSize = LIGHTWEIGHT_MODE ? 256 : (app.isPackaged ? 1024 : 512);
+app.commandLine.appendSwitch('js-flags', `--max-old-space-size=${maxOldSpaceSize}`);
+
+// 禁用不必要的 GPU 功能以節省內存
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('disable-gpu-memory-buffer-video-frames');
+
+// 減少渲染進程內存
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+
+// 限制緩存大小
+app.commandLine.appendSwitch('disk-cache-size', LIGHTWEIGHT_MODE ? '52428800' : '104857600'); // 50MB or 100MB
+
+// 禁用不必要的功能
+if (LIGHTWEIGHT_MODE) {
+  app.commandLine.appendSwitch('disable-extensions');
+  app.commandLine.appendSwitch('disable-sync');
+  app.commandLine.appendSwitch('disable-translate');
+}
 
 let mainWindow;
 let pythonProcess = null;
@@ -71,9 +123,17 @@ class RequestManager {
             'send-message', 'send-greeting', 'add-to-queue'
         ];
         // Commands that need longer timeout
-        const longTimeoutCommands = ['add-account', 'login-account', 'import-accounts', 'import-sessions', 'get-initial-state', 'get-chat-history-full', 'get-chat-list', 'generate-ai-response', 'analyze-conversation', 'get-rag-context'];
+        const longTimeoutCommands = [
+            'add-account', 'login-account', 'import-accounts', 'import-sessions', 
+            'get-initial-state', 'get-chat-history-full', 'get-chat-list', 
+            'generate-ai-response', 'analyze-conversation', 'get-rag-context',
+            'test-ai-model'  // 🔧 AI 測試需要較長超時（網絡延遲）
+        ];
         // Commands that should only retry once (low priority)
-        const lowRetryCommands = ['get-queue-status', 'get-performance-metrics', 'get-performance-summary'];
+        const lowRetryCommands = [
+            'get-queue-status', 'get-performance-metrics', 'get-performance-summary',
+            'test-ai-model', 'save-ai-model', 'get-ai-models'  // 🔧 AI 命令減少重試
+        ];
         
         let effectiveTimeout = timeout || this.defaultTimeout;
         let effectiveMaxRetries = this.maxRetries;
@@ -231,9 +291,121 @@ class RequestManager {
 // Global request manager instance
 const requestManager = new RequestManager();
 
+// 🆕 P0: 啟動畫面窗口
+let splashWindow = null;
+
+// 🆕 P0: 日誌文件路徑
+let logFilePath = null;
+
+// 🆕 P0: 後端準備狀態
+let backendReadyForUI = false;
+
+// 🆕 P0: 寫入日誌文件
+function writeLog(message, level = 'INFO') {
+  const timestamp = new Date().toISOString();
+  const logLine = `[${timestamp}] [${level}] ${message}\n`;
+  console.log(logLine.trim());
+  
+  if (logFilePath) {
+    try {
+      fs.appendFileSync(logFilePath, logLine);
+    } catch (e) {
+      // 忽略日誌寫入錯誤
+    }
+  }
+}
+
+// 🆕 P0: 初始化日誌文件
+function initLogFile() {
+  try {
+    const logDir = path.join(app.getPath('userData'), 'logs');
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    const today = new Date().toISOString().split('T')[0];
+    logFilePath = path.join(logDir, `app-${today}.log`);
+    writeLog('========== 應用啟動 ==========');
+    writeLog(`App version: ${app.getVersion()}`);
+    writeLog(`Electron: ${process.versions.electron}`);
+    writeLog(`Chrome: ${process.versions.chrome}`);
+    writeLog(`Node: ${process.versions.node}`);
+    writeLog(`Platform: ${process.platform} ${process.arch}`);
+    writeLog(`App path: ${app.getAppPath()}`);
+    writeLog(`User data: ${app.getPath('userData')}`);
+    writeLog(`Is packaged: ${app.isPackaged}`);
+    if (process.resourcesPath) {
+      writeLog(`Resources path: ${process.resourcesPath}`);
+    }
+  } catch (e) {
+    console.error('Failed to init log file:', e);
+  }
+}
+
+// 🆕 P0: 創建啟動畫面
+function createSplashWindow() {
+  writeLog('Creating splash window...');
+  
+  // 🔧 P0: 使用 app.getAppPath() 替代 __dirname
+  const appPath = app.isPackaged ? path.dirname(app.getAppPath()) : __dirname;
+  const splashPath = app.isPackaged 
+    ? path.join(app.getAppPath(), 'splash.html')
+    : path.join(__dirname, 'splash.html');
+  
+  writeLog(`Splash path: ${splashPath}`);
+  writeLog(`Splash exists: ${fs.existsSync(splashPath)}`);
+  
+  splashWindow = new BrowserWindow({
+    width: 500,
+    height: 400,
+    frame: false,
+    transparent: false,
+    backgroundColor: '#0f172a',
+    resizable: false,
+    center: true,
+    show: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+  
+  if (fs.existsSync(splashPath)) {
+    splashWindow.loadFile(splashPath);
+  } else {
+    // 回退：顯示簡單的加載頁面
+    splashWindow.loadURL(`data:text/html,
+      <html>
+        <body style="background:#0f172a;color:white;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;">
+          <div style="text-align:center">
+            <h1>🤖 TG-AI智控王</h1>
+            <p>正在啟動...</p>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+  
+  splashWindow.once('ready-to-show', () => {
+    splashWindow.show();
+    writeLog('Splash window shown');
+  });
+  
+  return splashWindow;
+}
+
+// 🆕 P0: 更新啟動畫面狀態
+function updateSplashStatus(message, progress = null, error = null) {
+  writeLog(`Splash status: ${message}${error ? ' ERROR: ' + error : ''}`);
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.webContents.send('splash-status', { message, progress, error });
+  }
+}
+
 function createWindow() {
   // 设置应用语言环境为中文
   app.commandLine.appendSwitch('lang', 'zh-CN');
+  
+  writeLog('Creating main window...');
   
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -244,17 +416,82 @@ function createWindow() {
     backgroundColor: '#0f172a',
     // 確保窗口不透明
     transparent: false,
+    show: false,  // 🆕 P0: 初始隱藏，等加載完成後顯示
     webPreferences: {
       nodeIntegration: true, // Allows renderer to use Node.js APIs like 'require'
       contextIsolation: false, // Required for nodeIntegration to work
       preload: path.join(__dirname, 'preload.js'), // We will create this in a future step for better security
+      // 🔧 P0: 禁用 webSecurity 以允許 ES 模塊在 file:// 協議下加載
+      webSecurity: false,
       // 禁用 WebGL 硬體加速以提高截屏兼容性
       enableBlinkFeatures: '',
-      disableBlinkFeatures: 'Accelerated2dCanvas'
+      disableBlinkFeatures: 'Accelerated2dCanvas',
+      // ========== 🔧 Phase 3 優化：內存優化設置 ==========
+      // 啟用背景節流以減少不活躍標籤頁的資源使用
+      backgroundThrottling: true,
+      // 禁用拼寫檢查以節省內存
+      spellcheck: false,
+      // 限制 Canvas 內存使用
+      enableWebSQL: false,
+      // 輕量模式下的額外優化
+      ...(LIGHTWEIGHT_MODE && {
+        // 禁用硬件加速
+        offscreen: false,
+      })
     },
     title: 'TG-Matrix',
     // In a real build, you'd create an icon file.
     // icon: path.join(__dirname, 'assets/icon.png') 
+  });
+  
+  // 🔧 Phase 3 優化：定期清理渲染進程緩存
+  if (LIGHTWEIGHT_MODE) {
+    setInterval(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.session.clearCache().catch(() => {});
+      }
+    }, 5 * 60 * 1000); // 每 5 分鐘清理一次
+  }
+  
+  // 🆕 P0: 主窗口加載完成後，等待後端準備好再顯示
+  mainWindow.once('ready-to-show', () => {
+    writeLog('Main window ready to show, waiting for backend...');
+    
+    // 檢查後端是否已準備好
+    const checkAndShow = () => {
+      if (backendReadyForUI) {
+        writeLog('Backend ready, showing main window');
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          splashWindow.close();
+          splashWindow = null;
+        }
+        mainWindow.show();
+        writeLog('Main window shown');
+      } else {
+        // 每 500ms 檢查一次
+        setTimeout(checkAndShow, 500);
+      }
+    };
+    
+    // 設置最大等待時間 60 秒
+    const maxWaitTimeout = setTimeout(() => {
+      writeLog('Max wait time reached (60s), showing main window anyway', 'WARN');
+      if (!mainWindow.isVisible()) {
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          splashWindow.close();
+          splashWindow = null;
+        }
+        mainWindow.show();
+      }
+    }, 60000);
+    
+    // 開始檢查
+    checkAndShow();
+    
+    // 當窗口顯示後清除超時
+    mainWindow.once('show', () => {
+      clearTimeout(maxWaitTimeout);
+    });
   });
 
   // Load the Angular app
@@ -262,16 +499,24 @@ function createWindow() {
   const isDevMode = process.argv.includes('--dev');
   
   if (isDevMode) {
-    // 開發模式：連接到 Angular 開發服務器
-    console.log('[Electron] 🚀 開發模式：連接到 http://localhost:3000');
-    mainWindow.loadURL('http://localhost:3000');
+    // 開發模式：清除緩存並連接到 Angular 開發服務器
+    console.log('[Electron] 🚀 開發模式：連接到 http://localhost:4200');
+    
+    // 清除緩存以確保加載最新代碼
+    mainWindow.webContents.session.clearCache().then(() => {
+      console.log('[Electron] ✅ 緩存已清除');
+    }).catch(err => {
+      console.log('[Electron] 清除緩存時出錯:', err);
+    });
+    
+    mainWindow.loadURL('http://localhost:4200');
     
     // 監聽開發服務器是否就緒
     let retryCount = 0;
     const maxRetries = 30;
     const checkDevServer = setInterval(() => {
       const http = require('http');
-      const req = http.get('http://localhost:3000', (res) => {
+      const req = http.get('http://localhost:4200', (res) => {
         clearInterval(checkDevServer);
         console.log('[Electron] ✅ 開發服務器已就緒');
       });
@@ -290,7 +535,9 @@ function createWindow() {
     const indexPath = path.join(__dirname, 'dist', 'index.html');
     if (fs.existsSync(indexPath)) {
       console.log('[Electron] 📦 加載構建文件: dist/index.html');
-      mainWindow.loadFile(indexPath);
+      writeLog('[Electron] Loading via app:// protocol');
+      // 🔧 P0: 使用 app:// 協議加載，以支持 ES 模塊
+      mainWindow.loadURL('app://./index.html');
     } else {
       // Build files should have been created by check-build.js
       // If we reach here, something went wrong
@@ -314,8 +561,8 @@ function createWindow() {
       );
       
       // Try to load anyway (might work if dev server is running)
-      console.warn('[Electron] Attempting to connect to dev server at http://localhost:3000');
-      mainWindow.loadURL('http://localhost:3000');
+      console.warn('[Electron] Attempting to connect to dev server at http://localhost:4200');
+      mainWindow.loadURL('http://localhost:4200');
     }
   }
 
@@ -331,9 +578,24 @@ function createWindow() {
   });
 
   // Open the DevTools for debugging during development
-  if (!app.isPackaged) {
+  // 🔧 臨時：打包模式也打開開發者工具以便調試
+  if (!app.isPackaged || process.env.DEBUG_MODE) {
     mainWindow.webContents.openDevTools();
   }
+  
+  // 🔧 P0: 監聽渲染進程的控制台輸出
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    writeLog(`[Renderer Console] ${message}`);
+  });
+  
+  // 🔧 P0: 監聯頁面加載完成事件
+  mainWindow.webContents.on('did-finish-load', () => {
+    writeLog('[Electron] Page did-finish-load');
+  });
+  
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    writeLog(`[Electron] Page did-fail-load: ${errorCode} - ${errorDescription} - ${validatedURL}`);
+  });
   
   // Start the Python backend
   startPythonBackend();
@@ -345,6 +607,78 @@ function createWindow() {
 
 // 在应用启动前设置语言环境
 app.on('ready', async () => {
+  // 🆕 P0: 初始化日誌
+  initLogFile();
+  writeLog('App ready event fired');
+  
+  // 🔧 P0: 註冊 app:// 協議處理程序
+  protocol.handle('app', (request) => {
+    const url = new URL(request.url);
+    let filePath = url.pathname;
+    
+    // 處理 URL：移除開頭的 ./ 或 /
+    if (filePath.startsWith('./')) {
+      filePath = filePath.substring(2);
+    } else if (filePath.startsWith('/')) {
+      filePath = filePath.substring(1);
+    }
+    
+    // 如果是根路徑，默認為 index.html
+    if (!filePath || filePath === '') {
+      filePath = 'index.html';
+    }
+    
+    // 構建完整路徑
+    const distPath = path.join(__dirname, 'dist');
+    const fullPath = path.join(distPath, filePath);
+    
+    writeLog(`[Protocol] Handling app://${filePath} -> ${fullPath}`);
+    
+    try {
+      // 讀取文件內容
+      const data = fs.readFileSync(fullPath);
+      
+      // 確定 MIME 類型
+      const ext = path.extname(filePath).toLowerCase();
+      const mimeTypes = {
+        '.html': 'text/html',
+        '.js': 'text/javascript',
+        '.mjs': 'text/javascript',
+        '.css': 'text/css',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
+        '.ico': 'image/x-icon',
+        '.woff': 'font/woff',
+        '.woff2': 'font/woff2',
+        '.ttf': 'font/ttf',
+        '.eot': 'application/vnd.ms-fontobject'
+      };
+      const mimeType = mimeTypes[ext] || 'application/octet-stream';
+      
+      writeLog(`[Protocol] Serving ${filePath} as ${mimeType} (${data.length} bytes)`);
+      
+      return new Response(data, {
+        status: 200,
+        headers: {
+          'Content-Type': mimeType,
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    } catch (err) {
+      writeLog(`[Protocol] Error reading ${fullPath}: ${err.message}`);
+      return new Response('Not Found', { status: 404 });
+    }
+  });
+  writeLog('[Protocol] app:// protocol registered');
+  
+  // 🆕 P0: 先顯示啟動畫面
+  createSplashWindow();
+  updateSplashStatus('正在初始化...', 10);
+  
   // 设置系统语言环境为中文（如果系统支持）
   if (process.platform === 'win32') {
     // Windows: 设置环境变量
@@ -360,29 +694,56 @@ app.on('ready', async () => {
     process.env.LC_ALL = 'zh_CN.UTF-8';
   }
   
+  updateSplashStatus('正在載入配置...', 20);
+  
   // 註冊本地文件協議，用於安全載入頭像等本地資源
   protocol.registerFileProtocol('local-file', (request, callback) => {
-    const filePath = decodeURIComponent(request.url.replace('local-file://', ''));
-    // 安全檢查：只允許載入 backend/data 目錄下的文件
+    let filePath = decodeURIComponent(request.url.replace('local-file://', ''));
+    
+    // 🔧 Windows 路徑修復：移除開頭的斜線
+    if (process.platform === 'win32' && filePath.startsWith('/')) {
+      filePath = filePath.substring(1);
+    }
+    
+    // 標準化路徑
     const normalizedPath = path.normalize(filePath);
-    const dataDir = path.join(__dirname, 'backend', 'data');
-    if (normalizedPath.startsWith(dataDir)) {
-      callback({ path: normalizedPath });
+    const dataDir = path.normalize(path.join(__dirname, 'backend', 'data'));
+    
+    // 🔧 安全檢查：允許載入 backend/data 目錄下的文件
+    // 使用 toLowerCase() 確保 Windows 下路徑比較不區分大小寫
+    const isAllowed = process.platform === 'win32'
+      ? normalizedPath.toLowerCase().startsWith(dataDir.toLowerCase())
+      : normalizedPath.startsWith(dataDir);
+    
+    if (isAllowed) {
+      // 檢查文件是否存在
+      const fs = require('fs');
+      if (fs.existsSync(normalizedPath)) {
+        callback({ path: normalizedPath });
+      } else {
+        console.warn('[Protocol] File not found:', normalizedPath);
+        callback({ error: -6 }); // NET::ERR_FILE_NOT_FOUND
+      }
     } else {
       console.error('[Protocol] Blocked access to:', normalizedPath);
+      console.error('[Protocol] Expected prefix:', dataDir);
       callback({ error: -6 }); // NET::ERR_FILE_NOT_FOUND
     }
   });
+  
+  updateSplashStatus('正在初始化 AI 模塊...', 40);
   
   // 初始化 AI 自動設置模塊
   autoAiSetup = new AutoAiSetup();
   try {
     const userDataPath = app.getPath('userData');
     const aiStatus = await autoAiSetup.initialize(userDataPath);
-    console.log('[Electron] AI 自動設置完成:', aiStatus);
+    writeLog('AI auto setup completed: ' + JSON.stringify(aiStatus));
   } catch (error) {
-    console.error('[Electron] AI 自動設置失敗:', error);
+    writeLog('AI auto setup failed: ' + error.message, 'ERROR');
   }
+  
+  updateSplashStatus('正在啟動後端服務...', 60);
   
   createWindow();
 });
@@ -537,50 +898,73 @@ function findPythonExecutable() {
 }
 
 function startPythonBackend() {
+    writeLog('========== Starting Python Backend ==========');
+    updateSplashStatus('正在啟動後端服務...', 70);
+    
     // 開發模式下優先使用 Python 腳本，生產環境優先使用編譯好的 exe
-    const backendExe = path.join(__dirname, 'backend-exe', 'tg-matrix-backend.exe');
-    const backendExeResources = path.join(process.resourcesPath || __dirname, 'backend-exe', 'tg-matrix-backend.exe');
-    const pythonScript = path.join(__dirname, 'backend', 'main.py');
+    const isPackaged = app.isPackaged;
+    
+    // 🔧 P0: 使用 app.getAppPath() 獲取正確的應用路徑
+    const appPath = app.getAppPath();
+    const resourcesPath = process.resourcesPath || path.dirname(appPath);
+    
+    // 🔧 修復：打包後優先使用 resourcesPath 中的 exe
+    const backendExeResources = path.join(resourcesPath, 'backend-exe', 'tg-matrix-backend.exe');
+    const backendExe = path.join(appPath, 'backend-exe', 'tg-matrix-backend.exe');
+    const pythonScript = path.join(appPath, 'backend', 'main.py');
     
     let useExe = false;
     let backendPath = '';
     let backendArgs = [];
-    let workingDir = __dirname;
+    let workingDir = appPath;
     
-    // 開發模式：優先使用 Python 腳本（方便調試和修改代碼）
-    const isDevelopment = !app.isPackaged;
+    // 🆕 P0: 詳細日誌
+    writeLog('App isPackaged: ' + isPackaged);
+    writeLog('appPath: ' + appPath);
+    writeLog('resourcesPath: ' + resourcesPath);
+    writeLog('Checking backendExeResources: ' + backendExeResources);
+    writeLog('backendExeResources exists: ' + fs.existsSync(backendExeResources));
+    writeLog('Checking backendExe: ' + backendExe);
+    writeLog('backendExe exists: ' + fs.existsSync(backendExe));
+    writeLog('Checking pythonScript: ' + pythonScript);
+    writeLog('pythonScript exists: ' + fs.existsSync(pythonScript));
     
-    if (isDevelopment && fs.existsSync(pythonScript)) {
+    if (!isPackaged && fs.existsSync(pythonScript)) {
         // 開發模式：使用 Python 腳本
         const pythonExecutable = findPythonExecutable();
         backendPath = pythonExecutable;
         backendArgs = [pythonScript];
-        workingDir = path.join(__dirname, 'backend');
-        console.log('[Backend] 🔧 開發模式：使用 Python 腳本後端');
-        console.log('[Backend] Python executable:', pythonExecutable);
-    } else if (fs.existsSync(backendExe)) {
-        // 生產環境：使用本地 exe
-        useExe = true;
-        backendPath = backendExe;
-        workingDir = path.join(__dirname, 'backend-exe');
-        console.log('[Backend] 使用編譯好的 exe 後端');
-    } else if (fs.existsSync(backendExeResources)) {
-        // 生產環境：使用 resources 中的 exe
+        workingDir = path.join(appPath, 'backend');
+        writeLog('DEV MODE: Using Python script');
+        writeLog('Python executable: ' + pythonExecutable);
+    } else if (isPackaged && fs.existsSync(backendExeResources)) {
+        // 🔧 生產環境：優先使用 resources 中的 exe
         useExe = true;
         backendPath = backendExeResources;
         workingDir = path.dirname(backendExeResources);
-        console.log('[Backend] 使用 resources 中的 exe 後端');
+        writeLog('PROD MODE: Using exe from resources');
+    } else if (fs.existsSync(backendExe)) {
+        // 回退：使用本地 exe（開發時測試用）
+        useExe = true;
+        backendPath = backendExe;
+        workingDir = path.join(appPath, 'backend-exe');
+        writeLog('Using local backend exe');
     } else if (fs.existsSync(pythonScript)) {
         // 回退：使用 Python 腳本
         const pythonExecutable = findPythonExecutable();
         backendPath = pythonExecutable;
         backendArgs = [pythonScript];
-        workingDir = path.join(__dirname, 'backend');
-        console.log('[Backend] 使用 Python 腳本後端');
-        console.log('[Backend] Python executable:', pythonExecutable);
+        workingDir = path.join(appPath, 'backend');
+        writeLog('Fallback: Using Python script');
+        writeLog('Python executable: ' + pythonExecutable);
     } else {
-        const errorMsg = `找不到後端程序！\n\n檢查的路徑:\n- ${backendExe}\n- ${pythonScript}`;
-        console.error(`[Backend] ${errorMsg}`);
+        const errorMsg = `找不到後端程序！\n\n檢查的路徑:\n- ${backendExeResources}\n- ${backendExe}\n- ${pythonScript}`;
+        writeLog('ERROR: Backend not found!', 'ERROR');
+        writeLog('Checked paths: ' + backendExeResources + ', ' + backendExe + ', ' + pythonScript, 'ERROR');
+        
+        // 🆕 P0: 更新啟動畫面顯示錯誤
+        updateSplashStatus(null, null, '找不到後端程序，請重新安裝');
+        
         if (mainWindow && !mainWindow.isDestroyed()) {
             dialog.showErrorBox('後端錯誤', errorMsg);
             mainWindow.webContents.send('backend-status', {
@@ -592,38 +976,141 @@ function startPythonBackend() {
         return;
     }
     
-    console.log('[Backend] Starting backend...');
-    console.log('[Backend] Path:', backendPath);
-    console.log('[Backend] Args:', backendArgs);
-    console.log('[Backend] Working Dir:', workingDir);
+    writeLog('Backend path: ' + backendPath);
+    writeLog('Backend args: ' + JSON.stringify(backendArgs));
+    writeLog('Working dir: ' + workingDir);
+    
+    writeLog('Starting backend process...');
+    updateSplashStatus('正在啟動後端服務...', 75);
     
     // 確保 sessions 和 data 目錄存在
     const sessionsDir = path.join(workingDir, 'sessions');
     const dataDir = path.join(workingDir, 'data');
-    if (!fs.existsSync(sessionsDir)) {
-        fs.mkdirSync(sessionsDir, { recursive: true });
-    }
-    if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
+    try {
+        if (!fs.existsSync(sessionsDir)) {
+            fs.mkdirSync(sessionsDir, { recursive: true });
+            writeLog('Created sessions dir: ' + sessionsDir);
+        }
+        if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+            writeLog('Created data dir: ' + dataDir);
+        }
+    } catch (dirError) {
+        writeLog('Failed to create directories: ' + dirError.message, 'ERROR');
     }
     
-    pythonProcess = spawn(backendPath, backendArgs, {
-        cwd: workingDir,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        shell: !useExe,  // exe 不需要 shell
-        env: {
-            ...process.env,
-            PYTHONUNBUFFERED: '1'
+    // 🆕 設置用戶數據目錄（用於持久化存儲）
+    const userDataPath = app.getPath('userData');
+    const persistentDataDir = path.join(userDataPath, 'backend-data');
+    const persistentSessionsDir = path.join(userDataPath, 'sessions');
+    
+    // 確保持久化目錄存在
+    try {
+        if (!fs.existsSync(persistentDataDir)) {
+            fs.mkdirSync(persistentDataDir, { recursive: true });
+            writeLog('Created persistent data dir: ' + persistentDataDir);
         }
+        if (!fs.existsSync(persistentSessionsDir)) {
+            fs.mkdirSync(persistentSessionsDir, { recursive: true });
+            writeLog('Created persistent sessions dir: ' + persistentSessionsDir);
+        }
+    } catch (e) {
+        writeLog('Failed to create persistent dirs: ' + e.message, 'ERROR');
+    }
+    
+    // 🆕 判斷是否為開發模式
+    const isDevelopment = !isPackaged;
+    
+    try {
+        pythonProcess = spawn(backendPath, backendArgs, {
+            cwd: workingDir,
+            stdio: ['pipe', 'pipe', 'pipe'],
+            shell: !useExe,  // exe 不需要 shell
+            env: {
+                ...process.env,
+                PYTHONUNBUFFERED: '1',
+                PYTHONIOENCODING: 'utf-8',  // 🔧 修復 Windows GBK 編碼問題
+                // 🆕 傳遞開發模式標識（開發模式使用本地數據目錄）
+                TG_DEV_MODE: isDevelopment ? 'true' : 'false',
+                IS_PACKAGED: isPackaged ? 'true' : 'false',
+                // 🆕 傳遞用戶數據路徑給 Python 後端（僅生產模式使用）
+                TG_USER_DATA_PATH: userDataPath,
+                TG_DATA_DIR: persistentDataDir,
+                TG_SESSIONS_DIR: persistentSessionsDir,
+                // 🔧 Phase 3: 內存優化環境變量
+                TG_LIGHTWEIGHT_MODE: LIGHTWEIGHT_MODE ? 'true' : 'false',
+                TG_DISABLE_NEURAL_EMBEDDING: LIGHTWEIGHT_MODE ? 'true' : 'false'
+            }
+        });
+        
+        writeLog('Backend env TG_DEV_MODE: ' + (isDevelopment ? 'true' : 'false'));
+        writeLog('Backend env IS_PACKAGED: ' + (isPackaged ? 'true' : 'false'));
+        writeLog('Backend env TG_USER_DATA_PATH: ' + userDataPath);
+        if (isDevelopment) {
+            writeLog('🔧 開發模式：後端將使用本地 backend/data/ 目錄');
+        } else {
+            writeLog('📦 生產模式：後端將使用 AppData 目錄: ' + persistentDataDir);
+        }
+        
+        writeLog('Backend process spawned, PID: ' + (pythonProcess.pid || 'unknown'));
+        updateSplashStatus('後端服務已啟動...', 85);
+    } catch (spawnError) {
+        writeLog('Failed to spawn backend: ' + spawnError.message, 'ERROR');
+        updateSplashStatus(null, null, '無法啟動後端服務: ' + spawnError.message);
+        return;
+    }
+    
+    // 🆕 P0: 監聽進程錯誤
+    pythonProcess.on('error', (err) => {
+        writeLog('Backend process error: ' + err.message, 'ERROR');
+        updateSplashStatus(null, null, '後端啟動失敗: ' + err.message);
     });
     
     // Buffer for incomplete lines (handles JSON split across multiple data events)
     let stdoutBuffer = '';
     
+    // 🆕 P1: 後端健康檢查
+    let backendReady = false;
+    const healthCheckTimeout = setTimeout(() => {
+        if (!backendReadyForUI && pythonProcess && !pythonProcess.killed) {
+            writeLog('Backend health check: no full init in 60s', 'WARN');
+            // 如果已經有響應但還沒完全初始化，繼續等待
+            if (backendReady) {
+                updateSplashStatus('後端服務初始化中，請稍候...', 90);
+            } else {
+                updateSplashStatus(null, null, '後端服務無響應，請檢查安裝');
+            }
+        }
+    }, 60000);
+    
     // Handle stdout (events from Python)
     pythonProcess.stdout.on('data', (data) => {
+        const rawData = data.toString();
         // Append new data to buffer
-        stdoutBuffer += data.toString();
+        stdoutBuffer += rawData;
+        
+        // 🆕 P1: 標記後端已響應（收到任何輸出即表示後端已啟動）
+        if (!backendReady) {
+            backendReady = true;
+            writeLog('Backend health check: first stdout data received');
+            writeLog('First data preview: ' + rawData.substring(0, 100));
+        }
+        
+        // 🆕 P1: 當收到初始化完成的標誌時，才標記為 UI 可用
+        if (!backendReadyForUI && (rawData.includes('後端初始化完成') || rawData.includes('Initialization complete') || rawData.includes('"event"'))) {
+            backendReadyForUI = true;
+            clearTimeout(healthCheckTimeout);
+            writeLog('Backend fully initialized, ready for UI');
+            updateSplashStatus('後端服務已就緒，正在載入界面...', 95);
+            
+            // 通知前端後端已就緒
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('backend-status', {
+                    running: true,
+                    error: null
+                });
+            }
+        }
         
         // Process complete lines
         const lines = stdoutBuffer.split('\n');
@@ -633,6 +1120,16 @@ function startPythonBackend() {
         
         lines.filter(line => line.trim()).forEach(line => {
             try {
+                // 🆕 跳過非 JSON 格式的行（如錯誤訊息）
+                const trimmedLine = line.trim();
+                if (!trimmedLine.startsWith('{')) {
+                    // 非 JSON 行，可能是錯誤或日誌，靜默忽略
+                    if (trimmedLine.includes('Error') || trimmedLine.includes('error')) {
+                        console.warn('[Backend] Non-JSON error output:', trimmedLine.substring(0, 100));
+                    }
+                    return;
+                }
+                
                 const event = JSON.parse(line);
                 console.log('[Backend] Event:', event.event);
                 
@@ -649,6 +1146,13 @@ function startPythonBackend() {
                     requestManager.handleCompletion(request_id, status, error);
                     // Don't forward completion events to frontend (already handled)
                     return;
+                }
+                
+                // 🆕 檢查是否有 invoke 模式的回調等待此事件
+                if (global.pendingRagCallbacks && global.pendingRagCallbacks[event.event]) {
+                    console.log(`[Backend] ★ RAG invoke callback found for: ${event.event}`);
+                    global.pendingRagCallbacks[event.event](event.payload);
+                    // 不要 return，仍然轉發到前端（前端可能也在監聽）
                 }
                 
                 // Forward other events to frontend
@@ -680,25 +1184,45 @@ function startPythonBackend() {
         const message = data.toString().trim();
         if (!message) return;
         
+        // 🆕 P0: 記錄到日誌文件
+        writeLog('[stderr] ' + message.substring(0, 200));
+        
+        // 🆕 P1: 如果後端還沒有通過 stdout 響應，stderr 也算響應
+        if (!backendReady) {
+            backendReady = true;
+            writeLog('Backend responded via stderr');
+        }
+        
         // 區分真正的錯誤和普通日誌
         // 只有包含 "Error"、"Exception"、"Traceback" 等關鍵字才標記為錯誤
         const isError = /\b(Error|Exception|Traceback|CRITICAL|FATAL|failed|Failed)\b/i.test(message);
         
         if (isError) {
             console.error('[electron]', message);
+            // 更新啟動畫面顯示錯誤
+            if (!backendReadyForUI) {
+                updateSplashStatus('後端啟動中...', 80);
+            }
         } else {
             console.log('[electron]', message);
         }
     });
     
     // Handle process exit
-    pythonProcess.on('exit', (code) => {
-        console.log(`[Backend] Python process exited with code ${code}`);
+    pythonProcess.on('exit', (code, signal) => {
+        writeLog(`Backend process exited with code ${code}, signal ${signal}`);
         pythonProcess = null;
+        
+        // 🆕 P0: 如果後端還沒準備好就退出了，顯示錯誤
+        if (!backendReadyForUI) {
+            const errorMsg = `後端進程異常退出 (code: ${code})`;
+            writeLog(errorMsg, 'ERROR');
+            updateSplashStatus(null, null, errorMsg + '，請查看日誌');
+        }
         
         // Restart if not intentionally closed and not shutting down
         if (!isShuttingDown && code !== 0 && mainWindow && !mainWindow.isDestroyed()) {
-            console.log('[Backend] Restarting Python backend...');
+            writeLog('Restarting Python backend in 2 seconds...');
             setTimeout(() => startPythonBackend(), 2000);
         }
     });
@@ -787,7 +1311,8 @@ function sendToPython(command, payload = {}, requestId = null) {
     
     console.log('[Backend] Sending command:', command, 'request_id:', requestId);
     try {
-        const result = pythonProcess.stdin.write(message, (error) => {
+        // 🆕 明確使用 UTF-8 編碼發送（解決中文關鍵詞亂碼問題）
+        const result = pythonProcess.stdin.write(message, 'utf8', (error) => {
             if (error) {
                 console.error('[Backend] Error sending command:', error);
                 // Remove request from pending if send failed
@@ -857,6 +1382,8 @@ const passThroughChannels = [
     'init-resource-discovery', 'search-resources', 'get-resources', 'get-resource-stats',
     'add-resource-manually', 'delete-resource', 'add-to-join-queue', 'process-join-queue',
     'batch-join-resources', 'get-discovery-keywords', 'add-discovery-keyword', 'get-discovery-logs',
+    // 🔧 P0: 添加群組搜索命令
+    'search-groups', 'get-group-members', 'get-monitored-groups',
     // Jiso Search Commands
     'search-jiso', 'check-jiso-availability',
     // Search Channel Management Commands
@@ -892,6 +1419,9 @@ const passThroughChannels = [
     'get-script-stats', 'execute-script',
     // Trigger Rules Commands
     'get-trigger-rules', 'get-trigger-rule', 'save-trigger-rule', 'delete-trigger-rule', 'toggle-trigger-rule',
+    // Collected Users Commands (廣告識別)
+    'get-collected-users', 'get-collected-users-stats', 'mark-user-as-ad', 'blacklist-user',
+    'get-user-message-samples', 'recalculate-user-risk',
     // Collaboration Coordinator Commands
     'get-collab-groups', 'create-collab-group', 'update-collab-group',
     'delete-collab-group', 'start-collab-session', 'stop-collab-session', 'get-collab-stats',
@@ -903,6 +1433,7 @@ const passThroughChannels = [
     // AI Model Management Commands
     'save-ai-model', 'get-ai-models', 'update-ai-model', 'delete-ai-model', 'test-ai-model', 'set-default-ai-model',
     'save-model-usage', 'get-model-usage',
+    'save-conversation-strategy', 'get-conversation-strategy',
     // QR Login Commands (Phase 1)
     'qr-login-create', 'qr-login-status', 'qr-login-refresh', 'qr-login-submit-2fa', 'qr-login-cancel',
     // IP Binding Commands (Phase 2)
@@ -922,6 +1453,8 @@ const passThroughChannels = [
     'save-personas', 'get-personas',
     // Member Extraction Commands
     'extract-members', 'get-extracted-members', 'get-member-stats', 'get-online-members', 'update-member',
+    // 🆕 Group Collected Stats
+    'get-group-collected-stats',
     // Group Message Commands
     'send-group-message', 'schedule-message',
     // Resource Commands
@@ -931,7 +1464,7 @@ const passThroughChannels = [
     // Orphan Session Recovery Commands
     'scan-orphan-sessions', 'recover-orphan-sessions',
     // Lead Management Commands
-    'delete-lead', 'batch-delete-leads', 'get-detailed-funnel-stats',
+    'delete-lead', 'batch-delete-leads', 'get-detailed-funnel-stats', 'get-leads-paginated',
     // Batch Operations
     'batch-update-leads', 'batch-tag-leads', 'batch-export-leads',
     'undo-batch-operation', 'get-batch-operation-history', 'get-all-tags',
@@ -944,8 +1477,60 @@ const passThroughChannels = [
     // AI Message Generation Commands (批量發送/拉群優化)
     'ai-generate-message', 'ai-generate-group-names', 'ai-generate-welcome',
     // Group Creation Commands
-    'create-group'
+    'create-group',
+    // Unified Contacts Commands (資源中心)
+    'unified-contacts:sync', 'unified-contacts:get', 'unified-contacts:stats',
+    'unified-contacts:update', 'unified-contacts:add-tags', 'unified-contacts:update-status',
+    'unified-contacts:delete', 'unified-contacts:import-members',
+    // 🆕 Knowledge Base Management Commands (知識庫管理)
+    'add-knowledge-base', 'add-knowledge-item', 'get-knowledge-items', 'update-knowledge-item', 'delete-knowledge-item',
+    // 🆕 AI 智能生成知識庫
+    'ai-generate-knowledge',
+    // 🆕 行業模板和聊天學習
+    'apply-industry-template', 'learn-from-chat-history',
+    // 🧠 RAG 知識大腦 2.0
+    'rag-initialize', 'rag-search', 'rag-get-stats', 'rag-add-knowledge',
+    'rag-record-feedback', 'rag-get-recent', 'rag-cleanup', 'rag-merge-similar',
+    'rag-build-from-conversation', 'rag-import-url', 'rag-import-document',
+    // 🆕 知識管理（完整 CRUD）
+    'rag-get-all-knowledge', 'rag-update-knowledge', 'rag-delete-knowledge', 'rag-delete-knowledge-batch',
+    // 🆕 知識缺口和健康度
+    'rag-get-gaps', 'rag-resolve-gap', 'rag-ignore-gap', 'rag-suggest-gap-answer',
+    'rag-get-health-report', 'rag-start-guided-build', 'rag-cleanup-duplicate-gaps',
+    // 🆕 AI 自主模式命令
+    'set-autonomous-mode', 'get-customer-state', 'get-smart-system-stats',
+    // 🆕 Phase1-3: 智能系統擴展命令
+    'get-user-memories', 'get-user-tags', 'add-user-tag', 'remove-user-tag', 'get-users-by-tag',
+    'get-customer-profile', 'get-emotion-trend', 'get-workflow-rules',
+    'get-followup-tasks', 'get-learning-stats', 'get-knowledge-gaps',
+    'schedule-followup', 'trigger-workflow',
+    // 🆕 P1-1: 統一營銷任務命令
+    'get-marketing-tasks', 'create-marketing-task', 'update-marketing-task', 'delete-marketing-task',
+    'start-marketing-task', 'pause-marketing-task', 'resume-marketing-task', 'complete-marketing-task',
+    'add-marketing-task-targets', 'get-marketing-task-targets', 'update-marketing-task-target',
+    'assign-marketing-task-role', 'auto-assign-marketing-task-roles', 'get-marketing-task-stats',
+    'set-ai-hosting', 'save-marketing-settings', 'navigate-to',
+    // 🔧 P0 修復: 添加 AI 文本生成命令
+    'ai:generate-text',
+    // 🔧 P0 修復: 添加多角色 AI 團隊執行命令
+    'ai-team:start-execution', 'ai-team:send-private-message', 'ai-team:send-manual-message',
+    'ai-team:send-scriptless-message', 'ai-team:generate-scriptless-message',
+    'ai-team:add-targets', 'ai-team:adjust-strategy', 'ai-team:request-suggestion',
+    'ai-team:user-completed', 'ai-team:queue-completed', 'ai-team:next-user',
+    'ai-team:conversion-signal',
+    // 🔧 群聊協作: 群組管理命令
+    'group:create', 'group:invite-user', 'group:add-member', 'group:send-message',
+    'group:get-info', 'group:leave', 'group:monitor-messages',
+    // 🆕 P0: 操作記錄命令
+    'record-action',
+    // 🆕 Phase3: 全鏈路自動化工作流命令
+    'multi-role:ai-plan', 'multi-role:start-private-collaboration',
+    'multi-role:auto-create-group', 'multi-role:start-group-collaboration',
+    'ai:analyze-interest', 'workflow:save-config', 'workflow:get-executions'
 ];
+
+// 🔧 P0: 將 passThroughChannels 導出為 Set 便於檢查
+const passThroughChannelsSet = new Set(passThroughChannels);
 
 passThroughChannels.forEach(channel => {
     ipcMain.on(channel, (event, data) => {
@@ -960,6 +1545,14 @@ passThroughChannels.forEach(channel => {
         }
         sendToPython(channel, data);
     });
+});
+
+// 🔧 P0: 添加未註冊命令的 fallback 警告處理器
+// 當收到未註冊的命令時，記錄警告日誌
+ipcMain.on('unhandled-command', (event, data) => {
+    const command = data?.command || 'unknown';
+    console.warn(`[IPC] ⚠️ Unhandled command received: ${command}`);
+    console.warn(`[IPC] ⚠️ Consider adding '${command}' to passThroughChannels if it should be forwarded to backend`);
 });
 
 
@@ -1089,6 +1682,166 @@ ipcMain.on('load-accounts-from-excel', async (event) => {
 ipcMain.on('reload-sessions-and-accounts', (event) => {
     console.log('[IPC] Received: reload-sessions-and-accounts');
     sendToPython('reload-sessions-and-accounts');
+});
+
+// ==================== RAG 知識管理 invoke 支持 ====================
+// 這些命令需要返回 Promise 結果，所以使用 ipcMain.handle
+
+// 輔助函數：等待後端響應事件
+function waitForBackendEvent(eventName, timeout = 30000) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.removeListener(eventName, handler);
+            }
+            reject(new Error(`Timeout waiting for ${eventName}`));
+        }, timeout);
+        
+        const handler = (event, payload) => {
+            clearTimeout(timer);
+            resolve(payload);
+        };
+        
+        // 使用 webContents.once 來監聽一次性事件
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            // 通過 IPC 從主進程監聽後端響應
+            const ipcHandler = (payload) => {
+                clearTimeout(timer);
+                mainWindow.webContents.removeAllListeners(`rag-event-${eventName}`);
+                resolve(payload);
+            };
+            
+            // 設置一個臨時的監聽器來接收後端響應
+            const originalSend = mainWindow.webContents.send.bind(mainWindow.webContents);
+            const tempListener = function(channel, data) {
+                if (channel === eventName) {
+                    clearTimeout(timer);
+                    // 恢復原始 send
+                    resolve(data);
+                }
+            };
+            
+            // 監聯後端事件（通過在 stdout 處理中攔截）
+            global.pendingRagCallbacks = global.pendingRagCallbacks || {};
+            global.pendingRagCallbacks[eventName] = (data) => {
+                clearTimeout(timer);
+                delete global.pendingRagCallbacks[eventName];
+                resolve(data);
+            };
+        } else {
+            clearTimeout(timer);
+            reject(new Error('Main window not available'));
+        }
+    });
+}
+
+// 攔截後端事件用於 invoke 模式
+function interceptBackendEvent(eventName, callback) {
+    global.pendingRagCallbacks = global.pendingRagCallbacks || {};
+    global.pendingRagCallbacks[eventName] = callback;
+}
+
+ipcMain.handle('rag-get-all-knowledge', async (event, payload = {}) => {
+    console.log('[IPC] Handle: rag-get-all-knowledge');
+    
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            delete global.pendingRagCallbacks['rag-all-knowledge'];
+            reject(new Error('Timeout waiting for rag-all-knowledge'));
+        }, 30000);
+        
+        global.pendingRagCallbacks = global.pendingRagCallbacks || {};
+        global.pendingRagCallbacks['rag-all-knowledge'] = (data) => {
+            clearTimeout(timeout);
+            delete global.pendingRagCallbacks['rag-all-knowledge'];
+            resolve(data);
+        };
+        
+        sendToPython('rag-get-all-knowledge', payload);
+    });
+});
+
+ipcMain.handle('rag-update-knowledge', async (event, payload = {}) => {
+    console.log('[IPC] Handle: rag-update-knowledge');
+    
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            delete global.pendingRagCallbacks['rag-knowledge-updated'];
+            reject(new Error('Timeout waiting for rag-knowledge-updated'));
+        }, 30000);
+        
+        global.pendingRagCallbacks = global.pendingRagCallbacks || {};
+        global.pendingRagCallbacks['rag-knowledge-updated'] = (data) => {
+            clearTimeout(timeout);
+            delete global.pendingRagCallbacks['rag-knowledge-updated'];
+            resolve(data);
+        };
+        
+        sendToPython('rag-update-knowledge', payload);
+    });
+});
+
+ipcMain.handle('rag-delete-knowledge', async (event, payload = {}) => {
+    console.log('[IPC] Handle: rag-delete-knowledge');
+    
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            delete global.pendingRagCallbacks['rag-knowledge-deleted'];
+            reject(new Error('Timeout waiting for rag-knowledge-deleted'));
+        }, 30000);
+        
+        global.pendingRagCallbacks = global.pendingRagCallbacks || {};
+        global.pendingRagCallbacks['rag-knowledge-deleted'] = (data) => {
+            clearTimeout(timeout);
+            delete global.pendingRagCallbacks['rag-knowledge-deleted'];
+            resolve(data);
+        };
+        
+        sendToPython('rag-delete-knowledge', payload);
+    });
+});
+
+ipcMain.handle('rag-delete-knowledge-batch', async (event, payload = {}) => {
+    console.log('[IPC] Handle: rag-delete-knowledge-batch');
+    
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            delete global.pendingRagCallbacks['rag-knowledge-batch-deleted'];
+            reject(new Error('Timeout waiting for rag-knowledge-batch-deleted'));
+        }, 30000);
+        
+        global.pendingRagCallbacks = global.pendingRagCallbacks || {};
+        global.pendingRagCallbacks['rag-knowledge-batch-deleted'] = (data) => {
+            clearTimeout(timeout);
+            delete global.pendingRagCallbacks['rag-knowledge-batch-deleted'];
+            resolve(data);
+        };
+        
+        sendToPython('rag-delete-knowledge-batch', payload);
+    });
+});
+
+// ==================== AI 執行持久化 API ====================
+
+ipcMain.handle('ai-execution:get-active', async (event, payload = {}) => {
+    console.log('[IPC] Handle: ai-execution:get-active');
+    
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            delete global.pendingRagCallbacks['ai-execution:active-list'];
+            // 超時時返回空列表而不是錯誤
+            resolve({ executions: [] });
+        }, 10000);
+        
+        global.pendingRagCallbacks = global.pendingRagCallbacks || {};
+        global.pendingRagCallbacks['ai-execution:active-list'] = (data) => {
+            clearTimeout(timeout);
+            delete global.pendingRagCallbacks['ai-execution:active-list'];
+            resolve(data);
+        };
+        
+        sendToPython('ai-execution:get-active', payload);
+    });
 });
 
 // ==================== 文件選擇 API ====================

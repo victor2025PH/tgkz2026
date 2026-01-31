@@ -40,6 +40,9 @@ except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
     print("[KnowledgeLearner] SentenceTransformers 未安裝，將使用關鍵詞匹配", file=sys.stderr)
 
+# 🔧 全局 ChromaDB 客戶端，避免重複創建
+_shared_chroma_client = None
+
 
 class KnowledgeLearner:
     """知識學習服務 - 從對話中自動學習"""
@@ -75,40 +78,74 @@ class KnowledgeLearner:
                 "type": level
             })
     
-    async def initialize(self):
-        """初始化知識學習系統"""
+    async def initialize(self, use_neural: bool = False):
+        """
+        初始化知識學習系統
+        
+        Args:
+            use_neural: 是否使用神經網絡嵌入（默認 False 節省 300-500MB 內存）
+        """
         if self.is_initialized:
             return True
         
         try:
             # 初始化向量數據庫
+            # 🔧 Phase 1 優化：使用統一的 ChromaDB 目錄，減少內存佔用
             if CHROMADB_AVAILABLE:
                 import os
-                persist_dir = os.path.join(os.path.dirname(__file__), "chroma_db")
+                persist_dir = os.path.join(os.path.dirname(__file__), "chroma_rag_db")
                 os.makedirs(persist_dir, exist_ok=True)
                 
-                # 嘗試使用 PersistentClient（新版 ChromaDB 0.4.0+）
-                try:
-                    self.chroma_client = chromadb.PersistentClient(path=persist_dir)
-                except AttributeError:
-                    # 降級到舊版 API
-                    self.chroma_client = chromadb.Client(Settings(
-                        persist_directory=persist_dir,
-                        anonymized_telemetry=False
-                    ))
+                # 🔧 修復：使用全局單例避免重複創建
+                global _shared_chroma_client
+                if '_shared_chroma_client' not in globals() or _shared_chroma_client is None:
+                    try:
+                        # 嘗試使用 PersistentClient（新版 ChromaDB 0.4.0+）
+                        try:
+                            _shared_chroma_client = chromadb.PersistentClient(path=persist_dir)
+                        except AttributeError:
+                            # 降級到舊版 API
+                            _shared_chroma_client = chromadb.Client(Settings(
+                                persist_directory=persist_dir,
+                                anonymized_telemetry=False
+                            ))
+                        self.log(f"✓ ChromaDB 新建客戶端")
+                    except ValueError as ve:
+                        # 🔧 修復：實例已存在，嘗試獲取現有實例
+                        if "already exists" in str(ve):
+                            self.log(f"⚠ ChromaDB 實例已存在，嘗試復用", "warning")
+                            try:
+                                # 使用內存模式作為備選
+                                _shared_chroma_client = chromadb.Client()
+                                self.log(f"✓ ChromaDB 使用內存模式")
+                            except Exception:
+                                self.log(f"❌ ChromaDB 初始化失敗，禁用知識學習", "error")
+                                self.chroma_client = None
+                                self.collection = None
+                                return
+                        else:
+                            raise
+                
+                self.chroma_client = _shared_chroma_client
                 
                 # 獲取或創建集合
-                self.collection = self.chroma_client.get_or_create_collection(
-                    name="telegram_knowledge",
-                    metadata={"description": "從 Telegram 對話學習的知識庫"}
-                )
-                self.log(f"✓ ChromaDB 已初始化，現有 {self.collection.count()} 條知識")
+                try:
+                    self.collection = self.chroma_client.get_or_create_collection(
+                        name="telegram_knowledge",
+                        metadata={"description": "從 Telegram 對話學習的知識庫"}
+                    )
+                    self.log(f"✓ ChromaDB 已初始化，現有 {self.collection.count()} 條知識")
+                except Exception as coll_err:
+                    self.log(f"⚠ ChromaDB 集合獲取失敗: {coll_err}", "warning")
+                    self.collection = None
             
-            # 初始化 Embedding 模型
-            if SENTENCE_TRANSFORMERS_AVAILABLE:
+            # 🔧 Phase 1 優化：默認禁用神經網絡嵌入，節省 300-500MB 內存
+            if use_neural and SENTENCE_TRANSFORMERS_AVAILABLE:
                 # 使用多語言模型，支持中文
                 self.embedding_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
                 self.log("✓ Embedding 模型已載入")
+            else:
+                self.log("✓ 使用簡單嵌入（節省內存）")
             
             # 確保數據庫表存在
             await self._ensure_tables()

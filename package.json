@@ -1,7 +1,7 @@
 {
   "name": "tg-ai-smartking",
-  "version": "2.0.0-beta.1",
-  "description": "TG-AI智控王 - 智能Telegram营销系统（测试版，全功能开放）",
+  "version": "2.1.1",
+  "description": "TG-AI智控王 - 智能Telegram营销系统（全功能版）",
   "main": "electron.js",
   "author": "Your Company",
   "scripts": {
@@ -10,8 +10,9 @@
     "build:prod": "ng build --configuration production",
     "start:build": "npm run build && npm start",
     "start:dev": "node scripts/dev-mode.js",
-    "dev": "ng serve --port 3000",
-    "dev:electron": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron . --dev\"",
+    "start:lightweight": "node scripts/dev-mode.js --lightweight",
+    "dev": "ng serve --port 4200",
+    "dev:electron": "concurrently \"npm run dev\" \"wait-on http://localhost:4200 && electron . --dev\"",
     "package": "npm run build:prod && electron-builder",
     "package:win": "npm run build:prod && electron-builder --win",
     "package:win:safe": "node scripts/package-win-safe.js",
@@ -31,8 +32,20 @@
     "prebuild:dist": "node build-scripts/prepare-dist.js",
     "clean:dist": "rimraf release dist-python build backend-exe build-python",
     "build:backend-exe": "python build-scripts/build-backend-exe.py",
-    "dist:full": "node build-scripts/build-full.js",
-    "dist:full:win": "node build-scripts/build-full.js"
+    "dist:full": "node build-scripts/package-full.js",
+    "dist:full:win": "node build-scripts/package-full.js",
+    "download:vcredist": "node build-scripts/download-vcredist.js",
+    "test": "ng test --watch=false --browsers=ChromeHeadless",
+    "test:watch": "ng test",
+    "test:coverage": "ng test --watch=false --code-coverage",
+    "test:backend": "cd backend && python -m pytest tests/ -v",
+    "test:backend:cov": "cd backend && python -m pytest tests/ -v --cov=. --cov-report=html",
+    "test:all": "npm run test && npm run test:backend",
+    "e2e": "npx playwright test --config=e2e/playwright.config.ts",
+    "e2e:chromium": "npx playwright test --config=e2e/playwright.config.ts --project=chromium",
+    "e2e:ui": "npx playwright test --config=e2e/playwright.config.ts --ui",
+    "e2e:report": "npx playwright show-report playwright-report",
+    "e2e:headed": "npx playwright test --config=e2e/playwright.config.ts --headed"
   },
   "devDependencies": {
     "@angular/build": "^21.0.4",
@@ -43,9 +56,14 @@
     "@angular/forms": "^21.0.6",
     "@angular/platform-browser": "^21.0.6",
     "@google/genai": "^1.34.0",
+    "@playwright/test": "^1.58.0",
+    "@tailwindcss/postcss": "^4.1.18",
+    "autoprefixer": "^10.4.23",
     "concurrently": "^9.2.1",
     "electron": "^28.2.0",
     "electron-builder": "^24.9.1",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18",
     "wait-on": "^9.0.3"
   },
   "build": {
@@ -138,6 +156,8 @@
     }
   },
   "dependencies": {
+    "@angular/animations": "^21.0.6",
+    "@angular/router": "^21.0.6",
     "chart.js": "^4.5.1",
     "uuid": "^8.3.2"
   }

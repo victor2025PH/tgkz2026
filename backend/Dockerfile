@@ -1,26 +1,28 @@
-# TG-AI智控王 License Server Docker 配置
+# TG-Matrix Backend Dockerfile
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# 安裝依賴
-COPY requirements-server.txt .
-RUN pip install --no-cache-dir -r requirements-server.txt
+# 安裝系統依賴
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# 複製代碼
-COPY database.py .
-COPY license_server.py .
-COPY start_admin_server.py .
+# 複製依賴文件
+COPY requirements.txt .
 
-# 創建數據目錄
-RUN mkdir -p /app/data
+# 安裝 Python 依賴
+RUN pip install --no-cache-dir -r requirements.txt
 
-# 環境變量
-ENV PYTHONUNBUFFERED=1
-ENV JWT_SECRET=your-secret-key-change-this
+# 複製應用代碼
+COPY . .
+
+# 創建必要目錄
+RUN mkdir -p /app/sessions /app/logs /app/data
 
 # 暴露端口
-EXPOSE 8080
+EXPOSE 8000
 
-# 啟動服務器
-CMD ["python", "start_admin_server.py", "--host", "0.0.0.0", "--port", "8080"]
+# 啟動命令
+CMD ["python", "main.py"]

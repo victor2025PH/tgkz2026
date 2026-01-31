@@ -7,15 +7,31 @@ Vector Memory System - 向量化記憶系統
 2. 語義相似度搜索
 3. 智能記憶摘要
 4. RAG 上下文增強
+
+🔧 Phase 3 優化：
+- 延遲加載 sentence-transformers（節省 ~200MB）
+- 支持內存優化配置
+- 默認使用輕量級簡單嵌入
 """
 import sys
 import json
 import hashlib
 import asyncio
-import numpy as np
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, TYPE_CHECKING
 from datetime import datetime, timedelta
 from database import db
+
+# 🔧 延遲導入 numpy（約 30MB）
+_numpy = None
+
+def _get_numpy():
+    """延遲加載 numpy"""
+    global _numpy
+    if _numpy is None:
+        import numpy
+        _numpy = numpy
+        print("[VectorMemory] numpy loaded", file=sys.stderr)
+    return _numpy
 
 
 class VectorMemorySystem:
@@ -27,37 +43,119 @@ class VectorMemorySystem:
         self._model_name = "local"
         self._initialized = False
         self._use_simple_embedding = True  # 使用簡單嵌入（無需外部依賴）
+        self._neural_loading = False  # 防止重複加載
         
-    async def initialize(self, use_neural: bool = False):
+    async def initialize(self, use_neural: bool = None):
         """
         初始化向量記憶系統
         
         Args:
-            use_neural: 是否使用神經網絡嵌入（需要安裝 sentence-transformers）
+            use_neural: 是否使用神經網絡嵌入。
+                        None = 自動根據 MemoryOptConfig 決定
+                        True = 強制使用神經網絡
+                        False = 使用簡單嵌入
         """
         if self._initialized:
             return
         
-        if use_neural:
+        # 🔧 從配置中讀取是否啟用神經網絡嵌入
+        if use_neural is None:
             try:
-                from sentence_transformers import SentenceTransformer
-                self._embedding_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-                self._embedding_dim = 384
-                self._model_name = "neural"
-                self._use_simple_embedding = False
-                print("[VectorMemory] Using neural embeddings", file=sys.stderr)
+                from config import MemoryOptConfig
+                use_neural = MemoryOptConfig.should_use_neural_embedding()
             except ImportError:
-                print("[VectorMemory] sentence-transformers not available, using simple embeddings", file=sys.stderr)
-                self._use_simple_embedding = True
+                use_neural = False
+        
+        if use_neural and not self._neural_loading:
+            self._neural_loading = True
+            await self._load_neural_model()
+        else:
+            print("[VectorMemory] 🚀 Using simple embeddings (memory-optimized mode)", file=sys.stderr)
         
         self._initialized = True
         print(f"[VectorMemory] Initialized with {self._model_name} embeddings", file=sys.stderr)
     
-    def _simple_embedding(self, text: str) -> np.ndarray:
+    async def _load_neural_model(self):
+        """
+        異步加載神經網絡模型
+        在後台線程中加載以避免阻塞主線程
+        """
+        try:
+            import asyncio
+            
+            def _load_sync():
+                try:
+                    from sentence_transformers import SentenceTransformer
+                    # 使用更小的模型以節省內存
+                    model_name = 'paraphrase-multilingual-MiniLM-L12-v2'
+                    print(f"[VectorMemory] Loading neural model: {model_name}...", file=sys.stderr)
+                    return SentenceTransformer(model_name)
+                except ImportError as e:
+                    print(f"[VectorMemory] sentence-transformers not available: {e}", file=sys.stderr)
+                    return None
+                except Exception as e:
+                    print(f"[VectorMemory] Failed to load neural model: {e}", file=sys.stderr)
+                    return None
+            
+            # 在線程池中運行以避免阻塞
+            loop = asyncio.get_event_loop()
+            model = await loop.run_in_executor(None, _load_sync)
+            
+            if model:
+                self._embedding_model = model
+                self._embedding_dim = 384
+                self._model_name = "neural"
+                self._use_simple_embedding = False
+                print("[VectorMemory] ✓ Neural model loaded successfully", file=sys.stderr)
+            else:
+                self._use_simple_embedding = True
+                print("[VectorMemory] Falling back to simple embeddings", file=sys.stderr)
+                
+        except Exception as e:
+            print(f"[VectorMemory] Error loading neural model: {e}", file=sys.stderr)
+            self._use_simple_embedding = True
+        finally:
+            self._neural_loading = False
+    
+    def load_neural_on_demand(self):
+        """
+        按需加載神經網絡模型（同步版本）
+        僅在真正需要高質量嵌入時調用
+        """
+        if self._embedding_model is not None:
+            return True
+        
+        try:
+            from config import MemoryOptConfig
+            if MemoryOptConfig.DISABLE_NEURAL_EMBEDDING:
+                print("[VectorMemory] Neural embedding disabled by config", file=sys.stderr)
+                return False
+        except ImportError:
+            pass
+        
+        try:
+            from sentence_transformers import SentenceTransformer
+            model_name = 'paraphrase-multilingual-MiniLM-L12-v2'
+            print(f"[VectorMemory] On-demand loading: {model_name}...", file=sys.stderr)
+            self._embedding_model = SentenceTransformer(model_name)
+            self._embedding_dim = 384
+            self._model_name = "neural"
+            self._use_simple_embedding = False
+            print("[VectorMemory] ✓ Neural model loaded on demand", file=sys.stderr)
+            return True
+        except Exception as e:
+            print(f"[VectorMemory] On-demand load failed: {e}", file=sys.stderr)
+            return False
+    
+    def _simple_embedding(self, text: str):
         """
         簡單文本嵌入 - 基於 TF-IDF 和字符特徵
         適用於沒有神經網絡的環境
+        
+        🔧 優化：使用延遲加載的 numpy
         """
+        np = _get_numpy()
+        
         # 將文本轉為小寫並分詞
         text = text.lower()
         
@@ -89,15 +187,16 @@ class VectorMemorySystem:
         
         return embedding
     
-    def _get_embedding(self, text: str) -> np.ndarray:
+    def _get_embedding(self, text: str):
         """獲取文本的嵌入向量"""
         if self._use_simple_embedding or self._embedding_model is None:
             return self._simple_embedding(text)
         else:
             return self._embedding_model.encode(text, convert_to_numpy=True)
     
-    def _cosine_similarity(self, a: np.ndarray, b: np.ndarray) -> float:
+    def _cosine_similarity(self, a, b) -> float:
         """計算餘弦相似度"""
+        np = _get_numpy()
         dot = np.dot(a, b)
         norm_a = np.linalg.norm(a)
         norm_b = np.linalg.norm(b)

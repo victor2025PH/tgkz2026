@@ -9,8 +9,23 @@
  * 4. 錯誤恢復建議
  */
 
-import { Injectable, signal, inject } from '@angular/core';
+import { Injectable, signal, inject, ErrorHandler } from '@angular/core';
 import { ToastService } from '../toast.service';
+
+/**
+ * 全局錯誤處理器 (Angular ErrorHandler)
+ * 攔截所有未處理的錯誤
+ */
+@Injectable()
+export class GlobalErrorHandler implements ErrorHandler {
+  private errorHandlerService = inject(ErrorHandlerService);
+  
+  handleError(error: any): void {
+    console.error('Global error caught:', error);
+    // 使用統一錯誤處理服務
+    this.errorHandlerService.handle(error);
+  }
+}
 
 // 錯誤類型
 export type ErrorType = 

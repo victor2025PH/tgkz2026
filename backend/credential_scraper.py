@@ -106,8 +106,15 @@ class CredentialScraper:
                 with open(self.credentials_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     for item in data:
-                        cred = APICredential(**item)
-                        self._credentials[cred.phone] = cred
+                        # 🔧 確保 item 是字典格式
+                        if isinstance(item, dict):
+                            try:
+                                cred = APICredential(**item)
+                                self._credentials[cred.phone] = cred
+                            except Exception as item_error:
+                                print(f"[CredentialScraper] Skip invalid credential: {item_error}", file=sys.stderr)
+                        else:
+                            print(f"[CredentialScraper] Skip non-dict item: {type(item)}", file=sys.stderr)
                 print(f"[CredentialScraper] Loaded {len(self._credentials)} credentials", file=sys.stderr)
         except Exception as e:
             print(f"[CredentialScraper] Error loading credentials: {e}", file=sys.stderr)

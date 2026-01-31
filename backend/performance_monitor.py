@@ -49,7 +49,7 @@ class PerformanceMonitor:
     def __init__(
         self,
         max_history: int = 1000,
-        collection_interval: float = 5.0,
+        collection_interval: float = 30.0,  # 🆕 性能優化：從 5 秒增加到 30 秒
         event_callback: Optional[Callable[[str, Any], None]] = None
     ):
         """
@@ -131,7 +131,9 @@ class PerformanceMonitor:
             PerformanceMetric object with current metrics
         """
         # System metrics
-        cpu_percent = psutil.cpu_percent(interval=0.1)
+        # 🆕 性能優化：使用非阻塞 CPU 測量（interval=None）
+        # 這樣會返回上次調用以來的 CPU 使用率，而不是阻塞測量
+        cpu_percent = psutil.cpu_percent(interval=None)
         memory = psutil.virtual_memory()
         disk = psutil.disk_usage('/')
         

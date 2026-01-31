@@ -789,6 +789,10 @@ class ResourceDiscoverySystem:
         if 'has_discussion' in d:
             d['has_discussion'] = bool(d['has_discussion'])
         
+        # 🔧 FIX: 添加 joined_phone 別名（前端兼容）
+        if 'joined_by_phone' in d:
+            d['joined_phone'] = d['joined_by_phone']
+        
         return d
 
 

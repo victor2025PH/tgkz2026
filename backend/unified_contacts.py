@@ -82,81 +82,21 @@ class UnifiedContactsManager:
         self._initialized = False
     
     async def initialize(self):
-        """初始化 - 創建統一視圖表"""
+        """初始化 - 驗證 unified_contacts 表存在
+        
+        注意：表結構統一定義在 database.py 的 _init_db() 方法中
+        這裡只負責驗證表存在，不重複創建
+        """
         if self._initialized:
             return
         
         try:
-            # 創建統一聯繫人表
-            await self.db.execute('''
-                CREATE TABLE IF NOT EXISTS unified_contacts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    
-                    -- 核心標識
-                    telegram_id TEXT UNIQUE NOT NULL,
-                    username TEXT,
-                    display_name TEXT,
-                    first_name TEXT,
-                    last_name TEXT,
-                    phone TEXT,
-                    
-                    -- 類型：user/group/channel
-                    contact_type TEXT DEFAULT 'user',
-                    
-                    -- 來源信息
-                    source_type TEXT DEFAULT 'member',
-                    source_id TEXT,
-                    source_name TEXT,
-                    
-                    -- 狀態和標籤
-                    status TEXT DEFAULT 'new',
-                    tags TEXT DEFAULT '[]',
-                    
-                    -- 評分
-                    ai_score REAL DEFAULT 0.5,
-                    activity_score REAL DEFAULT 0.5,
-                    value_level TEXT DEFAULT 'C',
-                    
-                    -- 在線狀態
-                    is_online INTEGER DEFAULT 0,
-                    last_seen TIMESTAMP,
-                    
-                    -- 屬性
-                    is_bot INTEGER DEFAULT 0,
-                    is_premium INTEGER DEFAULT 0,
-                    is_verified INTEGER DEFAULT 0,
-                    member_count INTEGER DEFAULT 0,
-                    
-                    -- 互動統計
-                    message_count INTEGER DEFAULT 0,
-                    last_contact_at TIMESTAMP,
-                    last_message_at TIMESTAMP,
-                    
-                    -- 元數據
-                    bio TEXT,
-                    notes TEXT,
-                    metadata TEXT DEFAULT '{}',
-                    
-                    -- 時間戳
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    synced_at TIMESTAMP
-                )
-            ''')
-            
-            # 創建索引
-            await self.db.execute('''
-                CREATE INDEX IF NOT EXISTS idx_unified_contacts_telegram_id 
-                ON unified_contacts(telegram_id)
-            ''')
-            await self.db.execute('''
-                CREATE INDEX IF NOT EXISTS idx_unified_contacts_status 
-                ON unified_contacts(status)
-            ''')
-            await self.db.execute('''
-                CREATE INDEX IF NOT EXISTS idx_unified_contacts_source_type 
-                ON unified_contacts(source_type)
-            ''')
+            # 驗證表存在（表由 database.py 創建）
+            result = await self.db.fetch_one("SELECT name FROM sqlite_master WHERE type='table' AND name='unified_contacts'")
+            if not result:
+                print("[UnifiedContacts] WARNING: unified_contacts table not found, it should be created by database.py", file=sys.stderr)
+            else:
+                print("[UnifiedContacts] Table verified", file=sys.stderr)
             await self.db.execute('''
                 CREATE INDEX IF NOT EXISTS idx_unified_contacts_contact_type 
                 ON unified_contacts(contact_type)
@@ -180,6 +120,7 @@ class UnifiedContactsManager:
         Returns:
             同步統計 {synced: int, updated: int, errors: int}
         """
+        print(f"[UnifiedContacts] sync_from_sources() called", file=sys.stderr)
         await self.initialize()
         
         stats = {'synced': 0, 'updated': 0, 'errors': 0, 'from_members': 0, 'from_resources': 0, 'from_leads': 0}
@@ -187,9 +128,11 @@ class UnifiedContactsManager:
         
         try:
             # 1. 同步 extracted_members (用戶)
+            print(f"[UnifiedContacts] Fetching extracted_members...", file=sys.stderr)
             members = await self.db.fetch_all('''
                 SELECT * FROM extracted_members ORDER BY created_at DESC
             ''')
+            print(f"[UnifiedContacts] Found {len(members)} members to sync", file=sys.stderr)
             
             for member in members:
                 try:
@@ -268,15 +211,16 @@ class UnifiedContactsManager:
                         ))
                         stats['updated'] += 1
                     else:
-                        # 插入新記錄
-                        await self.db.execute('''
+                        # 插入新記錄 - 🔧 FIX: 添加 captured_at 列
+                        print(f"[UnifiedContacts] INSERT member: {telegram_id}, {display_name}", file=sys.stderr)
+                        result = await self.db.execute('''
                             INSERT INTO unified_contacts (
                                 telegram_id, username, display_name, first_name, last_name, phone,
                                 contact_type, source_type, source_id, source_name,
                                 status, tags, activity_score, value_level,
                                 is_bot, is_premium, is_verified, last_seen,
-                                created_at, updated_at, synced_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                created_at, updated_at, synced_at, captured_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (
                             telegram_id,
                             member.get('username'),
@@ -298,8 +242,12 @@ class UnifiedContactsManager:
                             member.get('last_online'),
                             member.get('created_at', now),
                             now,
-                            now
+                            now,
+                            member.get('extracted_at', now)  # 🔧 FIX: captured_at
                         ))
+                        print(f"[UnifiedContacts] INSERT result: {result}", file=sys.stderr)
+                        if result == 0:
+                            print(f"[UnifiedContacts] WARNING: INSERT returned 0 for {telegram_id}", file=sys.stderr)
                         stats['synced'] += 1
                     
                     stats['from_members'] += 1
@@ -365,13 +313,14 @@ class UnifiedContactsManager:
                         ))
                         stats['updated'] += 1
                     else:
+                        # 🔧 FIX: 添加 captured_at 列
                         await self.db.execute('''
                             INSERT INTO unified_contacts (
                                 telegram_id, username, display_name,
                                 contact_type, source_type, source_id, source_name,
                                 status, ai_score, activity_score, member_count, bio,
-                                created_at, updated_at, synced_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                created_at, updated_at, synced_at, captured_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (
                             telegram_id,
                             resource.get('username'),
@@ -387,7 +336,8 @@ class UnifiedContactsManager:
                             resource.get('description'),
                             resource.get('discovered_at', now),
                             now,
-                            now
+                            now,
+                            resource.get('discovered_at', now)  # 🔧 FIX: captured_at
                         ))
                         stats['synced'] += 1
                     
@@ -521,14 +471,14 @@ class UnifiedContactsManager:
                         ))
                         stats['updated'] += 1
                     else:
-                        # 插入新記錄
+                        # 插入新記錄 - 🔧 FIX: 添加 captured_at 列
                         await self.db.execute('''
                             INSERT INTO unified_contacts (
                                 telegram_id, username, display_name, first_name, last_name, phone,
                                 contact_type, source_type, source_id, source_name,
                                 status, tags, message_count, last_contact_at, bio,
-                                created_at, updated_at, synced_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                created_at, updated_at, synced_at, captured_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (
                             telegram_id,
                             lead.get('username'),
@@ -547,7 +497,8 @@ class UnifiedContactsManager:
                             lead.get('bio'),
                             lead.get('timestamp', now),
                             now,
-                            now
+                            now,
+                            lead.get('timestamp', now)  # 🔧 FIX: captured_at
                         ))
                         stats['synced'] += 1
                     
@@ -558,10 +509,31 @@ class UnifiedContactsManager:
                     stats['errors'] += 1
             
             print(f"[UnifiedContacts] Sync completed: {stats}", file=sys.stderr)
+            
+            # 🔧 FIX: 顯式調用 commit 確保數據被提交
+            try:
+                if hasattr(self.db, '_connection') and self.db._connection:
+                    await self.db._connection.commit()
+                    print(f"[UnifiedContacts] Explicit commit called", file=sys.stderr)
+            except Exception as ce:
+                print(f"[UnifiedContacts] Commit error: {ce}", file=sys.stderr)
+            
+            # 🔧 驗證：檢查數據是否真的寫入了
+            try:
+                verify_result = await self.db.fetch_one("SELECT COUNT(*) as cnt FROM unified_contacts")
+                actual_count = verify_result['cnt'] if verify_result else 0
+                print(f"[UnifiedContacts] VERIFY: unified_contacts now has {actual_count} records", file=sys.stderr)
+                if actual_count == 0 and stats['synced'] > 0:
+                    print(f"[UnifiedContacts] WARNING: synced={stats['synced']} but table is empty! Data may not have been committed.", file=sys.stderr)
+            except Exception as ve:
+                print(f"[UnifiedContacts] Verify error: {ve}", file=sys.stderr)
+            
             return stats
             
         except Exception as e:
             print(f"[UnifiedContacts] Sync error: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
             stats['errors'] += 1
             return stats
     
@@ -786,20 +758,48 @@ class UnifiedContactsManager:
             print(f"[UnifiedContacts] Update status error: {e}", file=sys.stderr)
             return 0
     
-    async def delete_contacts(self, telegram_ids: List[str]) -> int:
-        """批量刪除聯繫人"""
+    async def delete_contacts(self, telegram_ids: List[str]) -> Dict[str, int]:
+        """
+        批量刪除聯繫人
+        同時刪除 unified_contacts 和 extracted_members 表中的數據
+        確保資源中心和發送控制台數據一致
+        """
         await self.initialize()
         
+        result = {
+            'unified_deleted': 0,
+            'leads_deleted': 0
+        }
+        
         try:
+            if not telegram_ids:
+                return result
+                
             placeholders = ','.join(['?' for _ in telegram_ids])
+            
+            # 1. 刪除 unified_contacts 表
             await self.db.execute(
                 f'DELETE FROM unified_contacts WHERE telegram_id IN ({placeholders})',
                 tuple(telegram_ids)
             )
-            return len(telegram_ids)
+            result['unified_deleted'] = len(telegram_ids)
+            
+            # 2. 同時刪除 extracted_members 表（發送控制台數據源）
+            # extracted_members 使用 user_id 字段存儲 telegram_id
+            await self.db.execute(
+                f'DELETE FROM extracted_members WHERE user_id IN ({placeholders})',
+                tuple(telegram_ids)
+            )
+            result['leads_deleted'] = len(telegram_ids)
+            
+            print(f"[UnifiedContacts] Deleted {result['unified_deleted']} from unified_contacts, {result['leads_deleted']} from extracted_members", file=sys.stderr)
+            
+            return result
         except Exception as e:
             print(f"[UnifiedContacts] Delete error: {e}", file=sys.stderr)
-            return 0
+            import traceback
+            traceback.print_exc()
+            return result
     
     async def get_contact_by_id(self, telegram_id: str) -> Optional[Dict]:
         """根據 telegram_id 獲取聯繫人"""
@@ -911,12 +911,13 @@ class UnifiedContactsManager:
                     telegram_id
                 ))
             else:
+                # 🔧 FIX: 添加 captured_at 列
                 await self.db.execute('''
                     INSERT INTO unified_contacts (
                         telegram_id, username, display_name, first_name, last_name,
                         contact_type, source_type, status,
-                        created_at, updated_at, synced_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        created_at, updated_at, synced_at, captured_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     telegram_id,
                     lead_data.get('username'),
@@ -928,7 +929,8 @@ class UnifiedContactsManager:
                     status,
                     now,
                     now,
-                    now
+                    now,
+                    now  # 🔧 FIX: captured_at
                 ))
             
             return True

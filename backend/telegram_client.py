@@ -42,6 +42,76 @@ def _apply_pyrogram_patch():
 
 # Apply the patch immediately
 _apply_pyrogram_patch()
+
+# ============ Monkey Patch for Peer ID Invalid Error ============
+# Pyrogram 有時會在 handle_updates 中拋出 ValueError: Peer id invalid
+# 這是因為 Telegram 發送的更新中包含了不在本地緩存中的 peer
+# 我們需要優雅地處理這個錯誤，而不是讓整個任務崩潰
+
+def _apply_peer_error_patch():
+    """Apply monkey patch to handle Peer id invalid errors"""
+    import sys
+    try:
+        from pyrogram.handlers.handler import Handler
+        
+        # 儲存原始的 check 方法
+        _original_check = Handler.check
+        
+        async def _patched_check(self, client, update):
+            """Patched check that handles Peer id invalid errors"""
+            try:
+                return await _original_check(self, client, update)
+            except ValueError as e:
+                error_str = str(e)
+                if "Peer id invalid" in error_str or "ID not found" in error_str:
+                    # 靜默忽略這種錯誤，只記錄日誌
+                    print(f"[Pyrogram Patch] Ignored Peer ID error in handler check: {error_str}", file=sys.stderr)
+                    return None  # 返回 None 表示不處理這個更新
+                raise
+            except KeyError as e:
+                error_str = str(e)
+                if "ID not found" in error_str:
+                    print(f"[Pyrogram Patch] Ignored KeyError in handler check: {error_str}", file=sys.stderr)
+                    return None
+                raise
+        
+        # Apply patch
+        Handler.check = _patched_check
+        print(f"[Pyrogram Patch] Successfully patched Handler.check for Peer ID errors", file=sys.stderr)
+    except Exception as patch_err:
+        print(f"[Pyrogram Patch] Failed to patch Handler.check: {patch_err}", file=sys.stderr)
+
+# Apply the peer error patch
+_apply_peer_error_patch()
+
+# ============ Global Task Exception Handler ============
+def setup_global_exception_handler():
+    """設置全局異常處理器，捕獲未處理的任務異常"""
+    import sys
+    
+    def handle_exception(loop, context):
+        exception = context.get('exception')
+        message = context.get('message', '')
+        
+        # 檢查是否是 Peer ID 相關的錯誤
+        if exception:
+            error_str = str(exception)
+            if "Peer id invalid" in error_str or "ID not found" in error_str:
+                print(f"[Global Handler] Suppressed Peer ID error: {error_str}", file=sys.stderr)
+                return  # 不傳播這個錯誤
+        
+        # 對於其他錯誤，記錄但不崩潰
+        print(f"[Global Handler] Unhandled exception: {message}", file=sys.stderr)
+        if exception:
+            print(f"[Global Handler] Exception: {type(exception).__name__}: {exception}", file=sys.stderr)
+    
+    try:
+        loop = asyncio.get_event_loop()
+        loop.set_exception_handler(handle_exception)
+        print(f"[Global Handler] Exception handler installed", file=sys.stderr)
+    except Exception as e:
+        print(f"[Global Handler] Failed to install: {e}", file=sys.stderr)
+
 # ============ End Monkey Patch ============
 import os
 import tempfile
@@ -129,11 +199,24 @@ class TelegramClientManager:
         self.trie_matchers: Dict[str, TrieKeywordMatcher] = {}  # phone -> TrieKeywordMatcher (優化版本)
         self.message_executor: Optional[ThreadPoolExecutor] = None  # 線程池用於 CPU 密集型任務（延遲初始化）
         self._processing_semaphore: Optional[asyncio.Semaphore] = None  # 最多50個並發處理（延遲初始化）
+        self._login_semaphore: Optional[asyncio.Semaphore] = None  # 🔧 限制並發登錄數量，避免數據庫鎖定
+        
+        # 🆕 性能優化：限制同時在線的客戶端數量
+        self.MAX_CONCURRENT_CLIENTS = 5  # 最多 5 個客戶端同時在線，防止 CPU 過載
         self.behavior_simulator = BehaviorSimulator()  # 行為模擬器
+        
+        # 🔧 Phase 2 優化：內存管理
+        self._last_cleanup_time = time.time()
+        self._cleanup_interval = 300  # 5 分鐘清理一次
+        self._idle_client_timeout = 600  # 10 分鐘未使用的客戶端可以斷開
+        self._client_last_used: Dict[str, float] = {}  # phone -> last_used_time
         # Store message handlers for proper cleanup
         self.message_handlers: Dict[str, MessageHandler] = {}  # phone -> MessageHandler
         # Store monitoring info for each account
         self.monitoring_info: Dict[str, Dict[str, Any]] = {}  # phone -> {chat_ids, keyword_sets, etc.}
+        
+        # 🆕 設置全局異常處理器（捕獲未處理的 Peer ID 錯誤等）
+        setup_global_exception_handler()
     
     def _get_executor(self) -> ThreadPoolExecutor:
         """獲取或創建線程池執行器"""
@@ -146,6 +229,86 @@ class TelegramClientManager:
         if self._processing_semaphore is None:
             self._processing_semaphore = asyncio.Semaphore(50)
         return self._processing_semaphore
+    
+    def _get_login_semaphore(self) -> asyncio.Semaphore:
+        """🔧 獲取或創建登錄信號量（限制並發登錄數量，避免數據庫鎖定）"""
+        if self._login_semaphore is None:
+            # 🔧 最多同時允許 1 個登錄操作，避免 SQLite session 文件鎖定衝突
+            self._login_semaphore = asyncio.Semaphore(1)
+        return self._login_semaphore
+    
+    def get_active_client_count(self) -> int:
+        """🆕 獲取當前活躍（已連接）的客戶端數量"""
+        count = 0
+        for phone, client in self.clients.items():
+            if client and client.is_connected:
+                count += 1
+        return count
+    
+    def can_connect_new_client(self) -> bool:
+        """🆕 檢查是否可以連接新的客戶端（性能限制）"""
+        return self.get_active_client_count() < self.MAX_CONCURRENT_CLIENTS
+    
+    def get_client_limit_info(self) -> Dict[str, Any]:
+        """🆕 獲取客戶端限制信息"""
+        active = self.get_active_client_count()
+        return {
+            "active_clients": active,
+            "max_clients": self.MAX_CONCURRENT_CLIENTS,
+            "can_connect_more": active < self.MAX_CONCURRENT_CLIENTS,
+            "remaining_slots": max(0, self.MAX_CONCURRENT_CLIENTS - active)
+        }
+    
+    def mark_client_used(self, phone: str):
+        """🔧 Phase 2 優化：標記客戶端為已使用"""
+        self._client_last_used[phone] = time.time()
+    
+    async def cleanup_idle_clients(self) -> int:
+        """🔧 Phase 2 優化：清理閒置客戶端，釋放內存"""
+        current_time = time.time()
+        
+        # 檢查是否需要清理
+        if current_time - self._last_cleanup_time < self._cleanup_interval:
+            return 0
+        
+        self._last_cleanup_time = current_time
+        cleaned = 0
+        
+        # 找出閒置的客戶端
+        idle_phones = []
+        for phone, client in list(self.clients.items()):
+            last_used = self._client_last_used.get(phone, 0)
+            idle_time = current_time - last_used
+            
+            # 如果客戶端閒置超過閾值，且不在登錄中，標記為可清理
+            if idle_time > self._idle_client_timeout:
+                if phone not in self.login_callbacks:
+                    idle_phones.append(phone)
+        
+        # 保留最常用的客戶端，只清理超出限制的
+        if len(self.clients) > self.MAX_CONCURRENT_CLIENTS and idle_phones:
+            for phone in idle_phones[:len(idle_phones) - self.MAX_CONCURRENT_CLIENTS]:
+                try:
+                    print(f"[TelegramClient] 🧹 清理閒置客戶端: {phone}", file=sys.stderr)
+                    await self.remove_client(phone, wait_for_disconnect=True)
+                    cleaned += 1
+                except Exception as e:
+                    print(f"[TelegramClient] 清理失敗: {phone} - {e}", file=sys.stderr)
+        
+        # 清理 keyword_matchers 中不再使用的條目
+        matcher_phones = list(self.keyword_matchers.keys())
+        for phone in matcher_phones:
+            if phone not in self.clients:
+                del self.keyword_matchers[phone]
+                if phone in self.trie_matchers:
+                    del self.trie_matchers[phone]
+        
+        # 強制垃圾回收
+        if cleaned > 0:
+            gc.collect()
+            print(f"[TelegramClient] 🧹 已清理 {cleaned} 個閒置客戶端", file=sys.stderr)
+        
+        return cleaned
     
     async def remove_client(self, phone: str, wait_for_disconnect: bool = True, preserve_login_state: bool = False) -> bool:
         """
@@ -357,7 +520,24 @@ class TelegramClientManager:
         """
         import sys
         
+        # 🔧 使用信號量限制並發登錄，避免數據庫鎖定
+        login_semaphore = self._get_login_semaphore()
+        acquired = False
+        
         try:
+            # 🔧 等待獲取登錄鎖（最多等待 60 秒）
+            try:
+                await asyncio.wait_for(login_semaphore.acquire(), timeout=60.0)
+                acquired = True
+                print(f"[TelegramClient] Acquired login lock for {phone}", file=sys.stderr)
+            except asyncio.TimeoutError:
+                print(f"[TelegramClient] Timeout waiting for login lock for {phone}", file=sys.stderr)
+                return {
+                    "success": False,
+                    "status": "error",
+                    "message": "登錄請求排隊超時，請稍後重試"
+                }
+            
             # ============================================================
             # CRITICAL FIX: If user submitted phone_code and phone_code_hash,
             # we MUST use the SAME client that sent the verification code.
@@ -424,7 +604,11 @@ class TelegramClientManager:
                                     "requires_2fa": True
                                 }
                             try:
-                                signed_in_2fa = await callback_client.check_password(two_factor_password)
+                                # 🆕 添加 30 秒超時保護
+                                signed_in_2fa = await asyncio.wait_for(
+                                    callback_client.check_password(two_factor_password),
+                                    timeout=30.0
+                                )
                                 self.clients[phone] = callback_client
                                 self.client_status[phone] = "Online"
                                 self.login_callbacks.pop(phone, None)
@@ -445,6 +629,13 @@ class TelegramClientManager:
                                     "status": "Online",
                                     "message": f"Successfully logged in to {phone} with 2FA",
                                     "user_info": user_info_2fa
+                                }
+                            except asyncio.TimeoutError:
+                                print(f"[TelegramClient] 2FA verification timeout for {phone} (30s)", file=sys.stderr)
+                                return {
+                                    "success": False,
+                                    "status": "error",
+                                    "message": "2FA verification timeout. Please check network and try again."
                                 }
                             except PasswordHashInvalid:
                                 return {
@@ -1154,6 +1345,8 @@ class TelegramClientManager:
                 friendly_message = "認證密鑰錯誤，請刪除 session 文件後重新登入"
             elif "network" in error_str or "connection" in error_str or "timeout" in error_str:
                 friendly_message = "網絡連接失敗，請檢查網絡後重試"
+            elif "database is locked" in error_str or "locked" in error_str:
+                friendly_message = "數據庫暫時鎖定，請稍後重試"
             else:
                 friendly_message = f"登入錯誤: {str(e)}"
             
@@ -1162,6 +1355,11 @@ class TelegramClientManager:
                 "status": "error",
                 "message": friendly_message
             }
+        finally:
+            # 🔧 確保釋放登錄鎖
+            if acquired:
+                login_semaphore.release()
+                print(f"[TelegramClient] Released login lock for {phone}", file=sys.stderr)
     
     async def check_account_status(self, phone: str) -> Dict[str, Any]:
         """
@@ -1244,13 +1442,14 @@ class TelegramClientManager:
                 "message": f"Error checking status: {str(e)}"
             }
     
-    async def get_full_user_profile(self, phone: str, download_avatar: bool = True) -> Dict[str, Any]:
+    async def get_full_user_profile(self, phone: str, download_avatar: bool = True, skip_bio: bool = False) -> Dict[str, Any]:
         """
         獲取完整的用戶資料，包括頭像下載
         
         Args:
             phone: 帳號電話號碼
             download_avatar: 是否下載頭像
+            skip_bio: 🔧 P1: 是否跳過 bio 獲取（避免 FloodWait）
             
         Returns:
             Dict with user profile info including avatar path
@@ -1279,23 +1478,27 @@ class TelegramClientManager:
                 "avatarPath": None,
             }
             
-            # 嘗試獲取 bio（個人簡介）
-            try:
-                full_user = await client.invoke(
-                    pyrogram.raw.functions.users.GetFullUser(
-                        id=pyrogram.raw.types.InputUserSelf()
+            # 🔧 P1: 嘗試獲取 bio（可選，避免 FloodWait）
+            if not skip_bio:
+                try:
+                    full_user = await client.invoke(
+                        pyrogram.raw.functions.users.GetFullUser(
+                            id=pyrogram.raw.types.InputUserSelf()
+                        )
                     )
-                )
-                if full_user and hasattr(full_user, 'full_user'):
-                    profile["bio"] = getattr(full_user.full_user, 'about', '') or ""
-            except Exception as bio_err:
-                print(f"[TelegramClient] Could not get bio for {phone}: {bio_err}", file=sys.stderr)
+                    if full_user and hasattr(full_user, 'full_user'):
+                        profile["bio"] = getattr(full_user.full_user, 'about', '') or ""
+                except Exception as bio_err:
+                    print(f"[TelegramClient] Could not get bio for {phone}: {bio_err}", file=sys.stderr)
+            else:
+                print(f"[TelegramClient] Skipping bio for {phone} (skip_bio=True)", file=sys.stderr)
             
             # 下載頭像
             if download_avatar and me.photo:
                 try:
-                    # 確保頭像目錄存在
-                    avatar_dir = Path(__file__).parent / "data" / "avatars"
+                    # 🆕 使用持久化數據目錄
+                    from config import DATABASE_DIR
+                    avatar_dir = DATABASE_DIR / "avatars"
                     avatar_dir.mkdir(parents=True, exist_ok=True)
                     
                     # 下載頭像
@@ -2211,6 +2414,7 @@ class TelegramClientManager:
         # This avoids the "already connected" error when we try to start() later
         
         # Convert group URLs to chat IDs, joining groups if needed
+        # 🆕 優化：使用並行處理加速群組加入
         monitored_chat_ids = set()
         failed_groups = []
         joined_groups = []
@@ -2218,77 +2422,105 @@ class TelegramClientManager:
         chat_id_to_url_map = {}
         
         import sys
-        for group_url in group_urls:
-            print(f"[TelegramClient] Processing group URL: {group_url}", file=sys.stderr)
+        import re
+        
+        # 🆕 定義單個群組的處理函數
+        async def process_single_group(group_url: str) -> dict:
+            """處理單個群組，返回結果"""
+            result = {
+                'url': group_url,
+                'success': False,
+                'chat_id': None,
+                'chat_title': None,
+                'joined': False,
+                'error': None
+            }
+            
             try:
                 # Try to resolve URL to chat_id
                 if isinstance(group_url, (int, str)) and str(group_url).lstrip('-').isdigit():
-                    # Already a chat ID - 確保存儲為整數類型
-                    chat_id = int(group_url)
-                    monitored_chat_ids.add(chat_id)  # 使用整數類型
-                    chat_id_to_url_map[chat_id] = str(group_url)
-                    print(f"[TelegramClient] URL is numeric chat ID: {chat_id}", file=sys.stderr)
+                    # Already a chat ID
+                    result['chat_id'] = int(group_url)
+                    result['success'] = True
+                    return result
+                
+                # First, try to join the group
+                join_result = await self.join_group(phone, group_url)
+                
+                if join_result.get("success"):
+                    result['chat_id'] = join_result.get("chat_id")
+                    result['chat_title'] = join_result.get("chat_title", "Unknown")
+                    result['success'] = True
+                    result['joined'] = not join_result.get("already_member", True)
                 else:
-                    # First, try to join the group (will succeed if already a member)
-                    print(f"[TelegramClient] Attempting to join/resolve group: {group_url}", file=sys.stderr)
-                    join_result = await self.join_group(phone, group_url)
-                    print(f"[TelegramClient] Join result: {join_result}", file=sys.stderr)
-                    
-                    if join_result.get("success"):
-                        chat_id = join_result.get("chat_id")
-                        chat_title = join_result.get("chat_title", "Unknown")
-                        if chat_id:
-                            monitored_chat_ids.add(chat_id)
-                            chat_id_to_url_map[chat_id] = str(group_url)
-                            print(f"[TelegramClient] ✓ Successfully resolved: {group_url} -> Chat ID: {chat_id}, Title: {chat_title}", file=sys.stderr)
-                            if self.event_callback:
-                                self.event_callback("log-entry", {
-                                    "message": f"[群組解析] ✓ {group_url} -> Chat ID: {chat_id} ({chat_title})",
-                                    "type": "success"
-                                })
-                            if not join_result.get("already_member"):
-                                joined_groups.append(join_result.get("chat_title", group_url))
-                    else:
-                        # Join failed, try to get chat directly (maybe it's a public channel we can read)
-                        print(f"[TelegramClient] Join failed, trying get_chat directly", file=sys.stderr)
-                        chat_resolved = False
-                        try:
-                            chat = await client.get_chat(group_url)
-                            monitored_chat_ids.add(chat.id)
-                            chat_id_to_url_map[chat.id] = str(group_url)
-                            chat_resolved = True
-                            print(f"[TelegramClient] ✓ get_chat succeeded: {chat.id} ({chat.title})", file=sys.stderr)
-                        except Exception as get_err:
-                            print(f"[TelegramClient] get_chat failed: {get_err}", file=sys.stderr)
-                            # Try extracting username from URL
-                            import re
-                            match = re.search(r't\.me/([^/]+)', str(group_url))
-                            if match:
-                                username = match.group(1)
-                                print(f"[TelegramClient] Trying extracted username: {username}", file=sys.stderr)
-                                try:
-                                    chat = await client.get_chat(username)
-                                    monitored_chat_ids.add(chat.id)
-                                    chat_id_to_url_map[chat.id] = str(group_url)
-                                    chat_resolved = True
-                                    print(f"[TelegramClient] ✓ Resolved by username: {chat.id} ({chat.title})", file=sys.stderr)
-                                except Exception as user_err:
-                                    print(f"[TelegramClient] Username resolution failed: {user_err}", file=sys.stderr)
-                        
-                        if not chat_resolved:
-                            failed_groups.append(str(group_url))
-                            print(f"[TelegramClient] ✗ Failed to resolve: {group_url}", file=sys.stderr)
-                            if self.event_callback:
-                                self.event_callback("log-entry", {
-                                    "message": f"[群組解析] ✗ 無法解析: {group_url}",
-                                    "type": "error"
-                                })
+                    # Join failed, try get_chat directly
+                    try:
+                        chat = await client.get_chat(group_url)
+                        result['chat_id'] = chat.id
+                        result['chat_title'] = chat.title
+                        result['success'] = True
+                    except Exception:
+                        # Try extracting username from URL
+                        match = re.search(r't\.me/([^/]+)', str(group_url))
+                        if match:
+                            username = match.group(1)
+                            try:
+                                chat = await client.get_chat(username)
+                                result['chat_id'] = chat.id
+                                result['chat_title'] = chat.title
+                                result['success'] = True
+                            except Exception as user_err:
+                                result['error'] = str(user_err)
+                        else:
+                            result['error'] = "Unable to resolve"
+                            
             except Exception as e:
+                result['error'] = str(e)
+            
+            return result
+        
+        # 🆕 並行處理群組（限制並發數為 5，避免被限速）
+        semaphore = asyncio.Semaphore(5)
+        
+        async def process_with_limit(group_url: str) -> dict:
+            async with semaphore:
+                return await process_single_group(group_url)
+        
+        print(f"[TelegramClient] Processing {len(group_urls)} groups in parallel (max 5 concurrent)...", file=sys.stderr)
+        
+        # 使用 gather 並行處理所有群組
+        tasks = [process_with_limit(url) for url in group_urls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # 處理結果
+        for i, result in enumerate(results):
+            group_url = group_urls[i]
+            
+            if isinstance(result, Exception):
                 failed_groups.append(str(group_url))
-                print(f"[TelegramClient] Error processing group {group_url}: {str(e)}", file=sys.stderr)
+                print(f"[TelegramClient] ✗ Exception processing {group_url}: {result}", file=sys.stderr)
                 if self.event_callback:
                     self.event_callback("log-entry", {
-                        "message": f"[群組解析] 錯誤: {group_url} - {str(e)}",
+                        "message": f"[群組解析] 錯誤: {group_url} - {str(result)}",
+                        "type": "error"
+                    })
+                continue
+            
+            if result.get('success') and result.get('chat_id'):
+                chat_id = result['chat_id']
+                monitored_chat_ids.add(chat_id)
+                chat_id_to_url_map[chat_id] = str(group_url)
+                
+                if result.get('joined'):
+                    joined_groups.append(result.get('chat_title', group_url))
+                
+                print(f"[TelegramClient] ✓ {group_url} -> {chat_id}", file=sys.stderr)
+            else:
+                failed_groups.append(str(group_url))
+                print(f"[TelegramClient] ✗ {group_url}: {result.get('error', 'Unknown error')}", file=sys.stderr)
+                if self.event_callback:
+                    self.event_callback("log-entry", {
+                        "message": f"[群組解析] ✗ 無法解析: {group_url}",
                         "type": "error"
                     })
         
@@ -2455,6 +2687,39 @@ class TelegramClientManager:
                         "message": f"[監控] 消息內容: '{sanitize_text(text[:100])}...' 來自: {safe_get_username(user) or safe_get_name(user, '未知')}",
                         "type": "info"
                     })
+                
+                # ==================== 🆕 自動收集發言者並識別廣告號 ====================
+                try:
+                    from ad_detection_service import ad_detection_service
+                    
+                    # 準備用戶數據
+                    user_data = {
+                        'id': user.id,
+                        'telegram_id': str(user.id),
+                        'username': safe_get_username(user),
+                        'first_name': sanitize_text(user.first_name) if user.first_name else '',
+                        'last_name': sanitize_text(user.last_name) if user.last_name else '',
+                        'bio': '',  # 需要額外 API 調用獲取
+                        'photo': user.photo,
+                        'is_premium': getattr(user, 'is_premium', False),
+                        'is_verified': getattr(user, 'is_verified', False),
+                        'is_bot': user.is_bot,
+                        'collected_by': phone
+                    }
+                    
+                    # 異步處理，不阻塞主流程
+                    asyncio.create_task(
+                        ad_detection_service.process_message(
+                            user_data=user_data,
+                            message_text=text,
+                            group_id=str(chat_id),
+                            group_name=chat_title
+                        )
+                    )
+                except Exception as collect_err:
+                    # 收集失敗不影響主監控流程
+                    print(f"[TelegramClient] Ad detection error (non-blocking): {collect_err}", file=sys.stderr)
+                # ==================== 收集發言者結束 ====================
                 
                 # 使用優化的 Trie 匹配器（更快的匹配速度）
                 if phone not in self.trie_matchers:

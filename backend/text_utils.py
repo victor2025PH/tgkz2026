@@ -8,6 +8,55 @@ import json
 from typing import Any, Union
 
 
+def mask_api_key(api_key: str, visible_chars: int = 4) -> str:
+    """
+    🔧 脫敏 API Key，只顯示前後幾個字符
+    
+    Args:
+        api_key: 原始 API Key
+        visible_chars: 前後顯示的字符數（默認 4）
+        
+    Returns:
+        脫敏後的字符串，如 "sk-pr...veHx"
+        
+    Examples:
+        >>> mask_api_key("sk-proj-1234567890abcdef")
+        "sk-p...cdef"
+    """
+    if not api_key:
+        return ""
+    
+    if len(api_key) <= visible_chars * 2 + 3:
+        # 太短的 key 全部替換為星號
+        return "*" * len(api_key)
+    
+    return f"{api_key[:visible_chars]}...{api_key[-visible_chars:]}"
+
+
+def mask_sensitive_payload(payload: dict) -> dict:
+    """
+    🔧 脫敏 payload 中的敏感字段
+    
+    Args:
+        payload: 原始 payload
+        
+    Returns:
+        脫敏後的 payload（淺拷貝）
+    """
+    if not payload or not isinstance(payload, dict):
+        return payload
+    
+    # 敏感字段列表
+    sensitive_fields = ['apiKey', 'api_key', 'password', 'secret', 'token']
+    
+    masked = payload.copy()
+    for field in sensitive_fields:
+        if field in masked and masked[field]:
+            masked[field] = mask_api_key(str(masked[field]))
+    
+    return masked
+
+
 def sanitize_text(text: Union[str, None]) -> str:
     """
     清理文本中的非法 Unicode 字符（代理對等）
@@ -207,3 +256,81 @@ def format_user_info(user: Any) -> dict:
         "is_bot": getattr(user, 'is_bot', False),
         "phone": sanitize_text(getattr(user, 'phone_number', "") or "")
     }
+
+
+# ============ 統一日誌格式化 ============
+
+from datetime import datetime
+from enum import Enum
+
+class LogLevel(Enum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    SUCCESS = "SUCCESS"
+
+# 日誌級別對應的 emoji
+LOG_EMOJI = {
+    LogLevel.DEBUG: "🔍",
+    LogLevel.INFO: "ℹ️",
+    LogLevel.WARNING: "⚠️",
+    LogLevel.ERROR: "❌",
+    LogLevel.SUCCESS: "✅"
+}
+
+def format_log(module: str, message: str, level: LogLevel = LogLevel.INFO, 
+               context: dict = None) -> str:
+    """
+    統一日誌格式化
+    
+    Args:
+        module: 模塊名稱（如 "AIAutoChat", "PrivatePoller"）
+        message: 日誌消息
+        level: 日誌級別
+        context: 額外上下文信息
+        
+    Returns:
+        格式化的日誌字符串
+        
+    Examples:
+        >>> format_log("AIAutoChat", "生成回覆成功", LogLevel.SUCCESS, {"user": "john"})
+        "[2024-01-23 14:30:45] [AIAutoChat] ✅ 生成回覆成功 | user=john"
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    emoji = LOG_EMOJI.get(level, "")
+    
+    base = f"[{timestamp}] [{module}] {emoji} {message}"
+    
+    if context:
+        # 脫敏敏感字段
+        safe_context = mask_sensitive_payload(context) if isinstance(context, dict) else context
+        context_str = " | ".join(f"{k}={v}" for k, v in safe_context.items())
+        return f"{base} | {context_str}"
+    
+    return base
+
+
+def log_ai_event(event_type: str, user_id: str = None, success: bool = True, 
+                 details: str = None) -> str:
+    """
+    專門用於 AI 事件的日誌格式化
+    
+    Args:
+        event_type: 事件類型（如 "生成回覆", "調用API", "發送消息"）
+        user_id: 用戶 ID
+        success: 是否成功
+        details: 詳細信息
+        
+    Returns:
+        格式化的日誌字符串
+    """
+    level = LogLevel.SUCCESS if success else LogLevel.ERROR
+    context = {}
+    
+    if user_id:
+        context["user"] = user_id
+    if details:
+        context["details"] = details[:100]  # 限制長度
+    
+    return format_log("AI", event_type, level, context if context else None)

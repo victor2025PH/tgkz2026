@@ -152,6 +152,10 @@ class GroupJoinError:
 class GroupJoinService:
     """群組自動加入服務"""
     
+    # 🆕 成員資格緩存（減少 API 調用，加速啟動）
+    _membership_cache: Dict[str, Dict] = {}  # key: "{phone}:{group_id}" -> {is_member, chat_info, cached_at}
+    CACHE_TTL = 24 * 60 * 60  # 24 小時緩存有效期
+    
     def __init__(self, event_callback: Optional[Callable] = None):
         self.event_callback = event_callback
         self._verification_handlers: Dict[str, asyncio.Task] = {}
@@ -273,76 +277,148 @@ class GroupJoinService:
         client: Client,
         group_urls: List[str],
         delay_between: float = 2.0,
-        auto_verify: bool = True
+        auto_verify: bool = True,
+        max_concurrent: int = 5  # 🆕 最大並發數
     ) -> Dict[str, Any]:
         """
-        批量加入多個群組
+        🆕 優化版：批量並行加入多個群組
+        
+        優化點：
+        1. 先批量檢查成員資格（使用緩存）
+        2. 跳過已加入的群組
+        3. 並行處理，最多 5 個同時
         
         Args:
             client: Telegram 客戶端
             group_urls: 群組 URL 列表
             delay_between: 每次加入之間的延遲（秒）
             auto_verify: 是否自動處理驗證
+            max_concurrent: 最大並發數
             
         Returns:
             批量加入結果報告
         """
+        import time as time_module
+        start_time = time_module.time()
+        
         report = {
             'total': len(group_urls),
             'success': [],
-            'pending': [],  # 等待審批
-            'need_manual': [],  # 需要手動處理
+            'pending': [],
+            'need_manual': [],
             'failed': [],
-            'details': []
+            'details': [],
+            'skipped_cached': 0  # 🆕 緩存命中跳過的數量
         }
         
-        for i, url in enumerate(group_urls):
-            self.log(f"加入進度: {i+1}/{len(group_urls)} - {url}")
+        if not group_urls:
+            return report
+        
+        # 🆕 階段 1：批量檢查成員資格（使用緩存，大幅減少 API 調用）
+        self.log(f"📋 批量檢查 {len(group_urls)} 個群組的成員資格...")
+        
+        urls_to_join = []  # 需要加入的群組
+        
+        for url in group_urls:
+            group_id = self._extract_group_id(url)
+            is_member, chat_info = await self._check_membership(client, group_id)
             
-            # 發送進度事件
-            if self.event_callback:
-                self.event_callback("group-join-progress", {
-                    "current": i + 1,
-                    "total": len(group_urls),
-                    "url": url
-                })
-            
-            result = await self.join_group(client, url, auto_verify)
-            report['details'].append(result)
-            
-            if result['success']:
+            if is_member:
+                # 已是成員，直接加入成功列表
                 report['success'].append({
                     'url': url,
-                    'title': result.get('chat_title'),
-                    'already_member': result.get('already_member', False)
+                    'title': chat_info.get('chat_title', ''),
+                    'already_member': True
                 })
-            elif result.get('error_code') == 'INVITE_REQUEST_SENT':
-                report['pending'].append({
-                    'url': url,
-                    'message': result.get('error')
-                })
-            elif result.get('error_code') in ['VERIFICATION_FAILED', 'VERIFICATION_REQUIRED']:
-                report['need_manual'].append({
-                    'url': url,
-                    'reason': result.get('error'),
-                    'suggestion': result.get('suggestion')
-                })
+                report['skipped_cached'] += 1
             else:
-                report['failed'].append({
-                    'url': url,
-                    'error': result.get('error'),
-                    'error_code': result.get('error_code'),
-                    'suggestion': result.get('suggestion')
+                urls_to_join.append(url)
+        
+        self.log(f"✓ 已是成員: {report['skipped_cached']} 個，需要加入: {len(urls_to_join)} 個")
+        
+        if not urls_to_join:
+            # 全部都已經是成員
+            if self.event_callback:
+                self.event_callback("group-join-complete", {
+                    "success_count": len(report['success']),
+                    "pending_count": 0,
+                    "failed_count": 0,
+                    "total": report['total'],
+                    "skipped_cached": report['skipped_cached']
                 })
-            
-            # 如果需要等待（FloodWait）
-            if result.get('wait_seconds'):
-                wait_time = min(result['wait_seconds'], 60)  # 最多等待60秒
-                self.log(f"等待 {wait_time} 秒後繼續...")
-                await asyncio.sleep(wait_time)
-            elif i < len(group_urls) - 1:
-                # 正常延遲
-                await asyncio.sleep(delay_between)
+            return report
+        
+        # 🆕 階段 2：並行加入未加入的群組
+        semaphore = asyncio.Semaphore(max_concurrent)
+        completed = [0]  # 使用列表以便在閉包中修改
+        
+        async def join_with_semaphore(url: str, index: int):
+            async with semaphore:
+                # 發送進度事件
+                if self.event_callback:
+                    self.event_callback("group-join-progress", {
+                        "current": report['skipped_cached'] + completed[0] + 1,
+                        "total": len(group_urls),
+                        "url": url
+                    })
+                
+                result = await self.join_group(client, url, auto_verify)
+                completed[0] += 1
+                
+                # 處理結果
+                if result['success']:
+                    report['success'].append({
+                        'url': url,
+                        'title': result.get('chat_title'),
+                        'already_member': result.get('already_member', False)
+                    })
+                    # 🆕 更新緩存
+                    try:
+                        me = await client.get_me()
+                        phone = getattr(me, 'phone_number', '') or str(me.id)
+                        group_id = self._extract_group_id(url)
+                        self.update_membership_cache(phone, group_id, True, {
+                            'chat_id': result.get('chat_id'),
+                            'chat_title': result.get('chat_title')
+                        })
+                    except:
+                        pass
+                elif result.get('error_code') == 'INVITE_REQUEST_SENT':
+                    report['pending'].append({
+                        'url': url,
+                        'message': result.get('error')
+                    })
+                elif result.get('error_code') in ['VERIFICATION_FAILED', 'VERIFICATION_REQUIRED']:
+                    report['need_manual'].append({
+                        'url': url,
+                        'reason': result.get('error'),
+                        'suggestion': result.get('suggestion')
+                    })
+                else:
+                    report['failed'].append({
+                        'url': url,
+                        'error': result.get('error'),
+                        'error_code': result.get('error_code'),
+                        'suggestion': result.get('suggestion')
+                    })
+                
+                report['details'].append(result)
+                
+                # 如果需要等待（FloodWait），在信號量內等待
+                if result.get('wait_seconds'):
+                    wait_time = min(result['wait_seconds'], 30)  # 最多等待30秒
+                    self.log(f"⏳ FloodWait: 等待 {wait_time} 秒")
+                    await asyncio.sleep(wait_time)
+                else:
+                    # 正常延遲（減少以加快速度）
+                    await asyncio.sleep(delay_between * 0.5)
+        
+        # 創建並行任務
+        tasks = [join_with_semaphore(url, i) for i, url in enumerate(urls_to_join)]
+        await asyncio.gather(*tasks, return_exceptions=True)
+        
+        elapsed = time_module.time() - start_time
+        self.log(f"✓ 群組加入完成: {len(report['success'])} 成功, {len(report['failed'])} 失敗 (耗時 {elapsed:.1f}秒)")
         
         # 發送完成事件
         if self.event_callback:
@@ -350,7 +426,9 @@ class GroupJoinService:
                 "success_count": len(report['success']),
                 "pending_count": len(report['pending']),
                 "failed_count": len(report['failed']),
-                "total": report['total']
+                "total": report['total'],
+                "skipped_cached": report['skipped_cached'],
+                "elapsed_seconds": elapsed
             })
         
         return report
@@ -360,22 +438,75 @@ class GroupJoinService:
         client: Client, 
         group_id: str
     ) -> tuple[bool, Dict]:
-        """檢查是否已經是群組成員"""
+        """檢查是否已經是群組成員（🆕 帶 24h 緩存）"""
+        import time
+        
+        # 🆕 生成緩存鍵
+        try:
+            me = await client.get_me()
+            phone = getattr(me, 'phone_number', '') or str(me.id)
+        except:
+            phone = 'unknown'
+        cache_key = f"{phone}:{group_id}"
+        
+        # 🆕 檢查緩存
+        if cache_key in self._membership_cache:
+            cached = self._membership_cache[cache_key]
+            if time.time() - cached.get('cached_at', 0) < self.CACHE_TTL:
+                self.log(f"✓ 緩存命中: {group_id} (is_member={cached['is_member']})")
+                return cached['is_member'], cached.get('chat_info', {})
+        
+        # 🆕 緩存未命中，調用 API
         try:
             chat = await client.get_chat(group_id)
-            me = await client.get_me()
             member = await client.get_chat_member(chat.id, me.id)
             
             if member.status in [ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.MEMBER]:
-                return True, {
+                chat_info = {
                     'chat_id': chat.id,
                     'chat_title': safe_get_name(chat, "未知群組"),
                     'status': str(member.status)
                 }
+                # 🆕 寫入緩存
+                self._membership_cache[cache_key] = {
+                    'is_member': True,
+                    'chat_info': chat_info,
+                    'cached_at': time.time()
+                }
+                return True, chat_info
         except Exception:
             pass
         
+        # 🆕 非成員也緩存（避免重複檢查）
+        self._membership_cache[cache_key] = {
+            'is_member': False,
+            'chat_info': {},
+            'cached_at': time.time()
+        }
         return False, {}
+    
+    @classmethod
+    def clear_membership_cache(cls, group_id: str = None):
+        """🆕 清除成員資格緩存"""
+        if group_id:
+            # 清除特定群組的緩存
+            keys_to_remove = [k for k in cls._membership_cache if k.endswith(f":{group_id}")]
+            for key in keys_to_remove:
+                del cls._membership_cache[key]
+        else:
+            # 清除所有緩存
+            cls._membership_cache.clear()
+    
+    @classmethod
+    def update_membership_cache(cls, phone: str, group_id: str, is_member: bool, chat_info: Dict = None):
+        """🆕 更新成員資格緩存（加入成功後調用）"""
+        import time
+        cache_key = f"{phone}:{group_id}"
+        cls._membership_cache[cache_key] = {
+            'is_member': is_member,
+            'chat_info': chat_info or {},
+            'cached_at': time.time()
+        }
     
     def _extract_group_id(self, group_url: str) -> str:
         """從 URL 提取群組 ID"""

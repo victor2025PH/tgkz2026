@@ -278,7 +278,8 @@ class GroupSearchService:
                 try:
                     message_chats = set()
                     count = 0
-                    async for message in client.search_global(query, limit=min(limit * 2, 100)):
+                    # 🔧 P0: 增加搜索範圍到 200
+                    async for message in client.search_global(query, limit=min(limit * 4, 200)):
                         if count >= limit:
                             break
                         try:
@@ -307,6 +308,58 @@ class GroupSearchService:
                     
                 except Exception as e:
                     self.log(f"search_global 失敗: {e}", "warning")
+            
+            # 🔧 P0: 策略 4: 搜索已加入的群組/頻道（按標題和描述匹配）
+            if len(results) < limit:
+                self.log("📋 策略4: 搜索已加入的群組/頻道...")
+                try:
+                    query_lower = query.lower()
+                    dialog_count = 0
+                    matched_count = 0
+                    
+                    async for dialog in client.get_dialogs():
+                        dialog_count += 1
+                        if dialog_count > 500:  # 限制遍歷數量
+                            break
+                        
+                        try:
+                            chat = dialog.chat
+                            if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
+                                continue
+                            
+                            chat_id = str(chat.id)
+                            if chat_id in seen_ids:
+                                continue
+                            
+                            # 檢查標題是否匹配
+                            title = (chat.title or '').lower()
+                            description = (getattr(chat, 'description', '') or '').lower()
+                            username = (chat.username or '').lower()
+                            
+                            if query_lower in title or query_lower in description or query_lower in username:
+                                result = await self._parse_chat_full(chat)
+                                if result:
+                                    # 類型過濾
+                                    if search_type != "all" and result.chat_type != search_type:
+                                        continue
+                                    # 成員數過濾
+                                    if min_members > 0 and result.member_count < min_members:
+                                        continue
+                                    
+                                    seen_ids.add(result.telegram_id)
+                                    results.append(result)
+                                    matched_count += 1
+                                    self.log(f"  ✓ 已加入群組匹配: {result.title}")
+                                    
+                                    if len(results) >= limit:
+                                        break
+                        except Exception as e:
+                            continue
+                    
+                    self.log(f"📋 已加入群組搜索: 遍歷 {dialog_count} 個對話，匹配 {matched_count} 個")
+                    
+                except Exception as e:
+                    self.log(f"已加入群組搜索失敗: {e}", "warning")
             
             # 按成員數排序
             results.sort(key=lambda x: x.member_count, reverse=True)

@@ -162,19 +162,26 @@ class AutoFunnelManager:
     
     async def _get_users_need_follow_up(self, stage: str, hours: int) -> List[Dict[str, Any]]:
         """獲取需要跟進的用戶列表"""
-        cursor = await db._connection.execute("""
-            SELECT up.*, 
-                   (SELECT COUNT(*) FROM funnel_history fh 
-                    WHERE fh.user_id = up.user_id AND fh.from_stage = ? 
-                    AND fh.reason LIKE '%自動跟進%') as follow_up_count
-            FROM user_profiles up
-            WHERE up.funnel_stage = ?
-            AND up.last_interaction < datetime('now', '-' || ? || ' hours')
-            AND (up.auto_follow_up_enabled IS NULL OR up.auto_follow_up_enabled = 1)
-        """, (stage, stage, hours))
-        
-        rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
+        try:
+            # 🔧 修復：檢查表是否存在，避免錯誤
+            if not db._connection:
+                return []
+            
+            # 先嘗試簡單查詢，不依賴 funnel_history 表
+            cursor = await db._connection.execute("""
+                SELECT up.*, 0 as follow_up_count
+                FROM user_profiles up
+                WHERE up.funnel_stage = ?
+                AND up.last_interaction < datetime('now', '-' || ? || ' hours')
+                AND (up.auto_follow_up_enabled IS NULL OR up.auto_follow_up_enabled = 1)
+                LIMIT 10
+            """, (stage, hours))
+            
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+        except Exception as e:
+            # 表不存在或其他錯誤，靜默返回空列表
+            return []
     
     async def _auto_follow_up(self, user: Dict[str, Any], stage: str, config: Dict[str, Any]):
         """自動跟進用戶"""
@@ -204,11 +211,14 @@ class AutoFunnelManager:
                     is_follow_up=True
                 )
                 
-                # 記錄跟進歷史
-                await db._connection.execute("""
-                    INSERT INTO funnel_history (user_id, from_stage, to_stage, reason, auto_triggered)
-                    VALUES (?, ?, ?, ?, 1)
-                """, (user_id, stage, stage, f"自動跟進 #{follow_up_count + 1}"))
+                # 記錄跟進歷史（忽略表不存在的錯誤）
+                try:
+                    await db._connection.execute("""
+                        INSERT INTO funnel_history (user_id, from_stage, to_stage, reason, auto_triggered)
+                        VALUES (?, ?, ?, ?, 1)
+                    """, (user_id, stage, stage, f"自動跟進 #{follow_up_count + 1}"))
+                except Exception:
+                    pass  # 表可能不存在，忽略
                 
                 # 更新最後互動時間
                 await db._connection.execute("""
@@ -483,7 +493,10 @@ class AutoFunnelManager:
     
     async def get_user_journey(self, user_id: str) -> List[Dict[str, Any]]:
         """獲取用戶漏斗旅程"""
-        history = await db.get_funnel_history(user_id, limit=50)
+        try:
+            history = await db.get_funnel_history(user_id, limit=50)
+        except Exception:
+            history = []  # 表可能不存在
         
         journey = []
         for item in history:

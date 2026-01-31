@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # Web 前端服務
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - api
+    restart: always
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./dist:/usr/share/nginx/html:ro
+
+  # API 後端服務
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://tgmatrix:tgmatrix123@db:5432/tgmatrix
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - DEBUG=false
+    depends_on:
+      - db
+      - redis
+    restart: always
+    volumes:
+      - ./data/sessions:/app/sessions
+      - ./data/logs:/app/logs
+
+  # PostgreSQL 數據庫
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=tgmatrix
+      - POSTGRES_PASSWORD=tgmatrix123
+      - POSTGRES_DB=tgmatrix
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+  # Redis 緩存
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    restart: always
+
+volumes:
+  postgres_data:
+  redis_data:

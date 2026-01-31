@@ -10,12 +10,60 @@
  * 5. 話題生成（新聞/生活/產品）
  */
 
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Injectable, signal, computed, inject, effect } from '@angular/core';
 import { ElectronIpcService } from '../electron-ipc.service';
 import { ToastService } from '../toast.service';
 import { MultiRoleService } from './multi-role.service';
+import { AccountManagementService } from '../services/account-management.service';
+import { TelegramAccount } from '../models';
 
 // ============ 類型定義 ============
+
+// 執行模式
+// 🔧 P0-1: 添加 'private' 模式，明確區分私聊和群聊
+export type ExecutionMode = 'scripted' | 'scriptless' | 'hybrid' | 'private';
+
+// 🔧 P0-1: 聊天場景類型
+export type ChatScenario = 'private_chat' | 'group_chat';
+
+// 🔧 P0-1: 判斷是否為私聊模式（無群組，1對1）
+export function isPrivateChatMode(mode: ExecutionMode): boolean {
+  return mode === 'private' || mode === 'scriptless' || mode === 'hybrid';
+}
+
+// 🔧 P0-1: 私聊模式下只使用單一角色
+export const PRIVATE_CHAT_MAX_ROLES = 1;
+
+// 帳號匹配結果
+export interface AccountRoleMatch {
+  accountId: number;
+  accountPhone: string;
+  accountName: string;
+  roleId: string;
+  roleName: string;
+  roleIcon: string;
+  matchScore: number;           // 匹配度 0-100
+  matchReasons: string[];       // 匹配原因
+  accountFeatures: {
+    profileStyle: 'professional' | 'casual' | 'friendly' | 'neutral';
+    activityLevel: 'high' | 'medium' | 'low';
+    successRate: number;        // 歷史成功率
+    responseRate: number;       // 回覆率
+  };
+}
+
+// 無劇本模式配置
+export interface ScriptlessConfig {
+  enabled: boolean;
+  maxTurns: number;             // 最大對話輪數
+  autoAdjustInterval: number;   // 自動調整間隔（消息數）
+  targetConversionSignals: string[];  // 轉化信號關鍵詞
+  exitConditions: {
+    maxSilenceMinutes: number;
+    negativeThreshold: number;
+    successSignals: string[];
+  };
+}
 
 // 用戶意圖類型
 export type IntentType = 
@@ -136,6 +184,22 @@ export interface ExecutionState {
   strategy: DynamicStrategy | null;
   roles: RecommendedRole[];
   
+  // 🆕 執行模式
+  mode: ExecutionMode;
+  
+  // 🆕 帳號角色匹配結果
+  accountMatches?: AccountRoleMatch[];
+  
+  // 🆕 無劇本模式配置
+  scriptlessConfig?: ScriptlessConfig;
+  
+  // 🆕 轉化漏斗追蹤
+  conversionFunnel?: {
+    currentStage: 'contact' | 'response' | 'interest' | 'intent' | 'conversion';
+    stageHistory: { stage: string; enteredAt: string; messageCount: number }[];
+    keyMoments: { message: string; trigger: string; stage: string; timestamp: string }[];
+  };
+  
   // 執行統計
   stats: {
     startTime: string;
@@ -144,6 +208,10 @@ export interface ExecutionState {
     currentPhase: number;
     interestScore: number;
     lastAnalysis?: RealtimeAnalysis | null;
+    // 🆕 新增統計
+    analysisCount: number;        // 分析次數
+    rolesSwitchCount: number;     // 角色切換次數
+    autoAdjustments: number;      // 自動調整次數
   };
   
   // 消息歷史（用於分析）
@@ -165,6 +233,27 @@ export interface ExecutionState {
     source?: string;
   }[];
   
+  // 🆕 任務隊列管理
+  queue?: {
+    totalUsers: number;           // 總目標用戶數
+    processedUsers: number;       // 已處理用戶數
+    currentUserIndex: number;     // 當前處理的用戶索引
+    currentUser?: {               // 當前正在處理的用戶
+      id: string;
+      name: string;
+      startTime: string;
+    };
+    completedUsers: {             // 已完成用戶列表
+      id: string;
+      name: string;
+      result: 'converted' | 'interested' | 'neutral' | 'rejected' | 'no_response';
+      messagesExchanged: number;
+      duration: number;           // 處理時長（秒）
+    }[];
+    pendingUsers: string[];       // 待處理用戶 ID 列表
+    pausedAt?: string;            // 暫停時間
+  };
+  
   // 來自 AI 營銷助手的策略數據
   marketingData?: {
     industry: string;
@@ -173,6 +262,17 @@ export interface ExecutionState {
     customerProfile: { identity: string[]; features: string[]; needs: string[] };
     recommendedGroups: string[];
     messageTemplates: { firstTouch: string; followUp: string; closing: string };
+  };
+  
+  // 🔧 群聊協作：聊天場景
+  chatScenario?: 'private' | 'group';
+  
+  // 🔧 群聊協作：群組配置
+  groupConfig?: {
+    groupId?: string;
+    groupName?: string;
+    roleAccounts?: { accountId: number; accountPhone: string; roleId: string; roleName: string }[];
+    chatScenario: 'group';
   };
 }
 
@@ -191,6 +291,7 @@ export class DynamicScriptEngineService {
   private ipc = inject(ElectronIpcService);
   private toast = inject(ToastService);
   private multiRoleService = inject(MultiRoleService);
+  private accountService = inject(AccountManagementService);
   
   // ============ 狀態 ============
   
@@ -206,8 +307,196 @@ export class DynamicScriptEngineService {
   private _isProcessing = signal(false);
   isProcessing = computed(() => this._isProcessing());
   
+  // 🆕 當前執行模式
+  private _executionMode = signal<ExecutionMode>('hybrid');
+  executionMode = computed(() => this._executionMode());
+  
+  // 🆕 帳號匹配結果
+  private _accountMatches = signal<AccountRoleMatch[]>([]);
+  accountMatches = computed(() => this._accountMatches());
+  
+  // 🆕 任務隊列狀態
+  queueProgress = computed(() => {
+    const exec = this._currentExecution();
+    if (!exec?.queue) return null;
+    return {
+      total: exec.queue.totalUsers,
+      processed: exec.queue.processedUsers,
+      current: exec.queue.currentUser,
+      pending: exec.queue.pendingUsers.length,
+      completed: exec.queue.completedUsers,
+      progress: exec.queue.totalUsers > 0 
+        ? Math.round((exec.queue.processedUsers / exec.queue.totalUsers) * 100)
+        : 0
+    };
+  });
+  
   // 分析間隔（每N條消息分析一次）
   private analysisInterval = 10;
+  
+  /**
+   * 🔧 Phase 4: 強制更新執行狀態（觸發 UI 刷新）
+   */
+  forceUpdateExecution(execution: ExecutionState): void {
+    this._currentExecution.set({ ...execution });
+    // 🔧 Phase 4: 同時持久化到數據庫
+    this.persistExecution(execution);
+  }
+  
+  /**
+   * 🔧 Phase 4: 持久化執行狀態到數據庫
+   */
+  private persistExecution(execution: ExecutionState): void {
+    try {
+      this.ipc.send('ai-execution:save', {
+        id: execution.id,
+        executionType: execution.chatScenario || 'private',
+        status: execution.status,
+        mode: execution.mode,
+        goal: execution.goal,
+        targetUsers: JSON.stringify(execution.targetUsers || []),
+        roleAccounts: JSON.stringify(execution.accountMatches || []),
+        groupId: execution.groupConfig?.groupId,
+        groupName: execution.groupConfig?.groupId ? `群組 ${execution.groupConfig.groupId}` : undefined,
+        messageHistory: JSON.stringify(execution.messageHistory || []),
+        stats: JSON.stringify(execution.stats || {})
+      });
+    } catch (error) {
+      console.warn('[DynamicEngine] 持久化執行狀態失敗:', error);
+    }
+  }
+  
+  /**
+   * 🔧 Phase 4: 從數據庫恢復執行狀態
+   */
+  async restoreExecutions(): Promise<void> {
+    try {
+      console.log('[DynamicEngine] 🔄 嘗試恢復執行狀態...');
+      const result = await this.ipc.invoke('ai-execution:get-active');
+      
+      if (result && result.executions && result.executions.length > 0) {
+        console.log(`[DynamicEngine] 找到 ${result.executions.length} 個活躍執行`);
+        
+        for (const saved of result.executions) {
+          const execution: ExecutionState = {
+            id: saved.id,
+            status: saved.status === 'running' ? 'executing' : saved.status,
+            goal: saved.goal || '',
+            mode: saved.mode || 'hybrid',
+            chatScenario: saved.executionType || 'private',
+            targetUsers: JSON.parse(saved.targetUsers || '[]'),
+            accountMatches: JSON.parse(saved.roleAccounts || '[]'),
+            messageHistory: JSON.parse(saved.messageHistory || '[]'),
+            stats: JSON.parse(saved.stats || '{}'),
+            intent: { 
+              type: 'sales_conversion', 
+              confidence: 80, 
+              goal: saved.goal || '',
+              targetAudience: '潛在客戶',
+              urgency: 'medium' as const,
+              suggestedDuration: '1-2週'
+            },
+            strategy: { 
+              id: 'restored_strategy',
+              name: '恢復策略',
+              description: '從數據庫恢復的執行策略',
+              phases: [], 
+              adjustmentRules: [],
+              constraints: {
+                maxDailyMessages: 20,
+                maxConsecutiveFromSameRole: 3,
+                minIntervalSeconds: 30,
+                maxIntervalSeconds: 300,
+                activeHours: { start: 8, end: 22 },
+                toneGuidelines: ['友好', '專業'],
+                forbiddenTopics: []
+              }
+            },
+            roles: [],
+            groupConfig: saved.groupId ? { groupId: saved.groupId, chatScenario: 'group' } : undefined
+          };
+          
+          this._currentExecution.set(execution);
+          this._executions.update(list => [execution, ...list.filter(e => e.id !== execution.id)]);
+          console.log(`[DynamicEngine] ✅ 已恢復執行: ${execution.id}`);
+        }
+        
+        this.toast.info(`🔄 已恢復 ${result.executions.length} 個進行中的任務`);
+      } else {
+        console.log('[DynamicEngine] 沒有需要恢復的執行');
+      }
+    } catch (error) {
+      console.warn('[DynamicEngine] 恢復執行狀態失敗:', error);
+    }
+  }
+  
+  // 🆕 無劇本模式默認配置
+  private defaultScriptlessConfig: ScriptlessConfig = {
+    enabled: false,
+    maxTurns: 50,
+    autoAdjustInterval: 10,
+    targetConversionSignals: ['怎麼買', '在哪買', '多少錢', '想買', '下單', '付款'],
+    exitConditions: {
+      maxSilenceMinutes: 60,
+      negativeThreshold: 30,
+      successSignals: ['買了', '已付款', '成交', '謝謝', '收到']
+    }
+  };
+  
+  constructor() {
+    this.setupMessageAnalysisListener();
+  }
+  
+  // ============ 🆕 消息分析監聽 ============
+  
+  /**
+   * 設置消息分析監聯（每 N 條消息自動分析）
+   */
+  private setupMessageAnalysisListener(): void {
+    // 監聽來自協作群組的新消息
+    this.ipc.on('collab:new-message', async (data: any) => {
+      const execution = this._currentExecution();
+      if (!execution || execution.status !== 'running') return;
+      
+      // 添加到消息歷史
+      const newMessage = {
+        role: data.role || 'customer',
+        content: data.content,
+        timestamp: new Date().toISOString(),
+        isFromCustomer: data.isFromCustomer ?? true
+      };
+      
+      execution.messageHistory = [...(execution.messageHistory || []), newMessage];
+      this._currentExecution.set({ ...execution });
+      
+      // 檢查是否達到分析間隔
+      const messageCount = execution.messageHistory?.length || 0;
+      if (messageCount > 0 && messageCount % this.analysisInterval === 0) {
+        console.log(`[DynamicEngine] 觸發第 ${execution.stats.analysisCount + 1} 次分析 (${messageCount} 條消息)`);
+        await this.performDynamicAnalysis(execution);
+      }
+      
+      // 無劇本模式：檢查轉化信號
+      if (execution.mode === 'scriptless' && data.isFromCustomer) {
+        await this.checkConversionSignals(execution, data.content);
+      }
+    });
+    
+    // 監聯客戶回覆
+    this.ipc.on('collab:customer-reply', async (data: any) => {
+      const execution = this._currentExecution();
+      if (!execution) return;
+      
+      // 更新回覆統計
+      execution.stats.responsesReceived++;
+      this._currentExecution.set({ ...execution });
+      
+      // 更新轉化漏斗
+      if (execution.conversionFunnel?.currentStage === 'contact') {
+        this.updateConversionStage(execution, 'response', data.content);
+      }
+    });
+  }
   
   // ============ 意圖預設庫 ============
   
@@ -218,7 +507,10 @@ export class DynamicScriptEngineService {
     defaultPhases: StrategyPhase[];
   }> = {
     sales_conversion: {
-      keywords: ['成交', '購買', '下單', '付費', '轉化', '買', '訂單', '付款'],
+      // 🔧 擴展關鍵詞：增加更多營銷相關詞彙
+      keywords: ['成交', '購買', '下單', '付費', '轉化', '買', '訂單', '付款', 
+                 '營銷', '銷售', '推廣', '支付', '代收', '代付', '產品', '服務',
+                 '客戶', '用戶', '興趣', '合作', '業務', '開發', '拓展', '簽約'],
       description: '促進潛在客戶完成購買',
       defaultRoles: [
         {
@@ -532,23 +824,392 @@ export class DynamicScriptEngineService {
     custom: {
       keywords: [],
       description: '自定義目標',
-      defaultRoles: [],
-      defaultPhases: []
+      // 🔧 修復: custom 類型使用通用銷售角色作為默認值，避免空角色問題
+      defaultRoles: [
+        {
+          id: 'account_manager',
+          name: '客戶經理',
+          icon: '💼',
+          type: 'account_manager',
+          purpose: '了解需求，建立關係',
+          personality: '專業友好，善於傾聽',
+          speakingStyle: '專業但不生硬，像朋友般交流',
+          entryTiming: '首次接觸和重要節點',
+          sampleMessages: [
+            '您好！我是您的專屬客戶經理',
+            '請問有什麼可以幫到您的嗎？',
+            '有任何問題都可以隨時問我'
+          ]
+        },
+        {
+          id: 'solution_expert',
+          name: '方案專家',
+          icon: '📋',
+          type: 'professional',
+          purpose: '提供專業方案和建議',
+          personality: '專業權威，有深度',
+          speakingStyle: '清晰簡潔，重點突出',
+          entryTiming: '客戶有具體需求時',
+          sampleMessages: [
+            '根據您的情況，我建議...',
+            '這個方案可以滿足您的需求',
+            '讓我來詳細說明一下'
+          ]
+        }
+      ],
+      defaultPhases: [
+        { id: 'phase_1', name: '了解需求', duration: '1-2天', goal: '建立聯繫，了解客戶需求', tactics: ['開場問候', '需求挖掘'], rolesFocus: ['account_manager'], successIndicators: ['客戶回覆', '說出需求'] },
+        { id: 'phase_2', name: '提供方案', duration: '1-2天', goal: '根據需求提供定制方案', tactics: ['方案介紹', '價值說明'], rolesFocus: ['solution_expert'], successIndicators: ['客戶認可', '詢問細節'] },
+        { id: 'phase_3', name: '促成轉化', duration: '靈活', goal: '解答疑慮，促成成交', tactics: ['異議處理', '優惠促單'], rolesFocus: ['account_manager'], successIndicators: ['客戶同意', '成交'] }
+      ]
     }
   };
+  
+  // ============ 🆕 智能帳號匹配 ============
+  
+  /**
+   * P0: 智能匹配帳號到角色
+   * 根據帳號特徵自動選擇最適合的角色
+   */
+  async smartMatchAccountsToRoles(
+    recommendedRoles: RecommendedRole[],
+    targetIntent: IntentAnalysis
+  ): Promise<AccountRoleMatch[]> {
+    return this.smartMatchAccountsToRolesEnhanced(recommendedRoles, targetIntent, {});
+  }
+  
+  /**
+   * 🆕 P0: 增強版智能匹配（支持降級策略）
+   * - allowMultiRole: 允許一號多角
+   * - allowOffline: 允許匹配離線帳號
+   */
+  async smartMatchAccountsToRolesEnhanced(
+    recommendedRoles: RecommendedRole[],
+    targetIntent: IntentAnalysis,
+    options: { allowMultiRole?: boolean; allowOffline?: boolean }
+  ): Promise<AccountRoleMatch[]> {
+    const { allowMultiRole = false, allowOffline = false } = options;
+    const accounts = this.accountService.accounts();
+    
+    // 🔧 Phase 3 優化: 使用所有在線帳號進行匹配
+    // 優先級: AI號 > 發送號 > 監控號
+    const onlineAccounts = accounts.filter(a => a.status === 'Online');
+    
+    // 🔧 Phase 3: 使用所有在線帳號（包括 Listener），按優先級排序
+    const rolePriority: Record<string, number> = { 'AI': 1, 'Sender': 2, 'Listener': 3 };
+    let availableAccounts = onlineAccounts
+      .sort((a, b) => (rolePriority[a.role] || 99) - (rolePriority[b.role] || 99));
+    
+    console.log(`[DynamicEngine] 🔍 Phase 3 帳號篩選: 在線 ${onlineAccounts.length} 個, 全部可用於多角色`);
+    console.log(`[DynamicEngine] 🔍 可用帳號明細:`, availableAccounts.map(a => `${a.phone}(${a.role})`));
+    
+    if (availableAccounts.length === 0 && allowOffline) {
+      // 降級: 嘗試離線但健康的帳號
+      availableAccounts = accounts.filter(a => 
+        a.status === 'Offline' && 
+        !a.status.toLowerCase().includes('error') &&
+        !a.status.toLowerCase().includes('banned')
+      );
+      if (availableAccounts.length > 0) {
+        console.log('[DynamicEngine] 降級: 使用離線帳號（需要先連線）');
+      }
+    }
+    
+    if (availableAccounts.length === 0) {
+      console.log('[DynamicEngine] 無可用帳號');
+      return [];
+    }
+    
+    const matches: AccountRoleMatch[] = [];
+    const usedAccounts = new Set<number>();
+    const accountUsageCount = new Map<number, number>();
+    
+    // 🔧 P0-3: 嚴格模式下，一個帳號只能分配一個角色
+    const strictOneAccountOneRole = !allowMultiRole;
+    if (strictOneAccountOneRole) {
+      console.log('[DynamicEngine] 🔒 嚴格模式：一帳號一角色');
+    }
+    
+    for (const role of recommendedRoles) {
+      // 找到最適合這個角色的帳號
+      let bestMatch: { account: TelegramAccount; score: number; reasons: string[] } | null = null;
+      
+      for (const account of availableAccounts) {
+        // 🔧 P0-3: 嚴格模式下，已使用的帳號不能再次使用
+        if (strictOneAccountOneRole && usedAccounts.has(account.id)) {
+          console.log(`[DynamicEngine] ⏭️ 跳過已使用帳號: ${account.phone}`);
+          continue;
+        }
+        
+        // 如果已經使用過，降低分數
+        const usageCount = accountUsageCount.get(account.id) || 0;
+        const usagePenalty = usageCount * 20;
+        
+        const { score, reasons } = this.calculateAccountRoleMatch(account, role, targetIntent);
+        const adjustedScore = Math.max(0, score - usagePenalty);
+        
+        if (!bestMatch || adjustedScore > bestMatch.score) {
+          bestMatch = { account, score: adjustedScore, reasons };
+        }
+      }
+      
+      // 🔧 Phase 3 優化: 降低匹配門檻到 10，並強制分配剩餘帳號
+      if (bestMatch && bestMatch.score >= 10) {
+        usedAccounts.add(bestMatch.account.id);
+        accountUsageCount.set(
+          bestMatch.account.id, 
+          (accountUsageCount.get(bestMatch.account.id) || 0) + 1
+        );
+        
+        const features = this.analyzeAccountFeatures(bestMatch.account);
+        const usageCount = accountUsageCount.get(bestMatch.account.id) || 1;
+        
+        matches.push({
+          accountId: bestMatch.account.id,
+          accountPhone: bestMatch.account.phone,
+          accountName: bestMatch.account.name || bestMatch.account.phone,
+          roleId: role.id,
+          roleName: role.name,
+          roleIcon: role.icon,
+          matchScore: bestMatch.score,
+          matchReasons: usageCount > 1 
+            ? [...bestMatch.reasons, `一號多角 (${usageCount} 角色)`]
+            : bestMatch.reasons,
+          accountFeatures: features
+        });
+      } else if (bestMatch) {
+        // 🔧 Phase 3: 分數不足也要分配，確保帳號被使用
+        console.log(`[DynamicEngine] ⚡ 強制分配低分帳號: ${bestMatch.account.phone} (分數: ${bestMatch.score})`);
+        usedAccounts.add(bestMatch.account.id);
+        accountUsageCount.set(
+          bestMatch.account.id, 
+          (accountUsageCount.get(bestMatch.account.id) || 0) + 1
+        );
+        
+        matches.push({
+          accountId: bestMatch.account.id,
+          accountPhone: bestMatch.account.phone,
+          accountName: bestMatch.account.name || bestMatch.account.phone,
+          roleId: role.id,
+          roleName: role.name,
+          roleIcon: role.icon,
+          matchScore: bestMatch.score,
+          matchReasons: [...bestMatch.reasons, '強制分配(分數較低)'],
+          accountFeatures: this.analyzeAccountFeatures(bestMatch.account)
+        });
+      } else if (allowMultiRole && availableAccounts.length > 0) {
+        // 🆕 強制分配: 如果沒有合適的，隨機分配第一個可用帳號
+        const fallbackAccount = availableAccounts[0];
+        accountUsageCount.set(
+          fallbackAccount.id, 
+          (accountUsageCount.get(fallbackAccount.id) || 0) + 1
+        );
+        const usageCount = accountUsageCount.get(fallbackAccount.id) || 1;
+        
+        matches.push({
+          accountId: fallbackAccount.id,
+          accountPhone: fallbackAccount.phone,
+          accountName: fallbackAccount.name || fallbackAccount.phone,
+          roleId: role.id,
+          roleName: role.name,
+          roleIcon: role.icon,
+          matchScore: 30,
+          matchReasons: ['自動分配', `一號多角 (${usageCount} 角色)`],
+          accountFeatures: this.analyzeAccountFeatures(fallbackAccount)
+        });
+      }
+    }
+    
+    this._accountMatches.set(matches);
+    
+    // 🆕 Phase 2.3: 增加帳號匹配透明度
+    const excludedAccounts = accounts.filter(a => 
+      a.status === 'Online' && 
+      !matches.some(m => m.accountId === a.id)
+    );
+    
+    console.log('[DynamicEngine] ✅ 智能匹配結果:', matches.length, '個帳號');
+    matches.forEach(m => {
+      console.log(`  - ${m.accountPhone} → ${m.roleName} (分數: ${m.matchScore})`);
+    });
+    
+    if (excludedAccounts.length > 0) {
+      console.log('[DynamicEngine] ⚠️ 未使用的在線帳號:', excludedAccounts.length, '個');
+      excludedAccounts.forEach(a => {
+        const reason = a.role === 'Listener' ? '監控號(保留用於監控)' : 
+                       usedAccounts.has(a.id) ? '已分配其他角色' : '匹配分數不足';
+        console.log(`  - ${a.phone} (${a.role}): ${reason}`);
+      });
+    }
+    
+    return matches;
+  }
+  
+  /**
+   * 計算帳號與角色的匹配度
+   */
+  private calculateAccountRoleMatch(
+    account: TelegramAccount,
+    role: RecommendedRole,
+    intent: IntentAnalysis
+  ): { score: number; reasons: string[] } {
+    let score = 50; // 基礎分
+    const reasons: string[] = [];
+    
+    // 1. 帳號狀態檢查
+    if (account.status === 'Online') {
+      score += 10;
+      reasons.push('帳號在線');
+    }
+    
+    // 2. 頭像/名稱風格匹配
+    const nameStyle = this.analyzeNameStyle(account.name);
+    const roleStyle = this.getRoleExpectedStyle(role.type);
+    
+    if (nameStyle === roleStyle) {
+      score += 20;
+      reasons.push(`名稱風格匹配 (${nameStyle})`);
+    } else if (nameStyle === 'neutral') {
+      score += 10;
+      reasons.push('名稱風格中性，適應性強');
+    }
+    
+    // 3. 角色類型特殊匹配
+    if (role.type === 'professional' && this.looksLikeProfessional(account)) {
+      score += 15;
+      reasons.push('帳號看起來專業');
+    }
+    
+    if (role.type === 'endorsement' && this.looksLikeFriendly(account)) {
+      score += 15;
+      reasons.push('帳號看起來親和');
+    }
+    
+    if (role.type === 'atmosphere' && this.looksLikeCasual(account)) {
+      score += 15;
+      reasons.push('帳號看起來輕鬆');
+    }
+    
+    // 4. 歷史表現（如果有）
+    // TODO: 從數據庫讀取帳號歷史表現數據
+    
+    return { score: Math.min(100, score), reasons };
+  }
+  
+  /**
+   * 分析帳號特徵
+   */
+  private analyzeAccountFeatures(account: TelegramAccount): AccountRoleMatch['accountFeatures'] {
+    const nameStyle = this.analyzeNameStyle(account.name);
+    
+    return {
+      profileStyle: nameStyle as 'professional' | 'casual' | 'friendly' | 'neutral',
+      activityLevel: 'medium',  // TODO: 從歷史數據計算
+      successRate: 0,           // TODO: 從歷史數據計算
+      responseRate: 0           // TODO: 從歷史數據計算
+    };
+  }
+  
+  /**
+   * 分析名稱風格
+   */
+  private analyzeNameStyle(name?: string): string {
+    const fullName = (name || '').toLowerCase();
+    
+    // 專業風格指標
+    const professionalIndicators = ['manager', 'director', 'expert', 'consultant', '經理', '顧問', '專家', '總監'];
+    if (professionalIndicators.some(ind => fullName.includes(ind))) {
+      return 'professional';
+    }
+    
+    // 友好風格指標
+    const friendlyIndicators = ['小', '阿', '哥', '姐', '寶', '萌', 'happy', 'sunny', 'sweet'];
+    if (friendlyIndicators.some(ind => fullName.includes(ind))) {
+      return 'friendly';
+    }
+    
+    // 隨性風格指標
+    const casualIndicators = ['cool', 'chill', '懶', '隨', 'random', 'just'];
+    if (casualIndicators.some(ind => fullName.includes(ind))) {
+      return 'casual';
+    }
+    
+    return 'neutral';
+  }
+  
+  /**
+   * 獲取角色期望的帳號風格
+   */
+  private getRoleExpectedStyle(roleType: string): string {
+    const styleMap: Record<string, string> = {
+      'professional': 'professional',
+      'endorsement': 'friendly',
+      'atmosphere': 'casual',
+      'care': 'friendly',
+      'solution': 'professional',
+      'retention': 'professional',
+      'host': 'friendly',
+      'participant': 'casual',
+      'expert': 'professional'
+    };
+    return styleMap[roleType] || 'neutral';
+  }
+  
+  private looksLikeProfessional(account: TelegramAccount): boolean {
+    const name = (account.name || '').toLowerCase();
+    return name.includes('manager') || name.includes('經理') || name.includes('顧問') || 
+           name.includes('director') || name.includes('總監');
+  }
+  
+  private looksLikeFriendly(account: TelegramAccount): boolean {
+    const name = (account.name || '').toLowerCase();
+    return name.includes('小') || name.includes('阿') || name.includes('姐') || 
+           name.includes('happy') || name.includes('sunny');
+  }
+  
+  private looksLikeCasual(account: TelegramAccount): boolean {
+    const name = (account.name || '').toLowerCase();
+    return name.includes('cool') || name.includes('chill') || name.length <= 3;
+  }
   
   // ============ 核心方法 ============
   
   /**
-   * 一句話啟動：解析用戶意圖並生成執行計劃
+   * 設置執行模式
    */
-  async startFromOnePhrase(userInput: string): Promise<ExecutionState | null> {
+  setExecutionMode(mode: ExecutionMode): void {
+    this._executionMode.set(mode);
+    console.log('[DynamicEngine] 執行模式設置為:', mode);
+  }
+  
+  /**
+   * 一句話啟動：解析用戶意圖並生成執行計劃（增強版）
+   * @param userInput 用戶輸入的目標
+   * @param mode 執行模式
+   * @param targetUsers 目標用戶列表（可選）
+   * @param options 額外選項（群聊協作配置）
+   */
+  async startFromOnePhrase(
+    userInput: string, 
+    mode: ExecutionMode = 'hybrid',
+    targetUsers?: { id: string; telegramId: string; username?: string; firstName?: string; lastName?: string; intentScore: number; source?: string }[],
+    options?: {
+      chatScenario?: 'private' | 'group';
+      groupId?: string;
+      roleAccounts?: { accountId: number; accountPhone: string; roleId: string; roleName: string }[];
+    }
+  ): Promise<ExecutionState | null> {
     if (!userInput.trim()) {
       this.toast.error('請輸入您的目標');
       return null;
     }
     
     this._isProcessing.set(true);
+    this._executionMode.set(mode);
+    
+    // 🔧 群聊協作：記錄場景
+    const chatScenario = options?.chatScenario || 'private';
+    console.log(`[DynamicEngine] 啟動模式: ${mode}, 場景: ${chatScenario}`);
     
     try {
       // 1. 解析意圖
@@ -558,23 +1219,118 @@ export class DynamicScriptEngineService {
       const strategy = this.generateStrategy(intent);
       
       // 3. 推薦角色
-      const roles = this.recommendRoles(intent);
+      let roles = this.recommendRoles(intent);
+      console.log('[DynamicEngine] 🔍 推薦角色:', roles?.length, roles);
       
-      // 4. 創建執行狀態
+      // 🔧 P0-1: 私聊模式強制限制為單一角色
+      // 私聊模式 = 沒有群組，直接與目標用戶 1v1 對話
+      const isPrivateChat = !targetUsers || targetUsers.length <= 1;
+      if (isPrivateChat) {
+        console.log('[DynamicEngine] 🔒 私聊模式：限制為單一角色');
+        // 只保留第一個角色（通常是客戶經理）
+        roles = roles.slice(0, PRIVATE_CHAT_MAX_ROLES);
+        this.toast.info('💬 私聊模式：使用單一角色與目標用戶對話');
+      }
+      
+      // 4. 🆕 智能匹配帳號到角色
+      const accountMatches = await this.smartMatchAccountsToRoles(roles, intent);
+      console.log('[DynamicEngine] 🔍 帳號匹配結果:', accountMatches?.length, accountMatches);
+      
+      // 🔧 P0-2: 帳號充足性檢查
+      if (accountMatches.length < roles.length) {
+        const shortage = roles.length - accountMatches.length;
+        console.warn(`[DynamicEngine] ⚠️ 帳號不足：需要 ${roles.length} 個，只有 ${accountMatches.length} 個`);
+        this.toast.warning(`⚠️ 帳號不足！需要再登入 ${shortage} 個帳號才能完整執行多角色協作`);
+        
+        // 如果是群聊模式且帳號嚴重不足，阻止執行
+        if (!isPrivateChat && accountMatches.length === 0) {
+          this.toast.error('❌ 沒有可用帳號，無法啟動。請先添加並登入帳號。');
+          return null;
+        }
+        
+        // 縮減角色到可用帳號數量
+        roles = roles.slice(0, Math.max(1, accountMatches.length));
+      }
+      
+      // 5. 🆕 將匹配結果更新到角色
+      const rolesWithAccounts = roles.map(role => {
+        const match = accountMatches.find(m => m.roleId === role.id);
+        if (match) {
+          return { ...role, accountId: match.accountId, accountPhone: match.accountPhone };
+        }
+        return role;
+      });
+      
+      // 6. 🆕 處理目標用戶
+      // 🔧 Phase 3 修復：確保同時設置 id 和 telegramId
+      const formattedTargetUsers = targetUsers?.map(u => ({
+        id: u.telegramId || u.id,
+        telegramId: u.telegramId || u.id,  // 🔧 確保後端可以匹配
+        username: u.username,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        intentScore: u.intentScore,
+        source: u.source
+      }));
+      
+      // 🔧 調試日誌
+      if (formattedTargetUsers && formattedTargetUsers.length > 0) {
+        console.log('[DynamicEngine] 🎯 格式化目標用戶:');
+        formattedTargetUsers.forEach(u => {
+          console.log(`  - ${u.firstName || u.username || 'unknown'}: id=${u.id}, telegramId=${u.telegramId}`);
+        });
+      }
+      
+      // 7. 創建執行狀態
+      // 🆕 初始化任務隊列
+      const targetUserIds = formattedTargetUsers?.map(u => String(u.id)) || [];
+      const queueConfig = targetUserIds.length > 0 ? {
+        totalUsers: targetUserIds.length,
+        processedUsers: 0,
+        currentUserIndex: 0,
+        currentUser: formattedTargetUsers?.[0] ? {
+          id: String(formattedTargetUsers[0].id),
+          name: formattedTargetUsers[0].firstName || formattedTargetUsers[0].username || String(formattedTargetUsers[0].id),
+          startTime: new Date().toISOString()
+        } : undefined,
+        completedUsers: [],
+        pendingUsers: targetUserIds.slice(1)  // 第一個已在處理，其餘待處理
+      } : undefined;
+      
       const execution: ExecutionState = {
         id: `exec_${Date.now()}`,
         status: 'planning',
         goal: userInput,
         intent,
         strategy,
-        roles,
+        roles: rolesWithAccounts,
+        mode,
+        accountMatches,
+        targetUsers: formattedTargetUsers,
+        scriptlessConfig: mode === 'scriptless' ? { ...this.defaultScriptlessConfig, enabled: true } : undefined,
+        conversionFunnel: {
+          currentStage: 'contact',
+          stageHistory: [{ stage: 'contact', enteredAt: new Date().toISOString(), messageCount: 0 }],
+          keyMoments: []
+        },
+        queue: queueConfig,  // 🆕 添加隊列
+        // 🔧 群聊協作：添加群聊配置
+        groupConfig: chatScenario === 'group' ? {
+          groupId: options?.groupId,
+          roleAccounts: options?.roleAccounts,
+          chatScenario: 'group'
+        } : undefined,
+        chatScenario,  // 🔧 群聊協作：記錄場景類型
         stats: {
           startTime: new Date().toISOString(),
           messagesSent: 0,
           responsesReceived: 0,
           currentPhase: 0,
           interestScore: 0,
-          lastAnalysis: null
+          lastAnalysis: null,
+          analysisCount: 0,
+          rolesSwitchCount: 0,
+          autoAdjustments: 0
         },
         messageHistory: []
       };
@@ -582,7 +1338,20 @@ export class DynamicScriptEngineService {
       this._currentExecution.set(execution);
       this._executions.update(list => [execution, ...list]);
       
-      this.toast.success('AI 已理解您的目標，正在策劃最佳方案...');
+      // 🔧 Phase 4: 持久化執行狀態
+      this.persistExecution(execution);
+      
+      const modeLabel = mode === 'scriptless' ? '無劇本' : mode === 'scripted' ? '劇本' : '混合';
+      const targetCount = formattedTargetUsers?.length || 0;
+      this.toast.success(`AI 已理解您的目標，${modeLabel}模式準備就緒，匹配了 ${accountMatches.length} 個帳號${targetCount > 0 ? `，目標 ${targetCount} 個用戶` : ''}`);
+      
+      // 🆕 P0: 自動開始私聊執行（如果有目標用戶）
+      if (formattedTargetUsers && formattedTargetUsers.length > 0) {
+        // 延遲一小段時間後開始，讓用戶看到成功提示
+        setTimeout(() => {
+          this.beginPrivateChatExecution(execution);
+        }, 1500);
+      }
       
       return execution;
       
@@ -639,12 +1408,17 @@ export class DynamicScriptEngineService {
         intent,
         strategy,
         roles,
+        mode: 'hybrid',
         stats: {
           startTime: new Date().toISOString(),
           messagesSent: 0,
           responsesReceived: 0,
           currentPhase: 0,
-          interestScore: 0
+          interestScore: 0,
+          lastAnalysis: null,
+          analysisCount: 0,
+          rolesSwitchCount: 0,
+          autoAdjustments: 0
         },
         // 保存原始營銷策略用於執行
         marketingData: marketingStrategy
@@ -901,6 +1675,281 @@ export class DynamicScriptEngineService {
     return suggestions;
   }
   
+  // ============ 🆕 P2: 轉化追蹤增強 ============
+  
+  /**
+   * 獲取轉化漏斗統計
+   */
+  getConversionFunnelStats(): {
+    totalExecutions: number;
+    funnelData: { stage: string; count: number; rate: number }[];
+    avgTimePerStage: Record<string, number>;
+    topKeyMoments: { trigger: string; count: number }[];
+  } {
+    const executions = this._executions();
+    
+    // 統計各階段數量
+    const stageCounts: Record<string, number> = {
+      'contact': 0,
+      'response': 0,
+      'interest': 0,
+      'intent': 0,
+      'conversion': 0
+    };
+    
+    const stageTimings: Record<string, number[]> = {
+      'contact': [],
+      'response': [],
+      'interest': [],
+      'intent': [],
+      'conversion': []
+    };
+    
+    const keyMomentCounts: Record<string, number> = {};
+    
+    for (const exec of executions) {
+      if (!exec.conversionFunnel) continue;
+      
+      // 統計最終階段
+      stageCounts[exec.conversionFunnel.currentStage]++;
+      
+      // 統計各階段停留時間
+      const history = exec.conversionFunnel.stageHistory;
+      for (let i = 0; i < history.length - 1; i++) {
+        const current = history[i];
+        const next = history[i + 1];
+        const duration = new Date(next.enteredAt).getTime() - new Date(current.enteredAt).getTime();
+        stageTimings[current.stage]?.push(duration / 1000 / 60); // 分鐘
+      }
+      
+      // 統計關鍵時刻
+      for (const moment of exec.conversionFunnel.keyMoments) {
+        keyMomentCounts[moment.trigger] = (keyMomentCounts[moment.trigger] || 0) + 1;
+      }
+    }
+    
+    // 計算漏斗轉化率
+    const stages = ['contact', 'response', 'interest', 'intent', 'conversion'];
+    const total = executions.length || 1;
+    
+    let cumulativeCount = total;
+    const funnelData = stages.map(stage => {
+      const count = stageCounts[stage];
+      const rate = Math.round((cumulativeCount / total) * 100);
+      cumulativeCount = cumulativeCount - count + stageCounts[stage];
+      return { stage, count, rate };
+    });
+    
+    // 計算平均時間
+    const avgTimePerStage: Record<string, number> = {};
+    for (const [stage, times] of Object.entries(stageTimings)) {
+      avgTimePerStage[stage] = times.length > 0 
+        ? Math.round(times.reduce((a, b) => a + b, 0) / times.length)
+        : 0;
+    }
+    
+    // 排序關鍵時刻
+    const topKeyMoments = Object.entries(keyMomentCounts)
+      .map(([trigger, count]) => ({ trigger, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    
+    return {
+      totalExecutions: executions.length,
+      funnelData,
+      avgTimePerStage,
+      topKeyMoments
+    };
+  }
+  
+  /**
+   * 記錄關鍵時刻
+   */
+  recordKeyMoment(executionId: string, message: string, trigger: string): void {
+    const execution = this._executions().find(e => e.id === executionId);
+    if (!execution || !execution.conversionFunnel) return;
+    
+    execution.conversionFunnel.keyMoments.push({
+      message,
+      trigger,
+      stage: execution.conversionFunnel.currentStage,
+      timestamp: new Date().toISOString()
+    });
+    
+    this._executions.update(list => list.map(e => e.id === executionId ? execution : e));
+    
+    if (this._currentExecution()?.id === executionId) {
+      this._currentExecution.set({ ...execution });
+    }
+    
+    console.log(`[DynamicEngine] 記錄關鍵時刻: ${trigger} - ${message.substring(0, 30)}...`);
+  }
+  
+  /**
+   * 獲取執行詳情報表
+   */
+  getExecutionReport(executionId: string): {
+    summary: {
+      goal: string;
+      mode: string;
+      duration: string;
+      messagesSent: number;
+      responsesReceived: number;
+      analysisCount: number;
+      finalInterestScore: number;
+      outcome: string;
+    };
+    rolePerformance: {
+      roleId: string;
+      roleName: string;
+      messageCount: number;
+      responseRate: number;
+    }[];
+    funnelProgress: {
+      stage: string;
+      enteredAt: string;
+      duration: string;
+    }[];
+    keyMoments: {
+      message: string;
+      trigger: string;
+      stage: string;
+      timestamp: string;
+    }[];
+    aiAdjustments: {
+      timestamp: string;
+      action: string;
+      reason: string;
+    }[];
+  } | null {
+    const execution = this._executions().find(e => e.id === executionId);
+    if (!execution) return null;
+    
+    // 計算持續時間
+    const startTime = new Date(execution.stats.startTime);
+    const endTime = execution.status === 'completed' ? new Date() : new Date();
+    const durationMs = endTime.getTime() - startTime.getTime();
+    const durationMinutes = Math.round(durationMs / 1000 / 60);
+    
+    // 角色表現統計
+    const roleMessages: Record<string, number> = {};
+    const roleResponses: Record<string, number> = {};
+    
+    for (const msg of execution.messageHistory || []) {
+      if (!msg.isFromCustomer) {
+        roleMessages[msg.role] = (roleMessages[msg.role] || 0) + 1;
+      }
+    }
+    
+    const rolePerformance = execution.roles.map(role => ({
+      roleId: role.id,
+      roleName: role.name,
+      messageCount: roleMessages[role.id] || 0,
+      responseRate: roleMessages[role.id] > 0 
+        ? Math.round((roleResponses[role.id] || 0) / roleMessages[role.id] * 100)
+        : 0
+    }));
+    
+    // 漏斗進度
+    const funnelProgress = (execution.conversionFunnel?.stageHistory || []).map((stage, i, arr) => {
+      const nextStage = arr[i + 1];
+      const duration = nextStage 
+        ? Math.round((new Date(nextStage.enteredAt).getTime() - new Date(stage.enteredAt).getTime()) / 1000 / 60)
+        : 0;
+      return {
+        stage: stage.stage,
+        enteredAt: stage.enteredAt,
+        duration: duration > 0 ? `${duration} 分鐘` : '進行中'
+      };
+    });
+    
+    // 確定結果
+    let outcome = '進行中';
+    if (execution.status === 'completed') {
+      const finalStage = execution.conversionFunnel?.currentStage;
+      if (finalStage === 'conversion') {
+        outcome = '✅ 轉化成功';
+      } else if (execution.stats.interestScore < 30) {
+        outcome = '❌ 未轉化 - 興趣度低';
+      } else {
+        outcome = '⏸️ 未轉化 - 待跟進';
+      }
+    }
+    
+    return {
+      summary: {
+        goal: execution.goal,
+        mode: execution.mode,
+        duration: durationMinutes > 60 
+          ? `${Math.floor(durationMinutes / 60)} 小時 ${durationMinutes % 60} 分鐘`
+          : `${durationMinutes} 分鐘`,
+        messagesSent: execution.stats.messagesSent,
+        responsesReceived: execution.stats.responsesReceived,
+        analysisCount: execution.stats.analysisCount,
+        finalInterestScore: execution.stats.interestScore,
+        outcome
+      },
+      rolePerformance,
+      funnelProgress,
+      keyMoments: execution.conversionFunnel?.keyMoments || [],
+      aiAdjustments: [] // TODO: 從執行歷史提取
+    };
+  }
+  
+  /**
+   * 獲取所有執行的統計摘要
+   */
+  getOverallStats(): {
+    totalExecutions: number;
+    completedExecutions: number;
+    conversionRate: number;
+    avgMessagesPerExecution: number;
+    avgInterestScore: number;
+    modeDistribution: { mode: string; count: number }[];
+    topGoals: { goal: string; count: number }[];
+  } {
+    const executions = this._executions();
+    const completed = executions.filter(e => e.status === 'completed');
+    const converted = completed.filter(e => 
+      e.conversionFunnel?.currentStage === 'conversion'
+    );
+    
+    const totalMessages = executions.reduce((sum, e) => sum + e.stats.messagesSent, 0);
+    const totalInterest = executions.reduce((sum, e) => sum + e.stats.interestScore, 0);
+    
+    // 模式分佈
+    const modeCount: Record<string, number> = {};
+    for (const e of executions) {
+      modeCount[e.mode] = (modeCount[e.mode] || 0) + 1;
+    }
+    
+    // 目標統計
+    const goalCount: Record<string, number> = {};
+    for (const e of executions) {
+      const goal = e.goal.substring(0, 20);
+      goalCount[goal] = (goalCount[goal] || 0) + 1;
+    }
+    
+    return {
+      totalExecutions: executions.length,
+      completedExecutions: completed.length,
+      conversionRate: completed.length > 0 
+        ? Math.round((converted.length / completed.length) * 100)
+        : 0,
+      avgMessagesPerExecution: executions.length > 0
+        ? Math.round(totalMessages / executions.length)
+        : 0,
+      avgInterestScore: executions.length > 0
+        ? Math.round(totalInterest / executions.length)
+        : 0,
+      modeDistribution: Object.entries(modeCount).map(([mode, count]) => ({ mode, count })),
+      topGoals: Object.entries(goalCount)
+        .map(([goal, count]) => ({ goal, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
+    };
+  }
+  
   // ============ 輔助方法 ============
   
   private extractTargetAudience(input: string): string {
@@ -1022,6 +2071,498 @@ export class DynamicScriptEngineService {
     return { nextAction, recommendedRole, topicSuggestion, toneAdjustment, reasoning };
   }
   
+  // ============ 🆕 動態分析閉環 ============
+  
+  /**
+   * P1: 執行動態分析（每 N 條消息觸發）
+   */
+  private async performDynamicAnalysis(execution: ExecutionState): Promise<void> {
+    if (!execution.messageHistory || execution.messageHistory.length === 0) return;
+    
+    console.log('[DynamicEngine] 執行動態分析...');
+    
+    // 1. 分析最近的消息
+    const recentMessages = execution.messageHistory.slice(-this.analysisInterval);
+    const analysis = await this.analyzeConversation(recentMessages);
+    
+    // 2. 更新統計
+    execution.stats.lastAnalysis = analysis;
+    execution.stats.analysisCount++;
+    execution.stats.interestScore = analysis.userProfile.readinessScore;
+    
+    // 3. 🆕 自動決策和調整
+    const adjustment = this.makeAutoAdjustment(execution, analysis);
+    
+    if (adjustment.shouldAdjust) {
+      execution.stats.autoAdjustments++;
+      
+      // 通知前端分析結果
+      this.toast.info(`📊 第 ${execution.stats.analysisCount} 次分析: ${adjustment.reason}`);
+      
+      // 發送調整指令到後端
+      this.ipc.send('ai-team:adjust-strategy', {
+        executionId: execution.id,
+        adjustment: adjustment
+      });
+    }
+    
+    // 4. 更新轉化漏斗
+    this.updateFunnelFromAnalysis(execution, analysis);
+    
+    this._currentExecution.set({ ...execution });
+    this._executions.update(list => list.map(e => e.id === execution.id ? execution : e));
+  }
+  
+  /**
+   * 自動調整決策
+   */
+  private makeAutoAdjustment(
+    execution: ExecutionState,
+    analysis: RealtimeAnalysis
+  ): { shouldAdjust: boolean; action: string; reason: string; newRole?: string; newPhase?: number } {
+    const { suggestions, userProfile } = analysis;
+    
+    // 規則 1: 興趣度高，推進到下一階段
+    if (userProfile.readinessScore > 70 && execution.strategy) {
+      const nextPhase = Math.min(
+        execution.stats.currentPhase + 1,
+        execution.strategy.phases.length - 1
+      );
+      if (nextPhase > execution.stats.currentPhase) {
+        return {
+          shouldAdjust: true,
+          action: 'advance_phase',
+          reason: `客戶興趣度 ${userProfile.readinessScore}%，推進到促單階段`,
+          newPhase: nextPhase
+        };
+      }
+    }
+    
+    // 規則 2: 情緒負面，切換到關懷角色
+    if (userProfile.sentiment === 'negative') {
+      return {
+        shouldAdjust: true,
+        action: 'switch_role',
+        reason: '客戶情緒負面，切換到關懷模式',
+        newRole: 'cs_agent'
+      };
+    }
+    
+    // 規則 3: 互動度低，換角色活躍
+    if (userProfile.engagementLevel === 'low' && execution.stats.messagesSent > 5) {
+      return {
+        shouldAdjust: true,
+        action: 'activate_atmosphere',
+        reason: '互動度低，引入活躍角色',
+        newRole: 'friendly_member'
+      };
+    }
+    
+    // 規則 4: 客戶有價格顧慮，引入專家
+    if (userProfile.objections.includes('價格顧慮')) {
+      return {
+        shouldAdjust: true,
+        action: 'handle_objection',
+        reason: '客戶有價格顧慮，引入專家處理',
+        newRole: 'sales_expert'
+      };
+    }
+    
+    return { shouldAdjust: false, action: 'continue', reason: '保持當前策略' };
+  }
+  
+  /**
+   * 根據分析更新轉化漏斗
+   */
+  private updateFunnelFromAnalysis(execution: ExecutionState, analysis: RealtimeAnalysis): void {
+    if (!execution.conversionFunnel) return;
+    
+    const { readinessScore, interests } = analysis.userProfile;
+    const currentStage = execution.conversionFunnel.currentStage;
+    
+    // 根據信號推進漏斗
+    if (currentStage === 'response' && interests.length > 0) {
+      this.updateConversionStage(execution, 'interest', '客戶表現出興趣');
+    } else if (currentStage === 'interest' && readinessScore > 60) {
+      this.updateConversionStage(execution, 'intent', '客戶有購買意向');
+    } else if (currentStage === 'intent' && readinessScore > 85) {
+      this.updateConversionStage(execution, 'conversion', '即將成交');
+    }
+  }
+  
+  /**
+   * 更新轉化階段
+   */
+  private updateConversionStage(execution: ExecutionState, newStage: string, trigger: string): void {
+    if (!execution.conversionFunnel) return;
+    
+    const messageCount = execution.messageHistory?.length || 0;
+    
+    execution.conversionFunnel.currentStage = newStage as any;
+    execution.conversionFunnel.stageHistory.push({
+      stage: newStage,
+      enteredAt: new Date().toISOString(),
+      messageCount
+    });
+    execution.conversionFunnel.keyMoments.push({
+      message: trigger,
+      trigger: `進入 ${newStage} 階段`,
+      stage: newStage,
+      timestamp: new Date().toISOString()
+    });
+    
+    console.log(`[DynamicEngine] 轉化漏斗: ${newStage}`, trigger);
+  }
+  
+  // 🆕 轉化信號關鍵詞庫
+  private conversionSignals = {
+    // 高意向信號（80分+）
+    high: ['怎麼買', '多少錢', '價格', '付款', '下單', '想買', '購買', '訂購', '付費', '支付'],
+    // 中意向信號（50-80分）
+    medium: ['有興趣', '想了解', '介紹一下', '詳細說說', '發給我', '有什麼優惠', '怎麼使用'],
+    // 正面信號（30-50分）
+    positive: ['不錯', '挺好', '有道理', '可以', '好的', '謝謝', '感謝'],
+    // 負面信號（減分）
+    negative: ['不需要', '不用了', '不感興趣', '別打擾', '取關', '拉黑', '騷擾'],
+    // 成交信號（確認轉化）
+    converted: ['買了', '已付款', '付好了', '下單了', '成交', '訂好了']
+  };
+  
+  /**
+   * 🆕 P1: 檢測轉化信號
+   */
+  private detectConversionSignal(message: string): {
+    hasSignal: boolean;
+    signalType: 'high' | 'medium' | 'positive' | 'negative' | 'converted' | null;
+    matchedKeyword: string | null;
+    score: number;
+  } {
+    const lowerMsg = message.toLowerCase();
+    
+    // 按優先級檢測
+    for (const keyword of this.conversionSignals.converted) {
+      if (lowerMsg.includes(keyword)) {
+        return { hasSignal: true, signalType: 'converted', matchedKeyword: keyword, score: 100 };
+      }
+    }
+    
+    for (const keyword of this.conversionSignals.high) {
+      if (lowerMsg.includes(keyword)) {
+        return { hasSignal: true, signalType: 'high', matchedKeyword: keyword, score: 85 };
+      }
+    }
+    
+    for (const keyword of this.conversionSignals.medium) {
+      if (lowerMsg.includes(keyword)) {
+        return { hasSignal: true, signalType: 'medium', matchedKeyword: keyword, score: 60 };
+      }
+    }
+    
+    for (const keyword of this.conversionSignals.positive) {
+      if (lowerMsg.includes(keyword)) {
+        return { hasSignal: true, signalType: 'positive', matchedKeyword: keyword, score: 40 };
+      }
+    }
+    
+    for (const keyword of this.conversionSignals.negative) {
+      if (lowerMsg.includes(keyword)) {
+        return { hasSignal: true, signalType: 'negative', matchedKeyword: keyword, score: -30 };
+      }
+    }
+    
+    return { hasSignal: false, signalType: null, matchedKeyword: null, score: 0 };
+  }
+  
+  /**
+   * 🆕 P1: 處理轉化信號
+   */
+  private handleConversionSignal(
+    execution: ExecutionState,
+    customerData: any,
+    signal: { signalType: string | null; matchedKeyword: string | null; score: number }
+  ): void {
+    console.log('[DynamicEngine] 🎯 轉化信號:', signal);
+    
+    // 記錄關鍵時刻
+    if (execution.conversionFunnel) {
+      execution.conversionFunnel.keyMoments.push({
+        message: customerData.text,
+        trigger: `${signal.signalType}: ${signal.matchedKeyword}`,
+        stage: signal.signalType || 'unknown',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // 根據信號類型處理
+    switch (signal.signalType) {
+      case 'converted':
+        // 客戶已成交
+        this.toast.success(`🎉 客戶 ${customerData.firstName || '用戶'} 已成交！`);
+        this.updateConversionStage(execution, 'conversion', customerData.text);
+        
+        // 標記當前用戶為轉化成功
+        if (this.completeCurrentUser) {
+          this.completeCurrentUser('converted');
+        }
+        break;
+        
+      case 'high':
+        // 高意向 - 發送通知，切換到銷售專家
+        this.toast.success(`🎯 高轉化信號！${customerData.firstName || '用戶'}: "${signal.matchedKeyword}"`);
+        this.updateConversionStage(execution, 'intent', customerData.text);
+        
+        // 發送前端通知
+        this.ipc.send('ai-team:conversion-signal', {
+          executionId: execution.id,
+          userId: customerData.userId,
+          userName: customerData.firstName || customerData.username,
+          signal: signal.matchedKeyword,
+          signalType: signal.signalType,
+          score: signal.score
+        });
+        break;
+        
+      case 'medium':
+        // 中意向 - 繼續跟進
+        this.updateConversionStage(execution, 'interest', customerData.text);
+        break;
+        
+      case 'positive':
+        // 正面反饋 - 更新興趣分
+        if (execution.conversionFunnel?.currentStage === 'contact') {
+          this.updateConversionStage(execution, 'response', customerData.text);
+        }
+        break;
+        
+      case 'negative':
+        // 負面反饋 - 考慮停止或切換策略
+        this.toast.warning(`⚠️ 客戶 ${customerData.firstName || '用戶'} 表達了拒絕意向`);
+        
+        // 可以考慮自動跳過此用戶
+        // this.skipCurrentUser();
+        break;
+    }
+    
+    // 更新執行狀態
+    this._currentExecution.set({ ...execution });
+  }
+  
+  /**
+   * 🆕 更新意向評分
+   */
+  private updateIntentScore(execution: ExecutionState, message: string): void {
+    const signal = this.detectConversionSignal(message);
+    if (signal.score !== 0) {
+      execution.stats.interestScore = Math.max(0, Math.min(100, 
+        (execution.stats.interestScore || 0) + signal.score
+      ));
+      this._currentExecution.set({ ...execution });
+    }
+  }
+  
+  /**
+   * 檢查轉化信號（無劇本模式）- 舊版兼容
+   */
+  private async checkConversionSignals(execution: ExecutionState, customerMessage: string): Promise<void> {
+    if (!execution.scriptlessConfig) return;
+    
+    const lowerMsg = customerMessage.toLowerCase();
+    
+    // 檢查轉化信號
+    const hasConversionSignal = execution.scriptlessConfig.targetConversionSignals.some(
+      signal => lowerMsg.includes(signal)
+    );
+    
+    if (hasConversionSignal) {
+      console.log('[DynamicEngine] 檢測到轉化信號:', customerMessage);
+      
+      execution.conversionFunnel?.keyMoments.push({
+        message: customerMessage,
+        trigger: '轉化信號',
+        stage: 'conversion_signal',
+        timestamp: new Date().toISOString()
+      });
+      
+      // 自動切換到促單角色
+      this.ipc.send('ai-team:conversion-signal', {
+        executionId: execution.id,
+        signal: customerMessage,
+        recommendedRole: 'sales_expert'
+      });
+      
+      this.toast.success('🎯 檢測到轉化信號！正在安排銷售專家跟進...');
+    }
+    
+    // 檢查成功信號
+    const hasSuccessSignal = execution.scriptlessConfig.exitConditions.successSignals.some(
+      signal => lowerMsg.includes(signal)
+    );
+    
+    if (hasSuccessSignal) {
+      console.log('[DynamicEngine] 檢測到成功信號:', customerMessage);
+      this.updateConversionStage(execution, 'conversion', customerMessage);
+      this.toast.success('🎉 恭喜！客戶已轉化成功！');
+    }
+    
+    this._currentExecution.set({ ...execution });
+  }
+  
+  // ============ 🆕 無劇本模式對話生成 ============
+  
+  /**
+   * P0: 無劇本模式 - AI 自主生成下一條對話
+   */
+  async generateScriptlessMessage(execution: ExecutionState): Promise<{
+    roleId: string;
+    roleName: string;
+    content: string;
+    reasoning: string;
+  } | null> {
+    if (execution.mode !== 'scriptless' || !execution.scriptlessConfig?.enabled) {
+      return null;
+    }
+    
+    const lastAnalysis = execution.stats.lastAnalysis;
+    const messageHistory = execution.messageHistory || [];
+    const currentPhase = execution.stats.currentPhase;
+    
+    // 選擇最適合的角色
+    const selectedRole = this.selectRoleForScriptless(execution, lastAnalysis);
+    if (!selectedRole) return null;
+    
+    // 構建 AI 生成 Prompt
+    const prompt = this.buildScriptlessPrompt(execution, selectedRole, messageHistory);
+    
+    // 調用後端 AI 生成
+    return new Promise((resolve) => {
+      this.ipc.send('ai-team:generate-scriptless-message', {
+        executionId: execution.id,
+        roleId: selectedRole.id,
+        roleName: selectedRole.name,
+        rolePersonality: selectedRole.personality,
+        roleSpeakingStyle: selectedRole.speakingStyle,
+        prompt,
+        context: {
+          goal: execution.goal,
+          intent: execution.intent,
+          messageCount: messageHistory.length,
+          interestScore: execution.stats.interestScore,
+          currentStage: execution.conversionFunnel?.currentStage
+        }
+      });
+      
+      // 監聽生成結果
+      this.ipc.once('ai-team:scriptless-message-generated', (data: any) => {
+        if (data.executionId === execution.id) {
+          resolve({
+            roleId: selectedRole.id,
+            roleName: selectedRole.name,
+            content: data.content,
+            reasoning: data.reasoning || '根據上下文自動生成'
+          });
+        } else {
+          resolve(null);
+        }
+      });
+      
+      // 超時處理
+      setTimeout(() => resolve(null), 30000);
+    });
+  }
+  
+  /**
+   * 為無劇本模式選擇角色
+   */
+  private selectRoleForScriptless(
+    execution: ExecutionState,
+    analysis: RealtimeAnalysis | null | undefined
+  ): RecommendedRole | null {
+    if (execution.roles.length === 0) return null;
+    
+    // 根據分析建議選擇角色
+    if (analysis?.suggestions.recommendedRole) {
+      const recommended = execution.roles.find(r => r.id === analysis.suggestions.recommendedRole);
+      if (recommended) return recommended;
+    }
+    
+    // 避免連續使用同一個角色（最多 3 條）
+    const recentRoles = (execution.messageHistory || [])
+      .slice(-3)
+      .filter(m => !m.isFromCustomer)
+      .map(m => m.role);
+    
+    const lastRole = recentRoles[recentRoles.length - 1];
+    const sameRoleCount = recentRoles.filter(r => r === lastRole).length;
+    
+    if (sameRoleCount >= 3) {
+      // 換一個角色
+      const otherRoles = execution.roles.filter(r => r.id !== lastRole);
+      if (otherRoles.length > 0) {
+        return otherRoles[Math.floor(Math.random() * otherRoles.length)];
+      }
+    }
+    
+    // 根據轉化階段選擇
+    const stage = execution.conversionFunnel?.currentStage;
+    if (stage === 'interest' || stage === 'intent') {
+      const expert = execution.roles.find(r => r.type === 'professional');
+      if (expert) return expert;
+    }
+    
+    // 默認返回第一個角色
+    return execution.roles[0];
+  }
+  
+  /**
+   * 構建無劇本模式 Prompt
+   */
+  private buildScriptlessPrompt(
+    execution: ExecutionState,
+    role: RecommendedRole,
+    messageHistory: { role: string; content: string; isFromCustomer: boolean }[]
+  ): string {
+    const recentMessages = messageHistory.slice(-20);
+    const historyText = recentMessages.map(m => 
+      `${m.isFromCustomer ? '【客戶】' : `【${m.role}】`}: ${m.content}`
+    ).join('\n');
+    
+    const stage = execution.conversionFunnel?.currentStage || 'contact';
+    const stageGoals: Record<string, string> = {
+      'contact': '建立聯繫，自然開場',
+      'response': '保持互動，了解需求',
+      'interest': '深入介紹，強調價值',
+      'intent': '處理異議，推動決策',
+      'conversion': '促成成交，確認訂單'
+    };
+    
+    return `你是 ${role.name}，${role.personality}。
+
+【說話風格】
+${role.speakingStyle}
+
+【當前目標】
+${execution.goal}
+
+【當前階段】
+${stage} - ${stageGoals[stage] || '繼續對話'}
+
+【客戶興趣度】
+${execution.stats.interestScore}/100
+
+【對話歷史】
+${historyText || '（暫無對話）'}
+
+【任務】
+作為 ${role.name}，根據上下文生成一條自然的回覆。
+- 保持角色人設
+- 推進對話目標
+- 不要生硬推銷
+- 像真人聊天一樣自然
+- 單條消息不超過 100 字
+
+請直接輸出消息內容，不要有任何前綴或解釋：`;
+  }
+  
   // ============ 執行控制 ============
   
   /**
@@ -1044,10 +2585,235 @@ export class DynamicScriptEngineService {
   }
   
   /**
-   * 啟動後端 AI 執行任務
+   * 🆕 P0: 開始私聊轉化執行
+   * 自動發送首條消息給目標用戶
+   * 🔧 Phase 7: 修復為並行發送給所有目標用戶
+   */
+  beginPrivateChatExecution(execution: ExecutionState): void {
+    if (!execution.targetUsers || execution.targetUsers.length === 0) {
+      this.toast.warning('沒有目標用戶，無法開始私聊');
+      return;
+    }
+    
+    // 更新執行狀態為運行中
+    execution.status = 'running';
+    this._currentExecution.set({ ...execution });
+    
+    console.log('[DynamicEngine] 🚀 開始私聊執行:', {
+      executionId: execution.id,
+      targetUsers: execution.targetUsers.length,
+      mode: execution.mode,
+      roles: execution.roles?.length
+    });
+    
+    // 啟動後端執行
+    this.startBackendExecution(execution);
+    
+    // 🔧 Phase 7: 並行發送首條消息給所有目標用戶
+    this.sendFirstMessageToAllUsers(execution);
+    
+    this.toast.success(`🚀 開始私聊轉化！目標：${execution.targetUsers.length} 人`);
+  }
+  
+  /**
+   * 🔧 Phase 7: 並行發送首條消息給所有目標用戶
+   */
+  private async sendFirstMessageToAllUsers(execution: ExecutionState): Promise<void> {
+    const targetUsers = execution.targetUsers || [];
+    const accountMatches = execution.accountMatches || [];
+    
+    if (targetUsers.length === 0) {
+      console.log('[DynamicEngine] 無目標用戶');
+      return;
+    }
+    
+    if (accountMatches.length === 0) {
+      this.toast.error('無可用帳號發送消息');
+      return;
+    }
+    
+    console.log(`[DynamicEngine] 🔄 並行發送首條消息給 ${targetUsers.length} 個目標用戶`);
+    
+    // 為每個目標用戶發送消息（使用不同帳號輪換）
+    for (let i = 0; i < targetUsers.length; i++) {
+      const targetUser = targetUsers[i];
+      // 輪換使用帳號
+      const accountMatch = accountMatches[i % accountMatches.length];
+      
+      const userName = targetUser.firstName || targetUser.username || targetUser.id;
+      console.log(`[DynamicEngine] 📤 發送給用戶 ${i + 1}/${targetUsers.length}: ${userName}`);
+      
+      // 生成並發送首條消息
+      this.sendFirstMessageToUser(execution, targetUser, accountMatch, i);
+      
+      // 短暫延遲避免 Telegram 限制（100-300ms）
+      if (i < targetUsers.length - 1) {
+        await new Promise(r => setTimeout(r, 100 + Math.random() * 200));
+      }
+    }
+    
+    this.toast.info(`📤 已發送首條消息給 ${targetUsers.length} 個目標用戶`);
+  }
+  
+  /**
+   * 🔧 Phase 7: 發送首條消息給指定用戶
+   */
+  private async sendFirstMessageToUser(
+    execution: ExecutionState,
+    targetUser: any,
+    accountMatch: any,
+    userIndex: number
+  ): Promise<void> {
+    const userName = targetUser.firstName || targetUser.username || targetUser.id;
+    const targetUserId = targetUser.telegramId || targetUser.id;
+    
+    // 生成首條消息
+    const firstMessage = await this.generateFirstTouchMessage(execution, {
+      id: targetUserId,
+      name: userName
+    });
+    
+    if (firstMessage) {
+      // 發送到後端執行實際的私聊發送
+      this.ipc.send('ai-team:send-private-message', {
+        executionId: execution.id,
+        accountId: accountMatch.accountId,
+        accountPhone: accountMatch.accountPhone,
+        roleId: accountMatch.roleId,
+        roleName: accountMatch.roleName,
+        targetUserId: targetUserId,
+        targetUserName: userName,
+        content: firstMessage,
+        isFirstTouch: true,
+        userIndex: userIndex
+      });
+      
+      // 記錄到消息歷史
+      if (!execution.messageHistory) execution.messageHistory = [];
+      execution.messageHistory.push({
+        role: accountMatch.roleName,
+        content: firstMessage,
+        timestamp: new Date().toISOString(),
+        isFromCustomer: false
+      });
+      
+      execution.stats.messagesSent++;
+      this._currentExecution.set({ ...execution });
+      
+      console.log(`[DynamicEngine] ✓ 首條消息已發送給 ${userName}:`, firstMessage.substring(0, 50) + '...');
+    }
+  }
+  
+  /**
+   * 🆕 P0: 發送首條觸達消息
+   */
+  private async sendFirstMessage(execution: ExecutionState): Promise<void> {
+    const currentUser = execution.queue?.currentUser;
+    if (!currentUser) {
+      console.log('[DynamicEngine] 無當前目標用戶');
+      return;
+    }
+    
+    // 選擇第一個角色（通常是客戶經理）發送首條消息
+    const firstRole = execution.roles?.[0];
+    const firstMatch = execution.accountMatches?.find(m => m.roleId === firstRole?.id) || execution.accountMatches?.[0];
+    
+    if (!firstMatch) {
+      this.toast.error('無可用帳號發送消息');
+      return;
+    }
+    
+    // 生成首條消息
+    const firstMessage = await this.generateFirstTouchMessage(execution, currentUser);
+    
+    if (firstMessage) {
+      // 發送到後端執行實際的私聊發送
+      this.ipc.send('ai-team:send-private-message', {
+        executionId: execution.id,
+        accountId: firstMatch.accountId,
+        accountPhone: firstMatch.accountPhone,
+        roleId: firstMatch.roleId,
+        roleName: firstMatch.roleName,
+        targetUserId: currentUser.id,
+        targetUserName: currentUser.name,
+        content: firstMessage,
+        isFirstTouch: true
+      });
+      
+      // 記錄到消息歷史
+      if (!execution.messageHistory) execution.messageHistory = [];
+      execution.messageHistory.push({
+        role: firstMatch.roleName,
+        content: firstMessage,
+        timestamp: new Date().toISOString(),
+        isFromCustomer: false
+      });
+      
+      execution.stats.messagesSent++;
+      this._currentExecution.set({ ...execution });
+      
+      console.log('[DynamicEngine] 首條消息已發送:', firstMessage.substring(0, 50) + '...');
+    }
+  }
+  
+  /**
+   * 🆕 P0: 生成首次觸達消息
+   */
+  private async generateFirstTouchMessage(
+    execution: ExecutionState,
+    targetUser: { id: string; name: string }
+  ): Promise<string | null> {
+    // 如果有營銷數據中的模板，使用模板
+    if (execution.marketingData?.messageTemplates?.firstTouch) {
+      return execution.marketingData.messageTemplates.firstTouch
+        .replace('{name}', targetUser.name)
+        .replace('{goal}', execution.goal);
+    }
+    
+    // 否則使用 AI 生成
+    return new Promise((resolve) => {
+      const prompt = `你是一個專業的客戶經理，需要主動聯繫一位潛在客戶。
+
+目標：${execution.goal}
+客戶名稱：${targetUser.name}
+
+請生成一條簡短、友好、自然的首次問候消息。要求：
+1. 不要太銷售化，像朋友一樣打招呼
+2. 可以提及對方可能感興趣的話題
+3. 簡短（1-2句話）
+4. 引起對方回覆的興趣
+
+直接輸出消息內容：`;
+
+      this.ipc.send('ai:generate-text', {
+        prompt,
+        maxTokens: 100,
+        callback: 'ai-team:first-message-generated'
+      });
+      
+      // 設置超時，如果 AI 沒響應則使用默認模板
+      const timeout = setTimeout(() => {
+        const defaultMessage = `您好！我是${execution.roles?.[0]?.name || '客戶經理'}，注意到您可能對我們的服務感興趣，方便聊聊嗎？`;
+        resolve(defaultMessage);
+      }, 5000);
+      
+      // 監聽一次性響應
+      const cleanup = this.ipc.on('ai-team:first-message-generated', (data: { text: string }) => {
+        clearTimeout(timeout);
+        cleanup();
+        resolve(data.text || `您好！請問有什麼可以幫您的嗎？`);
+      });
+    });
+  }
+  
+  /**
+   * 啟動後端 AI 執行任務（增強版）
    */
   private startBackendExecution(execution: ExecutionState): void {
-    console.log('[DynamicEngine] 啟動後端執行:', execution.id);
+    console.log('[DynamicEngine] 啟動後端執行:', execution.id, '模式:', execution.mode);
+    console.log('[DynamicEngine] 🔍 調試 - roles:', execution.roles?.length, execution.roles);
+    console.log('[DynamicEngine] 🔍 調試 - accountMatches:', execution.accountMatches?.length, execution.accountMatches);
+    console.log('[DynamicEngine] 🔍 調試 - targetUsers:', execution.targetUsers?.length);
     
     // 發送到後端開始 AI 團隊執行
     this.ipc.send('ai-team:start-execution', {
@@ -1056,11 +2822,42 @@ export class DynamicScriptEngineService {
       intent: execution.intent,
       strategy: execution.strategy,
       roles: execution.roles,
-      marketingData: execution.marketingData
+      marketingData: execution.marketingData,
+      // 🆕 新增參數
+      mode: execution.mode,
+      accountMatches: execution.accountMatches,
+      scriptlessConfig: execution.scriptlessConfig,
+      analysisInterval: this.analysisInterval,
+      targetUsers: execution.targetUsers  // 🆕 目標用戶列表
     });
     
     // 監聽執行進度更新
     this.setupExecutionListeners(execution.id);
+    
+    // 🆕 無劇本模式：啟動自動對話生成循環
+    if (execution.mode === 'scriptless') {
+      this.startScriptlessLoop(execution);
+    }
+  }
+  
+  /**
+   * 🆕 啟動無劇本模式對話循環
+   */
+  private async startScriptlessLoop(execution: ExecutionState): Promise<void> {
+    console.log('[DynamicEngine] 啟動無劇本模式對話循環');
+    
+    // 生成第一條消息
+    const firstMessage = await this.generateScriptlessMessage(execution);
+    if (firstMessage) {
+      this.ipc.send('ai-team:send-scriptless-message', {
+        executionId: execution.id,
+        roleId: firstMessage.roleId,
+        content: firstMessage.content
+      });
+      
+      execution.stats.messagesSent++;
+      this._currentExecution.set({ ...execution });
+    }
   }
   
   /**
@@ -1103,6 +2900,154 @@ export class DynamicScriptEngineService {
         this.toast.success(`🎉 任務完成！發送 ${data.totalSent} 條消息，收到 ${data.totalResponses} 個回覆`);
       }
     });
+    
+    // 🆕 監聽客戶回覆（增強版：含轉化信號檢測）
+    this.ipc.on('ai-team:customer-reply', async (data: any) => {
+      if (data.executionId === executionId) {
+        console.log('[DynamicEngine] 收到客戶回覆:', data.firstName, data.text?.substring(0, 50));
+        
+        // 更新統計
+        this.updateExecutionStats(executionId, {
+          responsesReceived: data.totalResponses
+        });
+        
+        // 添加到消息歷史
+        const execution = this._currentExecution();
+        if (execution) {
+          if (!execution.messageHistory) execution.messageHistory = [];
+          execution.messageHistory.push({
+            role: 'customer',
+            content: data.text,
+            timestamp: new Date().toISOString(),
+            isFromCustomer: true
+          });
+          this._currentExecution.set({ ...execution });
+          
+          // 🆕 P1: 檢測轉化信號
+          const signalResult = this.detectConversionSignal(data.text);
+          if (signalResult.hasSignal) {
+            this.handleConversionSignal(execution, data, signalResult);
+          }
+          
+          // 🆕 更新意向評分
+          this.updateIntentScore(execution, data.text);
+        }
+        
+        this.toast.info(`💬 客戶 ${data.firstName || data.username} 回覆了消息`);
+      }
+    });
+    
+    // 🆕 監聽觸發下一條消息的事件（增強版：私聊 + 角色切換 + 擬人化延遲）
+    this.ipc.on('ai-team:trigger-next-message', async (data: any) => {
+      if (data.executionId === executionId) {
+        console.log('[DynamicEngine] 觸發下一條消息:', data.customerName);
+        
+        const execution = this._currentExecution();
+        if (!execution || execution.status !== 'running') return;
+        
+        // 劇本模式跳過自動生成
+        if (execution.mode === 'scripted') return;
+        
+        // 🆕 添加擬人化延遲（15-45秒隨機，模擬思考和打字時間）
+        const thinkDelay = 15000 + Math.random() * 30000;
+        console.log(`[DynamicEngine] 擬人化延遲 ${(thinkDelay / 1000).toFixed(1)} 秒後回覆`);
+        
+        await new Promise(resolve => setTimeout(resolve, thinkDelay));
+        
+        // 再次檢查狀態（可能已被暫停）
+        const currentExec = this._currentExecution();
+        if (!currentExec || currentExec.status !== 'running') return;
+        
+        // 執行動態分析（如果達到間隔）
+        const messageCount = currentExec.messageHistory?.length || 0;
+        if (messageCount > 0 && messageCount % this.analysisInterval === 0) {
+          await this.performDynamicAnalysis(currentExec);
+        }
+        
+        // 🆕 智能選擇角色（基於對話內容）
+        const selectedRole = this.selectRoleForAutoReply(currentExec, data.customerMessage);
+        const match = currentExec.accountMatches?.find(m => m.roleId === selectedRole?.id) || currentExec.accountMatches?.[0];
+        
+        if (!match) {
+          console.log('[DynamicEngine] 無可用帳號發送回覆');
+          return;
+        }
+        
+        // 生成回覆消息
+        const nextMessage = await this.generateScriptlessMessage(currentExec);
+        
+        if (nextMessage) {
+          // 🆕 使用私聊發送
+          this.ipc.send('ai-team:send-private-message', {
+            executionId: currentExec.id,
+            accountId: match.accountId,
+            accountPhone: match.accountPhone,
+            roleId: match.roleId,
+            roleName: match.roleName,
+            targetUserId: data.customerId,
+            targetUserName: data.customerName,
+            content: nextMessage.content,
+            isFirstTouch: false
+          });
+          
+          // 記錄到消息歷史
+          if (!currentExec.messageHistory) currentExec.messageHistory = [];
+          currentExec.messageHistory.push({
+            role: match.roleName,
+            content: nextMessage.content,
+            timestamp: new Date().toISOString(),
+            isFromCustomer: false
+          });
+          
+          currentExec.stats.messagesSent++;
+          this._currentExecution.set({ ...currentExec });
+        }
+      }
+    });
+    
+    // 🆕 監聽私聊消息發送成功
+    this.ipc.on('ai-team:private-message-sent', (data: any) => {
+      if (data.executionId === executionId && data.success) {
+        console.log('[DynamicEngine] ✅ 私聊發送成功:', data.targetUserName);
+      }
+    });
+  }
+  
+  /**
+   * 🆕 智能選擇回覆角色
+   */
+  private selectRoleForAutoReply(
+    execution: ExecutionState,
+    customerMessage?: string
+  ): RecommendedRole | undefined {
+    const roles = execution.roles || [];
+    if (roles.length === 0) return undefined;
+    if (roles.length === 1) return roles[0];
+    
+    const lowerMsg = customerMessage?.toLowerCase() || '';
+    
+    // 價格/購買相關 → 服務專員
+    if (lowerMsg.includes('多少錢') || lowerMsg.includes('價格') || lowerMsg.includes('買') || lowerMsg.includes('付款')) {
+      return roles.find(r => r.name.includes('服務') || r.name.includes('專員')) || roles[0];
+    }
+    
+    // 專業問題 → 方案專家
+    if (lowerMsg.includes('怎麼') || lowerMsg.includes('如何') || lowerMsg.includes('什麼')) {
+      return roles.find(r => r.name.includes('專家') || r.name.includes('顧問')) || roles[0];
+    }
+    
+    // 輪換角色，避免連續使用同一角色
+    const recentRoles = (execution.messageHistory || [])
+      .filter(m => !m.isFromCustomer)
+      .slice(-3)
+      .map(m => m.role);
+    
+    const lastRole = recentRoles[recentRoles.length - 1];
+    const availableRoles = roles.filter(r => r.name !== lastRole);
+    
+    return availableRoles.length > 0 
+      ? availableRoles[Math.floor(Math.random() * availableRoles.length)]
+      : roles[0];
   }
   
   /**
@@ -1153,5 +3098,131 @@ export class DynamicScriptEngineService {
     }
     
     return true;
+  }
+  
+  // ============ 🆕 任務隊列管理 ============
+  
+  /**
+   * 標記當前用戶完成並移動到下一個
+   */
+  completeCurrentUser(result: 'converted' | 'interested' | 'neutral' | 'rejected' | 'no_response'): boolean {
+    const execution = this._currentExecution();
+    if (!execution?.queue?.currentUser) return false;
+    
+    const currentUser = execution.queue.currentUser;
+    const startTime = new Date(currentUser.startTime).getTime();
+    const duration = Math.round((Date.now() - startTime) / 1000);
+    
+    // 添加到已完成列表
+    execution.queue.completedUsers.push({
+      id: currentUser.id,
+      name: currentUser.name,
+      result,
+      messagesExchanged: execution.messageHistory?.length || 0,
+      duration
+    });
+    
+    execution.queue.processedUsers++;
+    
+    // 通知後端
+    this.ipc.send('ai-team:user-completed', {
+      executionId: execution.id,
+      userId: currentUser.id,
+      result,
+      duration
+    });
+    
+    // 移動到下一個用戶
+    return this.moveToNextUser();
+  }
+  
+  /**
+   * 移動到隊列中的下一個用戶
+   */
+  moveToNextUser(): boolean {
+    const execution = this._currentExecution();
+    if (!execution?.queue || !execution.targetUsers) return false;
+    
+    const nextUserId = execution.queue.pendingUsers.shift();
+    if (!nextUserId) {
+      // 隊列已完成
+      this.toast.success(`🎉 所有 ${execution.queue.totalUsers} 個目標用戶處理完畢！`);
+      execution.queue.currentUser = undefined;
+      this._currentExecution.set({ ...execution });
+      
+      // 發送完成事件
+      this.ipc.send('ai-team:queue-completed', {
+        executionId: execution.id,
+        stats: {
+          total: execution.queue.totalUsers,
+          completed: execution.queue.completedUsers.length,
+          results: this.calculateQueueResults(execution.queue.completedUsers)
+        }
+      });
+      
+      return false;
+    }
+    
+    // 找到下一個用戶
+    const nextUser = execution.targetUsers.find(u => String(u.id) === nextUserId);
+    if (!nextUser) return false;
+    
+    execution.queue.currentUserIndex++;
+    execution.queue.currentUser = {
+      id: nextUserId,
+      name: nextUser.firstName || nextUser.username || nextUserId,
+      startTime: new Date().toISOString()
+    };
+    
+    // 清空消息歷史（新用戶）
+    execution.messageHistory = [];
+    execution.conversionFunnel = {
+      currentStage: 'contact',
+      stageHistory: [{ stage: 'contact', enteredAt: new Date().toISOString(), messageCount: 0 }],
+      keyMoments: []
+    };
+    
+    this._currentExecution.set({ ...execution });
+    
+    // 通知後端開始處理新用戶
+    this.ipc.send('ai-team:next-user', {
+      executionId: execution.id,
+      userId: nextUserId,
+      userName: execution.queue.currentUser.name,
+      userIndex: execution.queue.currentUserIndex,
+      remaining: execution.queue.pendingUsers.length
+    });
+    
+    this.toast.info(`📋 開始處理第 ${execution.queue.currentUserIndex + 1}/${execution.queue.totalUsers} 個用戶：${execution.queue.currentUser.name}`);
+    
+    return true;
+  }
+  
+  /**
+   * 跳過當前用戶
+   */
+  skipCurrentUser(): boolean {
+    return this.completeCurrentUser('no_response');
+  }
+  
+  /**
+   * 計算隊列結果統計
+   */
+  private calculateQueueResults(completedUsers: { result: string }[]): { [key: string]: number } {
+    const results: { [key: string]: number } = {
+      converted: 0,
+      interested: 0,
+      neutral: 0,
+      rejected: 0,
+      no_response: 0
+    };
+    
+    completedUsers.forEach(u => {
+      if (results[u.result] !== undefined) {
+        results[u.result]++;
+      }
+    });
+    
+    return results;
   }
 }

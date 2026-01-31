@@ -235,6 +235,7 @@ class MemberExtractionService:
         limit: int = None,
         filter_bots: bool = True,
         filter_offline: bool = False,
+        online_status: str = 'all',  # 🔧 添加在線狀態過濾
         save_to_db: bool = True
     ) -> Dict[str, Any]:
         """
@@ -246,6 +247,7 @@ class MemberExtractionService:
             limit: 提取數量限制
             filter_bots: 是否過濾 Bot
             filter_offline: 是否過濾長期離線用戶
+            online_status: 在線狀態過濾 ('all', 'online', 'recently', 'offline')
             save_to_db: 是否保存到數據庫
             
         Returns:
@@ -306,10 +308,29 @@ class MemberExtractionService:
                         continue
                     
                     # 分析在線狀態
-                    online_status, last_online, activity_score = self._analyze_online_status(user)
+                    user_online_status, last_online, activity_score = self._analyze_online_status(user)
                     
-                    # 過濾長期離線
-                    if filter_offline and online_status in [OnlineStatus.LONG_AGO.value]:
+                    # 🔧 修復：根據 online_status 參數過濾
+                    # online_status: 'all', 'online', 'recently', 'offline'
+                    if online_status == 'online':
+                        # 只要在線用戶
+                        if user_online_status != OnlineStatus.ONLINE.value:
+                            result['filtered_offline'] += 1
+                            continue
+                    elif online_status == 'recently':
+                        # 只要最近活躍用戶（在線或最近上線）
+                        if user_online_status not in [OnlineStatus.ONLINE.value, OnlineStatus.RECENTLY.value]:
+                            result['filtered_offline'] += 1
+                            continue
+                    elif online_status == 'offline':
+                        # 只要離線用戶
+                        if user_online_status == OnlineStatus.ONLINE.value:
+                            result['filtered_offline'] += 1
+                            continue
+                    # 'all' 不過濾
+                    
+                    # 過濾長期離線（舊邏輯，作為額外過濾）
+                    if filter_offline and user_online_status in [OnlineStatus.LONG_AGO.value]:
                         result['filtered_offline'] += 1
                         continue
                     
@@ -349,8 +370,8 @@ class MemberExtractionService:
                         chat_member_status=member_status,
                         joined_date=joined_date,
                         
-                        # 狀態信息
-                        online_status=online_status,
+                        # 狀態信息 - 🔧 修復：使用 user_online_status
+                        online_status=user_online_status,
                         last_online=last_online,
                         is_bot=user.is_bot,
                         is_premium=getattr(user, 'is_premium', False) or False,
@@ -369,10 +390,10 @@ class MemberExtractionService:
                     
                     members.append(extracted)
                     
-                    # 統計在線狀態
-                    if online_status == OnlineStatus.ONLINE.value:
+                    # 統計在線狀態 - 🔧 修復：使用 user_online_status
+                    if user_online_status == OnlineStatus.ONLINE.value:
                         result['online_count'] += 1
-                    elif online_status == OnlineStatus.RECENTLY.value:
+                    elif user_online_status == OnlineStatus.RECENTLY.value:
                         result['recently_count'] += 1
                     
                     batch_count += 1
@@ -552,6 +573,22 @@ class MemberExtractionService:
                 result['error_details'] = {
                     'reason': '群組限制了成員列表訪問',
                     'suggestion': '可嘗試監控消息收集用戶'
+                }
+            elif 'USERNAME_NOT_OCCUPIED' in error_str:
+                # 🔧 FIX: 處理私有群組（無 username）的情況
+                result['error'] = '無法解析群組：這是私有群組或 username 無效'
+                result['error_code'] = 'USERNAME_NOT_OCCUPIED'
+                result['error_details'] = {
+                    'reason': '此群組可能是通過邀請鏈接加入的私有群組，沒有公開的 username',
+                    'suggestion': '請嘗試手動打開此群組，系統會自動獲取其 Telegram ID',
+                    'needs_telegram_id': True
+                }
+            elif 'INVITE_HASH_INVALID' in error_str or 'INVITE_HASH_EXPIRED' in error_str:
+                result['error'] = '邀請鏈接無效或已過期'
+                result['error_code'] = 'INVITE_INVALID'
+                result['error_details'] = {
+                    'reason': '邀請鏈接可能已過期或被撤銷',
+                    'suggestion': '請獲取新的邀請鏈接'
                 }
             else:
                 result['error'] = error_str

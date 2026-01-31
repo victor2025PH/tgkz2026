@@ -2,508 +2,649 @@
  * A/B 測試服務
  * A/B Testing Service
  * 
+ * 🆕 P5 階段：高級功能擴展
+ * 
  * 功能：
- * 1. 創建和管理 A/B 測試
- * 2. 自動分配變體
- * 3. 統計和分析結果
- * 4. 確定勝出方案
+ * - 創建和管理實驗
+ * - 變體分配
+ * - 效果統計
+ * - 自動優勝選擇
  */
 
 import { Injectable, signal, computed, inject } from '@angular/core';
-import { ElectronIpcService } from '../electron-ipc.service';
-import { ToastService } from '../toast.service';
+import { StatePersistenceService } from './state-persistence.service';
 
-// A/B 測試狀態
-export type ABTestStatus = 'draft' | 'running' | 'paused' | 'completed' | 'archived';
+// ============ 類型定義 ============
 
-// 變體類型
-export interface ABVariant {
-  id: string;
-  name: string;              // 如 "A", "B", "C"
-  content: string;           // 消息內容
-  weight: number;            // 分配權重 (0-100)
-  
-  // 統計數據
-  stats: {
-    sent: number;            // 已發送
-    delivered: number;       // 已送達
-    opened: number;          // 已打開（如可追蹤）
-    replied: number;         // 已回覆
-    converted: number;       // 已轉化
-    
-    // 計算指標
-    deliveryRate: number;    // 送達率
-    replyRate: number;       // 回覆率
-    conversionRate: number;  // 轉化率
-  };
-}
+/** 實驗狀態 */
+export type ExperimentStatus = 'draft' | 'running' | 'paused' | 'completed' | 'archived';
 
-// A/B 測試
-export interface ABTest {
+/** 變體類型 */
+export interface Variant {
   id: string;
   name: string;
   description?: string;
-  status: ABTestStatus;
-  
-  // 測試設置
-  templateId?: string;       // 關聯的模板 ID
-  targetAudience?: string;   // 目標受眾描述
-  sampleSize: number;        // 目標樣本量
-  confidenceLevel: number;   // 置信度 (如 95)
+  weight: number;           // 分配權重 (0-100)
+  config: Record<string, any>;  // 變體配置
+}
+
+/** 實驗定義 */
+export interface Experiment {
+  id: string;
+  name: string;
+  description?: string;
+  status: ExperimentStatus;
   
   // 變體
-  variants: ABVariant[];
+  variants: Variant[];
+  controlVariantId: string;  // 對照組
   
-  // 結果
-  winner?: string;           // 勝出變體 ID
-  winnerConfidence?: number; // 勝出置信度
+  // 目標
+  primaryMetric: MetricType;
+  secondaryMetrics?: MetricType[];
   
   // 時間
-  createdAt: string;
-  startedAt?: string;
-  completedAt?: string;
+  createdAt: Date;
+  startedAt?: Date;
+  endedAt?: Date;
   
-  // 備註
-  notes?: string;
+  // 配置
+  sampleSize?: number;       // 目標樣本量
+  minRunDays?: number;       // 最小運行天數
+  confidenceLevel?: number;  // 置信度 (0.9-0.99)
+  
+  // 結果
+  winner?: string;           // 優勝變體 ID
+  autoSelectWinner?: boolean;
 }
 
-// A/B 測試創建請求
-export interface CreateABTestRequest {
-  name: string;
-  description?: string;
-  variants: {
-    name: string;
-    content: string;
-    weight?: number;
-  }[];
-  sampleSize?: number;
-  confidenceLevel?: number;
+/** 指標類型 */
+export type MetricType = 
+  | 'conversion_rate'    // 轉化率
+  | 'response_rate'      // 回覆率
+  | 'avg_interest_score' // 平均興趣度
+  | 'avg_message_count'  // 平均消息數
+  | 'revenue'            // 收入
+  | 'engagement_time';   // 互動時長
+
+/** 變體統計 */
+export interface VariantStats {
+  variantId: string;
+  sampleSize: number;
+  
+  // 核心指標
+  conversions: number;
+  conversionRate: number;
+  
+  // 其他指標
+  totalRevenue: number;
+  avgInterestScore: number;
+  avgResponseTime: number;
+  avgMessageCount: number;
+  
+  // 統計顯著性
+  pValue?: number;
+  confidenceInterval?: [number, number];
+  isSignificant?: boolean;
+  
+  // 相對提升
+  uplift?: number;  // 相對對照組的提升
 }
+
+/** 實驗結果 */
+export interface ExperimentResult {
+  experimentId: string;
+  variantStats: VariantStats[];
+  overallSampleSize: number;
+  runDays: number;
+  hasSignificantWinner: boolean;
+  recommendedWinner?: string;
+  recommendation: string;
+}
+
+/** 用戶分配記錄 */
+interface UserAssignment {
+  experimentId: string;
+  variantId: string;
+  assignedAt: Date;
+}
+
+// ============ 服務實現 ============
 
 @Injectable({
   providedIn: 'root'
 })
 export class ABTestingService {
-  private ipc = inject(ElectronIpcService);
-  private toast = inject(ToastService);
+  private persistence = inject(StatePersistenceService);
   
-  // 所有測試
-  private _tests = signal<ABTest[]>([]);
-  tests = this._tests.asReadonly();
+  // 實驗列表
+  private _experiments = signal<Experiment[]>([]);
+  experiments = this._experiments.asReadonly();
   
-  // 活躍測試
-  activeTests = computed(() => 
-    this._tests().filter(t => t.status === 'running')
+  // 變體統計
+  private _variantStats = signal<Map<string, VariantStats[]>>(new Map());
+  
+  // 用戶分配
+  private _userAssignments = signal<Map<string, UserAssignment>>(new Map());
+  
+  // 活躍實驗
+  activeExperiments = computed(() => 
+    this._experiments().filter(e => e.status === 'running')
   );
   
-  // 已完成測試
-  completedTests = computed(() =>
-    this._tests().filter(t => t.status === 'completed')
+  // 🔧 兼容舊版：activeTests 別名
+  activeTests = this.activeExperiments;
+  
+  // 已完成實驗
+  completedExperiments = computed(() => 
+    this._experiments().filter(e => e.status === 'completed')
   );
   
-  // 當前選中的測試
-  private _selectedTest = signal<ABTest | null>(null);
-  selectedTest = this._selectedTest.asReadonly();
-  
-  // 統計
+  // 🔧 兼容舊版：統計信號
   stats = computed(() => {
-    const tests = this._tests();
+    const experiments = this._experiments();
+    const completed = this.completedExperiments();
+    
+    // 計算平均提升
+    let totalLift = 0;
+    let liftCount = 0;
+    
+    completed.forEach(exp => {
+      const result = this.getExperimentResult(exp.id);
+      if (result?.recommendedWinner) {
+        const winnerStats = result.variantStats.find(s => s.variantId === result.recommendedWinner);
+        if (winnerStats?.uplift) {
+          totalLift += winnerStats.uplift;
+          liftCount++;
+        }
+      }
+    });
+    
     return {
-      total: tests.length,
-      running: tests.filter(t => t.status === 'running').length,
-      completed: tests.filter(t => t.status === 'completed').length,
-      avgConversionLift: this.calculateAvgConversionLift(tests)
+      total: experiments.length,
+      running: this.activeExperiments().length,
+      completed: completed.length,
+      draft: experiments.filter(e => e.status === 'draft').length,
+      avgConversionLift: liftCount > 0 ? totalLift / liftCount : 0
     };
   });
   
+  private readonly STORAGE_KEY = 'abTesting';
+  
   constructor() {
-    this.loadTests();
-    this.setupIpcListeners();
+    this.loadFromStorage();
   }
   
-  /**
-   * 設置 IPC 監聽器
-   */
-  private setupIpcListeners() {
-    // 監聽消息發送結果
-    this.ipc.on('ab-test:message-sent', (data: { testId: string; variantId: string }) => {
-      this.incrementStat(data.testId, data.variantId, 'sent');
-    });
-    
-    // 監聯回覆
-    this.ipc.on('ab-test:reply-received', (data: { testId: string; variantId: string }) => {
-      this.incrementStat(data.testId, data.variantId, 'replied');
-      this.checkTestCompletion(data.testId);
-    });
-    
-    // 監聽轉化
-    this.ipc.on('ab-test:conversion', (data: { testId: string; variantId: string }) => {
-      this.incrementStat(data.testId, data.variantId, 'converted');
-    });
-  }
+  // ============ 實驗管理 ============
   
   /**
-   * 載入測試列表
+   * 創建實驗
    */
-  private loadTests() {
-    try {
-      const stored = localStorage.getItem('tg-matrix-ab-tests');
-      if (stored) {
-        this._tests.set(JSON.parse(stored));
-      }
-    } catch (e) {
-      console.error('Failed to load A/B tests:', e);
-    }
-  }
-  
-  /**
-   * 保存測試列表
-   */
-  private saveTests() {
-    try {
-      localStorage.setItem('tg-matrix-ab-tests', JSON.stringify(this._tests()));
-    } catch (e) {
-      console.error('Failed to save A/B tests:', e);
-    }
-  }
-  
-  /**
-   * 創建新測試
-   */
-  createTest(request: CreateABTestRequest): ABTest {
-    const id = `abt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    // 處理變體權重
-    const totalWeight = request.variants.reduce((sum, v) => sum + (v.weight || 0), 0);
-    const defaultWeight = Math.floor(100 / request.variants.length);
-    
-    const variants: ABVariant[] = request.variants.map((v, i) => ({
-      id: `var_${i}_${Math.random().toString(36).substr(2, 9)}`,
-      name: v.name || String.fromCharCode(65 + i), // A, B, C...
-      content: v.content,
-      weight: totalWeight > 0 ? v.weight || 0 : defaultWeight,
-      stats: {
-        sent: 0,
-        delivered: 0,
-        opened: 0,
-        replied: 0,
-        converted: 0,
-        deliveryRate: 0,
-        replyRate: 0,
-        conversionRate: 0
-      }
+  createExperiment(config: {
+    name: string;
+    description?: string;
+    variants: Omit<Variant, 'id'>[];
+    primaryMetric: MetricType;
+    secondaryMetrics?: MetricType[];
+    sampleSize?: number;
+    minRunDays?: number;
+    confidenceLevel?: number;
+    autoSelectWinner?: boolean;
+  }): Experiment {
+    // 確保權重總和為 100
+    const totalWeight = config.variants.reduce((sum, v) => sum + v.weight, 0);
+    const normalizedVariants: Variant[] = config.variants.map((v, i) => ({
+      ...v,
+      id: `var_${Date.now()}_${i}`,
+      weight: Math.round((v.weight / totalWeight) * 100)
     }));
     
-    const test: ABTest = {
-      id,
-      name: request.name,
-      description: request.description,
+    const experiment: Experiment = {
+      id: `exp_${Date.now()}`,
+      name: config.name,
+      description: config.description,
       status: 'draft',
-      sampleSize: request.sampleSize || 100,
-      confidenceLevel: request.confidenceLevel || 95,
-      variants,
-      createdAt: new Date().toISOString()
+      variants: normalizedVariants,
+      controlVariantId: normalizedVariants[0].id,
+      primaryMetric: config.primaryMetric,
+      secondaryMetrics: config.secondaryMetrics,
+      createdAt: new Date(),
+      sampleSize: config.sampleSize ?? 100,
+      minRunDays: config.minRunDays ?? 7,
+      confidenceLevel: config.confidenceLevel ?? 0.95,
+      autoSelectWinner: config.autoSelectWinner ?? true
     };
     
-    this._tests.update(tests => [test, ...tests]);
-    this.saveTests();
+    this._experiments.update(exps => [...exps, experiment]);
     
-    this.toast.success(`A/B 測試 "${test.name}" 已創建`);
-    return test;
+    // 初始化統計
+    this._variantStats.update(stats => {
+      const newStats = new Map(stats);
+      newStats.set(experiment.id, normalizedVariants.map(v => this.createEmptyStats(v.id)));
+      return newStats;
+    });
+    
+    this.saveToStorage();
+    console.log(`[ABTesting] 創建實驗: ${experiment.name}`);
+    return experiment;
   }
   
   /**
-   * 開始測試
+   * 開始實驗
    */
-  startTest(testId: string): void {
-    this._tests.update(tests =>
-      tests.map(t => t.id === testId ? {
-        ...t,
-        status: 'running' as ABTestStatus,
-        startedAt: new Date().toISOString()
-      } : t)
-    );
-    this.saveTests();
-    this.toast.success('A/B 測試已開始');
+  startExperiment(experimentId: string): boolean {
+    const experiment = this.getExperiment(experimentId);
+    if (!experiment || experiment.status !== 'draft') return false;
+    
+    this.updateExperiment(experimentId, {
+      status: 'running',
+      startedAt: new Date()
+    });
+    
+    console.log(`[ABTesting] 開始實驗: ${experiment.name}`);
+    return true;
   }
   
   /**
-   * 暫停測試
+   * 暫停實驗
    */
-  pauseTest(testId: string): void {
-    this._tests.update(tests =>
-      tests.map(t => t.id === testId ? {
-        ...t,
-        status: 'paused' as ABTestStatus
-      } : t)
-    );
-    this.saveTests();
-    this.toast.info('A/B 測試已暫停');
+  pauseExperiment(experimentId: string): boolean {
+    const experiment = this.getExperiment(experimentId);
+    if (!experiment || experiment.status !== 'running') return false;
+    
+    this.updateExperiment(experimentId, { status: 'paused' });
+    return true;
   }
   
   /**
-   * 恢復測試
+   * 恢復實驗
    */
-  resumeTest(testId: string): void {
-    this._tests.update(tests =>
-      tests.map(t => t.id === testId ? {
-        ...t,
-        status: 'running' as ABTestStatus
-      } : t)
-    );
-    this.saveTests();
-    this.toast.success('A/B 測試已恢復');
+  resumeExperiment(experimentId: string): boolean {
+    const experiment = this.getExperiment(experimentId);
+    if (!experiment || experiment.status !== 'paused') return false;
+    
+    this.updateExperiment(experimentId, { status: 'running' });
+    return true;
   }
   
   /**
-   * 結束測試並確定勝出者
+   * 結束實驗
    */
-  completeTest(testId: string): ABTest | null {
-    const test = this._tests().find(t => t.id === testId);
-    if (!test) return null;
+  endExperiment(experimentId: string, winnerId?: string): boolean {
+    const experiment = this.getExperiment(experimentId);
+    if (!experiment) return false;
     
-    // 計算勝出者
-    const { winner, confidence } = this.determineWinner(test);
+    this.updateExperiment(experimentId, {
+      status: 'completed',
+      endedAt: new Date(),
+      winner: winnerId
+    });
     
-    this._tests.update(tests =>
-      tests.map(t => t.id === testId ? {
-        ...t,
-        status: 'completed' as ABTestStatus,
-        completedAt: new Date().toISOString(),
-        winner,
-        winnerConfidence: confidence
-      } : t)
+    console.log(`[ABTesting] 結束實驗: ${experiment.name}, 優勝: ${winnerId}`);
+    return true;
+  }
+  
+  /**
+   * 獲取實驗
+   */
+  getExperiment(experimentId: string): Experiment | undefined {
+    return this._experiments().find(e => e.id === experimentId);
+  }
+  
+  /**
+   * 更新實驗
+   */
+  private updateExperiment(experimentId: string, updates: Partial<Experiment>) {
+    this._experiments.update(exps => 
+      exps.map(e => e.id === experimentId ? { ...e, ...updates } : e)
     );
-    this.saveTests();
+    this.saveToStorage();
+  }
+  
+  // ============ 變體分配 ============
+  
+  /**
+   * 分配變體
+   */
+  assignVariant(experimentId: string, userId: string): Variant | null {
+    const experiment = this.getExperiment(experimentId);
+    if (!experiment || experiment.status !== 'running') return null;
     
-    if (winner) {
-      const winnerVariant = test.variants.find(v => v.id === winner);
-      this.toast.success(`測試完成！勝出方案: ${winnerVariant?.name} (${confidence?.toFixed(1)}% 置信度)`);
-    } else {
-      this.toast.info('測試完成，但無法確定明顯勝出者');
+    // 檢查是否已分配
+    const existingKey = `${experimentId}_${userId}`;
+    const existing = this._userAssignments().get(existingKey);
+    if (existing) {
+      return experiment.variants.find(v => v.id === existing.variantId) || null;
     }
     
-    return this._tests().find(t => t.id === testId) || null;
-  }
-  
-  /**
-   * 刪除測試
-   */
-  deleteTest(testId: string): void {
-    this._tests.update(tests => tests.filter(t => t.id !== testId));
-    this.saveTests();
-    this.toast.info('A/B 測試已刪除');
-  }
-  
-  /**
-   * 選擇測試
-   */
-  selectTest(testId: string): void {
-    const test = this._tests().find(t => t.id === testId);
-    this._selectedTest.set(test || null);
-  }
-  
-  /**
-   * 根據權重分配變體
-   */
-  assignVariant(testId: string): ABVariant | null {
-    const test = this._tests().find(t => t.id === testId);
-    if (!test || test.status !== 'running') return null;
+    // 根據權重隨機分配
+    const variant = this.selectVariantByWeight(experiment.variants);
     
-    // 加權隨機選擇
-    const totalWeight = test.variants.reduce((sum, v) => sum + v.weight, 0);
+    // 記錄分配
+    this._userAssignments.update(assignments => {
+      const newAssignments = new Map(assignments);
+      newAssignments.set(existingKey, {
+        experimentId,
+        variantId: variant.id,
+        assignedAt: new Date()
+      });
+      return newAssignments;
+    });
+    
+    this.saveToStorage();
+    return variant;
+  }
+  
+  /**
+   * 根據權重選擇變體
+   */
+  private selectVariantByWeight(variants: Variant[]): Variant {
+    const totalWeight = variants.reduce((sum, v) => sum + v.weight, 0);
     let random = Math.random() * totalWeight;
     
-    for (const variant of test.variants) {
+    for (const variant of variants) {
       random -= variant.weight;
       if (random <= 0) {
         return variant;
       }
     }
     
-    return test.variants[0];
+    return variants[variants.length - 1];
   }
   
   /**
-   * 增加統計
+   * 獲取用戶的變體
    */
-  private incrementStat(
-    testId: string,
-    variantId: string,
-    stat: 'sent' | 'delivered' | 'opened' | 'replied' | 'converted'
-  ): void {
-    this._tests.update(tests =>
-      tests.map(t => {
-        if (t.id !== testId) return t;
+  getUserVariant(experimentId: string, userId: string): Variant | null {
+    const experiment = this.getExperiment(experimentId);
+    if (!experiment) return null;
+    
+    const key = `${experimentId}_${userId}`;
+    const assignment = this._userAssignments().get(key);
+    if (!assignment) return null;
+    
+    return experiment.variants.find(v => v.id === assignment.variantId) || null;
+  }
+  
+  // ============ 結果記錄 ============
+  
+  /**
+   * 記錄轉化
+   */
+  recordConversion(experimentId: string, userId: string, data: {
+    revenue?: number;
+    interestScore?: number;
+    messageCount?: number;
+    responseTime?: number;
+  }) {
+    const variant = this.getUserVariant(experimentId, userId);
+    if (!variant) return;
+    
+    this._variantStats.update(stats => {
+      const newStats = new Map(stats);
+      const expStats = newStats.get(experimentId) || [];
+      
+      const variantStats = expStats.find(s => s.variantId === variant.id);
+      if (variantStats) {
+        variantStats.sampleSize++;
+        variantStats.conversions++;
+        variantStats.conversionRate = variantStats.conversions / variantStats.sampleSize;
+        variantStats.totalRevenue += data.revenue || 0;
         
-        return {
-          ...t,
-          variants: t.variants.map(v => {
-            if (v.id !== variantId) return v;
-            
-            const newStats = { ...v.stats };
-            newStats[stat]++;
-            
-            // 重新計算比率
-            newStats.deliveryRate = newStats.sent > 0 ? (newStats.delivered / newStats.sent) * 100 : 0;
-            newStats.replyRate = newStats.sent > 0 ? (newStats.replied / newStats.sent) * 100 : 0;
-            newStats.conversionRate = newStats.sent > 0 ? (newStats.converted / newStats.sent) * 100 : 0;
-            
-            return { ...v, stats: newStats };
-          })
-        };
-      })
-    );
-    this.saveTests();
-  }
-  
-  /**
-   * 手動更新統計
-   */
-  updateVariantStats(
-    testId: string,
-    variantId: string,
-    stats: Partial<ABVariant['stats']>
-  ): void {
-    this._tests.update(tests =>
-      tests.map(t => {
-        if (t.id !== testId) return t;
-        
-        return {
-          ...t,
-          variants: t.variants.map(v => {
-            if (v.id !== variantId) return v;
-            
-            const newStats = { ...v.stats, ...stats };
-            
-            // 重新計算比率
-            newStats.deliveryRate = newStats.sent > 0 ? (newStats.delivered / newStats.sent) * 100 : 0;
-            newStats.replyRate = newStats.sent > 0 ? (newStats.replied / newStats.sent) * 100 : 0;
-            newStats.conversionRate = newStats.sent > 0 ? (newStats.converted / newStats.sent) * 100 : 0;
-            
-            return { ...v, stats: newStats };
-          })
-        };
-      })
-    );
-    this.saveTests();
-  }
-  
-  /**
-   * 檢查測試是否達到樣本量
-   */
-  private checkTestCompletion(testId: string): void {
-    const test = this._tests().find(t => t.id === testId);
-    if (!test || test.status !== 'running') return;
-    
-    const totalSent = test.variants.reduce((sum, v) => sum + v.stats.sent, 0);
-    
-    if (totalSent >= test.sampleSize) {
-      this.completeTest(testId);
-    }
-  }
-  
-  /**
-   * 確定勝出者
-   * 使用簡化的統計顯著性計算
-   */
-  private determineWinner(test: ABTest): { winner: string | undefined; confidence: number | undefined } {
-    if (test.variants.length < 2) {
-      return { winner: test.variants[0]?.id, confidence: 100 };
-    }
-    
-    // 按轉化率排序
-    const sorted = [...test.variants].sort(
-      (a, b) => b.stats.conversionRate - a.stats.conversionRate
-    );
-    
-    const best = sorted[0];
-    const second = sorted[1];
-    
-    // 計算簡化的置信度
-    // 真正的 A/B 測試應該使用 Chi-square 或 Z-test
-    const bestSample = best.stats.sent;
-    const secondSample = second.stats.sent;
-    
-    if (bestSample < 30 || secondSample < 30) {
-      // 樣本量不足
-      return { winner: undefined, confidence: undefined };
-    }
-    
-    const diff = best.stats.conversionRate - second.stats.conversionRate;
-    
-    if (diff < 1) {
-      // 差異太小
-      return { winner: undefined, confidence: undefined };
-    }
-    
-    // 簡化的置信度估算
-    const confidence = Math.min(99, 50 + diff * 5 + Math.min(bestSample, 100) / 5);
-    
-    if (confidence >= test.confidenceLevel) {
-      return { winner: best.id, confidence };
-    }
-    
-    return { winner: undefined, confidence };
-  }
-  
-  /**
-   * 計算平均轉化提升
-   */
-  private calculateAvgConversionLift(tests: ABTest[]): number {
-    const completedWithWinner = tests.filter(t => t.status === 'completed' && t.winner);
-    if (completedWithWinner.length === 0) return 0;
-    
-    const lifts = completedWithWinner.map(test => {
-      const winner = test.variants.find(v => v.id === test.winner);
-      const others = test.variants.filter(v => v.id !== test.winner);
+        // 更新平均值
+        if (data.interestScore !== undefined) {
+          variantStats.avgInterestScore = 
+            (variantStats.avgInterestScore * (variantStats.sampleSize - 1) + data.interestScore) / variantStats.sampleSize;
+        }
+        if (data.messageCount !== undefined) {
+          variantStats.avgMessageCount = 
+            (variantStats.avgMessageCount * (variantStats.sampleSize - 1) + data.messageCount) / variantStats.sampleSize;
+        }
+      }
       
-      if (!winner || others.length === 0) return 0;
-      
-      const avgOther = others.reduce((sum, v) => sum + v.stats.conversionRate, 0) / others.length;
-      
-      if (avgOther === 0) return 0;
-      
-      return ((winner.stats.conversionRate - avgOther) / avgOther) * 100;
+      newStats.set(experimentId, expStats);
+      return newStats;
     });
     
-    return lifts.reduce((sum, lift) => sum + lift, 0) / lifts.length;
+    this.saveToStorage();
+    this.checkAutoComplete(experimentId);
   }
   
   /**
-   * 獲取測試報告
+   * 記錄曝光（無轉化）
    */
-  getTestReport(testId: string): string {
-    const test = this._tests().find(t => t.id === testId);
-    if (!test) return '';
+  recordExposure(experimentId: string, userId: string) {
+    const variant = this.getUserVariant(experimentId, userId);
+    if (!variant) return;
     
-    let report = `# A/B 測試報告: ${test.name}\n\n`;
-    report += `狀態: ${test.status}\n`;
-    report += `創建時間: ${new Date(test.createdAt).toLocaleString()}\n`;
+    this._variantStats.update(stats => {
+      const newStats = new Map(stats);
+      const expStats = newStats.get(experimentId) || [];
+      
+      const variantStats = expStats.find(s => s.variantId === variant.id);
+      if (variantStats) {
+        variantStats.sampleSize++;
+        variantStats.conversionRate = variantStats.conversions / variantStats.sampleSize;
+      }
+      
+      newStats.set(experimentId, expStats);
+      return newStats;
+    });
     
-    if (test.startedAt) {
-      report += `開始時間: ${new Date(test.startedAt).toLocaleString()}\n`;
+    this.saveToStorage();
+  }
+  
+  // ============ 統計分析 ============
+  
+  /**
+   * 獲取實驗結果
+   */
+  getExperimentResult(experimentId: string): ExperimentResult | null {
+    const experiment = this.getExperiment(experimentId);
+    if (!experiment) return null;
+    
+    const variantStats = this._variantStats().get(experimentId) || [];
+    const controlStats = variantStats.find(s => s.variantId === experiment.controlVariantId);
+    
+    // 計算每個變體的統計顯著性
+    const enrichedStats = variantStats.map(stats => {
+      if (stats.variantId === experiment.controlVariantId) {
+        return stats;
+      }
+      
+      // 計算相對提升
+      const uplift = controlStats && controlStats.conversionRate > 0
+        ? ((stats.conversionRate - controlStats.conversionRate) / controlStats.conversionRate) * 100
+        : 0;
+      
+      // 簡化的顯著性檢驗
+      const significance = this.calculateSignificance(stats, controlStats);
+      
+      return {
+        ...stats,
+        uplift,
+        ...significance
+      };
+    });
+    
+    // 判斷是否有顯著優勝者
+    const significantWinners = enrichedStats.filter(s => 
+      s.isSignificant && (s.uplift || 0) > 0
+    );
+    
+    const runDays = experiment.startedAt 
+      ? Math.floor((Date.now() - experiment.startedAt.getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+    
+    const totalSampleSize = enrichedStats.reduce((sum, s) => sum + s.sampleSize, 0);
+    
+    let recommendation = '';
+    let recommendedWinner: string | undefined;
+    
+    if (totalSampleSize < (experiment.sampleSize || 100)) {
+      recommendation = `樣本量不足，建議繼續收集數據（當前 ${totalSampleSize}/${experiment.sampleSize}）`;
+    } else if (runDays < (experiment.minRunDays || 7)) {
+      recommendation = `運行時間不足，建議至少運行 ${experiment.minRunDays} 天`;
+    } else if (significantWinners.length === 0) {
+      recommendation = '暫無統計顯著的優勝者，建議繼續觀察或調整變體';
+    } else if (significantWinners.length === 1) {
+      recommendedWinner = significantWinners[0].variantId;
+      recommendation = `建議選擇變體 ${this.getVariantName(experiment, recommendedWinner)}，提升 ${significantWinners[0].uplift?.toFixed(1)}%`;
+    } else {
+      const best = significantWinners.sort((a, b) => (b.uplift || 0) - (a.uplift || 0))[0];
+      recommendedWinner = best.variantId;
+      recommendation = `多個變體表現優秀，建議選擇 ${this.getVariantName(experiment, recommendedWinner)}`;
     }
     
-    if (test.completedAt) {
-      report += `完成時間: ${new Date(test.completedAt).toLocaleString()}\n`;
+    return {
+      experimentId,
+      variantStats: enrichedStats,
+      overallSampleSize: totalSampleSize,
+      runDays,
+      hasSignificantWinner: significantWinners.length > 0,
+      recommendedWinner,
+      recommendation
+    };
+  }
+  
+  /**
+   * 計算統計顯著性（簡化版）
+   */
+  private calculateSignificance(variant: VariantStats, control?: VariantStats): {
+    pValue?: number;
+    isSignificant?: boolean;
+    confidenceInterval?: [number, number];
+  } {
+    if (!control || control.sampleSize < 30 || variant.sampleSize < 30) {
+      return {};
     }
     
-    report += `\n## 變體結果\n\n`;
-    report += `| 變體 | 發送 | 回覆 | 轉化 | 回覆率 | 轉化率 |\n`;
-    report += `|------|------|------|------|--------|--------|\n`;
+    // 使用 Z 檢驗近似
+    const p1 = variant.conversionRate;
+    const p2 = control.conversionRate;
+    const n1 = variant.sampleSize;
+    const n2 = control.sampleSize;
     
-    for (const v of test.variants) {
-      const isWinner = v.id === test.winner;
-      report += `| ${v.name}${isWinner ? ' 🏆' : ''} | ${v.stats.sent} | ${v.stats.replied} | ${v.stats.converted} | ${v.stats.replyRate.toFixed(1)}% | ${v.stats.conversionRate.toFixed(1)}% |\n`;
+    const pooledP = (variant.conversions + control.conversions) / (n1 + n2);
+    const se = Math.sqrt(pooledP * (1 - pooledP) * (1/n1 + 1/n2));
+    
+    if (se === 0) return {};
+    
+    const z = (p1 - p2) / se;
+    const pValue = 2 * (1 - this.normalCDF(Math.abs(z)));
+    
+    // 置信區間
+    const margin = 1.96 * se;
+    const diff = p1 - p2;
+    
+    return {
+      pValue,
+      isSignificant: pValue < 0.05,
+      confidenceInterval: [diff - margin, diff + margin]
+    };
+  }
+  
+  /**
+   * 標準正態分佈 CDF（近似）
+   */
+  private normalCDF(x: number): number {
+    const a1 = 0.254829592;
+    const a2 = -0.284496736;
+    const a3 = 1.421413741;
+    const a4 = -1.453152027;
+    const a5 = 1.061405429;
+    const p = 0.3275911;
+    
+    const sign = x < 0 ? -1 : 1;
+    x = Math.abs(x) / Math.sqrt(2);
+    
+    const t = 1.0 / (1.0 + p * x);
+    const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+    
+    return 0.5 * (1.0 + sign * y);
+  }
+  
+  /**
+   * 檢查自動完成
+   */
+  private checkAutoComplete(experimentId: string) {
+    const experiment = this.getExperiment(experimentId);
+    if (!experiment || !experiment.autoSelectWinner) return;
+    
+    const result = this.getExperimentResult(experimentId);
+    if (!result) return;
+    
+    // 檢查是否達到條件
+    if (result.hasSignificantWinner && 
+        result.overallSampleSize >= (experiment.sampleSize || 100) &&
+        result.runDays >= (experiment.minRunDays || 7)) {
+      
+      this.endExperiment(experimentId, result.recommendedWinner);
+      console.log(`[ABTesting] 自動選擇優勝者: ${result.recommendedWinner}`);
     }
-    
-    if (test.winner) {
-      const winner = test.variants.find(v => v.id === test.winner);
-      report += `\n## 結論\n\n`;
-      report += `勝出方案: **${winner?.name}** (置信度 ${test.winnerConfidence?.toFixed(1)}%)\n`;
+  }
+  
+  // ============ 輔助方法 ============
+  
+  private getVariantName(experiment: Experiment, variantId: string): string {
+    return experiment.variants.find(v => v.id === variantId)?.name || variantId;
+  }
+  
+  private createEmptyStats(variantId: string): VariantStats {
+    return {
+      variantId,
+      sampleSize: 0,
+      conversions: 0,
+      conversionRate: 0,
+      totalRevenue: 0,
+      avgInterestScore: 0,
+      avgResponseTime: 0,
+      avgMessageCount: 0
+    };
+  }
+  
+  // ============ 持久化 ============
+  
+  private saveToStorage() {
+    const data = {
+      experiments: this._experiments(),
+      variantStats: Array.from(this._variantStats().entries()),
+      userAssignments: Array.from(this._userAssignments().entries()),
+      savedAt: Date.now()
+    };
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+  }
+  
+  private loadFromStorage() {
+    try {
+      const stored = localStorage.getItem(this.STORAGE_KEY);
+      if (!stored) return;
+      
+      const data = JSON.parse(stored);
+      
+      if (data.experiments) {
+        this._experiments.set(data.experiments.map((e: any) => ({
+          ...e,
+          createdAt: new Date(e.createdAt),
+          startedAt: e.startedAt ? new Date(e.startedAt) : undefined,
+          endedAt: e.endedAt ? new Date(e.endedAt) : undefined
+        })));
+      }
+      
+      if (data.variantStats) {
+        this._variantStats.set(new Map(data.variantStats));
+      }
+      
+      if (data.userAssignments) {
+        this._userAssignments.set(new Map(data.userAssignments.map((e: any) => [
+          e[0],
+          { ...e[1], assignedAt: new Date(e[1].assignedAt) }
+        ])));
+      }
+      
+      console.log('[ABTesting] 已從存儲恢復數據');
+    } catch (e) {
+      console.error('[ABTesting] 恢復數據失敗:', e);
     }
-    
-    return report;
   }
 }

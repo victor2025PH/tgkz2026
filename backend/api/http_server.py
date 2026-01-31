@@ -200,6 +200,17 @@ class HttpApiServer:
         self.app.router.add_delete('/api/v1/api-keys/{id}', self.delete_api_key)
         self.app.router.add_post('/api/v1/api-keys/{id}/revoke', self.revoke_api_key)
         
+        # 管理員 API
+        self.app.router.add_get('/api/v1/admin/dashboard', self.admin_dashboard)
+        self.app.router.add_get('/api/v1/admin/users', self.admin_list_users)
+        self.app.router.add_get('/api/v1/admin/users/{id}', self.admin_get_user)
+        self.app.router.add_put('/api/v1/admin/users/{id}', self.admin_update_user)
+        self.app.router.add_post('/api/v1/admin/users/{id}/suspend', self.admin_suspend_user)
+        self.app.router.add_get('/api/v1/admin/security', self.admin_security_overview)
+        self.app.router.add_get('/api/v1/admin/audit-logs', self.admin_audit_logs)
+        self.app.router.add_get('/api/v1/admin/usage-trends', self.admin_usage_trends)
+        self.app.router.add_get('/api/v1/admin/cache-stats', self.admin_cache_stats)
+        
         # API 文檔
         self.app.router.add_get('/api/docs', self.swagger_ui)
         self.app.router.add_get('/api/redoc', self.redoc_ui)
@@ -1338,6 +1349,201 @@ class HttpApiServer:
             return self._json_response(result)
         except Exception as e:
             logger.error(f"Revoke API key error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 管理員 API ====================
+    
+    async def admin_dashboard(self, request):
+        """管理員儀表板"""
+        try:
+            from api.admin import get_admin_service
+            admin = get_admin_service()
+            
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            stats = await admin.get_dashboard_stats()
+            return self._json_response({'success': True, 'data': stats})
+        except Exception as e:
+            logger.error(f"Admin dashboard error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_list_users(self, request):
+        """管理員 - 用戶列表"""
+        try:
+            from api.admin import get_admin_service
+            admin = get_admin_service()
+            
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            page = int(request.query.get('page', '1'))
+            page_size = int(request.query.get('page_size', '20'))
+            search = request.query.get('search', '')
+            status = request.query.get('status', '')
+            tier = request.query.get('tier', '')
+            
+            result = await admin.get_users(page, page_size, search, status, tier)
+            return self._json_response({'success': True, 'data': result})
+        except Exception as e:
+            logger.error(f"Admin list users error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_get_user(self, request):
+        """管理員 - 用戶詳情"""
+        try:
+            from api.admin import get_admin_service
+            admin = get_admin_service()
+            
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            user_id = request.match_info.get('id')
+            user = await admin.get_user_detail(user_id)
+            
+            if user:
+                return self._json_response({'success': True, 'data': user})
+            return self._json_response({'success': False, 'error': '用戶不存在'}, 404)
+        except Exception as e:
+            logger.error(f"Admin get user error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_update_user(self, request):
+        """管理員 - 更新用戶"""
+        try:
+            from api.admin import get_admin_service
+            admin = get_admin_service()
+            
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            user_id = request.match_info.get('id')
+            data = await request.json()
+            
+            result = await admin.update_user(user_id, data)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin update user error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_suspend_user(self, request):
+        """管理員 - 暫停用戶"""
+        try:
+            from api.admin import get_admin_service
+            admin = get_admin_service()
+            
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            user_id = request.match_info.get('id')
+            data = await request.json()
+            reason = data.get('reason', '')
+            
+            result = await admin.suspend_user(user_id, reason)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin suspend user error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_security_overview(self, request):
+        """管理員 - 安全概覽"""
+        try:
+            from api.admin import get_admin_service
+            admin = get_admin_service()
+            
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            overview = await admin.get_security_overview()
+            return self._json_response({'success': True, 'data': overview})
+        except Exception as e:
+            logger.error(f"Admin security overview error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_audit_logs(self, request):
+        """管理員 - 審計日誌"""
+        try:
+            from api.admin import get_admin_service
+            admin = get_admin_service()
+            
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            page = int(request.query.get('page', '1'))
+            page_size = int(request.query.get('page_size', '50'))
+            action = request.query.get('action', '')
+            
+            result = await admin.get_audit_logs(page, page_size, action or None)
+            return self._json_response({'success': True, 'data': result})
+        except Exception as e:
+            logger.error(f"Admin audit logs error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_usage_trends(self, request):
+        """管理員 - 使用趨勢"""
+        try:
+            from api.admin import get_admin_service
+            admin = get_admin_service()
+            
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            days = int(request.query.get('days', '30'))
+            trends = await admin.get_usage_trends(days)
+            return self._json_response({'success': True, 'data': trends})
+        except Exception as e:
+            logger.error(f"Admin usage trends error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_cache_stats(self, request):
+        """管理員 - 緩存統計"""
+        try:
+            from core.cache import get_cache_service
+            cache = get_cache_service()
+            
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            stats = cache.stats()
+            return self._json_response({'success': True, 'data': stats})
+        except Exception as e:
+            logger.error(f"Admin cache stats error: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
     
     async def get_initial_state(self, request):

@@ -1,0 +1,236 @@
+/**
+ * TG-AI智控王 Application Routes
+ * 應用程式路由配置 - 支援懶加載、守衛和 Resolver
+ * 
+ * 🆕 Phase 22: 添加路由 Resolver 預加載數據
+ * 🆕 P2: 添加認證路由和 SaaS 守衛
+ */
+import { Routes } from '@angular/router';
+import { membershipGuard } from './guards';
+import { authGuard } from './core/auth.guard';
+// Resolvers 暫時禁用 - 事件不匹配問題待修復
+// import { 
+//   dashboardResolver, 
+//   accountsResolver, 
+//   leadsResolver,
+//   monitoringResolver,
+//   analyticsResolver,
+//   automationResolver,
+//   resourceDiscoveryResolver
+// } from './resolvers';
+
+export const routes: Routes = [
+  // 認證路由（公開）
+  {
+    path: 'auth',
+    loadChildren: () => import('./auth/auth.routes').then(m => m.AUTH_ROUTES)
+  },
+  // 簡化路由
+  {
+    path: 'login',
+    redirectTo: 'auth/login',
+    pathMatch: 'full'
+  },
+  {
+    path: 'register',
+    redirectTo: 'auth/register',
+    pathMatch: 'full'
+  },
+  {
+    path: '',
+    redirectTo: 'dashboard',
+    pathMatch: 'full'
+  },
+  // 核心功能 - SaaS 模式需要登入
+  {
+    path: 'dashboard',
+    loadComponent: () => import('./views/dashboard-view.component').then(m => m.DashboardViewComponent),
+    title: '儀表板',
+    canActivate: [authGuard]
+  },
+  {
+    path: 'accounts',
+    loadComponent: () => import('./views/accounts-view.component').then(m => m.AccountsViewComponent),
+    title: '帳號管理',
+    canActivate: [authGuard]
+  },
+  {
+    path: 'settings',
+    loadComponent: () => import('./views/settings-view.component').then(m => m.SettingsViewComponent),
+    title: '設定',
+    canActivate: [authGuard]
+  },
+  // 用戶設置頁面
+  {
+    path: 'user-settings',
+    loadComponent: () => import('./views/user-settings-view.component').then(m => m.UserSettingsViewComponent),
+    title: '用戶設置',
+    canActivate: [authGuard]
+  },
+  // 訂閱升級頁面
+  {
+    path: 'upgrade',
+    loadComponent: () => import('./views/upgrade-view.component').then(m => m.UpgradeViewComponent),
+    title: '升級方案',
+    canActivate: [authGuard]
+  },
+  // 營銷功能 - 需要會員權限
+  {
+    path: 'leads',
+    loadComponent: () => import('./views/leads-view.component').then(m => m.LeadsViewComponent),
+    title: '潛在客戶',
+    canActivate: [membershipGuard]
+  },
+  {
+    path: 'automation',
+    loadComponent: () => import('./views/automation-view.component').then(m => m.AutomationViewComponent),
+    title: '自動化中心',
+    canActivate: [membershipGuard]
+  },
+  {
+    path: 'resource-discovery',
+    loadComponent: () => import('./views/resource-discovery-view.component').then(m => m.ResourceDiscoveryViewComponent),
+    title: '資源發現',
+    canActivate: [membershipGuard]
+  },
+  // ============ 🆕 重構後的核心模塊 ============
+  
+  // 營銷任務中心（核心入口）
+  {
+    path: 'marketing-hub',
+    loadComponent: () => import('./views/smart-marketing-view.component').then(m => m.SmartMarketingViewComponent),
+    title: '營銷任務中心',
+    canActivate: [membershipGuard]
+  },
+  // 角色資源庫（原多角色協作的資產部分）
+  {
+    path: 'role-library',
+    loadComponent: () => import('./views/multi-role-view.component').then(m => m.MultiRoleViewComponent),
+    title: '角色資源庫',
+    canActivate: [membershipGuard]
+  },
+  // 智能引擎（原 AI 中心的配置部分）
+  {
+    path: 'ai-engine',
+    loadComponent: () => import('./views/ai-center-view.component').then(m => m.AiCenterViewComponent),
+    title: '智能引擎',
+    canActivate: [membershipGuard]
+  },
+  
+  // ============ 舊路由（保持兼容，重定向到新模塊） ============
+  {
+    path: 'ai-center',
+    redirectTo: 'ai-engine',
+    pathMatch: 'full'
+  },
+  {
+    path: 'multi-role',
+    redirectTo: 'role-library',
+    pathMatch: 'full'
+  },
+  {
+    path: 'smart-marketing',
+    redirectTo: 'marketing-hub',
+    pathMatch: 'full'
+  },
+  // 數據分析 - 需要高級會員
+  {
+    path: 'analytics',
+    loadComponent: () => import('./views/analytics-view.component').then(m => m.AnalyticsViewComponent),
+    title: '數據分析',
+    canActivate: [membershipGuard]
+  },
+  // 系統功能 - 無權限限制
+  {
+    path: 'monitoring',
+    loadComponent: () => import('./views/monitoring-view.component').then(m => m.MonitoringViewComponent),
+    title: '監控中心'
+  },
+  // 向下兼容舊路由（重定向到設置頁）
+  {
+    path: 'performance',
+    redirectTo: 'settings',
+    pathMatch: 'full'
+  },
+  {
+    path: 'alerts',
+    redirectTo: 'settings',
+    pathMatch: 'full'
+  },
+  // 404 fallback
+  {
+    path: '**',
+    redirectTo: 'dashboard'
+  }
+];
+
+/**
+ * 視圖名稱到路由路徑的映射
+ * 用於與現有 currentView signal 兼容
+ */
+/**
+ * 視圖名稱到路由路徑的映射
+ * 🆕 重構：添加新模塊路由，保持舊路由兼容
+ */
+export const VIEW_ROUTE_MAP: Record<string, string> = {
+  // 核心
+  'dashboard': '/dashboard',
+  'accounts': '/accounts',
+  'settings': '/settings',
+  
+  // 🆕 營銷任務中心（核心入口）
+  'marketing-hub': '/marketing-hub',
+  'marketing-tasks': '/marketing-hub',
+  'marketing-monitor': '/marketing-hub',
+  
+  // 🆕 角色資源庫
+  'role-library': '/role-library',
+  'role-store': '/role-library',
+  'my-roles': '/role-library',
+  'scene-templates': '/role-library',
+  'script-editor': '/role-library',
+  
+  // 🆕 智能引擎
+  'ai-engine': '/ai-engine',
+  'ai-models': '/ai-engine',
+  'ai-brain': '/ai-engine',
+  'ai-persona': '/ai-engine',
+  
+  // 觸發監控
+  'automation': '/automation',
+  'monitoring-groups': '/monitoring',
+  'keyword-sets': '/monitoring',
+  'trigger-rules': '/monitoring',
+  'chat-templates': '/monitoring',
+  'collected-users': '/monitoring',
+  
+  // 客戶管理
+  'leads': '/leads',
+  'lead-nurturing': '/leads',
+  'member-database': '/leads',
+  'user-tracking': '/leads',
+  
+  // 數據分析
+  'analytics': '/analytics',
+  'analytics-center': '/analytics',
+  'search-discovery': '/resource-discovery',
+  
+  // 系統
+  'monitoring': '/monitoring',
+  'performance': '/settings',
+  'alerts': '/settings',
+  
+  // 舊路由（兼容）
+  'ai-center': '/ai-engine',
+  'multi-role': '/role-library',
+  'smart-marketing': '/marketing-hub'
+};
+
+/**
+ * 路由路徑到視圖名稱的映射
+ */
+export const ROUTE_VIEW_MAP: Record<string, string> = Object.entries(VIEW_ROUTE_MAP)
+  .reduce((acc, [view, route]) => {
+    acc[route] = view;
+    return acc;
+  }, {} as Record<string, string>);

@@ -24,5 +24,5 @@ RUN mkdir -p /app/sessions /app/logs /app/data
 # 暴露端口
 EXPOSE 8000
 
-# 啟動命令
-CMD ["python", "main.py"]
+# 啟動命令 - 使用 Web 服務器模式
+CMD ["python", "web_server.py"]

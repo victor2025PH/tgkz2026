@@ -462,7 +462,7 @@ def get_multi_role_manager(data_dir: str = None) -> MultiRoleManager:
     return _manager_instance
 
 
-async def init_multi_role_manager(telegram_client=None, data_dir: str = None, db=None, event_callback=None):
+async def init_multi_role_manager(telegram_client=None, data_dir: str = None, db=None, event_callback=None, log_callback=None, **kwargs):
     """初始化多角色管理器"""
     manager = get_multi_role_manager(data_dir)
     if telegram_client:
@@ -471,4 +471,6 @@ async def init_multi_role_manager(telegram_client=None, data_dir: str = None, db
         manager.db = db
     if event_callback:
         manager.event_callback = event_callback
+    if log_callback:
+        manager.log_callback = log_callback
     return manager

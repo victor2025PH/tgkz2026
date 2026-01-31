@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '*.md'
+      - '.gitignore'
+      - '.cursorrules'
   workflow_dispatch:  # 允許手動觸發
 
 env:
@@ -12,49 +16,13 @@ env:
   DEPLOY_PATH: /opt/tg-matrix
 
 jobs:
-  build:
-    name: Build Frontend
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
-      
-      - name: Build Angular app
-        run: npm run build
-        env:
-          CI: false
-      
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
-          retention-days: 1
-
   deploy:
     name: Deploy to Server
-    needs: build
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
       
       - name: Setup SSH key
         run: |
@@ -65,7 +33,7 @@ jobs:
       
       - name: Deploy to server
         run: |
-          # 同步文件到服務器
+          # 同步文件到服務器（使用已構建的 dist/）
           rsync -avz --delete \
             --exclude '.git' \
             --exclude 'node_modules' \
@@ -74,16 +42,19 @@ jobs:
             --exclude 'venv' \
             --exclude '.env' \
             --exclude 'data/' \
+            --exclude 'certbot/' \
+            --exclude '*.py' \
+            --exclude 'playwright-report/' \
+            --exclude 'e2e/' \
             ./ ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }}:${{ env.DEPLOY_PATH }}/
-          
-          # 在服務器上重啟服務
+      
+      - name: Restart services
+        run: |
           ssh ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} << 'ENDSSH'
-            cd ${{ env.DEPLOY_PATH }}
+            cd /opt/tg-matrix
             
-            # 重建並重啟容器
-            sudo docker compose down
-            sudo docker compose build --no-cache api
-            sudo docker compose up -d
+            # 重啟 web 容器以加載新的前端文件
+            sudo docker compose restart web
             
             # 顯示狀態
             sudo docker ps
@@ -92,13 +63,14 @@ jobs:
       
       - name: Health check
         run: |
-          sleep 10
-          curl -f http://${{ env.SERVER_HOST }}/health || echo "Health check failed, but deployment may still be successful"
+          sleep 5
+          curl -f http://${{ env.SERVER_HOST }}/health || echo "Health check pending..."
       
-      - name: Notify success
-        if: success()
-        run: echo "🚀 Deployment successful!"
-      
-      - name: Notify failure
-        if: failure()
-        run: echo "❌ Deployment failed!"
+      - name: Notify result
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "🚀 Deployment successful!"
+          else
+            echo "❌ Deployment failed!"
+          fi

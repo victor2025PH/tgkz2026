@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["angular:styles/component:css;d11053ce0d31d8acc3ce7ea099ed66cdd10b71070d7060e8155d61ff3d8a5314;D:/tgkz2026/src/components/workflow-analytics.component.ts"],
+  "sourcesContent": ["\n    .workflow-analytics {\n      padding: 1.5rem;\n    }\n  "],
+  "mappings": ";AACI,CAAC;AACC,WAAS;AACX;",
+  "names": []
+}

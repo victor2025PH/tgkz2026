@@ -6,15 +6,19 @@ __pycache__/
 *.pyo
 
 # Build outputs
-dist/
+# dist/ - Temporarily enabled for SaaS deployment
 build/
 release/
 build-python/
-*.exe
+dist-backend/
 *.dmg
 *.AppImage
 *.pkg
 *.pyz
+
+# Keep backend exe for packaging, but not individual builds
+backend-exe/*.exe
+!backend-exe/.gitkeep
 
 # IDE
 .vs/

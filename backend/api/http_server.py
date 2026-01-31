@@ -211,6 +211,11 @@ class HttpApiServer:
         self.app.router.add_get('/api/v1/admin/usage-trends', self.admin_usage_trends)
         self.app.router.add_get('/api/v1/admin/cache-stats', self.admin_cache_stats)
         
+        # 診斷 API
+        self.app.router.add_get('/api/v1/diagnostics', self.get_diagnostics)
+        self.app.router.add_get('/api/v1/diagnostics/quick', self.get_quick_health)
+        self.app.router.add_get('/api/v1/diagnostics/system', self.get_system_info)
+        
         # API 文檔
         self.app.router.add_get('/api/docs', self.swagger_ui)
         self.app.router.add_get('/api/redoc', self.redoc_ui)
@@ -1544,6 +1549,74 @@ class HttpApiServer:
             return self._json_response({'success': True, 'data': stats})
         except Exception as e:
             logger.error(f"Admin cache stats error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 診斷 API ====================
+    
+    async def get_diagnostics(self, request):
+        """獲取完整診斷報告"""
+        try:
+            from core.diagnostics import get_diagnostics_service
+            diag = get_diagnostics_service()
+            
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            report = await diag.run_all_checks()
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'timestamp': report.timestamp,
+                    'overall_status': report.overall_status,
+                    'checks': [c.to_dict() for c in report.checks],
+                    'system_info': report.system_info,
+                    'performance': report.performance,
+                    'errors': report.errors,
+                    'recommendations': report.recommendations
+                }
+            })
+        except Exception as e:
+            logger.error(f"Get diagnostics error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_quick_health(self, request):
+        """快速健康檢查（公開）"""
+        try:
+            from core.diagnostics import get_diagnostics_service
+            diag = get_diagnostics_service()
+            
+            result = await diag.get_quick_health()
+            return self._json_response({'success': True, 'data': result})
+        except Exception as e:
+            logger.error(f"Quick health check error: {e}")
+            return self._json_response({
+                'success': False,
+                'status': 'unhealthy',
+                'error': str(e)
+            }, 500)
+    
+    async def get_system_info(self, request):
+        """獲取系統信息"""
+        try:
+            from core.diagnostics import get_diagnostics_service
+            diag = get_diagnostics_service()
+            
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            info = diag.get_system_info()
+            return self._json_response({'success': True, 'data': info})
+        except Exception as e:
+            logger.error(f"Get system info error: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
     
     async def get_initial_state(self, request):

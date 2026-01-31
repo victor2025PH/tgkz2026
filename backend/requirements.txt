@@ -37,8 +37,9 @@ psutil>=5.9.0
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
 
-# HTTP client
+# HTTP client and server
 aiohttp>=3.9.0
+aiohttp-cors>=0.7.0
 
 # Browser automation for API credential scraping (Phase 2)
 playwright>=1.40.0
@@ -46,12 +47,15 @@ playwright>=1.40.0
 # NumPy (required for vector operations)
 numpy>=1.24.0
 
-# ==================== RAG System (Optional) ====================
-# 以下依賴是可選的，系統會自動降級使用基礎功能
-# 如果安裝失敗可以跳過
+# ==================== RAG System (Recommended) ====================
+# 以下依賴強烈建議安裝，可大幅提升 AI 回覆質量
+# 如果安裝失敗，系統會自動降級使用基礎功能
 
-# Vector database (optional - will fallback to SQLite)
-# chromadb>=0.4.0
+# Vector database (recommended - provides semantic search)
+chromadb>=0.4.0
 
-# Neural embeddings (optional - will fallback to simple hash embeddings)
-# sentence-transformers>=2.2.0
+# Neural embeddings (recommended - provides better text understanding)
+sentence-transformers>=2.2.0
+
+# 🔧 安裝命令：
+# pip install chromadb sentence-transformers

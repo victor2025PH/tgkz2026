@@ -8,6 +8,8 @@
     "start": "node scripts/check-build.js && node_modules\\.bin\\electron.cmd .",
     "build": "ng build --configuration development",
     "build:prod": "ng build --configuration production",
+    "build:saas": "ng build --configuration saas",
+    "build:electron": "ng build --configuration production",
     "start:build": "npm run build && npm start",
     "start:dev": "node scripts/dev-mode.js",
     "start:lightweight": "node scripts/dev-mode.js --lightweight",

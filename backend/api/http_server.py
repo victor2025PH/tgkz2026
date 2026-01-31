@@ -107,7 +107,18 @@ class HttpApiServer:
         self.app.router.add_post('/api/v1/accounts/{id}/login', self.login_account)
         self.app.router.add_post('/api/v1/accounts/{id}/logout', self.logout_account)
         
-        # 認證
+        # 用戶認證（SaaS）
+        self.app.router.add_post('/api/v1/auth/register', self.user_register)
+        self.app.router.add_post('/api/v1/auth/login', self.user_login)
+        self.app.router.add_post('/api/v1/auth/logout', self.user_logout)
+        self.app.router.add_post('/api/v1/auth/refresh', self.user_refresh_token)
+        self.app.router.add_get('/api/v1/auth/me', self.get_current_user)
+        self.app.router.add_put('/api/v1/auth/me', self.update_current_user)
+        self.app.router.add_post('/api/v1/auth/change-password', self.change_password)
+        self.app.router.add_get('/api/v1/auth/sessions', self.get_user_sessions)
+        self.app.router.add_delete('/api/v1/auth/sessions/{id}', self.revoke_session)
+        
+        # Telegram 帳號認證
         self.app.router.add_post('/api/v1/auth/send-code', self.send_code)
         self.app.router.add_post('/api/v1/auth/verify-code', self.verify_code)
         self.app.router.add_post('/api/v1/auth/submit-2fa', self.submit_2fa)
@@ -272,7 +283,193 @@ class HttpApiServer:
         result = await self._execute_command('logout-account', {'id': account_id})
         return self._json_response(result)
     
-    # ==================== 認證 ====================
+    # ==================== 用戶認證 (SaaS) ====================
+    
+    async def user_register(self, request):
+        """用戶註冊"""
+        try:
+            data = await request.json()
+            from auth.service import get_auth_service
+            auth_service = get_auth_service()
+            result = await auth_service.register(
+                email=data.get('email', ''),
+                password=data.get('password', ''),
+                username=data.get('username'),
+                display_name=data.get('display_name')
+            )
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Registration error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def user_login(self, request):
+        """用戶登入"""
+        try:
+            data = await request.json()
+            from auth.service import get_auth_service
+            auth_service = get_auth_service()
+            
+            # 獲取設備信息
+            device_info = {
+                'ip_address': request.headers.get('X-Forwarded-For', 
+                              request.headers.get('X-Real-IP', 
+                              request.remote or '')),
+                'user_agent': request.headers.get('User-Agent', ''),
+                'device_type': 'web',
+                'device_name': data.get('device_name', 'Web Browser')
+            }
+            
+            result = await auth_service.login(
+                email=data.get('email', ''),
+                password=data.get('password', ''),
+                device_info=device_info
+            )
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Login error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def user_logout(self, request):
+        """用戶登出"""
+        try:
+            # 從 header 獲取 token
+            auth_header = request.headers.get('Authorization', '')
+            token = auth_header[7:] if auth_header.startswith('Bearer ') else None
+            
+            from auth.service import get_auth_service
+            auth_service = get_auth_service()
+            result = await auth_service.logout(token=token)
+            return self._json_response(result)
+        except Exception as e:
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def user_refresh_token(self, request):
+        """刷新 Token"""
+        try:
+            data = await request.json()
+            from auth.service import get_auth_service
+            auth_service = get_auth_service()
+            result = await auth_service.refresh_token(data.get('refresh_token', ''))
+            return self._json_response(result)
+        except Exception as e:
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_current_user(self, request):
+        """獲取當前用戶信息"""
+        try:
+            auth_header = request.headers.get('Authorization', '')
+            token = auth_header[7:] if auth_header.startswith('Bearer ') else None
+            
+            if not token:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            from auth.service import get_auth_service
+            auth_service = get_auth_service()
+            user = await auth_service.get_user_by_token(token)
+            
+            if not user:
+                return self._json_response({'success': False, 'error': '無效的令牌'}, 401)
+            
+            return self._json_response({'success': True, 'data': user.to_dict()})
+        except Exception as e:
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def update_current_user(self, request):
+        """更新當前用戶信息"""
+        try:
+            auth_header = request.headers.get('Authorization', '')
+            token = auth_header[7:] if auth_header.startswith('Bearer ') else None
+            
+            if not token:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            from auth.service import get_auth_service
+            from auth.utils import verify_token
+            
+            payload = verify_token(token)
+            if not payload:
+                return self._json_response({'success': False, 'error': '無效的令牌'}, 401)
+            
+            data = await request.json()
+            auth_service = get_auth_service()
+            result = await auth_service.update_user(payload.get('sub'), data)
+            return self._json_response(result)
+        except Exception as e:
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def change_password(self, request):
+        """修改密碼"""
+        try:
+            auth_header = request.headers.get('Authorization', '')
+            token = auth_header[7:] if auth_header.startswith('Bearer ') else None
+            
+            if not token:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            from auth.service import get_auth_service
+            from auth.utils import verify_token
+            
+            payload = verify_token(token)
+            if not payload:
+                return self._json_response({'success': False, 'error': '無效的令牌'}, 401)
+            
+            data = await request.json()
+            auth_service = get_auth_service()
+            result = await auth_service.change_password(
+                payload.get('sub'),
+                data.get('old_password', ''),
+                data.get('new_password', '')
+            )
+            return self._json_response(result)
+        except Exception as e:
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_user_sessions(self, request):
+        """獲取用戶會話列表"""
+        try:
+            auth_header = request.headers.get('Authorization', '')
+            token = auth_header[7:] if auth_header.startswith('Bearer ') else None
+            
+            if not token:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            from auth.service import get_auth_service
+            from auth.utils import verify_token
+            
+            payload = verify_token(token)
+            if not payload:
+                return self._json_response({'success': False, 'error': '無效的令牌'}, 401)
+            
+            auth_service = get_auth_service()
+            sessions = await auth_service.get_sessions(payload.get('sub'))
+            return self._json_response({'success': True, 'data': sessions})
+        except Exception as e:
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def revoke_session(self, request):
+        """撤銷會話"""
+        try:
+            auth_header = request.headers.get('Authorization', '')
+            token = auth_header[7:] if auth_header.startswith('Bearer ') else None
+            
+            if not token:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            from auth.service import get_auth_service
+            from auth.utils import verify_token
+            
+            payload = verify_token(token)
+            if not payload:
+                return self._json_response({'success': False, 'error': '無效的令牌'}, 401)
+            
+            session_id = request.match_info['id']
+            auth_service = get_auth_service()
+            result = await auth_service.revoke_session(payload.get('sub'), session_id)
+            return self._json_response(result)
+        except Exception as e:
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== Telegram 認證 ====================
     
     async def send_code(self, request):
         """發送驗證碼"""

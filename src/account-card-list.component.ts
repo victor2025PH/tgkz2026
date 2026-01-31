@@ -8,6 +8,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ElectronIpcService } from './electron-ipc.service';
 import { ToastService } from './toast.service';
+import { I18nService } from './i18n.service';
 
 export interface Account {
   id: number;
@@ -399,15 +400,15 @@ export const PROXY_TYPES = [
           </div>
           
           <select [(ngModel)]="statusFilter" class="filter-select">
-            <option value="all">全部状态</option>
-            <option value="Online">🟢 在线</option>
-            <option value="Offline">⚪ 离线</option>
-            <option value="Banned">🔴 封禁</option>
-            <option value="Warming Up">🟡 预热中</option>
+            <option value="all">{{ t('accounts.allStatus') }}</option>
+            <option value="Online">🟢 {{ t('accounts.online') }}</option>
+            <option value="Offline">⚪ {{ t('accounts.offline') }}</option>
+            <option value="Banned">🔴 {{ t('accounts.banned') }}</option>
+            <option value="Warming Up">🟡 {{ t('accounts.warmingUp') }}</option>
           </select>
 
           <select [(ngModel)]="groupFilter" class="filter-select">
-            <option value="all">全部分组</option>
+            <option value="all">{{ t('accounts.allGroups') }}</option>
             <option value="_ungrouped">📁 未分组</option>
             @for (group of groups(); track group.id) {
               <option [value]="group.id">📁 {{ group.name }}</option>
@@ -465,11 +466,11 @@ export const PROXY_TYPES = [
           </div>
           
           <button (click)="openGroupManager()" class="manage-btn">
-            📁 管理分组
+            📁 {{ t('accounts.manageGroups') }}
           </button>
 
           <button (click)="addAccount.emit()" class="add-btn">
-            ➕ 添加账户
+            ➕ {{ t('accounts.addAccount') }}
           </button>
         </div>
       </div>
@@ -479,25 +480,25 @@ export const PROXY_TYPES = [
         <div class="stats-left">
           <label class="batch-checkbox">
             <input type="checkbox" [checked]="isAllSelected()" (change)="toggleSelectAll()">
-            <span class="checkbox-label">全選</span>
+            <span class="checkbox-label">{{ t('accounts.selectAll') }}</span>
           </label>
           <div class="stat-item">
             <span class="stat-dot online"></span>
-            <span class="stat-label">在线</span>
+            <span class="stat-label">{{ t('accounts.online') }}</span>
             <span class="stat-value">{{ onlineCount }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-dot offline"></span>
-            <span class="stat-label">离线</span>
+            <span class="stat-label">{{ t('accounts.offline') }}</span>
             <span class="stat-value">{{ offlineCount }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-dot banned"></span>
-            <span class="stat-label">封禁</span>
+            <span class="stat-label">{{ t('accounts.banned') }}</span>
             <span class="stat-value">{{ bannedCount }}</span>
           </div>
           <div class="stat-item">
-            <span class="stat-label">总计</span>
+            <span class="stat-label">{{ t('accounts.total') }}</span>
             <span class="stat-value">{{ accounts.length }}</span>
           </div>
         </div>
@@ -551,8 +552,11 @@ export const PROXY_TYPES = [
               
               <!-- 頭部：头像 + 状态 + 角色 -->
               <div class="card-header">
-                @if (account.avatarPath) {
-                  <img [src]="getAvatarUrl(account.avatarPath)" class="card-avatar-img" alt="" (error)="onAvatarError($event)">
+                @if (isValidAvatarPath(account.avatarPath)) {
+                  <div class="card-avatar-wrapper">
+                    <img [src]="getAvatarUrl(account.avatarPath!)" class="card-avatar-img" alt="" (error)="onAvatarError($event)">
+                    <div class="card-avatar avatar-fallback" style="display: none;">{{ getAvatarLetter(account) }}</div>
+                  </div>
                 } @else {
                   <div class="card-avatar">{{ getAvatarLetter(account) }}</div>
                 }
@@ -735,10 +739,10 @@ export const PROXY_TYPES = [
       @if (filteredAccounts.length === 0 && accounts.length === 0) {
         <div class="empty-state">
           <div class="empty-icon">👥</div>
-          <h3>尚未添加任何账户</h3>
-          <p>点击下方按鈕添加您的第一個 Telegram 账户</p>
+          <h3>{{ t('accounts.noAccountsYet') }}</h3>
+          <p>{{ t('accounts.clickToAddFirst') }}</p>
           <button (click)="addAccount.emit()" class="add-btn large">
-            ➕ 添加账户
+            ➕ {{ t('accounts.addAccount') }}
           </button>
         </div>
       }
@@ -764,8 +768,13 @@ export const PROXY_TYPES = [
         <div class="detail-content">
           <!-- 基本信息 -->
           <div class="detail-section">
-            @if (selectedAccount()!.avatarPath) {
-              <img [src]="getAvatarUrl(selectedAccount()!.avatarPath)" class="detail-avatar-img" alt="Avatar" (error)="onAvatarError($event)">
+            @if (isValidAvatarPath(selectedAccount()!.avatarPath)) {
+              <div class="detail-avatar-wrapper">
+                <img [src]="getAvatarUrl(selectedAccount()!.avatarPath!)" class="detail-avatar-img" alt="Avatar" (error)="onAvatarError($event)">
+                <div class="detail-avatar avatar-fallback" style="display: none;">
+                  {{ getAvatarLetter(selectedAccount()!) }}
+                </div>
+              </div>
             } @else {
               <div class="detail-avatar">
                 {{ getAvatarLetter(selectedAccount()!) }}
@@ -4006,7 +4015,13 @@ export const PROXY_TYPES = [
 export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
   private ipcService = inject(ElectronIpcService);
   private toast = inject(ToastService);
+  private i18n = inject(I18nService);
   private ipcChannels: string[] = [];
+  
+  // 翻譯輔助方法
+  t(key: string): string {
+    return this.i18n.t(key);
+  }
 
   @Input() accounts: Account[] = [];
   
@@ -4319,13 +4334,27 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
     return 'local-file://' + avatarPath;
   }
 
-  // 頭像載入失敗時的處理
+  // 🔧 頭像載入失敗時的處理（顯示 fallback）
   onAvatarError(event: Event): void {
     const target = event.target as HTMLImageElement;
     if (target) {
-      // 隱藏失敗的圖片
+      // 隱藏失敗的圖片，讓 fallback div 顯示
       target.style.display = 'none';
+      
+      // 嘗試找到相鄰的 fallback 元素並顯示
+      const parent = target.parentElement;
+      if (parent) {
+        const fallback = parent.querySelector('.avatar-fallback');
+        if (fallback) {
+          (fallback as HTMLElement).style.display = 'flex';
+        }
+      }
     }
+  }
+  
+  // 🔧 檢查頭像路徑是否有效
+  isValidAvatarPath(path: string | undefined): boolean {
+    return !!path && path.length > 0 && !path.includes('undefined');
   }
 
   selectAccount(account: Account): void {
@@ -4504,6 +4533,12 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
   // ========== 同步账号信息 ==========
 
   syncAccountInfo(account: Account): void {
+    // 🔧 P0: 檢查帳號是否在線
+    if (account.status !== 'Online') {
+      this.toast.warning(`帳號 ${account.phone} 未登入，請先點擊「登入」按鈕`);
+      return;
+    }
+    
     this.syncing.set(true);
     this.toast.info('正在同步账号信息...');
 

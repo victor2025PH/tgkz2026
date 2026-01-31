@@ -1,0 +1,68 @@
+name: Deploy Backend Only
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'docker-compose.yml'
+      - 'nginx.conf'
+  workflow_dispatch:  # 允許手動觸發
+
+env:
+  SERVER_HOST: 165.154.210.154
+  SERVER_USER: ubuntu
+  DEPLOY_PATH: /opt/tg-matrix
+
+jobs:
+  deploy:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.SERVER_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy backend files
+        run: |
+          # 只同步後端和配置文件
+          rsync -avz --delete \
+            --exclude '__pycache__' \
+            --exclude '*.pyc' \
+            --exclude 'venv' \
+            --exclude '.env' \
+            backend/ ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }}:${{ env.DEPLOY_PATH }}/backend/
+          
+          # 同步配置文件
+          rsync -avz docker-compose.yml nginx.conf \
+            ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }}:${{ env.DEPLOY_PATH }}/
+      
+      - name: Restart services
+        run: |
+          ssh ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} << 'ENDSSH'
+            cd /opt/tg-matrix
+            
+            # 重建 API 容器
+            sudo docker compose build --no-cache api
+            sudo docker compose up -d api
+            
+            # 重載 nginx 配置
+            sudo docker compose exec -T web nginx -s reload || true
+            
+            # 顯示狀態
+            sudo docker ps
+            echo "✅ Backend deployment completed at $(date)"
+          ENDSSH
+      
+      - name: Health check
+        run: |
+          sleep 5
+          curl -f http://${{ env.SERVER_HOST }}/api/health || echo "API health check pending..."

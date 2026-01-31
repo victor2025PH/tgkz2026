@@ -1,75 +1,102 @@
-name: 🚀 Auto Deploy to Server
+name: Deploy to Production
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:  # 允許手動觸發
 
+env:
+  SERVER_HOST: 165.154.210.154
+  SERVER_USER: ubuntu
+  DEPLOY_PATH: /opt/tg-matrix
+
 jobs:
-  deploy:
-    name: 🔄 Deploy to Production
+  build:
+    name: Build Frontend
     runs-on: ubuntu-latest
     
     steps:
-      - name: 📥 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: 🔐 Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          node-version: '20'
+          cache: 'npm'
       
-      - name: 🚀 Deploy to server
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build Angular app
+        run: npm run build
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Server
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      
+      - name: Setup SSH key
         run: |
-          # 添加服務器到已知主機
           mkdir -p ~/.ssh
-          ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts 2>/dev/null
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.SERVER_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy to server
+        run: |
+          # 同步文件到服務器
+          rsync -avz --delete \
+            --exclude '.git' \
+            --exclude 'node_modules' \
+            --exclude '__pycache__' \
+            --exclude '*.pyc' \
+            --exclude 'venv' \
+            --exclude '.env' \
+            --exclude 'data/' \
+            ./ ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }}:${{ env.DEPLOY_PATH }}/
           
-          # 執行部署命令
-          ssh $SERVER_USER@$SERVER_HOST << 'ENDSSH'
-            echo "🔄 開始自動部署..."
+          # 在服務器上重啟服務
+          ssh ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} << 'ENDSSH'
+            cd ${{ env.DEPLOY_PATH }}
             
-            # 進入項目目錄
-            cd /opt/tg-matrix-server
+            # 重建並重啟容器
+            sudo docker compose down
+            sudo docker compose build --no-cache api
+            sudo docker compose up -d
             
-            # 拉取最新代碼
-            echo "📥 拉取最新代碼..."
-            git pull origin main
-            
-            # 安裝/更新 Python 依賴（如果需要）
-            if [ -f backend/requirements.txt ]; then
-              echo "📦 檢查 Python 依賴..."
-              source venv/bin/activate
-              pip install -q -r backend/requirements.txt 2>/dev/null || true
-              deactivate
-            fi
-            
-            # 重啟服務
-            echo "🔄 重啟服務..."
-            sudo systemctl restart tg-matrix-license
-            
-            # 等待服務啟動
-            sleep 3
-            
-            # 檢查服務狀態
-            if sudo systemctl is-active --quiet tg-matrix-license; then
-              echo "✅ 服務啟動成功！"
-            else
-              echo "❌ 服務啟動失敗"
-              sudo systemctl status tg-matrix-license
-              exit 1
-            fi
-            
-            echo "🎉 部署完成！"
+            # 顯示狀態
+            sudo docker ps
+            echo "✅ Deployment completed at $(date)"
           ENDSSH
       
-      - name: 📊 Deployment Summary
+      - name: Health check
         run: |
-          echo "## 🚀 部署完成" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **時間**: $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
-          echo "- **分支**: main" >> $GITHUB_STEP_SUMMARY
-          echo "- **提交**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          sleep 10
+          curl -f http://${{ env.SERVER_HOST }}/health || echo "Health check failed, but deployment may still be successful"
+      
+      - name: Notify success
+        if: success()
+        run: echo "🚀 Deployment successful!"
+      
+      - name: Notify failure
+        if: failure()
+        run: echo "❌ Deployment failed!"

@@ -43,7 +43,7 @@ ACCOUNT_COMMANDS = [
     'credential-start-scrape', 'credential-submit-code',
     'credential-get-status', 'credential-get-all', 'credential-cancel-scrape',
     # 驗證碼
-    'verify-code', 'submit-2fa-password', 'resend-code',
+    'send-code', 'verify-code', 'submit-2fa-password', 'resend-code',
 ]
 
 # 消息相關命令

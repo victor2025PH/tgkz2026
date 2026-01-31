@@ -3309,6 +3309,94 @@ class BackendService:
             })
             handle_error(e, {"command": "add-account", "payload": payload})
     
+    async def handle_send_code(self, payload: Dict[str, Any]):
+        """
+        Handle send-code command - 發送驗證碼
+        
+        這是獨立的驗證碼發送命令，用於 SaaS 版本
+        """
+        try:
+            import sys
+            print(f"[Backend] handle_send_code called with payload: {payload}", file=sys.stderr)
+            
+            phone = payload.get('phone', '').strip()
+            api_id = payload.get('api_id') or payload.get('apiId')
+            api_hash = payload.get('api_hash') or payload.get('apiHash')
+            proxy = payload.get('proxy')
+            two_factor_password = payload.get('twoFactorPassword') or payload.get('two_factor_password')
+            
+            if not phone:
+                self.send_event("send-code-error", {
+                    "success": False,
+                    "error": "電話號碼不能為空"
+                })
+                return
+            
+            # 如果沒有提供 API ID/Hash，嘗試使用推薦的憑證
+            if not api_id or not api_hash:
+                try:
+                    from api_credential_pool import get_api_credential_pool
+                    data_dir = str(Path(config.DATA_PATH))
+                    pool = get_api_credential_pool(data_dir)
+                    recommended = pool.get_recommended_credential()
+                    if recommended:
+                        api_id = api_id or recommended.get('api_id')
+                        api_hash = api_hash or recommended.get('api_hash')
+                        print(f"[Backend] Using recommended credential: {api_id}", file=sys.stderr)
+                except Exception as e:
+                    print(f"[Backend] Could not get recommended credential: {e}", file=sys.stderr)
+            
+            if not api_id or not api_hash:
+                self.send_event("send-code-error", {
+                    "success": False,
+                    "error": "請提供 API ID 和 API Hash，或在 API 憑證池中添加憑證"
+                })
+                return
+            
+            # 使用 TelegramManager 發送驗證碼
+            print(f"[Backend] Sending verification code to {phone}...", file=sys.stderr)
+            
+            result = await self.telegram_manager.login_account(
+                phone=phone,
+                api_id=api_id,
+                api_hash=api_hash,
+                proxy=proxy,
+                two_factor_password=two_factor_password
+            )
+            
+            if result.get('success'):
+                # 驗證碼已發送
+                self.send_log(result.get('message', f"驗證碼已發送到 {phone}"), "success")
+                self.send_event("send-code-result", {
+                    "success": True,
+                    "phone": phone,
+                    "status": result.get('status', 'waiting_code'),
+                    "message": result.get('message'),
+                    "send_type": result.get('send_type', 'unknown'),
+                    "requires_code": result.get('requires_code', True),
+                    "phone_code_hash": result.get('phone_code_hash')
+                })
+            else:
+                # 發送失敗
+                error_msg = result.get('message', '發送驗證碼失敗')
+                self.send_log(error_msg, "error")
+                self.send_event("send-code-error", {
+                    "success": False,
+                    "phone": phone,
+                    "error": error_msg,
+                    "status": result.get('status', 'error')
+                })
+                
+        except Exception as e:
+            import traceback
+            print(f"[Backend] Error in handle_send_code: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            self.send_log(f"發送驗證碼失敗: {str(e)}", "error")
+            self.send_event("send-code-error", {
+                "success": False,
+                "error": str(e)
+            })
+    
     async def handle_login_account(self, payload: Any):
         """Handle login-account command with Pyrogram"""
         try:

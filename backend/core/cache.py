@@ -445,3 +445,44 @@ class QueryCache:
 
 def get_cache_service() -> CacheService:
     return CacheService.get_instance()
+
+
+# ==================== 向後兼容別名 ====================
+# 這些別名用於兼容舊版 cache_manager.py
+
+# CacheManager 是 CacheService 的別名
+CacheManager = CacheService
+
+# 單例實例
+_cache_manager_instance: CacheService = None
+
+
+def init_cache_manager(default_ttl: int = 300) -> CacheService:
+    """
+    初始化緩存管理器（向後兼容）
+    
+    Args:
+        default_ttl: 默認緩存過期時間（秒）
+    
+    Returns:
+        CacheService 實例
+    """
+    global _cache_manager_instance
+    if _cache_manager_instance is None:
+        _cache_manager_instance = CacheService.get_instance()
+        # 設置默認 TTL（可選）
+        _cache_manager_instance._default_ttl = default_ttl
+    return _cache_manager_instance
+
+
+def get_cache_manager() -> CacheService:
+    """
+    獲取緩存管理器實例（向後兼容）
+    
+    Returns:
+        CacheService 實例
+    """
+    global _cache_manager_instance
+    if _cache_manager_instance is None:
+        _cache_manager_instance = init_cache_manager()
+    return _cache_manager_instance

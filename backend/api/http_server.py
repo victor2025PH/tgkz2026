@@ -237,10 +237,7 @@ class HttpApiServer:
         
         if self.backend_service:
             try:
-                result = await self.backend_service.handle_command({
-                    'command': command,
-                    'payload': payload
-                })
+                result = await self.backend_service.handle_command(command, payload)
                 return result
             except Exception as e:
                 logger.error(f"Command execution error: {command} - {e}")

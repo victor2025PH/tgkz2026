@@ -5,6 +5,9 @@ TG-Matrix 核心模組
 - 多租戶上下文管理
 - 使用量追蹤
 - 郵件服務
+- 支付服務
+- 數據導出
+- 系統監控
 """
 
 from .tenant_context import (
@@ -31,6 +34,26 @@ from .email_service import (
     EMAIL_TEMPLATES
 )
 
+from .payment_service import (
+    PaymentService,
+    get_payment_service,
+    SUBSCRIPTION_PLANS
+)
+
+from .data_export import (
+    DataExportService,
+    get_export_service,
+    ExportOptions,
+    BackupInfo
+)
+
+from .monitoring import (
+    SystemMonitor,
+    get_system_monitor,
+    SystemMetrics,
+    Alert
+)
+
 __all__ = [
     # 租戶上下文
     'TenantContext',
@@ -51,5 +74,22 @@ __all__ = [
     'EmailConfig',
     'EmailService',
     'get_email_service',
-    'EMAIL_TEMPLATES'
+    'EMAIL_TEMPLATES',
+    
+    # 支付服務
+    'PaymentService',
+    'get_payment_service',
+    'SUBSCRIPTION_PLANS',
+    
+    # 數據導出
+    'DataExportService',
+    'get_export_service',
+    'ExportOptions',
+    'BackupInfo',
+    
+    # 系統監控
+    'SystemMonitor',
+    'get_system_monitor',
+    'SystemMetrics',
+    'Alert'
 ]

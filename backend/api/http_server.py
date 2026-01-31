@@ -164,6 +164,27 @@ class HttpApiServer:
         self.app.router.add_get('/api/v1/usage/history', self.get_usage_history)
         self.app.router.add_get('/api/v1/quota', self.get_quota_status)
         
+        # 支付和訂閱
+        self.app.router.get('/api/v1/subscription', self.get_subscription)
+        self.app.router.add_post('/api/v1/subscription/checkout', self.create_checkout)
+        self.app.router.add_post('/api/v1/subscription/cancel', self.cancel_subscription)
+        self.app.router.add_get('/api/v1/subscription/plans', self.get_plans)
+        self.app.router.add_get('/api/v1/transactions', self.get_transactions)
+        self.app.router.add_post('/api/v1/webhooks/stripe', self.stripe_webhook)
+        
+        # 數據導出和備份
+        self.app.router.add_post('/api/v1/export', self.export_data)
+        self.app.router.add_get('/api/v1/backups', self.list_backups)
+        self.app.router.add_post('/api/v1/backups', self.create_backup)
+        self.app.router.add_delete('/api/v1/backups/{id}', self.delete_backup)
+        self.app.router.add_get('/api/v1/backups/{id}/download', self.download_backup)
+        
+        # 系統監控
+        self.app.router.add_get('/api/v1/system/health', self.system_health)
+        self.app.router.add_get('/api/v1/system/metrics', self.system_metrics)
+        self.app.router.add_get('/api/v1/system/alerts', self.system_alerts)
+        self.app.router.add_get('/metrics', self.prometheus_metrics)
+        
         # 初始狀態
         self.app.router.add_get('/api/v1/initial-state', self.get_initial_state)
         
@@ -685,6 +706,378 @@ class HttpApiServer:
         except Exception as e:
             logger.error(f"Get quota status error: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 支付和訂閱 ====================
+    
+    async def get_subscription(self, request):
+        """獲取用戶訂閱"""
+        try:
+            from core.payment_service import get_payment_service
+            service = get_payment_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '未登入'
+                }, 401)
+            
+            sub = await service.get_subscription(user_id)
+            if sub:
+                return self._json_response({'success': True, 'data': sub.to_dict()})
+            return self._json_response({'success': True, 'data': None})
+        except Exception as e:
+            logger.error(f"Get subscription error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def create_checkout(self, request):
+        """創建結帳會話"""
+        try:
+            from core.payment_service import get_payment_service
+            service = get_payment_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '未登入'
+                }, 401)
+            
+            data = await request.json()
+            plan_id = data.get('plan_id')
+            billing_cycle = data.get('billing_cycle', 'monthly')
+            success_url = data.get('success_url', '')
+            cancel_url = data.get('cancel_url', '')
+            
+            result = await service.create_checkout(
+                user_id=user_id,
+                plan_id=plan_id,
+                billing_cycle=billing_cycle,
+                success_url=success_url,
+                cancel_url=cancel_url
+            )
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Create checkout error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def cancel_subscription(self, request):
+        """取消訂閱"""
+        try:
+            from core.payment_service import get_payment_service
+            service = get_payment_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '未登入'
+                }, 401)
+            
+            result = await service.cancel_subscription(user_id)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Cancel subscription error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_plans(self, request):
+        """獲取訂閱方案列表"""
+        try:
+            from core.payment_service import SUBSCRIPTION_PLANS
+            return self._json_response({
+                'success': True,
+                'data': list(SUBSCRIPTION_PLANS.values())
+            })
+        except Exception as e:
+            logger.error(f"Get plans error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_transactions(self, request):
+        """獲取交易記錄"""
+        try:
+            from core.payment_service import get_payment_service
+            service = get_payment_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '未登入'
+                }, 401)
+            
+            limit = int(request.query.get('limit', '20'))
+            transactions = await service.get_transactions(user_id, limit)
+            return self._json_response({
+                'success': True,
+                'data': [t.to_dict() for t in transactions]
+            })
+        except Exception as e:
+            logger.error(f"Get transactions error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def stripe_webhook(self, request):
+        """Stripe Webhook 處理"""
+        try:
+            from core.payment_service import get_payment_service
+            service = get_payment_service()
+            
+            payload = await request.read()
+            signature = request.headers.get('Stripe-Signature', '')
+            
+            # 驗證簽名
+            provider = service.get_provider('stripe')
+            if not provider.verify_webhook(payload, signature):
+                return self._json_response({
+                    'success': False,
+                    'error': 'Invalid signature'
+                }, 400)
+            
+            # 解析事件
+            import json
+            event = json.loads(payload)
+            event_type = event.get('type', '')
+            event_data = event.get('data', {}).get('object', {})
+            
+            # 處理事件
+            result = await service.handle_webhook(event_type, event_data)
+            return self._json_response({'success': True, **result})
+        except Exception as e:
+            logger.error(f"Stripe webhook error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 數據導出和備份 ====================
+    
+    async def export_data(self, request):
+        """導出用戶數據"""
+        try:
+            from core.data_export import get_export_service, ExportOptions
+            service = get_export_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '未登入'
+                }, 401)
+            
+            data = await request.json()
+            options = ExportOptions(
+                include_accounts=data.get('include_accounts', True),
+                include_messages=data.get('include_messages', True),
+                include_contacts=data.get('include_contacts', True),
+                include_settings=data.get('include_settings', True),
+                include_usage=data.get('include_usage', False),
+                mask_sensitive=data.get('mask_sensitive', True),
+                format=data.get('format', 'json')
+            )
+            
+            result = await service.export_user_data(user_id, options)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Export data error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def list_backups(self, request):
+        """列出備份"""
+        try:
+            from core.data_export import get_export_service
+            service = get_export_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '未登入'
+                }, 401)
+            
+            backups = await service.list_backups(user_id)
+            return self._json_response({
+                'success': True,
+                'data': [b.to_dict() for b in backups]
+            })
+        except Exception as e:
+            logger.error(f"List backups error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def create_backup(self, request):
+        """創建備份"""
+        try:
+            from core.data_export import get_export_service
+            service = get_export_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '未登入'
+                }, 401)
+            
+            data = await request.json()
+            backup_type = data.get('type', 'full')
+            
+            result = await service.create_backup(user_id, backup_type)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Create backup error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def delete_backup(self, request):
+        """刪除備份"""
+        try:
+            from core.data_export import get_export_service
+            service = get_export_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            backup_id = request.match_info.get('id')
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '未登入'
+                }, 401)
+            
+            result = await service.delete_backup(user_id, backup_id)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Delete backup error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def download_backup(self, request):
+        """下載備份"""
+        try:
+            from core.data_export import get_export_service
+            import os
+            service = get_export_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            backup_id = request.match_info.get('id')
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '未登入'
+                }, 401)
+            
+            # 獲取備份列表找到對應文件
+            backups = await service.list_backups(user_id)
+            backup = next((b for b in backups if b.id == backup_id), None)
+            
+            if not backup:
+                return self._json_response({
+                    'success': False,
+                    'error': '備份不存在'
+                }, 404)
+            
+            filepath = os.path.join(service.backup_dir, user_id, backup.filename)
+            
+            if not os.path.exists(filepath):
+                return self._json_response({
+                    'success': False,
+                    'error': '備份文件不存在'
+                }, 404)
+            
+            # 返回文件
+            with open(filepath, 'rb') as f:
+                content = f.read()
+            
+            return web.Response(
+                body=content,
+                content_type='application/zip',
+                headers={
+                    'Content-Disposition': f'attachment; filename="{backup.filename}"'
+                }
+            )
+        except Exception as e:
+            logger.error(f"Download backup error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 系統監控 ====================
+    
+    async def system_health(self, request):
+        """系統健康檢查"""
+        try:
+            from core.monitoring import get_system_monitor
+            monitor = get_system_monitor()
+            result = await monitor.health_check()
+            
+            status_code = 200
+            if result['status'] == 'unhealthy':
+                status_code = 503
+            elif result['status'] == 'degraded':
+                status_code = 200  # 降級仍返回 200
+            
+            return self._json_response(result, status_code)
+        except Exception as e:
+            logger.error(f"Health check error: {e}")
+            return self._json_response({
+                'status': 'unhealthy',
+                'error': str(e)
+            }, 503)
+    
+    async def system_metrics(self, request):
+        """獲取系統指標"""
+        try:
+            from core.monitoring import get_system_monitor
+            monitor = get_system_monitor()
+            metrics = monitor.collect_metrics()
+            
+            return self._json_response({
+                'success': True,
+                'data': metrics.to_dict()
+            })
+        except Exception as e:
+            logger.error(f"Get metrics error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def system_alerts(self, request):
+        """獲取系統告警"""
+        try:
+            from core.monitoring import get_system_monitor
+            monitor = get_system_monitor()
+            
+            status = request.query.get('status')
+            limit = int(request.query.get('limit', '50'))
+            
+            alerts = await monitor.get_alerts(status, limit)
+            
+            return self._json_response({
+                'success': True,
+                'data': [a.to_dict() for a in alerts]
+            })
+        except Exception as e:
+            logger.error(f"Get alerts error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def prometheus_metrics(self, request):
+        """Prometheus 指標端點"""
+        try:
+            from core.monitoring import get_system_monitor
+            monitor = get_system_monitor()
+            metrics = monitor.get_prometheus_metrics()
+            
+            return web.Response(
+                text=metrics,
+                content_type='text/plain; version=0.0.4'
+            )
+        except Exception as e:
+            logger.error(f"Prometheus metrics error: {e}")
+            return web.Response(text=f'# Error: {e}', status=500)
     
     async def get_initial_state(self, request):
         """獲取初始狀態"""

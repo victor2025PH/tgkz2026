@@ -185,6 +185,26 @@ class HttpApiServer:
         self.app.router.add_get('/api/v1/system/alerts', self.system_alerts)
         self.app.router.add_get('/metrics', self.prometheus_metrics)
         
+        # 2FA
+        self.app.router.add_get('/api/v1/auth/2fa', self.get_2fa_status)
+        self.app.router.add_post('/api/v1/auth/2fa/setup', self.setup_2fa)
+        self.app.router.add_post('/api/v1/auth/2fa/enable', self.enable_2fa)
+        self.app.router.add_post('/api/v1/auth/2fa/disable', self.disable_2fa)
+        self.app.router.add_post('/api/v1/auth/2fa/verify', self.verify_2fa)
+        self.app.router.add_get('/api/v1/auth/2fa/devices', self.get_trusted_devices)
+        self.app.router.add_delete('/api/v1/auth/2fa/devices/{id}', self.remove_trusted_device)
+        
+        # API 密鑰
+        self.app.router.add_get('/api/v1/api-keys', self.list_api_keys)
+        self.app.router.add_post('/api/v1/api-keys', self.create_api_key)
+        self.app.router.add_delete('/api/v1/api-keys/{id}', self.delete_api_key)
+        self.app.router.add_post('/api/v1/api-keys/{id}/revoke', self.revoke_api_key)
+        
+        # API 文檔
+        self.app.router.add_get('/api/docs', self.swagger_ui)
+        self.app.router.add_get('/api/redoc', self.redoc_ui)
+        self.app.router.add_get('/api/openapi.json', self.openapi_json)
+        
         # 初始狀態
         self.app.router.add_get('/api/v1/initial-state', self.get_initial_state)
         
@@ -1078,6 +1098,247 @@ class HttpApiServer:
         except Exception as e:
             logger.error(f"Prometheus metrics error: {e}")
             return web.Response(text=f'# Error: {e}', status=500)
+    
+    # ==================== API 文檔 ====================
+    
+    async def swagger_ui(self, request):
+        """Swagger UI"""
+        from api.openapi import SWAGGER_UI_HTML
+        return web.Response(text=SWAGGER_UI_HTML, content_type='text/html')
+    
+    async def redoc_ui(self, request):
+        """ReDoc UI"""
+        from api.openapi import REDOC_HTML
+        return web.Response(text=REDOC_HTML, content_type='text/html')
+    
+    async def openapi_json(self, request):
+        """OpenAPI JSON 規範"""
+        from api.openapi import get_openapi_json
+        return web.Response(
+            text=get_openapi_json(),
+            content_type='application/json'
+        )
+    
+    # ==================== 2FA ====================
+    
+    async def get_2fa_status(self, request):
+        """獲取 2FA 狀態"""
+        try:
+            from auth.two_factor import get_two_factor_service
+            service = get_two_factor_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            config = service.get_config(user_id)
+            if config:
+                return self._json_response({'success': True, 'data': config.to_dict()})
+            return self._json_response({'success': True, 'data': {'enabled': False}})
+        except Exception as e:
+            logger.error(f"Get 2FA status error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def setup_2fa(self, request):
+        """開始 2FA 設置"""
+        try:
+            from auth.two_factor import get_two_factor_service
+            service = get_two_factor_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            email = tenant.email if tenant else ''
+            
+            if not user_id:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            result = await service.setup(user_id, email)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Setup 2FA error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def enable_2fa(self, request):
+        """啟用 2FA"""
+        try:
+            from auth.two_factor import get_two_factor_service
+            service = get_two_factor_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            data = await request.json()
+            code = data.get('code', '')
+            
+            result = await service.enable(user_id, code)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Enable 2FA error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def disable_2fa(self, request):
+        """禁用 2FA"""
+        try:
+            from auth.two_factor import get_two_factor_service
+            service = get_two_factor_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            data = await request.json()
+            code = data.get('code', '')
+            
+            result = await service.disable(user_id, code)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Disable 2FA error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def verify_2fa(self, request):
+        """驗證 2FA"""
+        try:
+            from auth.two_factor import get_two_factor_service
+            service = get_two_factor_service()
+            
+            data = await request.json()
+            user_id = data.get('user_id', '')
+            code = data.get('code', '')
+            device_fingerprint = data.get('device_fingerprint', '')
+            
+            result = await service.verify(user_id, code, device_fingerprint)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Verify 2FA error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_trusted_devices(self, request):
+        """獲取受信任設備"""
+        try:
+            from auth.two_factor import get_two_factor_service
+            service = get_two_factor_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            devices = await service.get_trusted_devices(user_id)
+            return self._json_response({'success': True, 'data': devices})
+        except Exception as e:
+            logger.error(f"Get trusted devices error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def remove_trusted_device(self, request):
+        """移除受信任設備"""
+        try:
+            from auth.two_factor import get_two_factor_service
+            service = get_two_factor_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            device_id = request.match_info.get('id')
+            
+            if not user_id:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            success = await service.remove_trusted_device(user_id, device_id)
+            return self._json_response({'success': success})
+        except Exception as e:
+            logger.error(f"Remove trusted device error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== API 密鑰 ====================
+    
+    async def list_api_keys(self, request):
+        """列出 API 密鑰"""
+        try:
+            from auth.api_key import get_api_key_service
+            service = get_api_key_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            keys = await service.list_keys(user_id)
+            return self._json_response({
+                'success': True,
+                'data': [k.to_dict() for k in keys]
+            })
+        except Exception as e:
+            logger.error(f"List API keys error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def create_api_key(self, request):
+        """創建 API 密鑰"""
+        try:
+            from auth.api_key import get_api_key_service
+            service = get_api_key_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            data = await request.json()
+            name = data.get('name', 'Unnamed Key')
+            scopes = data.get('scopes', ['read'])
+            expires_in_days = data.get('expires_in_days')
+            
+            result = await service.create(user_id, name, scopes, expires_in_days)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Create API key error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def delete_api_key(self, request):
+        """刪除 API 密鑰"""
+        try:
+            from auth.api_key import get_api_key_service
+            service = get_api_key_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            key_id = request.match_info.get('id')
+            
+            if not user_id:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            result = await service.delete(user_id, key_id)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Delete API key error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def revoke_api_key(self, request):
+        """撤銷 API 密鑰"""
+        try:
+            from auth.api_key import get_api_key_service
+            service = get_api_key_service()
+            
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            key_id = request.match_info.get('id')
+            
+            if not user_id:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            result = await service.revoke(user_id, key_id)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Revoke API key error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
     
     async def get_initial_state(self, request):
         """獲取初始狀態"""

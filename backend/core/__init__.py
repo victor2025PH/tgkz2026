@@ -54,6 +54,14 @@ from .monitoring import (
     Alert
 )
 
+from .realtime import (
+    RealtimeService,
+    get_realtime_service,
+    notify_user,
+    broadcast_event,
+    EventType
+)
+
 __all__ = [
     # 租戶上下文
     'TenantContext',
@@ -91,5 +99,12 @@ __all__ = [
     'SystemMonitor',
     'get_system_monitor',
     'SystemMetrics',
-    'Alert'
+    'Alert',
+    
+    # 實時通知
+    'RealtimeService',
+    'get_realtime_service',
+    'notify_user',
+    'broadcast_event',
+    'EventType'
 ]

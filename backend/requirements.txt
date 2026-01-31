@@ -48,15 +48,18 @@ playwright>=1.40.0
 # NumPy (required for vector operations)
 numpy>=1.24.0
 
-# ==================== RAG System (Recommended) ====================
-# 以下依賴強烈建議安裝，可大幅提升 AI 回覆質量
-# 如果安裝失敗，系統會自動降級使用基礎功能
+# ==================== RAG System (Optional for Production) ====================
+# 以下依賴為可選，用於增強 AI 回覆質量
+# 在小型 VPS 上建議跳過以減少鏡像大小
 
-# Vector database (recommended - provides semantic search)
-chromadb>=0.4.0
+# Vector database - using lightweight alternative for production
+# chromadb>=0.4.0
 
-# Neural embeddings (recommended - provides better text understanding)
-sentence-transformers>=2.2.0
+# Neural embeddings - DISABLED for production to save disk space (4GB+ PyTorch)
+# sentence-transformers>=2.2.0
+# 如需啟用，請安裝 CPU 版本：
+# pip install torch --index-url https://download.pytorch.org/whl/cpu
+# pip install sentence-transformers
 
-# 🔧 安裝命令：
-# pip install chromadb sentence-transformers
+# Lightweight text search alternative
+Whoosh>=2.7.4

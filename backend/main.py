@@ -2268,7 +2268,7 @@ class BackendService:
                     handled, result = await try_route_command(command, payload, request_id)
                     if handled:
                         print(f"[Backend] ✓ Command handled by router: {command}", file=sys.stderr)
-                        return  # 命令已被路由器處理
+                        return result  # 🔧 FIX: Return the result from router
                     else:
                         print(f"[Backend] Command not handled by router, using fallback: {command}", file=sys.stderr)
                 except Exception as router_error:
@@ -2433,14 +2433,16 @@ class BackendService:
                     # 無法獲取簽名時，嘗試傳入 payload
                     accepts_payload = True
                 
-                # 調用處理器
+                # 調用處理器並返回結果
                 if payload is not None and accepts_payload:
-                    await handler(payload)
+                    result = await handler(payload)
                 else:
-                    await handler()
+                    result = await handler()
+                return result  # 🔧 FIX: Return the handler result
             else:
                 # 命令未找到
                 self.send_log(f"Unknown command: {command}", "warning")
+                return None
             
             # 🆕 Phase 7: 舊的 if-elif 鏈（1,370+ 行）已被上方動態機制取代
             # 所有 452 個命令現在通過 CommandRouter + 動態 getattr 回退處理

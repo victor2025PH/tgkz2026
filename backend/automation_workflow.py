@@ -654,3 +654,18 @@ def get_automation_workflow_service() -> AutomationWorkflowService:
     if automation_workflow_service is None:
         automation_workflow_service = AutomationWorkflowService()
     return automation_workflow_service
+
+
+# 別名 - 兼容其他模塊的調用
+def get_workflow_engine() -> AutomationWorkflowService:
+    """別名：獲取工作流引擎"""
+    return get_automation_workflow_service()
+
+
+class EventType:
+    """事件類型枚舉"""
+    KEYWORD_MATCH = "keyword_match"
+    INTEREST_DETECTED = "interest_detected"
+    GROUP_CREATED = "group_created"
+    MESSAGE_SENT = "message_sent"
+    CONVERSION = "conversion"

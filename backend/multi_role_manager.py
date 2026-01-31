@@ -460,3 +460,11 @@ def get_multi_role_manager(data_dir: str = None) -> MultiRoleManager:
     if _manager_instance is None:
         _manager_instance = MultiRoleManager(data_dir)
     return _manager_instance
+
+
+async def init_multi_role_manager(telegram_client=None, data_dir: str = None):
+    """初始化多角色管理器"""
+    manager = get_multi_role_manager(data_dir)
+    if telegram_client:
+        manager.telegram_client = telegram_client
+    return manager

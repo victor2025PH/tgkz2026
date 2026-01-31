@@ -317,6 +317,32 @@ class CacheService:
             'memory': self._memory.stats,
             'redis_available': self._redis.available
         }
+    
+    async def start_cleanup_task(self) -> None:
+        """
+        啟動後台清理任務（向後兼容）
+        
+        LRUCache 已經有自動過期機制，這個方法主要是為了兼容舊代碼
+        """
+        import asyncio
+        
+        async def cleanup_loop():
+            while True:
+                try:
+                    await asyncio.sleep(60)  # 每分鐘清理一次
+                    # 觸發 LRU 緩存的過期清理
+                    self._memory._cleanup()
+                except asyncio.CancelledError:
+                    break
+                except Exception:
+                    pass
+        
+        # 在後台啟動清理任務
+        asyncio.create_task(cleanup_loop())
+    
+    async def close(self) -> None:
+        """關閉緩存服務"""
+        await self._redis.close()
 
 
 # ==================== 緩存裝飾器 ====================

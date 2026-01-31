@@ -3367,7 +3367,7 @@ class BackendService:
             if result.get('success'):
                 # 驗證碼已發送
                 self.send_log(result.get('message', f"驗證碼已發送到 {phone}"), "success")
-                self.send_event("send-code-result", {
+                response = {
                     "success": True,
                     "phone": phone,
                     "status": result.get('status', 'waiting_code'),
@@ -3375,27 +3375,33 @@ class BackendService:
                     "send_type": result.get('send_type', 'unknown'),
                     "requires_code": result.get('requires_code', True),
                     "phone_code_hash": result.get('phone_code_hash')
-                })
+                }
+                self.send_event("send-code-result", response)
+                return response
             else:
                 # 發送失敗
                 error_msg = result.get('message', '發送驗證碼失敗')
                 self.send_log(error_msg, "error")
-                self.send_event("send-code-error", {
+                response = {
                     "success": False,
                     "phone": phone,
                     "error": error_msg,
                     "status": result.get('status', 'error')
-                })
+                }
+                self.send_event("send-code-error", response)
+                return response
                 
         except Exception as e:
             import traceback
             print(f"[Backend] Error in handle_send_code: {e}", file=sys.stderr)
             traceback.print_exc(file=sys.stderr)
             self.send_log(f"發送驗證碼失敗: {str(e)}", "error")
-            self.send_event("send-code-error", {
+            response = {
                 "success": False,
                 "error": str(e)
-            })
+            }
+            self.send_event("send-code-error", response)
+            return response
     
     async def handle_login_account(self, payload: Any):
         """Handle login-account command with Pyrogram"""

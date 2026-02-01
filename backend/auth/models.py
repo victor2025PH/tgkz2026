@@ -182,30 +182,90 @@ class ApiKey:
     last_used_at: Optional[datetime] = None
 
 
-# 訂閱級別配置
-SUBSCRIPTION_TIERS = {
+# ==================== 訂閱級別配置（向後兼容） ====================
+# 
+# 注意：SUBSCRIPTION_TIERS 現已由 LevelConfigService 統一管理
+# 此處保留靜態定義作為 fallback，實際使用時優先從統一配置服務獲取
+#
+# 新舊等級映射關係：
+#   free       <- bronze  (青銅戰士)
+#   basic      <- silver  (白銀精英)
+#   pro        <- gold    (黃金大師)
+#   enterprise <- king    (榮耀王者)
+#
+# 建議使用新的統一 API：
+#   from backend.core.level_config import get_subscription_tiers, get_user_quota
+#
+
+def _get_subscription_tiers_dynamic():
+    """動態生成 SUBSCRIPTION_TIERS（優先使用）"""
+    try:
+        from ..core.level_config import get_subscription_tiers
+        return get_subscription_tiers()
+    except ImportError:
+        # Fallback：返回靜態配置
+        return _SUBSCRIPTION_TIERS_FALLBACK
+
+
+# Fallback 靜態配置（僅在無法導入統一配置時使用）
+_SUBSCRIPTION_TIERS_FALLBACK = {
     'free': {
-        'max_accounts': 3,
-        'max_api_calls': 1000,
-        'features': ['basic_monitoring', 'basic_ai'],
+        'max_accounts': 2,
+        'max_api_calls': 10,
+        'features': ['basic_messaging', 'manual_reply'],
         'price': 0
     },
     'basic': {
-        'max_accounts': 10,
-        'max_api_calls': 10000,
-        'features': ['basic_monitoring', 'basic_ai', 'templates'],
-        'price': 29
+        'max_accounts': 5,
+        'max_api_calls': 50,
+        'features': ['basic_messaging', 'manual_reply', 'auto_reply', 'basic_ai', 'scheduled_send'],
+        'price': 4.99
     },
     'pro': {
-        'max_accounts': 50,
-        'max_api_calls': 100000,
-        'features': ['full_monitoring', 'advanced_ai', 'templates', 'team', 'api_access'],
-        'price': 99
+        'max_accounts': 15,
+        'max_api_calls': 300,
+        'features': ['basic_messaging', 'manual_reply', 'auto_reply', 'basic_ai', 'scheduled_send',
+                     'batch_send', 'data_export', 'keyword_reply', 'smart_mode', 'ai_insights'],
+        'price': 19.9
     },
     'enterprise': {
-        'max_accounts': 999,
+        'max_accounts': -1,  # 無限
         'max_api_calls': -1,  # 無限
         'features': ['all'],
         'price': -1  # 定制
     }
 }
+
+# 向後兼容：SUBSCRIPTION_TIERS 變量（延遲初始化）
+class _SubscriptionTiersProxy:
+    """代理類：延遲加載 SUBSCRIPTION_TIERS，避免循環導入"""
+    _cache = None
+    
+    def __getitem__(self, key):
+        return self._get_tiers()[key]
+    
+    def get(self, key, default=None):
+        return self._get_tiers().get(key, default)
+    
+    def keys(self):
+        return self._get_tiers().keys()
+    
+    def values(self):
+        return self._get_tiers().values()
+    
+    def items(self):
+        return self._get_tiers().items()
+    
+    def __iter__(self):
+        return iter(self._get_tiers())
+    
+    def __contains__(self, key):
+        return key in self._get_tiers()
+    
+    def _get_tiers(self):
+        if self._cache is None:
+            self._cache = _get_subscription_tiers_dynamic()
+        return self._cache
+
+
+SUBSCRIPTION_TIERS = _SubscriptionTiersProxy()

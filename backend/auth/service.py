@@ -22,6 +22,41 @@ from .utils import (
     generate_verification_code, generate_api_key
 )
 
+# 統一配置服務（優先使用）
+def _get_user_quotas(tier_name: str = 'free') -> dict:
+    """
+    獲取用戶配額（從統一配置服務）
+    
+    優先使用 LevelConfigService，fallback 到 SUBSCRIPTION_TIERS
+    """
+    try:
+        from ..core.level_config import get_level_config_service, MembershipLevel
+        service = get_level_config_service()
+        level = MembershipLevel.from_string(tier_name)
+        config = service.get_level_config(level)
+        if config:
+            return {
+                'max_accounts': config.quotas.tg_accounts,
+                'max_api_calls': config.quotas.ai_calls if config.quotas.ai_calls != -1 else 999999,
+                'daily_messages': config.quotas.daily_messages,
+                'devices': config.quotas.devices,
+                'groups': config.quotas.groups,
+                'features': config.features,
+            }
+    except ImportError:
+        pass
+    
+    # Fallback
+    tier = SUBSCRIPTION_TIERS.get(tier_name, {})
+    return {
+        'max_accounts': tier.get('max_accounts', 3),
+        'max_api_calls': tier.get('max_api_calls', 1000),
+        'daily_messages': 20,
+        'devices': 1,
+        'groups': 3,
+        'features': tier.get('features', []),
+    }
+
 logger = logging.getLogger(__name__)
 
 
@@ -181,10 +216,10 @@ class AuthService:
                 subscription_tier='free'
             )
             
-            # 設置配額
-            tier = SUBSCRIPTION_TIERS.get('free', {})
-            user.max_accounts = tier.get('max_accounts', 3)
-            user.max_api_calls = tier.get('max_api_calls', 1000)
+            # 設置配額（從統一配置服務獲取）
+            quotas = _get_user_quotas('free')
+            user.max_accounts = quotas['max_accounts']
+            user.max_api_calls = quotas['max_api_calls']
             
             db.execute('''
                 INSERT INTO users (
@@ -292,10 +327,10 @@ class AuthService:
                 is_verified=True  # OAuth 用戶自動驗證
             )
             
-            # 設置配額
-            tier = SUBSCRIPTION_TIERS.get('free', {})
-            user.max_accounts = tier.get('max_accounts', 3)
-            user.max_api_calls = tier.get('max_api_calls', 1000)
+            # 設置配額（從統一配置服務獲取）
+            quotas = _get_user_quotas('free')
+            user.max_accounts = quotas['max_accounts']
+            user.max_api_calls = quotas['max_api_calls']
             
             db.execute('''
                 INSERT INTO users (

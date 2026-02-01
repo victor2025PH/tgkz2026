@@ -484,6 +484,110 @@ class BackendService:
         self._cache.pop(cache_key, None)
         self._cache_timestamps.pop(cache_key, None)
     
+    # ==================== 配額檢查輔助方法 ====================
+    
+    async def check_quota(
+        self, 
+        quota_type: str, 
+        amount: int = 1,
+        owner_user_id: str = None
+    ) -> Dict[str, Any]:
+        """
+        檢查配額是否足夠
+        
+        Args:
+            quota_type: 配額類型（daily_messages, ai_calls, tg_accounts 等）
+            amount: 需要消耗的數量
+            owner_user_id: 用戶 ID（可選，Electron 模式可省略）
+        
+        Returns:
+            {'allowed': bool, 'result': QuotaCheckResult dict}
+        """
+        # Electron 模式跳過配額檢查
+        if os.environ.get('ELECTRON_MODE', 'false').lower() == 'true':
+            return {'allowed': True, 'unlimited': True}
+        
+        # 獲取用戶 ID
+        user_id = owner_user_id
+        if not user_id:
+            try:
+                from core.tenant_context import get_user_id
+                user_id = get_user_id()
+            except:
+                pass
+        
+        if not user_id:
+            # 無法確定用戶，允許操作（降級處理）
+            return {'allowed': True, 'unknown_user': True}
+        
+        try:
+            from core.quota_service import get_quota_service
+            service = get_quota_service()
+            result = service.check_quota(user_id, quota_type, amount)
+            return {'allowed': result.allowed, 'result': result.to_dict()}
+        except Exception as e:
+            print(f"[Backend] Quota check error: {e}", file=sys.stderr)
+            return {'allowed': True, 'error': str(e)}
+    
+    async def consume_quota(
+        self, 
+        quota_type: str, 
+        amount: int = 1,
+        owner_user_id: str = None,
+        context: str = None
+    ) -> bool:
+        """
+        消耗配額
+        
+        Args:
+            quota_type: 配額類型
+            amount: 消耗數量
+            owner_user_id: 用戶 ID
+            context: 操作上下文
+        
+        Returns:
+            是否成功
+        """
+        # Electron 模式跳過
+        if os.environ.get('ELECTRON_MODE', 'false').lower() == 'true':
+            return True
+        
+        user_id = owner_user_id
+        if not user_id:
+            try:
+                from core.tenant_context import get_user_id
+                user_id = get_user_id()
+            except:
+                pass
+        
+        if not user_id:
+            return True
+        
+        try:
+            from core.quota_service import get_quota_service
+            service = get_quota_service()
+            success, _ = service.consume_quota(user_id, quota_type, amount, context)
+            return success
+        except Exception as e:
+            print(f"[Backend] Quota consume error: {e}", file=sys.stderr)
+            return True
+    
+    def send_quota_exceeded_error(
+        self, 
+        event_name: str, 
+        quota_type: str,
+        quota_result: Dict[str, Any]
+    ):
+        """發送配額不足錯誤事件"""
+        self.send_event(event_name, {
+            'success': False,
+            'error': quota_result.get('message', f'{quota_type} 配額已用盡'),
+            'code': 'QUOTA_EXCEEDED',
+            'quota_type': quota_type,
+            'quota': quota_result,
+            'upgrade_suggestion': quota_result.get('upgrade_suggestion', '升級會員等級可獲得更多配額')
+        })
+    
     def _cleanup_cache(self):
         """🔧 Phase 1 優化：清理過期和超出限制的緩存"""
         now = datetime.now()
@@ -3040,6 +3144,14 @@ class BackendService:
         try:
             import sys
             import re as re_module
+            
+            owner_user_id = payload.get('ownerUserId')
+            
+            # 配額檢查：TG 帳號數量
+            quota_check = await self.check_quota('tg_accounts', 1, owner_user_id)
+            if not quota_check.get('allowed', True):
+                self.send_quota_exceeded_error('account-added', 'tg_accounts', quota_check.get('result', {}))
+                return {"success": False, "error": "TG 帳號配額已用盡", "code": "QUOTA_EXCEEDED"}
             
             # Clean phone number - remove spaces, dashes, and parentheses
             if 'phone' in payload:
@@ -8507,6 +8619,14 @@ class BackendService:
             style = payload.get('style', 'friendly')
             count = payload.get('count', 5)
             context = payload.get('context', {})
+            owner_user_id = payload.get('ownerUserId')
+            
+            # 配額檢查（根據生成數量計算消耗）
+            ai_cost = max(1, count // 3)  # 每 3 條消息消耗 1 次 AI 配額
+            quota_check = await self.check_quota('ai_calls', ai_cost, owner_user_id)
+            if not quota_check.get('allowed', True):
+                self.send_quota_exceeded_error('ai-generate-message-result', 'ai_calls', quota_check.get('result', {}))
+                return
             
             print(f"[AI] 生成消息: topic={topic}, style={style}, count={count}", file=sys.stderr)
             
@@ -8602,6 +8722,7 @@ class BackendService:
         🆕 P0: 通用 AI 文本生成 handler
         支持多角色協作等模塊調用 AI 生成文本
         🔧 P1: 添加重試機制
+        🔧 P4.3: 添加配額檢查
         """
         import sys
         import aiohttp
@@ -8615,6 +8736,18 @@ class BackendService:
             max_tokens = payload.get('maxTokens', 500)
             callback = payload.get('callback', 'ai:generate-text-result')
             response_format = payload.get('responseFormat', 'text')  # text 或 json
+            owner_user_id = payload.get('ownerUserId')
+            
+            # 配額檢查
+            quota_check = await self.check_quota('ai_calls', 1, owner_user_id)
+            if not quota_check.get('allowed', True):
+                self.send_event(callback, {
+                    "success": False,
+                    "error": "AI 調用配額已用盡",
+                    "code": "QUOTA_EXCEEDED",
+                    "quota": quota_check.get('result', {})
+                })
+                return
             
             print(f"[AI] callback={callback}, prompt長度={len(prompt)}", file=sys.stderr)
             
@@ -10000,6 +10133,13 @@ class BackendService:
             url = payload.get('url')
             name = payload.get('name', url)  # Use URL as name if not provided
             keyword_set_ids = payload.get('keywordSetIds', [])
+            owner_user_id = payload.get('ownerUserId')
+            
+            # 配額檢查：群組數量
+            quota_check = await self.check_quota('groups', 1, owner_user_id)
+            if not quota_check.get('allowed', True):
+                self.send_quota_exceeded_error('group-added', 'groups', quota_check.get('result', {}))
+                return
             
             # Validate group URL
             is_valid, error = validate_group_url(url)
@@ -10858,6 +10998,13 @@ class BackendService:
             attachment = payload.get('attachment')
             priority = payload.get('priority', 'normal')  # high, normal, low
             scheduled_at = payload.get('scheduledAt')  # Optional ISO datetime string
+            owner_user_id = payload.get('ownerUserId')  # 用於配額檢查
+            
+            # 配額檢查
+            quota_check = await self.check_quota('daily_messages', 1, owner_user_id)
+            if not quota_check.get('allowed', True):
+                self.send_quota_exceeded_error('message-sent', 'daily_messages', quota_check.get('result', {}))
+                return
             
             # 必須有帳號和用戶ID，消息內容或附件至少一個
             if not account_phone or not user_id:

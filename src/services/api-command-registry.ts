@@ -1070,6 +1070,125 @@ export const COMMAND_REGISTRY: CommandConfig[] = [
     httpMethod: 'GET',
     endpoint: '/api/v1/credentials/recommend',
     responseEvents: ['api-recommendation']
+  },
+  
+  // ==================== 配額管理 ====================
+  {
+    command: 'get-quota-status',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/quota',
+    responseEvents: ['quota-status-loaded']
+  },
+  {
+    command: 'check-quota',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/quota/check',
+    responseEvents: ['quota-check-result']
+  },
+  {
+    command: 'get-quota-alerts',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/quota/alerts',
+    responseEvents: ['quota-alerts-loaded']
+  },
+  {
+    command: 'acknowledge-quota-alert',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/quota/alerts/acknowledge',
+    responseEvents: ['quota-alert-acknowledged']
+  },
+  {
+    command: 'get-membership-levels',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/membership/levels',
+    responseEvents: ['membership-levels-loaded']
+  },
+  {
+    command: 'get-quota-trend',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/quota/trend',
+    responseEvents: ['quota-trend-loaded']
+  },
+  {
+    command: 'get-quota-history',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/quota/history',
+    responseEvents: ['quota-history-loaded']
+  },
+  // 計費和配額包
+  {
+    command: 'get-quota-packs',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/billing/quota-packs',
+    responseEvents: ['quota-packs-loaded']
+  },
+  {
+    command: 'purchase-quota-pack',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/billing/quota-packs/purchase',
+    responseEvents: ['quota-pack-purchased']
+  },
+  {
+    command: 'get-my-packages',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/billing/my-packages',
+    responseEvents: ['my-packages-loaded']
+  },
+  {
+    command: 'get-user-bills',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/billing/bills',
+    responseEvents: ['user-bills-loaded']
+  },
+  {
+    command: 'pay-bill',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/billing/bills/pay',
+    responseEvents: ['bill-paid']
+  },
+  {
+    command: 'get-overage-info',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/billing/overage',
+    responseEvents: ['overage-info-loaded']
+  },
+  {
+    command: 'get-freeze-status',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/billing/freeze-status',
+    responseEvents: ['freeze-status-loaded']
+  },
+  // 統一支付
+  {
+    command: 'create-payment',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/payment/create',
+    responseEvents: ['payment-created']
+  },
+  {
+    command: 'get-payment-status',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/payment/status',
+    responseEvents: ['payment-status-loaded']
+  },
+  {
+    command: 'get-payment-history',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/payment/history',
+    responseEvents: ['payment-history-loaded']
+  },
+  // 發票
+  {
+    command: 'get-invoices',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/invoices',
+    responseEvents: ['invoices-loaded']
+  },
+  {
+    command: 'get-invoice-detail',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/invoices/{invoice_id}',
+    responseEvents: ['invoice-detail-loaded']
   }
 ];
 

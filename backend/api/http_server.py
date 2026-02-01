@@ -182,6 +182,14 @@ class HttpApiServer:
         self.app.router.add_get('/api/v1/usage/history', self.get_usage_history)
         self.app.router.add_get('/api/v1/quota', self.get_quota_status)
         
+        # 配額管理（增強版）
+        self.app.router.add_post('/api/v1/quota/check', self.check_quota)
+        self.app.router.add_get('/api/v1/quota/alerts', self.get_quota_alerts)
+        self.app.router.add_post('/api/v1/quota/alerts/acknowledge', self.acknowledge_quota_alert)
+        self.app.router.add_get('/api/v1/membership/levels', self.get_all_membership_levels)
+        self.app.router.add_get('/api/v1/quota/trend', self.get_quota_trend)
+        self.app.router.add_get('/api/v1/quota/history', self.get_quota_history)
+        
         # 支付和訂閱
         self.app.router.get('/api/v1/subscription', self.get_subscription)
         self.app.router.add_post('/api/v1/subscription/checkout', self.create_checkout)
@@ -189,6 +197,31 @@ class HttpApiServer:
         self.app.router.add_get('/api/v1/subscription/plans', self.get_plans)
         self.app.router.add_get('/api/v1/transactions', self.get_transactions)
         self.app.router.add_post('/api/v1/webhooks/stripe', self.stripe_webhook)
+        
+        # 統一支付 API
+        self.app.router.add_post('/api/v1/payment/create', self.create_payment)
+        self.app.router.add_get('/api/v1/payment/status', self.get_payment_status)
+        self.app.router.add_get('/api/v1/payment/history', self.get_payment_history)
+        self.app.router.add_post('/api/v1/webhooks/paypal', self.paypal_webhook)
+        self.app.router.add_post('/api/v1/webhooks/alipay', self.alipay_webhook)
+        self.app.router.add_post('/api/v1/webhooks/wechat', self.wechat_webhook)
+        
+        # 發票 API
+        self.app.router.add_get('/api/v1/invoices', self.get_invoices)
+        self.app.router.add_get('/api/v1/invoices/{invoice_id}', self.get_invoice_detail)
+        
+        # 財務報表 API（管理員）
+        self.app.router.add_get('/api/v1/admin/financial/summary', self.admin_financial_summary)
+        self.app.router.add_get('/api/v1/admin/financial/export', self.admin_export_financial)
+        
+        # 計費和配額包
+        self.app.router.add_get('/api/v1/billing/quota-packs', self.get_quota_packs)
+        self.app.router.add_post('/api/v1/billing/quota-packs/purchase', self.purchase_quota_pack)
+        self.app.router.add_get('/api/v1/billing/my-packages', self.get_my_packages)
+        self.app.router.add_get('/api/v1/billing/bills', self.get_user_bills)
+        self.app.router.add_post('/api/v1/billing/bills/pay', self.pay_bill)
+        self.app.router.add_get('/api/v1/billing/overage', self.get_overage_info)
+        self.app.router.add_get('/api/v1/billing/freeze-status', self.get_freeze_status)
         
         # 數據導出和備份
         self.app.router.add_post('/api/v1/export', self.export_data)
@@ -228,6 +261,93 @@ class HttpApiServer:
         self.app.router.add_get('/api/v1/admin/audit-logs', self.admin_audit_logs)
         self.app.router.add_get('/api/v1/admin/usage-trends', self.admin_usage_trends)
         self.app.router.add_get('/api/v1/admin/cache-stats', self.admin_cache_stats)
+        
+        # 管理員配額監控 API
+        self.app.router.add_get('/api/v1/admin/quota/overview', self.admin_quota_overview)
+        self.app.router.add_get('/api/v1/admin/quota/rankings', self.admin_quota_rankings)
+        self.app.router.add_get('/api/v1/admin/quota/alerts', self.admin_quota_alerts)
+        self.app.router.add_post('/api/v1/admin/quota/adjust', self.admin_adjust_quota)
+        self.app.router.add_post('/api/v1/admin/quota/batch-adjust', self.admin_batch_adjust_quotas)
+        self.app.router.add_get('/api/v1/admin/quota/export', self.admin_export_quota_report)
+        self.app.router.add_post('/api/v1/admin/quota/reset-daily', self.admin_reset_daily_quotas)
+        
+        # 管理員計費 API
+        self.app.router.add_get('/api/v1/admin/billing/overview', self.admin_billing_overview)
+        self.app.router.add_get('/api/v1/admin/billing/bills', self.admin_get_all_bills)
+        self.app.router.add_post('/api/v1/admin/billing/refund', self.admin_process_refund)
+        self.app.router.add_post('/api/v1/admin/billing/freeze', self.admin_freeze_quota)
+        self.app.router.add_post('/api/v1/admin/billing/unfreeze', self.admin_unfreeze_quota)
+        self.app.router.add_get('/api/v1/admin/billing/frozen-users', self.admin_get_frozen_users)
+        
+        # 訂閱管理 API
+        self.app.router.add_get('/api/v1/subscription/details', self.get_subscription_details)
+        self.app.router.add_post('/api/v1/subscription/upgrade', self.upgrade_subscription)
+        self.app.router.add_post('/api/v1/subscription/downgrade', self.downgrade_subscription)
+        self.app.router.add_post('/api/v1/subscription/pause', self.pause_subscription)
+        self.app.router.add_post('/api/v1/subscription/resume', self.resume_subscription)
+        self.app.router.add_get('/api/v1/subscription/history', self.get_subscription_history)
+        
+        # 優惠券 API
+        self.app.router.add_post('/api/v1/coupon/validate', self.validate_coupon)
+        self.app.router.add_post('/api/v1/coupon/apply', self.apply_coupon)
+        self.app.router.add_get('/api/v1/campaigns/active', self.get_active_campaigns)
+        
+        # 推薦獎勵 API
+        self.app.router.add_get('/api/v1/referral/code', self.get_referral_code)
+        self.app.router.add_get('/api/v1/referral/stats', self.get_referral_stats)
+        self.app.router.add_post('/api/v1/referral/track', self.track_referral)
+        
+        # 通知 API
+        self.app.router.add_get('/api/v1/notifications', self.get_notifications)
+        self.app.router.add_get('/api/v1/notifications/unread-count', self.get_unread_count)
+        self.app.router.add_post('/api/v1/notifications/read', self.mark_notification_read)
+        self.app.router.add_post('/api/v1/notifications/read-all', self.mark_all_notifications_read)
+        self.app.router.add_get('/api/v1/notifications/preferences', self.get_notification_preferences)
+        self.app.router.add_put('/api/v1/notifications/preferences', self.update_notification_preferences)
+        
+        # 數據分析 API（管理員）
+        self.app.router.add_get('/api/v1/admin/analytics/dashboard', self.admin_analytics_dashboard)
+        self.app.router.add_get('/api/v1/admin/analytics/trends', self.admin_analytics_trends)
+        
+        # 國際化 API
+        self.app.router.add_get('/api/v1/i18n/languages', self.get_supported_languages)
+        self.app.router.add_get('/api/v1/i18n/translations', self.get_translations)
+        self.app.router.add_put('/api/v1/i18n/language', self.set_user_language)
+        
+        # 時區 API
+        self.app.router.add_get('/api/v1/timezone/list', self.get_timezones)
+        self.app.router.add_get('/api/v1/timezone/settings', self.get_timezone_settings)
+        self.app.router.add_put('/api/v1/timezone/settings', self.update_timezone_settings)
+        
+        # 健康檢查 API
+        self.app.router.add_get('/api/v1/health', self.health_check)
+        self.app.router.add_get('/api/v1/health/live', self.liveness_probe)
+        self.app.router.add_get('/api/v1/health/ready', self.readiness_probe)
+        self.app.router.add_get('/api/v1/health/info', self.service_info)
+        
+        # 緩存管理 API（管理員）
+        self.app.router.add_get('/api/v1/admin/cache/stats', self.admin_cache_stats)
+        self.app.router.add_post('/api/v1/admin/cache/clear', self.admin_clear_cache)
+        
+        # 消息隊列 API（管理員）
+        self.app.router.add_get('/api/v1/admin/queue/stats', self.admin_queue_stats)
+        
+        # 速率限制 API（管理員）
+        self.app.router.add_get('/api/v1/admin/rate-limit/stats', self.admin_rate_limit_stats)
+        self.app.router.add_get('/api/v1/admin/rate-limit/rules', self.admin_get_rate_limit_rules)
+        self.app.router.add_post('/api/v1/admin/rate-limit/ban', self.admin_ban_ip)
+        self.app.router.add_post('/api/v1/admin/rate-limit/unban', self.admin_unban_ip)
+        
+        # 審計日誌 API（管理員）
+        self.app.router.add_get('/api/v1/admin/audit/logs', self.admin_get_audit_logs)
+        self.app.router.add_get('/api/v1/admin/audit/stats', self.admin_audit_stats)
+        self.app.router.add_get('/api/v1/admin/audit/export', self.admin_export_audit)
+        
+        # 安全告警 API（管理員）
+        self.app.router.add_get('/api/v1/admin/security/alerts', self.admin_get_security_alerts)
+        self.app.router.add_get('/api/v1/admin/security/stats', self.admin_security_stats)
+        self.app.router.add_post('/api/v1/admin/security/acknowledge', self.admin_acknowledge_alert)
+        self.app.router.add_post('/api/v1/admin/security/resolve', self.admin_resolve_alert)
         
         # 診斷 API
         self.app.router.add_get('/api/v1/diagnostics', self.get_diagnostics)
@@ -1020,11 +1140,8 @@ class HttpApiServer:
             return self._json_response({'success': False, 'error': str(e)}, 500)
     
     async def get_quota_status(self, request):
-        """獲取配額狀態"""
+        """獲取配額狀態（增強版）"""
         try:
-            from core.usage_tracker import get_usage_tracker
-            tracker = get_usage_tracker()
-            
             tenant = request.get('tenant')
             user_id = tenant.user_id if tenant else None
             
@@ -1034,21 +1151,327 @@ class HttpApiServer:
                     'error': '未登入'
                 }, 401)
             
-            # 獲取各類配額狀態
-            api_quota = await tracker.check_quota('api_calls', user_id)
-            accounts_quota = await tracker.check_quota('accounts', user_id)
+            # 使用新的 QuotaService
+            try:
+                from core.quota_service import get_quota_service
+                quota_service = get_quota_service()
+                summary = quota_service.get_usage_summary(user_id)
+                
+                return self._json_response({
+                    'success': True,
+                    'data': summary.to_dict()
+                })
+            except ImportError:
+                # Fallback 到舊的 usage_tracker
+                from core.usage_tracker import get_usage_tracker
+                tracker = get_usage_tracker()
+                
+                api_quota = await tracker.check_quota('api_calls', user_id)
+                accounts_quota = await tracker.check_quota('accounts', user_id)
+                
+                return self._json_response({
+                    'success': True,
+                    'data': {
+                        'api_calls': api_quota,
+                        'accounts': accounts_quota,
+                        'subscription_tier': tenant.subscription_tier if tenant else 'free'
+                    }
+                })
+        except Exception as e:
+            logger.error(f"Get quota status error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def check_quota(self, request):
+        """檢查特定配額"""
+        try:
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            data = await request.json()
+            quota_type = data.get('quota_type', 'daily_messages')
+            amount = data.get('amount', 1)
+            
+            from core.quota_service import get_quota_service
+            service = get_quota_service()
+            result = service.check_quota(user_id, quota_type, amount)
+            
+            return self._json_response({
+                'success': True,
+                'data': result.to_dict()
+            })
+        except Exception as e:
+            logger.error(f"Check quota error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_quota_alerts(self, request):
+        """獲取配額告警"""
+        try:
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            from core.quota_service import get_quota_service
+            service = get_quota_service()
+            alerts = service.get_user_alerts(user_id)
+            
+            return self._json_response({
+                'success': True,
+                'data': {'alerts': alerts}
+            })
+        except Exception as e:
+            logger.error(f"Get quota alerts error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def acknowledge_quota_alert(self, request):
+        """確認配額告警"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            data = await request.json()
+            alert_id = data.get('alert_id')
+            
+            if not alert_id:
+                return self._json_response({'success': False, 'error': '缺少 alert_id'}, 400)
+            
+            from core.quota_service import get_quota_service
+            service = get_quota_service()
+            success = service.acknowledge_alert(alert_id)
+            
+            return self._json_response({'success': success})
+        except Exception as e:
+            logger.error(f"Acknowledge alert error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_all_membership_levels(self, request):
+        """獲取所有會員等級配置（公開）"""
+        try:
+            from core.level_config import get_level_config_service
+            service = get_level_config_service()
+            levels = service.get_all_levels()
             
             return self._json_response({
                 'success': True,
                 'data': {
-                    'api_calls': api_quota,
-                    'accounts': accounts_quota,
-                    'subscription_tier': tenant.subscription_tier if tenant else 'free'
+                    'levels': [level.to_dict() for level in levels]
                 }
             })
         except Exception as e:
-            logger.error(f"Get quota status error: {e}")
+            logger.error(f"Get membership levels error: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_quota_trend(self, request):
+        """獲取配額使用趨勢數據"""
+        try:
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '需要登入'
+                }, 401)
+            
+            # 獲取查詢參數
+            period = request.query.get('period', '7d')
+            quota_types = request.query.get('types', 'daily_messages,ai_calls').split(',')
+            
+            days = 7 if period == '7d' else 30 if period == '30d' else 90
+            
+            import sqlite3
+            from datetime import datetime, timedelta
+            
+            db_path = os.environ.get('DB_PATH', 'tg_matrix.db')
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            # 生成日期範圍
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=days - 1)
+            
+            # 初始化結果
+            labels = []
+            datasets = {}
+            
+            for i in range(days):
+                date = start_date + timedelta(days=i)
+                labels.append(date.strftime('%m/%d'))
+            
+            for qt in quota_types:
+                datasets[qt] = {
+                    'name': self._get_quota_display_name(qt),
+                    'data': [0] * days,
+                    'color': self._get_quota_color(qt)
+                }
+            
+            # 查詢歷史數據
+            try:
+                cursor.execute('''
+                    SELECT date, quota_type, used
+                    FROM quota_usage
+                    WHERE user_id = ?
+                    AND date >= ?
+                    AND quota_type IN ({})
+                    ORDER BY date
+                '''.format(','.join('?' * len(quota_types))),
+                (user_id, start_date.isoformat(), *quota_types))
+                
+                for row in cursor.fetchall():
+                    date_str = row['date']
+                    qt = row['quota_type']
+                    used = row['used']
+                    
+                    # 計算索引
+                    try:
+                        date_obj = datetime.fromisoformat(date_str).date() if isinstance(date_str, str) else date_str
+                        idx = (date_obj - start_date).days
+                        if 0 <= idx < days and qt in datasets:
+                            datasets[qt]['data'][idx] = used
+                    except:
+                        pass
+            except sqlite3.OperationalError:
+                # 表不存在，返回空數據
+                pass
+            
+            conn.close()
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'labels': labels,
+                    'datasets': list(datasets.values()),
+                    'period': period,
+                    'days': days
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Get quota trend error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_quota_history(self, request):
+        """獲取配額使用歷史記錄"""
+        try:
+            tenant = request.get('tenant')
+            user_id = tenant.user_id if tenant else None
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '需要登入'
+                }, 401)
+            
+            # 獲取查詢參數
+            limit = int(request.query.get('limit', 50))
+            offset = int(request.query.get('offset', 0))
+            quota_type = request.query.get('type')  # 可選過濾
+            
+            import sqlite3
+            
+            db_path = os.environ.get('DB_PATH', 'tg_matrix.db')
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            history = []
+            
+            try:
+                # 構建查詢
+                query = '''
+                    SELECT date, quota_type, used, 
+                           COALESCE((SELECT used FROM quota_usage q2 
+                                     WHERE q2.user_id = quota_usage.user_id 
+                                     AND q2.quota_type = quota_usage.quota_type 
+                                     AND q2.date < quota_usage.date 
+                                     ORDER BY q2.date DESC LIMIT 1), 0) as prev_used
+                    FROM quota_usage
+                    WHERE user_id = ?
+                '''
+                params = [user_id]
+                
+                if quota_type:
+                    query += ' AND quota_type = ?'
+                    params.append(quota_type)
+                
+                query += ' ORDER BY date DESC, quota_type LIMIT ? OFFSET ?'
+                params.extend([limit, offset])
+                
+                cursor.execute(query, params)
+                
+                # 獲取用戶等級以確定配額限制
+                from core.level_config import get_level_config_service
+                service = get_level_config_service()
+                
+                # 獲取用戶等級
+                cursor.execute('SELECT subscription_tier FROM users WHERE id = ?', (user_id,))
+                row = cursor.fetchone()
+                tier = row['subscription_tier'] if row else 'bronze'
+                
+                cursor.execute(query, params)
+                
+                for row in cursor.fetchall():
+                    qt = row['quota_type']
+                    limit_val = service.get_quota_limit(tier, qt)
+                    
+                    history.append({
+                        'date': row['date'],
+                        'quota_type': qt,
+                        'quota_name': self._get_quota_display_name(qt),
+                        'used': row['used'],
+                        'limit': limit_val,
+                        'percentage': (row['used'] / limit_val * 100) if limit_val > 0 else 0,
+                        'change': row['used'] - (row['prev_used'] or 0)
+                    })
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Quota history query error: {e}")
+            
+            conn.close()
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'history': history,
+                    'limit': limit,
+                    'offset': offset,
+                    'has_more': len(history) == limit
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Get quota history error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    def _get_quota_display_name(self, quota_type: str) -> str:
+        """獲取配額顯示名稱"""
+        names = {
+            'daily_messages': '每日消息',
+            'ai_calls': 'AI 調用',
+            'tg_accounts': 'TG 帳號',
+            'groups': '群組數',
+            'devices': '設備數',
+            'keyword_sets': '關鍵詞集',
+            'auto_reply_rules': '自動回覆',
+            'scheduled_tasks': '定時任務',
+        }
+        return names.get(quota_type, quota_type)
+    
+    def _get_quota_color(self, quota_type: str) -> str:
+        """獲取配額圖表顏色"""
+        colors = {
+            'daily_messages': '#3b82f6',
+            'ai_calls': '#8b5cf6',
+            'tg_accounts': '#22c55e',
+            'groups': '#f59e0b',
+            'devices': '#ef4444',
+        }
+        return colors.get(quota_type, '#666666')
     
     # ==================== 支付和訂閱 ====================
     
@@ -1194,6 +1617,561 @@ class HttpApiServer:
             return self._json_response({'success': True, **result})
         except Exception as e:
             logger.error(f"Stripe webhook error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 統一支付 API ====================
+    
+    async def create_payment(self, request):
+        """創建支付"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            data = await request.json()
+            amount = data.get('amount')
+            provider = data.get('provider', 'demo')
+            payment_type = data.get('payment_type', 'one_time')
+            description = data.get('description', '')
+            metadata = data.get('metadata', {})
+            success_url = data.get('success_url')
+            cancel_url = data.get('cancel_url')
+            
+            if not amount:
+                return self._json_response({'success': False, 'error': '缺少金額'}, 400)
+            
+            from core.unified_payment import (
+                get_unified_payment_service, PaymentProvider, PaymentType
+            )
+            service = get_unified_payment_service()
+            
+            try:
+                provider_enum = PaymentProvider(provider)
+            except ValueError:
+                provider_enum = PaymentProvider.DEMO
+            
+            try:
+                payment_type_enum = PaymentType(payment_type)
+            except ValueError:
+                payment_type_enum = PaymentType.ONE_TIME
+            
+            success, message, intent = await service.create_payment_intent(
+                user_id=tenant.user_id,
+                amount=amount,
+                currency=data.get('currency', 'CNY'),
+                provider=provider_enum,
+                payment_type=payment_type_enum,
+                description=description,
+                metadata=metadata,
+                success_url=success_url,
+                cancel_url=cancel_url
+            )
+            
+            if success and intent:
+                return self._json_response({
+                    'success': True,
+                    'data': intent.to_dict()
+                })
+            else:
+                return self._json_response({'success': False, 'error': message}, 400)
+                
+        except Exception as e:
+            logger.error(f"Create payment error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_payment_status(self, request):
+        """獲取支付狀態"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            intent_id = request.query.get('intent_id')
+            if not intent_id:
+                return self._json_response({'success': False, 'error': '缺少 intent_id'}, 400)
+            
+            from core.unified_payment import get_unified_payment_service
+            service = get_unified_payment_service()
+            
+            success, state = await service.verify_payment(intent_id)
+            intent = await service.get_payment_intent(intent_id)
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'paid': success,
+                    'state': state.value,
+                    'intent': intent.to_dict() if intent else None
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Get payment status error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_payment_history(self, request):
+        """獲取支付歷史"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            limit = int(request.query.get('limit', 50))
+            
+            from core.unified_payment import get_unified_payment_service
+            import sqlite3
+            
+            service = get_unified_payment_service()
+            db = sqlite3.connect(service.db_path)
+            db.row_factory = sqlite3.Row
+            
+            rows = db.execute('''
+                SELECT * FROM payment_intents 
+                WHERE user_id = ? 
+                ORDER BY created_at DESC 
+                LIMIT ?
+            ''', (tenant.user_id, limit)).fetchall()
+            db.close()
+            
+            payments = []
+            for row in rows:
+                payments.append({
+                    'id': row['id'],
+                    'amount': row['amount'],
+                    'currency': row['currency'],
+                    'provider': row['provider'],
+                    'state': row['state'],
+                    'description': row['description'],
+                    'created_at': row['created_at'],
+                    'completed_at': row['completed_at']
+                })
+            
+            return self._json_response({
+                'success': True,
+                'data': {'payments': payments}
+            })
+            
+        except Exception as e:
+            logger.error(f"Get payment history error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def paypal_webhook(self, request):
+        """PayPal Webhook 處理"""
+        try:
+            from core.unified_payment import get_unified_payment_service, PaymentProvider
+            service = get_unified_payment_service()
+            
+            payload = await request.read()
+            headers = dict(request.headers)
+            
+            success, event_type = await service.handle_webhook(
+                PaymentProvider.PAYPAL, payload, headers
+            )
+            
+            return self._json_response({'success': success, 'event': event_type})
+        except Exception as e:
+            logger.error(f"PayPal webhook error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def alipay_webhook(self, request):
+        """支付寶 Webhook 處理"""
+        try:
+            from core.unified_payment import get_unified_payment_service, PaymentProvider
+            service = get_unified_payment_service()
+            
+            payload = await request.read()
+            headers = dict(request.headers)
+            
+            success, event_type = await service.handle_webhook(
+                PaymentProvider.ALIPAY, payload, headers
+            )
+            
+            # 支付寶需要返回特定格式
+            if success:
+                return self._text_response('success')
+            return self._text_response('fail')
+        except Exception as e:
+            logger.error(f"Alipay webhook error: {e}")
+            return self._text_response('fail')
+    
+    async def wechat_webhook(self, request):
+        """微信支付 Webhook 處理"""
+        try:
+            from core.unified_payment import get_unified_payment_service, PaymentProvider
+            service = get_unified_payment_service()
+            
+            payload = await request.read()
+            headers = dict(request.headers)
+            
+            success, event_type = await service.handle_webhook(
+                PaymentProvider.WECHAT, payload, headers
+            )
+            
+            # 微信需要返回 XML
+            if success:
+                return self._xml_response('<xml><return_code>SUCCESS</return_code></xml>')
+            return self._xml_response('<xml><return_code>FAIL</return_code></xml>')
+        except Exception as e:
+            logger.error(f"Wechat webhook error: {e}")
+            return self._xml_response('<xml><return_code>FAIL</return_code></xml>')
+    
+    def _text_response(self, text: str):
+        """純文本響應"""
+        from aiohttp import web
+        return web.Response(text=text, content_type='text/plain')
+    
+    def _xml_response(self, xml: str):
+        """XML 響應"""
+        from aiohttp import web
+        return web.Response(text=xml, content_type='application/xml')
+    
+    # ==================== 發票 API ====================
+    
+    async def get_invoices(self, request):
+        """獲取用戶發票列表"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            limit = int(request.query.get('limit', 50))
+            
+            from core.unified_payment import get_unified_payment_service
+            service = get_unified_payment_service()
+            
+            invoices = await service.get_user_invoices(tenant.user_id, limit)
+            
+            return self._json_response({
+                'success': True,
+                'data': {'invoices': [inv.to_dict() for inv in invoices]}
+            })
+            
+        except Exception as e:
+            logger.error(f"Get invoices error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_invoice_detail(self, request):
+        """獲取發票詳情"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            invoice_id = request.match_info.get('invoice_id')
+            
+            from core.unified_payment import get_unified_payment_service
+            import sqlite3
+            
+            service = get_unified_payment_service()
+            db = sqlite3.connect(service.db_path)
+            db.row_factory = sqlite3.Row
+            
+            row = db.execute(
+                'SELECT * FROM invoices WHERE id = ? AND user_id = ?',
+                (invoice_id, tenant.user_id)
+            ).fetchone()
+            db.close()
+            
+            if not row:
+                return self._json_response({'success': False, 'error': '發票不存在'}, 404)
+            
+            import json
+            invoice_data = dict(row)
+            invoice_data['items'] = json.loads(invoice_data['items']) if invoice_data['items'] else []
+            
+            return self._json_response({
+                'success': True,
+                'data': invoice_data
+            })
+            
+        except Exception as e:
+            logger.error(f"Get invoice detail error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 財務報表 API（管理員）====================
+    
+    async def admin_financial_summary(self, request):
+        """管理員 - 財務摘要"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            start_date = request.query.get('start_date')
+            end_date = request.query.get('end_date')
+            
+            if not start_date or not end_date:
+                from datetime import datetime, timedelta
+                end_date = datetime.utcnow().strftime('%Y-%m-%d')
+                start_date = (datetime.utcnow() - timedelta(days=30)).strftime('%Y-%m-%d')
+            
+            from core.unified_payment import get_unified_payment_service
+            service = get_unified_payment_service()
+            
+            summary = await service.get_financial_summary(start_date, end_date)
+            
+            return self._json_response({
+                'success': True,
+                'data': summary
+            })
+            
+        except Exception as e:
+            logger.error(f"Admin financial summary error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_export_financial(self, request):
+        """管理員 - 導出財務報表"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            start_date = request.query.get('start_date')
+            end_date = request.query.get('end_date')
+            format_type = request.query.get('format', 'json')
+            
+            if not start_date or not end_date:
+                from datetime import datetime, timedelta
+                end_date = datetime.utcnow().strftime('%Y-%m-%d')
+                start_date = (datetime.utcnow() - timedelta(days=30)).strftime('%Y-%m-%d')
+            
+            from core.unified_payment import get_unified_payment_service
+            service = get_unified_payment_service()
+            
+            result = await service.export_financial_report(start_date, end_date, format_type)
+            
+            if format_type == 'csv':
+                from aiohttp import web
+                return web.Response(
+                    text=result['content'],
+                    content_type='text/csv',
+                    headers={
+                        'Content-Disposition': f'attachment; filename="{result["filename"]}"'
+                    }
+                )
+            
+            return self._json_response({
+                'success': True,
+                'data': result['content']
+            })
+            
+        except Exception as e:
+            logger.error(f"Admin export financial error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 計費和配額包 API ====================
+    
+    async def get_quota_packs(self, request):
+        """獲取可購買的配額包"""
+        try:
+            from core.billing_service import get_billing_service
+            service = get_billing_service()
+            
+            tenant = request.get('tenant')
+            user_tier = tenant.subscription_tier if tenant else 'bronze'
+            
+            packs = service.get_available_packs(user_tier)
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'packs': [p.to_dict() for p in packs]
+                }
+            })
+        except Exception as e:
+            logger.error(f"Get quota packs error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def purchase_quota_pack(self, request):
+        """購買配額包"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '需要登入'
+                }, 401)
+            
+            data = await request.json()
+            pack_id = data.get('pack_id')
+            payment_method = data.get('payment_method', 'balance')
+            
+            if not pack_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '缺少 pack_id'
+                }, 400)
+            
+            from core.billing_service import get_billing_service
+            service = get_billing_service()
+            
+            result = service.purchase_pack(tenant.user_id, pack_id, payment_method)
+            return self._json_response(result)
+            
+        except Exception as e:
+            logger.error(f"Purchase quota pack error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_my_packages(self, request):
+        """獲取我的配額包"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '需要登入'
+                }, 401)
+            
+            active_only = request.query.get('active_only', 'true').lower() == 'true'
+            
+            from core.billing_service import get_billing_service
+            service = get_billing_service()
+            
+            packages = service.get_user_packages(tenant.user_id, active_only)
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'packages': [p.to_dict() for p in packages]
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Get my packages error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_user_bills(self, request):
+        """獲取用戶賬單"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '需要登入'
+                }, 401)
+            
+            status = request.query.get('status')
+            billing_type = request.query.get('type')
+            limit = int(request.query.get('limit', 50))
+            
+            from core.billing_service import get_billing_service
+            service = get_billing_service()
+            
+            bills = service.get_user_bills(tenant.user_id, status, billing_type, limit)
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'bills': [b.to_dict() for b in bills]
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Get user bills error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def pay_bill(self, request):
+        """支付賬單"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '需要登入'
+                }, 401)
+            
+            data = await request.json()
+            bill_id = data.get('bill_id')
+            payment_method = data.get('payment_method', 'balance')
+            
+            if not bill_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '缺少 bill_id'
+                }, 400)
+            
+            from core.billing_service import get_billing_service
+            service = get_billing_service()
+            
+            result = service.pay_bill(bill_id, payment_method)
+            return self._json_response(result)
+            
+        except Exception as e:
+            logger.error(f"Pay bill error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_overage_info(self, request):
+        """獲取超額使用信息"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '需要登入'
+                }, 401)
+            
+            from core.billing_service import get_billing_service, OVERAGE_RATES
+            from core.quota_service import get_quota_service
+            
+            billing = get_billing_service()
+            quota_service = get_quota_service()
+            
+            # 獲取當前配額使用情況
+            summary = quota_service.get_usage_summary(tenant.user_id)
+            
+            overage_info = {}
+            for qt, rate in OVERAGE_RATES.items():
+                quota_info = summary.quotas.get(qt, {})
+                used = quota_info.get('used', 0)
+                limit = quota_info.get('limit', 0)
+                pack_bonus = billing.get_pack_bonus(tenant.user_id, qt)
+                
+                calc = billing.calculate_overage(tenant.user_id, qt, used, limit, pack_bonus)
+                
+                overage_info[qt] = {
+                    'used': used,
+                    'base_limit': limit,
+                    'pack_bonus': pack_bonus,
+                    'total_limit': limit + pack_bonus if limit != -1 else -1,
+                    'overage': calc.get('overage', 0),
+                    'charge': calc.get('charge', 0),
+                    'rate': {
+                        'unit_price': rate.unit_price,
+                        'unit_size': rate.unit_size
+                    }
+                }
+            
+            return self._json_response({
+                'success': True,
+                'data': overage_info
+            })
+            
+        except Exception as e:
+            logger.error(f"Get overage info error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_freeze_status(self, request):
+        """獲取配額凍結狀態"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '需要登入'
+                }, 401)
+            
+            from core.billing_service import get_billing_service
+            service = get_billing_service()
+            
+            freeze_info = service.is_quota_frozen(tenant.user_id)
+            
+            return self._json_response({
+                'success': True,
+                'data': freeze_info
+            })
+            
+        except Exception as e:
+            logger.error(f"Get freeze status error: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
     
     # ==================== 數據導出和備份 ====================
@@ -1856,6 +2834,1351 @@ class HttpApiServer:
             return self._json_response({'success': True, 'data': stats})
         except Exception as e:
             logger.error(f"Admin cache stats error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 管理員配額監控 API ====================
+    
+    async def admin_quota_overview(self, request):
+        """管理員 - 配額使用總覽"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            from api.admin import get_admin_service
+            service = get_admin_service()
+            result = await service.get_quota_overview()
+            
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin quota overview error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_quota_rankings(self, request):
+        """管理員 - 配額使用排行"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            quota_type = request.query.get('type', 'daily_messages')
+            period = request.query.get('period', 'today')
+            limit = int(request.query.get('limit', 20))
+            
+            from api.admin import get_admin_service
+            service = get_admin_service()
+            result = await service.get_quota_rankings(quota_type, period, limit)
+            
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin quota rankings error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_quota_alerts(self, request):
+        """管理員 - 配額告警列表"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            page = int(request.query.get('page', 1))
+            page_size = int(request.query.get('page_size', 50))
+            alert_type = request.query.get('alert_type')
+            acknowledged = request.query.get('acknowledged')
+            
+            if acknowledged is not None:
+                acknowledged = acknowledged.lower() == 'true'
+            
+            from api.admin import get_admin_service
+            service = get_admin_service()
+            result = await service.get_quota_alerts_admin(page, page_size, alert_type, acknowledged)
+            
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin quota alerts error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_adjust_quota(self, request):
+        """管理員 - 調整用戶配額"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            data = await request.json()
+            user_id = data.get('user_id')
+            quota_type = data.get('quota_type')
+            new_value = data.get('new_value')
+            reason = data.get('reason', '')
+            
+            if not all([user_id, quota_type, new_value is not None]):
+                return self._json_response({
+                    'success': False,
+                    'error': '缺少必要參數'
+                }, 400)
+            
+            from api.admin import get_admin_service
+            service = get_admin_service()
+            result = await service.adjust_user_quota(
+                user_id, quota_type, new_value, tenant.user_id, reason
+            )
+            
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin adjust quota error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_batch_adjust_quotas(self, request):
+        """管理員 - 批量調整用戶配額"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            data = await request.json()
+            user_ids = data.get('user_ids', [])
+            quota_type = data.get('quota_type')
+            new_value = data.get('new_value')
+            reason = data.get('reason', '')
+            
+            if not all([user_ids, quota_type, new_value is not None]):
+                return self._json_response({
+                    'success': False,
+                    'error': '缺少必要參數'
+                }, 400)
+            
+            from api.admin import get_admin_service
+            service = get_admin_service()
+            result = await service.batch_adjust_quotas(
+                user_ids, quota_type, new_value, tenant.user_id, reason
+            )
+            
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin batch adjust quotas error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_export_quota_report(self, request):
+        """管理員 - 導出配額報表"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            start_date = request.query.get('start_date')
+            end_date = request.query.get('end_date')
+            quota_types = request.query.get('types')
+            format = request.query.get('format', 'json')
+            
+            if quota_types:
+                quota_types = quota_types.split(',')
+            
+            from api.admin import get_admin_service
+            service = get_admin_service()
+            result = await service.export_quota_report(
+                start_date, end_date, quota_types, format
+            )
+            
+            # 如果是 CSV 格式，轉換並返回
+            if format == 'csv' and result.get('success'):
+                csv_content = self._convert_to_csv(result['data'])
+                return web.Response(
+                    body=csv_content.encode('utf-8-sig'),
+                    content_type='text/csv',
+                    headers={
+                        'Content-Disposition': f'attachment; filename=quota_report_{datetime.now().strftime("%Y%m%d")}.csv'
+                    }
+                )
+            
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin export quota report error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    def _convert_to_csv(self, report_data: dict) -> str:
+        """將報表數據轉換為 CSV"""
+        import io
+        import csv
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 寫入標題和時間
+        writer.writerow(['配額使用報表'])
+        writer.writerow([f'生成時間: {report_data.get("generated_at", "")}'])
+        writer.writerow([f'統計區間: {report_data.get("period", {}).get("start", "")} 至 {report_data.get("period", {}).get("end", "")}'])
+        writer.writerow([])
+        
+        # 總覽
+        writer.writerow(['=== 總覽 ==='])
+        writer.writerow(['配額類型', '總使用量', '日均', '最高單日', '活躍用戶數'])
+        for qt, stats in report_data.get('summary', {}).items():
+            writer.writerow([
+                qt, stats.get('total', 0), stats.get('avg_per_day', 0),
+                stats.get('max_single_day', 0), stats.get('unique_users', 0)
+            ])
+        writer.writerow([])
+        
+        # 每日統計
+        writer.writerow(['=== 每日統計 ==='])
+        daily = report_data.get('daily', [])
+        if daily:
+            headers = ['日期'] + list(daily[0].keys() - {'date'})
+            writer.writerow(headers)
+            for day in daily:
+                row = [day.get('date', '')]
+                for h in headers[1:]:
+                    val = day.get(h, {})
+                    if isinstance(val, dict):
+                        row.append(val.get('total', 0))
+                    else:
+                        row.append(val)
+                writer.writerow(row)
+        
+        return output.getvalue()
+    
+    async def admin_reset_daily_quotas(self, request):
+        """管理員 - 手動重置每日配額"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            from api.admin import get_admin_service
+            service = get_admin_service()
+            result = await service.reset_daily_quotas(tenant.user_id)
+            
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin reset daily quotas error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 管理員計費 API ====================
+    
+    async def admin_billing_overview(self, request):
+        """管理員 - 獲取計費總覽"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            from api.admin import get_admin_service
+            service = get_admin_service()
+            result = await service.get_billing_overview()
+            
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin billing overview error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_get_all_bills(self, request):
+        """管理員 - 獲取所有賬單"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            page = int(request.query.get('page', 1))
+            page_size = int(request.query.get('page_size', 20))
+            status = request.query.get('status')
+            billing_type = request.query.get('type')
+            user_id = request.query.get('user_id')
+            
+            from api.admin import get_admin_service
+            service = get_admin_service()
+            result = await service.get_all_bills(page, page_size, status, billing_type, user_id)
+            
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin get all bills error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_process_refund(self, request):
+        """管理員 - 處理退款"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            data = await request.json()
+            bill_id = data.get('bill_id')
+            refund_amount = data.get('refund_amount')
+            reason = data.get('reason', '')
+            
+            if not bill_id or refund_amount is None:
+                return self._json_response({
+                    'success': False,
+                    'error': '缺少必要參數'
+                }, 400)
+            
+            from api.admin import get_admin_service
+            service = get_admin_service()
+            result = await service.process_refund(bill_id, refund_amount, reason, tenant.user_id)
+            
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin process refund error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_freeze_quota(self, request):
+        """管理員 - 凍結用戶配額"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            data = await request.json()
+            user_id = data.get('user_id')
+            reason = data.get('reason', '管理員操作')
+            duration_hours = int(data.get('duration_hours', 24))
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '缺少用戶 ID'
+                }, 400)
+            
+            from api.admin import get_admin_service
+            service = get_admin_service()
+            result = await service.freeze_user_quota(user_id, reason, duration_hours, tenant.user_id)
+            
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin freeze quota error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_unfreeze_quota(self, request):
+        """管理員 - 解凍用戶配額"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            data = await request.json()
+            user_id = data.get('user_id')
+            
+            if not user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '缺少用戶 ID'
+                }, 400)
+            
+            from api.admin import get_admin_service
+            service = get_admin_service()
+            result = await service.unfreeze_user_quota(user_id, tenant.user_id)
+            
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin unfreeze quota error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_get_frozen_users(self, request):
+        """管理員 - 獲取被凍結的用戶"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            from api.admin import get_admin_service
+            service = get_admin_service()
+            result = await service.get_frozen_users()
+            
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Admin get frozen users error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 訂閱管理 API ====================
+    
+    async def get_subscription_details(self, request):
+        """獲取訂閱詳情"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            from core.subscription_manager import get_subscription_manager
+            manager = get_subscription_manager()
+            
+            sub = manager.get_user_subscription(tenant.user_id)
+            history = manager.get_subscription_history(tenant.user_id, limit=10)
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'subscription': sub.to_dict() if sub else None,
+                    'history': [h.to_dict() for h in history]
+                }
+            })
+        except Exception as e:
+            logger.error(f"Get subscription details error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def upgrade_subscription(self, request):
+        """升級訂閱"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            data = await request.json()
+            to_tier = data.get('tier')
+            billing_cycle = data.get('billing_cycle', 'monthly')
+            
+            if not to_tier:
+                return self._json_response({'success': False, 'error': '缺少目標等級'}, 400)
+            
+            from core.subscription_manager import get_subscription_manager
+            manager = get_subscription_manager()
+            
+            result = await manager.upgrade_subscription(tenant.user_id, to_tier, billing_cycle)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Upgrade subscription error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def downgrade_subscription(self, request):
+        """降級訂閱"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            data = await request.json()
+            to_tier = data.get('tier')
+            immediate = data.get('immediate', False)
+            
+            if not to_tier:
+                return self._json_response({'success': False, 'error': '缺少目標等級'}, 400)
+            
+            from core.subscription_manager import get_subscription_manager
+            manager = get_subscription_manager()
+            
+            result = await manager.downgrade_subscription(tenant.user_id, to_tier, immediate)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Downgrade subscription error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def pause_subscription(self, request):
+        """暫停訂閱"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            data = await request.json()
+            reason = data.get('reason', '')
+            
+            from core.subscription_manager import get_subscription_manager
+            manager = get_subscription_manager()
+            
+            result = await manager.pause_subscription(tenant.user_id, reason)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Pause subscription error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def resume_subscription(self, request):
+        """恢復訂閱"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            from core.subscription_manager import get_subscription_manager
+            manager = get_subscription_manager()
+            
+            result = await manager.resume_subscription(tenant.user_id)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Resume subscription error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_subscription_history(self, request):
+        """獲取訂閱歷史"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            limit = int(request.query.get('limit', 50))
+            
+            from core.subscription_manager import get_subscription_manager
+            manager = get_subscription_manager()
+            
+            history = manager.get_subscription_history(tenant.user_id, limit)
+            return self._json_response({
+                'success': True,
+                'data': [h.to_dict() for h in history]
+            })
+        except Exception as e:
+            logger.error(f"Get subscription history error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 優惠券 API ====================
+    
+    async def validate_coupon(self, request):
+        """驗證優惠券"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            data = await request.json()
+            code = data.get('code')
+            amount = data.get('amount', 0)
+            
+            if not code:
+                return self._json_response({'success': False, 'error': '缺少優惠碼'}, 400)
+            
+            from core.coupon_service import get_coupon_service
+            service = get_coupon_service()
+            
+            result = service.validate_coupon(code, tenant.user_id, amount, tenant.subscription_tier)
+            return self._json_response({'success': True, 'data': result})
+        except Exception as e:
+            logger.error(f"Validate coupon error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def apply_coupon(self, request):
+        """應用優惠券"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            data = await request.json()
+            code = data.get('code')
+            order_id = data.get('order_id')
+            amount = data.get('amount', 0)
+            
+            if not code or not order_id:
+                return self._json_response({'success': False, 'error': '缺少必要參數'}, 400)
+            
+            from core.coupon_service import get_coupon_service
+            service = get_coupon_service()
+            
+            result = service.use_coupon(code, tenant.user_id, order_id, amount)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Apply coupon error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_active_campaigns(self, request):
+        """獲取活躍促銷活動"""
+        try:
+            from core.coupon_service import get_coupon_service
+            service = get_coupon_service()
+            
+            campaigns = service.get_active_campaigns()
+            return self._json_response({
+                'success': True,
+                'data': [c.to_dict() for c in campaigns]
+            })
+        except Exception as e:
+            logger.error(f"Get active campaigns error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 推薦獎勵 API ====================
+    
+    async def get_referral_code(self, request):
+        """獲取推薦碼"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            from core.referral_service import get_referral_service
+            service = get_referral_service()
+            
+            code = service.get_or_create_referral_code(tenant.user_id)
+            return self._json_response({
+                'success': True,
+                'data': {'code': code}
+            })
+        except Exception as e:
+            logger.error(f"Get referral code error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_referral_stats(self, request):
+        """獲取推薦統計"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            from core.referral_service import get_referral_service
+            service = get_referral_service()
+            
+            stats = service.get_user_referral_stats(tenant.user_id)
+            return self._json_response({
+                'success': True,
+                'data': stats
+            })
+        except Exception as e:
+            logger.error(f"Get referral stats error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def track_referral(self, request):
+        """追蹤推薦"""
+        try:
+            data = await request.json()
+            referral_code = data.get('referral_code')
+            referee_id = data.get('referee_id')
+            
+            if not referral_code or not referee_id:
+                return self._json_response({'success': False, 'error': '缺少必要參數'}, 400)
+            
+            from core.referral_service import get_referral_service
+            service = get_referral_service()
+            
+            result = service.track_referral(referral_code, referee_id)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Track referral error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 通知 API ====================
+    
+    async def get_notifications(self, request):
+        """獲取通知列表"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            unread_only = request.query.get('unread_only', 'false').lower() == 'true'
+            notification_type = request.query.get('type')
+            limit = int(request.query.get('limit', 50))
+            
+            from core.notification_service import get_notification_service
+            service = get_notification_service()
+            
+            notifications = service.get_user_notifications(
+                tenant.user_id, unread_only, notification_type, limit
+            )
+            
+            return self._json_response({
+                'success': True,
+                'data': [n.to_dict() for n in notifications]
+            })
+        except Exception as e:
+            logger.error(f"Get notifications error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_unread_count(self, request):
+        """獲取未讀通知數量"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            from core.notification_service import get_notification_service
+            service = get_notification_service()
+            
+            count = service.get_unread_count(tenant.user_id)
+            return self._json_response({
+                'success': True,
+                'data': {'count': count}
+            })
+        except Exception as e:
+            logger.error(f"Get unread count error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def mark_notification_read(self, request):
+        """標記通知為已讀"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            data = await request.json()
+            notification_id = data.get('notification_id')
+            
+            if not notification_id:
+                return self._json_response({'success': False, 'error': '缺少通知 ID'}, 400)
+            
+            from core.notification_service import get_notification_service
+            service = get_notification_service()
+            
+            success = service.mark_as_read(notification_id, tenant.user_id)
+            return self._json_response({'success': success})
+        except Exception as e:
+            logger.error(f"Mark notification read error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def mark_all_notifications_read(self, request):
+        """標記所有通知為已讀"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            from core.notification_service import get_notification_service
+            service = get_notification_service()
+            
+            count = service.mark_all_as_read(tenant.user_id)
+            return self._json_response({'success': True, 'data': {'count': count}})
+        except Exception as e:
+            logger.error(f"Mark all notifications read error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_notification_preferences(self, request):
+        """獲取通知偏好設置"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            from core.notification_service import get_notification_service
+            service = get_notification_service()
+            
+            prefs = service.get_user_preferences(tenant.user_id)
+            return self._json_response({
+                'success': True,
+                'data': prefs.to_dict()
+            })
+        except Exception as e:
+            logger.error(f"Get notification preferences error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def update_notification_preferences(self, request):
+        """更新通知偏好設置"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            data = await request.json()
+            
+            from core.notification_service import get_notification_service
+            service = get_notification_service()
+            
+            success = service.update_user_preferences(tenant.user_id, data)
+            return self._json_response({'success': success})
+        except Exception as e:
+            logger.error(f"Update notification preferences error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 數據分析 API（管理員）====================
+    
+    async def admin_analytics_dashboard(self, request):
+        """管理員 - 分析儀表板"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            from core.analytics_service import get_analytics_service
+            service = get_analytics_service()
+            
+            summary = service.get_dashboard_summary()
+            funnel = service.get_conversion_funnel()
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'summary': summary,
+                    'funnel': funnel
+                }
+            })
+        except Exception as e:
+            logger.error(f"Admin analytics dashboard error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_analytics_trends(self, request):
+        """管理員 - 趨勢數據"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            metric = request.query.get('metric', 'revenue')
+            days = int(request.query.get('days', 30))
+            
+            from core.analytics_service import get_analytics_service
+            service = get_analytics_service()
+            
+            trend = service.get_trend_data(metric, days)
+            
+            return self._json_response({
+                'success': True,
+                'data': {'trend': trend}
+            })
+        except Exception as e:
+            logger.error(f"Admin analytics trends error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 國際化 API ====================
+    
+    async def get_supported_languages(self, request):
+        """獲取支援的語言列表"""
+        try:
+            from core.i18n_service import get_i18n_service
+            service = get_i18n_service()
+            
+            return self._json_response({
+                'success': True,
+                'data': service.get_supported_languages()
+            })
+        except Exception as e:
+            logger.error(f"Get supported languages error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_translations(self, request):
+        """獲取翻譯"""
+        try:
+            language = request.query.get('language', 'zh-TW')
+            
+            from core.i18n_service import get_i18n_service
+            service = get_i18n_service()
+            
+            translations = service.get_all_translations(language)
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'language': language,
+                    'translations': translations
+                }
+            })
+        except Exception as e:
+            logger.error(f"Get translations error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def set_user_language(self, request):
+        """設置用戶語言"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            data = await request.json()
+            language = data.get('language')
+            
+            if not language:
+                return self._json_response({'success': False, 'error': '缺少語言參數'}, 400)
+            
+            from core.i18n_service import get_i18n_service
+            service = get_i18n_service()
+            
+            if not service.is_supported(language):
+                return self._json_response({'success': False, 'error': '不支援的語言'}, 400)
+            
+            service.set_user_language(tenant.user_id, language)
+            
+            return self._json_response({'success': True})
+        except Exception as e:
+            logger.error(f"Set user language error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 時區 API ====================
+    
+    async def get_timezones(self, request):
+        """獲取時區列表"""
+        try:
+            from core.timezone_service import get_timezone_service
+            service = get_timezone_service()
+            
+            return self._json_response({
+                'success': True,
+                'data': service.get_common_timezones()
+            })
+        except Exception as e:
+            logger.error(f"Get timezones error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_timezone_settings(self, request):
+        """獲取用戶時區設置"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            from core.timezone_service import get_timezone_service
+            service = get_timezone_service()
+            
+            settings = service.get_user_settings(tenant.user_id)
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'timezone': settings.timezone,
+                    'auto_detect': settings.auto_detect,
+                    'format_24h': settings.format_24h,
+                    'first_day_of_week': settings.first_day_of_week,
+                    'date_format': settings.date_format,
+                    'time_format': settings.time_format
+                }
+            })
+        except Exception as e:
+            logger.error(f"Get timezone settings error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def update_timezone_settings(self, request):
+        """更新用戶時區設置"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            data = await request.json()
+            
+            from core.timezone_service import get_timezone_service
+            service = get_timezone_service()
+            
+            success = service.update_user_settings(tenant.user_id, data)
+            
+            return self._json_response({'success': success})
+        except Exception as e:
+            logger.error(f"Update timezone settings error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 健康檢查 API ====================
+    
+    async def health_check(self, request):
+        """完整健康檢查"""
+        try:
+            from core.health_service import get_health_service
+            service = get_health_service()
+            
+            health = await service.check_all()
+            
+            status_code = 200 if health.status.value == 'healthy' else 503
+            return self._json_response(health.to_dict(), status_code)
+        except Exception as e:
+            logger.error(f"Health check error: {e}")
+            return self._json_response({
+                'status': 'unhealthy',
+                'error': str(e)
+            }, 503)
+    
+    async def liveness_probe(self, request):
+        """存活探針"""
+        try:
+            from core.health_service import get_health_service
+            service = get_health_service()
+            
+            result = await service.liveness_probe()
+            return self._json_response(result)
+        except:
+            return self._json_response({'status': 'dead'}, 503)
+    
+    async def readiness_probe(self, request):
+        """就緒探針"""
+        try:
+            from core.health_service import get_health_service
+            service = get_health_service()
+            
+            result = await service.readiness_probe()
+            status_code = 200 if result['status'] == 'ready' else 503
+            return self._json_response(result, status_code)
+        except Exception as e:
+            return self._json_response({
+                'status': 'not_ready',
+                'error': str(e)
+            }, 503)
+    
+    async def service_info(self, request):
+        """服務信息"""
+        try:
+            from core.health_service import get_health_service
+            service = get_health_service()
+            
+            return self._json_response({
+                'success': True,
+                'data': service.get_service_info()
+            })
+        except Exception as e:
+            logger.error(f"Service info error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 緩存管理 API（管理員）====================
+    
+    async def admin_cache_stats(self, request):
+        """管理員 - 獲取緩存統計"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            from core.cache_service import get_cache_service
+            service = get_cache_service()
+            
+            return self._json_response({
+                'success': True,
+                'data': service.get_stats()
+            })
+        except Exception as e:
+            logger.error(f"Admin cache stats error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_clear_cache(self, request):
+        """管理員 - 清空緩存"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            data = await request.json()
+            namespace = data.get('namespace')
+            
+            from core.cache_service import get_cache_service
+            service = get_cache_service()
+            
+            if namespace:
+                service.clear_namespace(namespace)
+            else:
+                service.clear_all()
+            
+            return self._json_response({
+                'success': True,
+                'message': f'緩存已清空 ({namespace or "all"})'
+            })
+        except Exception as e:
+            logger.error(f"Admin clear cache error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 消息隊列 API（管理員）====================
+    
+    async def admin_queue_stats(self, request):
+        """管理員 - 獲取隊列統計"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            from core.message_queue import get_message_queue
+            queue = get_message_queue()
+            
+            return self._json_response({
+                'success': True,
+                'data': queue.get_stats()
+            })
+        except Exception as e:
+            logger.error(f"Admin queue stats error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 速率限制 API（管理員）====================
+    
+    async def admin_rate_limit_stats(self, request):
+        """管理員 - 獲取限流統計"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            from core.rate_limiter import get_rate_limiter
+            limiter = get_rate_limiter()
+            
+            return self._json_response({
+                'success': True,
+                'data': limiter.get_stats()
+            })
+        except Exception as e:
+            logger.error(f"Admin rate limit stats error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_get_rate_limit_rules(self, request):
+        """管理員 - 獲取限流規則"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            from core.rate_limiter import get_rate_limiter
+            limiter = get_rate_limiter()
+            
+            return self._json_response({
+                'success': True,
+                'data': limiter.get_rules()
+            })
+        except Exception as e:
+            logger.error(f"Admin get rate limit rules error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_ban_ip(self, request):
+        """管理員 - 封禁 IP"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            data = await request.json()
+            identifier = data.get('identifier')
+            duration = data.get('duration', 3600)
+            reason = data.get('reason', '')
+            
+            if not identifier:
+                return self._json_response({'success': False, 'error': '缺少標識符'}, 400)
+            
+            from core.rate_limiter import get_rate_limiter
+            limiter = get_rate_limiter()
+            limiter.ban(identifier, duration, reason)
+            
+            # 記錄審計日誌
+            from core.audit_service import get_audit_service, AuditCategory, AuditAction
+            audit = get_audit_service()
+            audit.log_admin_action(
+                admin_id=tenant.user_id,
+                admin_name=tenant.email or '',
+                action='ban_ip',
+                target_type='ip',
+                target_id=identifier,
+                description=f"Banned for {duration}s: {reason}"
+            )
+            
+            return self._json_response({'success': True, 'message': f'已封禁 {identifier}'})
+        except Exception as e:
+            logger.error(f"Admin ban IP error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_unban_ip(self, request):
+        """管理員 - 解除封禁"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            data = await request.json()
+            identifier = data.get('identifier')
+            
+            if not identifier:
+                return self._json_response({'success': False, 'error': '缺少標識符'}, 400)
+            
+            from core.rate_limiter import get_rate_limiter
+            limiter = get_rate_limiter()
+            limiter.unban(identifier)
+            
+            return self._json_response({'success': True, 'message': f'已解除封禁 {identifier}'})
+        except Exception as e:
+            logger.error(f"Admin unban IP error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 審計日誌 API（管理員）====================
+    
+    async def admin_get_audit_logs(self, request):
+        """管理員 - 獲取審計日誌"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            user_id = request.query.get('user_id')
+            category = request.query.get('category')
+            action = request.query.get('action')
+            start_time = request.query.get('start_time')
+            end_time = request.query.get('end_time')
+            limit = int(request.query.get('limit', 100))
+            offset = int(request.query.get('offset', 0))
+            
+            from core.audit_service import get_audit_service
+            audit = get_audit_service()
+            
+            logs = audit.query(
+                user_id=user_id,
+                category=category,
+                action=action,
+                start_time=start_time,
+                end_time=end_time,
+                limit=limit,
+                offset=offset
+            )
+            
+            return self._json_response({
+                'success': True,
+                'data': [log.to_dict() for log in logs]
+            })
+        except Exception as e:
+            logger.error(f"Admin get audit logs error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_audit_stats(self, request):
+        """管理員 - 審計統計"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            days = int(request.query.get('days', 7))
+            
+            from core.audit_service import get_audit_service
+            audit = get_audit_service()
+            
+            return self._json_response({
+                'success': True,
+                'data': audit.get_stats(days)
+            })
+        except Exception as e:
+            logger.error(f"Admin audit stats error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_export_audit(self, request):
+        """管理員 - 導出審計日誌"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            start_time = request.query.get('start_time')
+            end_time = request.query.get('end_time')
+            format_type = request.query.get('format', 'json')
+            
+            if not start_time or not end_time:
+                return self._json_response({'success': False, 'error': '缺少時間範圍'}, 400)
+            
+            from core.audit_service import get_audit_service
+            audit = get_audit_service()
+            
+            data = audit.export(start_time, end_time, format_type)
+            
+            content_type = 'application/json' if format_type == 'json' else 'text/csv'
+            
+            return web.Response(
+                text=data,
+                content_type=content_type,
+                headers={
+                    'Content-Disposition': f'attachment; filename="audit_{start_time}_{end_time}.{format_type}"'
+                }
+            )
+        except Exception as e:
+            logger.error(f"Admin export audit error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 安全告警 API（管理員）====================
+    
+    async def admin_get_security_alerts(self, request):
+        """管理員 - 獲取安全告警"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            status = request.query.get('status')
+            severity = request.query.get('severity')
+            alert_type = request.query.get('type')
+            limit = int(request.query.get('limit', 100))
+            
+            from core.security_alert import get_security_alert_service
+            service = get_security_alert_service()
+            
+            alerts = service.get_alerts(
+                status=status,
+                severity=severity,
+                alert_type=alert_type,
+                limit=limit
+            )
+            
+            return self._json_response({
+                'success': True,
+                'data': [a.to_dict() for a in alerts]
+            })
+        except Exception as e:
+            logger.error(f"Admin get security alerts error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_security_stats(self, request):
+        """管理員 - 安全統計"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            from core.security_alert import get_security_alert_service
+            service = get_security_alert_service()
+            
+            return self._json_response({
+                'success': True,
+                'data': service.get_stats()
+            })
+        except Exception as e:
+            logger.error(f"Admin security stats error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_acknowledge_alert(self, request):
+        """管理員 - 確認告警"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            data = await request.json()
+            alert_id = data.get('alert_id')
+            
+            if not alert_id:
+                return self._json_response({'success': False, 'error': '缺少告警 ID'}, 400)
+            
+            from core.security_alert import get_security_alert_service
+            service = get_security_alert_service()
+            
+            success = service.acknowledge_alert(alert_id, tenant.user_id)
+            return self._json_response({'success': success})
+        except Exception as e:
+            logger.error(f"Admin acknowledge alert error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_resolve_alert(self, request):
+        """管理員 - 解決告警"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            data = await request.json()
+            alert_id = data.get('alert_id')
+            notes = data.get('notes', '')
+            false_positive = data.get('false_positive', False)
+            
+            if not alert_id:
+                return self._json_response({'success': False, 'error': '缺少告警 ID'}, 400)
+            
+            from core.security_alert import get_security_alert_service
+            service = get_security_alert_service()
+            
+            success = service.resolve_alert(alert_id, notes, false_positive)
+            return self._json_response({'success': success})
+        except Exception as e:
+            logger.error(f"Admin resolve alert error: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
     
     # ==================== 診斷 API ====================

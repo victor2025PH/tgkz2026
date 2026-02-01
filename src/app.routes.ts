@@ -74,6 +74,27 @@ export const routes: Routes = [
     title: '升級方案',
     canActivate: [authGuard]
   },
+  // 配額管理儀表板
+  {
+    path: 'quota',
+    loadComponent: () => import('./views/quota-dashboard-view.component').then(m => m.QuotaDashboardViewComponent),
+    title: '配額管理',
+    canActivate: [authGuard]
+  },
+  // 計費管理
+  {
+    path: 'billing',
+    loadComponent: () => import('./views/billing-view.component').then(m => m.BillingViewComponent),
+    title: '計費管理',
+    canActivate: [authGuard]
+  },
+  // 支付中心
+  {
+    path: 'payment',
+    loadComponent: () => import('./views/payment-view.component').then(m => m.PaymentViewComponent),
+    title: '支付中心',
+    canActivate: [authGuard]
+  },
   // 營銷功能 - 需要會員權限
   {
     path: 'leads',

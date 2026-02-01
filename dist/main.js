@@ -27056,26 +27056,44 @@ var AuthService2 = class _AuthService {
   }
   /**
    * 檢查本地存儲的認證狀態
+   *
+   * 🔧 修復：同時支持新版 (tgm_access_token) 和舊版 (tgm_auth_token) Token 格式
    */
   async checkLocalAuth() {
     try {
       if (typeof localStorage === "undefined") {
         return;
       }
-      const storedToken = localStorage.getItem("tgm_auth_token");
+      const storedToken = localStorage.getItem("tgm_access_token") || localStorage.getItem("tgm_auth_token");
       const storedUser = localStorage.getItem("tgm_user");
       if (storedToken && storedUser) {
-        const user = JSON.parse(storedUser);
-        const deviceCode = await this.deviceService.getDeviceCode();
-        const isValid = await this.verifyToken(storedToken, deviceCode);
-        if (isValid) {
+        try {
+          const rawUser = JSON.parse(storedUser);
+          const user = {
+            id: rawUser.id || 0,
+            username: rawUser.username || rawUser.display_name || "User",
+            email: rawUser.email || void 0,
+            phone: rawUser.phone || void 0,
+            avatar: rawUser.avatar_url || rawUser.avatar || void 0,
+            // 🔧 從 subscription_tier 轉換到 membershipLevel
+            membershipLevel: this.tierToLevel(rawUser.subscription_tier || rawUser.membershipLevel || "free"),
+            membershipExpires: rawUser.membershipExpires || rawUser.subscription_expires || void 0,
+            inviteCode: rawUser.inviteCode || rawUser.invite_code || "",
+            invitedCount: rawUser.invitedCount || rawUser.invited_count || 0,
+            createdAt: rawUser.createdAt || rawUser.created_at || (/* @__PURE__ */ new Date()).toISOString(),
+            lastLogin: rawUser.lastLogin || rawUser.last_login_at || (/* @__PURE__ */ new Date()).toISOString(),
+            status: rawUser.status || (rawUser.is_active ? "active" : "suspended")
+          };
           this._token.set(storedToken);
           this._user.set(user);
           this._isAuthenticated.set(true);
+          console.log("[AuthService] \u5DF2\u5F9E\u672C\u5730\u5B58\u5132\u6062\u5FA9\u7528\u6236:", user.username);
           this.loadDevices().catch((err) => console.error("\u8F09\u5165\u8A2D\u5099\u5217\u8868\u5931\u6557:", err));
           this.loadUsageStats().catch((err) => console.error("\u8F09\u5165\u4F7F\u7528\u7D71\u8A08\u5931\u6557:", err));
-        } else {
+        } catch (parseError) {
+          console.error("\u89E3\u6790\u7528\u6236\u6578\u64DA\u5931\u6557:", parseError);
           this.clearLocalAuth();
+          this._isAuthenticated.set(false);
         }
       } else {
         this._isAuthenticated.set(false);
@@ -27085,6 +27103,25 @@ var AuthService2 = class _AuthService {
       this.clearLocalAuth();
       this._isAuthenticated.set(false);
     }
+  }
+  /**
+   * 🔧 將 subscription_tier 轉換為 membershipLevel
+   */
+  tierToLevel(tier) {
+    const tierMap = {
+      "free": "bronze",
+      "basic": "silver",
+      "pro": "gold",
+      "enterprise": "diamond",
+      // 直接映射
+      "bronze": "bronze",
+      "silver": "silver",
+      "gold": "gold",
+      "diamond": "diamond",
+      "star": "star",
+      "king": "king"
+    };
+    return tierMap[tier] || "bronze";
   }
   /**
    * 帳號密碼登入
@@ -27447,7 +27484,10 @@ var AuthService2 = class _AuthService {
    */
   clearLocalAuth() {
     localStorage.removeItem("tgm_auth_token");
+    localStorage.removeItem("tgm_access_token");
+    localStorage.removeItem("tgm_refresh_token");
     localStorage.removeItem("tgm_user");
+    localStorage.removeItem("tgm_session_id");
   }
   /**
    * 調用認證 API（開發模式使用模擬數據）

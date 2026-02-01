@@ -655,10 +655,15 @@ export class UnifiedAuthService {
     refresh_token?: string;
   }): void {
     if (data.user) {
-      this._user.set(this.normalizeUser(data.user));
+      const normalizedUser = this.normalizeUser(data.user);
+      this._user.set(normalizedUser);
+      // 🔧 同步保存到 localStorage（避免 effect 異步導致頁面刷新前未保存）
+      localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(normalizedUser));
     }
     if (data.access_token) {
       this._accessToken.set(data.access_token);
+      // 🔧 同步保存到 localStorage
+      localStorage.setItem(TOKEN_KEYS.ACCESS, data.access_token);
     }
     if (data.refresh_token) {
       this._refreshToken.set(data.refresh_token);

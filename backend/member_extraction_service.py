@@ -119,6 +119,14 @@ class MemberExtractionService:
         self._extraction_lock = asyncio.Lock()
         self._current_extraction: Dict[str, Any] = {}
         
+        # 🆕 P1 優化：Peer 緩存
+        self._peer_cache: Dict[str, Dict] = {}  # key: f"{phone}:{chat_id}"
+        self._peer_cache_ttl = 300  # 緩存有效期 5 分鐘
+        
+        # 🆕 P1 優化：提取隊列
+        self._extraction_queue: List[Dict] = []
+        self._queue_processing = False
+        
         # 提取配置
         self.config = {
             'batch_size': 200,           # 每批提取數量
@@ -126,6 +134,7 @@ class MemberExtractionService:
             'max_members_per_group': 10000,  # 每群最大提取數
             'flood_wait_multiplier': 1.2,    # FloodWait 等待倍數
             'save_interval': 100,        # 每多少個保存一次
+            'pre_extraction_delay': 2,   # 🆕 提取前延遲（確保 Telegram 同步）
         }
     
     def set_event_callback(self, callback: Callable):
@@ -135,6 +144,51 @@ class MemberExtractionService:
     def set_clients(self, clients: Dict[str, Client]):
         """設置客戶端"""
         self._clients = clients
+    
+    # ==================== P1 優化：Peer 緩存 ====================
+    
+    def _get_cache_key(self, phone: str, chat_id: str) -> str:
+        """生成緩存鍵"""
+        return f"{phone}:{chat_id}"
+    
+    def _get_cached_peer(self, phone: str, chat_id: str) -> Optional[Dict]:
+        """從緩存獲取 peer 信息"""
+        key = self._get_cache_key(phone, chat_id)
+        if key in self._peer_cache:
+            cache_entry = self._peer_cache[key]
+            # 檢查是否過期
+            if time.time() - cache_entry['cached_at'] < self._peer_cache_ttl:
+                self.log(f"📦 使用緩存的 peer: {chat_id}", "debug")
+                return cache_entry['data']
+            else:
+                # 過期，刪除
+                del self._peer_cache[key]
+        return None
+    
+    def _cache_peer(self, phone: str, chat_id: str, chat_data: Dict):
+        """緩存 peer 信息"""
+        key = self._get_cache_key(phone, chat_id)
+        self._peer_cache[key] = {
+            'data': chat_data,
+            'cached_at': time.time()
+        }
+        self.log(f"💾 已緩存 peer: {chat_id}", "debug")
+        
+        # 清理過期緩存（超過 100 個時）
+        if len(self._peer_cache) > 100:
+            self._cleanup_peer_cache()
+    
+    def _cleanup_peer_cache(self):
+        """清理過期的緩存條目"""
+        now = time.time()
+        expired_keys = [
+            k for k, v in self._peer_cache.items() 
+            if now - v['cached_at'] > self._peer_cache_ttl
+        ]
+        for key in expired_keys:
+            del self._peer_cache[key]
+        if expired_keys:
+            self.log(f"🧹 清理了 {len(expired_keys)} 個過期緩存", "debug")
     
     def log(self, message: str, level: str = "info"):
         """記錄日誌"""
@@ -285,8 +339,33 @@ class MemberExtractionService:
         self.log(f"🔍 開始提取成員: {chat_id} (帳號: {phone})")
         
         try:
-            # 獲取群組信息
-            chat = await client.get_chat(chat_id)
+            # 🆕 P1 優化：預延遲確保 Telegram 同步
+            pre_delay = self.config.get('pre_extraction_delay', 0)
+            if pre_delay > 0:
+                await asyncio.sleep(pre_delay)
+            
+            # 🆕 P1 優化：嘗試從緩存獲取群組信息
+            cached_peer = self._get_cached_peer(phone, str(chat_id))
+            chat = None
+            
+            if cached_peer:
+                # 使用緩存的 chat_id 直接獲取（更快）
+                try:
+                    chat = await client.get_chat(cached_peer['chat_id'])
+                except Exception:
+                    # 緩存失效，重新獲取
+                    chat = None
+            
+            if not chat:
+                # 獲取群組信息
+                chat = await client.get_chat(chat_id)
+                # 緩存成功解析的 peer
+                self._cache_peer(phone, str(chat_id), {
+                    'chat_id': chat.id,
+                    'title': chat.title,
+                    'type': str(chat.type)
+                })
+            
             result['chat_title'] = sanitize_text(chat.title) if chat.title else str(chat_id)
             result['total_members'] = getattr(chat, 'members_count', 0) or 0
             
@@ -836,6 +915,113 @@ class MemberExtractionService:
                     "UPDATE extracted_members SET tags = ?, updated_at = ? WHERE user_id = ?",
                     (json.dumps(tags), datetime.now().isoformat(), user_id)
                 )
+    
+    # ==================== P1 優化：批量提取隊列 ====================
+    
+    def add_to_queue(self, extraction_request: Dict) -> str:
+        """添加提取任務到隊列"""
+        import uuid
+        task_id = str(uuid.uuid4())[:8]
+        self._extraction_queue.append({
+            'task_id': task_id,
+            'status': 'pending',
+            'request': extraction_request,
+            'created_at': time.time(),
+            'result': None
+        })
+        self.log(f"📥 任務已加入隊列: {task_id}", "info")
+        return task_id
+    
+    def get_queue_status(self) -> Dict:
+        """獲取隊列狀態"""
+        return {
+            'queue_length': len(self._extraction_queue),
+            'is_processing': self._queue_processing,
+            'tasks': [
+                {
+                    'task_id': t['task_id'],
+                    'status': t['status'],
+                    'chat_id': t['request'].get('chat_id', 'unknown'),
+                    'created_at': t['created_at']
+                }
+                for t in self._extraction_queue
+            ]
+        }
+    
+    async def process_queue(self):
+        """處理提取隊列"""
+        if self._queue_processing:
+            self.log("⚠️ 隊列已在處理中", "warning")
+            return
+        
+        self._queue_processing = True
+        self.log(f"🚀 開始處理隊列，共 {len(self._extraction_queue)} 個任務", "info")
+        
+        try:
+            while self._extraction_queue:
+                task = self._extraction_queue[0]
+                task['status'] = 'processing'
+                
+                try:
+                    # 發送進度事件
+                    if self.event_callback:
+                        self.event_callback("queue-progress", {
+                            "taskId": task['task_id'],
+                            "status": "processing",
+                            "remaining": len(self._extraction_queue) - 1
+                        })
+                    
+                    # 執行提取
+                    request = task['request']
+                    result = await self.extract_members(
+                        chat_id=request.get('chat_id'),
+                        phone=request.get('phone'),
+                        limit=request.get('limit'),
+                        filter_bots=request.get('filter_bots', True),
+                        filter_offline=request.get('filter_offline', False),
+                        online_status=request.get('online_status', 'all'),
+                        save_to_db=request.get('save_to_db', True)
+                    )
+                    
+                    task['status'] = 'completed' if result.get('success') else 'failed'
+                    task['result'] = result
+                    
+                    # 發送完成事件
+                    if self.event_callback:
+                        self.event_callback("queue-task-completed", {
+                            "taskId": task['task_id'],
+                            "success": result.get('success', False),
+                            "extracted": result.get('extracted', 0),
+                            "error": result.get('error')
+                        })
+                    
+                except Exception as e:
+                    task['status'] = 'failed'
+                    task['result'] = {'success': False, 'error': str(e)}
+                    self.log(f"❌ 隊列任務失敗: {task['task_id']} - {e}", "error")
+                
+                # 移除已處理的任務
+                self._extraction_queue.pop(0)
+                
+                # 任務間延遲（避免頻率限制）
+                if self._extraction_queue:
+                    await asyncio.sleep(5)
+        
+        finally:
+            self._queue_processing = False
+            self.log("✅ 隊列處理完成", "success")
+            
+            if self.event_callback:
+                self.event_callback("queue-completed", {
+                    "totalProcessed": len(self._extraction_queue)
+                })
+    
+    def clear_queue(self):
+        """清空隊列"""
+        count = len(self._extraction_queue)
+        self._extraction_queue.clear()
+        self.log(f"🧹 已清空隊列，移除 {count} 個任務", "info")
+        return count
 
 
 # 全局實例

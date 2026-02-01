@@ -25943,15 +25943,16 @@ class BackendService:
                 from database import db
                 await db.connect()
                 
-                # 1. 嘗試從 discovered_resources 獲取 joined_by_phone
-                # 🔧 修復：同時支持按 id、telegram_id、username 查詢
+                # 1. 嘗試從 discovered_resources 獲取 joined_by_phone 和 joined_at
+                # 🔧 P1 優化：同時獲取 joined_at 用於智能延遲
                 try:
                     resource = None
+                    joined_at_str = None
                     
                     # 1a. 按 resource_id 查詢
                     if resource_id:
                         resource = await db.fetch_one(
-                            "SELECT joined_by_phone, telegram_id FROM discovered_resources WHERE id = ?",
+                            "SELECT joined_by_phone, telegram_id, joined_at FROM discovered_resources WHERE id = ?",
                             (resource_id,)
                         )
                         print(f"[Backend] Query by resource_id={resource_id}: found={resource is not None}", file=sys.stderr)
@@ -25959,7 +25960,7 @@ class BackendService:
                     # 1b. 按 telegram_id 查詢
                     if not resource and telegram_id:
                         resource = await db.fetch_one(
-                            "SELECT joined_by_phone, telegram_id FROM discovered_resources WHERE telegram_id = ?",
+                            "SELECT joined_by_phone, telegram_id, joined_at FROM discovered_resources WHERE telegram_id = ?",
                             (str(telegram_id),)
                         )
                         print(f"[Backend] Query by telegram_id={telegram_id}: found={resource is not None}", file=sys.stderr)
@@ -25967,14 +25968,43 @@ class BackendService:
                     # 1c. 按 username 查詢
                     if not resource and username:
                         resource = await db.fetch_one(
-                            "SELECT joined_by_phone, telegram_id FROM discovered_resources WHERE username = ?",
+                            "SELECT joined_by_phone, telegram_id, joined_at FROM discovered_resources WHERE username = ?",
                             (username.lstrip('@'),)
                         )
                         print(f"[Backend] Query by username={username}: found={resource is not None}", file=sys.stderr)
                     
                     if resource:
                         joined_phone = resource.get('joined_by_phone') if hasattr(resource, 'get') else resource[0]
-                        print(f"[Backend] Found joined_by_phone={joined_phone}", file=sys.stderr)
+                        joined_at_str = resource.get('joined_at') if hasattr(resource, 'get') else (resource[2] if len(resource) > 2 else None)
+                        print(f"[Backend] Found joined_by_phone={joined_phone}, joined_at={joined_at_str}", file=sys.stderr)
+                        
+                        # 🆕 P1 優化：智能延遲 - 如果加入時間不到 30 秒，自動等待
+                        if joined_at_str:
+                            try:
+                                from datetime import datetime
+                                if isinstance(joined_at_str, str):
+                                    joined_at = datetime.fromisoformat(joined_at_str.replace('Z', '+00:00'))
+                                else:
+                                    joined_at = joined_at_str
+                                
+                                time_since_join = (datetime.now() - joined_at.replace(tzinfo=None)).total_seconds()
+                                MIN_WAIT_AFTER_JOIN = 30  # 最少等待 30 秒
+                                
+                                if time_since_join < MIN_WAIT_AFTER_JOIN:
+                                    wait_time = int(MIN_WAIT_AFTER_JOIN - time_since_join) + 1
+                                    self.send_log(f"⏳ 剛加入群組 ({int(time_since_join)}s)，等待 Telegram 同步 ({wait_time}s)...", "info")
+                                    self.send_event("members-extraction-progress", {
+                                        "resourceId": resource_id,
+                                        "status": "waiting",
+                                        "message": f"等待群組同步 ({wait_time}s)...",
+                                        "extracted": 0,
+                                        "total": 0
+                                    })
+                                    await asyncio.sleep(wait_time)
+                                    self.send_log(f"✓ 同步等待完成，開始提取", "info")
+                            except Exception as dt_err:
+                                print(f"[Backend] Error parsing joined_at: {dt_err}", file=sys.stderr)
+                        
                         if joined_phone and joined_phone in self.telegram_manager.clients:
                             phone = joined_phone
                             print(f"[Backend] ✓ Using joined_by_phone from discovered_resources: {phone}", file=sys.stderr)

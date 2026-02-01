@@ -60,6 +60,19 @@ export interface ExtractionProgress {
   total: number;
   status: string;
   percent: number;
+  // 🆕 P3 優化：預估時間
+  estimatedSeconds?: number;
+  elapsedSeconds?: number;
+  speed?: number;  // 每秒提取數
+  fromCache?: boolean;
+}
+
+// 🆕 P3 優化：智能建議
+export interface ExtractionSuggestion {
+  type: 'info' | 'warning' | 'action';
+  message: string;
+  action?: string;
+  actionLabel?: string;
 }
 
 // 配額信息
@@ -144,6 +157,10 @@ export class UnifiedExtractionService {
     this.loadHistory();
   }
   
+  // 🆕 P3 優化：提取開始時間（用於計算速度）
+  private _extractionStartTime: number = 0;
+  private _lastProgressUpdate: { time: number; count: number } = { time: 0, count: 0 };
+  
   private setupListeners() {
     // 監聽提取進度
     this.ipc.on('members-extraction-progress', (data: any) => {
@@ -154,6 +171,8 @@ export class UnifiedExtractionService {
           statusText = data.message || '正在同步群組狀態...';
         } else if (data.status === 'starting') {
           statusText = '正在連接群組...';
+          this._extractionStartTime = Date.now();
+          this._lastProgressUpdate = { time: Date.now(), count: 0 };
         } else if (data.status === 'waiting') {
           statusText = data.message || '等待群組同步...';
         } else if (data.status === 'completed') {
@@ -162,12 +181,41 @@ export class UnifiedExtractionService {
           statusText = `正在提取 (${data.extracted || 0}/${data.total || '?'})...`;
         }
         
+        // 🆕 P3 優化：計算速度和預估時間
+        const now = Date.now();
+        const current = data.extracted || 0;
+        const total = data.total || 0;
+        const elapsedSeconds = this._extractionStartTime ? Math.round((now - this._extractionStartTime) / 1000) : 0;
+        
+        let speed = 0;
+        let estimatedSeconds = 0;
+        
+        if (current > 0 && elapsedSeconds > 0) {
+          speed = Math.round((current / elapsedSeconds) * 10) / 10;  // 每秒提取數
+          const remaining = total - current;
+          if (speed > 0 && remaining > 0) {
+            estimatedSeconds = Math.ceil(remaining / speed);
+          }
+        }
+        
+        // 格式化狀態文字（包含預估時間）
+        if (data.status === 'extracting' && estimatedSeconds > 0) {
+          const mins = Math.floor(estimatedSeconds / 60);
+          const secs = estimatedSeconds % 60;
+          const timeStr = mins > 0 ? `${mins}分${secs}秒` : `${secs}秒`;
+          statusText = `正在提取 (${current}/${total}) 預估剩餘 ${timeStr}`;
+        }
+        
         const progress: ExtractionProgress = {
           groupId: String(data.resourceId || data.groupId),
-          current: data.extracted || 0,
-          total: data.total || 0,
+          current,
+          total,
           status: statusText,
-          percent: data.total > 0 ? Math.round((data.extracted / data.total) * 100) : 0
+          percent: total > 0 ? Math.round((current / total) * 100) : 0,
+          estimatedSeconds,
+          elapsedSeconds,
+          speed,
+          fromCache: data.fromCache || false
         };
         this._progress.set(progress);
         this.extractionProgress$.next(progress);
@@ -184,14 +232,28 @@ export class UnifiedExtractionService {
         this._lastResult.set(result);
         this.extractionCompleted$.next(result);
         
+        // 🆕 P3：顯示來自緩存的提示
+        if (data.fromCache) {
+          this.toast.info(`📦 使用緩存結果（${Math.round(data.cacheAge / 60)} 分鐘前）`);
+        }
+        
         // 更新配額
         this._quota.update(q => ({
           ...q,
           used: q.used + result.count,
           remaining: Math.max(0, q.remaining - result.count)
         }));
+        
+        // 🆕 P3：智能建議
+        this.showSmartSuggestions(result);
       } else if (data.error) {
-        this.toast.error(`提取失敗：${data.error}`);
+        // 🆕 P3：智能錯誤建議
+        const suggestion = this.getErrorSuggestion(data.error_code, data.error_details);
+        if (suggestion) {
+          this.toast.warning(`${data.error}\n\n💡 ${suggestion}`);
+        } else {
+          this.toast.error(`提取失敗：${data.error}`);
+        }
       }
     });
     
@@ -515,6 +577,65 @@ export class UnifiedExtractionService {
   clearHistory(): void {
     this._history.set([]);
     localStorage.removeItem('extraction_history');
+  }
+  
+  // ==================== P3 優化：智能建議 ====================
+  
+  /**
+   * 根據錯誤代碼獲取建議
+   */
+  private getErrorSuggestion(errorCode?: string, errorDetails?: any): string | null {
+    if (!errorCode) return null;
+    
+    const suggestions: Record<string, string> = {
+      'PEER_ID_INVALID': '請先加入群組，然後等待 30 秒再嘗試提取',
+      'NOT_PARTICIPANT': '請使用已加入群組的帳號進行提取',
+      'USER_NOT_PARTICIPANT': '帳號尚未加入群組，請先加入後重試',
+      'CHANNEL_PRIVATE': '這是私有群組，需要邀請鏈接或管理員批准',
+      'ADMIN_REQUIRED': '群組設置限制了成員列表，可嘗試監控消息來收集用戶',
+      'FLOOD_WAIT': '請求過於頻繁，系統會自動等待後重試',
+      'CHANNEL_INVALID': '群組可能已被刪除，請刷新資源列表'
+    };
+    
+    let suggestion = suggestions[errorCode];
+    
+    // 根據 errorDetails 提供更具體的建議
+    if (errorDetails) {
+      if (errorDetails.attempts && errorDetails.attempts > 1) {
+        suggestion = `已嘗試 ${errorDetails.attempts} 次，Telegram 同步較慢。建議等待 1 分鐘後重試，或嘗試重新加入群組。`;
+      }
+      if (errorDetails.suggestion) {
+        suggestion = errorDetails.suggestion;
+      }
+    }
+    
+    return suggestion || null;
+  }
+  
+  /**
+   * 顯示智能建議
+   */
+  private showSmartSuggestions(result: ExtractionResult): void {
+    const suggestions: string[] = [];
+    
+    // 分析結果並提供建議
+    if (result.count === 0) {
+      suggestions.push('未提取到成員，可能是群組設置限制或成員列表為空');
+    } else if (result.count < 10) {
+      suggestions.push('提取成員較少，可能群組成員不多或有過濾條件');
+    }
+    
+    // 質量分析
+    const onlineRate = result.stats?.online ? result.stats.online / result.count : 0;
+    if (onlineRate < 0.1 && result.count > 20) {
+      suggestions.push('在線用戶比例較低，建議使用「最近活躍」過濾器獲取更活躍的用戶');
+    }
+    
+    // 顯示建議
+    if (suggestions.length > 0 && result.count > 0) {
+      // 只在有實際數據時顯示建議
+      console.log('[UnifiedExtraction] Smart suggestions:', suggestions);
+    }
   }
   
   // ==================== 輔助方法 ====================

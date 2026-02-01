@@ -26197,7 +26197,7 @@ class BackendService:
             })
     
     async def handle_get_extracted_members(self, payload: Dict[str, Any]):
-        """獲取已提取的成員列表"""
+        """獲取已提取的成員列表 - 🆕 P3 優化：支持完整分頁"""
         import time
         start_time = time.time()
         print(f"[Backend] handle_get_extracted_members started, payload: {payload}", file=sys.stderr)
@@ -26209,8 +26209,24 @@ class BackendService:
             not_contacted = payload.get('notContacted', False)
             limit = payload.get('limit', 100)
             offset = payload.get('offset', 0)
+            page = payload.get('page', 1)
+            page_size = payload.get('pageSize', limit)
+            
+            # 🆕 P3：支持頁碼方式分頁
+            if page > 1:
+                offset = (page - 1) * page_size
+                limit = page_size
             
             print(f"[Backend] Fetching members with limit={limit}, offset={offset}...", file=sys.stderr)
+            
+            # 🆕 P3：獲取總數（用於分頁）
+            total_count = await member_extraction_service.count_members_filtered(
+                online_only=online_only,
+                min_value_level=min_value_level,
+                source_chat_id=source_chat_id,
+                not_contacted=not_contacted
+            )
+            
             members = await member_extraction_service.get_members(
                 online_only=online_only,
                 min_value_level=min_value_level,
@@ -26221,16 +26237,29 @@ class BackendService:
             )
             
             elapsed = time.time() - start_time
-            print(f"[Backend] Fetched {len(members)} members in {elapsed:.2f}s", file=sys.stderr)
+            print(f"[Backend] Fetched {len(members)} members (total: {total_count}) in {elapsed:.2f}s", file=sys.stderr)
+            
+            # 🆕 P3：返回分頁信息
+            total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 1
             
             self.send_event("extracted-members-list", {
                 "success": True,
                 "members": members,
-                "count": len(members)
+                "count": len(members),
+                # 🆕 P3：分頁元數據
+                "pagination": {
+                    "total": total_count,
+                    "page": page,
+                    "pageSize": page_size,
+                    "totalPages": total_pages,
+                    "hasMore": offset + len(members) < total_count
+                }
             })
             print(f"[Backend] Sent extracted-members-list event with {len(members)} members", file=sys.stderr)
             
         except Exception as e:
+            import traceback
+            traceback.print_exc(file=sys.stderr)
             self.send_log(f"❌ 獲取成員列表失敗: {e}", "error")
             self.send_event("extracted-members-list", {
                 "success": False,

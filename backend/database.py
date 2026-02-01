@@ -1334,6 +1334,15 @@ class Database:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_members_user_id ON extracted_members(user_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_members_status ON extracted_members(online_status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_members_value ON extracted_members(value_level)')
+        
+        # 🆕 P3 優化：額外索引提升查詢性能
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_members_source ON extracted_members(source_chat_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_members_extracted_at ON extracted_members(extracted_at DESC)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_members_contacted ON extracted_members(contacted)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_members_composite ON extracted_members(online_status, value_level, contacted)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_extraction_logs_phone ON member_extraction_logs(account_phone)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_extraction_logs_status ON member_extraction_logs(status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_extraction_logs_created ON member_extraction_logs(created_at DESC)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_campaigns_status ON marketing_campaigns(status)')
         
         # 日誌和消息隊列索引

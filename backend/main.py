@@ -2720,6 +2720,24 @@ class BackendService:
                 
                 # 延遲 1 秒後在後台恢復監控
                 asyncio.get_event_loop().call_later(1.0, lambda: asyncio.create_task(restore_monitoring_background()))
+            
+            # 🆕 返回 HTTP 響應（Web 模式需要）
+            return {
+                "success": True,
+                "accounts": accounts,
+                "keywordSets": keyword_sets,
+                "monitoredGroups": monitored_groups,
+                "campaigns": campaigns,
+                "messageTemplates": message_templates,
+                "chatTemplates": message_templates,
+                "triggerRules": trigger_rules,
+                "leads": leads,
+                "leadsTotal": leads_total,
+                "leadsHasMore": leads_has_more,
+                "logs": logs,
+                "settings": settings,
+                "isMonitoring": is_monitoring
+            }
         
         except Exception as e:
             import traceback
@@ -3221,6 +3239,7 @@ class BackendService:
             print(f"[Backend] Adding account to database...", file=sys.stderr)
             
             # Generate device fingerprint for anti-ban (防封)
+            DeviceFingerprintGenerator = get_DeviceFingerprintGenerator()
             device_config = DeviceFingerprintGenerator.generate_for_phone(phone)
             print(f"[Backend] Generated device fingerprint for {phone}: {device_config.get('device_model')} ({device_config.get('platform')})", file=sys.stderr)
             
@@ -3515,6 +3534,7 @@ class BackendService:
             
             # If device fingerprint not in account, generate it (for existing accounts)
             if not device_model or not system_version or not app_version:
+                DeviceFingerprintGenerator = get_DeviceFingerprintGenerator()
                 device_config = DeviceFingerprintGenerator.generate_for_phone(phone, prefer_platform=platform)
                 device_model = device_model or device_config.get('device_model')
                 system_version = system_version or device_config.get('system_version')
@@ -8093,9 +8113,12 @@ class BackendService:
         try:
             accounts = await db.get_all_accounts()
             self.send_event("accounts-updated", accounts)
+            # 同時返回數據給 HTTP 響應
+            return {'success': True, 'accounts': accounts}
         except Exception as e:
             self.send_log(f"❌ 獲取帳號列表失敗: {e}", "error")
             self.send_event("accounts-updated", [])
+            return {'success': False, 'error': str(e), 'accounts': []}
     
     async def handle_get_monitored_groups(self):
         """獲取所有監控群組列表"""

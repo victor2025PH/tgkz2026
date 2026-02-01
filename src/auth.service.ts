@@ -162,6 +162,8 @@ export class AuthService {
 
   /**
    * 檢查本地存儲的認證狀態
+   * 
+   * 🔧 修復：同時支持新版 (tgm_access_token) 和舊版 (tgm_auth_token) Token 格式
    */
   private async checkLocalAuth(): Promise<void> {
     try {
@@ -170,27 +172,45 @@ export class AuthService {
         return;
       }
 
-      const storedToken = localStorage.getItem('tgm_auth_token');
+      // 🔧 優先使用新版 Token（來自 Telegram 登入）
+      const storedToken = localStorage.getItem('tgm_access_token') || localStorage.getItem('tgm_auth_token');
       const storedUser = localStorage.getItem('tgm_user');
       
       if (storedToken && storedUser) {
-        const user = JSON.parse(storedUser) as User;
-        const deviceCode = await this.deviceService.getDeviceCode();
-        
-        // 驗證 Token 和設備碼
-        const isValid = await this.verifyToken(storedToken, deviceCode);
-        
-        if (isValid) {
+        try {
+          const rawUser = JSON.parse(storedUser);
+          
+          // 🔧 轉換用戶對象格式（新版 API 返回的格式可能不同）
+          const user: User = {
+            id: rawUser.id || 0,
+            username: rawUser.username || rawUser.display_name || 'User',
+            email: rawUser.email || undefined,
+            phone: rawUser.phone || undefined,
+            avatar: rawUser.avatar_url || rawUser.avatar || undefined,
+            // 🔧 從 subscription_tier 轉換到 membershipLevel
+            membershipLevel: this.tierToLevel(rawUser.subscription_tier || rawUser.membershipLevel || 'free'),
+            membershipExpires: rawUser.membershipExpires || rawUser.subscription_expires || undefined,
+            inviteCode: rawUser.inviteCode || rawUser.invite_code || '',
+            invitedCount: rawUser.invitedCount || rawUser.invited_count || 0,
+            createdAt: rawUser.createdAt || rawUser.created_at || new Date().toISOString(),
+            lastLogin: rawUser.lastLogin || rawUser.last_login_at || new Date().toISOString(),
+            status: rawUser.status || (rawUser.is_active ? 'active' : 'suspended')
+          };
+          
+          // 設置用戶狀態
           this._token.set(storedToken);
           this._user.set(user);
           this._isAuthenticated.set(true);
           
+          console.log('[AuthService] 已從本地存儲恢復用戶:', user.username);
+          
           // 載入設備列表和使用統計（異步，不阻塞）
           this.loadDevices().catch(err => console.error('載入設備列表失敗:', err));
           this.loadUsageStats().catch(err => console.error('載入使用統計失敗:', err));
-        } else {
-          // Token 無效，清除本地存儲
+        } catch (parseError) {
+          console.error('解析用戶數據失敗:', parseError);
           this.clearLocalAuth();
+          this._isAuthenticated.set(false);
         }
       } else {
         // 沒有存儲的認證信息，確保狀態為未認證
@@ -202,6 +222,26 @@ export class AuthService {
       // 確保錯誤時也顯示登入頁面
       this._isAuthenticated.set(false);
     }
+  }
+  
+  /**
+   * 🔧 將 subscription_tier 轉換為 membershipLevel
+   */
+  private tierToLevel(tier: string): MembershipLevel {
+    const tierMap: Record<string, MembershipLevel> = {
+      'free': 'bronze',
+      'basic': 'silver',
+      'pro': 'gold',
+      'enterprise': 'diamond',
+      // 直接映射
+      'bronze': 'bronze',
+      'silver': 'silver',
+      'gold': 'gold',
+      'diamond': 'diamond',
+      'star': 'star',
+      'king': 'king'
+    };
+    return tierMap[tier] || 'bronze';
   }
 
   /**
@@ -623,8 +663,12 @@ export class AuthService {
    * 清除本地認證數據
    */
   private clearLocalAuth(): void {
+    // 🔧 清除所有認證相關的本地存儲
     localStorage.removeItem('tgm_auth_token');
+    localStorage.removeItem('tgm_access_token');
+    localStorage.removeItem('tgm_refresh_token');
     localStorage.removeItem('tgm_user');
+    localStorage.removeItem('tgm_session_id');
   }
 
   /**

@@ -710,14 +710,19 @@ export class LoginComponent implements OnInit, OnDestroy {
         this.handleTelegramAuth(user);
       };
       
+      // 🔧 修復：先顯示容器，等待 Angular 渲染完成，再載入腳本
+      this.telegramWidgetReady.set(true);
+      
+      // 等待下一個變更檢測週期，確保 DOM 已渲染
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // 3. 動態載入 Telegram Widget 腳本
       await this.loadTelegramWidgetScript();
-      
-      this.telegramWidgetReady.set(true);
       
     } catch (e: any) {
       console.error('Telegram widget init error:', e);
       this.error.set(e.message || 'Telegram 載入失敗');
+      this.telegramWidgetReady.set(false);  // 🔧 錯誤時重置狀態
     } finally {
       this.telegramLoading.set(false);
     }

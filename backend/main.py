@@ -2135,9 +2135,12 @@ class BackendService:
         except Exception as e:
             print(f"[Backend] Error during database shutdown: {e}", file=sys.stderr)
     
+    # HTTP Server 引用（由 HttpApiServer 設置）
+    _http_server = None
+    
     def send_event(self, event_name: str, payload: Any, message_id: Optional[str] = None):
         """
-        Send an event to Electron via stdout
+        Send an event to Electron via stdout AND broadcast to WebSocket clients
         
         Args:
             event_name: Event name
@@ -2169,6 +2172,17 @@ class BackendService:
                 import sys
                 print(f"[Backend] JSON length for {event_name}: {len(json_str)}", file=sys.stderr)
             print(json_str, flush=True)
+            
+            # 🆕 SaaS 模式：廣播到 WebSocket 客戶端
+            if self._http_server and hasattr(self._http_server, 'broadcast'):
+                import asyncio
+                try:
+                    loop = asyncio.get_running_loop()
+                    asyncio.ensure_future(self._http_server.broadcast(event_name, payload))
+                except RuntimeError:
+                    # 如果沒有運行的事件循環，嘗試創建新任務
+                    pass
+                    
         except Exception as e:
             import sys
             print(f"[Backend] Error in safe_json_dumps for {event_name}: {e}", file=sys.stderr)

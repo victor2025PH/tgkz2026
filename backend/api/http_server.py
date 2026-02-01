@@ -42,6 +42,10 @@ class HttpApiServer:
         self._setup_routes()
         self._setup_cors()
         self._setup_middleware()
+        
+        # 將 http_server 實例設置回 backend，讓 send_event 可以廣播到 WebSocket
+        if backend_service:
+            backend_service._http_server = self
     
     def _setup_middleware(self):
         """設置中間件"""

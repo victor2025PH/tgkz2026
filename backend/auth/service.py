@@ -443,10 +443,23 @@ class AuthService:
         db = self._get_db()
         try:
             # 🆕 首先檢查 telegram_id 字段（新綁定方式）
-            row = db.execute(
-                "SELECT * FROM users WHERE telegram_id = ?",
-                (telegram_id,)
-            ).fetchone()
+            try:
+                row = db.execute(
+                    "SELECT * FROM users WHERE telegram_id = ?",
+                    (telegram_id,)
+                ).fetchone()
+            except Exception as col_err:
+                # 🔧 如果列不存在，先執行遷移
+                if 'no such column' in str(col_err).lower():
+                    logger.warning(f"telegram_id column missing, running migration...")
+                    self._migrate_telegram_fields(db)
+                    # 遷移後重試
+                    row = db.execute(
+                        "SELECT * FROM users WHERE telegram_id = ?",
+                        (telegram_id,)
+                    ).fetchone()
+                else:
+                    raise
             
             # 🔧 兼容舊的 OAuth 登入方式
             if not row:
@@ -493,6 +506,9 @@ class AuthService:
         """
         db = self._get_db()
         try:
+            # 🔧 確保 telegram 相關列存在
+            self._migrate_telegram_fields(db)
+            
             # 更新用戶的 Telegram 信息
             db.execute('''
                 UPDATE users SET

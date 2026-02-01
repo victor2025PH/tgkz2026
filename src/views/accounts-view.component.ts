@@ -33,7 +33,7 @@ import { AccountCardListComponent } from '../account-card-list.component';
   template: `
     <!-- 帳戶管理頁面 - 使用卡片視圖 -->
     <div class="flex items-center justify-between mb-6">
-      <h2 id="accounts-section" class="text-4xl font-bold text-slate-900 dark:text-white">{{ t('manageAccounts') }}</h2>
+      <h2 id="accounts-section" class="text-4xl font-bold text-slate-900 dark:text-white">{{ t('accounts.manageAccounts') }}</h2>
       <!-- 賬戶配額顯示 -->
       <div class="flex items-center gap-3">
         <span class="text-sm text-slate-500">賬戶配額:</span>

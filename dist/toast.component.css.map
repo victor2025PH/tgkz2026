@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["angular:styles/component:css;fb7864e74ad0e60560259ca3953e9e02e0ac8d796678c9d69d33a7d2310d2602;D:/tgkz2026/src/toast.component.ts"],
-  "sourcesContent": ["\n    @keyframes slide-in {\n      from {\n        transform: translateX(100%) scale(0.95);\n        opacity: 0;\n      }\n      to {\n        transform: translateX(0) scale(1);\n        opacity: 1;\n      }\n    }\n    \n    .animate-slide-in {\n      animation: slide-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);\n    }\n  "],
-  "mappings": ";AACI,WAAW;AACT;AACE,eAAW,WAAW,MAAM,MAAM;AAClC,aAAS;AACX;AACA;AACE,eAAW,WAAW,GAAG,MAAM;AAC/B,aAAS;AACX;AACF;AAEA,CAAC;AACC,aAAW,SAAS,KAAK,aAAa,IAAI,EAAE,IAAI,EAAE,IAAI,EAAE;AAC1D;",
-  "names": []
-}

@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["angular:styles/component:css;efbb247d89ec398bcebdc46eb0729d028f9368b1270a3f362ac7cd29f4d18bdb;D:/tgkz2026/src/search-discovery/search-discovery.component.ts"],
-  "sourcesContent": ["\n    :host {\n      display: block;\n      height: 100%;\n    }\n    \n    .line-clamp-2 {\n      display: -webkit-box;\n      -webkit-line-clamp: 2;\n      -webkit-box-orient: vertical;\n      overflow: hidden;\n    }\n    \n    /* \u81EA\u5B9A\u7FA9\u6EFE\u52D5\u689D */\n    ::-webkit-scrollbar {\n      width: 8px;\n    }\n    ::-webkit-scrollbar-track {\n      background: transparent;\n    }\n    ::-webkit-scrollbar-thumb {\n      background: rgba(100, 116, 139, 0.3);\n      border-radius: 4px;\n    }\n    ::-webkit-scrollbar-thumb:hover {\n      background: rgba(100, 116, 139, 0.5);\n    }\n  "],
-  "mappings": ";AACI;AACE,WAAS;AACT,UAAQ;AACV;AAEA,CAAC;AACC,WAAS;AACT,sBAAoB;AACpB,sBAAoB;AACpB,YAAU;AACZ;AAGA;AACE,SAAO;AACT;AACA;AACE,cAAY;AACd;AACA;AACE,cAAY,KAAK,GAAG,EAAE,GAAG,EAAE,GAAG,EAAE;AAChC,iBAAe;AACjB;AACA,yBAAyB;AACvB,cAAY,KAAK,GAAG,EAAE,GAAG,EAAE,GAAG,EAAE;AAClC;",
-  "names": []
-}

@@ -200,12 +200,14 @@ class AuthService:
             cursor = db.execute("PRAGMA table_info(users)")
             columns = [col[1] for col in cursor.fetchall()]
             
+            # ⚠️ 注意：SQLite 的 ALTER TABLE ADD COLUMN 不支持 UNIQUE 約束
+            # 需要分開處理：先添加列（不帶 UNIQUE），再建索引
             migrations = [
-                ('telegram_id', 'TEXT UNIQUE'),
+                ('telegram_id', 'TEXT'),           # 不帶 UNIQUE，稍後建索引
                 ('telegram_username', 'TEXT'),
                 ('telegram_first_name', 'TEXT'),
                 ('telegram_photo_url', 'TEXT'),
-                ('google_id', 'TEXT UNIQUE'),
+                ('google_id', 'TEXT'),             # 不帶 UNIQUE，稍後建索引
             ]
             
             for col_name, col_def in migrations:
@@ -215,9 +217,23 @@ class AuthService:
                         db.commit()
                         logger.info(f"Added column users.{col_name}")
                     except Exception as e:
-                        # 列可能已存在（UNIQUE 約束衝突）
+                        # 列可能已存在
                         if 'duplicate column' not in str(e).lower():
                             logger.warning(f"Migration warning for {col_name}: {e}")
+            
+            # 🆕 創建唯一索引（替代 UNIQUE 約束）
+            unique_indexes = [
+                ('idx_users_telegram_id_unique', 'telegram_id'),
+                ('idx_users_google_id_unique', 'google_id'),
+            ]
+            for idx_name, col_name in unique_indexes:
+                try:
+                    db.execute(f'CREATE UNIQUE INDEX IF NOT EXISTS {idx_name} ON users({col_name}) WHERE {col_name} IS NOT NULL')
+                    db.commit()
+                except Exception as e:
+                    # 索引可能已存在或其他問題
+                    if 'already exists' not in str(e).lower():
+                        logger.debug(f"Index {idx_name} note: {e}")
             
         except Exception as e:
             logger.warning(f"Telegram fields migration: {e}")

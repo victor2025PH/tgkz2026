@@ -36,6 +36,10 @@ services:
       - DEBUG=${DEBUG:-false}
       - ELECTRON_MODE=false
       
+      # 🆕 Telegram OAuth（P2.2）
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME:-}
+      
       # 郵件配置
       - EMAIL_PROVIDER=${EMAIL_PROVIDER:-smtp}
       - SMTP_HOST=${SMTP_HOST:-}

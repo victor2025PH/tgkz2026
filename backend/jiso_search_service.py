@@ -2793,7 +2793,7 @@ class JisoSearchService:
         if not all_results:
             return {
                 "success": False,
-                "error": f"Bot 未响应（最后尝试 @{tried_bots[-1] if tried_bots else "unknown"}）。可能需要先在 Telegram 里手动打开该 Bot，发送 /start 并点击其菜单中的“搜索/找群”按钮后再试。",
+                "error": f"Bot 未响应（最后尝试 @{tried_bots[-1] if tried_bots else 'unknown'}）。可能需要先在 Telegram 里手动打开该 Bot，发送 /start 并点击其菜单中的“搜索/找群”按钮后再试。",
                 "results": [],
                 "tried_bots": tried_bots,
                 "source": "jiso"

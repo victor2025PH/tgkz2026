@@ -284,6 +284,48 @@ export class UnifiedExtractionService {
         console.log('[UnifiedExtraction] Background task started:', data.taskId);
       }
     });
+    
+    // 🆕 P4：監聽導出完成
+    this.ipc.on('members-exported', (data: any) => {
+      if (data.success && data.content) {
+        // 創建下載
+        const blob = new Blob([data.content], { 
+          type: data.format === 'json' ? 'application/json' : 'text/csv' 
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = data.filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.toast.success(`✅ 導出成功: ${data.filename}`);
+      } else if (data.error) {
+        this.toast.error(`導出失敗: ${data.error}`);
+      }
+    });
+    
+    // 🆕 P4：監聽去重完成
+    this.ipc.on('members-deduplicated', (data: any) => {
+      if (data.success) {
+        this.toast.success(`✅ 去重完成: 合併 ${data.merged} 個，刪除 ${data.deleted} 條`);
+      } else {
+        this.toast.error(`去重失敗: ${data.error}`);
+      }
+    });
+    
+    // 🆕 P4：監聽批量標籤完成
+    this.ipc.on('members-tagged', (data: any) => {
+      if (data.success) {
+        this.toast.success(`✅ 已${data.action === 'add' ? '添加' : '移除'}標籤「${data.tag}」: ${data.count} 個成員`);
+      }
+    });
+    
+    // 🆕 P4：監聯評分重算完成
+    this.ipc.on('scores-recalculated', (data: any) => {
+      if (data.success) {
+        this.toast.success(`✅ 評分重算完成: ${data.count} 個成員`);
+      }
+    });
   }
   
   // ==================== 核心方法 ====================
@@ -518,6 +560,67 @@ export class UnifiedExtractionService {
   clearExtractionCache(chatId?: string): void {
     this.ipc.send('clear-extraction-cache', { chatId });
     this.toast.info(chatId ? '已清除該群組緩存' : '已清除所有緩存');
+  }
+  
+  // ==================== P4 優化：數據導出與管理 ====================
+  
+  /**
+   * 導出成員數據
+   */
+  exportMembers(format: 'csv' | 'json' = 'csv', filters?: any): void {
+    this.ipc.send('export-members', { format, filters });
+    this.toast.info(`正在導出 ${format.toUpperCase()} 格式數據...`);
+  }
+  
+  /**
+   * 去重成員數據
+   */
+  deduplicateMembers(): void {
+    this.ipc.send('deduplicate-members', {});
+    this.toast.info('正在執行去重...');
+  }
+  
+  /**
+   * 批量添加標籤
+   */
+  batchAddTag(userIds: string[], tag: string): void {
+    this.ipc.send('batch-tag-members', { userIds, tag, action: 'add' });
+  }
+  
+  /**
+   * 批量移除標籤
+   */
+  batchRemoveTag(userIds: string[], tag: string): void {
+    this.ipc.send('batch-tag-members', { userIds, tag, action: 'remove' });
+  }
+  
+  /**
+   * 獲取所有標籤
+   */
+  getAllTags(): void {
+    this.ipc.send('get-all-tags', {});
+  }
+  
+  /**
+   * 獲取群組畫像
+   */
+  getGroupProfile(chatId: string): void {
+    this.ipc.send('get-group-profile', { chatId });
+  }
+  
+  /**
+   * 比較群組
+   */
+  compareGroups(chatIds: string[]): void {
+    this.ipc.send('compare-groups', { chatIds });
+  }
+  
+  /**
+   * 重新計算評分
+   */
+  recalculateScores(chatId?: string): void {
+    this.ipc.send('recalculate-scores', { chatId });
+    this.toast.info('正在重新計算評分...');
   }
   
   // ==================== 配額管理 ====================

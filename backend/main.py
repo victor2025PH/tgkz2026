@@ -26457,6 +26457,170 @@ class BackendService:
                 "error": str(e)
             })
     
+    # ==================== P4 優化：數據導出與管理 ====================
+    
+    async def handle_export_members(self, payload: Dict[str, Any]):
+        """導出成員數據"""
+        import sys
+        print(f"[Backend] handle_export_members called: {payload}", file=sys.stderr)
+        
+        try:
+            format_type = payload.get('format', 'csv')  # csv 或 json
+            filters = payload.get('filters', {})
+            
+            if format_type == 'json':
+                content = await member_extraction_service.export_members_json(filters)
+                filename = f"members_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            else:
+                content = await member_extraction_service.export_members_csv(filters)
+                filename = f"members_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            
+            self.send_log(f"✅ 導出完成: {filename}", "success")
+            self.send_event("members-exported", {
+                "success": True,
+                "content": content,
+                "filename": filename,
+                "format": format_type
+            })
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_log(f"❌ 導出失敗: {e}", "error")
+            self.send_event("members-exported", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_deduplicate_members(self, payload: Dict[str, Any]):
+        """去重成員數據"""
+        import sys
+        print(f"[Backend] handle_deduplicate_members called", file=sys.stderr)
+        
+        try:
+            result = await member_extraction_service.deduplicate_members()
+            
+            self.send_log(f"✅ 去重完成: 合併 {result['merged']} 個，刪除 {result['deleted']} 條", "success")
+            self.send_event("members-deduplicated", {
+                "success": True,
+                **result
+            })
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_event("members-deduplicated", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_batch_tag_members(self, payload: Dict[str, Any]):
+        """批量標籤成員"""
+        try:
+            user_ids = payload.get('userIds', [])
+            tag = payload.get('tag', '')
+            action = payload.get('action', 'add')  # add 或 remove
+            
+            if not user_ids or not tag:
+                raise ValueError("用戶 ID 列表和標籤不能為空")
+            
+            if action == 'remove':
+                count = await member_extraction_service.batch_remove_tag(user_ids, tag)
+            else:
+                count = await member_extraction_service.batch_add_tag(user_ids, tag)
+            
+            self.send_log(f"✅ 批量標籤完成: {count} 個成員", "success")
+            self.send_event("members-tagged", {
+                "success": True,
+                "count": count,
+                "tag": tag,
+                "action": action
+            })
+            
+        except Exception as e:
+            self.send_event("members-tagged", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_get_all_tags(self, payload: Dict[str, Any]):
+        """獲取所有標籤"""
+        try:
+            tags = await member_extraction_service.get_all_tags()
+            
+            self.send_event("all-tags", {
+                "success": True,
+                "tags": tags
+            })
+            
+        except Exception as e:
+            self.send_event("all-tags", {
+                "success": False,
+                "error": str(e),
+                "tags": []
+            })
+    
+    async def handle_get_group_profile(self, payload: Dict[str, Any]):
+        """獲取群組畫像"""
+        try:
+            chat_id = payload.get('chatId')
+            
+            if not chat_id:
+                raise ValueError("群組 ID 不能為空")
+            
+            profile = await member_extraction_service.get_group_profile(str(chat_id))
+            
+            self.send_event("group-profile", {
+                "success": True,
+                "profile": profile
+            })
+            
+        except Exception as e:
+            self.send_event("group-profile", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_compare_groups(self, payload: Dict[str, Any]):
+        """比較多個群組"""
+        try:
+            chat_ids = payload.get('chatIds', [])
+            
+            if len(chat_ids) < 2:
+                raise ValueError("至少需要兩個群組進行比較")
+            
+            profiles = await member_extraction_service.get_group_comparison(chat_ids)
+            
+            self.send_event("groups-compared", {
+                "success": True,
+                "profiles": profiles
+            })
+            
+        except Exception as e:
+            self.send_event("groups-compared", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_recalculate_scores(self, payload: Dict[str, Any]):
+        """重新計算成員評分"""
+        try:
+            chat_id = payload.get('chatId')
+            
+            count = await member_extraction_service.recalculate_member_scores(chat_id)
+            
+            self.send_log(f"✅ 重新計算評分完成: {count} 個成員", "success")
+            self.send_event("scores-recalculated", {
+                "success": True,
+                "count": count
+            })
+            
+        except Exception as e:
+            self.send_event("scores-recalculated", {
+                "success": False,
+                "error": str(e)
+            })
+    
     # ==================== 營銷觸達處理器 ====================
     
     async def handle_send_bulk_messages(self, payload: Dict[str, Any]):

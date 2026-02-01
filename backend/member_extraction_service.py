@@ -1362,6 +1362,366 @@ class MemberExtractionService:
         self._extraction_queue.clear()
         self.log(f"🧹 已清空隊列，移除 {count} 個任務", "info")
         return count
+    
+    # ==================== P4 優化：數據導出 ====================
+    
+    async def export_members_csv(
+        self,
+        filters: Dict = None,
+        columns: List[str] = None
+    ) -> str:
+        """導出成員數據為 CSV 格式"""
+        import csv
+        from io import StringIO
+        
+        # 默認列
+        default_columns = [
+            'user_id', 'username', 'first_name', 'last_name', 'phone',
+            'online_status', 'value_level', 'source_chat_title',
+            'contacted', 'response_status', 'tags', 'extracted_at'
+        ]
+        columns = columns or default_columns
+        
+        # 獲取成員
+        members = await self.get_members(
+            online_only=filters.get('onlineOnly', False) if filters else False,
+            min_value_level=filters.get('minValueLevel') if filters else None,
+            source_chat_id=filters.get('sourceChatId') if filters else None,
+            not_contacted=filters.get('notContacted', False) if filters else False,
+            limit=10000  # 最大導出 10000 條
+        )
+        
+        # 生成 CSV
+        output = StringIO()
+        writer = csv.DictWriter(output, fieldnames=columns, extrasaction='ignore')
+        writer.writeheader()
+        
+        for member in members:
+            # 處理 tags 字段（轉換為字符串）
+            if 'tags' in member and isinstance(member['tags'], list):
+                member['tags'] = ', '.join(member['tags'])
+            writer.writerow(member)
+        
+        csv_content = output.getvalue()
+        self.log(f"📤 導出 {len(members)} 條成員數據", "success")
+        
+        return csv_content
+    
+    async def export_members_json(self, filters: Dict = None) -> str:
+        """導出成員數據為 JSON 格式"""
+        members = await self.get_members(
+            online_only=filters.get('onlineOnly', False) if filters else False,
+            min_value_level=filters.get('minValueLevel') if filters else None,
+            source_chat_id=filters.get('sourceChatId') if filters else None,
+            not_contacted=filters.get('notContacted', False) if filters else False,
+            limit=10000
+        )
+        
+        export_data = {
+            'exported_at': datetime.now().isoformat(),
+            'total_count': len(members),
+            'members': members
+        }
+        
+        self.log(f"📤 導出 {len(members)} 條成員數據 (JSON)", "success")
+        return json.dumps(export_data, ensure_ascii=False, indent=2, default=str)
+    
+    # ==================== P4 優化：智能去重 ====================
+    
+    async def deduplicate_members(self) -> Dict[str, int]:
+        """跨群組成員去重合併"""
+        self.log("🔄 開始成員去重...", "info")
+        
+        # 查找重複的 user_id
+        query = """
+            SELECT user_id, COUNT(*) as count, 
+                   GROUP_CONCAT(id) as ids,
+                   GROUP_CONCAT(source_chat_id) as sources
+            FROM extracted_members
+            GROUP BY user_id
+            HAVING count > 1
+        """
+        duplicates = await db.fetch_all(query)
+        
+        merged_count = 0
+        deleted_count = 0
+        
+        for dup in duplicates:
+            user_id = dup['user_id']
+            ids = dup['ids'].split(',')
+            sources = dup['sources'].split(',') if dup['sources'] else []
+            
+            if len(ids) <= 1:
+                continue
+            
+            # 保留第一條記錄，合併來源群組
+            keep_id = ids[0]
+            delete_ids = ids[1:]
+            
+            # 合併群組列表
+            unique_sources = list(set(sources))
+            groups_json = json.dumps(unique_sources)
+            
+            # 更新保留的記錄
+            await db.execute(
+                "UPDATE extracted_members SET groups = ? WHERE id = ?",
+                (groups_json, keep_id)
+            )
+            
+            # 刪除重複記錄
+            for del_id in delete_ids:
+                await db.execute(
+                    "DELETE FROM extracted_members WHERE id = ?",
+                    (del_id,)
+                )
+                deleted_count += 1
+            
+            merged_count += 1
+        
+        self.log(f"✅ 去重完成: 合併 {merged_count} 個用戶，刪除 {deleted_count} 條重複記錄", "success")
+        
+        return {
+            'merged': merged_count,
+            'deleted': deleted_count
+        }
+    
+    # ==================== P4 優化：批量標籤管理 ====================
+    
+    async def batch_add_tag(self, user_ids: List[str], tag: str) -> int:
+        """批量添加標籤"""
+        count = 0
+        for user_id in user_ids:
+            try:
+                await self.add_tag(user_id, tag)
+                count += 1
+            except Exception as e:
+                self.log(f"⚠️ 添加標籤失敗 {user_id}: {e}", "warning")
+        
+        self.log(f"✅ 批量添加標籤完成: {count}/{len(user_ids)}", "success")
+        return count
+    
+    async def batch_remove_tag(self, user_ids: List[str], tag: str) -> int:
+        """批量移除標籤"""
+        count = 0
+        for user_id in user_ids:
+            try:
+                member = await db.fetch_one(
+                    "SELECT tags FROM extracted_members WHERE user_id = ?",
+                    (user_id,)
+                )
+                if member:
+                    tags = json.loads(member['tags'] or '[]')
+                    if tag in tags:
+                        tags.remove(tag)
+                        await db.execute(
+                            "UPDATE extracted_members SET tags = ?, updated_at = ? WHERE user_id = ?",
+                            (json.dumps(tags), datetime.now().isoformat(), user_id)
+                        )
+                        count += 1
+            except Exception as e:
+                self.log(f"⚠️ 移除標籤失敗 {user_id}: {e}", "warning")
+        
+        self.log(f"✅ 批量移除標籤完成: {count}/{len(user_ids)}", "success")
+        return count
+    
+    async def get_all_tags(self) -> List[Dict]:
+        """獲取所有使用的標籤及其計數"""
+        query = """
+            SELECT tags FROM extracted_members WHERE tags IS NOT NULL AND tags != '[]'
+        """
+        results = await db.fetch_all(query)
+        
+        tag_counts = {}
+        for row in results:
+            try:
+                tags = json.loads(row['tags'] or '[]')
+                for tag in tags:
+                    tag_counts[tag] = tag_counts.get(tag, 0) + 1
+            except:
+                continue
+        
+        return [
+            {'tag': tag, 'count': count}
+            for tag, count in sorted(tag_counts.items(), key=lambda x: -x[1])
+        ]
+    
+    # ==================== P4 優化：群組畫像 ====================
+    
+    async def get_group_profile(self, chat_id: str) -> Dict[str, Any]:
+        """獲取群組畫像分析"""
+        # 基本統計
+        query = """
+            SELECT 
+                COUNT(*) as total_members,
+                SUM(CASE WHEN online_status = 'online' THEN 1 ELSE 0 END) as online_count,
+                SUM(CASE WHEN online_status = 'recently' THEN 1 ELSE 0 END) as recently_count,
+                SUM(CASE WHEN value_level = 'S' THEN 1 ELSE 0 END) as s_level,
+                SUM(CASE WHEN value_level = 'A' THEN 1 ELSE 0 END) as a_level,
+                SUM(CASE WHEN value_level = 'B' THEN 1 ELSE 0 END) as b_level,
+                SUM(CASE WHEN is_premium = 1 THEN 1 ELSE 0 END) as premium_count,
+                SUM(CASE WHEN username IS NOT NULL AND username != '' THEN 1 ELSE 0 END) as has_username,
+                SUM(CASE WHEN contacted = 1 THEN 1 ELSE 0 END) as contacted_count,
+                SUM(CASE WHEN response_status = 'replied' THEN 1 ELSE 0 END) as replied_count,
+                AVG(activity_score) as avg_activity,
+                MAX(extracted_at) as last_extraction
+            FROM extracted_members
+            WHERE groups LIKE ?
+        """
+        
+        stats = await db.fetch_one(query, (f'%{chat_id}%',))
+        
+        if not stats or stats['total_members'] == 0:
+            return {'error': '沒有找到該群組的成員數據'}
+        
+        total = stats['total_members']
+        
+        # 計算各種比率
+        profile = {
+            'chat_id': chat_id,
+            'total_members': total,
+            'online_rate': round(stats['online_count'] / total * 100, 1) if total else 0,
+            'recently_rate': round(stats['recently_count'] / total * 100, 1) if total else 0,
+            'active_rate': round((stats['online_count'] + stats['recently_count']) / total * 100, 1) if total else 0,
+            'high_value_rate': round((stats['s_level'] + stats['a_level']) / total * 100, 1) if total else 0,
+            'premium_rate': round(stats['premium_count'] / total * 100, 1) if total else 0,
+            'username_rate': round(stats['has_username'] / total * 100, 1) if total else 0,
+            'contact_rate': round(stats['contacted_count'] / total * 100, 1) if total else 0,
+            'reply_rate': round(stats['replied_count'] / stats['contacted_count'] * 100, 1) if stats['contacted_count'] else 0,
+            'avg_activity_score': round(stats['avg_activity'], 2) if stats['avg_activity'] else 0,
+            'last_extraction': stats['last_extraction'],
+            
+            # 詳細分布
+            'value_distribution': {
+                'S': stats['s_level'],
+                'A': stats['a_level'],
+                'B': stats['b_level'],
+                'C': total - stats['s_level'] - stats['a_level'] - stats['b_level']
+            },
+            'status_distribution': {
+                'online': stats['online_count'],
+                'recently': stats['recently_count'],
+                'offline': total - stats['online_count'] - stats['recently_count']
+            },
+            
+            # 質量評分 (0-100)
+            'quality_score': self._calculate_group_quality_score(stats, total)
+        }
+        
+        return profile
+    
+    def _calculate_group_quality_score(self, stats: Dict, total: int) -> int:
+        """計算群組質量評分"""
+        if total == 0:
+            return 0
+        
+        score = 0
+        
+        # 活躍度 (40分)
+        active_rate = (stats['online_count'] + stats['recently_count']) / total
+        score += min(40, int(active_rate * 80))
+        
+        # 高價值用戶比例 (30分)
+        high_value_rate = (stats['s_level'] + stats['a_level']) / total
+        score += min(30, int(high_value_rate * 60))
+        
+        # Premium 用戶比例 (15分)
+        premium_rate = stats['premium_count'] / total
+        score += min(15, int(premium_rate * 75))
+        
+        # 有用戶名比例 (15分)
+        username_rate = stats['has_username'] / total
+        score += min(15, int(username_rate * 30))
+        
+        return min(100, score)
+    
+    async def get_group_comparison(self, chat_ids: List[str]) -> List[Dict]:
+        """比較多個群組的質量"""
+        profiles = []
+        for chat_id in chat_ids:
+            profile = await self.get_group_profile(chat_id)
+            if 'error' not in profile:
+                profiles.append(profile)
+        
+        # 按質量評分排序
+        profiles.sort(key=lambda x: x.get('quality_score', 0), reverse=True)
+        
+        return profiles
+    
+    # ==================== P4 優化：智能質量評分 ====================
+    
+    async def recalculate_member_scores(self, chat_id: str = None) -> int:
+        """重新計算成員價值評分"""
+        conditions = []
+        params = []
+        
+        if chat_id:
+            conditions.append("groups LIKE ?")
+            params.append(f'%{chat_id}%')
+        
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        
+        # 獲取所有成員
+        query = f"""
+            SELECT id, online_status, is_premium, username, activity_score,
+                   contacted, response_status
+            FROM extracted_members WHERE {where_clause}
+        """
+        members = await db.fetch_all(query, tuple(params))
+        
+        updated = 0
+        for member in members:
+            # 計算新的價值等級
+            score = 0
+            
+            # 在線狀態 (40%)
+            if member['online_status'] == 'online':
+                score += 40
+            elif member['online_status'] == 'recently':
+                score += 30
+            elif member['online_status'] == 'last_week':
+                score += 15
+            
+            # Premium (20%)
+            if member['is_premium']:
+                score += 20
+            
+            # 有用戶名 (15%)
+            if member['username']:
+                score += 15
+            
+            # 活躍度 (15%)
+            activity = member['activity_score'] or 0
+            score += int(activity * 15)
+            
+            # 互動歷史 (10%)
+            if member['response_status'] == 'replied':
+                score += 10
+            elif member['response_status'] == 'interested':
+                score += 8
+            elif member['contacted']:
+                score += 3
+            
+            # 確定等級
+            if score >= 80:
+                level = 'S'
+            elif score >= 60:
+                level = 'A'
+            elif score >= 40:
+                level = 'B'
+            elif score >= 20:
+                level = 'C'
+            else:
+                level = 'D'
+            
+            # 更新
+            await db.execute(
+                "UPDATE extracted_members SET value_level = ?, updated_at = ? WHERE id = ?",
+                (level, datetime.now().isoformat(), member['id'])
+            )
+            updated += 1
+        
+        self.log(f"✅ 重新計算評分完成: 更新 {updated} 個成員", "success")
+        return updated
 
 
 # 全局實例

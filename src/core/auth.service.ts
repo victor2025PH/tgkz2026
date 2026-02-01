@@ -195,7 +195,7 @@ export class AuthService {
   /**
    * 獲取 Telegram OAuth 配置
    */
-  async getTelegramConfig(): Promise<{ enabled: boolean; bot_username?: string }> {
+  async getTelegramConfig(): Promise<{ enabled: boolean; bot_username?: string; bot_id?: string }> {
     try {
       const response = await fetch(`${this.getApiBaseUrl()}/api/v1/oauth/telegram/config`);
       const result = await response.json();

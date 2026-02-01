@@ -472,6 +472,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   
   // Telegram 配置
   private telegramBotUsername = '';
+  private telegramBotId = '';  // 🆕 數字格式的 Bot ID
   private lockoutCleanup: (() => void) | null = null;
   
   ngOnInit() {
@@ -669,12 +670,13 @@ export class LoginComponent implements OnInit, OnDestroy {
       // 1. 獲取 Telegram 配置
       const config = await this.authService.getTelegramConfig();
       
-      if (!config.enabled || !config.bot_username) {
+      if (!config.enabled || !config.bot_id) {
         this.error.set(this.t('auth.telegramNotConfigured'));
         return;
       }
       
       this.telegramBotUsername = config.bot_username;
+      this.telegramBotId = config.bot_id;  // 🆕 使用數字格式的 bot_id
       
       // 2. 使用 Telegram Login Widget
       // 方法一：彈窗方式（更好的用戶體驗）
@@ -690,12 +692,12 @@ export class LoginComponent implements OnInit, OnDestroy {
   
   private openTelegramLoginPopup() {
     // 構建 Telegram OAuth URL
-    const botUsername = this.telegramBotUsername;
+    const botId = this.telegramBotId;  // 🔧 使用數字格式的 bot_id
     const origin = window.location.origin;
     const returnUrl = `${origin}/auth/telegram-callback`;
     
-    // Telegram Login Widget URL
-    const telegramUrl = `https://oauth.telegram.org/auth?bot_id=${botUsername}&origin=${encodeURIComponent(origin)}&request_access=write&return_to=${encodeURIComponent(returnUrl)}`;
+    // Telegram Login Widget URL - bot_id 必須是數字格式
+    const telegramUrl = `https://oauth.telegram.org/auth?bot_id=${botId}&origin=${encodeURIComponent(origin)}&request_access=write&return_to=${encodeURIComponent(returnUrl)}`;
     
     // 打開彈窗
     const width = 550;

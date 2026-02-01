@@ -206,6 +206,22 @@ export class UnifiedExtractionService {
         });
       }
     });
+    
+    // 🆕 P2：監聽背景提取完成
+    this.ipc.on('background-extraction-completed', (data: any) => {
+      if (data.success) {
+        this.toast.success(`✅ 背景提取完成：${data.chatTitle || '群組'} - ${data.extracted} 個成員`);
+      } else {
+        this.toast.error(`❌ 背景提取失敗：${data.error || '未知錯誤'}`);
+      }
+    });
+    
+    // 🆕 P2：監聽背景提取啟動確認
+    this.ipc.on('background-extraction-started', (data: any) => {
+      if (data.success) {
+        console.log('[UnifiedExtraction] Background task started:', data.taskId);
+      }
+    });
   }
   
   // ==================== 核心方法 ====================
@@ -386,6 +402,60 @@ export class UnifiedExtractionService {
     this._isExtracting.set(false);
     this._progress.set(null);
     this.toast.info('已停止提取');
+  }
+  
+  // ==================== P2 優化：背景提取 ====================
+  
+  /**
+   * 啟動背景提取（可以關閉對話框繼續其他操作）
+   */
+  startBackgroundExtraction(
+    group: ExtractionGroupInfo,
+    config: MemberExtractionConfig
+  ): void {
+    let chatId = '';
+    if (group.url) {
+      const match = group.url.match(/t\.me\/([+\w]+)/);
+      if (match) {
+        chatId = match[1];
+      }
+    }
+    
+    this.ipc.send('start-background-extraction', {
+      chatId: chatId || group.telegramId || group.id,
+      telegramId: group.telegramId,
+      limit: config.limit === -1 ? undefined : config.limit,
+      filters: {
+        bots: !config.filters.excludeBots,
+        onlineStatus: config.filters.onlineStatus
+      }
+    });
+    
+    this.toast.success('🔄 背景提取已啟動，可以繼續其他操作');
+  }
+  
+  /**
+   * 獲取背景任務列表
+   */
+  getBackgroundTasks(): void {
+    this.ipc.send('get-background-tasks', {});
+  }
+  
+  // ==================== P2 優化：統計功能 ====================
+  
+  /**
+   * 獲取提取統計
+   */
+  getExtractionStats(): void {
+    this.ipc.send('get-extraction-stats', {});
+  }
+  
+  /**
+   * 清除緩存
+   */
+  clearExtractionCache(chatId?: string): void {
+    this.ipc.send('clear-extraction-cache', { chatId });
+    this.toast.info(chatId ? '已清除該群組緩存' : '已清除所有緩存');
   }
   
   // ==================== 配額管理 ====================

@@ -26328,6 +26328,106 @@ class BackendService:
                 "error": str(e)
             })
     
+    # ==================== P2 優化：統計與背景提取 ====================
+    
+    async def handle_get_extraction_stats(self, payload: Dict[str, Any]):
+        """獲取提取統計信息"""
+        import sys
+        print(f"[Backend] handle_get_extraction_stats called", file=sys.stderr)
+        
+        try:
+            stats = member_extraction_service.get_stats()
+            
+            self.send_event("extraction-stats", {
+                "success": True,
+                **stats
+            })
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_event("extraction-stats", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_start_background_extraction(self, payload: Dict[str, Any]):
+        """啟動背景提取"""
+        import sys
+        print(f"[Backend] handle_start_background_extraction called: {payload}", file=sys.stderr)
+        
+        try:
+            chat_id = payload.get('chatId') or payload.get('telegramId')
+            phone = payload.get('phone')
+            limit = payload.get('limit', 100)
+            filters = payload.get('filters', {})
+            
+            if not chat_id:
+                raise ValueError("群組 ID 不能為空")
+            
+            # 設置客戶端
+            member_extraction_service.set_clients(self.telegram_manager.clients)
+            member_extraction_service.set_event_callback(self.send_event)
+            
+            # 啟動背景任務
+            task_id = await member_extraction_service.start_background_extraction(
+                chat_id=chat_id,
+                phone=phone,
+                limit=limit,
+                filter_bots=filters.get('bots', True),
+                online_status=filters.get('onlineStatus', 'all')
+            )
+            
+            self.send_log(f"🔄 背景提取已啟動: {task_id}", "info")
+            self.send_event("background-extraction-started", {
+                "success": True,
+                "taskId": task_id,
+                "chatId": chat_id
+            })
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            self.send_log(f"❌ 啟動背景提取失敗: {e}", "error")
+            self.send_event("background-extraction-started", {
+                "success": False,
+                "error": str(e)
+            })
+    
+    async def handle_get_background_tasks(self, payload: Dict[str, Any]):
+        """獲取背景任務列表"""
+        try:
+            tasks = member_extraction_service.get_all_background_tasks()
+            
+            self.send_event("background-tasks", {
+                "success": True,
+                "tasks": tasks
+            })
+            
+        except Exception as e:
+            self.send_event("background-tasks", {
+                "success": False,
+                "error": str(e),
+                "tasks": []
+            })
+    
+    async def handle_clear_extraction_cache(self, payload: Dict[str, Any]):
+        """清除提取緩存"""
+        try:
+            chat_id = payload.get('chatId')
+            member_extraction_service.clear_result_cache(chat_id)
+            
+            self.send_event("cache-cleared", {
+                "success": True,
+                "chatId": chat_id
+            })
+            
+        except Exception as e:
+            self.send_event("cache-cleared", {
+                "success": False,
+                "error": str(e)
+            })
+    
     # ==================== 營銷觸達處理器 ====================
     
     async def handle_send_bulk_messages(self, payload: Dict[str, Any]):

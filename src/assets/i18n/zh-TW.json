@@ -614,6 +614,11 @@
   "auth": {
     "welcomeBack": "歡迎回來",
     "loginSubtitle": "登入您的帳戶以繼續",
+    "loginWithTelegram": "使用 Telegram 登入",
+    "loginWithGoogle": "使用 Google 登入",
+    "googleNotAvailable": "Google 登入功能即將推出，請使用其他方式登入",
+    "telegramNotConfigured": "Telegram 登入配置中，請稍後再試",
+    "telegramLoginFailed": "Telegram 登入失敗，請重試",
     "createAccount": "建立帳戶",
     "registerSubtitle": "開始使用 TG-Matrix",
     "email": "電子郵件",

@@ -8,9 +8,10 @@
  * 4. 動畫效果
  */
 
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { I18nService, SupportedLocale } from '../i18n.service';
 
 @Component({
   selector: 'app-auth-layout',
@@ -19,6 +20,25 @@ import { RouterModule } from '@angular/router';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="auth-container">
+      <!-- 🆕 語言切換器 -->
+      <div class="lang-switcher">
+        <button 
+          class="lang-btn" 
+          [class.active]="currentLocale() === 'zh-TW'"
+          (click)="setLocale('zh-TW')"
+        >繁</button>
+        <button 
+          class="lang-btn" 
+          [class.active]="currentLocale() === 'zh-CN'"
+          (click)="setLocale('zh-CN')"
+        >简</button>
+        <button 
+          class="lang-btn" 
+          [class.active]="currentLocale() === 'en'"
+          (click)="setLocale('en')"
+        >EN</button>
+      </div>
+      
       <!-- 左側品牌區域 -->
       <div class="auth-brand">
         <div class="brand-content">
@@ -187,6 +207,50 @@ import { RouterModule } from '@angular/router';
       width: 100%;
       max-width: 420px;
     }
+    
+    /* 🆕 語言切換器樣式 */
+    .lang-switcher {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: flex;
+      gap: 0.25rem;
+      background: rgba(30, 41, 59, 0.8);
+      padding: 0.25rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 100;
+    }
+    
+    .lang-btn {
+      padding: 0.375rem 0.75rem;
+      border: none;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    
+    .lang-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+    
+    .lang-btn.active {
+      background: linear-gradient(135deg, #0891b2, #7c3aed);
+      color: white;
+    }
   `]
 })
-export class AuthLayoutComponent {}
+export class AuthLayoutComponent {
+  private i18n = inject(I18nService);
+  
+  currentLocale = this.i18n.locale;
+  
+  setLocale(locale: SupportedLocale): void {
+    this.i18n.setLocale(locale);
+  }
+}

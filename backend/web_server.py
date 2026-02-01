@@ -22,6 +22,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 async def init_backend():
     """初始化後端服務"""
+    # 🆕 確保 auth 數據庫表已遷移（添加 telegram_id 等列）
+    try:
+        from auth.service import get_auth_service
+        auth_service = get_auth_service()
+        logger.info("✅ Auth service initialized (database migrated)")
+    except Exception as e:
+        logger.warning(f"⚠️ Auth service init warning: {e}")
+    
     try:
         from main import BackendService
         backend = BackendService()

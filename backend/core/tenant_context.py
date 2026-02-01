@@ -144,13 +144,23 @@ class TenantAwareQuery:
     """
     租戶感知的查詢構建器
     
-    自動為查詢添加 user_id 過濾
+    自動為查詢添加 owner_user_id 過濾
+    支持 Electron 本地模式（無限制）和 SaaS 多用戶模式（嚴格隔離）
     """
+    
+    # 需要租戶隔離的表
+    TENANT_TABLES = {
+        'accounts', 'keyword_sets', 'monitored_groups', 'leads',
+        'campaigns', 'message_templates', 'chat_templates', 'trigger_rules',
+        'extracted_members', 'collected_users', 'discovered_resources',
+        'knowledge_items', 'api_credentials'
+    }
     
     def __init__(self, table_name: str):
         self.table = table_name
         self.conditions = []
         self.params = []
+        self._tenant_applied = False
     
     def where(self, condition: str, *params):
         """添加條件"""
@@ -158,12 +168,48 @@ class TenantAwareQuery:
         self.params.extend(params)
         return self
     
-    def with_tenant(self):
-        """添加租戶過濾"""
+    def with_tenant(self, force: bool = False):
+        """
+        添加租戶過濾
+        
+        Args:
+            force: 強制添加過濾，即使是 Electron 模式
+        """
+        # 避免重複添加
+        if self._tenant_applied:
+            return self
+        
+        # 檢查是否為需要隔離的表
+        if self.table not in self.TENANT_TABLES:
+            return self
+        
+        # 獲取當前租戶
+        tenant = get_current_tenant()
+        
+        # Electron 本地模式不需要過濾（除非強制）
+        if tenant and tenant.is_electron_mode and not force:
+            return self
+        
+        # 獲取用戶 ID
         user_id = get_user_id()
         if user_id:
-            self.conditions.append("user_id = ?")
+            # 使用 owner_user_id 字段
+            self.conditions.append("owner_user_id = ?")
             self.params.append(user_id)
+            self._tenant_applied = True
+        
+        return self
+    
+    def or_shared(self):
+        """
+        允許訪問共享數據（owner_user_id IS NULL 或 = 'shared'）
+        用於系統級共享資源
+        """
+        if self._tenant_applied and self.conditions:
+            # 修改最後一個條件為 OR 共享
+            last_condition = self.conditions.pop()
+            shared_condition = f"({last_condition} OR owner_user_id IS NULL OR owner_user_id = 'shared')"
+            self.conditions.append(shared_condition)
         return self
     
     def select(self, columns: str = "*") -> tuple:
@@ -174,10 +220,12 @@ class TenantAwareQuery:
         return sql, tuple(self.params)
     
     def insert(self, data: Dict[str, Any]) -> tuple:
-        """構建 INSERT 查詢，自動添加 user_id"""
-        user_id = get_user_id()
-        if user_id and 'user_id' not in data:
-            data['user_id'] = user_id
+        """構建 INSERT 查詢，自動添加 owner_user_id"""
+        # 檢查是否為需要隔離的表
+        if self.table in self.TENANT_TABLES:
+            user_id = get_user_id()
+            if user_id and 'owner_user_id' not in data:
+                data['owner_user_id'] = user_id
         
         columns = ", ".join(data.keys())
         placeholders = ", ".join(["?" for _ in data])
@@ -202,8 +250,54 @@ class TenantAwareQuery:
         if self.conditions:
             sql += " WHERE " + " AND ".join(self.conditions)
         return sql, tuple(self.params)
+    
+    def count(self) -> tuple:
+        """構建 COUNT 查詢"""
+        sql = f"SELECT COUNT(*) as count FROM {self.table}"
+        if self.conditions:
+            sql += " WHERE " + " AND ".join(self.conditions)
+        return sql, tuple(self.params)
 
 
 def tenant_query(table: str) -> TenantAwareQuery:
     """創建租戶感知查詢"""
     return TenantAwareQuery(table)
+
+
+def with_tenant_filter(table: str, base_query: str, params: list = None) -> tuple:
+    """
+    為現有查詢添加租戶過濾
+    
+    Args:
+        table: 表名
+        base_query: 基礎 SQL 查詢
+        params: 現有參數列表
+    
+    Returns:
+        (modified_query, params) 元組
+    """
+    if params is None:
+        params = []
+    
+    # 檢查是否需要隔離
+    if table not in TenantAwareQuery.TENANT_TABLES:
+        return base_query, params
+    
+    # Electron 模式不過濾
+    tenant = get_current_tenant()
+    if tenant and tenant.is_electron_mode:
+        return base_query, params
+    
+    # 獲取用戶 ID
+    user_id = get_user_id()
+    if not user_id:
+        return base_query, params
+    
+    # 添加租戶過濾
+    if 'WHERE' in base_query.upper():
+        modified_query = base_query + " AND owner_user_id = ?"
+    else:
+        modified_query = base_query + " WHERE owner_user_id = ?"
+    
+    params.append(user_id)
+    return modified_query, params

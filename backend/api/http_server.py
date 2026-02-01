@@ -176,6 +176,12 @@ class HttpApiServer:
         self.app.router.add_delete('/api/v1/auth/devices/{session_id}', self.revoke_device)
         self.app.router.add_post('/api/v1/auth/devices/revoke-all', self.revoke_all_devices)
         
+        # 🆕 Phase 5: 安全事件和信任位置
+        self.app.router.add_get('/api/v1/auth/security-events', self.get_security_events)
+        self.app.router.add_post('/api/v1/auth/security-events/{event_id}/acknowledge', self.acknowledge_security_event)
+        self.app.router.add_get('/api/v1/auth/trusted-locations', self.get_trusted_locations)
+        self.app.router.add_delete('/api/v1/auth/trusted-locations/{location_id}', self.remove_trusted_location)
+        
         # 郵箱驗證和密碼重置
         self.app.router.add_post('/api/v1/auth/send-verification', self.send_verification_email)
         self.app.router.add_post('/api/v1/auth/verify-email', self.verify_email)
@@ -1306,6 +1312,117 @@ class HttpApiServer:
                 'error': str(e)
             }, 500)
     
+    # ==================== 🆕 Phase 5: 安全事件 API ====================
+    
+    async def get_security_events(self, request):
+        """
+        獲取用戶安全事件列表
+        """
+        try:
+            from auth.geo_security import get_geo_security
+            
+            user = request.get('user')
+            if not user:
+                return self._json_response({'success': False, 'error': '未認證'}, 401)
+            
+            user_id = user.get('user_id') or user.get('id')
+            unacknowledged_only = request.query.get('unacknowledged', 'false').lower() == 'true'
+            
+            service = get_geo_security()
+            events = service.get_user_security_events(user_id, limit=50, unacknowledged_only=unacknowledged_only)
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'events': events,
+                    'total': len(events)
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Get security events error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def acknowledge_security_event(self, request):
+        """
+        確認安全事件
+        """
+        try:
+            from auth.geo_security import get_geo_security
+            
+            user = request.get('user')
+            if not user:
+                return self._json_response({'success': False, 'error': '未認證'}, 401)
+            
+            user_id = user.get('user_id') or user.get('id')
+            event_id = int(request.match_info['event_id'])
+            
+            service = get_geo_security()
+            success = service.acknowledge_event(user_id, event_id)
+            
+            return self._json_response({
+                'success': success,
+                'message': '事件已確認' if success else '事件不存在'
+            })
+            
+        except Exception as e:
+            logger.error(f"Acknowledge event error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_trusted_locations(self, request):
+        """
+        獲取用戶信任位置列表
+        """
+        try:
+            from auth.geo_security import get_geo_security
+            
+            user = request.get('user')
+            if not user:
+                return self._json_response({'success': False, 'error': '未認證'}, 401)
+            
+            user_id = user.get('user_id') or user.get('id')
+            
+            service = get_geo_security()
+            locations = service.get_user_trusted_locations(user_id)
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'locations': locations,
+                    'total': len(locations)
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Get trusted locations error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def remove_trusted_location(self, request):
+        """
+        移除信任位置
+        """
+        try:
+            from auth.geo_security import get_geo_security
+            
+            user = request.get('user')
+            if not user:
+                return self._json_response({'success': False, 'error': '未認證'}, 401)
+            
+            user_id = user.get('user_id') or user.get('id')
+            location_id = int(request.match_info['location_id'])
+            
+            service = get_geo_security()
+            success = service.remove_trusted_location(user_id, location_id)
+            
+            return self._json_response({
+                'success': success,
+                'message': '位置已移除' if success else '位置不存在'
+            })
+            
+        except Exception as e:
+            logger.error(f"Remove trusted location error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
     async def telegram_webhook(self, request):
         """
         處理 Telegram Bot Webhook 回調
@@ -1429,12 +1546,15 @@ class HttpApiServer:
         發送登入成功消息（含 JWT Token）
         
         🆕 Phase 4: 創建設備會話 + 新設備通知
+        🆕 Phase 5: 地理安全檢查
         """
         from auth.service import get_auth_service
         from auth.device_session import get_device_session_service
+        from auth.geo_security import get_geo_security
         
         auth_service = get_auth_service()
         device_service = get_device_session_service()
+        geo_service = get_geo_security()
         
         # 查找或創建用戶
         user = await auth_service.get_user_by_telegram_id(user_data['telegram_id'])
@@ -1473,6 +1593,26 @@ class HttpApiServer:
                     device_name=device_session.device_name,
                     ip_address=ip_address
                 )
+            
+            # 🆕 Phase 5: 地理安全檢查
+            security_warning = None
+            if ip_address:
+                try:
+                    is_suspicious, alert = await geo_service.check_login_location(user.id, ip_address)
+                    if is_suspicious and alert:
+                        security_warning = {
+                            'type': alert.alert_type,
+                            'severity': alert.severity,
+                            'message': alert.message
+                        }
+                        # 發送安全警報通知
+                        await self._send_security_alert(
+                            telegram_id=user_data['telegram_id'],
+                            alert=alert,
+                            ip_address=ip_address
+                        )
+                except Exception as geo_err:
+                    logger.debug(f"Geo security check error: {geo_err}")
             
             await ws.send_json({
                 'type': 'login_success',
@@ -1556,6 +1696,68 @@ _如果這是您本人操作，請忽略此消息_
             
         except Exception as e:
             logger.warning(f"Failed to send new device notification: {e}")
+    
+    async def _send_security_alert(
+        self,
+        telegram_id: str,
+        alert,
+        ip_address: str
+    ):
+        """
+        🆕 Phase 5: 發送安全警報通知
+        
+        向用戶的 Telegram 發送異常登入警報
+        """
+        try:
+            import os
+            import aiohttp
+            
+            bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+            if not bot_token:
+                return
+            
+            from datetime import datetime
+            current_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+            
+            # 根據嚴重程度選擇圖標
+            severity_icons = {
+                'low': '⚠️',
+                'medium': '🟠',
+                'high': '🔴',
+                'critical': '🚨'
+            }
+            icon = severity_icons.get(alert.severity, '⚠️')
+            
+            # 構建警報消息
+            message = f"""
+{icon} *安全警報*
+
+{alert.message}
+
+📍 IP: {ip_address[:ip_address.rfind('.') + 1] + '*' if ip_address and '.' in ip_address else '未知'}
+⏰ 時間: {current_time}
+📊 嚴重程度: {alert.severity.upper()}
+
+*如果這不是您的操作，請立即：*
+1. 登出所有設備
+2. 聯繫客服
+
+_如果這是您本人操作，可以在設置中將此位置添加為信任位置_
+"""
+            
+            api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            
+            async with aiohttp.ClientSession() as session:
+                await session.post(api_url, json={
+                    'chat_id': telegram_id,
+                    'text': message,
+                    'parse_mode': 'Markdown'
+                })
+            
+            logger.info(f"Security alert sent to TG user {telegram_id}: {alert.alert_type}")
+            
+        except Exception as e:
+            logger.warning(f"Failed to send security alert: {e}")
     
     # ==================== OAuth 授權重定向 ====================
     

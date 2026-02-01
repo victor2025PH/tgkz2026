@@ -127,18 +127,21 @@ import { FrontendSecurityService } from '../services/security.service';
       
       <!-- 第三方登入 -->
       <div class="social-login">
-        <button class="social-btn google" (click)="socialLogin('google')" [disabled]="isLoading()">
-          <span class="social-icon">G</span>
-          <span>Google</span>
-        </button>
-        <button class="social-btn telegram" (click)="socialLogin('telegram')" [disabled]="telegramLoading()">
+        <!-- 🔧 Telegram 登入 - 主要社交登入方式 -->
+        <button class="social-btn telegram full-width" (click)="socialLogin('telegram')" [disabled]="telegramLoading()">
           @if (telegramLoading()) {
             <span class="loading-spinner small"></span>
           } @else {
             <span class="social-icon">✈️</span>
           }
-          <span>Telegram</span>
+          <span>{{ t('auth.loginWithTelegram') }}</span>
         </button>
+        <!-- 🔧 Google 登入暫時隱藏，待實現後啟用
+        <button class="social-btn google" (click)="socialLogin('google')" [disabled]="isLoading()">
+          <span class="social-icon">G</span>
+          <span>Google</span>
+        </button>
+        -->
       </div>
       
       <!-- Telegram Login Widget 容器 -->
@@ -406,6 +409,20 @@ import { FrontendSecurityService } from '../services/security.service';
       color: #0088cc;
     }
     
+    .social-btn.full-width {
+      width: 100%;
+      flex: none;
+    }
+    
+    .social-btn.telegram {
+      background: linear-gradient(135deg, #0088cc, #0077b5);
+      border-color: #0088cc;
+    }
+    
+    .social-btn.telegram:hover {
+      background: linear-gradient(135deg, #0099dd, #0088cc);
+    }
+    
     .loading-spinner.small {
       width: 14px;
       height: 14px;
@@ -554,7 +571,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       const config = await response.json();
       
       if (!config.success || !config.data?.enabled) {
-        this.error.set('Google 登入功能即將推出，請使用其他方式登入');
+        this.error.set(this.t('auth.googleNotAvailable'));
         return;
       }
       
@@ -563,7 +580,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       
     } catch (e: any) {
       console.error('Google login error:', e);
-      this.error.set('Google 登入功能即將推出，請使用其他方式登入');
+      this.error.set(this.t('auth.googleNotAvailable'));
     } finally {
       this.isLoading.set(false);
     }
@@ -653,7 +670,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       const config = await this.authService.getTelegramConfig();
       
       if (!config.enabled || !config.bot_username) {
-        this.error.set('Telegram 登入未配置');
+        this.error.set(this.t('auth.telegramNotConfigured'));
         return;
       }
       

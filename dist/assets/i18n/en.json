@@ -614,6 +614,11 @@
   "auth": {
     "welcomeBack": "Welcome Back",
     "loginSubtitle": "Sign in to your account to continue",
+    "loginWithTelegram": "Sign in with Telegram",
+    "loginWithGoogle": "Sign in with Google",
+    "googleNotAvailable": "Google sign-in coming soon, please use another method",
+    "telegramNotConfigured": "Telegram sign-in is being configured, please try again later",
+    "telegramLoginFailed": "Telegram sign-in failed, please try again",
     "createAccount": "Create Account",
     "registerSubtitle": "Get started with TG-Matrix",
     "email": "Email",

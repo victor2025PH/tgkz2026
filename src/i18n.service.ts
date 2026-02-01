@@ -68,6 +68,7 @@ export class I18nService {
   
   /**
    * 初始化語言設置
+   * 🔧 優化：默認使用繁體中文，因為主要用戶群體是中文用戶
    */
   private initLocale(): void {
     // 優先從本地存儲讀取
@@ -79,15 +80,15 @@ export class I18nService {
     
     // 自動檢測瀏覽器語言
     const browserLang = navigator.language;
-    if (browserLang.startsWith('zh')) {
-      // 區分簡繁體
-      if (browserLang === 'zh-CN' || browserLang === 'zh-Hans') {
-        this._locale.set('zh-CN');
-      } else {
-        this._locale.set('zh-TW');
-      }
-    } else {
+    if (browserLang.startsWith('en')) {
+      // 只有明確是英文才使用英文
       this._locale.set('en');
+    } else if (browserLang === 'zh-CN' || browserLang === 'zh-Hans') {
+      // 簡體中文
+      this._locale.set('zh-CN');
+    } else {
+      // 🔧 其他所有情況（包括繁體中文、未知語言）默認使用繁體中文
+      this._locale.set('zh-TW');
     }
   }
   

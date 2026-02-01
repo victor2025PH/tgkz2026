@@ -155,6 +155,10 @@ class HttpApiServer:
         
         self.app.router.add_get('/api/v1/oauth/providers', self.oauth_providers)
         
+        # 🆕 P2.2: Telegram 帳號綁定
+        self.app.router.add_post('/api/v1/oauth/telegram/bind', self.bind_telegram)
+        self.app.router.add_delete('/api/v1/oauth/telegram/unbind', self.unbind_telegram)
+        
         # 郵箱驗證和密碼重置
         self.app.router.add_post('/api/v1/auth/send-verification', self.send_verification_email)
         self.app.router.add_post('/api/v1/auth/verify-email', self.verify_email)
@@ -1055,6 +1059,153 @@ class HttpApiServer:
                 'client_id': client_id  # 前端需要此 ID 初始化 Google Sign-In
             }
         })
+    
+    # ==================== 🆕 P2.2: Telegram 綁定 API ====================
+    
+    async def bind_telegram(self, request):
+        """
+        綁定 Telegram 帳號到當前用戶
+        
+        允許已登入的用戶綁定 Telegram，以便以後可以用 Telegram 登入
+        """
+        try:
+            # 1. 驗證用戶身份
+            payload = await self._verify_token(request)
+            if not payload:
+                return self._json_response({
+                    'success': False, 
+                    'error': '未授權訪問',
+                    'code': 'UNAUTHORIZED'
+                }, 401)
+            
+            user_id = payload.get('sub')
+            if not user_id:
+                return self._json_response({
+                    'success': False, 
+                    'error': '無效的用戶令牌'
+                }, 401)
+            
+            # 2. 獲取 Telegram 認證數據
+            data = await request.json()
+            
+            # 3. 驗證 Telegram 數據
+            from auth.oauth_telegram import get_telegram_oauth_service
+            oauth_service = get_telegram_oauth_service()
+            
+            success, tg_user, error = await oauth_service.authenticate(data)
+            if not success:
+                return self._json_response({
+                    'success': False, 
+                    'error': error or 'Telegram 認證失敗'
+                }, 401)
+            
+            # 4. 檢查 Telegram ID 是否已被其他用戶綁定
+            from auth.service import get_auth_service
+            auth_service = get_auth_service()
+            
+            existing_user = await auth_service.get_user_by_telegram_id(str(tg_user.id))
+            if existing_user and existing_user.id != user_id:
+                return self._json_response({
+                    'success': False, 
+                    'error': '此 Telegram 帳號已綁定到其他用戶',
+                    'code': 'TELEGRAM_ALREADY_BOUND'
+                }, 400)
+            
+            # 5. 綁定 Telegram 到當前用戶
+            result = await auth_service.bind_telegram(
+                user_id=user_id,
+                telegram_id=str(tg_user.id),
+                telegram_username=tg_user.username,
+                telegram_first_name=tg_user.first_name,
+                telegram_photo_url=tg_user.photo_url,
+                auth_date=tg_user.auth_date
+            )
+            
+            if result.get('success'):
+                logger.info(f"User {user_id} bound Telegram {tg_user.id}")
+                return self._json_response({
+                    'success': True,
+                    'message': 'Telegram 綁定成功',
+                    'telegram': {
+                        'id': str(tg_user.id),
+                        'username': tg_user.username,
+                        'first_name': tg_user.first_name,
+                        'photo_url': tg_user.photo_url
+                    }
+                })
+            else:
+                return self._json_response({
+                    'success': False,
+                    'error': result.get('error', '綁定失敗')
+                }, 400)
+            
+        except Exception as e:
+            logger.error(f"Bind Telegram error: {e}")
+            import traceback
+            traceback.print_exc()
+            return self._json_response({
+                'success': False, 
+                'error': f'綁定失敗: {str(e)}'
+            }, 500)
+    
+    async def unbind_telegram(self, request):
+        """
+        解除 Telegram 綁定
+        """
+        try:
+            # 1. 驗證用戶身份
+            payload = await self._verify_token(request)
+            if not payload:
+                return self._json_response({
+                    'success': False, 
+                    'error': '未授權訪問'
+                }, 401)
+            
+            user_id = payload.get('sub')
+            
+            # 2. 檢查用戶是否有其他登入方式（防止帳號無法登入）
+            from auth.service import get_auth_service
+            auth_service = get_auth_service()
+            
+            user = await auth_service.get_user(user_id)
+            if not user:
+                return self._json_response({
+                    'success': False, 
+                    'error': '用戶不存在'
+                }, 404)
+            
+            # 如果用戶沒有密碼也沒有其他綁定方式，不允許解綁
+            has_password = bool(getattr(user, 'password_hash', None))
+            has_google = bool(getattr(user, 'google_id', None))
+            
+            if not has_password and not has_google:
+                return self._json_response({
+                    'success': False, 
+                    'error': '無法解綁：解綁後您將無法登入。請先設置密碼或綁定其他帳號。',
+                    'code': 'CANNOT_UNBIND'
+                }, 400)
+            
+            # 3. 解綁 Telegram
+            result = await auth_service.unbind_telegram(user_id)
+            
+            if result.get('success'):
+                logger.info(f"User {user_id} unbound Telegram")
+                return self._json_response({
+                    'success': True,
+                    'message': 'Telegram 已解除綁定'
+                })
+            else:
+                return self._json_response({
+                    'success': False,
+                    'error': result.get('error', '解綁失敗')
+                }, 400)
+            
+        except Exception as e:
+            logger.error(f"Unbind Telegram error: {e}")
+            return self._json_response({
+                'success': False, 
+                'error': str(e)
+            }, 500)
     
     async def oauth_google_callback(self, request):
         """Google OAuth 回調處理（GET 方式）"""

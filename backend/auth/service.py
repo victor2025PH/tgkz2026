@@ -90,6 +90,16 @@ class AuthService:
                     avatar_url TEXT,
                     auth_provider TEXT DEFAULT 'local',
                     oauth_id TEXT,
+                    
+                    -- 🆕 P2.2: Telegram 綁定（支持多登入方式）
+                    telegram_id TEXT UNIQUE,
+                    telegram_username TEXT,
+                    telegram_first_name TEXT,
+                    telegram_photo_url TEXT,
+                    
+                    -- Google 綁定（預留）
+                    google_id TEXT UNIQUE,
+                    
                     role TEXT DEFAULT 'free',
                     subscription_tier TEXT DEFAULT 'free',
                     subscription_expires TIMESTAMP,
@@ -167,6 +177,8 @@ class AuthService:
                 -- 索引
                 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
                 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+                CREATE INDEX IF NOT EXISTS idx_users_telegram ON users(telegram_id);
+                CREATE INDEX IF NOT EXISTS idx_users_google ON users(google_id);
                 CREATE INDEX IF NOT EXISTS idx_sessions_user ON user_sessions(user_id);
                 CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(access_token);
                 CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
@@ -174,8 +186,41 @@ class AuthService:
             ''')
             db.commit()
             logger.info("Auth database tables initialized")
+            
+            # 🆕 P2.2: 數據庫遷移 - 添加 Telegram 綁定字段
+            self._migrate_telegram_fields(db)
+            
         finally:
             db.close()
+    
+    def _migrate_telegram_fields(self, db):
+        """🆕 P2.2: 遷移添加 Telegram 綁定字段"""
+        try:
+            # 檢查並添加缺失的列
+            cursor = db.execute("PRAGMA table_info(users)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            migrations = [
+                ('telegram_id', 'TEXT UNIQUE'),
+                ('telegram_username', 'TEXT'),
+                ('telegram_first_name', 'TEXT'),
+                ('telegram_photo_url', 'TEXT'),
+                ('google_id', 'TEXT UNIQUE'),
+            ]
+            
+            for col_name, col_def in migrations:
+                if col_name not in columns:
+                    try:
+                        db.execute(f'ALTER TABLE users ADD COLUMN {col_name} {col_def}')
+                        db.commit()
+                        logger.info(f"Added column users.{col_name}")
+                    except Exception as e:
+                        # 列可能已存在（UNIQUE 約束衝突）
+                        if 'duplicate column' not in str(e).lower():
+                            logger.warning(f"Migration warning for {col_name}: {e}")
+            
+        except Exception as e:
+            logger.warning(f"Telegram fields migration: {e}")
     
     # ==================== 用戶管理 ====================
     
@@ -371,6 +416,8 @@ class AuthService:
         """
         通過 Telegram ID 獲取用戶
         
+        🔧 P2.2: 支持新的 telegram_id 字段和舊的 oauth_id 字段
+        
         Args:
             telegram_id: Telegram 用戶 ID
         
@@ -379,10 +426,18 @@ class AuthService:
         """
         db = self._get_db()
         try:
+            # 🆕 首先檢查 telegram_id 字段（新綁定方式）
             row = db.execute(
-                "SELECT * FROM users WHERE auth_provider = 'telegram' AND oauth_id = ?",
+                "SELECT * FROM users WHERE telegram_id = ?",
                 (telegram_id,)
             ).fetchone()
+            
+            # 🔧 兼容舊的 OAuth 登入方式
+            if not row:
+                row = db.execute(
+                    "SELECT * FROM users WHERE auth_provider = 'telegram' AND oauth_id = ?",
+                    (telegram_id,)
+                ).fetchone()
             
             if not row:
                 return None
@@ -392,6 +447,99 @@ class AuthService:
         except Exception as e:
             logger.error(f"Error getting user by telegram_id: {e}")
             return None
+        finally:
+            db.close()
+    
+    # ==================== 🆕 P2.2: Telegram 綁定方法 ====================
+    
+    async def bind_telegram(
+        self,
+        user_id: str,
+        telegram_id: str,
+        telegram_username: str = None,
+        telegram_first_name: str = None,
+        telegram_photo_url: str = None,
+        auth_date: int = None
+    ) -> Dict[str, Any]:
+        """
+        綁定 Telegram 到現有用戶
+        
+        Args:
+            user_id: 用戶 ID
+            telegram_id: Telegram 用戶 ID
+            telegram_username: Telegram 用戶名
+            telegram_first_name: Telegram 名字
+            telegram_photo_url: Telegram 頭像 URL
+            auth_date: 認證時間戳
+        
+        Returns:
+            操作結果
+        """
+        db = self._get_db()
+        try:
+            # 更新用戶的 Telegram 信息
+            db.execute('''
+                UPDATE users SET
+                    telegram_id = ?,
+                    telegram_username = ?,
+                    telegram_first_name = ?,
+                    telegram_photo_url = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (telegram_id, telegram_username, telegram_first_name, telegram_photo_url, user_id))
+            
+            db.commit()
+            
+            # 記錄審計
+            self._log_audit(db, user_id, 'telegram_bound', details={
+                'telegram_id': telegram_id,
+                'telegram_username': telegram_username
+            })
+            
+            logger.info(f"User {user_id} bound Telegram {telegram_id}")
+            
+            return {'success': True}
+            
+        except Exception as e:
+            logger.exception(f"Bind Telegram error: {e}")
+            return {'success': False, 'error': str(e)}
+        finally:
+            db.close()
+    
+    async def unbind_telegram(self, user_id: str) -> Dict[str, Any]:
+        """
+        解除用戶的 Telegram 綁定
+        
+        Args:
+            user_id: 用戶 ID
+        
+        Returns:
+            操作結果
+        """
+        db = self._get_db()
+        try:
+            db.execute('''
+                UPDATE users SET
+                    telegram_id = NULL,
+                    telegram_username = NULL,
+                    telegram_first_name = NULL,
+                    telegram_photo_url = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (user_id,))
+            
+            db.commit()
+            
+            # 記錄審計
+            self._log_audit(db, user_id, 'telegram_unbound')
+            
+            logger.info(f"User {user_id} unbound Telegram")
+            
+            return {'success': True}
+            
+        except Exception as e:
+            logger.exception(f"Unbind Telegram error: {e}")
+            return {'success': False, 'error': str(e)}
         finally:
             db.close()
     

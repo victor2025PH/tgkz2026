@@ -442,6 +442,35 @@ class Database:
                 
         except Exception as e:
             print(f"[Database] Migration warning: {e}", file=sys.stderr)
+        
+        try:
+            # ============ 🆕 P2.2: users 表 Telegram 綁定字段遷移 ============
+            cursor.execute("PRAGMA table_info(users)")
+            users_columns = [col[1] for col in cursor.fetchall()]
+            
+            telegram_migrations = [
+                ('telegram_id', "TEXT UNIQUE"),
+                ('telegram_username', "TEXT"),
+                ('telegram_first_name', "TEXT"),
+                ('telegram_photo_url', "TEXT"),
+                ('telegram_auth_date', "INTEGER"),
+            ]
+            
+            for col_name, col_def in telegram_migrations:
+                if col_name not in users_columns:
+                    print(f"[Database] Adding column: users.{col_name}", file=sys.stderr)
+                    cursor.execute(f'ALTER TABLE users ADD COLUMN {col_name} {col_def}')
+                    conn.commit()
+            
+            # 創建 telegram_id 索引
+            try:
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id)')
+                conn.commit()
+            except Exception:
+                pass  # 索引可能已存在
+                
+        except Exception as e:
+            print(f"[Database] Telegram migration warning: {e}", file=sys.stderr)
         finally:
             conn.close()
     
@@ -463,6 +492,13 @@ class Database:
                 nickname TEXT,
                 avatar TEXT,
                 machine_id TEXT,
+                
+                -- 🆕 P2.2: Telegram 綁定信息
+                telegram_id TEXT UNIQUE,
+                telegram_username TEXT,
+                telegram_first_name TEXT,
+                telegram_photo_url TEXT,
+                telegram_auth_date INTEGER,
                 
                 -- 會員信息
                 membership_level TEXT DEFAULT 'bronze',

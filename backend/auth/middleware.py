@@ -146,32 +146,85 @@ def auth_middleware(app):
     
     Usage:
         app = web.Application(middlewares=[auth_middleware])
+    
+    功能：
+    1. 認證請求（Bearer Token / API Key）
+    2. 注入認證上下文到請求
+    3. 注入租戶上下文（用於數據隔離）
     """
     from aiohttp import web
+    import os
     
     @web.middleware
     async def middleware(request, handler):
-        # 檢查是否為公開路由
-        path = request.path
-        if any(path == route or path.startswith(route + '/') for route in PUBLIC_ROUTES):
-            request['auth'] = AuthContext()
+        # 導入租戶上下文模塊
+        try:
+            from core.tenant_context import TenantContext, set_current_tenant, clear_current_tenant
+        except ImportError:
+            # 如果無法導入，使用空操作
+            TenantContext = None
+            set_current_tenant = lambda x: None
+            clear_current_tenant = lambda: None
+        
+        tenant_token = None
+        
+        try:
+            # 檢查是否為公開路由
+            path = request.path
+            if any(path == route or path.startswith(route + '/') for route in PUBLIC_ROUTES):
+                request['auth'] = AuthContext()
+                return await handler(request)
+            
+            # 認證請求
+            ctx = await authenticate_request(request)
+            request['auth'] = ctx
+            
+            # 🆕 注入租戶上下文
+            if TenantContext:
+                if ctx.is_authenticated and ctx.user:
+                    # 已認證用戶：使用用戶 ID 進行租戶隔離
+                    tenant = TenantContext(
+                        user_id=ctx.user.id,
+                        email=ctx.user.email or '',
+                        role=ctx.user.role.value if hasattr(ctx.user.role, 'value') else str(ctx.user.role),
+                        subscription_tier=ctx.user.subscription_tier or 'free',
+                        max_accounts=ctx.user.max_accounts or 3,
+                        max_api_calls=ctx.user.max_api_calls or 1000,
+                        request_id=request.headers.get('X-Request-ID', ''),
+                        ip_address=request.headers.get('X-Forwarded-For', 
+                                   request.headers.get('X-Real-IP', 
+                                   request.remote or ''))
+                    )
+                    tenant_token = set_current_tenant(tenant)
+                elif os.environ.get('ELECTRON_MODE', 'false').lower() == 'true':
+                    # Electron 本地模式：使用本地用戶
+                    tenant = TenantContext(
+                        user_id='local_user',
+                        role='admin',
+                        subscription_tier='enterprise',
+                        max_accounts=9999,
+                        max_api_calls=-1
+                    )
+                    tenant_token = set_current_tenant(tenant)
+            
+            # 如果需要認證但未認證
+            if not ctx.is_authenticated:
+                # Electron 模式允許無認證訪問
+                if os.environ.get('ELECTRON_MODE', 'false').lower() != 'true':
+                    # SaaS 模式：需要認證
+                    if path.startswith('/api/v1/') and not path.startswith('/api/v1/auth/'):
+                        return web.json_response({
+                            'success': False,
+                            'error': '需要登入',
+                            'code': 'UNAUTHORIZED'
+                        }, status=401)
+            
             return await handler(request)
-        
-        # 認證請求
-        ctx = await authenticate_request(request)
-        request['auth'] = ctx
-        
-        # 如果需要認證但未認證
-        if not ctx.is_authenticated:
-            # 允許某些路由在未認證時也能訪問（返回有限數據）
-            if path.startswith('/api/v1/'):
-                return web.json_response({
-                    'success': False,
-                    'error': '需要登入',
-                    'code': 'UNAUTHORIZED'
-                }, status=401)
-        
-        return await handler(request)
+            
+        finally:
+            # 清理租戶上下文
+            if tenant_token:
+                clear_current_tenant(tenant_token)
     
     return middleware
 

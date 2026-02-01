@@ -3546,13 +3546,25 @@ class Database:
             Database._knowledge_tables_initialized = True
     
     async def add_keyword_set(self, name: str, description: str = '') -> int:
-        """添加關鍵詞集"""
+        """添加關鍵詞集
+        
+        🆕 P1: 自動添加 owner_user_id 進行租戶隔離
+        """
         await self._ensure_keyword_tables()
         try:
-            return await self.execute_insert(
-                'INSERT INTO keyword_sets (name, description) VALUES (?, ?)',
-                (name, description)
-            )
+            # 🆕 P1: 添加 owner_user_id
+            try:
+                from core.tenant_filter import get_owner_user_id
+                owner_id = get_owner_user_id()
+                return await self.execute_insert(
+                    'INSERT INTO keyword_sets (name, description, owner_user_id) VALUES (?, ?, ?)',
+                    (name, description, owner_id)
+                )
+            except ImportError:
+                return await self.execute_insert(
+                    'INSERT INTO keyword_sets (name, description) VALUES (?, ?)',
+                    (name, description)
+                )
         except Exception as e:
             print(f"Error adding keyword set: {e}")
             raise e
@@ -3565,12 +3577,21 @@ class Database:
         2. keywords 關聯表（舊格式）
         
         🔧 格式統一：同時包含 'keyword' 和 'text' 字段，確保匹配器和前端都能使用
+        
+        🆕 P1: 添加租戶過濾，只返回當前用戶的關鍵詞集
         """
         await self._ensure_keyword_tables()
         import sys
         
         try:
-            rows = await self.fetch_all('SELECT * FROM keyword_sets ORDER BY created_at DESC')
+            # 🆕 P1: 應用租戶過濾
+            query = 'SELECT * FROM keyword_sets ORDER BY created_at DESC'
+            try:
+                from core.tenant_filter import add_tenant_filter
+                query, params = add_tenant_filter(query, 'keyword_sets', [])
+                rows = await self.fetch_all(query, tuple(params) if params else None)
+            except ImportError:
+                rows = await self.fetch_all(query)
             result = []
             
             for row in rows:
@@ -3858,11 +3879,21 @@ class Database:
             raise e
     
     async def get_all_groups(self) -> List[Dict]:
-        """獲取所有監控群組"""
+        """獲取所有監控群組
+        
+        🆕 P1: 添加租戶過濾，只返回當前用戶的群組
+        """
         import sys
         await self._ensure_keyword_tables()
         try:
-            rows = await self.fetch_all('SELECT * FROM monitored_groups ORDER BY created_at DESC')
+            # 🆕 P1: 應用租戶過濾
+            query = 'SELECT * FROM monitored_groups ORDER BY created_at DESC'
+            try:
+                from core.tenant_filter import add_tenant_filter
+                query, params = add_tenant_filter(query, 'monitored_groups', [])
+                rows = await self.fetch_all(query, tuple(params) if params else None)
+            except ImportError:
+                rows = await self.fetch_all(query)
             groups = []
             for row in rows:
                 group = dict(row) if hasattr(row, 'keys') else dict(row) if isinstance(row, dict) else {}

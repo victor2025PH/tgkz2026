@@ -6481,43 +6481,63 @@ export class AppComponent implements OnDestroy, OnInit {
     }
   }
 
-  // 🆕 連接超時檢測
+  // 🆕 P0 優化：簡化連接檢測（移除硬超時）
   private startConnectionTimeout(): void {
-    // 階段 1: 5 秒後顯示「連接較慢」提示
+    // P0: 只在 10 秒後顯示輕微提示，不再有硬超時
+    // 連接成功由 HTTP 響應決定，不是時間
     setTimeout(() => {
       if (this.backendConnectionState() === 'connecting') {
-        this.backendConnectionMessage.set('連接較慢，請稍候...');
+        this.backendConnectionMessage.set('正在連接...');
+        this.backendConnectionProgress.set(50);
       }
-    }, 5000);
-    
-    // 階段 2: 15 秒後顯示「可能有問題」
-    setTimeout(() => {
-      if (this.backendConnectionState() === 'connecting') {
-        this.backendConnectionMessage.set('連接時間較長，正在重試...');
-        this.backendConnectionProgress.set(30);
-      }
-    }, 15000);
-    
-    // 階段 3: 30 秒超時
-    this.connectionTimeoutId = setTimeout(() => {
-      if (this.backendConnectionState() === 'connecting') {
-        this.backendConnectionState.set('timeout');
-        this.backendConnectionMessage.set('連接超時，請檢查後端服務');
-      }
-    }, 30000);
+    }, 3000);
   }
   
-  // 🆕 重試連接
+  // 🆕 P0: 連接成功後自動隱藏提示
+  private hideConnectionIndicator(): void {
+    // 2 秒後隱藏
+    setTimeout(() => {
+      if (this.backendConnectionState() === 'connected') {
+        // 保持 connected 狀態，UI 會自動隱藏
+      }
+    }, 2000);
+  }
+  
+  // 🆕 P0 優化：重試連接
   retryConnection(): void {
     this.backendConnectionState.set('connecting');
     this.backendConnectionMessage.set('正在重新連接...');
     this.backendConnectionProgress.set(0);
     this.connectionStartTime = Date.now();
     this.startConnectionTimeout();
+    // 發送任何命令都會觸發連接確認
     this.ipcService.send('get-initial-state');
   }
   
   private setupIpcListeners(): void {
+    // 🆕 P0 優化：監聽連接確認事件（HTTP 成功即連接成功）
+    this.ipcService.on('connection-confirmed', (data: { mode: string; timestamp: number }) => {
+      console.log('[Frontend] ✅ Connection confirmed:', data);
+      this.backendConnectionState.set('connected');
+      this.backendConnectionProgress.set(100);
+      this.backendConnectionMessage.set('連接成功');
+      if (this.connectionTimeoutId) {
+        clearTimeout(this.connectionTimeoutId);
+        this.connectionTimeoutId = null;
+      }
+      this.hideConnectionIndicator();
+    });
+    
+    // 🆕 P0 優化：監聽連接錯誤事件
+    this.ipcService.on('connection-error', (data: { error: string; message: string }) => {
+      console.log('[Frontend] ❌ Connection error:', data);
+      // 只有在連接中狀態才更新為錯誤
+      if (this.backendConnectionState() === 'connecting') {
+        this.backendConnectionState.set('error');
+        this.backendConnectionMessage.set(data.message || '連接失敗');
+      }
+    });
+    
     // 🆕 監聽載入進度事件（非阻塞式更新狀態指示器）
     this.ipcService.on('loading-progress', (data: { step: string; message: string; progress: number; duration?: number }) => {
       console.log('[Frontend] Loading progress:', data);
@@ -6533,6 +6553,7 @@ export class AppComponent implements OnDestroy, OnInit {
           clearTimeout(this.connectionTimeoutId);
           this.connectionTimeoutId = null;
         }
+        this.hideConnectionIndicator();
       }
     });
     

@@ -196,8 +196,12 @@ export class ElectronIpcService implements OnDestroy {
     }
   }
   
+  // 🆕 P0 優化：追蹤 HTTP 連接狀態
+  private httpConnected = false;
+  
   /**
    * 🆕 Web 模式：通過 HTTP 發送命令
+   * P0 優化：任何成功的 HTTP 響應都確認連接
    */
   private async httpSend(command: string, payload: any): Promise<void> {
     try {
@@ -217,8 +221,8 @@ export class ElectronIpcService implements OnDestroy {
         const errorText = await response.text();
         console.error(`[Web Mode] Error body:`, errorText);
         
-        // 觸發錯誤事件
-        this.triggerEvent('login-error', {
+        // 🆕 P0: 觸發連接錯誤事件
+        this.triggerEvent('connection-error', {
           error: `HTTP 錯誤: ${response.status}`,
           message: errorText
         });
@@ -227,6 +231,16 @@ export class ElectronIpcService implements OnDestroy {
       
       const result = await response.json();
       console.log(`[Web Mode] Response for '${command}':`, result);
+      
+      // 🆕 P0 優化：首次成功響應 → 確認連接
+      if (!this.httpConnected) {
+        this.httpConnected = true;
+        console.log('[Web Mode] ✅ HTTP connection confirmed');
+        this.triggerEvent('connection-confirmed', { 
+          mode: 'http',
+          timestamp: Date.now()
+        });
+      }
       
       // 如果響應中有事件，手動觸發對應的監聯器
       if (result.event) {
@@ -244,11 +258,13 @@ export class ElectronIpcService implements OnDestroy {
     } catch (error: any) {
       console.error(`[Web Mode] HTTP send error for '${command}':`, error);
       
-      // 觸發錯誤事件
-      this.triggerEvent('login-error', {
-        error: error.message || '網絡連接錯誤',
-        message: '無法連接到服務器，請檢查網絡連接'
-      });
+      // 🆕 P0: 觸發連接錯誤事件（僅在未連接時）
+      if (!this.httpConnected) {
+        this.triggerEvent('connection-error', {
+          error: error.message || '網絡連接錯誤',
+          message: '無法連接到服務器，請檢查網絡連接'
+        });
+      }
     }
   }
   

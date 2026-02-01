@@ -125,29 +125,21 @@ import { FrontendSecurityService } from '../services/security.service';
         <span>{{ t('auth.or') }}</span>
       </div>
       
-      <!-- 第三方登入 - 嵌入式 Telegram Widget -->
+      <!-- 第三方登入 - Telegram OAuth -->
       <div class="social-login">
-        @if (telegramWidgetReady()) {
-          <!-- 🆕 嵌入式 Telegram Login Widget -->
-          <div class="telegram-widget-container">
-            <div id="telegram-login-widget"></div>
-          </div>
-        } @else {
-          <!-- 載入中或備用按鈕 -->
-          <button 
-            class="social-btn telegram full-width" 
-            (click)="initTelegramWidget()"
-            [disabled]="telegramLoading()"
-          >
-            @if (telegramLoading()) {
-              <span class="loading-spinner small"></span>
-              <span>{{ t('auth.loadingTelegram') }}</span>
-            } @else {
-              <span class="social-icon">✈️</span>
-              <span>{{ t('auth.loginWithTelegram') }}</span>
-            }
-          </button>
-        }
+        <button 
+          class="social-btn telegram full-width" 
+          (click)="initTelegramWidget()"
+          [disabled]="telegramLoading()"
+        >
+          @if (telegramLoading()) {
+            <span class="loading-spinner small"></span>
+            <span>{{ t('auth.loadingTelegram') }}</span>
+          } @else {
+            <span class="social-icon">✈️</span>
+            <span>{{ t('auth.loginWithTelegram') }}</span>
+          }
+        </button>
       </div>
       
       <!-- 註冊入口 -->
@@ -696,80 +688,70 @@ export class LoginComponent implements OnInit, OnDestroy {
       // 1. 獲取 Telegram 配置
       const config = await this.authService.getTelegramConfig();
       
-      if (!config.enabled || !config.bot_username) {
+      if (!config.enabled || !config.bot_id) {
         this.error.set(this.t('auth.telegramNotConfigured'));
         return;
       }
       
-      this.telegramBotUsername = config.bot_username;
-      this.telegramBotId = config.bot_id || '';
+      this.telegramBotUsername = config.bot_username || '';
+      this.telegramBotId = config.bot_id;
       
-      // 2. 定義全局回調函數
+      // 2. 定義全局回調函數（用於 Telegram 回調）
       (window as any).onTelegramAuth = (user: any) => {
         console.log('Telegram auth callback:', user);
         this.handleTelegramAuth(user);
       };
       
-      // 🔧 修復：先顯示容器，等待 Angular 渲染完成，再載入腳本
-      this.telegramWidgetReady.set(true);
-      
-      // 等待下一個變更檢測週期，確保 DOM 已渲染
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // 3. 動態載入 Telegram Widget 腳本
-      await this.loadTelegramWidgetScript();
+      // 🔧 改用 OAuth 重定向方式（更可靠，不依賴外部腳本）
+      this.openTelegramOAuth();
       
     } catch (e: any) {
-      console.error('Telegram widget init error:', e);
-      this.error.set(e.message || 'Telegram 載入失敗');
-      this.telegramWidgetReady.set(false);  // 🔧 錯誤時重置狀態
+      console.error('Telegram login error:', e);
+      this.error.set(e.message || 'Telegram 登入失敗');
     } finally {
       this.telegramLoading.set(false);
     }
   }
   
   /**
-   * 動態載入 Telegram Widget 腳本
+   * 🔧 改用 OAuth URL 重定向方式（更可靠）
+   * 不依賴外部腳本加載，直接跳轉到 Telegram 授權頁面
    */
-  private loadTelegramWidgetScript(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // 檢查是否已載入
-      if (document.getElementById('telegram-widget-script')) {
-        resolve();
-        return;
-      }
-      
-      const container = document.getElementById('telegram-login-widget');
-      if (!container) {
-        reject(new Error('Widget container not found'));
-        return;
-      }
-      
-      // 清空容器
-      container.innerHTML = '';
-      
-      // 創建 Telegram Login Widget 腳本
-      const script = document.createElement('script');
-      script.id = 'telegram-widget-script';
-      script.src = 'https://telegram.org/js/telegram-widget.js?22';
-      script.async = true;
-      script.setAttribute('data-telegram-login', this.telegramBotUsername);
-      script.setAttribute('data-size', 'large');
-      script.setAttribute('data-radius', '8');
-      script.setAttribute('data-onauth', 'onTelegramAuth(user)');
-      script.setAttribute('data-request-access', 'write');
-      
-      script.onload = () => {
-        console.log('Telegram widget script loaded');
-        resolve();
-      };
-      
-      script.onerror = () => {
-        reject(new Error('Failed to load Telegram widget'));
-      };
-      
-      container.appendChild(script);
-    });
+  private openTelegramOAuth(): void {
+    // 構建回調 URL
+    const callbackUrl = `${window.location.origin}/auth/telegram-callback`;
+    
+    // 構建 Telegram OAuth URL
+    const authUrl = `https://oauth.telegram.org/auth?bot_id=${this.telegramBotId}&origin=${encodeURIComponent(window.location.origin)}&request_access=write&return_to=${encodeURIComponent(callbackUrl)}`;
+    
+    console.log('Opening Telegram OAuth:', authUrl);
+    
+    // 在新窗口打開（避免離開當前頁面）
+    const width = 550;
+    const height = 470;
+    const left = (window.innerWidth - width) / 2;
+    const top = (window.innerHeight - height) / 2;
+    
+    const popup = window.open(
+      authUrl,
+      'telegram-oauth',
+      `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`
+    );
+    
+    // 監聽授權結果
+    if (popup) {
+      const checkPopup = setInterval(() => {
+        try {
+          if (popup.closed) {
+            clearInterval(checkPopup);
+            // 用戶關閉了彈窗
+            this.telegramLoading.set(false);
+          }
+        } catch (e) {
+          // 跨域錯誤，忽略
+        }
+      }, 500);
+    }
   }
   
   private async handleTelegramAuth(authData: any) {

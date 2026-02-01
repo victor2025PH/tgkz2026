@@ -616,6 +616,7 @@
     "loginSubtitle": "登录您的账户以继续",
     "loginWithTelegram": "使用 Telegram 登录",
     "loginWithGoogle": "使用 Google 登录",
+    "loadingTelegram": "加载 Telegram...",
     "googleNotAvailable": "Google 登录功能即将推出，请使用其他方式登录",
     "telegramNotConfigured": "Telegram 登录配置中，请稍后再试",
     "telegramLoginFailed": "Telegram 登录失败，请重试",

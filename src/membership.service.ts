@@ -413,7 +413,8 @@ export class MembershipService {
   
   // ========== 免登錄完整版配置 ==========
   // 與 AuthService 保持一致：免登錄模式下默認為榮耀王者
-  private readonly SKIP_LOGIN = true;
+  // 僅在 Electron/IPC 模式下啟用免登錄
+  private readonly SKIP_LOGIN = !!(window as any).electronAPI || !!(window as any).electron;
   private readonly DEFAULT_LEVEL: MembershipLevel = 'king';
   // ========================================
   

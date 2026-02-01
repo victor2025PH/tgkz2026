@@ -142,7 +142,17 @@ class HttpApiServer:
         # OAuth 第三方登入
         self.app.router.add_post('/api/v1/oauth/telegram', self.oauth_telegram)
         self.app.router.add_get('/api/v1/oauth/telegram/config', self.oauth_telegram_config)
+        
+        # Telegram OAuth 授權重定向（兼容舊路由）
+        self.app.router.add_get('/api/oauth/telegram/authorize', self.oauth_telegram_authorize)
+        self.app.router.add_get('/api/v1/oauth/telegram/authorize', self.oauth_telegram_authorize)
+        
+        # Google OAuth
         self.app.router.add_post('/api/v1/oauth/google', self.oauth_google)
+        self.app.router.add_get('/api/v1/oauth/google/authorize', self.oauth_google_authorize)
+        self.app.router.add_get('/api/v1/oauth/google/config', self.oauth_google_config)
+        self.app.router.add_get('/api/v1/oauth/google/callback', self.oauth_google_callback)
+        
         self.app.router.add_get('/api/v1/oauth/providers', self.oauth_providers)
         
         # 郵箱驗證和密碼重置
@@ -543,20 +553,75 @@ class HttpApiServer:
             auth_service = get_auth_service()
             
             # 獲取設備信息
+            ip_address = request.headers.get('X-Forwarded-For', 
+                          request.headers.get('X-Real-IP', 
+                          request.remote or ''))
             device_info = {
-                'ip_address': request.headers.get('X-Forwarded-For', 
-                              request.headers.get('X-Real-IP', 
-                              request.remote or '')),
+                'ip_address': ip_address,
                 'user_agent': request.headers.get('User-Agent', ''),
                 'device_type': 'web',
                 'device_name': data.get('device_name', 'Web Browser')
             }
             
+            email = data.get('email', '')
+            
+            # 檢查 IP 是否被封禁
+            try:
+                from core.rate_limiter import get_rate_limiter
+                limiter = get_rate_limiter()
+                if limiter.is_banned(ip_address):
+                    logger.warning(f"Blocked login attempt from banned IP: {ip_address}")
+                    return self._json_response({
+                        'success': False, 
+                        'error': '您的 IP 已被暫時封禁，請稍後再試',
+                        'code': 'IP_BANNED'
+                    }, 403)
+            except Exception:
+                pass  # 限流服務未啟用
+            
             result = await auth_service.login(
-                email=data.get('email', ''),
+                email=email,
                 password=data.get('password', ''),
                 device_info=device_info
             )
+            
+            # 記錄審計日誌
+            try:
+                from core.audit_service import get_audit_service
+                audit = get_audit_service()
+                
+                if result.get('success'):
+                    user_id = result.get('data', {}).get('user', {}).get('id', '')
+                    audit.log_login(
+                        user_id=user_id,
+                        ip_address=ip_address,
+                        user_agent=device_info.get('user_agent', ''),
+                        success=True
+                    )
+                else:
+                    # 登入失敗
+                    audit.log_login(
+                        user_id=email,  # 用 email 作為標識
+                        ip_address=ip_address,
+                        user_agent=device_info.get('user_agent', ''),
+                        success=False,
+                        failure_reason=result.get('error', 'Unknown')
+                    )
+                    
+                    # 記錄安全告警（可疑登入嘗試）
+                    try:
+                        from core.security_alert import get_security_alert_service, AlertType
+                        alert_service = get_security_alert_service()
+                        alert_service.record_event(
+                            event_type=AlertType.BRUTE_FORCE,
+                            identifier=ip_address,
+                            details={'email': email, 'error': result.get('error', '')}
+                        )
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.debug(f"Audit logging skipped: {e}")
+            
             return self._json_response(result)
         except Exception as e:
             logger.error(f"Login error: {e}")
@@ -830,13 +895,260 @@ class HttpApiServer:
             }
         })
     
+    async def oauth_telegram_authorize(self, request):
+        """Telegram OAuth 授權重定向"""
+        import os
+        import urllib.parse
+        
+        # 獲取參數
+        device = request.query.get('device', '')
+        callback = request.query.get('callback', '')
+        provider = request.query.get('provider', 'telegram')
+        
+        # 獲取 Bot 配置
+        bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', '')
+        
+        if not bot_username:
+            return self._json_response({
+                'success': False,
+                'error': 'Telegram 登入未配置',
+                'code': 'TELEGRAM_NOT_CONFIGURED'
+            }, 503)
+        
+        # 構建 Telegram 授權 URL
+        # 使用 Telegram Login Widget 的 URL 格式
+        origin = request.headers.get('Origin', callback.rsplit('/', 1)[0] if callback else '')
+        
+        # 回調 URL
+        if not callback:
+            callback = f"{origin}/auth/telegram-callback"
+        
+        # Telegram OAuth URL
+        # 方法1: 重定向到 Telegram 授權頁面
+        telegram_auth_url = f"https://oauth.telegram.org/auth?bot_id={bot_username}&origin={urllib.parse.quote(origin)}&request_access=write"
+        
+        # 如果有 callback，添加 return_to 參數
+        if callback:
+            telegram_auth_url += f"&return_to={urllib.parse.quote(callback)}"
+        
+        # 返回重定向
+        raise web.HTTPFound(location=telegram_auth_url)
+    
     async def oauth_google(self, request):
-        """Google OAuth 登入（待實現）"""
+        """Google OAuth 登入回調處理"""
+        try:
+            from auth.oauth_google import get_google_oauth_service
+            
+            google_service = get_google_oauth_service()
+            
+            if not google_service.is_configured:
+                return self._json_response({
+                    'success': False,
+                    'error': 'Google OAuth 未配置',
+                    'code': 'GOOGLE_NOT_CONFIGURED'
+                }, 503)
+            
+            # 獲取請求數據
+            data = await request.json()
+            code = data.get('code')
+            state = data.get('state')
+            redirect_uri = data.get('redirect_uri')
+            
+            if not code:
+                return self._json_response({
+                    'success': False,
+                    'error': '缺少授權碼',
+                    'code': 'MISSING_CODE'
+                }, 400)
+            
+            # 處理回調
+            google_user = await google_service.handle_callback(code, state or '', redirect_uri)
+            
+            if not google_user:
+                return self._json_response({
+                    'success': False,
+                    'error': 'Google 認證失敗',
+                    'code': 'AUTH_FAILED'
+                }, 401)
+            
+            # 創建或獲取用戶
+            result = await google_service.get_or_create_user(google_user)
+            
+            return self._json_response({
+                'success': True,
+                **result
+            })
+            
+        except Exception as e:
+            logger.error(f"Google OAuth error: {e}")
+            return self._json_response({
+                'success': False,
+                'error': str(e),
+                'code': 'OAUTH_ERROR'
+            }, 500)
+    
+    async def oauth_google_authorize(self, request):
+        """Google OAuth 授權重定向"""
+        try:
+            from auth.oauth_google import get_google_oauth_service
+            
+            google_service = get_google_oauth_service()
+            
+            if not google_service.is_configured:
+                return self._json_response({
+                    'success': False,
+                    'error': 'Google OAuth 未配置，請聯繫管理員',
+                    'code': 'GOOGLE_NOT_CONFIGURED'
+                }, 503)
+            
+            # 獲取參數
+            callback = request.query.get('callback', '')
+            
+            # 構建回調 URL
+            if not callback:
+                origin = request.headers.get('Origin', request.headers.get('Referer', ''))
+                if origin:
+                    callback = f"{origin.rstrip('/')}/auth/google-callback"
+                else:
+                    callback = os.environ.get('GOOGLE_REDIRECT_URI', '')
+            
+            # 獲取授權 URL
+            auth_url = google_service.get_authorization_url(
+                redirect_uri=callback,
+                state_data={'callback': callback}
+            )
+            
+            # 重定向到 Google
+            raise web.HTTPFound(location=auth_url)
+            
+        except web.HTTPFound:
+            raise
+        except Exception as e:
+            logger.error(f"Google authorize error: {e}")
+            return self._json_response({
+                'success': False,
+                'error': str(e),
+                'code': 'AUTHORIZE_ERROR'
+            }, 500)
+    
+    async def oauth_google_config(self, request):
+        """獲取 Google OAuth 配置"""
+        import os
+        
+        client_id = os.environ.get('GOOGLE_CLIENT_ID', '')
+        
         return self._json_response({
-            'success': False,
-            'error': 'Google OAuth 尚未實現',
-            'code': 'NOT_IMPLEMENTED'
-        }, 501)
+            'success': True,
+            'data': {
+                'enabled': bool(client_id),
+                'client_id': client_id  # 前端需要此 ID 初始化 Google Sign-In
+            }
+        })
+    
+    async def oauth_google_callback(self, request):
+        """Google OAuth 回調處理（GET 方式）"""
+        try:
+            from auth.oauth_google import get_google_oauth_service
+            
+            google_service = get_google_oauth_service()
+            
+            # 獲取參數
+            code = request.query.get('code', '')
+            state = request.query.get('state', '')
+            error = request.query.get('error', '')
+            
+            if error:
+                # 用戶取消授權或其他錯誤
+                return web.Response(
+                    text=f'''
+                    <html>
+                    <body>
+                    <script>
+                        window.opener.postMessage({{
+                            type: 'google_auth_error',
+                            error: '{error}'
+                        }}, '*');
+                        window.close();
+                    </script>
+                    </body>
+                    </html>
+                    ''',
+                    content_type='text/html'
+                )
+            
+            if not code:
+                return self._json_response({
+                    'success': False,
+                    'error': '缺少授權碼',
+                    'code': 'MISSING_CODE'
+                }, 400)
+            
+            # 獲取回調 URL
+            redirect_uri = os.environ.get('GOOGLE_REDIRECT_URI', '')
+            
+            # 處理回調
+            google_user = await google_service.handle_callback(code, state, redirect_uri)
+            
+            if not google_user:
+                return web.Response(
+                    text='''
+                    <html>
+                    <body>
+                    <script>
+                        window.opener.postMessage({
+                            type: 'google_auth_error',
+                            error: '認證失敗'
+                        }, '*');
+                        window.close();
+                    </script>
+                    </body>
+                    </html>
+                    ''',
+                    content_type='text/html'
+                )
+            
+            # 創建或獲取用戶
+            result = await google_service.get_or_create_user(google_user)
+            
+            # 返回 HTML，通過 postMessage 傳遞結果
+            import json
+            result_json = json.dumps(result)
+            
+            return web.Response(
+                text=f'''
+                <html>
+                <body>
+                <script>
+                    window.opener.postMessage({{
+                        type: 'google_auth',
+                        auth: {result_json}
+                    }}, '*');
+                    window.close();
+                </script>
+                </body>
+                </html>
+                ''',
+                content_type='text/html'
+            )
+            
+        except Exception as e:
+            logger.error(f"Google callback error: {e}")
+            return web.Response(
+                text=f'''
+                <html>
+                <body>
+                <script>
+                    window.opener.postMessage({{
+                        type: 'google_auth_error',
+                        error: '{str(e)}'
+                    }}, '*');
+                    window.close();
+                </script>
+                </body>
+                </html>
+                ''',
+                content_type='text/html'
+            )
     
     async def oauth_providers(self, request):
         """獲取可用的 OAuth 提供者列表"""

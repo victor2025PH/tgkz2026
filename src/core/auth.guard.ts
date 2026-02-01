@@ -25,17 +25,27 @@ export const authGuard: CanActivateFn = (
   const router = inject(Router);
   
   // 本地版（Electron）不需要認證
-  if (environment.apiMode === 'ipc') {
+  // 必須同時滿足：1) apiMode 為 ipc 2) 在 Electron 環境中
+  const isElectron = !!(window as any).electronAPI || !!(window as any).electron;
+  if (environment.apiMode === 'ipc' && isElectron) {
     return true;
   }
   
+  // SaaS 模式：嚴格檢查認證狀態
   if (authService.isAuthenticated()) {
-    return true;
+    // 額外驗證：確保有有效的 token
+    const token = authService.accessToken();
+    if (token && token.length > 10) {
+      return true;
+    }
   }
+  
+  // 清除可能的無效狀態
+  authService.clearSession();
   
   // 保存原始 URL 用於登入後重定向
   const returnUrl = state.url;
-  router.navigate(['/login'], { queryParams: { returnUrl } });
+  router.navigate(['/auth/login'], { queryParams: { returnUrl } });
   return false;
 };
 
@@ -47,12 +57,16 @@ export const guestGuard: CanActivateFn = () => {
   const authService = inject(AuthService);
   const router = inject(Router);
   
-  if (!authService.isAuthenticated()) {
+  // 嚴格檢查認證狀態
+  const isAuthenticated = authService.isAuthenticated();
+  const hasValidToken = authService.accessToken() && (authService.accessToken()?.length || 0) > 10;
+  
+  if (!isAuthenticated || !hasValidToken) {
     return true;
   }
   
   // 已登入，重定向到首頁
-  router.navigate(['/']);
+  router.navigate(['/dashboard']);
   return false;
 };
 

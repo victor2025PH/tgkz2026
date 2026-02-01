@@ -30,6 +30,23 @@ PUBLIC_ROUTES = [
     '/api/v1/auth/register',
     '/api/v1/auth/refresh',
     '/api/v1/auth/forgot-password',
+    '/api/v1/auth/reset-password',
+    '/api/v1/auth/verify-email',
+    '/api/v1/auth/verify-email-code',
+    '/api/v1/auth/reset-password-code',
+    '/api/v1/auth/send-verification',
+    # OAuth 路由
+    '/api/oauth/telegram/authorize',
+    '/api/v1/oauth/telegram',
+    '/api/v1/oauth/telegram/authorize',
+    '/api/v1/oauth/telegram/config',
+    '/api/v1/oauth/google',
+    '/api/v1/oauth/google/authorize',
+    '/api/v1/oauth/providers',
+    # 健康檢查
+    '/api/v1/health',
+    '/api/v1/health/liveness',
+    '/api/v1/health/readiness',
 ]
 
 # 速率限制配置
@@ -140,12 +157,13 @@ async def authenticate_request(request) -> AuthContext:
     return ctx
 
 
-def auth_middleware(app):
+def create_auth_middleware():
     """
-    aiohttp 認證中間件
+    創建 aiohttp 認證中間件
     
     Usage:
-        app = web.Application(middlewares=[auth_middleware])
+        from auth.middleware import create_auth_middleware
+        app.middlewares.append(create_auth_middleware())
     
     功能：
     1. 認證請求（Bearer Token / API Key）

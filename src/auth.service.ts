@@ -83,8 +83,9 @@ export class AuthService {
   private licenseClient = inject(LicenseClientService);
   
   // ========== 免登錄完整版配置 ==========
-  // 設置為 true 時，應用啟動即為已登錄狀態，擁有全部功能
-  private readonly SKIP_LOGIN = true;
+  // 僅在 Electron/IPC 模式下啟用，SaaS 模式必須登入
+  // 檢測方式：window.electronAPI 存在表示在 Electron 環境
+  private readonly SKIP_LOGIN = !!(window as any).electronAPI || !!(window as any).electron;
   
   // 默認用戶配置（免登錄模式使用）
   private readonly DEFAULT_USER: User = {

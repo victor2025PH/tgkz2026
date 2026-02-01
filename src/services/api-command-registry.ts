@@ -527,6 +527,129 @@ export const COMMAND_REGISTRY: CommandConfig[] = [
     useCommandEndpoint: true
   },
 
+  // ==================== 歷史消息收集 ====================
+  {
+    command: 'collect-users-from-history',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['collect-from-history-result'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'collect-users-from-history-advanced',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['history-collection-result'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'get-history-collection-stats',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['history-collection-stats'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'get-group-collected-stats',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['group-collected-stats'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'get-collected-users-count',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['collected-users-count'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'check-group-monitoring-status',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['group-monitoring-status'],
+    useCommandEndpoint: true
+  },
+
+  // ==================== P4：數據導出與管理 ====================
+  {
+    command: 'export-members',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['members-exported'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'deduplicate-members',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['members-deduplicated'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'batch-tag-members',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['members-tagged'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'get-all-tags',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['all-tags-result'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'get-group-profile',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['group-profile-result'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'compare-groups',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['groups-compared'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'recalculate-scores',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['scores-recalculated'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'get-extraction-stats',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['extraction-stats-result'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'start-background-extraction',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['background-extraction-started'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'get-background-tasks',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['background-tasks-result'],
+    useCommandEndpoint: true
+  },
+  {
+    command: 'clear-extraction-cache',
+    httpMethod: 'POST',
+    endpoint: '/api/command',
+    responseEvents: ['extraction-cache-cleared'],
+    useCommandEndpoint: true
+  },
+
   // ==================== AI 功能 ====================
   {
     command: 'generate-ai-response',

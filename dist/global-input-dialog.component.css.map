@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["angular:styles/component:css;28960841c3dbc0fc51dd41b8f0e56e1bb8e2bcbe62c0010aa6c16e5ea2b0d62d;D:/tgkz2026/src/global-input-dialog.component.ts"],
+  "sourcesContent": ["\n    @keyframes fade-in {\n      from { opacity: 0; }\n      to { opacity: 1; }\n    }\n    @keyframes scale-in {\n      from { opacity: 0; transform: scale(0.95); }\n      to { opacity: 1; transform: scale(1); }\n    }\n    .animate-fade-in {\n      animation: fade-in 0.15s ease-out;\n    }\n    .animate-scale-in {\n      animation: scale-in 0.2s ease-out;\n    }\n  "],
+  "mappings": ";AACI,WAAW;AACT;AAAO,aAAS;AAAG;AACnB;AAAK,aAAS;AAAG;AACnB;AACA,WAAW;AACT;AAAO,aAAS;AAAG,eAAW,MAAM;AAAO;AAC3C;AAAK,aAAS;AAAG,eAAW,MAAM;AAAI;AACxC;AACA,CAAC;AACC,aAAW,QAAQ,MAAM;AAC3B;AACA,CAAC;AACC,aAAW,SAAS,KAAK;AAC3B;",
+  "names": []
+}

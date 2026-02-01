@@ -24,6 +24,23 @@ import { FrontendSecurityService } from '../services/security.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="login-page">
+      <!-- 🆕 Phase 3: 登入成功動畫遮罩 -->
+      @if (loginSuccess()) {
+        <div class="success-overlay">
+          <div class="success-content">
+            <div class="success-icon">
+              <svg viewBox="0 0 52 52" class="checkmark">
+                <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+                <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+              </svg>
+            </div>
+            <h3 class="success-title">登入成功</h3>
+            <p class="success-user">歡迎回來，{{ successUserName() }}</p>
+            <p class="success-hint">正在跳轉...</p>
+          </div>
+        </div>
+      }
+      
       <h2 class="page-title">{{ t('auth.welcomeBack') }}</h2>
       <p class="page-subtitle">{{ t('auth.loginSubtitle') }}</p>
       
@@ -845,6 +862,105 @@ import { FrontendSecurityService } from '../services/security.service';
       color: var(--text-secondary, #888);
       margin: 0;
     }
+    
+    /* 🆕 Phase 3: 登入成功動畫 */
+    .success-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      animation: fadeIn 0.3s ease-out;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    .success-content {
+      text-align: center;
+      animation: scaleIn 0.4s ease-out;
+    }
+    
+    @keyframes scaleIn {
+      from { transform: scale(0.8); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    
+    .success-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 1.5rem;
+    }
+    
+    .checkmark {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: block;
+      stroke-width: 2;
+      stroke: #4ade80;
+      stroke-miterlimit: 10;
+      animation: fill 0.4s ease-in-out 0.4s forwards, scale 0.3s ease-in-out 0.9s both;
+    }
+    
+    .checkmark-circle {
+      stroke-dasharray: 166;
+      stroke-dashoffset: 166;
+      stroke-width: 2;
+      stroke-miterlimit: 10;
+      stroke: #4ade80;
+      fill: none;
+      animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+    
+    .checkmark-check {
+      transform-origin: 50% 50%;
+      stroke-dasharray: 48;
+      stroke-dashoffset: 48;
+      animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+    }
+    
+    @keyframes stroke {
+      100% { stroke-dashoffset: 0; }
+    }
+    
+    @keyframes scale {
+      0%, 100% { transform: none; }
+      50% { transform: scale3d(1.1, 1.1, 1); }
+    }
+    
+    @keyframes fill {
+      100% { box-shadow: inset 0px 0px 0px 40px rgba(74, 222, 128, 0.1); }
+    }
+    
+    .success-title {
+      color: #4ade80;
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin: 0 0 0.5rem;
+    }
+    
+    .success-user {
+      color: #fff;
+      font-size: 1rem;
+      margin: 0 0 0.5rem;
+    }
+    
+    .success-hint {
+      color: var(--text-secondary, #888);
+      font-size: 0.875rem;
+      margin: 0;
+      animation: pulse 1s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
   `]
 })
 export class LoginComponent implements OnInit, OnDestroy {
@@ -884,6 +1000,10 @@ export class LoginComponent implements OnInit, OnDestroy {
   private qrWebSocket: WebSocket | null = null;
   private qrCountdownInterval: any = null;
   
+  // 🆕 Phase 3: 登入成功動畫
+  loginSuccess = signal(false);
+  successUserName = signal('');
+  
   // P1.5: 安全增強 - 登入限制
   isLocked = computed(() => this.security.isLocked());
   lockoutRemaining = computed(() => this.security.lockoutRemaining());
@@ -898,8 +1018,17 @@ export class LoginComponent implements OnInit, OnDestroy {
     // 檢查登入限制狀態
     this.checkLoginLimit();
     
-    // 🆕 智能檢測：移動端默認使用 Deep Link，桌面端使用 QR Code
-    if (this.isMobileDevice()) {
+    // 🆕 Phase 3: 優先使用保存的偏好
+    const savedPreference = this.loadLoginPreference();
+    
+    if (savedPreference) {
+      // 使用用戶之前的選擇
+      this.loginMethod.set(savedPreference);
+      if (savedPreference === 'qrcode') {
+        this.generateQRCode();
+      }
+    } else if (this.isMobileDevice()) {
+      // 移動端默認使用 Deep Link
       this.loginMethod.set('deeplink');
     } else {
       // 桌面端自動生成 QR Code
@@ -1280,12 +1409,12 @@ export class LoginComponent implements OnInit, OnDestroy {
         return;
       }
       
-      const { token, deep_link_url, expires_in } = result.data;
+      const { token, deep_link_url, expires_in, qr_image, qr_fallback_url } = result.data;
       this.qrToken = token;
       this.qrCountdown.set(expires_in || 300);
       
-      // 2. 生成 QR Code 圖片（使用 Google Chart API 或本地生成）
-      const qrDataUrl = this.generateQRCodeImage(deep_link_url);
+      // 🆕 Phase 3: 優先使用後端生成的 QR Code（離線支持）
+      const qrDataUrl = qr_image || qr_fallback_url || this.generateQRCodeImage(deep_link_url);
       this.qrCodeUrl.set(qrDataUrl);
       
       // 3. 建立 WebSocket 連接
@@ -1451,6 +1580,8 @@ export class LoginComponent implements OnInit, OnDestroy {
   
   /**
    * 處理登入成功
+   * 
+   * 🆕 Phase 3: 添加成功動畫
    */
   private handleLoginSuccess(data: any) {
     console.log('[Login] Success:', data);
@@ -1470,9 +1601,44 @@ export class LoginComponent implements OnInit, OnDestroy {
       localStorage.setItem('tgm_user', JSON.stringify(data.user));
     }
     
-    // 跳轉到目標頁面
+    // 🆕 Phase 3: 顯示成功動畫
+    this.successUserName.set(data.user?.display_name || data.user?.username || 'User');
+    this.loginSuccess.set(true);
+    
+    // 記住登入方式偏好
+    this.saveLoginPreference();
+    
+    // 延遲跳轉，讓用戶看到成功動畫
     const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
-    window.location.href = returnUrl;
+    setTimeout(() => {
+      window.location.href = returnUrl;
+    }, 1500);  // 1.5 秒後跳轉
+  }
+  
+  /**
+   * 🆕 Phase 3: 保存登入方式偏好
+   */
+  private saveLoginPreference() {
+    try {
+      localStorage.setItem('tgm_login_method', this.loginMethod());
+    } catch (e) {
+      console.debug('Could not save login preference');
+    }
+  }
+  
+  /**
+   * 🆕 Phase 3: 讀取登入方式偏好
+   */
+  private loadLoginPreference(): 'qrcode' | 'deeplink' | 'widget' | null {
+    try {
+      const saved = localStorage.getItem('tgm_login_method');
+      if (saved === 'qrcode' || saved === 'deeplink' || saved === 'widget') {
+        return saved;
+      }
+    } catch (e) {
+      console.debug('Could not load login preference');
+    }
+    return null;
   }
   
   // ==================== Telegram Widget 登入 ====================

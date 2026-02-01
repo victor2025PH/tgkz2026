@@ -10,6 +10,9 @@ Telegram Bot 命令處理器
 1. Token 驗證
 2. 一次性確認
 3. 過期檢查
+
+Phase 3 優化：
+1. 多語言支持（根據用戶語言設置）
 """
 
 import os
@@ -18,6 +21,105 @@ import aiohttp
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
+
+
+# ==================== 🆕 Phase 3: 多語言消息模板 ====================
+
+BOT_MESSAGES = {
+    'zh-hant': {  # 繁體中文（默認）
+        'welcome': '👋 歡迎使用 TG-Matrix！\n\n我是您的智能營銷助手。',
+        'welcome_features': '🚀 **主要功能**\n• 智能群組管理\n• AI 營銷內容生成\n• 自動化工作流程',
+        'login_confirm_title': '🔐 登入確認',
+        'login_confirm_desc': '您正在請求登入 TG-Matrix 後台',
+        'login_confirm_info': '📍 瀏覽器: {user_agent}\n⏰ 時間: {time}',
+        'login_confirm_warning': '⚠️ 如果這不是您的操作，請忽略此消息',
+        'login_confirm_btn': '✅ 確認登入',
+        'login_cancel_btn': '❌ 取消',
+        'login_success': '✅ 登入成功！\n\n您已成功登入 TG-Matrix 後台。\n瀏覽器頁面將自動跳轉。',
+        'login_failed': '❌ 登入失敗\n\n{error}\n\n請重新嘗試或聯繫客服。',
+        'login_expired': '⏰ 登入請求已過期\n\n請返回網頁重新發起登入。',
+        'login_cancelled': '❌ 已取消登入',
+        'help_title': '📖 幫助信息',
+        'help_commands': '🔹 /start - 開始使用\n🔹 /login - 獲取登入連結\n🔹 /help - 查看幫助',
+        'login_link': '🔗 登入連結\n\n請訪問以下地址進行登入：\n{url}'
+    },
+    'zh-hans': {  # 简体中文
+        'welcome': '👋 欢迎使用 TG-Matrix！\n\n我是您的智能营销助手。',
+        'welcome_features': '🚀 **主要功能**\n• 智能群组管理\n• AI 营销内容生成\n• 自动化工作流程',
+        'login_confirm_title': '🔐 登录确认',
+        'login_confirm_desc': '您正在请求登录 TG-Matrix 后台',
+        'login_confirm_info': '📍 浏览器: {user_agent}\n⏰ 时间: {time}',
+        'login_confirm_warning': '⚠️ 如果这不是您的操作，请忽略此消息',
+        'login_confirm_btn': '✅ 确认登录',
+        'login_cancel_btn': '❌ 取消',
+        'login_success': '✅ 登录成功！\n\n您已成功登录 TG-Matrix 后台。\n浏览器页面将自动跳转。',
+        'login_failed': '❌ 登录失败\n\n{error}\n\n请重新尝试或联系客服。',
+        'login_expired': '⏰ 登录请求已过期\n\n请返回网页重新发起登录。',
+        'login_cancelled': '❌ 已取消登录',
+        'help_title': '📖 帮助信息',
+        'help_commands': '🔹 /start - 开始使用\n🔹 /login - 获取登录链接\n🔹 /help - 查看帮助',
+        'login_link': '🔗 登录链接\n\n请访问以下地址进行登录：\n{url}'
+    },
+    'en': {  # 英文
+        'welcome': '👋 Welcome to TG-Matrix!\n\nI\'m your intelligent marketing assistant.',
+        'welcome_features': '🚀 **Key Features**\n• Smart group management\n• AI content generation\n• Workflow automation',
+        'login_confirm_title': '🔐 Login Confirmation',
+        'login_confirm_desc': 'You are requesting to log in to TG-Matrix dashboard',
+        'login_confirm_info': '📍 Browser: {user_agent}\n⏰ Time: {time}',
+        'login_confirm_warning': '⚠️ If this wasn\'t you, please ignore this message',
+        'login_confirm_btn': '✅ Confirm Login',
+        'login_cancel_btn': '❌ Cancel',
+        'login_success': '✅ Login Successful!\n\nYou have logged in to TG-Matrix dashboard.\nThe browser page will redirect automatically.',
+        'login_failed': '❌ Login Failed\n\n{error}\n\nPlease try again or contact support.',
+        'login_expired': '⏰ Login Request Expired\n\nPlease go back to the website and try again.',
+        'login_cancelled': '❌ Login Cancelled',
+        'help_title': '📖 Help',
+        'help_commands': '🔹 /start - Get started\n🔹 /login - Get login link\n🔹 /help - View help',
+        'login_link': '🔗 Login Link\n\nPlease visit the following URL to log in:\n{url}'
+    }
+}
+
+
+def get_user_language(user: Dict[str, Any]) -> str:
+    """
+    根據用戶的 Telegram 語言設置獲取語言代碼
+    
+    優先級：
+    1. 用戶的 language_code
+    2. 繁體中文（默認）
+    """
+    lang_code = user.get('language_code', '').lower()
+    
+    if lang_code.startswith('zh'):
+        # 中文用戶
+        if 'tw' in lang_code or 'hk' in lang_code or 'hant' in lang_code:
+            return 'zh-hant'
+        else:
+            return 'zh-hans'
+    elif lang_code.startswith('en'):
+        return 'en'
+    else:
+        # 其他語言暫時使用英文
+        return 'en' if lang_code else 'zh-hant'
+
+
+def get_message(key: str, user: Dict[str, Any] = None, **kwargs) -> str:
+    """
+    獲取本地化消息
+    
+    Args:
+        key: 消息鍵
+        user: Telegram 用戶對象（用於獲取語言）
+        **kwargs: 消息格式化參數
+    """
+    lang = get_user_language(user) if user else 'zh-hant'
+    messages = BOT_MESSAGES.get(lang, BOT_MESSAGES['zh-hant'])
+    template = messages.get(key, BOT_MESSAGES['zh-hant'].get(key, key))
+    
+    try:
+        return template.format(**kwargs)
+    except (KeyError, ValueError):
+        return template
 
 
 class TelegramBotHandler:
@@ -89,7 +191,11 @@ class TelegramBotHandler:
         return None
     
     async def _handle_callback(self, callback: Dict[str, Any]) -> Optional[str]:
-        """處理回調查詢（內聯按鈕點擊）"""
+        """
+        處理回調查詢（內聯按鈕點擊）
+        
+        🆕 Phase 3: 多語言支持
+        """
         data = callback.get('data', '')
         chat_id = callback.get('message', {}).get('chat', {}).get('id')
         user = callback.get('from', {})
@@ -104,17 +210,23 @@ class TelegramBotHandler:
             await self._answer_callback(callback_id, result['message'])
             
             if result['success']:
-                await self._send_message(chat_id, "✅ 登入成功！您現在可以關閉此對話並返回網頁。")
+                # 🆕 多語言成功消息
+                success_msg = get_message('login_success', user)
+                await self._send_message(chat_id, success_msg)
             else:
-                await self._send_message(chat_id, f"❌ {result['message']}")
+                # 🆕 多語言錯誤消息
+                error_msg = get_message('login_failed', user, error=result['message'])
+                await self._send_message(chat_id, error_msg)
             
             return result['message']
         
         # 取消登入按鈕
         elif data.startswith('cancel_login_'):
-            await self._answer_callback(callback_id, "已取消")
-            await self._send_message(chat_id, "已取消登入請求。")
-            return "已取消"
+            # 🆕 多語言取消消息
+            cancel_msg = get_message('login_cancelled', user)
+            await self._answer_callback(callback_id, cancel_msg)
+            await self._send_message(chat_id, cancel_msg)
+            return cancel_msg
         
         return None
     
@@ -127,31 +239,47 @@ class TelegramBotHandler:
         """
         處理 Deep Link 登入確認
         
+        🆕 Phase 3: 多語言支持
+        
         Args:
             chat_id: 對話 ID
             user: Telegram 用戶信息
             token: 登入 Token
         """
+        from datetime import datetime
+        
         user_name = user.get('first_name', 'User')
+        current_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+        
+        # 獲取本地化按鈕文字
+        confirm_text = get_message('login_confirm_btn', user)
+        cancel_text = get_message('login_cancel_btn', user)
         
         # 發送確認請求（帶按鈕）
         keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": "✅ 確認登入", "callback_data": f"confirm_login_{token}"},
-                    {"text": "❌ 取消", "callback_data": f"cancel_login_{token}"}
+                    {"text": confirm_text, "callback_data": f"confirm_login_{token}"},
+                    {"text": cancel_text, "callback_data": f"cancel_login_{token}"}
                 ]
             ]
         }
         
+        # 構建本地化消息
+        title = get_message('login_confirm_title', user)
+        desc = get_message('login_confirm_desc', user)
+        warning = get_message('login_confirm_warning', user)
+        
         message = f"""
-👋 *{user_name}，您好！*
+👋 *{user_name}*
 
-您正在嘗試登入 *TG-AI智控王*
+{title}
 
-🔐 如果這是您發起的登入請求，請點擊下方「確認登入」按鈕。
+{desc}
 
-⚠️ 如果您沒有發起此請求，請點擊「取消」並忽略此消息。
+⏰ {current_time}
+
+{warning}
 """
         
         await self._send_message(

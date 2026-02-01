@@ -19,7 +19,7 @@ var AUTH_ROUTES = [
       },
       {
         path: "login",
-        loadComponent: () => import("./chunk-UD6YPMY2.js").then((m) => m.LoginComponent),
+        loadComponent: () => import("./chunk-BQOX2M25.js").then((m) => m.LoginComponent),
         canActivate: [guestGuard],
         title: "Login - TG-Matrix"
       },
@@ -57,4 +57,4 @@ var AUTH_ROUTES = [
 export {
   AUTH_ROUTES
 };
-//# sourceMappingURL=chunk-LOJNY3BX.js.map
+//# sourceMappingURL=chunk-7QUGDPIB.js.map

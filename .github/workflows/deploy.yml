@@ -33,7 +33,7 @@ jobs:
       
       - name: Deploy to server
         run: |
-          # 同步文件到服務器（使用已構建的 dist/）
+          # 同步文件到服務器（包含後端 Python 文件）
           rsync -avz --delete \
             --exclude '.git' \
             --exclude 'node_modules' \
@@ -43,9 +43,10 @@ jobs:
             --exclude '.env' \
             --exclude 'data/' \
             --exclude 'certbot/' \
-            --exclude '*.py' \
             --exclude 'playwright-report/' \
             --exclude 'e2e/' \
+            --exclude 'build-scripts/' \
+            --exclude 'scripts/' \
             ./ ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }}:${{ env.DEPLOY_PATH }}/
       
       - name: Restart services

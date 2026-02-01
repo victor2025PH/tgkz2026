@@ -19,6 +19,7 @@ jobs:
   deploy:
     name: Deploy to Server
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     
     steps:
       - name: Checkout code
@@ -41,34 +42,71 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ env.SERVER_HOST }} >> ~/.ssh/known_hosts
+          
+          # 配置 SSH 連接參數（增強穩定性）
+          cat >> ~/.ssh/config << EOF
+          Host deploy-server
+            HostName ${{ env.SERVER_HOST }}
+            User ${{ env.SERVER_USER }}
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            ServerAliveInterval 30
+            ServerAliveCountMax 5
+            ConnectTimeout 30
+            ConnectionAttempts 3
+          EOF
+          chmod 600 ~/.ssh/config
+      
+      - name: Test SSH connection
+        run: |
+          for i in 1 2 3 4 5; do
+            echo "SSH connection attempt $i..."
+            if ssh -o ConnectTimeout=10 deploy-server "echo 'SSH connection successful'" 2>/dev/null; then
+              echo "✅ SSH connected on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i failed, waiting 10s..."
+            sleep 10
+          done
+          echo "❌ All SSH attempts failed"
+          exit 1
       
       - name: Deploy to server
         run: |
-          # 同步文件到服務器（包含後端 Python 文件）
-          rsync -avz --delete \
-            --exclude '.git' \
-            --exclude 'node_modules' \
-            --exclude '__pycache__' \
-            --exclude '*.pyc' \
-            --exclude 'venv' \
-            --exclude '.env' \
-            --exclude 'data/' \
-            --exclude 'certbot/' \
-            --exclude 'playwright-report/' \
-            --exclude 'e2e/' \
-            --exclude 'build-scripts/' \
-            --exclude 'scripts/' \
-            ./ ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }}:${{ env.DEPLOY_PATH }}/
+          # 同步文件到服務器（帶重試和超時）
+          for i in 1 2 3; do
+            echo "Rsync attempt $i..."
+            if rsync -avz --delete \
+              --timeout=120 \
+              --exclude '.git' \
+              --exclude 'node_modules' \
+              --exclude '__pycache__' \
+              --exclude '*.pyc' \
+              --exclude 'venv' \
+              --exclude '.env' \
+              --exclude 'data/' \
+              --exclude 'certbot/' \
+              --exclude 'playwright-report/' \
+              --exclude 'e2e/' \
+              --exclude 'build-scripts/' \
+              --exclude 'scripts/' \
+              -e "ssh -o ConnectTimeout=30 -o ServerAliveInterval=15" \
+              ./ deploy-server:${{ env.DEPLOY_PATH }}/; then
+              echo "✅ Files synced successfully"
+              break
+            fi
+            echo "Attempt $i failed, waiting 10s..."
+            sleep 10
+          done
       
       - name: Restart services
         run: |
-          ssh ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} << 'ENDSSH'
+          ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 deploy-server << 'ENDSSH'
             cd /opt/tg-matrix
             
-            # 重新創建容器以應用配置更改
-            sudo docker compose down
-            sudo docker compose up -d --build
+            # 重啟服務（不重建以加快速度）
+            sudo docker compose restart api
             
             # 等待服務啟動
             sleep 10
@@ -80,8 +118,16 @@ jobs:
       
       - name: Health check
         run: |
-          sleep 5
-          curl -f http://${{ env.SERVER_HOST }}/health || echo "Health check pending..."
+          sleep 10
+          for i in 1 2 3 4 5 6; do
+            if curl -sf http://${{ env.SERVER_HOST }}/api/health > /dev/null; then
+              echo "✅ Health check passed"
+              exit 0
+            fi
+            echo "Health check attempt $i failed, waiting 10s..."
+            sleep 10
+          done
+          echo "⚠️ Health check timeout (service may still be starting)"
       
       - name: Notify result
         if: always()

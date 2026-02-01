@@ -19,6 +19,7 @@ jobs:
   deploy:
     name: Deploy Backend
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     
     steps:
       - name: Checkout code
@@ -29,40 +30,89 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ env.SERVER_HOST }} >> ~/.ssh/known_hosts
+          
+          # 配置 SSH 連接參數
+          cat >> ~/.ssh/config << EOF
+          Host deploy-server
+            HostName ${{ env.SERVER_HOST }}
+            User ${{ env.SERVER_USER }}
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            ServerAliveInterval 30
+            ServerAliveCountMax 5
+            ConnectTimeout 30
+            ConnectionAttempts 3
+          EOF
+          chmod 600 ~/.ssh/config
+      
+      - name: Test SSH connection
+        run: |
+          for i in 1 2 3 4 5; do
+            echo "SSH connection attempt $i..."
+            if ssh -o ConnectTimeout=10 deploy-server "echo 'SSH connection successful'" 2>/dev/null; then
+              echo "✅ SSH connected on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i failed, waiting 10s..."
+            sleep 10
+          done
+          echo "❌ All SSH attempts failed"
+          exit 1
       
       - name: Deploy backend files
         run: |
-          # 只同步後端和配置文件
-          rsync -avz --delete \
-            --exclude '__pycache__' \
-            --exclude '*.pyc' \
-            --exclude 'venv' \
-            --exclude '.env' \
-            backend/ ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }}:${{ env.DEPLOY_PATH }}/backend/
+          # 只同步後端和配置文件（帶重試）
+          for i in 1 2 3; do
+            if rsync -avz --delete \
+              --timeout=60 \
+              --exclude '__pycache__' \
+              --exclude '*.pyc' \
+              --exclude 'venv' \
+              --exclude '.env' \
+              -e "ssh -o ConnectTimeout=30" \
+              backend/ deploy-server:${{ env.DEPLOY_PATH }}/backend/; then
+              echo "✅ Backend files synced"
+              break
+            fi
+            echo "Rsync attempt $i failed, retrying..."
+            sleep 5
+          done
           
           # 同步配置文件
-          rsync -avz docker-compose.yml nginx.conf \
-            ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }}:${{ env.DEPLOY_PATH }}/
+          rsync -avz --timeout=60 \
+            -e "ssh -o ConnectTimeout=30" \
+            docker-compose.yml nginx.conf \
+            deploy-server:${{ env.DEPLOY_PATH }}/
       
       - name: Restart services
         run: |
-          ssh ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} << 'ENDSSH'
+          ssh -o ConnectTimeout=30 deploy-server << 'ENDSSH'
             cd /opt/tg-matrix
             
-            # 重建 API 容器
-            sudo docker compose build --no-cache api
-            sudo docker compose up -d api
+            # 重啟 API 容器
+            sudo docker compose restart api
+            
+            # 等待啟動
+            sleep 5
             
             # 重載 nginx 配置
             sudo docker compose exec -T web nginx -s reload || true
             
             # 顯示狀態
-            sudo docker ps
+            sudo docker compose ps
             echo "✅ Backend deployment completed at $(date)"
           ENDSSH
       
       - name: Health check
         run: |
-          sleep 5
-          curl -f http://${{ env.SERVER_HOST }}/api/health || echo "API health check pending..."
+          sleep 10
+          for i in 1 2 3 4 5; do
+            if curl -sf http://${{ env.SERVER_HOST }}/api/health > /dev/null; then
+              echo "✅ Health check passed"
+              exit 0
+            fi
+            echo "Health check attempt $i failed, waiting..."
+            sleep 5
+          done
+          echo "⚠️ Health check timeout (service may still be starting)"

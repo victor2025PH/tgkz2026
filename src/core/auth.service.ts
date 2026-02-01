@@ -558,12 +558,18 @@ export class AuthService {
   private setAuthState(data: any): void {
     if (data.user) {
       this._user.set(data.user);
+      // 🔧 同步保存到 localStorage（避免 effect 異步導致頁面刷新前未保存）
+      localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(data.user));
     }
     if (data.access_token) {
       this._accessToken.set(data.access_token);
+      // 🔧 同步保存到 localStorage
+      localStorage.setItem(TOKEN_KEYS.ACCESS, data.access_token);
     }
     if (data.refresh_token) {
       this._refreshToken.set(data.refresh_token);
+      // 🔧 同步保存到 localStorage
+      localStorage.setItem(TOKEN_KEYS.REFRESH, data.refresh_token);
     }
   }
   

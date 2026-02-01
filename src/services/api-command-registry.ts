@@ -59,6 +59,32 @@ export const COMMAND_REGISTRY: CommandConfig[] = [
     endpoint: '/api/v1/auth/me',
     responseEvents: ['current-user-loaded']
   },
+  
+  // ==================== OAuth 第三方登入 ====================
+  {
+    command: 'oauth-telegram',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/oauth/telegram',
+    responseEvents: ['oauth-telegram-success', 'auth-state-changed']
+  },
+  {
+    command: 'oauth-telegram-config',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/oauth/telegram/config',
+    responseEvents: ['oauth-telegram-config-loaded']
+  },
+  {
+    command: 'oauth-google',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/oauth/google',
+    responseEvents: ['oauth-google-success', 'auth-state-changed']
+  },
+  {
+    command: 'oauth-providers',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/oauth/providers',
+    responseEvents: ['oauth-providers-loaded']
+  },
   {
     command: 'update-current-user',
     httpMethod: 'PUT',

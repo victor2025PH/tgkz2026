@@ -115,15 +115,22 @@ import { I18nService } from '../i18n.service';
       
       <!-- 第三方登入 -->
       <div class="social-login">
-        <button class="social-btn google" (click)="socialLogin('google')">
+        <button class="social-btn google" (click)="socialLogin('google')" [disabled]="isLoading()">
           <span class="social-icon">G</span>
           <span>Google</span>
         </button>
-        <button class="social-btn telegram" (click)="socialLogin('telegram')">
-          <span class="social-icon">✈️</span>
+        <button class="social-btn telegram" (click)="socialLogin('telegram')" [disabled]="telegramLoading()">
+          @if (telegramLoading()) {
+            <span class="loading-spinner small"></span>
+          } @else {
+            <span class="social-icon">✈️</span>
+          }
           <span>Telegram</span>
         </button>
       </div>
+      
+      <!-- Telegram Login Widget 容器 -->
+      <div id="telegram-login-widget" style="display: none;"></div>
       
       <!-- 註冊入口 -->
       <p class="register-link">
@@ -355,6 +362,12 @@ import { I18nService } from '../i18n.service';
       color: #0088cc;
     }
     
+    .loading-spinner.small {
+      width: 14px;
+      height: 14px;
+      border-width: 2px;
+    }
+    
     .register-link {
       text-align: center;
       margin-top: 1.5rem;
@@ -387,7 +400,11 @@ export class LoginComponent {
   // 狀態
   showPassword = signal(false);
   isLoading = signal(false);
+  telegramLoading = signal(false);
   error = signal<string | null>(null);
+  
+  // Telegram 配置
+  private telegramBotUsername = '';
   
   t(key: string): string {
     return this.i18n.t(key);
@@ -420,8 +437,106 @@ export class LoginComponent {
     }
   }
   
-  socialLogin(provider: string) {
-    // TODO: 實現第三方登入
-    console.log('Social login:', provider);
+  async socialLogin(provider: string) {
+    if (provider === 'telegram') {
+      await this.telegramLogin();
+    } else if (provider === 'google') {
+      // Google OAuth 待實現
+      this.error.set('Google 登入功能即將推出');
+    }
+  }
+  
+  private async telegramLogin() {
+    this.telegramLoading.set(true);
+    this.error.set(null);
+    
+    try {
+      // 1. 獲取 Telegram 配置
+      const config = await this.authService.getTelegramConfig();
+      
+      if (!config.enabled || !config.bot_username) {
+        this.error.set('Telegram 登入未配置');
+        return;
+      }
+      
+      this.telegramBotUsername = config.bot_username;
+      
+      // 2. 使用 Telegram Login Widget
+      // 方法一：彈窗方式（更好的用戶體驗）
+      this.openTelegramLoginPopup();
+      
+    } catch (e: any) {
+      console.error('Telegram login error:', e);
+      this.error.set(e.message || 'Telegram 登入失敗');
+    } finally {
+      this.telegramLoading.set(false);
+    }
+  }
+  
+  private openTelegramLoginPopup() {
+    // 構建 Telegram OAuth URL
+    const botUsername = this.telegramBotUsername;
+    const origin = window.location.origin;
+    const returnUrl = `${origin}/auth/telegram-callback`;
+    
+    // Telegram Login Widget URL
+    const telegramUrl = `https://oauth.telegram.org/auth?bot_id=${botUsername}&origin=${encodeURIComponent(origin)}&request_access=write&return_to=${encodeURIComponent(returnUrl)}`;
+    
+    // 打開彈窗
+    const width = 550;
+    const height = 470;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    
+    const popup = window.open(
+      telegramUrl,
+      'TelegramAuth',
+      `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=no`
+    );
+    
+    // 監聽彈窗消息
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data && event.data.type === 'telegram_auth') {
+        window.removeEventListener('message', handleMessage);
+        popup?.close();
+        
+        // 處理 Telegram 認證數據
+        await this.handleTelegramAuth(event.data.auth);
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    
+    // 監聯彈窗關閉
+    const checkClosed = setInterval(() => {
+      if (popup?.closed) {
+        clearInterval(checkClosed);
+        window.removeEventListener('message', handleMessage);
+        this.telegramLoading.set(false);
+      }
+    }, 500);
+  }
+  
+  private async handleTelegramAuth(authData: any) {
+    this.telegramLoading.set(true);
+    
+    try {
+      // 發送認證數據到後端
+      const result = await this.authService.telegramLogin(authData);
+      
+      if (result.success) {
+        // 登入成功
+        const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
+        this.router.navigateByUrl(returnUrl);
+      } else {
+        this.error.set(result.error || 'Telegram 登入失敗');
+      }
+    } catch (e: any) {
+      this.error.set(e.message || 'Telegram 登入失敗');
+    } finally {
+      this.telegramLoading.set(false);
+    }
   }
 }

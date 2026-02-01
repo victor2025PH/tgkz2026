@@ -294,6 +294,22 @@ export class ElectronIpcService implements OnDestroy {
     if (result.accounts) {
       this.triggerEvent('accounts-updated', result.accounts);
     }
+    
+    // 🆕 API 憑據相關命令
+    if (command === 'get-api-credentials') {
+      // 無論成功與否，都觸發事件以結束 loading 狀態
+      this.triggerEvent('api-credentials-updated', {
+        credentials: result.credentials || result.data || []
+      });
+    }
+    
+    if (command === 'add-api-credential') {
+      this.triggerEvent('api-credential-added', {
+        success: result.success !== false,
+        credential: result.credential || result.data,
+        error: result.error
+      });
+    }
   }
   
   /**

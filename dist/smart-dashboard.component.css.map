@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["angular:styles/component:css;52e183525ab7d5485cdd6c302fa0767b2ebe62b4ecfcb5d97e6211df3bbebc5a;D:/tgkz2026/src/components/smart-dashboard.component.ts"],
+  "sourcesContent": ["\n    :host {\n      display: block;\n      height: 100%;\n    }\n    \n    /* \u81EA\u5B9A\u7FA9\u6EFE\u52D5\u689D */\n    .smart-dashboard ::-webkit-scrollbar {\n      width: 6px;\n    }\n    \n    .smart-dashboard ::-webkit-scrollbar-track {\n      background: transparent;\n    }\n    \n    .smart-dashboard ::-webkit-scrollbar-thumb {\n      background: rgb(71, 85, 105);\n      border-radius: 3px;\n    }\n  "],
+  "mappings": ";AACI;AACE,WAAS;AACT,UAAQ;AACV;AAGA,CAAC,gBAAgB;AACf,SAAO;AACT;AAEA,CAJC,gBAIgB;AACf,cAAY;AACd;AAEA,CARC,gBAQgB;AACf,cAAY,IAAI,EAAE,EAAE,EAAE,EAAE;AACxB,iBAAe;AACjB;",
+  "names": []
+}

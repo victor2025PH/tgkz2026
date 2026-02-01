@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["angular:styles/component:css;323317427a9c66efb06d20554802dcde3e9320c5683188001e1f00a1f7dfd291;D:/tgkz2026/src/components/workflow-config.component.ts"],
+  "sourcesContent": ["\n    .workflow-config {\n      padding: 1.5rem;\n    }\n    \n    input[type=\"range\"] {\n      -webkit-appearance: none;\n    }\n    \n    input[type=\"range\"]::-webkit-slider-thumb {\n      -webkit-appearance: none;\n      width: 18px;\n      height: 18px;\n      border-radius: 50%;\n      background: white;\n      cursor: pointer;\n      border: 2px solid var(--primary);\n      box-shadow: 0 2px 6px rgba(0,0,0,0.3);\n    }\n  "],
+  "mappings": ";AACI,CAAC;AACC,WAAS;AACX;AAEA,KAAK,CAAC;AACJ,sBAAoB;AACtB;AAEA,KAAK,CAAC,WAAa;AACjB,sBAAoB;AACpB,SAAO;AACP,UAAQ;AACR,iBAAe;AACf,cAAY;AACZ,UAAQ;AACR,UAAQ,IAAI,MAAM,IAAI;AACtB,cAAY,EAAE,IAAI,IAAI,KAAK,CAAC,EAAC,CAAC,EAAC,CAAC,EAAC;AACnC;",
+  "names": []
+}

@@ -1,9 +1,9 @@
 #!/bin/bash
 # SSL 證書設置腳本
-# 域名: tgw.usdt2006.cc
+# 域名: tgw.usdt2026.cc
 
-DOMAIN="tgw.usdt2006.cc"
-EMAIL="admin@usdt2006.cc"  # 請替換為您的郵箱
+DOMAIN="tgw.usdt2026.cc"
+EMAIL="admin@usdt2026.cc"  # 請替換為您的郵箱
 
 echo "========================================="
 echo "  TG-Matrix SSL 證書設置"
@@ -24,7 +24,7 @@ events {
 http {
     server {
         listen 80;
-        server_name tgw.usdt2006.cc;
+        server_name tgw.usdt2026.cc;
 
         location /.well-known/acme-challenge/ {
             root /var/www/certbot;

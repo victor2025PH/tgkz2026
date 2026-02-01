@@ -30,6 +30,18 @@ export class ElectronIpcService implements OnDestroy {
   
   // 頻道到監聽器的映射
   private channelListeners = new Map<string, ListenerInfo[]>();
+  
+  // 🆕 Web 模式：WebSocket 連接
+  private ws: WebSocket | null = null;
+  private wsReconnectTimer: any = null;
+  private wsConnected = false;
+  private webListeners = new Map<string, Set<(...args: any[]) => void>>();
+  
+  // 🆕 Web 模式：API 基礎 URL
+  private apiBaseUrl: string = '';
+  
+  // 🆕 是否為 Web 模式
+  private isWebMode: boolean = false;
 
   constructor(private ngZone: NgZone) {
     // Check if the app is running in Electron by looking for the 'require' function.
@@ -40,19 +52,129 @@ export class ElectronIpcService implements OnDestroy {
           this.ipcRenderer = electron.ipcRenderer;
           console.log('Electron IPC renderer successfully loaded.');
         } else {
-           console.warn('Electron IPC renderer not found, running in browser mode.');
+          console.warn('Electron IPC renderer not found, running in browser mode.');
+          this.initWebMode();
         }
       } catch (e) {
         console.error('Could not load Electron IPC renderer:', e);
+        this.initWebMode();
       }
     } else {
       console.warn('Electron IPC not available, running in browser mode.');
+      this.initWebMode();
     }
+  }
+  
+  /**
+   * 🆕 初始化 Web 模式（HTTP + WebSocket）
+   */
+  private initWebMode(): void {
+    this.isWebMode = true;
+    
+    // 設置 API 基礎 URL
+    if (window.location.hostname === 'localhost' && window.location.port === '4200') {
+      this.apiBaseUrl = 'http://localhost:8000';
+    } else {
+      this.apiBaseUrl = `${window.location.protocol}//${window.location.host}`;
+    }
+    
+    console.log(`[Web Mode] API URL: ${this.apiBaseUrl}`);
+    
+    // 連接 WebSocket
+    this.connectWebSocket();
+  }
+  
+  /**
+   * 🆕 連接 WebSocket（用於接收事件）
+   */
+  private connectWebSocket(): void {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    let wsUrl: string;
+    
+    if (window.location.hostname === 'localhost' && window.location.port === '4200') {
+      wsUrl = 'ws://localhost:8000/ws';
+    } else {
+      wsUrl = `${protocol}//${window.location.host}/ws`;
+    }
+    
+    console.log(`[Web Mode] Connecting WebSocket: ${wsUrl}`);
+    
+    try {
+      this.ws = new WebSocket(wsUrl);
+      
+      this.ws.onopen = () => {
+        console.log('[Web Mode] WebSocket connected');
+        this.wsConnected = true;
+        if (this.wsReconnectTimer) {
+          clearTimeout(this.wsReconnectTimer);
+          this.wsReconnectTimer = null;
+        }
+      };
+      
+      this.ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          const eventName = message.event || message.type;
+          const payload = message.data || message.payload || message;
+          
+          // 觸發監聽器
+          const listeners = this.webListeners.get(eventName);
+          if (listeners) {
+            this.ngZone.run(() => {
+              listeners.forEach(listener => {
+                try {
+                  listener(payload);
+                } catch (e) {
+                  console.error(`[Web Mode] Listener error for ${eventName}:`, e);
+                }
+              });
+            });
+          }
+        } catch (e) {
+          console.error('[Web Mode] WebSocket message parse error:', e);
+        }
+      };
+      
+      this.ws.onclose = () => {
+        console.log('[Web Mode] WebSocket disconnected');
+        this.wsConnected = false;
+        this.scheduleReconnect();
+      };
+      
+      this.ws.onerror = (error) => {
+        console.error('[Web Mode] WebSocket error:', error);
+      };
+    } catch (e) {
+      console.error('[Web Mode] WebSocket connection failed:', e);
+      this.scheduleReconnect();
+    }
+  }
+  
+  /**
+   * 🆕 計劃重新連接
+   */
+  private scheduleReconnect(): void {
+    if (this.wsReconnectTimer) return;
+    
+    this.wsReconnectTimer = setTimeout(() => {
+      this.wsReconnectTimer = null;
+      console.log('[Web Mode] Attempting WebSocket reconnection...');
+      this.connectWebSocket();
+    }, 5000);
   }
   
   ngOnDestroy(): void {
     // 清理所有監聽器
     this.cleanupAll();
+    
+    // 🆕 關閉 WebSocket
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    if (this.wsReconnectTimer) {
+      clearTimeout(this.wsReconnectTimer);
+    }
   }
 
   /**
@@ -61,12 +183,136 @@ export class ElectronIpcService implements OnDestroy {
    * @param args The data to send.
    */
   send(channel: string, ...args: any[]): void {
-    if (!this.ipcRenderer) {
+    if (this.ipcRenderer) {
+      // Electron 模式
+      console.log(`[IPC Service] → Sending '${channel}':`, args);
+      this.ipcRenderer.send(channel, ...args);
+    } else if (this.isWebMode) {
+      // 🆕 Web 模式：使用 HTTP API
+      console.log(`[Web Mode] → Sending '${channel}':`, args);
+      this.httpSend(channel, args[0] || {});
+    } else {
       console.log(`[Browser Mode] IPC Send to '${channel}':`, ...args);
-      return;
     }
-    console.log(`[IPC Service] → Sending '${channel}':`, args);
-    this.ipcRenderer.send(channel, ...args);
+  }
+  
+  /**
+   * 🆕 Web 模式：通過 HTTP 發送命令
+   */
+  private async httpSend(command: string, payload: any): Promise<void> {
+    try {
+      const url = `${this.apiBaseUrl}/api/command`;
+      console.log(`[Web Mode] HTTP POST to ${url}`, { command, payload });
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ command, payload })
+      });
+      
+      if (!response.ok) {
+        console.error(`[Web Mode] HTTP error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error(`[Web Mode] Error body:`, errorText);
+        
+        // 觸發錯誤事件
+        this.triggerEvent('login-error', {
+          error: `HTTP 錯誤: ${response.status}`,
+          message: errorText
+        });
+        return;
+      }
+      
+      const result = await response.json();
+      console.log(`[Web Mode] Response for '${command}':`, result);
+      
+      // 如果響應中有事件，手動觸發對應的監聯器
+      if (result.event) {
+        const listeners = this.webListeners.get(result.event);
+        if (listeners) {
+          this.ngZone.run(() => {
+            listeners.forEach(listener => listener(result.data || result));
+          });
+        }
+      }
+      
+      // 處理常見的響應事件映射
+      this.handleResponseEvents(command, result);
+      
+    } catch (error: any) {
+      console.error(`[Web Mode] HTTP send error for '${command}':`, error);
+      
+      // 觸發錯誤事件
+      this.triggerEvent('login-error', {
+        error: error.message || '網絡連接錯誤',
+        message: '無法連接到服務器，請檢查網絡連接'
+      });
+    }
+  }
+  
+  /**
+   * 🆕 處理 HTTP 響應並觸發對應的事件
+   */
+  private handleResponseEvents(command: string, result: any): void {
+    // 根據命令和響應結果，觸發對應的事件
+    if (command === 'login-account' || command === 'add-account') {
+      if (result.success && result.requires_code) {
+        // 需要驗證碼
+        this.triggerEvent('login-requires-code', {
+          accountId: result.account_id || result.accountId,
+          phone: result.phone,
+          phoneCodeHash: result.phone_code_hash || result.phoneCodeHash,
+          sendType: result.send_type || result.sendType || 'app',
+          message: result.message
+        });
+      } else if (result.success && result.requires_2fa) {
+        // 需要 2FA
+        this.triggerEvent('login-requires-2fa', {
+          accountId: result.account_id || result.accountId,
+          phone: result.phone
+        });
+      } else if (result.success && result.status === 'Online') {
+        // 登入成功
+        this.triggerEvent('login-success', {
+          accountId: result.account_id || result.accountId,
+          phone: result.phone,
+          userInfo: result.user_info || result.userInfo
+        });
+      } else if (!result.success) {
+        // 登入失敗
+        this.triggerEvent('login-error', {
+          error: result.error || result.message,
+          phone: result.phone,
+          codeExpired: result.code_expired || result.codeExpired
+        });
+      }
+    }
+    
+    // 帳號更新事件
+    if (result.accounts) {
+      this.triggerEvent('accounts-updated', result.accounts);
+    }
+  }
+  
+  /**
+   * 🆕 手動觸發事件
+   */
+  private triggerEvent(eventName: string, payload: any): void {
+    const listeners = this.webListeners.get(eventName);
+    if (listeners && listeners.size > 0) {
+      console.log(`[Web Mode] Triggering event '${eventName}':`, payload);
+      this.ngZone.run(() => {
+        listeners.forEach(listener => {
+          try {
+            listener(payload);
+          } catch (e) {
+            console.error(`[Web Mode] Listener error for ${eventName}:`, e);
+          }
+        });
+      });
+    }
   }
 
   /**
@@ -77,6 +323,24 @@ export class ElectronIpcService implements OnDestroy {
    * @returns Unsubscribe function
    */
   on(channel: string, listener: (...args: any[]) => void): Unsubscribe {
+    if (this.isWebMode) {
+      // 🆕 Web 模式：添加到 WebSocket 監聽器
+      if (!this.webListeners.has(channel)) {
+        this.webListeners.set(channel, new Set());
+      }
+      this.webListeners.get(channel)!.add(listener);
+      
+      console.log(`[Web Mode] Added listener for '${channel}'`);
+      
+      return () => {
+        const listeners = this.webListeners.get(channel);
+        if (listeners) {
+          listeners.delete(listener);
+          console.log(`[Web Mode] Removed listener for '${channel}'`);
+        }
+      };
+    }
+    
     if (!this.ipcRenderer) {
       // 瀏覽器模式返回空的取消訂閱函數
       return () => {};
@@ -120,6 +384,23 @@ export class ElectronIpcService implements OnDestroy {
    * @returns Unsubscribe function
    */
   once(channel: string, listener: (...args: any[]) => void): Unsubscribe {
+    if (this.isWebMode) {
+      // 🆕 Web 模式：一次性監聽
+      const onceListener = (...args: any[]) => {
+        this.webListeners.get(channel)?.delete(onceListener);
+        listener(...args);
+      };
+      
+      if (!this.webListeners.has(channel)) {
+        this.webListeners.set(channel, new Set());
+      }
+      this.webListeners.get(channel)!.add(onceListener);
+      
+      return () => {
+        this.webListeners.get(channel)?.delete(onceListener);
+      };
+    }
+    
     if (!this.ipcRenderer) {
       return () => {};
     }
@@ -166,6 +447,11 @@ export class ElectronIpcService implements OnDestroy {
    * @param args The data to send.
    */
   invoke(channel: string, ...args: any[]): Promise<any> {
+    if (this.isWebMode) {
+      // 🆕 Web 模式：使用 HTTP
+      return this.httpInvoke(channel, args[0] || {});
+    }
+    
     if (!this.ipcRenderer) {
       console.log(`[Browser Mode] IPC Invoke to '${channel}':`, ...args);
       return Promise.resolve(null);
@@ -174,9 +460,40 @@ export class ElectronIpcService implements OnDestroy {
   }
   
   /**
+   * 🆕 Web 模式：HTTP invoke
+   */
+  private async httpInvoke(command: string, payload: any): Promise<any> {
+    try {
+      const url = `${this.apiBaseUrl}/api/command`;
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ command, payload })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error: any) {
+      console.error(`[Web Mode] HTTP invoke error for '${command}':`, error);
+      return { success: false, error: error.message };
+    }
+  }
+  
+  /**
    * 移除特定監聽器
    */
   removeListener(channel: string, listener: (...args: any[]) => void): void {
+    if (this.isWebMode) {
+      this.webListeners.get(channel)?.delete(listener);
+      return;
+    }
+    
     if (!this.ipcRenderer) return;
     
     const channelList = this.channelListeners.get(channel);
@@ -224,6 +541,11 @@ export class ElectronIpcService implements OnDestroy {
    * @param channel The channel to clean up listeners for.
    */
   cleanup(channel: string): void {
+    if (this.isWebMode) {
+      this.webListeners.delete(channel);
+      return;
+    }
+    
     if (!this.ipcRenderer) return;
     
     this.ipcRenderer.removeAllListeners(channel);
@@ -245,9 +567,14 @@ export class ElectronIpcService implements OnDestroy {
    * 清理所有監聽器
    */
   cleanupAll(): void {
+    if (this.isWebMode) {
+      this.webListeners.clear();
+      return;
+    }
+    
     if (!this.ipcRenderer) return;
     
-    // 移除所有追蹤的監聯器
+    // 移除所有追蹤的監聽器
     const channels = new Set(this.listeners.map(l => l.channel));
     channels.forEach(channel => {
       this.ipcRenderer!.removeAllListeners(channel);
@@ -272,6 +599,15 @@ export class ElectronIpcService implements OnDestroy {
    * 獲取當前監聽器數量（用於調試）
    */
   getListenerCount(channel?: string): number {
+    if (this.isWebMode) {
+      if (channel) {
+        return this.webListeners.get(channel)?.size || 0;
+      }
+      let total = 0;
+      this.webListeners.forEach(set => total += set.size);
+      return total;
+    }
+    
     if (channel) {
       return this.channelListeners.get(channel)?.length || 0;
     }
@@ -282,6 +618,9 @@ export class ElectronIpcService implements OnDestroy {
    * 獲取所有活躍的頻道
    */
   getActiveChannels(): string[] {
+    if (this.isWebMode) {
+      return Array.from(this.webListeners.keys());
+    }
     return Array.from(this.channelListeners.keys());
   }
 
@@ -305,6 +644,12 @@ export class ElectronIpcService implements OnDestroy {
       fileType: 'image' | 'file';
     }>;
   }> {
+    if (this.isWebMode) {
+      console.warn('[Web Mode] selectFileForAttachment - using browser file picker');
+      // 在 Web 模式下，返回空結果（需要使用 HTML input file）
+      return { success: false, canceled: true };
+    }
+    
     if (!this.ipcRenderer) {
       console.warn('[Browser Mode] selectFileForAttachment not available');
       return { success: false, canceled: true };

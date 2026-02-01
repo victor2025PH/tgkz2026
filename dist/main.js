@@ -1,6 +1,6 @@
 import {
   authGuard
-} from "./chunk-MEX7FZNY.js";
+} from "./chunk-N57L3E3X.js";
 import {
   AiCenterViewComponent
 } from "./chunk-3UNX4HBK.js";
@@ -21,7 +21,7 @@ import {
 } from "./chunk-4B5ERMTO.js";
 import {
   AuthService
-} from "./chunk-U7RNLJAQ.js";
+} from "./chunk-7DUCTZ33.js";
 import {
   LicenseClientService
 } from "./chunk-ZIT2CRMJ.js";
@@ -72279,7 +72279,7 @@ var routes = [
   // 認證路由（公開）
   {
     path: "auth",
-    loadChildren: () => import("./chunk-7QUGDPIB.js").then((m) => m.AUTH_ROUTES)
+    loadChildren: () => import("./chunk-6FVLDQGH.js").then((m) => m.AUTH_ROUTES)
   },
   // 簡化路由
   {
@@ -72319,21 +72319,21 @@ var routes = [
   // 用戶設置頁面
   {
     path: "user-settings",
-    loadComponent: () => import("./chunk-LUC7TWB5.js").then((m) => m.UserSettingsViewComponent),
+    loadComponent: () => import("./chunk-TURMDXVG.js").then((m) => m.UserSettingsViewComponent),
     title: "\u7528\u6236\u8A2D\u7F6E",
     canActivate: [authGuard]
   },
   // 訂閱升級頁面
   {
     path: "upgrade",
-    loadComponent: () => import("./chunk-DLSJPRGU.js").then((m) => m.UpgradeViewComponent),
+    loadComponent: () => import("./chunk-6FH3KIH2.js").then((m) => m.UpgradeViewComponent),
     title: "\u5347\u7D1A\u65B9\u6848",
     canActivate: [authGuard]
   },
   // 配額管理儀表板
   {
     path: "quota",
-    loadComponent: () => import("./chunk-PVTW7ZAO.js").then((m) => m.QuotaDashboardViewComponent),
+    loadComponent: () => import("./chunk-S4SHYLT3.js").then((m) => m.QuotaDashboardViewComponent),
     title: "\u914D\u984D\u7BA1\u7406",
     canActivate: [authGuard]
   },

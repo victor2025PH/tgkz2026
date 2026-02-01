@@ -1,6 +1,6 @@
 import {
   AuthService
-} from "./chunk-U7RNLJAQ.js";
+} from "./chunk-7DUCTZ33.js";
 import {
   Router,
   RouterLink,
@@ -538,4 +538,4 @@ var RegisterComponent = class _RegisterComponent {
 export {
   RegisterComponent
 };
-//# sourceMappingURL=chunk-NSZY4XAK.js.map
+//# sourceMappingURL=chunk-MOWUUDTD.js.map

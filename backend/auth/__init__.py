@@ -17,6 +17,7 @@ from .utils import hash_password, verify_password, generate_token
 from .two_factor import TwoFactorService, get_two_factor_service
 from .api_key import ApiKeyService, get_api_key_service, ApiKeyScope
 from .login_token import LoginTokenService, get_login_token_service, LoginTokenType, LoginTokenStatus
+from .device_session import DeviceSessionService, get_device_session_service, DeviceSession, DeviceType
 
 __all__ = [
     # 用戶和會話

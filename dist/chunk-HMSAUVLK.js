@@ -1,6 +1,6 @@
 import {
   AuthService
-} from "./chunk-U7RNLJAQ.js";
+} from "./chunk-7DUCTZ33.js";
 import {
   ActivatedRoute,
   Router,
@@ -1092,6 +1092,9 @@ var LoginComponent = class _LoginComponent {
     if (data.user) {
       localStorage.setItem("tgm_user", JSON.stringify(data.user));
     }
+    if (data.session_id) {
+      localStorage.setItem("tgm_session_id", data.session_id);
+    }
     this.successUserName.set(data.user?.display_name || data.user?.username || "User");
     this.loginSuccess.set(true);
     this.saveLoginPreference();
@@ -1710,4 +1713,4 @@ var LoginComponent = class _LoginComponent {
 export {
   LoginComponent
 };
-//# sourceMappingURL=chunk-BQOX2M25.js.map
+//# sourceMappingURL=chunk-HMSAUVLK.js.map

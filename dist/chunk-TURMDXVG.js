@@ -1,6 +1,6 @@
 import {
   AuthService
-} from "./chunk-U7RNLJAQ.js";
+} from "./chunk-7DUCTZ33.js";
 import "./chunk-6TNMQ6CH.js";
 import {
   DefaultValueAccessor,
@@ -586,7 +586,18 @@ var UserSettingsViewComponent = class _UserSettingsViewComponent {
       this.sessions.update((sessions) => sessions.filter((s) => s.id !== sessionId));
     }
   }
+  /**
+   * 🆕 Phase 4: 登出除當前設備外的所有設備
+   */
   async revokeAllSessions() {
+    if (!confirm("\u78BA\u5B9A\u8981\u767B\u51FA\u6240\u6709\u5176\u4ED6\u8A2D\u5099\u55CE\uFF1F\u9019\u5C07\u8981\u6C42\u5728\u9019\u4E9B\u8A2D\u5099\u4E0A\u91CD\u65B0\u767B\u5165\u3002")) {
+      return;
+    }
+    const count = await this.authService.revokeAllOtherSessions();
+    if (count > 0) {
+      await this.loadSessions();
+      alert(`\u5DF2\u6210\u529F\u767B\u51FA ${count} \u500B\u8A2D\u5099`);
+    }
   }
   createApiKey() {
   }
@@ -904,4 +915,4 @@ var UserSettingsViewComponent = class _UserSettingsViewComponent {
 export {
   UserSettingsViewComponent
 };
-//# sourceMappingURL=chunk-LUC7TWB5.js.map
+//# sourceMappingURL=chunk-TURMDXVG.js.map

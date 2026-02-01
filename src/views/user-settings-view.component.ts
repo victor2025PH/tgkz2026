@@ -746,8 +746,20 @@ export class UserSettingsViewComponent implements OnInit {
     }
   }
   
+  /**
+   * 🆕 Phase 4: 登出除當前設備外的所有設備
+   */
   async revokeAllSessions() {
-    // TODO: 實現撤銷所有會話
+    if (!confirm('確定要登出所有其他設備嗎？這將要求在這些設備上重新登入。')) {
+      return;
+    }
+    
+    const count = await this.authService.revokeAllOtherSessions();
+    if (count > 0) {
+      // 刷新設備列表
+      await this.loadSessions();
+      alert(`已成功登出 ${count} 個設備`);
+    }
   }
   
   createApiKey() {

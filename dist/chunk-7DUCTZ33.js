@@ -713,16 +713,19 @@ var AuthService = class _AuthService {
   /**
    * 獲取會話列表
    */
+  /**
+   * 🆕 Phase 4: 獲取用戶所有設備
+   */
   async getSessions() {
     const token = this._accessToken();
     if (!token)
       return [];
     try {
-      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/sessions`, {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/devices`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       const result = await response.json();
-      return result.success ? result.data : [];
+      return result.success ? result.data?.devices || [] : [];
     } catch (e) {
       return [];
     }
@@ -730,12 +733,15 @@ var AuthService = class _AuthService {
   /**
    * 撤銷會話
    */
+  /**
+   * 🆕 Phase 4: 撤銷指定設備會話
+   */
   async revokeSession(sessionId) {
     const token = this._accessToken();
     if (!token)
       return false;
     try {
-      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/sessions/${sessionId}`, {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/devices/${sessionId}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -743,6 +749,29 @@ var AuthService = class _AuthService {
       return result.success;
     } catch (e) {
       return false;
+    }
+  }
+  /**
+   * 🆕 Phase 4: 登出除當前設備外的所有設備
+   */
+  async revokeAllOtherSessions() {
+    const token = this._accessToken();
+    if (!token)
+      return 0;
+    try {
+      const currentSessionId = localStorage.getItem("tgm_session_id") || "";
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/devices/revoke-all`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ current_session_id: currentSessionId })
+      });
+      const result = await response.json();
+      return result.success ? result.revoked_count || 0 : 0;
+    } catch (e) {
+      return 0;
     }
   }
   /**
@@ -927,4 +956,4 @@ var AuthService = class _AuthService {
 export {
   AuthService
 };
-//# sourceMappingURL=chunk-U7RNLJAQ.js.map
+//# sourceMappingURL=chunk-7DUCTZ33.js.map

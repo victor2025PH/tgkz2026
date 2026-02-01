@@ -886,12 +886,19 @@ class HttpApiServer:
         """獲取 Telegram OAuth 配置（用於前端 Widget）"""
         import os
         bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', '')
+        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+        
+        # 從 Bot Token 中提取 Bot ID（格式：bot_id:secret）
+        bot_id = ''
+        if bot_token and ':' in bot_token:
+            bot_id = bot_token.split(':')[0]
         
         return self._json_response({
             'success': True,
             'data': {
                 'bot_username': bot_username,
-                'enabled': bool(bot_username and os.environ.get('TELEGRAM_BOT_TOKEN'))
+                'bot_id': bot_id,  # 🆕 添加數字格式的 bot_id
+                'enabled': bool(bot_username and bot_token and bot_id)
             }
         })
     
@@ -925,7 +932,11 @@ class HttpApiServer:
         
         # Telegram OAuth URL
         # 方法1: 重定向到 Telegram 授權頁面
-        telegram_auth_url = f"https://oauth.telegram.org/auth?bot_id={bot_username}&origin={urllib.parse.quote(origin)}&request_access=write"
+        # 從 Bot Token 中提取 Bot ID
+        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+        bot_id = bot_token.split(':')[0] if bot_token and ':' in bot_token else ''
+        
+        telegram_auth_url = f"https://oauth.telegram.org/auth?bot_id={bot_id}&origin={urllib.parse.quote(origin)}&request_access=write"
         
         # 如果有 callback，添加 return_to 參數
         if callback:

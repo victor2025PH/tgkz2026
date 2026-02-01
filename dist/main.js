@@ -72279,7 +72279,7 @@ var routes = [
   // 認證路由（公開）
   {
     path: "auth",
-    loadChildren: () => import("./chunk-LOJNY3BX.js").then((m) => m.AUTH_ROUTES)
+    loadChildren: () => import("./chunk-7QUGDPIB.js").then((m) => m.AUTH_ROUTES)
   },
   // 簡化路由
   {

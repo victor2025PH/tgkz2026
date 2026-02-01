@@ -925,10 +925,14 @@ class HttpApiServer:
         創建 Deep Link 登入 Token
         
         用戶點擊「打開 Telegram 登入」時調用
-        返回 Token 和 Deep Link URL
+        返回 Token、Deep Link URL 和 QR Code 圖片
+        
+        Phase 3 優化：
+        1. 後端生成 QR Code（離線支持）
+        2. Base64 圖片直接返回（無需外部 API）
         """
         try:
-            from auth.login_token import get_login_token_service, LoginTokenType
+            from auth.login_token import get_login_token_service, LoginTokenType, LoginTokenService
             import os
             
             service = get_login_token_service()
@@ -944,6 +948,7 @@ class HttpApiServer:
                 body = {}
             
             token_type = body.get('type', 'deep_link')
+            qr_size = body.get('qr_size', 200)  # 可自定義 QR 尺寸
             
             # 生成 Token
             login_token = service.generate_token(
@@ -956,8 +961,11 @@ class HttpApiServer:
             bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', 'TGSmartKingBot')
             deep_link_url = f"https://t.me/{bot_username}?start=login_{login_token.token}"
             
-            # 構建 QR Code 數據（Phase 2 用）
-            # qr_data = deep_link_url
+            # 🆕 Phase 3: 本地生成 QR Code
+            qr_image = LoginTokenService.generate_qr_image(deep_link_url, size=qr_size)
+            
+            # 如果本地生成失敗，提供備用 URL
+            qr_fallback_url = LoginTokenService.get_fallback_qr_url(deep_link_url, size=qr_size) if not qr_image else None
             
             return self._json_response({
                 'success': True,
@@ -967,7 +975,10 @@ class HttpApiServer:
                     'deep_link_url': deep_link_url,
                     'bot_username': bot_username,
                     'expires_in': 300,  # 5 分鐘
-                    'expires_at': login_token.expires_at.isoformat()
+                    'expires_at': login_token.expires_at.isoformat(),
+                    # 🆕 Phase 3: QR Code 數據
+                    'qr_image': qr_image,           # Base64 圖片（優先使用）
+                    'qr_fallback_url': qr_fallback_url  # 備用外部 URL
                 }
             })
             
@@ -1101,11 +1112,30 @@ class HttpApiServer:
             
             # 確認 Token
             service = get_login_token_service()
+            
+            # 🆕 Phase 3.5: 檢查可疑活動
+            suspicious = service.check_suspicious_activity(telegram_id, ip_address=None)
+            if suspicious['is_suspicious'] and suspicious['risk_level'] == 'high':
+                logger.warning(f"High risk login attempt for TG user {telegram_id}: {suspicious['reasons']}")
+                # 暫時不阻止，只記錄
+            
             success, error = service.confirm_token(
                 token=token,
                 telegram_id=telegram_id,
                 telegram_username=telegram_username,
                 telegram_first_name=telegram_first_name
+            )
+            
+            # 🆕 Phase 3.5: 記錄審計日誌
+            service.record_login_attempt(
+                token=token,
+                success=success,
+                telegram_id=telegram_id,
+                additional_info={
+                    'username': telegram_username,
+                    'first_name': telegram_first_name,
+                    'risk_level': suspicious['risk_level']
+                }
             )
             
             if not success:

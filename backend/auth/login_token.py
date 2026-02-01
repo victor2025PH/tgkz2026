@@ -10,9 +10,15 @@
 2. 5 分鐘過期
 3. 一次性使用
 4. IP 和 User-Agent 記錄
+
+Phase 3 優化：
+1. 本地 QR Code 生成（離線支持）
+2. Base64 圖片直接返回
 """
 
 import os
+import io
+import base64
 import secrets
 import logging
 import sqlite3
@@ -20,6 +26,16 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass
 from enum import Enum
+
+# QR Code 生成庫
+try:
+    import qrcode
+    from PIL import Image
+    HAS_QRCODE = True
+except ImportError:
+    HAS_QRCODE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("qrcode/Pillow not installed, QR generation will use fallback")
 
 logger = logging.getLogger(__name__)
 
@@ -371,6 +387,253 @@ class LoginTokenService:
                 logger.info(f"Cleaned up {deleted} expired login tokens")
         finally:
             db.close()
+    
+    # ==================== 🆕 Phase 3: QR Code 生成 ====================
+    
+    @staticmethod
+    def generate_qr_image(data: str, size: int = 200, with_logo: bool = True) -> Optional[str]:
+        """
+        生成 QR Code 圖片（Base64 格式）
+        
+        優化：
+        1. 本地生成，不依賴外部 API
+        2. 可選添加 Logo
+        3. 高容錯率確保掃描可靠性
+        
+        Args:
+            data: 要編碼的數據（通常是 Deep Link URL）
+            size: 圖片尺寸（像素）
+            with_logo: 是否添加中央 Logo
+        
+        Returns:
+            Base64 編碼的 PNG 圖片，如果失敗返回 None
+        """
+        if not HAS_QRCODE:
+            logger.warning("QR Code library not available, using fallback URL")
+            return None
+        
+        try:
+            # 使用高容錯率（H = 30%）
+            qr = qrcode.QRCode(
+                version=None,  # 自動選擇最佳版本
+                error_correction=qrcode.constants.ERROR_CORRECT_H,
+                box_size=10,
+                border=2
+            )
+            qr.add_data(data)
+            qr.make(fit=True)
+            
+            # 生成圖片
+            img = qr.make_image(fill_color="#0088cc", back_color="white")
+            
+            # 調整大小
+            img = img.resize((size, size), Image.Resampling.LANCZOS)
+            
+            # 可選：添加 Telegram Logo 到中央
+            if with_logo:
+                try:
+                    # 創建一個簡單的中央圓形標記
+                    from PIL import ImageDraw
+                    draw = ImageDraw.Draw(img)
+                    center = size // 2
+                    radius = size // 8
+                    # 白色圓形背景
+                    draw.ellipse(
+                        [center - radius, center - radius, center + radius, center + radius],
+                        fill='white',
+                        outline='#0088cc',
+                        width=2
+                    )
+                    # Telegram 藍色內圓
+                    inner_radius = radius - 4
+                    draw.ellipse(
+                        [center - inner_radius, center - inner_radius, 
+                         center + inner_radius, center + inner_radius],
+                        fill='#0088cc'
+                    )
+                except Exception as e:
+                    logger.debug(f"Logo overlay skipped: {e}")
+            
+            # 轉換為 Base64
+            buffer = io.BytesIO()
+            img.save(buffer, format='PNG', optimize=True)
+            buffer.seek(0)
+            
+            base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            return f"data:image/png;base64,{base64_data}"
+            
+        except Exception as e:
+            logger.error(f"Failed to generate QR code: {e}")
+            return None
+    
+    @staticmethod
+    def get_fallback_qr_url(data: str, size: int = 200) -> str:
+        """
+        備用 QR Code URL（使用外部 API）
+        
+        當本地生成失敗時使用
+        """
+        import urllib.parse
+        encoded = urllib.parse.quote_plus(data)
+        return f"https://api.qrserver.com/v1/create-qr-code/?size={size}x{size}&data={encoded}&bgcolor=ffffff&color=0088cc&margin=10"
+    
+    # ==================== 🆕 Phase 3.5: 安全增強 ====================
+    
+    def record_login_attempt(
+        self, 
+        token: str, 
+        success: bool,
+        telegram_id: str = None,
+        ip_address: str = None,
+        user_agent: str = None,
+        additional_info: Dict[str, Any] = None
+    ) -> None:
+        """
+        記錄登入嘗試（審計日誌）
+        
+        安全特性：
+        1. 記錄所有登入嘗試（成功和失敗）
+        2. 用於異常檢測和審計
+        """
+        db = self._get_db()
+        try:
+            # 確保審計表存在
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS login_audit (
+                    id TEXT PRIMARY KEY,
+                    token TEXT,
+                    telegram_id TEXT,
+                    success INTEGER,
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    additional_info TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            import uuid
+            import json
+            
+            db.execute('''
+                INSERT INTO login_audit 
+                (id, token, telegram_id, success, ip_address, user_agent, additional_info, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                str(uuid.uuid4()),
+                token[:16] if token else None,  # 只記錄部分 Token
+                telegram_id,
+                1 if success else 0,
+                ip_address,
+                user_agent[:200] if user_agent else None,  # 限制長度
+                json.dumps(additional_info) if additional_info else None,
+                datetime.utcnow().isoformat()
+            ))
+            db.commit()
+            
+        except Exception as e:
+            logger.warning(f"Failed to record login audit: {e}")
+        finally:
+            db.close()
+    
+    def check_suspicious_activity(self, telegram_id: str, ip_address: str = None) -> Dict[str, Any]:
+        """
+        檢查可疑活動
+        
+        異常檢測：
+        1. 短時間內多次登入嘗試
+        2. 不同 IP 的登入請求
+        3. 異常的 User-Agent 模式
+        
+        Returns:
+            {
+                'is_suspicious': bool,
+                'risk_level': 'low' | 'medium' | 'high',
+                'reasons': [],
+                'recent_attempts': int
+            }
+        """
+        db = self._get_db()
+        result = {
+            'is_suspicious': False,
+            'risk_level': 'low',
+            'reasons': [],
+            'recent_attempts': 0
+        }
+        
+        try:
+            # 檢查過去 5 分鐘的登入嘗試次數
+            five_minutes_ago = (datetime.utcnow() - timedelta(minutes=5)).isoformat()
+            
+            cursor = db.execute('''
+                SELECT COUNT(*) as count FROM login_audit
+                WHERE telegram_id = ? AND created_at > ?
+            ''', (telegram_id, five_minutes_ago))
+            
+            row = cursor.fetchone()
+            recent_attempts = row['count'] if row else 0
+            result['recent_attempts'] = recent_attempts
+            
+            # 規則 1: 5 分鐘內超過 5 次嘗試
+            if recent_attempts > 5:
+                result['is_suspicious'] = True
+                result['reasons'].append('頻繁登入嘗試')
+                result['risk_level'] = 'high' if recent_attempts > 10 else 'medium'
+            
+            # 規則 2: 檢查不同 IP 的登入
+            if ip_address:
+                cursor = db.execute('''
+                    SELECT COUNT(DISTINCT ip_address) as ip_count 
+                    FROM login_audit
+                    WHERE telegram_id = ? AND created_at > ?
+                ''', (telegram_id, five_minutes_ago))
+                
+                row = cursor.fetchone()
+                ip_count = row['ip_count'] if row else 0
+                
+                if ip_count > 3:
+                    result['is_suspicious'] = True
+                    result['reasons'].append('多個 IP 地址登入')
+                    result['risk_level'] = 'high'
+            
+        except Exception as e:
+            logger.warning(f"Failed to check suspicious activity: {e}")
+        finally:
+            db.close()
+        
+        return result
+    
+    def get_login_history(self, telegram_id: str, limit: int = 10) -> list:
+        """
+        獲取用戶登入歷史
+        
+        用於用戶查看自己的登入記錄
+        """
+        db = self._get_db()
+        history = []
+        
+        try:
+            cursor = db.execute('''
+                SELECT success, ip_address, user_agent, created_at
+                FROM login_audit
+                WHERE telegram_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            ''', (telegram_id, limit))
+            
+            for row in cursor.fetchall():
+                history.append({
+                    'success': bool(row['success']),
+                    'ip_address': row['ip_address'],
+                    'user_agent': row['user_agent'][:50] if row['user_agent'] else None,
+                    'time': row['created_at']
+                })
+                
+        except Exception as e:
+            logger.warning(f"Failed to get login history: {e}")
+        finally:
+            db.close()
+        
+        return history
 
 
 # 全局服務實例

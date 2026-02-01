@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["angular:styles/component:css;2fe1adf824cc91c403f36a03a326f236a41dfcf343b9d686a650ba220782fa8f;D:/tgkz2026/src/smart-marketing/conversion-funnel.component.ts"],
+  "sourcesContent": ["\n    .funnel-bar {\n      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);\n    }\n    \n    .funnel-stage:first-child .funnel-bar {\n      clip-path: polygon(0 0, 100% 0, 98% 100%, 2% 100%);\n    }\n    \n    .funnel-stage:last-child .funnel-bar {\n      clip-path: polygon(5% 0, 95% 0, 100% 100%, 0 100%);\n    }\n    \n    .funnel-stage:not(:first-child):not(:last-child) .funnel-bar {\n      clip-path: polygon(2% 0, 98% 0, 96% 100%, 4% 100%);\n    }\n  "],
+  "mappings": ";AACI,CAAC;AACC,cAAY,MAAM,EAAE,IAAI,IAAI,KAAK,CAAC,EAAE,CAAC,EAAE,CAAC,EAAE;AAC5C;AAEA,CAAC,YAAY,aAAa,CAJzB;AAKC,aAAW,QAAQ,EAAE,CAAC,EAAE,KAAK,CAAC,EAAE,IAAI,IAAI,EAAE,GAAG;AAC/C;AAEA,CAJC,YAIY,YAAY,CARxB;AASC,aAAW,QAAQ,GAAG,CAAC,EAAE,IAAI,CAAC,EAAE,KAAK,IAAI,EAAE,EAAE;AAC/C;AAEA,CARC,YAQY,KAAK,aAAa,KAAK,aAAa,CAZhD;AAaC,aAAW,QAAQ,GAAG,CAAC,EAAE,IAAI,CAAC,EAAE,IAAI,IAAI,EAAE,GAAG;AAC/C;",
+  "names": []
+}

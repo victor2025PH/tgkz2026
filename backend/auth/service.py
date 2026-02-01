@@ -575,6 +575,119 @@ class AuthService:
         finally:
             db.close()
     
+    def create_user_from_telegram(
+        self,
+        telegram_id: str,
+        username: str = None,
+        first_name: str = None,
+        photo_url: str = None
+    ) -> Optional[User]:
+        """
+        通過 Telegram 信息創建新用戶（Deep Link / QR Code 登入用）
+        
+        Args:
+            telegram_id: Telegram 用戶 ID
+            username: Telegram 用戶名
+            first_name: Telegram 名字
+            photo_url: Telegram 頭像 URL
+        
+        Returns:
+            User 對象，失敗返回 None
+        """
+        db = self._get_db()
+        try:
+            # 確保 Telegram 相關列存在
+            self._migrate_telegram_fields(db)
+            
+            # 檢查是否已存在
+            existing = db.execute(
+                "SELECT * FROM users WHERE telegram_id = ?",
+                (telegram_id,)
+            ).fetchone()
+            
+            if existing:
+                return User.from_dict(dict(existing))
+            
+            # 兼容舊的 OAuth 方式
+            existing = db.execute(
+                "SELECT * FROM users WHERE auth_provider = 'telegram' AND oauth_id = ?",
+                (telegram_id,)
+            ).fetchone()
+            
+            if existing:
+                # 更新 telegram_id 字段
+                db.execute(
+                    "UPDATE users SET telegram_id = ? WHERE id = ?",
+                    (telegram_id, existing['id'])
+                )
+                db.commit()
+                return User.from_dict(dict(existing))
+            
+            # 創建新用戶
+            display_name = first_name or f"TG_{telegram_id[-4:]}"
+            safe_username = (username or f"tg_{telegram_id}").lower().replace('@', '')
+            
+            # 確保用戶名唯一
+            base_username = safe_username
+            counter = 1
+            while True:
+                existing = db.execute(
+                    "SELECT id FROM users WHERE username = ?", (safe_username,)
+                ).fetchone()
+                if not existing:
+                    break
+                safe_username = f"{base_username}_{counter}"
+                counter += 1
+            
+            user = User(
+                email=None,
+                username=safe_username,
+                password_hash=None,
+                display_name=display_name,
+                avatar_url=photo_url,
+                auth_provider='telegram',
+                oauth_id=telegram_id,
+                role=UserRole.FREE,
+                subscription_tier='free',
+                is_verified=True
+            )
+            
+            # 設置配額
+            quotas = _get_user_quotas('free')
+            user.max_accounts = quotas['max_accounts']
+            user.max_api_calls = quotas['max_api_calls']
+            
+            # 插入用戶
+            db.execute('''
+                INSERT INTO users (
+                    id, email, username, password_hash, display_name, avatar_url,
+                    auth_provider, oauth_id, telegram_id, telegram_username, telegram_first_name,
+                    role, subscription_tier, max_accounts, max_api_calls, is_verified
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                user.id, user.email, user.username, user.password_hash,
+                user.display_name, user.avatar_url,
+                'telegram', telegram_id, telegram_id, username, first_name,
+                user.role.value, user.subscription_tier,
+                user.max_accounts, user.max_api_calls, 1
+            ))
+            db.commit()
+            
+            # 記錄審計
+            self._log_audit(db, user.id, 'telegram_register', details={
+                'telegram_id': telegram_id,
+                'telegram_username': username
+            })
+            
+            logger.info(f"Created user from Telegram: {user.id} (TG: {telegram_id})")
+            return user
+            
+        except Exception as e:
+            logger.exception(f"Create user from Telegram error: {e}")
+            return None
+        finally:
+            db.close()
+    
     async def create_session(
         self, 
         user_id: str, 

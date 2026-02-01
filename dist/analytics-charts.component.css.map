@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["angular:styles/component:css;0b9911c38299268ec1a6f7f221444dd465c14a1deb71dd83c9e86da025253da7;D:/tgkz2026/src/analytics-charts.component.ts"],
+  "sourcesContent": ["\n    .analytics-charts-container {\n      position: relative;\n      width: 100%;\n      height: 100%;\n    }\n    canvas {\n      max-height: 400px;\n    }\n  "],
+  "mappings": ";AACI,CAAC;AACC,YAAU;AACV,SAAO;AACP,UAAQ;AACV;AACA;AACE,cAAY;AACd;",
+  "names": []
+}

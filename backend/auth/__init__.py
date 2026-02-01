@@ -16,6 +16,7 @@ auth_middleware = create_auth_middleware
 from .utils import hash_password, verify_password, generate_token
 from .two_factor import TwoFactorService, get_two_factor_service
 from .api_key import ApiKeyService, get_api_key_service, ApiKeyScope
+from .login_token import LoginTokenService, get_login_token_service, LoginTokenType, LoginTokenStatus
 
 __all__ = [
     # 用戶和會話
@@ -40,5 +41,11 @@ __all__ = [
     # API 密鑰
     'ApiKeyService',
     'get_api_key_service',
-    'ApiKeyScope'
+    'ApiKeyScope',
+    
+    # 登入 Token（Deep Link / QR Code）
+    'LoginTokenService',
+    'get_login_token_service',
+    'LoginTokenType',
+    'LoginTokenStatus'
 ]

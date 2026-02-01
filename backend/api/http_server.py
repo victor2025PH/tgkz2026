@@ -145,6 +145,14 @@ class HttpApiServer:
         self.app.router.add_post('/api/v1/oauth/google', self.oauth_google)
         self.app.router.add_get('/api/v1/oauth/providers', self.oauth_providers)
         
+        # 郵箱驗證和密碼重置
+        self.app.router.add_post('/api/v1/auth/send-verification', self.send_verification_email)
+        self.app.router.add_post('/api/v1/auth/verify-email', self.verify_email)
+        self.app.router.add_post('/api/v1/auth/verify-email-code', self.verify_email_by_code)
+        self.app.router.add_post('/api/v1/auth/forgot-password', self.forgot_password)
+        self.app.router.add_post('/api/v1/auth/reset-password', self.reset_password)
+        self.app.router.add_post('/api/v1/auth/reset-password-code', self.reset_password_by_code)
+        
         # API 憑證
         self.app.router.add_get('/api/v1/credentials', self.get_credentials)
         self.app.router.add_post('/api/v1/credentials', self.add_credential)
@@ -738,7 +746,130 @@ class HttpApiServer:
             'success': True,
             'data': providers
         })
-        return self._json_response(result)
+    
+    # ==================== 郵箱驗證和密碼重置 ====================
+    
+    async def send_verification_email(self, request):
+        """發送郵箱驗證郵件"""
+        try:
+            auth_header = request.headers.get('Authorization', '')
+            token = auth_header[7:] if auth_header.startswith('Bearer ') else None
+            
+            if not token:
+                return self._json_response({'success': False, 'error': '未登入'}, 401)
+            
+            from auth.service import get_auth_service
+            from auth.utils import verify_token
+            
+            payload = verify_token(token)
+            if not payload:
+                return self._json_response({'success': False, 'error': '無效的令牌'}, 401)
+            
+            auth_service = get_auth_service()
+            result = await auth_service.send_verification_email(payload.get('sub'))
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Send verification email error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def verify_email(self, request):
+        """驗證郵箱（通過 Token）"""
+        try:
+            data = await request.json()
+            token = data.get('token', '')
+            
+            if not token:
+                return self._json_response({'success': False, 'error': '缺少驗證令牌'}, 400)
+            
+            from auth.service import get_auth_service
+            auth_service = get_auth_service()
+            result = await auth_service.verify_email(token)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Verify email error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def verify_email_by_code(self, request):
+        """驗證郵箱（通過驗證碼）"""
+        try:
+            data = await request.json()
+            email = data.get('email', '')
+            code = data.get('code', '')
+            
+            if not email or not code:
+                return self._json_response({'success': False, 'error': '缺少郵箱或驗證碼'}, 400)
+            
+            from auth.service import get_auth_service
+            auth_service = get_auth_service()
+            result = await auth_service.verify_email_by_code(email, code)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Verify email by code error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def forgot_password(self, request):
+        """請求密碼重置"""
+        try:
+            data = await request.json()
+            email = data.get('email', '')
+            
+            if not email:
+                return self._json_response({'success': False, 'error': '請輸入郵箱'}, 400)
+            
+            from auth.service import get_auth_service
+            auth_service = get_auth_service()
+            result = await auth_service.request_password_reset(email)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Forgot password error: {e}")
+            # 安全考慮：不暴露錯誤詳情
+            return self._json_response({
+                'success': True, 
+                'message': '如果該郵箱已註冊，您將收到重置郵件'
+            })
+    
+    async def reset_password(self, request):
+        """重置密碼（通過 Token）"""
+        try:
+            data = await request.json()
+            token = data.get('token', '')
+            new_password = data.get('password', '')
+            
+            if not token:
+                return self._json_response({'success': False, 'error': '缺少重置令牌'}, 400)
+            
+            if not new_password or len(new_password) < 8:
+                return self._json_response({'success': False, 'error': '密碼至少需要 8 個字符'}, 400)
+            
+            from auth.service import get_auth_service
+            auth_service = get_auth_service()
+            result = await auth_service.reset_password(token, new_password)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Reset password error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def reset_password_by_code(self, request):
+        """重置密碼（通過驗證碼）"""
+        try:
+            data = await request.json()
+            email = data.get('email', '')
+            code = data.get('code', '')
+            new_password = data.get('password', '')
+            
+            if not email or not code:
+                return self._json_response({'success': False, 'error': '缺少郵箱或驗證碼'}, 400)
+            
+            if not new_password or len(new_password) < 8:
+                return self._json_response({'success': False, 'error': '密碼至少需要 8 個字符'}, 400)
+            
+            from auth.service import get_auth_service
+            auth_service = get_auth_service()
+            result = await auth_service.reset_password_by_code(email, code, new_password)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Reset password by code error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
     
     # ==================== API 憑證 ====================
     

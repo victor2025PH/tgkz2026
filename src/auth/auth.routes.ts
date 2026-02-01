@@ -32,6 +32,17 @@ export const AUTH_ROUTES: Routes = [
         loadComponent: () => import('./forgot-password.component').then(m => m.ForgotPasswordComponent),
         canActivate: [guestGuard],
         title: 'Forgot Password - TG-Matrix'
+      },
+      {
+        path: 'verify-email',
+        loadComponent: () => import('./verify-email.component').then(m => m.VerifyEmailComponent),
+        title: 'Verify Email - TG-Matrix'
+      },
+      {
+        path: 'reset-password',
+        loadComponent: () => import('./reset-password.component').then(m => m.ResetPasswordComponent),
+        canActivate: [guestGuard],
+        title: 'Reset Password - TG-Matrix'
       }
     ]
   }

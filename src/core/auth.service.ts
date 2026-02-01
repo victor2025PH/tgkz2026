@@ -269,6 +269,103 @@ export class AuthService {
   }
   
   /**
+   * 請求密碼重置
+   */
+  async forgotPassword(email: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      
+      const result = await response.json();
+      return { success: result.success, error: result.error };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+  
+  /**
+   * 重置密碼
+   */
+  async resetPassword(token: string, password: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password })
+      });
+      
+      const result = await response.json();
+      return { success: result.success, error: result.error };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+  
+  /**
+   * 驗證郵箱（通過 Token）
+   */
+  async verifyEmail(token: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/verify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      
+      const result = await response.json();
+      return { success: result.success, error: result.error };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+  
+  /**
+   * 驗證郵箱（通過驗證碼）
+   */
+  async verifyEmailByCode(email: string, code: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/verify-email-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code })
+      });
+      
+      const result = await response.json();
+      return { success: result.success, error: result.error };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+  
+  /**
+   * 重新發送驗證郵件
+   */
+  async resendVerificationEmail(): Promise<{ success: boolean; error?: string }> {
+    try {
+      const token = this._accessToken();
+      if (!token) {
+        return { success: false, error: '未登入' };
+      }
+      
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/send-verification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const result = await response.json();
+      return { success: result.success, error: result.error };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+  
+  /**
    * 刷新 Token
    */
   async refreshAccessToken(): Promise<boolean> {

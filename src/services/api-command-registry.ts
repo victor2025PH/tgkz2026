@@ -85,6 +85,45 @@ export const COMMAND_REGISTRY: CommandConfig[] = [
     endpoint: '/api/v1/oauth/providers',
     responseEvents: ['oauth-providers-loaded']
   },
+  
+  // ==================== 郵箱驗證和密碼重置 ====================
+  {
+    command: 'send-verification-email',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/auth/send-verification',
+    responseEvents: ['verification-email-sent'],
+    requiresAuth: true
+  },
+  {
+    command: 'verify-email',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/auth/verify-email',
+    responseEvents: ['email-verified']
+  },
+  {
+    command: 'verify-email-code',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/auth/verify-email-code',
+    responseEvents: ['email-verified']
+  },
+  {
+    command: 'forgot-password',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/auth/forgot-password',
+    responseEvents: ['password-reset-requested']
+  },
+  {
+    command: 'reset-password',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/auth/reset-password',
+    responseEvents: ['password-reset-completed']
+  },
+  {
+    command: 'reset-password-code',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/auth/reset-password-code',
+    responseEvents: ['password-reset-completed']
+  },
   {
     command: 'update-current-user',
     httpMethod: 'PUT',

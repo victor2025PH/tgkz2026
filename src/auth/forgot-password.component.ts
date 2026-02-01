@@ -7,6 +7,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { I18nService } from '../i18n.service';
+import { AuthService } from '../core/auth.service';
 
 @Component({
   selector: 'app-forgot-password',
@@ -215,6 +216,7 @@ import { I18nService } from '../i18n.service';
 })
 export class ForgotPasswordComponent {
   private i18n = inject(I18nService);
+  private authService = inject(AuthService);
   
   email = '';
   isLoading = signal(false);
@@ -228,9 +230,13 @@ export class ForgotPasswordComponent {
     this.error.set(null);
     
     try {
-      // TODO: 調用後端 API
-      await new Promise(r => setTimeout(r, 1500));
-      this.success.set(true);
+      const result = await this.authService.forgotPassword(this.email);
+      
+      if (result.success) {
+        this.success.set(true);
+      } else {
+        this.error.set(result.error || '發送失敗');
+      }
     } catch (e: any) {
       this.error.set(e.message || '發送失敗');
     } finally {

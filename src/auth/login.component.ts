@@ -769,20 +769,40 @@ export class LoginComponent implements OnInit, OnDestroy {
   
   private async handleTelegramAuth(authData: any) {
     this.telegramLoading.set(true);
+    this.error.set(null);
+    
+    console.log('[TelegramAuth] Processing auth data:', authData);
     
     try {
-      // 發送認證數據到後端
-      const result = await this.authService.telegramLogin(authData);
+      // 🆕 P1.4: 錯誤重試機制（最多重試 3 次）
+      let result: { success: boolean; error?: string } = { success: false };
+      let retries = 0;
+      const maxRetries = 3;
+      
+      while (retries < maxRetries) {
+        try {
+          result = await this.authService.telegramLogin(authData);
+          break;  // 成功則跳出循環
+        } catch (e: any) {
+          retries++;
+          console.warn(`[TelegramAuth] Retry ${retries}/${maxRetries}:`, e.message);
+          if (retries >= maxRetries) throw e;
+          await new Promise(r => setTimeout(r, 1000 * retries));  // 遞增延遲
+        }
+      }
       
       if (result.success) {
-        // 登入成功
-        const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
-        this.router.navigateByUrl(returnUrl);
+        console.log('[TelegramAuth] Login successful, redirecting...');
+        // 🆕 登入成功，使用 window.location 強制刷新以確保狀態更新
+        const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
+        window.location.href = returnUrl;
       } else {
-        this.error.set(result.error || 'Telegram 登入失敗');
+        console.error('[TelegramAuth] Login failed:', result.error);
+        this.error.set(result.error || this.t('auth.telegramLoginFailed'));
       }
     } catch (e: any) {
-      this.error.set(e.message || 'Telegram 登入失敗');
+      console.error('[TelegramAuth] Exception:', e);
+      this.error.set(e.message || this.t('auth.telegramLoginFailed'));
     } finally {
       this.telegramLoading.set(false);
     }

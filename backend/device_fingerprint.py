@@ -28,305 +28,312 @@ class DeviceProfile:
 class DeviceFingerprintGenerator:
     """生成唯一的设备指纹"""
     
-    # iOS 设备配置库（2024-2025 最新型號）
+    # iOS 设备配置库（2025-2026 最新型號）
     IOS_DEVICES = [
-        # iPhone 15 系列（最新，高權重）
+        # iPhone 16 系列（最新，高權重）
+        DeviceProfile(
+            device_model="iPhone 16 Pro Max",
+            system_version="iOS 18.3",
+            app_version="11.5.2",
+            lang_code="en",
+            platform="ios",
+            weight=4.0
+        ),
+        DeviceProfile(
+            device_model="iPhone 16 Pro",
+            system_version="iOS 18.3",
+            app_version="11.5.2",
+            lang_code="en",
+            platform="ios",
+            weight=4.0
+        ),
+        DeviceProfile(
+            device_model="iPhone 16 Plus",
+            system_version="iOS 18.2.1",
+            app_version="11.5.1",
+            lang_code="en",
+            platform="ios",
+            weight=3.0
+        ),
+        DeviceProfile(
+            device_model="iPhone 16",
+            system_version="iOS 18.2",
+            app_version="11.5.0",
+            lang_code="en",
+            platform="ios",
+            weight=3.0
+        ),
+        # iPhone 15 系列
         DeviceProfile(
             device_model="iPhone 15 Pro Max",
-            system_version="iOS 17.4.1",
-            app_version="10.12.1",
+            system_version="iOS 18.2",
+            app_version="11.5.2",
             lang_code="en",
             platform="ios",
             weight=3.0
         ),
         DeviceProfile(
             device_model="iPhone 15 Pro",
-            system_version="iOS 17.4",
-            app_version="10.12.0",
+            system_version="iOS 18.1.1",
+            app_version="11.5.1",
             lang_code="en",
             platform="ios",
-            weight=3.0
+            weight=2.5
         ),
         DeviceProfile(
             device_model="iPhone 15 Plus",
-            system_version="iOS 17.3.1",
-            app_version="10.11.5",
+            system_version="iOS 18.1",
+            app_version="11.5.0",
             lang_code="en",
             platform="ios",
             weight=2.0
         ),
         DeviceProfile(
             device_model="iPhone 15",
-            system_version="iOS 17.3",
-            app_version="10.11.2",
+            system_version="iOS 18.0.1",
+            app_version="11.4.2",
             lang_code="en",
             platform="ios",
-            weight=2.5
+            weight=2.0
         ),
         # iPhone 14 系列
         DeviceProfile(
             device_model="iPhone 14 Pro Max",
-            system_version="iOS 17.2.1",
-            app_version="10.10.2",
-            lang_code="en",
-            platform="ios",
-            weight=2.0
-        ),
-        DeviceProfile(
-            device_model="iPhone 14 Pro",
-            system_version="iOS 17.1.2",
-            app_version="10.9.3",
-            lang_code="en",
-            platform="ios",
-            weight=2.0
-        ),
-        DeviceProfile(
-            device_model="iPhone 14",
-            system_version="iOS 17.0.3",
-            app_version="10.8.5",
+            system_version="iOS 17.7.2",
+            app_version="11.4.1",
             lang_code="en",
             platform="ios",
             weight=1.5
         ),
+        DeviceProfile(
+            device_model="iPhone 14 Pro",
+            system_version="iOS 17.7.1",
+            app_version="11.4.0",
+            lang_code="en",
+            platform="ios",
+            weight=1.5
+        ),
+        DeviceProfile(
+            device_model="iPhone 14",
+            system_version="iOS 17.7",
+            app_version="11.3.5",
+            lang_code="en",
+            platform="ios",
+            weight=1.0
+        ),
         # iPhone 13 系列
         DeviceProfile(
             device_model="iPhone 13 Pro Max",
-            system_version="iOS 16.7.5",
-            app_version="10.8.3",
+            system_version="iOS 17.7.2",
+            app_version="11.4.0",
             lang_code="en",
             platform="ios",
             weight=1.0
         ),
         DeviceProfile(
-            device_model="iPhone 13 Pro",
-            system_version="iOS 16.7.2",
-            app_version="10.7.5",
-            lang_code="en",
-            platform="ios",
-            weight=1.0
-        ),
-        DeviceProfile(
-            device_model="iPhone 13",
-            system_version="iOS 16.6.1",
-            app_version="10.6.3",
-            lang_code="en",
-            platform="ios",
-            weight=1.0
-        ),
-        # 舊型號（低權重）
-        DeviceProfile(
-            device_model="iPhone 12 Pro",
-            system_version="iOS 15.7.9",
-            app_version="10.5.2",
+            device_model="iPhone SE (3rd generation)",
+            system_version="iOS 18.2",
+            app_version="11.5.0",
             lang_code="en",
             platform="ios",
             weight=0.5
         ),
-        DeviceProfile(
-            device_model="iPhone SE (3rd generation)",
-            system_version="iOS 17.2",
-            app_version="10.10.0",
-            lang_code="en",
-            platform="ios",
-            weight=0.3
-        ),
     ]
     
-    # Android 设备配置库（2024-2025 最新型號）
+    # Android 设备配置库（2025-2026 最新型號）
     ANDROID_DEVICES = [
-        # Samsung Galaxy S24 系列（最新旗艦）
+        # Samsung Galaxy S25 系列（最新旗艦）
+        DeviceProfile(
+            device_model="Samsung Galaxy S25 Ultra",
+            system_version="Android 15",
+            app_version="11.5.2",
+            lang_code="en",
+            platform="android",
+            weight=4.0
+        ),
+        DeviceProfile(
+            device_model="Samsung Galaxy S25+",
+            system_version="Android 15",
+            app_version="11.5.2",
+            lang_code="en",
+            platform="android",
+            weight=3.5
+        ),
+        DeviceProfile(
+            device_model="Samsung Galaxy S25",
+            system_version="Android 15",
+            app_version="11.5.1",
+            lang_code="en",
+            platform="android",
+            weight=3.0
+        ),
+        # Samsung Galaxy S24 系列
         DeviceProfile(
             device_model="Samsung Galaxy S24 Ultra",
-            system_version="Android 14",
-            app_version="10.12.1",
+            system_version="Android 15",
+            app_version="11.5.2",
             lang_code="en",
             platform="android",
             weight=3.0
         ),
         DeviceProfile(
             device_model="Samsung Galaxy S24+",
-            system_version="Android 14",
-            app_version="10.12.0",
+            system_version="Android 15",
+            app_version="11.5.1",
             lang_code="en",
             platform="android",
             weight=2.5
         ),
         DeviceProfile(
             device_model="Samsung Galaxy S24",
-            system_version="Android 14",
-            app_version="10.11.5",
+            system_version="Android 15",
+            app_version="11.5.0",
+            lang_code="en",
+            platform="android",
+            weight=2.0
+        ),
+        # Google Pixel 系列
+        DeviceProfile(
+            device_model="Google Pixel 9 Pro XL",
+            system_version="Android 15",
+            app_version="11.5.2",
+            lang_code="en",
+            platform="android",
+            weight=3.0
+        ),
+        DeviceProfile(
+            device_model="Google Pixel 9 Pro",
+            system_version="Android 15",
+            app_version="11.5.2",
             lang_code="en",
             platform="android",
             weight=2.5
         ),
-        # Samsung Galaxy S23 系列
         DeviceProfile(
-            device_model="Samsung Galaxy S23 Ultra",
-            system_version="Android 14",
-            app_version="10.11.0",
+            device_model="Google Pixel 9",
+            system_version="Android 15",
+            app_version="11.5.1",
             lang_code="en",
             platform="android",
             weight=2.0
         ),
-        DeviceProfile(
-            device_model="Samsung Galaxy S23",
-            system_version="Android 14",
-            app_version="10.10.2",
-            lang_code="en",
-            platform="android",
-            weight=1.5
-        ),
-        # Google Pixel 系列
         DeviceProfile(
             device_model="Google Pixel 8 Pro",
-            system_version="Android 14",
-            app_version="10.12.1",
-            lang_code="en",
-            platform="android",
-            weight=2.0
-        ),
-        DeviceProfile(
-            device_model="Google Pixel 8",
-            system_version="Android 14",
-            app_version="10.11.5",
+            system_version="Android 15",
+            app_version="11.5.0",
             lang_code="en",
             platform="android",
             weight=1.5
-        ),
-        DeviceProfile(
-            device_model="Google Pixel 7 Pro",
-            system_version="Android 14",
-            app_version="10.10.0",
-            lang_code="en",
-            platform="android",
-            weight=1.0
         ),
         # Xiaomi 系列
         DeviceProfile(
-            device_model="Xiaomi 14 Pro",
-            system_version="Android 14 MIUI 15",
-            app_version="10.11.5",
+            device_model="Xiaomi 15 Pro",
+            system_version="Android 15 HyperOS 2",
+            app_version="11.5.2",
+            lang_code="zh",
+            platform="android",
+            weight=2.5
+        ),
+        DeviceProfile(
+            device_model="Xiaomi 15",
+            system_version="Android 15 HyperOS 2",
+            app_version="11.5.1",
             lang_code="zh",
             platform="android",
             weight=2.0
         ),
         DeviceProfile(
-            device_model="Xiaomi 14",
-            system_version="Android 14 MIUI 15",
-            app_version="10.10.2",
+            device_model="Xiaomi 14 Pro",
+            system_version="Android 14 HyperOS",
+            app_version="11.4.2",
             lang_code="zh",
             platform="android",
             weight=1.5
-        ),
-        DeviceProfile(
-            device_model="Xiaomi 13 Pro",
-            system_version="Android 13 MIUI 14",
-            app_version="10.8.3",
-            lang_code="zh",
-            platform="android",
-            weight=1.0
         ),
         # OnePlus 系列
         DeviceProfile(
+            device_model="OnePlus 13",
+            system_version="Android 15 OxygenOS 15",
+            app_version="11.5.2",
+            lang_code="en",
+            platform="android",
+            weight=2.0
+        ),
+        DeviceProfile(
             device_model="OnePlus 12",
-            system_version="Android 14 OxygenOS 14",
-            app_version="10.11.5",
+            system_version="Android 15 OxygenOS 15",
+            app_version="11.5.0",
             lang_code="en",
             platform="android",
             weight=1.5
-        ),
-        DeviceProfile(
-            device_model="OnePlus 11",
-            system_version="Android 14 OxygenOS 14",
-            app_version="10.9.2",
-            lang_code="en",
-            platform="android",
-            weight=1.0
         ),
         # OPPO 系列
         DeviceProfile(
-            device_model="OPPO Find X7 Ultra",
-            system_version="Android 14 ColorOS 14",
-            app_version="10.11.0",
+            device_model="OPPO Find X8 Pro",
+            system_version="Android 15 ColorOS 15",
+            app_version="11.5.1",
             lang_code="zh",
             platform="android",
             weight=1.5
         ),
-        DeviceProfile(
-            device_model="OPPO Find X6 Pro",
-            system_version="Android 13 ColorOS 13",
-            app_version="10.8.5",
-            lang_code="zh",
-            platform="android",
-            weight=1.0
-        ),
         # Vivo 系列
         DeviceProfile(
-            device_model="Vivo X100 Pro",
-            system_version="Android 14 OriginOS 4",
-            app_version="10.11.2",
+            device_model="Vivo X200 Pro",
+            system_version="Android 15 OriginOS 5",
+            app_version="11.5.1",
             lang_code="zh",
             platform="android",
-            weight=1.0
+            weight=1.5
         ),
         # Honor 系列
         DeviceProfile(
-            device_model="Honor Magic6 Pro",
-            system_version="Android 14 MagicOS 8",
-            app_version="10.10.5",
+            device_model="Honor Magic7 Pro",
+            system_version="Android 15 MagicOS 9",
+            app_version="11.5.0",
             lang_code="zh",
             platform="android",
-            weight=1.0
-        ),
-        # 華為（鴻蒙模擬 Android）
-        DeviceProfile(
-            device_model="Huawei Mate 60 Pro",
-            system_version="Android 12",
-            app_version="10.8.0",
-            lang_code="zh",
-            platform="android",
-            weight=0.8
+            weight=1.5
         ),
     ]
     
-    # 桌面設備配置庫
+    # 桌面設備配置庫（2025-2026 最新）
     DESKTOP_DEVICES = [
         DeviceProfile(
             device_model="Desktop",
             system_version="Windows 11",
-            app_version="4.16.1",
+            app_version="5.10.2",
+            lang_code="en",
+            platform="desktop",
+            weight=1.5
+        ),
+        DeviceProfile(
+            device_model="Desktop",
+            system_version="Windows 10",
+            app_version="5.10.1",
             lang_code="en",
             platform="desktop",
             weight=1.0
         ),
         DeviceProfile(
             device_model="Desktop",
-            system_version="Windows 10",
-            app_version="4.15.2",
+            system_version="macOS 15.2",
+            app_version="11.5.2",
             lang_code="en",
             platform="desktop",
             weight=0.8
         ),
         DeviceProfile(
             device_model="Desktop",
-            system_version="macOS 14.4",
-            app_version="10.6.2",
+            system_version="macOS 14.7",
+            app_version="11.5.0",
             lang_code="en",
             platform="desktop",
-            weight=0.6
+            weight=0.5
         ),
         DeviceProfile(
             device_model="Desktop",
-            system_version="macOS 13.6",
-            app_version="10.5.5",
-            lang_code="en",
-            platform="desktop",
-            weight=0.4
-        ),
-        DeviceProfile(
-            device_model="Desktop",
-            system_version="Ubuntu 22.04 LTS",
-            app_version="4.16.1",
+            system_version="Ubuntu 24.04 LTS",
+            app_version="5.10.2",
             lang_code="en",
             platform="desktop",
             weight=0.2

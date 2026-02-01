@@ -26022,16 +26022,77 @@ class BackendService:
                 "total": 0
             })
             
-            # 提取成員 - 🔧 修復：傳遞 online_status 參數
-            result = await member_extraction_service.extract_members(
-                chat_id=chat_id,
-                phone=phone,
-                limit=limit,
-                filter_bots=filter_bots,
-                filter_offline=filter_offline,
-                online_status=online_status,  # 🔧 添加在線狀態過濾
-                save_to_db=True
-            )
+            # 🆕 P0 修復：智能重試機制
+            MAX_RETRIES = 3
+            RETRY_DELAYS = [3, 5, 8]  # 每次重試的延遲秒數
+            result = None
+            last_error = None
+            
+            for attempt in range(MAX_RETRIES):
+                try:
+                    if attempt > 0:
+                        # 重試前發送進度通知
+                        self.send_event("members-extraction-progress", {
+                            "resourceId": resource_id,
+                            "status": "retrying",
+                            "message": f"正在重試 ({attempt + 1}/{MAX_RETRIES})...",
+                            "extracted": 0,
+                            "total": 0
+                        })
+                        self.send_log(f"🔄 群組同步中，{RETRY_DELAYS[attempt-1]} 秒後重試 (第 {attempt + 1} 次)...", "info")
+                        await asyncio.sleep(RETRY_DELAYS[attempt-1])
+                    
+                    # 提取成員 - 🔧 修復：傳遞 online_status 參數
+                    result = await member_extraction_service.extract_members(
+                        chat_id=chat_id,
+                        phone=phone,
+                        limit=limit,
+                        filter_bots=filter_bots,
+                        filter_offline=filter_offline,
+                        online_status=online_status,  # 🔧 添加在線狀態過濾
+                        save_to_db=True
+                    )
+                    
+                    # 檢查是否需要重試的錯誤
+                    if result.get('success'):
+                        break  # 成功，跳出重試循環
+                    
+                    error_code = result.get('error_code', '')
+                    if error_code in ['PEER_ID_INVALID', 'NOT_PARTICIPANT', 'USER_NOT_PARTICIPANT']:
+                        last_error = result.get('error')
+                        print(f"[Backend] Retryable error: {error_code}, attempt {attempt + 1}/{MAX_RETRIES}", file=sys.stderr)
+                        
+                        if attempt < MAX_RETRIES - 1:
+                            # 還有重試機會，繼續循環
+                            continue
+                        else:
+                            # 最後一次重試也失敗
+                            result['error'] = f"群組同步未完成。{result.get('error', '')}"
+                            result['error_details'] = {
+                                'reason': '帳號剛加入群組，Telegram 服務器尚未同步完成',
+                                'suggestion': '請等待 30 秒後再試，或重新加入群組',
+                                'attempts': attempt + 1,
+                                'can_auto_join': False
+                            }
+                            break
+                    else:
+                        # 其他錯誤不重試
+                        break
+                        
+                except Exception as retry_err:
+                    last_error = str(retry_err)
+                    print(f"[Backend] Extraction attempt {attempt + 1} failed: {retry_err}", file=sys.stderr)
+                    if attempt >= MAX_RETRIES - 1:
+                        raise
+            
+            # 如果所有重試都失敗且沒有結果
+            if result is None:
+                result = {
+                    'success': False,
+                    'error': last_error or '提取失敗',
+                    'members': [],
+                    'extracted': 0
+                }
             
             if result['success']:
                 members = result.get('members', [])

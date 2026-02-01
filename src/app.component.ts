@@ -25,6 +25,8 @@ import { PaymentComponent } from './payment.component';
 import { SecurityService } from './security.service';
 import { GlobalErrorHandler } from './services/error-handler.service';
 import { LoadingService } from './loading.service';
+import { OfflineCacheService } from './services/offline-cache.service';
+import { SwManagerService } from './services/sw-manager.service';
 // LoadingOverlayComponent removed - using non-blocking connection indicator instead
 import { OnboardingComponent } from './onboarding.component';
 // BackupService 從 ./services 統一導入
@@ -319,6 +321,8 @@ export class AppComponent implements OnDestroy, OnInit {
   translationService = inject(TranslationService);
   accountLoaderService = inject(AccountLoaderService);
   ipcService = inject(ElectronIpcService);
+  offlineCache = inject(OfflineCacheService); // 🆕 P2: 離線緩存服務
+  swManager = inject(SwManagerService); // 🆕 P3: Service Worker 管理
   toastService = inject(ToastService);
   membershipService = inject(MembershipService);
   securityService = inject(SecurityService);
@@ -3377,7 +3381,7 @@ export class AppComponent implements OnDestroy, OnInit {
   handleMemberExtractionError(data: { 
     error?: string, 
     error_code?: string, 
-    error_details?: { reason?: string, suggestion?: string, can_auto_join?: boolean, alternative?: string }
+    error_details?: { reason?: string, suggestion?: string, can_auto_join?: boolean, alternative?: string, attempts?: number }
   }) {
     const errorCode = data.error_code || 'UNKNOWN';
     const details = data.error_details || {};
@@ -3390,13 +3394,27 @@ export class AppComponent implements OnDestroy, OnInit {
       case 'PEER_ID_INVALID':
       case 'NOT_PARTICIPANT':
       case 'CHANNEL_PRIVATE':
-        // 需要先加入群組
-        this.showExtractionErrorWithAction(
-          '⚠️ 無法提取成員',
-          details.reason || '帳號尚未加入此群組',
-          details.suggestion || '請先加入群組再嘗試提取',
-          details.can_auto_join ? 'join' : undefined
-        );
+        // 🆕 P0 修復：區分是否已重試過
+        const attempts = details.attempts || 0;
+        const hasRetried = attempts > 1;
+        
+        if (hasRetried) {
+          // 已重試多次仍失敗，可能是 Telegram 同步問題
+          this.showExtractionErrorWithAction(
+            '⚠️ 群組同步未完成',
+            details.reason || `已嘗試 ${attempts} 次，Telegram 服務器尚未同步`,
+            details.suggestion || '請等待 30 秒後再試，或重新加入群組',
+            undefined  // 不提供自動加入，因為可能已經加入了
+          );
+        } else {
+          // 首次失敗，需要先加入群組
+          this.showExtractionErrorWithAction(
+            '⚠️ 無法提取成員',
+            details.reason || '帳號尚未加入此群組',
+            details.suggestion || '請先加入群組再嘗試提取',
+            details.can_auto_join ? 'join' : undefined
+          );
+        }
         break;
         
       case 'ADMIN_REQUIRED':
@@ -6106,6 +6124,20 @@ export class AppComponent implements OnDestroy, OnInit {
     this.connectionStartTime = Date.now();
     this.startConnectionTimeout();
     
+    // 🆕 P2 優化：嘗試載入緩存狀態（快速啟動）
+    this.loadCachedStateIfAvailable();
+    
+    // 🆕 P2-3: 監聽頁面可見性變更
+    window.addEventListener('page-became-visible', () => {
+      console.log('[App] Page became visible, refreshing data...');
+      this.ipcService.send('get-initial-state');
+    });
+    
+    // 🆕 P2-4: 監聽離線操作同步
+    window.addEventListener('sync-offline-operations', ((event: CustomEvent) => {
+      this.syncOfflineOperations(event.detail.operations);
+    }) as EventListener);
+    
     // 路由調試
     console.log('[App] Current URL:', window.location.href);
     
@@ -6503,7 +6535,62 @@ export class AppComponent implements OnDestroy, OnInit {
     }, 2000);
   }
   
-  // 🆕 P0 優化：重試連接
+  // 🆕 P2-1: 載入緩存狀態（快速啟動）
+  private async loadCachedStateIfAvailable(): Promise<void> {
+    try {
+      const cached = await this.offlineCache.loadCachedState();
+      if (cached && this.offlineCache.isCacheValid()) {
+        console.log('[App] 🚀 Loading cached state for fast startup');
+        
+        // 應用緩存數據（不觸發連接確認）
+        if (cached.accounts?.length > 0) {
+          this.accounts.set(cached.accounts);
+        }
+        if (cached.keywordSets?.length > 0) {
+          this.keywordSets.set(cached.keywordSets);
+        }
+        if (cached.leads?.length > 0) {
+          this.leads.set(cached.leads.map((l: any) => this.mapLeadFromBackend(l)));
+        }
+        if (cached.settings) {
+          this.spintaxEnabled.set(cached.settings.spintaxEnabled ?? true);
+        }
+        
+        console.log('[App] ✅ Cached state applied, waiting for fresh data...');
+      }
+    } catch (error) {
+      console.warn('[App] Failed to load cached state:', error);
+    }
+  }
+  
+  // 🆕 P2-4: 同步離線操作
+  private async syncOfflineOperations(operations: any[]): Promise<void> {
+    if (!this.offlineCache.isOnline()) {
+      console.log('[App] Still offline, skipping sync');
+      return;
+    }
+    
+    console.log('[App] 🔄 Syncing', operations.length, 'offline operations');
+    
+    for (const op of operations) {
+      try {
+        // 重新發送操作
+        this.ipcService.send(op.command, op.payload);
+        
+        // 標記為已完成
+        await this.offlineCache.removeOperation(op.id);
+        console.log('[App] ✅ Synced operation:', op.command);
+      } catch (error) {
+        console.error('[App] Failed to sync operation:', op.command, error);
+      }
+    }
+    
+    if (operations.length > 0) {
+      this.toastService.success(`✅ 已同步 ${operations.length} 個離線操作`);
+    }
+  }
+  
+  // 🆕 P2 優化：重試連接
   retryConnection(): void {
     this.backendConnectionState.set('connecting');
     this.backendConnectionMessage.set('正在重新連接...');
@@ -6528,13 +6615,26 @@ export class AppComponent implements OnDestroy, OnInit {
       this.hideConnectionIndicator();
     });
     
-    // 🆕 P0 優化：監聽連接錯誤事件
+    // 🆕 P0 優化：監聯連接錯誤事件
     this.ipcService.on('connection-error', (data: { error: string; message: string }) => {
       console.log('[Frontend] ❌ Connection error:', data);
       // 只有在連接中狀態才更新為錯誤
       if (this.backendConnectionState() === 'connecting') {
         this.backendConnectionState.set('error');
         this.backendConnectionMessage.set(data.message || '連接失敗');
+      }
+    });
+    
+    // 🆕 P1 優化：監聽連接模式變更（WebSocket ↔ HTTP 輪詢）
+    this.ipcService.on('connection-mode-changed', (data: { mode: 'websocket' | 'polling' }) => {
+      console.log('[Frontend] Connection mode changed:', data.mode);
+      if (data.mode === 'polling') {
+        // 降級模式：顯示黃色指示但不阻擋操作
+        // 保持 connected 狀態，因為 HTTP 仍然可用
+        console.log('[Frontend] ⚠️ Running in degraded mode (HTTP polling)');
+      } else if (data.mode === 'websocket') {
+        // WebSocket 恢復
+        console.log('[Frontend] ✅ WebSocket connection restored');
       }
     });
     
@@ -9050,7 +9150,7 @@ export class AppComponent implements OnDestroy, OnInit {
       total?: number, 
       error?: string,
       error_code?: string,
-      error_details?: { reason?: string, suggestion?: string, can_auto_join?: boolean, alternative?: string }
+      error_details?: { reason?: string, suggestion?: string, can_auto_join?: boolean, alternative?: string, attempts?: number }
     }) => {
       this.memberListLoading.set(false);
       if (data.success && data.members) {
@@ -9436,6 +9536,16 @@ export class AppComponent implements OnDestroy, OnInit {
             this.autoReplyMessage.set(state.settings.autoReplyMessage || "Thanks for getting back to me! I'll read your message and respond shortly.");
             this.smartSendingEnabled.set(state.settings.smartSendingEnabled ?? true);
         }
+        
+        // 🆕 P2-1: 緩存狀態到 IndexedDB（用於快速啟動）
+        this.offlineCache.cacheState({
+          accounts: state.accounts || [],
+          keywordSets: state.keywordSets || [],
+          monitoredGroups: state.monitoredGroups || [],
+          campaigns: state.campaigns || [],
+          leads: state.leads || [],
+          settings: state.settings || {}
+        });
   }
 
   // --- View & Language ---

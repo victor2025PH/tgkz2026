@@ -148,11 +148,21 @@ export class UnifiedExtractionService {
     // 監聽提取進度
     this.ipc.on('members-extraction-progress', (data: any) => {
       if (data) {
+        // 🆕 P0 修復：處理重試狀態
+        let statusText = data.status || '提取中...';
+        if (data.status === 'retrying') {
+          statusText = data.message || '正在同步群組狀態...';
+        } else if (data.status === 'starting') {
+          statusText = '正在連接群組...';
+        } else if (data.status === 'completed') {
+          statusText = '提取完成';
+        }
+        
         const progress: ExtractionProgress = {
           groupId: String(data.resourceId || data.groupId),
           current: data.extracted || 0,
           total: data.total || 0,
-          status: data.status || '提取中...',
+          status: statusText,
           percent: data.total > 0 ? Math.round((data.extracted / data.total) * 100) : 0
         };
         this._progress.set(progress);

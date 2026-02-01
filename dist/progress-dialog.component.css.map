@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["angular:styles/component:css;b3193f51e1f3d95e231e60caf2fe1666c69761008fe295527c08271c1d14114a;D:/tgkz2026/src/progress-dialog.component.ts"],
-  "sourcesContent": ["\n    .transition-all {\n      transition-property: all;\n      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n      transition-duration: 300ms;\n    }\n  "],
-  "mappings": ";AACI,CAAC;AACC,uBAAqB;AACrB,8BAA4B,aAAa,GAAG,EAAE,CAAC,EAAE,GAAG,EAAE;AACtD,uBAAqB;AACvB;",
-  "names": []
-}

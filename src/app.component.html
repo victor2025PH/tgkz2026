@@ -2018,7 +2018,7 @@
   </div>
 } @else {
   <!-- 未認證用戶：顯示路由內容（登入頁面等） -->
-  <div class="auth-container min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+  <div class="auth-wrapper" style="min-height: 100vh; background: linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a);">
     <router-outlet></router-outlet>
   </div>
 } <!-- 結束 @if (isAuthenticated()) -->

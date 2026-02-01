@@ -159,6 +159,15 @@ class HttpApiServer:
         self.app.router.add_post('/api/v1/oauth/telegram/bind', self.bind_telegram)
         self.app.router.add_delete('/api/v1/oauth/telegram/unbind', self.unbind_telegram)
         
+        # 🆕 Deep Link / QR Code 登入
+        self.app.router.add_post('/api/v1/auth/login-token', self.create_login_token)
+        self.app.router.add_get('/api/v1/auth/login-token/{token}', self.check_login_token)
+        self.app.router.add_post('/api/v1/auth/login-token/{token}/confirm', self.confirm_login_token)
+        
+        # 🆕 Telegram Bot Webhook
+        self.app.router.add_post('/webhook/telegram', self.telegram_webhook)
+        self.app.router.add_post('/webhook/telegram/{token}', self.telegram_webhook)
+        
         # 郵箱驗證和密碼重置
         self.app.router.add_post('/api/v1/auth/send-verification', self.send_verification_email)
         self.app.router.add_post('/api/v1/auth/verify-email', self.verify_email)
@@ -905,6 +914,239 @@ class HttpApiServer:
                 'enabled': bool(bot_username and bot_token and bot_id)
             }
         })
+    
+    # ==================== Deep Link / QR Code 登入 ====================
+    
+    async def create_login_token(self, request):
+        """
+        創建 Deep Link 登入 Token
+        
+        用戶點擊「打開 Telegram 登入」時調用
+        返回 Token 和 Deep Link URL
+        """
+        try:
+            from auth.login_token import get_login_token_service, LoginTokenType
+            import os
+            
+            service = get_login_token_service()
+            
+            # 獲取客戶端信息
+            ip_address = request.headers.get('X-Forwarded-For', request.remote)
+            user_agent = request.headers.get('User-Agent', '')
+            
+            # 請求體（可選）
+            try:
+                body = await request.json()
+            except:
+                body = {}
+            
+            token_type = body.get('type', 'deep_link')
+            
+            # 生成 Token
+            login_token = service.generate_token(
+                token_type=LoginTokenType(token_type),
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+            
+            # 構建 Deep Link URL
+            bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', 'TGSmartKingBot')
+            deep_link_url = f"https://t.me/{bot_username}?start=login_{login_token.token}"
+            
+            # 構建 QR Code 數據（Phase 2 用）
+            # qr_data = deep_link_url
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'token': login_token.token,
+                    'token_id': login_token.id,
+                    'deep_link_url': deep_link_url,
+                    'bot_username': bot_username,
+                    'expires_in': 300,  # 5 分鐘
+                    'expires_at': login_token.expires_at.isoformat()
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Create login token error: {e}")
+            import traceback
+            traceback.print_exc()
+            return self._json_response({
+                'success': False,
+                'error': str(e)
+            }, 500)
+    
+    async def check_login_token(self, request):
+        """
+        檢查 Deep Link 登入 Token 狀態
+        
+        前端輪詢此接口，等待用戶在 Telegram 確認登入
+        """
+        try:
+            from auth.login_token import get_login_token_service
+            from auth.service import get_auth_service
+            
+            token = request.match_info['token']
+            service = get_login_token_service()
+            
+            status, user_data = service.check_token_status(token)
+            
+            if status == 'not_found':
+                return self._json_response({
+                    'success': False,
+                    'error': 'Token 不存在'
+                }, 404)
+            
+            if status == 'expired':
+                return self._json_response({
+                    'success': True,
+                    'data': {'status': 'expired'}
+                })
+            
+            if status == 'confirmed' and user_data:
+                # Token 已確認，生成 JWT
+                auth_service = get_auth_service()
+                
+                # 查找或創建用戶（get_user_by_telegram_id 是 async）
+                user = await auth_service.get_user_by_telegram_id(user_data['telegram_id'])
+                
+                if not user:
+                    # 自動創建新用戶（create_user_from_telegram 是同步方法）
+                    user = auth_service.create_user_from_telegram(
+                        telegram_id=user_data['telegram_id'],
+                        username=user_data.get('telegram_username'),
+                        first_name=user_data.get('telegram_first_name', 'Telegram User')
+                    )
+                
+                if not user:
+                    return self._json_response({
+                        'success': False,
+                        'error': '無法創建用戶'
+                    }, 500)
+                
+                # 生成 JWT Token
+                access_token = auth_service.generate_jwt_token(user.id, user.role)
+                refresh_token = auth_service.generate_refresh_token(user.id)
+                
+                return self._json_response({
+                    'success': True,
+                    'data': {
+                        'status': 'confirmed',
+                        'access_token': access_token,
+                        'refresh_token': refresh_token,
+                        'user': {
+                            'id': user.id,
+                            'username': user.username,
+                            'display_name': user.display_name or user.username,
+                            'email': user.email,
+                            'avatar_url': user.avatar_url,
+                            'subscription_tier': user.subscription_tier,
+                            'role': user.role
+                        }
+                    }
+                })
+            
+            # 其他狀態（pending, scanned）
+            return self._json_response({
+                'success': True,
+                'data': {'status': status}
+            })
+            
+        except Exception as e:
+            logger.error(f"Check login token error: {e}")
+            import traceback
+            traceback.print_exc()
+            return self._json_response({
+                'success': False,
+                'error': str(e)
+            }, 500)
+    
+    async def confirm_login_token(self, request):
+        """
+        確認 Deep Link 登入 Token（Bot 調用）
+        
+        用戶在 Telegram 點擊確認後，Bot 調用此接口確認登入
+        """
+        try:
+            from auth.login_token import get_login_token_service
+            import os
+            
+            token = request.match_info['token']
+            
+            # 驗證 Bot 密鑰（安全檢查）
+            body = await request.json()
+            bot_secret = body.get('bot_secret', '')
+            expected_secret = os.environ.get('TELEGRAM_BOT_TOKEN', '').split(':')[-1][:16]
+            
+            if bot_secret != expected_secret:
+                return self._json_response({
+                    'success': False,
+                    'error': '無效的 Bot 密鑰'
+                }, 403)
+            
+            # 獲取 Telegram 用戶信息
+            telegram_id = str(body.get('telegram_id', ''))
+            telegram_username = body.get('telegram_username', '')
+            telegram_first_name = body.get('telegram_first_name', '')
+            
+            if not telegram_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '缺少 Telegram 用戶信息'
+                }, 400)
+            
+            # 確認 Token
+            service = get_login_token_service()
+            success, error = service.confirm_token(
+                token=token,
+                telegram_id=telegram_id,
+                telegram_username=telegram_username,
+                telegram_first_name=telegram_first_name
+            )
+            
+            if not success:
+                return self._json_response({
+                    'success': False,
+                    'error': error
+                }, 400)
+            
+            return self._json_response({
+                'success': True,
+                'message': '登入已確認'
+            })
+            
+        except Exception as e:
+            logger.error(f"Confirm login token error: {e}")
+            import traceback
+            traceback.print_exc()
+            return self._json_response({
+                'success': False,
+                'error': str(e)
+            }, 500)
+    
+    async def telegram_webhook(self, request):
+        """
+        處理 Telegram Bot Webhook 回調
+        
+        接收來自 Telegram 的消息更新
+        """
+        try:
+            from telegram.bot_handler import get_bot_handler
+            
+            update = await request.json()
+            handler = get_bot_handler()
+            await handler.handle_update(update)
+            
+            return self._json_response({'ok': True})
+            
+        except Exception as e:
+            logger.error(f"Telegram webhook error: {e}")
+            import traceback
+            traceback.print_exc()
+            return self._json_response({'ok': False, 'error': str(e)}, 500)
+    
+    # ==================== OAuth 授權重定向 ====================
     
     async def oauth_telegram_authorize(self, request):
         """Telegram OAuth 授權重定向"""

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["angular:styles/component:css;58953c077898953e950de05ea17f579682d6f7973167aed8e933293d6dcd6086;D:/tgkz2026/src/queue-progress.component.ts"],
+  "sourcesContent": ["\n    .custom-scrollbar::-webkit-scrollbar {\n      width: 6px;\n    }\n    .custom-scrollbar::-webkit-scrollbar-track {\n      background: transparent;\n    }\n    .custom-scrollbar::-webkit-scrollbar-thumb {\n      background: rgba(148, 163, 184, 0.2);\n      border-radius: 3px;\n    }\n  "],
+  "mappings": ";AACI,CAAC,gBAAgB;AACf,SAAO;AACT;AACA,CAHC,gBAGgB;AACf,cAAY;AACd;AACA,CANC,gBAMgB;AACf,cAAY,KAAK,GAAG,EAAE,GAAG,EAAE,GAAG,EAAE;AAChC,iBAAe;AACjB;",
+  "names": []
+}

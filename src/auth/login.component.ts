@@ -125,19 +125,48 @@ import { FrontendSecurityService } from '../services/security.service';
         <span>{{ t('auth.or') }}</span>
       </div>
       
-      <!-- 第三方登入 - Telegram OAuth -->
+      <!-- 🆕 多種 Telegram 登入方式 -->
       <div class="social-login">
+        <!-- Deep Link 登入（推薦） -->
         <button 
-          class="social-btn telegram full-width" 
+          class="social-btn telegram full-width primary-telegram" 
+          (click)="openDeepLink()"
+          [disabled]="telegramLoading()"
+        >
+          @if (deepLinkLoading()) {
+            <span class="loading-spinner small"></span>
+            <span>等待確認中...</span>
+          } @else {
+            <span class="social-icon">📱</span>
+            <span>打開 Telegram App 登入</span>
+          }
+        </button>
+        
+        <!-- 倒計時和狀態提示 -->
+        @if (deepLinkLoading()) {
+          <div class="deep-link-status">
+            <div class="status-text">
+              請在 Telegram 中點擊「確認登入」按鈕
+            </div>
+            <div class="countdown">
+              剩餘時間: {{ deepLinkCountdown() }}s
+            </div>
+            <button class="cancel-btn" (click)="cancelDeepLink()">取消</button>
+          </div>
+        }
+        
+        <!-- Widget 登入（備用） -->
+        <button 
+          class="social-btn telegram full-width secondary-telegram" 
           (click)="initTelegramWidget()"
           [disabled]="telegramLoading()"
         >
-          @if (telegramLoading()) {
+          @if (telegramLoading() && !deepLinkLoading()) {
             <span class="loading-spinner small"></span>
             <span>{{ t('auth.loadingTelegram') }}</span>
           } @else {
-            <span class="social-icon">✈️</span>
-            <span>{{ t('auth.loginWithTelegram') }}</span>
+            <span class="social-icon">💬</span>
+            <span>使用 Telegram Widget 登入</span>
           }
         </button>
       </div>
@@ -418,6 +447,77 @@ import { FrontendSecurityService } from '../services/security.service';
       background: linear-gradient(135deg, #0099dd, #0088cc);
     }
     
+    /* 🆕 Deep Link 主按鈕 */
+    .social-btn.primary-telegram {
+      background: linear-gradient(135deg, #0088cc, #0066aa);
+      border-color: #0088cc;
+      font-weight: 600;
+    }
+    
+    .social-btn.primary-telegram:hover {
+      background: linear-gradient(135deg, #0099dd, #0077bb);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 136, 204, 0.3);
+    }
+    
+    /* 🆕 Widget 備用按鈕 */
+    .social-btn.secondary-telegram {
+      background: transparent;
+      border: 1px solid #0088cc;
+      color: #0088cc;
+    }
+    
+    .social-btn.secondary-telegram:hover {
+      background: rgba(0, 136, 204, 0.1);
+    }
+    
+    /* 🆕 Deep Link 狀態提示 */
+    .deep-link-status {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem;
+      background: rgba(0, 136, 204, 0.1);
+      border: 1px solid rgba(0, 136, 204, 0.3);
+      border-radius: 8px;
+      margin: 0.75rem 0;
+    }
+    
+    .deep-link-status .status-text {
+      color: #0088cc;
+      font-size: 0.875rem;
+      text-align: center;
+    }
+    
+    .deep-link-status .countdown {
+      font-size: 0.75rem;
+      color: var(--text-secondary, #888);
+    }
+    
+    .deep-link-status .cancel-btn {
+      padding: 0.375rem 1rem;
+      background: transparent;
+      border: 1px solid #888;
+      border-radius: 4px;
+      color: #888;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .deep-link-status .cancel-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: #fff;
+      color: #fff;
+    }
+    
+    .social-login {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
     /* 🆕 Telegram Widget 容器樣式 */
     .telegram-widget-container {
       display: flex;
@@ -479,6 +579,13 @@ export class LoginComponent implements OnInit, OnDestroy {
   telegramWidgetReady = signal(false);  // 🆕 Widget 是否已載入
   error = signal<string | null>(null);
   
+  // 🆕 Deep Link 登入狀態
+  deepLinkLoading = signal(false);
+  deepLinkCountdown = signal(300);  // 5 分鐘倒計時
+  private deepLinkToken = '';
+  private deepLinkPollInterval: any = null;
+  private deepLinkCountdownInterval: any = null;
+  
   // P1.5: 安全增強 - 登入限制
   isLocked = computed(() => this.security.isLocked());
   lockoutRemaining = computed(() => this.security.lockoutRemaining());
@@ -497,6 +604,8 @@ export class LoginComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     // 清理倒計時
     this.lockoutCleanup?.();
+    // 清理 Deep Link 輪詢
+    this.cancelDeepLink();
   }
   
   private checkLoginLimit() {
@@ -675,6 +784,141 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.isLoading.set(false);
     }
   }
+  
+  // ==================== 🆕 Deep Link 登入 ====================
+  
+  /**
+   * 打開 Telegram Deep Link 登入
+   * 流程：生成 Token → 打開 Telegram App → 用戶確認 → 輪詢結果
+   */
+  async openDeepLink() {
+    this.error.set(null);
+    this.deepLinkLoading.set(true);
+    this.telegramLoading.set(true);
+    
+    try {
+      // 1. 調用 API 生成登入 Token
+      const response = await fetch('/api/v1/auth/login-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'deep_link' })
+      });
+      
+      const result = await response.json();
+      
+      if (!result.success || !result.data) {
+        this.error.set(result.error || '無法生成登入連結');
+        this.deepLinkLoading.set(false);
+        this.telegramLoading.set(false);
+        return;
+      }
+      
+      const { token, deep_link_url, expires_in } = result.data;
+      this.deepLinkToken = token;
+      this.deepLinkCountdown.set(expires_in || 300);
+      
+      // 2. 打開 Telegram Deep Link
+      console.log('[DeepLink] Opening:', deep_link_url);
+      window.open(deep_link_url, '_blank');
+      
+      // 3. 開始倒計時
+      this.deepLinkCountdownInterval = setInterval(() => {
+        const current = this.deepLinkCountdown();
+        if (current <= 0) {
+          this.cancelDeepLink();
+          this.error.set('登入超時，請重試');
+        } else {
+          this.deepLinkCountdown.set(current - 1);
+        }
+      }, 1000);
+      
+      // 4. 開始輪詢登入狀態
+      this.startPollingLoginStatus();
+      
+    } catch (e: any) {
+      console.error('[DeepLink] Error:', e);
+      this.error.set(e.message || '登入失敗');
+      this.deepLinkLoading.set(false);
+      this.telegramLoading.set(false);
+    }
+  }
+  
+  /**
+   * 取消 Deep Link 登入
+   */
+  cancelDeepLink() {
+    if (this.deepLinkPollInterval) {
+      clearInterval(this.deepLinkPollInterval);
+      this.deepLinkPollInterval = null;
+    }
+    if (this.deepLinkCountdownInterval) {
+      clearInterval(this.deepLinkCountdownInterval);
+      this.deepLinkCountdownInterval = null;
+    }
+    this.deepLinkLoading.set(false);
+    this.telegramLoading.set(false);
+    this.deepLinkToken = '';
+  }
+  
+  /**
+   * 輪詢登入狀態
+   */
+  private startPollingLoginStatus() {
+    if (this.deepLinkPollInterval) {
+      clearInterval(this.deepLinkPollInterval);
+    }
+    
+    const pollStatus = async () => {
+      if (!this.deepLinkToken) return;
+      
+      try {
+        const response = await fetch(`/api/v1/auth/login-token/${this.deepLinkToken}`);
+        const result = await response.json();
+        
+        if (!result.success) {
+          console.warn('[DeepLink] Poll error:', result.error);
+          return;
+        }
+        
+        const { status, access_token, refresh_token, user } = result.data || {};
+        
+        if (status === 'confirmed' && access_token) {
+          // 登入成功！
+          console.log('[DeepLink] Login confirmed!');
+          this.cancelDeepLink();
+          
+          // 保存 Token
+          localStorage.setItem('tgm_access_token', access_token);
+          if (refresh_token) {
+            localStorage.setItem('tgm_refresh_token', refresh_token);
+          }
+          if (user) {
+            localStorage.setItem('tgm_user', JSON.stringify(user));
+          }
+          
+          // 跳轉到目標頁面
+          const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
+          window.location.href = returnUrl;
+          
+        } else if (status === 'expired') {
+          this.cancelDeepLink();
+          this.error.set('登入連結已過期，請重試');
+        }
+        // pending 狀態繼續輪詢
+        
+      } catch (e) {
+        console.error('[DeepLink] Poll error:', e);
+      }
+    };
+    
+    // 立即執行一次
+    pollStatus();
+    
+    // 每 2 秒輪詢一次
+    this.deepLinkPollInterval = setInterval(pollStatus, 2000);
+  }
+  
+  // ==================== Telegram Widget 登入 ====================
   
   /**
    * 🆕 初始化嵌入式 Telegram Login Widget

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["angular:styles/component:css;c63aac4e1d1ce1074d0fb61b93c3d082a38ddfc40b5cc09fdd9a596f2e08e21b;D:/tgkz2026/src/analytics/smart-analytics.component.ts"],
+  "sourcesContent": ["\n    :host {\n      display: block;\n      height: 100%;\n    }\n  "],
+  "mappings": ";AACI;AACE,WAAS;AACT,UAAQ;AACV;",
+  "names": []
+}

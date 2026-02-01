@@ -88,6 +88,19 @@ export class AuthService {
   readonly maxAccounts = computed(() => this._user()?.max_accounts || 3);
   readonly isPro = computed(() => ['pro', 'enterprise'].includes(this.subscriptionTier()));
   
+  // 會員等級（兼容舊接口）
+  readonly membershipLevel = computed(() => {
+    const tier = this.subscriptionTier();
+    const tierMap: Record<string, string> = {
+      'free': 'bronze',
+      'basic': 'silver',
+      'pro': 'gold',
+      'enterprise': 'diamond'
+    };
+    return tierMap[tier] || 'bronze';
+  });
+  
+  
   constructor() {
     // 初始化時恢復狀態
     this.restoreSession();

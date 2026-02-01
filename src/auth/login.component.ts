@@ -696,14 +696,19 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.telegramBotUsername = config.bot_username || '';
       this.telegramBotId = config.bot_id;
       
-      // 2. 定義全局回調函數（用於 Telegram 回調）
+      // 2. 定義全局回調函數
       (window as any).onTelegramAuth = (user: any) => {
         console.log('Telegram auth callback:', user);
         this.handleTelegramAuth(user);
       };
       
-      // 🔧 改用 OAuth 重定向方式（更可靠，不依賴外部腳本）
-      this.openTelegramOAuth();
+      // 🆕 優先嘗試 Widget（支持一鍵登入），失敗則回退到 OAuth
+      try {
+        await this.loadTelegramWidget();
+      } catch (widgetError) {
+        console.warn('Widget failed, falling back to OAuth:', widgetError);
+        this.openTelegramOAuth();
+      }
       
     } catch (e: any) {
       console.error('Telegram login error:', e);
@@ -711,6 +716,79 @@ export class LoginComponent implements OnInit, OnDestroy {
     } finally {
       this.telegramLoading.set(false);
     }
+  }
+  
+  /**
+   * 🆕 載入 Telegram Login Widget（支持一鍵登入）
+   */
+  private loadTelegramWidget(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // 創建彈窗容器
+      const popup = window.open('', 'telegram-widget', 'width=550,height=470,scrollbars=yes');
+      if (!popup) {
+        reject(new Error('Popup blocked'));
+        return;
+      }
+      
+      // 寫入 Widget HTML
+      popup.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Telegram 登入</title>
+          <style>
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              display: flex; 
+              flex-direction: column;
+              justify-content: center; 
+              align-items: center; 
+              height: 100vh; 
+              margin: 0;
+              background: linear-gradient(135deg, #0f172a, #1e293b);
+              color: white;
+            }
+            h2 { margin-bottom: 30px; }
+            #telegram-login { min-height: 50px; }
+            .hint { color: #94a3b8; font-size: 14px; margin-top: 20px; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <h2>使用 Telegram 登入</h2>
+          <div id="telegram-login"></div>
+          <p class="hint">如果您已在瀏覽器登入 Telegram，將顯示一鍵登入按鈕</p>
+          <script>
+            window.onTelegramAuth = function(user) {
+              window.opener.onTelegramAuth(user);
+              window.close();
+            };
+          </script>
+          <script async src="https://telegram.org/js/telegram-widget.js?22"
+            data-telegram-login="${this.telegramBotUsername}"
+            data-size="large"
+            data-radius="8"
+            data-onauth="onTelegramAuth(user)"
+            data-request-access="write">
+          </script>
+        </body>
+        </html>
+      `);
+      popup.document.close();
+      
+      // 監聽彈窗關閉
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          resolve();
+        }
+      }, 500);
+      
+      // 5秒超時
+      setTimeout(() => {
+        clearInterval(checkClosed);
+        resolve();
+      }, 30000);
+    });
   }
   
   /**

@@ -22117,21 +22117,25 @@ class BackendService:
             credentials = pool.list_credentials(include_hash=True, accounts=accounts)
             print(f"[Backend] Sending {len(credentials)} API credentials to frontend", file=sys.stderr)
 
-            self.send_event("api-credentials-updated", {
+            response = {
                 "success": True,
                 "statistics": statistics,
                 "credentials": credentials
-            })
+            }
+            self.send_event("api-credentials-updated", response)
             print("[Backend] api-credentials-updated event sent", file=sys.stderr)
+            return response
             
         except Exception as e:
             print(f"[Backend] Error getting API credentials: {e}", file=sys.stderr)
-            self.send_event("api-credentials-updated", {
+            response = {
                 "success": False,
                 "error": str(e),
                 "statistics": None,
                 "credentials": []
-            })
+            }
+            self.send_event("api-credentials-updated", response)
+            return response
     
     async def handle_add_api_credential(self, payload: Dict[str, Any]):
         """添加 API 憑據"""

@@ -53,11 +53,15 @@ jobs:
           ssh ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} << 'ENDSSH'
             cd /opt/tg-matrix
             
-            # 重啟 web 容器以加載新的前端文件
-            sudo docker compose restart web
+            # 重新創建容器以應用配置更改
+            sudo docker compose down
+            sudo docker compose up -d --build
+            
+            # 等待服務啟動
+            sleep 10
             
             # 顯示狀態
-            sudo docker ps
+            sudo docker compose ps
             echo "✅ Deployment completed at $(date)"
           ENDSSH
       

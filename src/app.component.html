@@ -147,11 +147,11 @@
   </div>
 }
 
-<!-- 登入頁面（未認證時顯示） -->
-@if (!isAuthenticated()) {
-  <app-login></app-login>
-} @else {
-  <!-- 主應用界面（已認證） -->
+<!-- 主應用界面 -->
+<!-- 🆕 P1.3: 統一使用 Router 處理登入/未登入狀態 -->
+<!-- 未認證用戶會被 AuthGuard 自動重定向到 /auth/login -->
+@if (isAuthenticated()) {
+  <!-- 已認證用戶顯示主界面 -->
   <div class="flex h-screen" style="background-color: var(--bg-primary); color: var(--text-primary);">
     
     <!-- Onboarding 新手引导 -->
@@ -2015,5 +2015,10 @@
         </div>
       </div>
     }
+  </div>
+} @else {
+  <!-- 未認證用戶：顯示路由內容（登入頁面等） -->
+  <div class="auth-container min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <router-outlet></router-outlet>
   </div>
 } <!-- 結束 @if (isAuthenticated()) -->

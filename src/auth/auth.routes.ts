@@ -43,6 +43,11 @@ export const AUTH_ROUTES: Routes = [
         loadComponent: () => import('./reset-password.component').then(m => m.ResetPasswordComponent),
         canActivate: [guestGuard],
         title: 'Reset Password - TG-Matrix'
+      },
+      {
+        path: 'telegram-callback',
+        loadComponent: () => import('./telegram-callback.component').then(m => m.TelegramCallbackComponent),
+        title: 'Telegram Login - TG-Matrix'
       }
     ]
   }

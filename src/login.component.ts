@@ -383,8 +383,18 @@ type LoginMode = 'login' | 'activate' | 'register';
           </div>
         }
         
-        <!-- 設備信息 -->
+        <!-- 註冊入口 -->
         <div class="mt-5 pt-4 border-t border-slate-700/50 text-center">
+          <p class="text-sm text-slate-400">
+            還沒有帳號？
+            <a href="/auth/register" class="text-cyan-400 hover:text-cyan-300 font-medium ml-1">
+              立即註冊 →
+            </a>
+          </p>
+        </div>
+        
+        <!-- 設備信息 -->
+        <div class="mt-3 text-center">
           <p class="text-xs text-slate-500">
             設備碼: <span class="font-mono text-slate-400">{{ deviceCode() }}</span>
           </p>
@@ -859,14 +869,27 @@ export class LoginComponent implements OnInit {
         return;
       }
       
-      // 生產模式：跳轉到 Google OAuth
+      // 生產模式：Google OAuth
+      // 目前 Google OAuth 尚未完全實現，顯示友好提示
+      // TODO: 實現 Google OAuth 後移除此檢查
+      const checkProviders = await fetch('/api/v1/oauth/providers');
+      const providersData = await checkProviders.json();
+      
+      const googleProvider = providersData?.providers?.find((p: any) => p.id === 'google');
+      if (!googleProvider) {
+        this.errorMessage.set('Google 登入功能即將推出，請使用 Telegram 或郵箱登入');
+        this.googleLoading.set(false);
+        return;
+      }
+      
+      // 跳轉到 Google OAuth
       const deviceCode = await this.deviceService.getDeviceCode();
       const callbackUrl = encodeURIComponent(window.location.origin + '?provider=google');
       const authUrl = `/api/oauth/google/authorize?device=${deviceCode}&callback=${callbackUrl}`;
       
       window.location.href = authUrl;
     } catch (error: any) {
-      this.errorMessage.set(error.message || 'Google 登入失敗');
+      this.errorMessage.set('Google 登入功能即將推出，請使用 Telegram 或郵箱登入');
       this.googleLoading.set(false);
     }
   }

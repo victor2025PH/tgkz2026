@@ -2,7 +2,7 @@
 import { ChangeDetectionStrategy, Component, signal, WritableSignal, computed, inject, OnDestroy, effect, OnInit, ChangeDetectorRef, NgZone, HostListener, ViewChild } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs/operators';
 // 路由動畫改用 CSS 過渡效果，不再使用 Angular animations
 import { TelegramAccount, KeywordConfig, MonitoredGroup, CapturedLead, LogEntry, GenerationState, MessageTemplate, LeadStatus, Interaction, OnlineStatus, AccountRole, Attachment, KeywordSet, AutomationCampaign, CampaignTrigger, CampaignAction, AccountStatus, QueueStatus, QueueMessage, Alert } from './models';
@@ -141,7 +141,7 @@ interface SuccessOverlayConfig {
   standalone: true,
   imports: [
     // 核心模組
-    CommonModule, FormsModule,
+    CommonModule, FormsModule, RouterOutlet,
     // 🆕 視圖組件（用於 @switch 視圖切換）
     DashboardViewComponent, AccountsViewComponent, SettingsViewComponent,
     LeadsViewComponent, AutomationViewComponent, ResourceDiscoveryViewComponent,

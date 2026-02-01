@@ -37,9 +37,24 @@ def create_middleware_stack():
     middlewares = []
     
     if HAS_AIOHTTP:
+        # 嘗試導入認證中間件
+        try:
+            from auth.middleware import create_auth_middleware
+            has_auth_middleware = True
+        except ImportError:
+            has_auth_middleware = False
+            logger.warning("Auth middleware not found, authentication disabled")
+        
         middlewares.extend([
             request_id_middleware,
             logging_middleware,
+        ])
+        
+        # 認證中間件（必須在 tenant 之前）
+        if has_auth_middleware:
+            middlewares.append(create_auth_middleware())
+        
+        middlewares.extend([
             tenant_middleware,
             usage_tracking_middleware,
             quota_check_middleware,

@@ -424,4 +424,200 @@ export class ErrorHandlerService {
       }
     };
   }
+  
+  // ==================== P1.4: 增強功能 ====================
+  
+  /**
+   * 帶自動重試的異步請求
+   * 
+   * @param fn 要執行的異步函數
+   * @param options 重試選項
+   */
+  async withRetry<T>(
+    fn: () => Promise<T>,
+    options: {
+      maxRetries?: number;
+      delay?: number;
+      backoff?: number;  // 指數退避係數
+      retryOn?: (error: any) => boolean;
+      onRetry?: (error: any, attempt: number) => void;
+      context?: { component?: string; action?: string };
+    } = {}
+  ): Promise<T> {
+    const {
+      maxRetries = 3,
+      delay = 1000,
+      backoff = 2,
+      retryOn = (e) => this.isRetryable(e),
+      onRetry,
+      context
+    } = options;
+    
+    let lastError: any;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error: any) {
+        lastError = error;
+        
+        // 檢查是否應該重試
+        if (attempt < maxRetries && retryOn(error)) {
+          const waitTime = delay * Math.pow(backoff, attempt - 1);
+          
+          // 通知重試
+          if (onRetry) {
+            onRetry(error, attempt);
+          } else {
+            console.warn(`Retry attempt ${attempt}/${maxRetries} in ${waitTime}ms...`, error.message);
+          }
+          
+          // 等待後重試
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        } else {
+          // 不重試，拋出錯誤
+          break;
+        }
+      }
+    }
+    
+    // 所有重試失敗，處理錯誤
+    this.handle(lastError, context);
+    throw lastError;
+  }
+  
+  /**
+   * 判斷錯誤是否可重試
+   */
+  private isRetryable(error: any): boolean {
+    const message = (error?.message || String(error)).toLowerCase();
+    
+    // 網絡錯誤通常可重試
+    if (message.includes('network') || 
+        message.includes('fetch') || 
+        message.includes('timeout') ||
+        message.includes('connection refused') ||
+        message.includes('econnreset')) {
+      return true;
+    }
+    
+    // 服務器錯誤（5xx）可重試
+    if (message.includes('500') || 
+        message.includes('502') || 
+        message.includes('503') || 
+        message.includes('504')) {
+      return true;
+    }
+    
+    // HTTP 狀態碼
+    const status = error?.status || error?.response?.status;
+    if (status && status >= 500 && status < 600) {
+      return true;
+    }
+    
+    // Telegram FloodWait 可重試（但需要等待）
+    if (message.includes('flood_wait')) {
+      return true;
+    }
+    
+    return false;
+  }
+  
+  /**
+   * API 請求包裝器
+   * 自動處理錯誤和重試
+   */
+  async apiCall<T>(
+    url: string,
+    options: RequestInit = {},
+    config: {
+      retry?: boolean;
+      maxRetries?: number;
+      context?: { component?: string; action?: string };
+      silent?: boolean;
+    } = {}
+  ): Promise<T> {
+    const { retry = true, maxRetries = 2, context, silent = false } = config;
+    
+    const fetchFn = async () => {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const error = new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
+        (error as any).status = response.status;
+        (error as any).data = errorData;
+        throw error;
+      }
+      
+      return response.json();
+    };
+    
+    if (retry) {
+      return this.withRetry(fetchFn, { maxRetries, context });
+    } else {
+      try {
+        return await fetchFn();
+      } catch (error) {
+        if (!silent) {
+          this.handle(error, context);
+        }
+        throw error;
+      }
+    }
+  }
+  
+  /**
+   * 網絡狀態監測
+   */
+  private _isOnline = signal<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  readonly isOnline = this._isOnline.asReadonly();
+  
+  /**
+   * 初始化網絡監聽
+   * 在 constructor 中調用無效，需要在 ngOnInit 或類似生命週期中調用
+   */
+  initNetworkMonitoring(): void {
+    if (typeof window === 'undefined') return;
+    
+    window.addEventListener('online', () => {
+      this._isOnline.set(true);
+      this.toast.success('網絡連接已恢復');
+    });
+    
+    window.addEventListener('offline', () => {
+      this._isOnline.set(false);
+      this.toast.warning('網絡連接已斷開，部分功能可能不可用');
+    });
+  }
+  
+  /**
+   * 檢查網絡狀態
+   */
+  checkNetwork(): boolean {
+    return this._isOnline();
+  }
+  
+  /**
+   * 帶超時的 Promise
+   */
+  async withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+    timeoutMessage = '操作超時，請重試'
+  ): Promise<T> {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(timeoutMessage));
+      }, timeoutMs);
+    });
+    
+    return Promise.race([promise, timeoutPromise]);
+  }
 }

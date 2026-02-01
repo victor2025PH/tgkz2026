@@ -567,6 +567,14 @@ export class AuthService {
     }
   }
   
+  /**
+   * 清除會話（公開方法）
+   * 用於認證守衛發現無效狀態時清理
+   */
+  clearSession(): void {
+    this.clearAuthState();
+  }
+  
   private clearAuthState(): void {
     this._user.set(null);
     this._accessToken.set(null);

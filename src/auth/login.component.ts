@@ -9,12 +9,13 @@
  * 5. 加載狀態
  */
 
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, ChangeDetectionStrategy, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { I18nService } from '../i18n.service';
+import { FrontendSecurityService } from '../services/security.service';
 
 @Component({
   selector: 'app-login',
@@ -26,8 +27,19 @@ import { I18nService } from '../i18n.service';
       <h2 class="page-title">{{ t('auth.welcomeBack') }}</h2>
       <p class="page-subtitle">{{ t('auth.loginSubtitle') }}</p>
       
+      <!-- 鎖定提示 -->
+      @if (isLocked()) {
+        <div class="lockout-alert">
+          <span class="lockout-icon">🔒</span>
+          <div class="lockout-content">
+            <span class="lockout-title">帳號暫時鎖定</span>
+            <span class="lockout-time">請等待 {{ lockoutRemaining() }} 秒後重試</span>
+          </div>
+        </div>
+      }
+      
       <!-- 錯誤提示 -->
-      @if (error()) {
+      @if (error() && !isLocked()) {
         <div class="error-alert">
           <span class="error-icon">⚠️</span>
           <span>{{ error() }}</span>
@@ -97,7 +109,7 @@ import { I18nService } from '../i18n.service';
         <button 
           type="submit" 
           class="submit-btn"
-          [disabled]="isLoading() || !email || !password"
+          [disabled]="isLoading() || !email || !password || isLocked()"
         >
           @if (isLoading()) {
             <span class="loading-spinner"></span>
@@ -166,6 +178,38 @@ import { I18nService } from '../i18n.service';
       color: #f87171;
       margin-bottom: 1.5rem;
       font-size: 0.875rem;
+    }
+    
+    .lockout-alert {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem;
+      background: rgba(251, 146, 60, 0.1);
+      border: 1px solid rgba(251, 146, 60, 0.3);
+      border-radius: 8px;
+      color: #fb923c;
+      margin-bottom: 1.5rem;
+    }
+    
+    .lockout-icon {
+      font-size: 1.5rem;
+    }
+    
+    .lockout-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    
+    .lockout-title {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    .lockout-time {
+      font-size: 0.8rem;
+      opacity: 0.8;
     }
     
     .login-form {
@@ -386,11 +430,12 @@ import { I18nService } from '../i18n.service';
     }
   `]
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private i18n = inject(I18nService);
+  private security = inject(FrontendSecurityService);
   
   // 表單數據
   email = '';
@@ -403,8 +448,37 @@ export class LoginComponent {
   telegramLoading = signal(false);
   error = signal<string | null>(null);
   
+  // P1.5: 安全增強 - 登入限制
+  isLocked = computed(() => this.security.isLocked());
+  lockoutRemaining = computed(() => this.security.lockoutRemaining());
+  attemptsLeft = computed(() => this.security.attemptsLeft());
+  
   // Telegram 配置
   private telegramBotUsername = '';
+  private lockoutCleanup: (() => void) | null = null;
+  
+  ngOnInit() {
+    // 檢查登入限制狀態
+    this.checkLoginLimit();
+  }
+  
+  ngOnDestroy() {
+    // 清理倒計時
+    this.lockoutCleanup?.();
+  }
+  
+  private checkLoginLimit() {
+    const result = this.security.canAttemptLogin();
+    if (!result.allowed) {
+      this.error.set(result.message || '');
+      // 啟動倒計時
+      this.lockoutCleanup = this.security.startLockoutCountdown((remaining) => {
+        if (remaining <= 0) {
+          this.error.set(null);
+        }
+      });
+    }
+  }
   
   t(key: string): string {
     return this.i18n.t(key);
@@ -412,6 +486,13 @@ export class LoginComponent {
   
   async onSubmit() {
     if (!this.email || !this.password) return;
+    
+    // P1.5: 安全檢查 - 登入限制
+    const canLogin = this.security.canAttemptLogin();
+    if (!canLogin.allowed) {
+      this.error.set(canLogin.message || '');
+      return;
+    }
     
     this.isLoading.set(true);
     this.error.set(null);
@@ -424,14 +505,32 @@ export class LoginComponent {
       });
       
       if (result.success) {
+        // 記錄成功嘗試（清除限制）
+        this.security.recordLoginAttempt(true, this.email);
+        
         // 獲取重定向 URL
         const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
         this.router.navigateByUrl(returnUrl);
       } else {
-        this.error.set(result.error || this.t('auth.loginFailed'));
+        // 記錄失敗嘗試
+        this.security.recordLoginAttempt(false, this.email);
+        
+        // 顯示錯誤和剩餘嘗試次數
+        const attemptsLeft = this.security.attemptsLeft();
+        let errorMsg = result.error || this.t('auth.loginFailed');
+        if (attemptsLeft > 0 && attemptsLeft <= 3) {
+          errorMsg += ` (剩餘 ${attemptsLeft} 次嘗試機會)`;
+        }
+        this.error.set(errorMsg);
+        
+        // 檢查是否需要鎖定
+        this.checkLoginLimit();
       }
     } catch (e: any) {
+      // 記錄失敗嘗試
+      this.security.recordLoginAttempt(false, this.email);
       this.error.set(e.message || this.t('auth.loginFailed'));
+      this.checkLoginLimit();
     } finally {
       this.isLoading.set(false);
     }
@@ -441,8 +540,107 @@ export class LoginComponent {
     if (provider === 'telegram') {
       await this.telegramLogin();
     } else if (provider === 'google') {
-      // Google OAuth 待實現
-      this.error.set('Google 登入功能即將推出');
+      await this.googleLogin();
+    }
+  }
+  
+  private async googleLogin() {
+    this.isLoading.set(true);
+    this.error.set(null);
+    
+    try {
+      // 1. 獲取 Google 配置
+      const response = await fetch('/api/v1/oauth/google/config');
+      const config = await response.json();
+      
+      if (!config.success || !config.data?.enabled) {
+        this.error.set('Google 登入功能即將推出，請使用其他方式登入');
+        return;
+      }
+      
+      // 2. 打開 Google OAuth 彈窗
+      this.openGoogleLoginPopup();
+      
+    } catch (e: any) {
+      console.error('Google login error:', e);
+      this.error.set('Google 登入功能即將推出，請使用其他方式登入');
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+  
+  private openGoogleLoginPopup() {
+    // 構建回調 URL
+    const origin = window.location.origin;
+    const callbackUrl = `${origin}/api/v1/oauth/google/callback`;
+    
+    // Google OAuth 授權 URL
+    const authUrl = `/api/v1/oauth/google/authorize?callback=${encodeURIComponent(callbackUrl)}`;
+    
+    // 打開彈窗
+    const width = 550;
+    const height = 600;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    
+    const popup = window.open(
+      authUrl,
+      'GoogleAuth',
+      `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes`
+    );
+    
+    // 監聽彈窗消息
+    const handleMessage = async (event: MessageEvent) => {
+      // 接受來自任何來源的消息（因為 Google 回調會發送消息）
+      if (event.data && event.data.type === 'google_auth') {
+        window.removeEventListener('message', handleMessage);
+        popup?.close();
+        
+        // 處理 Google 認證數據
+        await this.handleGoogleAuth(event.data.auth);
+      } else if (event.data && event.data.type === 'google_auth_error') {
+        window.removeEventListener('message', handleMessage);
+        popup?.close();
+        
+        this.error.set(event.data.error || 'Google 登入失敗');
+        this.isLoading.set(false);
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    
+    // 監測彈窗關閉
+    const checkClosed = setInterval(() => {
+      if (popup?.closed) {
+        clearInterval(checkClosed);
+        window.removeEventListener('message', handleMessage);
+        this.isLoading.set(false);
+      }
+    }, 500);
+  }
+  
+  private async handleGoogleAuth(authData: any) {
+    this.isLoading.set(true);
+    
+    try {
+      if (authData.access_token && authData.user) {
+        // 設置認證狀態（直接使用返回的 token）
+        localStorage.setItem('tgm_access_token', authData.access_token);
+        if (authData.refresh_token) {
+          localStorage.setItem('tgm_refresh_token', authData.refresh_token);
+        }
+        localStorage.setItem('tgm_user', JSON.stringify(authData.user));
+        
+        // 登入成功，重定向
+        const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
+        window.location.href = returnUrl;
+      } else {
+        this.error.set('Google 登入失敗：無效的認證數據');
+      }
+    } catch (e: any) {
+      this.error.set(e.message || 'Google 登入失敗');
+    } finally {
+      this.isLoading.set(false);
     }
   }
   

@@ -7,15 +7,18 @@ Member Extraction Service - 成員提取服務
 - 檢測用戶在線狀態
 - 構建用戶畫像
 - 批量處理和進度追蹤
+- 🆕 P2: 智能帳號選擇、結果緩存、成功率監控
 """
 import sys
 import asyncio
 import time
 import random
+import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Callable, Tuple
 from dataclasses import dataclass, field, asdict
 from enum import Enum
+from collections import defaultdict
 
 from pyrogram import Client
 from pyrogram.types import User, ChatMember
@@ -127,6 +130,24 @@ class MemberExtractionService:
         self._extraction_queue: List[Dict] = []
         self._queue_processing = False
         
+        # 🆕 P2 優化：結果緩存（24小時有效）
+        self._result_cache: Dict[str, Dict] = {}  # key: chat_id
+        self._result_cache_ttl = 86400  # 24 小時
+        
+        # 🆕 P2 優化：成功率統計
+        self._stats: Dict[str, Any] = {
+            'total_extractions': 0,
+            'successful_extractions': 0,
+            'failed_extractions': 0,
+            'total_members_extracted': 0,
+            'by_account': defaultdict(lambda: {'success': 0, 'failed': 0, 'members': 0}),
+            'by_error': defaultdict(int),
+            'last_24h': []  # 最近 24 小時的提取記錄
+        }
+        
+        # 🆕 P2 優化：背景任務
+        self._background_tasks: Dict[str, Dict] = {}
+        
         # 提取配置
         self.config = {
             'batch_size': 200,           # 每批提取數量
@@ -135,6 +156,8 @@ class MemberExtractionService:
             'flood_wait_multiplier': 1.2,    # FloodWait 等待倍數
             'save_interval': 100,        # 每多少個保存一次
             'pre_extraction_delay': 2,   # 🆕 提取前延遲（確保 Telegram 同步）
+            'result_cache_enabled': True,  # 🆕 P2: 啟用結果緩存
+            'smart_account_selection': True,  # 🆕 P2: 智能帳號選擇
         }
     
     def set_event_callback(self, callback: Callable):
@@ -320,11 +343,26 @@ class MemberExtractionService:
             'new_members': 0,
             'updated_members': 0,
             'duration_ms': 0,
-            'error': None
+            'error': None,
+            'from_cache': False  # 🆕 P2: 標記是否來自緩存
         }
         
         start_time = time.time()
         max_members = limit or self.config['max_members_per_group']
+        
+        # 🆕 P2 優化：檢查結果緩存（只對非強制刷新的請求使用）
+        cached = self.get_cached_result(chat_id)
+        if cached and cached.get('success'):
+            # 返回緩存的結果，但標記為來自緩存
+            cached_result = cached.copy()
+            cached_result['from_cache'] = True
+            cached_result['cache_age'] = int(time.time() - self._result_cache.get(str(chat_id), {}).get('cached_at', 0))
+            self.log(f"📦 返回緩存結果: {chat_id} (緩存時間: {cached_result['cache_age']}s)", "info")
+            return cached_result
+        
+        # 🆕 P2 優化：智能帳號選擇
+        if not phone and self.config.get('smart_account_selection'):
+            phone = self.select_best_account(chat_id)
         
         # 獲取客戶端
         if phone and phone in self._clients:
@@ -571,6 +609,10 @@ class MemberExtractionService:
             # 記錄日誌
             await self._log_extraction(result, phone)
             
+            # 🆕 P2 優化：緩存成功結果
+            if result['success']:
+                self._cache_result(chat_id, result)
+            
             return result
             
         except FloodWait as e:
@@ -761,6 +803,251 @@ class MemberExtractionService:
             phone, 'success' if result['success'] else 'failed',
             result.get('error'), datetime.now().isoformat()
         ))
+        
+        # 🆕 P2 優化：更新統計
+        self._update_stats(result, phone)
+    
+    # ==================== P2 優化：統計與緩存 ====================
+    
+    def _update_stats(self, result: Dict, phone: str):
+        """更新成功率統計"""
+        self._stats['total_extractions'] += 1
+        
+        if result.get('success'):
+            self._stats['successful_extractions'] += 1
+            self._stats['total_members_extracted'] += result.get('extracted', 0)
+            self._stats['by_account'][phone]['success'] += 1
+            self._stats['by_account'][phone]['members'] += result.get('extracted', 0)
+        else:
+            self._stats['failed_extractions'] += 1
+            self._stats['by_account'][phone]['failed'] += 1
+            error_code = result.get('error_code', 'UNKNOWN')
+            self._stats['by_error'][error_code] += 1
+        
+        # 記錄最近 24 小時
+        record = {
+            'timestamp': time.time(),
+            'chat_id': result.get('chat_id'),
+            'success': result.get('success', False),
+            'extracted': result.get('extracted', 0),
+            'phone': phone
+        }
+        self._stats['last_24h'].append(record)
+        
+        # 清理超過 24 小時的記錄
+        cutoff = time.time() - 86400
+        self._stats['last_24h'] = [r for r in self._stats['last_24h'] if r['timestamp'] > cutoff]
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """獲取統計信息"""
+        success_rate = 0
+        if self._stats['total_extractions'] > 0:
+            success_rate = self._stats['successful_extractions'] / self._stats['total_extractions'] * 100
+        
+        # 計算每個帳號的成功率
+        account_stats = {}
+        for phone, stats in self._stats['by_account'].items():
+            total = stats['success'] + stats['failed']
+            rate = stats['success'] / total * 100 if total > 0 else 0
+            account_stats[phone] = {
+                'success': stats['success'],
+                'failed': stats['failed'],
+                'members': stats['members'],
+                'success_rate': round(rate, 1)
+            }
+        
+        # 最近 24 小時統計
+        last_24h_success = sum(1 for r in self._stats['last_24h'] if r['success'])
+        last_24h_total = len(self._stats['last_24h'])
+        last_24h_members = sum(r['extracted'] for r in self._stats['last_24h'] if r['success'])
+        
+        return {
+            'total_extractions': self._stats['total_extractions'],
+            'successful': self._stats['successful_extractions'],
+            'failed': self._stats['failed_extractions'],
+            'success_rate': round(success_rate, 1),
+            'total_members': self._stats['total_members_extracted'],
+            'by_account': account_stats,
+            'by_error': dict(self._stats['by_error']),
+            'last_24h': {
+                'total': last_24h_total,
+                'success': last_24h_success,
+                'members': last_24h_members
+            }
+        }
+    
+    def _cache_result(self, chat_id: str, result: Dict):
+        """緩存提取結果"""
+        if not self.config.get('result_cache_enabled'):
+            return
+        
+        self._result_cache[str(chat_id)] = {
+            'result': result,
+            'cached_at': time.time()
+        }
+        self.log(f"💾 已緩存提取結果: {chat_id}", "debug")
+    
+    def get_cached_result(self, chat_id: str) -> Optional[Dict]:
+        """獲取緩存的結果"""
+        if not self.config.get('result_cache_enabled'):
+            return None
+        
+        key = str(chat_id)
+        if key in self._result_cache:
+            cache_entry = self._result_cache[key]
+            if time.time() - cache_entry['cached_at'] < self._result_cache_ttl:
+                self.log(f"📦 使用緩存的提取結果: {chat_id}", "info")
+                return cache_entry['result']
+            else:
+                del self._result_cache[key]
+        return None
+    
+    def clear_result_cache(self, chat_id: str = None):
+        """清除結果緩存"""
+        if chat_id:
+            key = str(chat_id)
+            if key in self._result_cache:
+                del self._result_cache[key]
+                self.log(f"🧹 已清除緩存: {chat_id}", "info")
+        else:
+            count = len(self._result_cache)
+            self._result_cache.clear()
+            self.log(f"🧹 已清除所有緩存: {count} 個", "info")
+    
+    def select_best_account(self, target_chat_id: str = None) -> Optional[str]:
+        """
+        🆕 P2 優化：智能選擇最佳帳號
+        
+        選擇策略：
+        1. 優先選擇已加入目標群組的帳號
+        2. 其次選擇成功率最高的帳號
+        3. 避免選擇最近失敗的帳號
+        """
+        if not self._clients:
+            return None
+        
+        # 獲取每個帳號的評分
+        account_scores = {}
+        
+        for phone in self._clients.keys():
+            score = 100  # 基礎分
+            
+            # 帳號統計
+            stats = self._stats['by_account'].get(phone, {'success': 0, 'failed': 0})
+            total = stats['success'] + stats['failed']
+            
+            if total > 0:
+                # 成功率加分 (最高 30 分)
+                success_rate = stats['success'] / total
+                score += success_rate * 30
+                
+                # 經驗加分（提取越多越可靠，最高 20 分）
+                experience_bonus = min(20, total * 2)
+                score += experience_bonus
+            
+            # 最近失敗扣分
+            recent_fails = sum(
+                1 for r in self._stats['last_24h'][-10:]  # 最近 10 次
+                if r.get('phone') == phone and not r.get('success')
+            )
+            score -= recent_fails * 10
+            
+            # 檢查是否有目標群組的緩存（表示之前成功過）
+            if target_chat_id:
+                cache_key = self._get_cache_key(phone, str(target_chat_id))
+                if cache_key in self._peer_cache:
+                    score += 50  # 已知可用，大幅加分
+            
+            account_scores[phone] = max(0, score)
+        
+        if not account_scores:
+            return list(self._clients.keys())[0]
+        
+        # 選擇得分最高的帳號
+        best_phone = max(account_scores, key=account_scores.get)
+        self.log(f"🎯 智能選擇帳號: {best_phone[:4]}**** (得分: {account_scores[best_phone]:.0f})", "info")
+        
+        return best_phone
+    
+    # ==================== P2 優化：背景提取 ====================
+    
+    async def start_background_extraction(
+        self, 
+        chat_id: str, 
+        phone: str = None,
+        **kwargs
+    ) -> str:
+        """啟動背景提取任務"""
+        import uuid
+        task_id = str(uuid.uuid4())[:8]
+        
+        self._background_tasks[task_id] = {
+            'status': 'running',
+            'chat_id': chat_id,
+            'phone': phone,
+            'started_at': time.time(),
+            'progress': 0,
+            'result': None
+        }
+        
+        # 啟動異步任務
+        asyncio.create_task(self._run_background_extraction(task_id, chat_id, phone, **kwargs))
+        
+        self.log(f"🔄 背景提取已啟動: {task_id}", "info")
+        return task_id
+    
+    async def _run_background_extraction(
+        self, 
+        task_id: str, 
+        chat_id: str, 
+        phone: str,
+        **kwargs
+    ):
+        """執行背景提取"""
+        try:
+            result = await self.extract_members(
+                chat_id=chat_id,
+                phone=phone,
+                **kwargs
+            )
+            
+            self._background_tasks[task_id]['status'] = 'completed' if result.get('success') else 'failed'
+            self._background_tasks[task_id]['result'] = result
+            self._background_tasks[task_id]['completed_at'] = time.time()
+            
+            # 發送完成事件
+            if self.event_callback:
+                self.event_callback("background-extraction-completed", {
+                    "taskId": task_id,
+                    "success": result.get('success', False),
+                    "extracted": result.get('extracted', 0),
+                    "chatTitle": result.get('chat_title', '')
+                })
+                
+        except Exception as e:
+            self._background_tasks[task_id]['status'] = 'error'
+            self._background_tasks[task_id]['error'] = str(e)
+            self.log(f"❌ 背景提取失敗 [{task_id}]: {e}", "error")
+    
+    def get_background_task(self, task_id: str) -> Optional[Dict]:
+        """獲取背景任務狀態"""
+        return self._background_tasks.get(task_id)
+    
+    def get_all_background_tasks(self) -> List[Dict]:
+        """獲取所有背景任務"""
+        return [
+            {'task_id': tid, **task}
+            for tid, task in self._background_tasks.items()
+        ]
+    
+    def cancel_background_task(self, task_id: str) -> bool:
+        """取消背景任務（標記為取消，實際任務可能無法中斷）"""
+        if task_id in self._background_tasks:
+            if self._background_tasks[task_id]['status'] == 'running':
+                self._background_tasks[task_id]['status'] = 'cancelled'
+                self.log(f"⏹️ 背景任務已標記取消: {task_id}", "info")
+                return True
+        return False
     
     # ==================== 查詢和篩選 ====================
     

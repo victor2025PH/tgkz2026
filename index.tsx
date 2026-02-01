@@ -10,18 +10,21 @@ import { bootstrapApplication } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { provideAnimations } from '@angular/platform-browser/animations';
+import { provideRouter } from '@angular/router';
 
 console.log('[Bootstrap] Angular imports completed');
 
 import { AppComponent } from './src/app.component';
+import { routes } from './src/app.routes';
 
-console.log('[Bootstrap] AppComponent imported, calling bootstrapApplication...');
+console.log('[Bootstrap] AppComponent and routes imported, calling bootstrapApplication...');
 
 bootstrapApplication(AppComponent, {
   providers: [
     provideZonelessChangeDetection(),
     provideHttpClient(),
     provideAnimations(),
+    provideRouter(routes),  // 🔧 關鍵：添加路由配置
   ],
 }).then(() => {
   console.log('[TG-AI智控王] Application started successfully');

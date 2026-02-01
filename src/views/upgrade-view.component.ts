@@ -67,7 +67,7 @@ interface PricingPlan {
       
       <!-- 方案卡片 -->
       <div class="plans-grid">
-        @for (plan of plans; track plan.id) {
+        @for (plan of plans(); track plan.id) {
           <div 
             class="plan-card" 
             [class.highlighted]="plan.highlighted"
@@ -140,7 +140,7 @@ interface PricingPlan {
           <thead>
             <tr>
               <th>功能</th>
-              @for (plan of plans; track plan.id) {
+              @for (plan of plans(); track plan.id) {
                 <th [class.highlighted]="plan.highlighted">{{ plan.name }}</th>
               }
             </tr>
@@ -149,7 +149,7 @@ interface PricingPlan {
             @for (feature of featuresList(); track feature.key) {
               <tr>
                 <td>{{ feature.name }}</td>
-                @for (plan of plans; track plan.id) {
+                @for (plan of plans(); track plan.id) {
                   <td>
                     @if (feature.values[plan.id] === true) {
                       <span class="check">✓</span>

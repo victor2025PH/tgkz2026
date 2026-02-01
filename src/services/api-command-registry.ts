@@ -28,6 +28,62 @@ export interface CommandConfig {
  * 按功能模塊分類
  */
 export const COMMAND_REGISTRY: CommandConfig[] = [
+  // ==================== 用戶認證 (SaaS) ====================
+  {
+    command: 'user-register',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/auth/register',
+    responseEvents: ['user-registered', 'auth-state-changed']
+  },
+  {
+    command: 'user-login',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/auth/login',
+    responseEvents: ['user-logged-in', 'auth-state-changed']
+  },
+  {
+    command: 'user-logout',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/auth/logout',
+    responseEvents: ['user-logged-out', 'auth-state-changed']
+  },
+  {
+    command: 'user-refresh-token',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/auth/refresh',
+    responseEvents: ['token-refreshed']
+  },
+  {
+    command: 'get-current-user',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/auth/me',
+    responseEvents: ['current-user-loaded']
+  },
+  {
+    command: 'update-current-user',
+    httpMethod: 'PUT',
+    endpoint: '/api/v1/auth/me',
+    responseEvents: ['current-user-updated']
+  },
+  {
+    command: 'change-password',
+    httpMethod: 'POST',
+    endpoint: '/api/v1/auth/change-password',
+    responseEvents: ['password-changed']
+  },
+  {
+    command: 'get-user-sessions',
+    httpMethod: 'GET',
+    endpoint: '/api/v1/auth/sessions',
+    responseEvents: ['sessions-loaded']
+  },
+  {
+    command: 'revoke-session',
+    httpMethod: 'DELETE',
+    endpoint: '/api/v1/auth/sessions/{id}',
+    responseEvents: ['session-revoked']
+  },
+
   // ==================== 帳號管理 ====================
   {
     command: 'get-accounts',

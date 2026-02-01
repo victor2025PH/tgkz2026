@@ -32,8 +32,8 @@ import { OnboardingComponent } from './onboarding.component';
 // BackupService 從 ./services 統一導入
 import { I18nService } from './i18n.service';
 import { LanguageSwitcherCompactComponent } from './language-switcher.component';
-// 新增：用戶認證相關
-import { AuthService } from './auth.service';
+// 新增：用戶認證相關 - 使用統一的 JWT 認證服務
+import { AuthService } from './core/auth.service';
 import { LoginComponent } from './login.component';
 // ProfileComponent, MembershipCenterComponent - 移至路由視圖
 import { QrLoginComponent } from './qr-login.component';

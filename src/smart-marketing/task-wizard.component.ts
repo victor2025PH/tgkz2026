@@ -625,7 +625,7 @@ export class TaskWizardComponent {
       const name = this.taskName || this.defaultTaskName();
       
       // 創建任務
-      const taskId = await this.taskService.create({
+      const taskId = await this.taskService.createTask({
         name,
         goalType: goal,
         executionMode: this.selectedMode(),

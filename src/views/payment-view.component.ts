@@ -128,7 +128,7 @@ import { PaymentService, PaymentIntent, Invoice, PaymentProvider, PaymentHistory
           
           <div class="history-list" *ngIf="payment.paymentHistory().length > 0; else noHistory">
             <div class="history-item" *ngFor="let item of payment.paymentHistory()">
-              <div class="item-icon">{{ payment.getProviderIcon(item.provider as PaymentProvider) }}</div>
+              <div class="item-icon">{{ payment.getProviderIcon(item.provider) }}</div>
               <div class="item-info">
                 <span class="item-desc">{{ item.description || '支付' }}</span>
                 <span class="item-time">{{ formatDate(item.created_at) }}</span>
@@ -136,8 +136,8 @@ import { PaymentService, PaymentIntent, Invoice, PaymentProvider, PaymentHistory
               <div class="item-amount" [class.completed]="item.state === 'completed'">
                 {{ payment.formatAmount(item.amount, item.currency) }}
               </div>
-              <div class="item-status" [style.color]="payment.getStateLabel(item.state as any).color">
-                {{ payment.getStateLabel(item.state as any).text }}
+              <div class="item-status" [style.color]="payment.getStateLabel(item.state).color">
+                {{ payment.getStateLabel(item.state).text }}
               </div>
             </div>
           </div>

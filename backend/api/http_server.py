@@ -276,9 +276,28 @@ class HttpApiServer:
             'note': 'Backend not fully initialized'
         }
     
-    def _json_response(self, data: dict, status: int = 200) -> web.Response:
-        """統一 JSON 響應"""
-        return web.json_response(data, status=status, dumps=lambda x: json.dumps(x, ensure_ascii=False, default=str))
+    def _json_response(self, data: dict, status: int = 200, events: list = None) -> web.Response:
+        """統一 JSON 響應，支持事件觸發信息
+        
+        Args:
+            data: 響應數據
+            status: HTTP 狀態碼
+            events: 前端需要觸發的事件列表，格式: [{'name': 'event-name', 'data': {...}}]
+        """
+        response_data = {
+            **data,
+            'timestamp': datetime.now().isoformat(),
+        }
+        
+        # 添加事件列表（如果有）
+        if events:
+            response_data['events'] = events
+        
+        return web.json_response(
+            response_data, 
+            status=status, 
+            dumps=lambda x: json.dumps(x, ensure_ascii=False, default=str)
+        )
     
     # ==================== 端點處理器 ====================
     
@@ -1624,33 +1643,73 @@ class HttpApiServer:
     # ==================== WebSocket ====================
     
     async def websocket_handler(self, request):
-        """WebSocket 處理器 - 實時通訊"""
-        ws = web.WebSocketResponse()
+        """WebSocket 處理器 - 實時通訊，支持心跳"""
+        ws = web.WebSocketResponse(
+            heartbeat=30.0,  # 服務器端心跳間隔
+            receive_timeout=60.0  # 接收超時
+        )
         await ws.prepare(request)
         
         self.websocket_clients.add(ws)
-        logger.info(f"WebSocket client connected. Total: {len(self.websocket_clients)}")
+        client_id = id(ws)
+        logger.info(f"WebSocket client {client_id} connected. Total: {len(self.websocket_clients)}")
+        
+        # 發送連接確認
+        await ws.send_json({
+            'type': 'connected',
+            'event': 'connected',
+            'data': {
+                'client_id': client_id,
+                'timestamp': datetime.now().isoformat()
+            }
+        })
         
         try:
             async for msg in ws:
                 if msg.type == web.WSMsgType.TEXT:
                     try:
                         data = json.loads(msg.data)
+                        msg_type = data.get('type')
+                        
+                        # 處理心跳
+                        if msg_type == 'ping':
+                            await ws.send_json({
+                                'type': 'pong',
+                                'event': 'pong',
+                                'timestamp': datetime.now().isoformat(),
+                                'client_timestamp': data.get('timestamp')
+                            })
+                            continue
+                        
                         command = data.get('command')
                         payload = data.get('payload', {})
                         request_id = data.get('request_id')
                         
-                        result = await self._execute_command(command, payload)
-                        result['request_id'] = request_id
+                        if command:
+                            result = await self._execute_command(command, payload)
+                            result['request_id'] = request_id
+                            await ws.send_json(result)
                         
-                        await ws.send_json(result)
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"WebSocket invalid JSON: {e}")
+                        await ws.send_json({'success': False, 'error': 'Invalid JSON'})
                     except Exception as e:
+                        logger.error(f"WebSocket command error: {e}")
                         await ws.send_json({'success': False, 'error': str(e)})
+                        
                 elif msg.type == web.WSMsgType.ERROR:
                     logger.error(f"WebSocket error: {ws.exception()}")
+                elif msg.type == web.WSMsgType.CLOSE:
+                    logger.info(f"WebSocket client {client_id} requested close")
+                    break
+                    
+        except asyncio.CancelledError:
+            logger.info(f"WebSocket client {client_id} connection cancelled")
+        except Exception as e:
+            logger.error(f"WebSocket handler error: {e}")
         finally:
             self.websocket_clients.discard(ws)
-            logger.info(f"WebSocket client disconnected. Total: {len(self.websocket_clients)}")
+            logger.info(f"WebSocket client {client_id} disconnected. Total: {len(self.websocket_clients)}")
         
         return ws
     

@@ -7,7 +7,7 @@ from pathlib import Path
 block_cipher = None
 
 # 後端路徑
-backend_path = Path(r'C:\tgkz2026\backend')
+backend_path = Path(r'D:\tgkz2026\backend')
 
 a = Analysis(
     [str(backend_path / 'main.py')],
@@ -15,9 +15,12 @@ a = Analysis(
     binaries=[],
     datas=[
         # 包含默認配置
-        (str(Path(r'C:\tgkz2026') / 'default-config'), 'default-config'),
+        (str(Path(r'D:\tgkz2026') / 'default-config'), 'default-config'),
     ],
-    hiddenimports=['pyrogram', 'pyrogram.raw', 'pyrogram.raw.all', 'pyrogram.raw.base', 'pyrogram.raw.functions', 'pyrogram.raw.types', 'pyrogram.handlers', 'pyrogram.types', 'pyrogram.errors', 'pyrogram.crypto', 'tgcrypto', 'telethon', 'telethon.client', 'telethon.sessions', 'telethon.sessions.string', 'telethon.errors', 'telethon.tl', 'telethon.tl.functions', 'telethon.tl.functions.auth', 'telethon.tl.types', 'telethon.tl.types.auth', 'telethon.crypto', 'qrcode', 'qrcode.main', 'qrcode.image', 'qrcode.image.pil', 'qrcode.image.base', 'qrcode.constants', 'PIL', 'PIL.Image', 'PIL.ImageDraw', 'socks', 'pysocks', 'aiosqlite', 'sqlite3', 'aiohttp', 'aiohttp.web', 'sentence_transformers', 'chromadb', 'torch', 'transformers', 'asyncio', 'json', 'typing', 'datetime', 'pathlib', 'hashlib', 'uuid', 'random', 'time', 're', 'os', 'sys', 'gc', 'traceback', 'logging', 'collections', 'functools', 'itertools', 'httpx', 'socksio', 'python_socks', 'playwright', 'playwright.async_api'],
+    # 🔧 Phase 3 優化：移除重量級 AI 依賴以節省內存和縮小體積
+    # sentence_transformers, chromadb, torch, transformers 已移除
+    # 這些功能在輕量模式下使用簡單嵌入替代
+    hiddenimports=['pyrogram', 'pyrogram.raw', 'pyrogram.raw.all', 'pyrogram.raw.base', 'pyrogram.raw.functions', 'pyrogram.raw.types', 'pyrogram.handlers', 'pyrogram.types', 'pyrogram.errors', 'pyrogram.crypto', 'tgcrypto', 'telethon', 'telethon.client', 'telethon.sessions', 'telethon.sessions.string', 'telethon.errors', 'telethon.tl', 'telethon.tl.functions', 'telethon.tl.functions.auth', 'telethon.tl.types', 'telethon.tl.types.auth', 'telethon.crypto', 'qrcode', 'qrcode.main', 'qrcode.image', 'qrcode.image.pil', 'qrcode.image.base', 'qrcode.constants', 'PIL', 'PIL.Image', 'PIL.ImageDraw', 'socks', 'pysocks', 'aiosqlite', 'sqlite3', 'aiohttp', 'aiohttp.web', 'asyncio', 'json', 'typing', 'datetime', 'pathlib', 'hashlib', 'uuid', 'random', 'time', 're', 'os', 'sys', 'gc', 'traceback', 'logging', 'collections', 'functools', 'itertools', 'httpx', 'socksio', 'python_socks', 'numpy', 'psutil'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -30,6 +33,18 @@ a = Analysis(
         'test',
         'unittest',
         'pytest',
+        # 🔧 Phase 3 優化：排除重量級 AI 依賴（節省 ~500MB）
+        'torch',
+        'torchvision',
+        'torchaudio',
+        'transformers',
+        'sentence_transformers',
+        'chromadb',
+        'huggingface_hub',
+        'tokenizers',
+        'safetensors',
+        # 排除不需要的 playwright（如果不用於爬蟲）
+        'playwright',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

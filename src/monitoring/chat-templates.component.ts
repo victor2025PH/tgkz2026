@@ -3,12 +3,13 @@
  * 獨立管理自動回覆使用的聊天模板
  * 數據格式與自動化中心保持一致
  */
-import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, OnDestroy, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ElectronIpcService } from '../electron-ipc.service';
 import { ToastService } from '../toast.service';
 import { ConfirmDialogService } from '../confirm-dialog.service';
+import { MonitoringStateService } from './monitoring-state.service';
 
 // 模板數據接口
 export interface ChatTemplateData {
@@ -265,16 +266,26 @@ const TEMPLATE_TYPES = {
     </div>
   `
 })
-export class ChatTemplatesComponent implements OnInit {
+export class ChatTemplatesComponent implements OnInit, OnDestroy {
   private ipcService = inject(ElectronIpcService);
   private toastService = inject(ToastService);
   private confirmDialog = inject(ConfirmDialogService);
+  private stateService = inject(MonitoringStateService);  // 🔧 FIX: 注入 StateService
 
   // 狀態
   templates = signal<ChatTemplateData[]>([]);
   selectedTemplate = signal<ChatTemplateData | null>(null);
   isCreating = signal(false);
   isLoading = signal(false);
+  
+  // 🔧 FIX: 從 StateService 同步數據
+  private stateEffect = effect(() => {
+    const stateTemplates = this.stateService.chatTemplates();
+    if (stateTemplates.length > 0 && this.templates().length === 0) {
+      console.log('[ChatTemplates] Syncing from StateService:', stateTemplates.length, 'templates');
+      this.updateTemplates(stateTemplates);
+    }
+  });
   
   // 編輯狀態
   editingTemplate: ChatTemplateData = this.createEmptyTemplate();
@@ -325,27 +336,67 @@ export class ChatTemplatesComponent implements OnInit {
     return content;
   });
 
+  // 🔧 FIX: 清理監聽器用
+  private listeners: (() => void)[] = [];
+  private retryCount = 0;
+  private readonly MAX_RETRIES = 3;
+
   ngOnInit() {
-    this.loadTemplates();
+    // 🔧 FIX: 先設置監聯器，再發送請求，確保不會丟失事件
     this.setupListeners();
+    
+    // 🔧 FIX: 先檢查 StateService 是否已有數據（從 initial-state 加載）
+    const stateTemplates = this.stateService.chatTemplates();
+    if (stateTemplates.length > 0) {
+      console.log('[ChatTemplates] Using existing StateService data:', stateTemplates.length, 'templates');
+      this.updateTemplates(stateTemplates);
+    } else {
+      // 沒有數據則請求加載
+      this.stateService.loadAll();
+    }
+    
+    this.loadTemplates();
+  }
+
+  ngOnDestroy() {
+    // 🔧 FIX: 清理監聽器防止內存洩漏
+    this.listeners.forEach(cleanup => cleanup());
   }
 
   setupListeners() {
-    // 監聯模板數據更新
-    this.ipcService.on('get-chat-templates-result', (data: any) => {
+    // 監聽模板數據更新
+    const cleanup1 = this.ipcService.on('get-chat-templates-result', (data: any) => {
+      console.log('[ChatTemplates] Received get-chat-templates-result:', data);
+      this.isLoading.set(false);
+      this.retryCount = 0;  // 重置重試計數
       if (data.templates) {
         this.updateTemplates(data.templates);
+      } else if (data.error) {
+        console.error('[ChatTemplates] Error loading templates:', data.error);
+        this.toastService.error('加載模板失敗: ' + data.error);
       }
     });
+    this.listeners.push(cleanup1);
 
     // 從 initial-state 獲取數據
-    this.ipcService.on('initial-state', (data: any) => {
+    const cleanup2 = this.ipcService.on('initial-state', (data: any) => {
       if (data.chatTemplates) {
+        console.log('[ChatTemplates] Received from initial-state:', data.chatTemplates.length, 'templates');
         this.updateTemplates(data.chatTemplates);
       }
     });
+    this.listeners.push(cleanup2);
 
-    this.ipcService.on('save-chat-template-result', (data: any) => {
+    // 🔧 FIX: 監聽 initial-state-config（漸進式加載的第二階段）
+    const cleanup3 = this.ipcService.on('initial-state-config', (data: any) => {
+      if (data.chatTemplates) {
+        console.log('[ChatTemplates] Received from initial-state-config:', data.chatTemplates.length, 'templates');
+        this.updateTemplates(data.chatTemplates);
+      }
+    });
+    this.listeners.push(cleanup3);
+
+    const cleanup4 = this.ipcService.on('save-chat-template-result', (data: any) => {
       if (data.success) {
         this.toastService.success(this.isCreating() ? '模板創建成功' : '模板保存成功');
         this.loadTemplates();
@@ -354,20 +405,33 @@ export class ChatTemplatesComponent implements OnInit {
         this.toastService.error(data.error || '保存失敗');
       }
     });
+    this.listeners.push(cleanup4);
 
-    this.ipcService.on('delete-chat-template-result', (data: any) => {
+    const cleanup5 = this.ipcService.on('delete-chat-template-result', (data: any) => {
       if (data.success) {
         this.toastService.success('模板已刪除');
         this.selectedTemplate.set(null);
         this.loadTemplates();
       }
     });
+    this.listeners.push(cleanup5);
   }
 
   loadTemplates() {
     this.isLoading.set(true);
+    console.log('[ChatTemplates] Sending get-chat-templates request');
     this.ipcService.send('get-chat-templates');
-    setTimeout(() => this.isLoading.set(false), 500);
+    
+    // 🔧 FIX: 添加超時重試機制
+    setTimeout(() => {
+      if (this.isLoading() && this.templates().length === 0 && this.retryCount < this.MAX_RETRIES) {
+        this.retryCount++;
+        console.log(`[ChatTemplates] Retrying... (${this.retryCount}/${this.MAX_RETRIES})`);
+        this.ipcService.send('get-chat-templates');
+      } else if (this.isLoading()) {
+        this.isLoading.set(false);
+      }
+    }, 3000);
   }
 
   // 轉換後端數據為本地格式

@@ -2,9 +2,12 @@
 import { ChangeDetectionStrategy, Component, signal, WritableSignal, computed, inject, OnDestroy, effect, OnInit, ChangeDetectorRef, NgZone, HostListener, ViewChild } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import { filter } from 'rxjs/operators';
+// 路由動畫改用 CSS 過渡效果，不再使用 Angular animations
 import { TelegramAccount, KeywordConfig, MonitoredGroup, CapturedLead, LogEntry, GenerationState, MessageTemplate, LeadStatus, Interaction, OnlineStatus, AccountRole, Attachment, KeywordSet, AutomationCampaign, CampaignTrigger, CampaignAction, AccountStatus, QueueStatus, QueueMessage, Alert } from './models';
-import { PerformanceMonitorComponent } from './performance-monitor.component';
-import { AnalyticsChartsComponent, TimeSeriesData } from './analytics-charts.component';
+// PerformanceMonitorComponent - 移至路由視圖
+import { TimeSeriesData } from './analytics-charts.component';
 import { GeminiService } from './gemini.service';
 import { TranslationService, Language } from './translation.service';
 import { AccountLoaderService } from './account-loader.service';
@@ -12,6 +15,7 @@ import { ElectronIpcService } from './electron-ipc.service';
 import { ToastService } from './toast.service';
 import { ToastComponent } from './toast.component';
 import { GlobalConfirmDialogComponent } from './global-confirm-dialog.component';
+import { GlobalInputDialogComponent } from './global-input-dialog.component';
 import { ProgressDialogComponent, ProgressInfo } from './progress-dialog.component';
 import { MembershipService } from './membership.service';
 import { MembershipDialogComponent, UpgradePromptComponent } from './membership-ui.component';
@@ -19,62 +23,104 @@ import { LicenseClientService } from './license-client.service';
 import { UnifiedContactsService } from './services/unified-contacts.service';
 import { PaymentComponent } from './payment.component';
 import { SecurityService } from './security.service';
-import { GlobalErrorHandler } from './error-handler.service';
+import { GlobalErrorHandler } from './services/error-handler.service';
 import { LoadingService } from './loading.service';
-import { LoadingOverlayComponent } from './loading-overlay.component';
+// LoadingOverlayComponent removed - using non-blocking connection indicator instead
 import { OnboardingComponent } from './onboarding.component';
-import { BackupService } from './backup.service';
+// BackupService 從 ./services 統一導入
 import { I18nService } from './i18n.service';
 import { LanguageSwitcherCompactComponent } from './language-switcher.component';
 // 新增：用戶認證相關
 import { AuthService } from './auth.service';
 import { LoginComponent } from './login.component';
-import { ProfileComponent } from './profile.component';
-import { MembershipCenterComponent } from './membership-center.component';
+// ProfileComponent, MembershipCenterComponent - 移至路由視圖
 import { QrLoginComponent } from './qr-login.component';
-import { AccountCardListComponent, Account } from './account-card-list.component';
+// AccountCardListComponent, ApiCredentialManagerComponent - 移至路由視圖
+// 🔧 P0: 恢復 AddAccountPageComponent 導入，用於 @switch 視圖切換
 import { AddAccountPageComponent } from './add-account-page.component';
-import { ApiCredentialManagerComponent } from './api-credential-manager.component';
-// 客戶培育系統
-import { LeadManagementComponent } from './lead-nurturing/lead-management.component';
-// Phase 4 分析儀表板
-import { AnalyticsDashboardComponent } from './lead-nurturing/analytics-dashboard.component';
-// Phase 1 優化組件
-import { QueueProgressComponent, AccountQueueStatus } from './queue-progress.component';
-import { QuickWorkflowComponent, Workflow } from './quick-workflow.component';
-// Phase 2 數據分析組件
-import { AnalyticsCenterComponent } from './analytics/analytics-center.component';
-// 自動化中心整合組件
-// AutomationCenterComponent 已被 DashboardOverviewComponent 替代
-import { DashboardOverviewComponent } from './automation/dashboard-overview.component';
-// AI 中心組件
-import { AICenterComponent } from './ai-center/ai-center.component';
-// 多角色協作組件
-import { MultiRoleCenterComponent } from './multi-role/multi-role-center.component';
-import { AiTeamHubComponent } from './multi-role/ai-team-hub.component';
-import { SmartAnalyticsComponent } from './analytics/smart-analytics.component';
-// 手動模式組件
-import { ResourceCenterComponent } from './manual-mode/resource-center.component';
-// 搜索發現組件
-import { SearchDiscoveryComponent, DiscoveredResource, SearchSource } from './search-discovery/search-discovery.component';
-// 成員資料庫組件
-import { MemberDatabaseComponent, ExtractedMember } from './member-database/member-database.component';
+import { Account } from './account-card-list.component';
+// 類型導入（用於信號和狀態）
+import { AccountQueueStatus } from './queue-progress.component';
+import { Workflow } from './quick-workflow.component';
+import { DiscoveredResource, SearchSource } from './search-discovery/search-discovery.component';
+import { ExtractedMember } from './member-database/member-database.component';
 import { BatchSendDialogComponent, BatchSendTarget } from './dialogs/batch-send-dialog.component';
 import { BatchInviteDialogComponent, BatchInviteTarget } from './dialogs/batch-invite-dialog.component';
 import { MemberExtractionDialogComponent, MemberExtractionConfig, ExtractionGroupInfo } from './dialogs/member-extraction-dialog.component';
-import { AiMarketingAssistantComponent, AIStrategyResult } from './ai-assistant/ai-marketing-assistant.component';
+import { AIStrategyResult } from './ai-assistant/ai-marketing-assistant.component';
 import { CommandPaletteComponent } from './components/command-palette.component';
 // EmptyStateComponent 暫時未使用
 import { FeedbackService } from './components/feedback-animation.component';
 import { ErrorHandlerService } from './services/error-handler.service';
-import { SmartDashboardComponent } from './components/smart-dashboard.component';
+// SmartDashboardComponent, AnimationSelectorComponent - 移至路由視圖
 import { LeadScoringService } from './services/lead-scoring.service';
 import { ABTestingService } from './services/ab-testing.service';
-// 監控管理獨立頁面
-import { MonitoringAccountsComponent, MonitoringGroupsComponent, KeywordSetsComponent, ChatTemplatesComponent, TriggerRulesComponent, ConfigProgressComponent, MonitoringStateService } from './monitoring';
+// 監控管理（組件用於 ViewChild 類型引用）
+import { MonitoringGroupsComponent, ConfigProgressComponent, MonitoringStateService } from './monitoring';
+// 🆕 Phase 3: 統一導航服務
+import { NavBridgeService, NavShortcutsService } from './services/nav-bridge.service';
+import { UnifiedNavService } from './components/unified-nav.service';
+// 🆕 Phase 4: 統一導航組件
+// 注意：UnifiedNavComponent 和 UnifiedSidebarComponent 暫時未使用
+// 未來將用於替代現有導航
+// import { UnifiedNavComponent, UnifiedSidebarComponent } from './components/unified-nav.component';
 
-// 更新視圖類型：合併 monitoring 和 alerts 為 runtime-logs，添加 add-account 和 api-credentials
-type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-center' | 'runtime-logs' | 'settings' | 'analytics' | 'analytics-center' | 'logs' | 'performance' | 'alerts' | 'profile' | 'membership-center' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules';
+// 視圖組件透過路由懶加載，不需要在此導入
+
+// 🆕 Phase 19-26: 專用服務（從 app.component.ts 提取的方法）
+import { 
+  NavigationService,
+  MonitoringManagementService,
+  LeadManagementService,
+  CampaignManagementService,
+  TemplateManagementService,
+  GroupManagementService,
+  MessageQueueService,
+  AppFacadeService,
+  AnimationConfigService,
+  SettingsService,
+  AiChatService,
+  ResourceService,
+  ExportService,
+  RagService,
+  VectorMemoryService,
+  BackupService,
+  SchedulerService,
+  DialogService
+} from './services';
+
+// 🆕 視圖組件導入（用於 @switch 視圖切換）
+import { DashboardViewComponent } from './views/dashboard-view.component';
+import { AccountsViewComponent } from './views/accounts-view.component';
+import { SettingsViewComponent } from './views/settings-view.component';
+import { LeadsViewComponent } from './views/leads-view.component';
+import { AutomationViewComponent } from './views/automation-view.component';
+import { ResourceDiscoveryViewComponent } from './views/resource-discovery-view.component';
+import { AiCenterViewComponent } from './views/ai-center-view.component';
+import { MultiRoleViewComponent } from './views/multi-role-view.component';
+import { AnalyticsViewComponent } from './views/analytics-view.component';
+import { MonitoringViewComponent } from './views/monitoring-view.component';
+// RuntimeLogsViewComponent 已移除
+import { ApiCredentialsViewComponent } from './views/api-credentials-view.component';
+
+// 🆕 Phase P0: 補全缺失的視圖組件
+import { MembershipCenterComponent } from './membership-center.component';
+import { ProfileComponent } from './profile.component';
+import { ResourceCenterComponent } from './manual-mode/resource-center.component';
+import { SearchDiscoveryComponent } from './search-discovery/search-discovery.component';
+import { AiMarketingAssistantComponent } from './ai-assistant/ai-marketing-assistant.component';
+import { AiTeamHubComponent } from './multi-role/ai-team-hub.component';
+import { MemberDatabaseComponent } from './member-database/member-database.component';
+// 🆕 知識大腦獨立組件
+import { AIBrainComponent } from './ai-center/ai-brain.component';
+import { KnowledgeGapsComponent } from './ai-center/knowledge-gaps.component';
+import { KnowledgeManageComponent } from './ai-center/knowledge-manage.component';
+import { RAGBrainService } from './services/rag-brain.service';
+// 🆕 P2: 營銷報表組件
+import { MarketingReportComponent } from './components/marketing-report.component';
+
+// 視圖類型定義
+type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'resource-discovery' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps' | 'settings' | 'analytics' | 'analytics-center' | 'marketing-report' | 'profile' | 'membership-center' | 'monitoring' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules' | 'collected-users';
 type LeadDetailView = 'sendMessage' | 'history';
 type LeadsViewMode = 'kanban' | 'list';
 
@@ -91,8 +137,39 @@ interface SuccessOverlayConfig {
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
-  imports: [CommonModule, FormsModule, PerformanceMonitorComponent, AnalyticsChartsComponent, ToastComponent, GlobalConfirmDialogComponent, ProgressDialogComponent, MembershipDialogComponent, UpgradePromptComponent, PaymentComponent, LoadingOverlayComponent, OnboardingComponent, LanguageSwitcherCompactComponent, LoginComponent, ProfileComponent, MembershipCenterComponent, QrLoginComponent, AccountCardListComponent, AddAccountPageComponent, ApiCredentialManagerComponent, LeadManagementComponent, AnalyticsDashboardComponent, QueueProgressComponent, QuickWorkflowComponent, AnalyticsCenterComponent, DashboardOverviewComponent, AICenterComponent, MultiRoleCenterComponent, AiTeamHubComponent, ResourceCenterComponent, SearchDiscoveryComponent, MemberDatabaseComponent, AiMarketingAssistantComponent, BatchSendDialogComponent, BatchInviteDialogComponent, MemberExtractionDialogComponent, SmartAnalyticsComponent, CommandPaletteComponent, SmartDashboardComponent, MonitoringAccountsComponent, MonitoringGroupsComponent, KeywordSetsComponent, ChatTemplatesComponent, TriggerRulesComponent],
+  imports: [
+    // 核心模組
+    CommonModule, FormsModule,
+    // 🆕 視圖組件（用於 @switch 視圖切換）
+    DashboardViewComponent, AccountsViewComponent, SettingsViewComponent,
+    LeadsViewComponent, AutomationViewComponent, ResourceDiscoveryViewComponent,
+    AiCenterViewComponent, MultiRoleViewComponent, AnalyticsViewComponent,
+    MonitoringViewComponent,
+    // 🔧 P0: 添加帳號頁面組件
+    AddAccountPageComponent,
+    // 🆕 Phase P0: 補全缺失的視圖組件
+    MembershipCenterComponent, ProfileComponent, ResourceCenterComponent,
+    SearchDiscoveryComponent, AiMarketingAssistantComponent, AiTeamHubComponent,
+    MemberDatabaseComponent, ApiCredentialsViewComponent,
+    // 🆕 知識大腦獨立組件
+    AIBrainComponent, KnowledgeGapsComponent, KnowledgeManageComponent, KnowledgeManageComponent,
+    // 🆕 P2: 營銷報表
+    MarketingReportComponent,
+    // 通用組件（模板中使用）
+    ToastComponent, GlobalConfirmDialogComponent, GlobalInputDialogComponent, ProgressDialogComponent,
+    // 會員相關（模板中使用）
+    MembershipDialogComponent, UpgradePromptComponent, PaymentComponent,
+    // 導航和佈局（模板中使用）
+    OnboardingComponent, LanguageSwitcherCompactComponent, LoginComponent,
+    // 帳號管理（模板中使用）
+    QrLoginComponent,
+    // 對話框（模板中使用）
+    BatchSendDialogComponent, BatchInviteDialogComponent, MemberExtractionDialogComponent,
+    // 命令面板（模板中使用）
+    CommandPaletteComponent,
+  ],
   providers: [AccountLoaderService, ToastService],
+  // 路由動畫改用 CSS 過渡效果
   styles: [`
     /* 錯誤引導高亮動畫 */
     :host ::ng-deep .highlight-pulse {
@@ -237,6 +314,7 @@ interface SuccessOverlayConfig {
   `]
 })
 export class AppComponent implements OnDestroy, OnInit {
+  private router = inject(Router);  // 🆕 Angular Router 導航
   geminiService = inject(GeminiService);
   translationService = inject(TranslationService);
   accountLoaderService = inject(AccountLoaderService);
@@ -249,6 +327,39 @@ export class AppComponent implements OnDestroy, OnInit {
   backupService = inject(BackupService);
   i18n = inject(I18nService);
   authService = inject(AuthService);  // 新增：認證服務
+  // 🆕 Phase 3: 統一導航服務
+  navBridge = inject(NavBridgeService);
+  navShortcuts = inject(NavShortcutsService);
+  unifiedNav = inject(UnifiedNavService);
+  
+  // 🆕 Phase 19-22: 專用服務
+  navigationService = inject(NavigationService);
+  monitoringMgmt = inject(MonitoringManagementService);
+  leadMgmt = inject(LeadManagementService);
+  campaignMgmt = inject(CampaignManagementService);
+  templateMgmt = inject(TemplateManagementService);
+  groupMgmt = inject(GroupManagementService);
+  messageMgmt = inject(MessageQueueService);
+  
+  // 🆕 Phase 22: 應用外觀服務（統一委託入口）
+  facade = inject(AppFacadeService);
+  
+  // 🆕 Phase 23: 路由動畫上下文（已禁用，使用 @switch 視圖切換）
+  // private contexts = inject(ChildrenOutletContexts);
+  
+  // 🆕 Phase 24-26: 新增服務
+  animationConfig = inject(AnimationConfigService);
+  settingsService = inject(SettingsService);
+  aiChatService = inject(AiChatService);
+  resourceService = inject(ResourceService);
+  exportService = inject(ExportService);
+  ragService = inject(RagService);
+  ragBrainService = inject(RAGBrainService);  // 🆕 用於側邊欄顯示知識缺口數量
+  vectorMemoryService = inject(VectorMemoryService);
+  // backupService 已在上面聲明
+  schedulerService = inject(SchedulerService);
+  dialogService = inject(DialogService);
+  
   private document = inject(DOCUMENT);
   private cdr = inject(ChangeDetectorRef);
   private ngZone = inject(NgZone);
@@ -273,6 +384,24 @@ export class AppComponent implements OnDestroy, OnInit {
   theme = signal<'light' | 'dark'>('dark');
   currentView: WritableSignal<View> = signal('dashboard');
   dashboardMode = signal<'smart' | 'classic'>('smart');  // 儀表板模式：智能/經典
+  
+  // 🆕 用於調試的路由 URL
+  get routerUrl(): string {
+    return this.router?.url || 'N/A';
+  }
+  
+  // 🆕 Phase 22-29: Angular Router 模式
+  // Phase 29: 完全移除 @switch，所有視圖使用 Router
+  // 此信號現在永遠為 true，保留僅為向後兼容
+  useRouterMode = signal(true);
+  
+  // 🆕 Phase 23: 路由動畫數據（已禁用，使用 @switch 視圖切換）
+  // getRouteAnimationData() {
+  //   return this.contexts.getContext('primary')?.route?.snapshot?.data?.['animation'];
+  // }
+  
+  // 🆕 Phase 4: 導航模式（classic: 經典側邊欄, unified: 統一導航）
+  navMode = signal<'classic' | 'unified'>('classic');
   leadDetailView: WritableSignal<LeadDetailView> = signal('sendMessage');
   leadsViewMode: WritableSignal<LeadsViewMode> = signal('kanban');
   leadStatusFilter = signal<string>('all');  // 當前篩選的 Lead 狀態
@@ -282,9 +411,69 @@ export class AppComponent implements OnDestroy, OnInit {
   showLeadsActionMenu = signal(false);  // 操作下拉菜單
   
   // --- 子視圖狀態 ---
-  runtimeLogsTab = signal<'analytics' | 'logs' | 'performance' | 'alerts'>('analytics');  // 合併監控和告警
   aiCenterTab = signal<'config' | 'chat' | 'rag' | 'voice' | 'memory'>('config');
   automationTab = signal<'targets' | 'keywords' | 'templates' | 'campaigns'>('targets');  // 自動化中心標籤頁
+  
+  // --- 🆕 知識大腦菜單狀態 ---
+  knowledgeMenuExpanded = signal(true);  // 默認展開
+  
+  // --- 🆕 側邊欄分組折疊狀態 ---
+  sidebarGroups = signal<Record<string, boolean>>({
+    manual: true,      // 手動操作 - 默認展開
+    monitoring: true,  // 監控中心 - 默認展開
+    marketing: true,   // 智能營銷 - 默認展開
+    analytics: false,  // 數據分析 - 默認折疊
+    advanced: false,   // 進階設置 - 默認折疊
+    ai: true,          // AI 智能 - 默認展開
+    system: false      // 系統監控 - 默認折疊
+  });
+  
+  // 切換側邊欄分組展開狀態
+  toggleSidebarGroup(group: string): void {
+    const current = this.sidebarGroups();
+    this.sidebarGroups.set({
+      ...current,
+      [group]: !current[group]
+    });
+    // 保存到本地存儲
+    localStorage.setItem('sidebar_groups', JSON.stringify(this.sidebarGroups()));
+  }
+  
+  // 檢查分組是否展開
+  isSidebarGroupExpanded(group: string): boolean {
+    return this.sidebarGroups()[group] ?? true;
+  }
+  
+  // 從本地存儲加載側邊欄分組狀態
+  loadSidebarGroupsState(): void {
+    try {
+      const saved = localStorage.getItem('sidebar_groups');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        this.sidebarGroups.set({
+          ...this.sidebarGroups(),
+          ...parsed
+        });
+      }
+      // 加載側邊欄收縮狀態
+      const collapsed = localStorage.getItem('sidebar_collapsed');
+      if (collapsed === 'true') {
+        this.sidebarCollapsed.set(true);
+      }
+    } catch (e) {
+      console.warn('[Sidebar] Failed to load sidebar groups state:', e);
+    }
+  }
+  
+  // --- 🆕 側邊欄收縮模式 ---
+  sidebarCollapsed = signal(false);
+  
+  // 切換側邊欄收縮狀態
+  toggleSidebarCollapse(): void {
+    const newState = !this.sidebarCollapsed();
+    this.sidebarCollapsed.set(newState);
+    localStorage.setItem('sidebar_collapsed', String(newState));
+  }
   
   // --- AI 模組銜接狀態 ---
   aiTeamIncomingStrategy = signal<AIStrategyResult | null>(null);  // 從 AI 營銷助手傳入的策略
@@ -370,8 +559,8 @@ export class AppComponent implements OnDestroy, OnInit {
   // Membership Dialog
   showMembershipDialog = signal(false);
   
-  // Settings Tab
-  settingsTab = signal<'backup' | 'migration' | 'scheduler'>('backup');
+  // Settings Tab（🆕 Phase 26: 添加外觀標籤）
+  settingsTab = signal<'backup' | 'migration' | 'scheduler' | 'appearance'>('backup');
   
   // --- Vector Memory State ---
   vectorMemoryStats = signal<{
@@ -436,7 +625,8 @@ export class AppComponent implements OnDestroy, OnInit {
   isDetectingOllama = signal(false);
   
   // --- QR 掃碼登入 ---
-  showQrLoginDialog = signal(false);
+  // 使用 DialogService 的狀態，實現統一管理
+  get showQrLoginDialog() { return this.dialogService.showQrLoginDialog; }
   ollamaDetected = signal(false);
   detectedOllamaModels = signal<string[]>([]);
   autoSelectedModel = signal('');
@@ -965,6 +1155,8 @@ export class AppComponent implements OnDestroy, OnInit {
   monitoredGroups: WritableSignal<MonitoredGroup[]> = signal([]);
   leads: WritableSignal<CapturedLead[]> = signal([]);
   leadsTotal: WritableSignal<number> = signal(0);  // 數據庫中的實際總數
+  leadsHasMore: WritableSignal<boolean> = signal(false);  // 🆕 是否有更多 leads 需要加載
+  leadsLoading: WritableSignal<boolean> = signal(false);  // 🆕 是否正在加載更多 leads
   logs: WritableSignal<LogEntry[]> = signal([]);
   
   // 邀請進群相關
@@ -2891,6 +3083,8 @@ export class AppComponent implements OnDestroy, OnInit {
       resourceId: resource.id,
       telegramId: resource.telegram_id,
       username: resource.username,
+      // 🔧 FIX: 傳遞已加入群組的帳號
+      phone: resource.joined_phone || resource.joined_by_phone || null,
       limit: 200, // 首次加載 200 個
       offset: 0
     });
@@ -2910,6 +3104,8 @@ export class AppComponent implements OnDestroy, OnInit {
       resourceId: resource.id,
       telegramId: resource.telegram_id,
       username: resource.username,
+      // 🔧 FIX: 傳遞已加入群組的帳號
+      phone: resource.joined_phone || resource.joined_by_phone || null,
       limit: 200,
       offset: currentCount
     });
@@ -3134,6 +3330,8 @@ export class AppComponent implements OnDestroy, OnInit {
       resourceId: resource.id,
       telegramId: resource.telegram_id,
       username: resource.username,
+      // 🔧 FIX: 傳遞已加入群組的帳號
+      phone: resource.joined_phone || resource.joined_by_phone || null,
       limit: limit,
       offset: 0,
       filters: {
@@ -5232,6 +5430,16 @@ export class AppComponent implements OnDestroy, OnInit {
     this.automationTab.set(tab as 'targets' | 'keywords' | 'templates' | 'campaigns');
   }
 
+  // 🆕 知識大腦菜單方法
+  toggleKnowledgeMenu(): void {
+    this.knowledgeMenuExpanded.set(!this.knowledgeMenuExpanded());
+  }
+  
+  isKnowledgeView(): boolean {
+    const view = this.currentView();
+    return view === 'knowledge-brain' || view === 'knowledge-manage' || view === 'knowledge-gaps';
+  }
+
   // --- Kanban State ---
   leadStatuses: LeadStatus[] = ['New', 'Contacted', 'Replied', 'Follow-up', 'Closed-Won', 'Closed-Lost'];
   openLeadMenuId = signal<number | null>(null);
@@ -5277,6 +5485,26 @@ export class AppComponent implements OnDestroy, OnInit {
     if (total === 0) return '0.0';
     const converted = this.leadsByStatus('Closed-Won').length;
     return ((converted / total) * 100).toFixed(1);
+  }
+  
+  // 🆕 計算聯繫率（已聯繫 / 總數）
+  getContactRate(): string {
+    const total = this.leads().length;
+    if (total === 0) return '0.0';
+    const newLeads = this.leadsByStatus('New').length;
+    const contacted = total - newLeads;  // 非 New 狀態的都算已聯繫
+    return ((contacted / total) * 100).toFixed(1);
+  }
+  
+  // 🆕 計算回覆率（已回覆 / 已聯繫）
+  getReplyRate(): string {
+    const contacted = this.leads().length - this.leadsByStatus('New').length;
+    if (contacted === 0) return '0.0';
+    const replied = this.leadsByStatus('Replied').length + 
+                   this.leadsByStatus('Follow-up').length +
+                   this.leadsByStatus('Closed-Won').length +
+                   this.leadsByStatus('Closed-Lost').length;
+    return ((replied / contacted) * 100).toFixed(1);
   }
   
   // 過濾和排序後的 Leads
@@ -5782,6 +6010,7 @@ export class AppComponent implements OnDestroy, OnInit {
 
   // --- System State ---
   isMonitoring = signal(false);
+  coreDataLoaded = signal(false);  // 🆕 核心數據是否已載入（用於骨架屏判斷）
   private senderRoundRobinIndex = signal(0);
   
   // --- One-Click Start State ---
@@ -5804,6 +6033,19 @@ export class AppComponent implements OnDestroy, OnInit {
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     this.theme.set(prefersDark ? 'dark' : 'light');
     effect(() => { this.document.documentElement.className = this.theme(); });
+    
+    // 🔧 P0: 監聽 NavBridgeService.currentView() 變化並同步到本地
+    // 這樣子組件調用 nav.navigateTo() 時，AppComponent 的視圖也會切換
+    effect(() => {
+      const navView = this.navBridge.currentView();
+      const localView = this.currentView();
+      
+      // 只有當 NavBridge 視圖與本地視圖不同時才同步
+      if (navView && navView !== localView) {
+        console.log('[AppComponent] 同步導航:', navView, '← from NavBridge');
+        this.currentView.set(navView as View);
+      }
+    });
   }
 
   private queueRefreshInterval?: any;
@@ -5811,6 +6053,10 @@ export class AppComponent implements OnDestroy, OnInit {
   private initialStateDebounceTimer?: any;
   private keywordSetsUpdateDebounceTimer?: any;
   private lastInitialStateTime = 0;
+  
+  // 🆕 性能優化：頁面可見性狀態
+  private isPageVisible = true;
+  private visibilityChangeHandler?: () => void;
 
   // 點擊頁面其他地方時關閉資源菜單
   @HostListener('document:click', ['$event'])
@@ -5821,17 +6067,47 @@ export class AppComponent implements OnDestroy, OnInit {
     }
   }
 
+  // 🆕 非阻塞式連接狀態（取代全屏遮罩）
+  backendConnectionState = signal<'connecting' | 'connected' | 'error' | 'timeout'>('connecting');
+  backendConnectionMessage = signal<string>('正在連接後端服務...');
+  backendConnectionProgress = signal<number>(0);
+  private connectionStartTime: number = 0;
+  private connectionTimeoutId: any = null;
+  
   ngOnInit() {
+    console.log('[App] ngOnInit called, coreDataLoaded:', this.coreDataLoaded());
+    console.log('[App] Current URL:', window.location.href);
+    console.log('[App] Router URL:', this.router.url);
+    
+    // 🆕 P0: 通知加載畫面 Angular 已就緒
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('angular-ready'));
+      console.log('[App] Angular ready event dispatched');
+    }, 100);
+    
     // 设置默认语言为中文
     this.translationService.setLanguage('zh');
     
     // Load saved AI settings from localStorage
     this.loadAiSettings();
     
+    // 🆕 加載保存的側邊欄分組狀態
+    this.loadSidebarGroupsState();
+    
+    // 🆕 性能優化：設置頁面可見性監聯（Tab 不活躍時暫停刷新）
+    this.setupVisibilityListener();
+    
     this.setupIpcListeners();
     
     // 檢查是否首次運行
     this.checkFirstRun();
+    
+    // 🆕 非阻塞式啟動：不再使用全屏遮罩
+    this.connectionStartTime = Date.now();
+    this.startConnectionTimeout();
+    
+    // 路由調試
+    console.log('[App] Current URL:', window.location.href);
     
     // Request initial state from the backend once the app is ready
     this.ipcService.send('get-initial-state');
@@ -5964,14 +6240,7 @@ export class AppComponent implements OnDestroy, OnInit {
       if (currentView !== lastView) {
         lastView = currentView;
         
-        if (currentView === 'runtime-logs') {
-          // 根據當前 tab 加載數據
-          if (this.runtimeLogsTab() === 'analytics') {
-            this.loadAllAnalytics(7);
-          } else if (this.runtimeLogsTab() === 'alerts') {
-            this.loadAlerts();
-          }
-        } else if (currentView === 'leads') {
+        if (currentView === 'leads') {
           // 加載漏斗統計和用戶列表
           this.loadFunnelStats();
           this.loadUsersWithProfiles();
@@ -5993,8 +6262,70 @@ export class AppComponent implements OnDestroy, OnInit {
     // Check immediately
     checkView();
     
-    // Set up interval to check view changes
-    this.viewCheckInterval = setInterval(checkView, 500);
+    // 🆕 性能優化：將視圖檢查間隔從 500ms 增加到 2000ms
+    // 視圖切換不需要如此頻繁的檢查
+    this.viewCheckInterval = setInterval(checkView, 2000);
+  }
+  
+  /**
+   * 🆕 性能優化：設置頁面可見性監聽
+   * 當用戶切換到其他 Tab 時暫停定時刷新，減少 CPU 消耗
+   */
+  private setupVisibilityListener() {
+    this.visibilityChangeHandler = () => {
+      this.isPageVisible = !document.hidden;
+      
+      if (this.isPageVisible) {
+        console.log('[Performance] 頁面變為可見，恢復刷新');
+        // 頁面可見時，重新啟動定時器
+        this.resumeRefreshIntervals();
+      } else {
+        console.log('[Performance] 頁面變為隱藏，暫停刷新');
+        // 頁面隱藏時，暫停定時器
+        this.pauseRefreshIntervals();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', this.visibilityChangeHandler);
+  }
+  
+  /**
+   * 🆕 暫停所有定時刷新
+   */
+  private pauseRefreshIntervals() {
+    if (this.viewCheckInterval) {
+      clearInterval(this.viewCheckInterval);
+      this.viewCheckInterval = undefined;
+    }
+    if (this.queueRefreshInterval) {
+      clearInterval(this.queueRefreshInterval);
+      this.queueRefreshInterval = undefined;
+    }
+  }
+  
+  /**
+   * 🆕 恢復定時刷新
+   */
+  private resumeRefreshIntervals() {
+    // 重新設置視圖檢查（只有在沒有運行時才啟動）
+    if (!this.viewCheckInterval) {
+      let lastView = '';
+      const checkView = () => {
+        const currentView = this.currentView();
+        if (currentView !== lastView) {
+          lastView = currentView;
+          // 視圖變化時的刷新邏輯
+        }
+      };
+      this.viewCheckInterval = setInterval(checkView, 2000);
+    }
+    
+    // 重新設置隊列刷新
+    if (!this.queueRefreshInterval) {
+      this.queueRefreshInterval = setInterval(() => {
+        this.refreshQueueStatusThrottled();
+      }, 60000);
+    }
   }
   
   private setupKeyboardShortcuts() {
@@ -6053,14 +6384,19 @@ export class AppComponent implements OnDestroy, OnInit {
           this.changeView('campaigns');
         } else if (event.key === '7' && (event.ctrlKey || event.metaKey)) {
           event.preventDefault();
-          this.changeView('alerts');
+          this.changeView('settings');
         }
       }
     });
   }
 
   ngOnDestroy() {
-    // 清理會員狀態更新事件監聽
+    // 🆕 清理頁面可見性監聽器
+    if (this.visibilityChangeHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
+    }
+    
+    // 清理會員狀態更新事件監聯
     if (this.membershipUpdateHandler) {
       window.removeEventListener('membership-updated', this.membershipUpdateHandler);
     }
@@ -6145,11 +6481,76 @@ export class AppComponent implements OnDestroy, OnInit {
     }
   }
 
+  // 🆕 連接超時檢測
+  private startConnectionTimeout(): void {
+    // 階段 1: 5 秒後顯示「連接較慢」提示
+    setTimeout(() => {
+      if (this.backendConnectionState() === 'connecting') {
+        this.backendConnectionMessage.set('連接較慢，請稍候...');
+      }
+    }, 5000);
+    
+    // 階段 2: 15 秒後顯示「可能有問題」
+    setTimeout(() => {
+      if (this.backendConnectionState() === 'connecting') {
+        this.backendConnectionMessage.set('連接時間較長，正在重試...');
+        this.backendConnectionProgress.set(30);
+      }
+    }, 15000);
+    
+    // 階段 3: 30 秒超時
+    this.connectionTimeoutId = setTimeout(() => {
+      if (this.backendConnectionState() === 'connecting') {
+        this.backendConnectionState.set('timeout');
+        this.backendConnectionMessage.set('連接超時，請檢查後端服務');
+      }
+    }, 30000);
+  }
+  
+  // 🆕 重試連接
+  retryConnection(): void {
+    this.backendConnectionState.set('connecting');
+    this.backendConnectionMessage.set('正在重新連接...');
+    this.backendConnectionProgress.set(0);
+    this.connectionStartTime = Date.now();
+    this.startConnectionTimeout();
+    this.ipcService.send('get-initial-state');
+  }
+  
   private setupIpcListeners(): void {
+    // 🆕 監聽載入進度事件（非阻塞式更新狀態指示器）
+    this.ipcService.on('loading-progress', (data: { step: string; message: string; progress: number; duration?: number }) => {
+      console.log('[Frontend] Loading progress:', data);
+      
+      // 更新連接狀態指示器
+      this.backendConnectionProgress.set(data.progress);
+      this.backendConnectionMessage.set(data.message);
+      
+      // 載入完成時更新狀態
+      if (data.step === 'complete') {
+        this.backendConnectionState.set('connected');
+        if (this.connectionTimeoutId) {
+          clearTimeout(this.connectionTimeoutId);
+          this.connectionTimeoutId = null;
+        }
+      }
+    });
+    
     this.ipcService.on('log-entry', (log: LogEntry) => {
         // Ensure timestamp is a Date object
         log.timestamp = new Date(log.timestamp);
         this.logs.update(logs => [log, ...logs].slice(0, 100));
+    });
+    
+    // 🆕 批量日誌事件處理（減少 IPC 調用次數）
+    this.ipcService.on('log-entries-batch', (data: {entries: LogEntry[]}) => {
+        if (data.entries && data.entries.length > 0) {
+            const processedEntries = data.entries.map(log => ({
+                ...log,
+                timestamp: new Date(log.timestamp)
+            }));
+            this.logs.update(logs => [...processedEntries.reverse(), ...logs].slice(0, 100));
+        }
     });
 
     this.ipcService.on('monitoring-status-changed', (status: boolean) => {
@@ -6164,14 +6565,36 @@ export class AppComponent implements OnDestroy, OnInit {
         this.isStartingMonitoring.set(false);
         
         if (data.reason === 'config_check_failed') {
-            // 顯示配置檢查失敗的詳細信息
+            // 🔧 P1: 優化配置檢查失敗提示，添加操作按鈕
             const issues = data.issues || [];
             const warnings = data.warnings || [];
             
-            // 顯示嚴重問題
+            // 檢查是否是帳號離線問題
+            const hasOfflineIssue = issues.some((i: any) => 
+                i.message?.includes('離線') || i.message?.includes('offline') || i.code === 'no_online_accounts'
+            );
+            
+            // 顯示嚴重問題（帶操作按鈕）
             if (issues.length > 0) {
                 const issueMessages = issues.map((i: any) => `• ${i.message}`).join('\n');
-                this.toastService.error(`配置檢查失敗：\n${issueMessages}`, 10000);
+                
+                if (hasOfflineIssue) {
+                    // 帳號離線問題，提供導航到帳號管理的按鈕
+                    this.toastService.withActions('error', `配置檢查失敗：\n${issueMessages}`, [
+                        { 
+                            label: '📱 前往帳號管理', 
+                            variant: 'primary', 
+                            handler: () => this.navigateToView('manageAccounts') 
+                        },
+                        { 
+                            label: '關閉', 
+                            variant: 'secondary', 
+                            handler: () => {} 
+                        }
+                    ], 15000);
+                } else {
+                    this.toastService.error(`配置檢查失敗：\n${issueMessages}`, 10000);
+                }
             }
             
             // 顯示警告（作為單獨的提示）
@@ -6182,7 +6605,19 @@ export class AppComponent implements OnDestroy, OnInit {
                 }, 1000);
             }
         } else if (data.reason === 'no_online_listeners') {
-            this.toastService.error('無法啟動監控：沒有在線的監聽賬戶。請先添加賬戶並設置為"監聽"角色，然後登錄賬戶。', 8000);
+            // 🔧 P1: 優化提示，添加操作按鈕
+            this.toastService.withActions('error', '無法啟動監控：沒有在線的監聽賬戶', [
+                { 
+                    label: '📱 前往帳號管理', 
+                    variant: 'primary', 
+                    handler: () => this.navigateToView('manageAccounts') 
+                },
+                { 
+                    label: '關閉', 
+                    variant: 'secondary', 
+                    handler: () => {} 
+                }
+            ], 10000);
         } else if (data.reason === 'no_groups') {
             this.toastService.error('無法啟動監控：沒有監控群組。請先添加要監控的群組。', 5000);
         } else if (data.reason === 'no_accessible_groups') {
@@ -6754,6 +7189,74 @@ export class AppComponent implements OnDestroy, OnInit {
         // The accounts-updated event will be sent separately
     });
 
+    // 🆕 漸進式載入：分階段接收數據，讓 UI 盡快顯示
+    this.ipcService.on('initial-state-core', (state: any) => {
+        console.log('[Frontend] 🚀 Received initial-state-core (accounts + settings)');
+        if (state?.accounts) {
+            this.accounts.set(state.accounts);
+            console.log('[Frontend] Accounts loaded:', state.accounts.length);
+        }
+        if (state?.settings) {
+            // 設置分散的 settings signals
+            this.spintaxEnabled.set(state.settings.spintaxEnabled ?? true);
+            this.autoReplyEnabled.set(state.settings.autoReplyEnabled ?? false);
+            this.autoReplyMessage.set(state.settings.autoReplyMessage || "Thanks for getting back to me! I'll read your message and respond shortly.");
+            this.smartSendingEnabled.set(state.settings.smartSendingEnabled ?? true);
+        }
+        if (state?.isMonitoring !== undefined) {
+            this.isMonitoring.set(state.isMonitoring);
+        }
+        // 標記核心數據已載入，UI 可以開始渲染
+        console.log('[App] Setting coreDataLoaded to true');
+        this.coreDataLoaded.set(true);
+        console.log('[App] coreDataLoaded is now:', this.coreDataLoaded());
+    });
+    
+    this.ipcService.on('initial-state-config', (state: any) => {
+        console.log('[Frontend] 📋 Received initial-state-config');
+        if (state?.keywordSets) {
+            this.keywordSets.set(state.keywordSets);
+        }
+        if (state?.monitoredGroups) {
+            this.monitoredGroups.set(state.monitoredGroups);
+        }
+        if (state?.campaigns) {
+            this.campaigns.set(state.campaigns);
+        }
+        if (state?.messageTemplates) {
+            this.messageTemplates.set(state.messageTemplates);
+        }
+    });
+    
+    this.ipcService.on('initial-state-data', (state: any) => {
+        console.log('[Frontend] 📊 Received initial-state-data (leads + logs)');
+        console.log('[Frontend] leads count:', state?.leads?.length, 'total:', state?.leadsTotal, 'hasMore:', state?.leadsHasMore);
+        
+        if (state?.leads) {
+            const mappedLeads = (state.leads || []).map((l: any) => this.mapLeadFromBackend(l));
+            this.leads.set(mappedLeads);
+            // 同步到資源中心
+            this.contactsService.importLeadsDirectly(mappedLeads);
+            console.log('[Frontend] Initial leads synced to resource center:', mappedLeads.length);
+        }
+        if (state?.leadsTotal !== undefined) {
+            this.leadsTotal.set(state.leadsTotal);
+        }
+        if (state?.leadsHasMore !== undefined) {
+            this.leadsHasMore.set(state.leadsHasMore);
+        }
+        // 🆕 如果初始數據少於總數，自動加載全部
+        if (state?.leads && state?.leadsTotal && state.leads.length < state.leadsTotal) {
+            console.log('[Frontend] 🔄 Auto-loading remaining leads...');
+            this.leadsHasMore.set(true);
+            this.leadsLoading.set(false);  // 🆕 確保 loading 狀態為 false
+            setTimeout(() => this.loadRemainingLeads(), 500);
+        }
+        if (state?.logs) {
+            this.logs.set(state.logs);
+        }
+    });
+    
     this.ipcService.on('initial-state', (state: any) => {
         console.log('[Frontend] ★★★ Received initial-state event ★★★');
         console.log('[Frontend] initial-state payload:', state);
@@ -6974,6 +7477,28 @@ export class AppComponent implements OnDestroy, OnInit {
         
         // 🆕 同時更新資源中心，使用同一份數據
         this.contactsService.importLeadsDirectly(mappedLeads);
+    });
+    
+    // 🆕 處理分頁加載的 leads 數據
+    this.ipcService.on('leads-paginated', (data: {leads: any[], total: number, hasMore: boolean}) => {
+        console.log('[Frontend] Received leads-paginated:', data.leads?.length || 0, 'total:', data.total);
+        this.leadsLoading.set(false);
+        
+        if (data.leads && data.leads.length > 0) {
+            const mappedLeads = data.leads.map((l: any) => this.mapLeadFromBackend(l));
+            this.leads.set(mappedLeads);
+            this.leadsTotal.set(data.total);
+            this.leadsHasMore.set(data.hasMore);
+            
+            // 🆕 強制同步到資源中心（使用已映射的數據）
+            this.contactsService.importLeadsDirectly(mappedLeads);
+            console.log('[Frontend] ✅ Synced to resource center:', mappedLeads.length, 'leads');
+            
+            // 🆕 顯示提示
+            if (!data.hasMore) {
+                this.toastService.success(`數據加載完成：共 ${mappedLeads.length} 條`);
+            }
+        }
     });
     
     // 漏斗統計事件
@@ -7263,6 +7788,22 @@ export class AppComponent implements OnDestroy, OnInit {
         console.log('[Frontend] One-click progress:', data);
         this.oneClickProgress.set(data.progress);
         this.oneClickMessage.set(data.message);
+    });
+    
+    // 🆕 群組加入進度事件（漸進式更新）
+    this.ipcService.on('group-join-progress', (data: {current: number, total: number, url: string}) => {
+        const progressMsg = `👥 正在檢查群組 ${data.current}/${data.total}...`;
+        this.oneClickMessage.set(progressMsg);
+        // 計算進度：群組階段佔 42-48%
+        const groupProgress = 42 + (data.current / data.total) * 6;
+        this.oneClickProgress.set(Math.round(groupProgress));
+    });
+    
+    // 🆕 群組加入完成事件
+    this.ipcService.on('group-join-complete', (data: {success_count: number, pending_count: number, failed_count: number, total: number, skipped_cached?: number}) => {
+        console.log('[Frontend] Group join complete:', data);
+        const cachedInfo = data.skipped_cached ? ` (${data.skipped_cached} 個緩存命中)` : '';
+        this.oneClickMessage.set(`✅ 群組加入完成: ${data.success_count}/${data.total} 成功${cachedInfo}`);
     });
     
     this.ipcService.on('one-click-start-result', (data: any) => {
@@ -8837,6 +9378,16 @@ export class AppComponent implements OnDestroy, OnInit {
   
   private applyInitialState(state: any) {
         console.log('Received initial state from backend:', state);
+        
+        // 🆕 更新連接狀態為已連接
+        this.backendConnectionState.set('connected');
+        this.backendConnectionProgress.set(100);
+        this.backendConnectionMessage.set('連接成功');
+        if (this.connectionTimeoutId) {
+          clearTimeout(this.connectionTimeoutId);
+          this.connectionTimeoutId = null;
+        }
+        
         this.accounts.set(state.accounts || []);
         this.keywordSets.set(state.keywordSets || []);
         this.monitoredGroups.set(state.monitoredGroups || []);
@@ -8927,7 +9478,35 @@ export class AppComponent implements OnDestroy, OnInit {
       return;
     }
     
-    this.currentView.set(view); 
+    // 🆕 Phase P1: 補充缺失的權限檢查
+    // 黃金功能：客戶培育
+    if (view === 'lead-nurturing' && !this.membershipService.hasFeature('dataInsightsBasic')) {
+      this.toastService.warning(`🥇 客戶培育功能需要 黃金大師 或以上會員`);
+      window.dispatchEvent(new CustomEvent('open-membership-dialog'));
+      return;
+    }
+    
+    // 鑽石功能：培育分析
+    if (view === 'nurturing-analytics' && !this.membershipService.hasFeature('advancedAnalytics')) {
+      this.toastService.warning(`💎 培育分析功能需要 鑽石王牌 或以上會員`);
+      window.dispatchEvent(new CustomEvent('open-membership-dialog'));
+      return;
+    }
+    
+    // 🔧 P0: 先同步到 NavBridgeService，讓子組件的 effect 能捕獲變化
+    this.navBridge.navigateTo(view as any);
+    
+    // 然後更新本地視圖（觸發 @switch 重新渲染）
+    this.currentView.set(view);
+    
+    // 🆕 切換到資源中心時自動同步 leads 數據
+    if (view === 'resources') {
+      const currentLeads = this.leads();
+      if (currentLeads.length > 0) {
+        this.syncLeadsToResourceCenter(currentLeads);
+        console.log('[changeView] Synced leads to resource center:', currentLeads.length);
+      }
+    }
   }
   
   // 智能模式切換權限檢查
@@ -8948,6 +9527,7 @@ export class AppComponent implements OnDestroy, OnInit {
       'keyword-sets': 'keyword-sets',
       'chat-templates': 'chat-templates',
       'trigger-rules': 'trigger-rules', // 觸發規則頁面
+      'collected-users': 'collected-users', // 收集用戶頁面（廣告識別）
       'automation-rules': 'trigger-rules', // 觸發規則配置（新入口）
       'resources': 'resources',
       'rules': 'trigger-rules', // 自動化規則指向新的觸發規則頁面
@@ -8995,10 +9575,11 @@ export class AppComponent implements OnDestroy, OnInit {
     // Frontend validation
     const errors: string[] = [];
     
-    // Validate phone
-    if (!form.phone.trim()) {
+    // Validate phone - remove spaces, dashes, and parentheses before validation
+    const cleanedPhone = form.phone.trim().replace(/[\s\-\(\)]/g, '');
+    if (!cleanedPhone) {
       errors.push('Phone number is required');
-    } else if (!/^\+\d{1,15}$/.test(form.phone.trim())) {
+    } else if (!/^\+\d{1,15}$/.test(cleanedPhone)) {
       errors.push('Phone number must be in format +1234567890 (with country code)');
     }
     
@@ -9024,9 +9605,10 @@ export class AppComponent implements OnDestroy, OnInit {
       return;
     }
     
-    // Prepare account data
+    // Prepare account data - use cleaned phone number
+    const cleanedPhoneForSubmit = form.phone.trim().replace(/[\s\-\(\)]/g, '');
     const accountData = {
-      phone: form.phone.trim(),
+      phone: cleanedPhoneForSubmit,
       apiId: form.apiId.trim(),
       apiHash: form.apiHash.trim(),
       proxy: form.proxy.trim() || '',
@@ -9347,18 +9929,27 @@ export class AppComponent implements OnDestroy, OnInit {
   stopMonitoring() { this.ipcService.send('stop-monitoring'); }
   
   // === 一鍵啟動控制 ===
+  // 🔧 P0 v2: 不在前端阻止，讓後端處理帳號連接
   oneClickStart() {
     if (this.oneClickStarting()) {
       this.toastService.warning('正在啟動中，請稍候...', 2000);
       return;
     }
     
+    // 檢查是否有任何帳號配置
+    const totalAccounts = this.accounts().length;
+    if (totalAccounts === 0) {
+      this.toastService.error('❌ 沒有配置任何帳號，請先添加帳號', 4000);
+      return;
+    }
+    
     this.oneClickStarting.set(true);
     this.oneClickProgress.set(0);
-    this.oneClickMessage.set('準備啟動...');
+    this.oneClickMessage.set(`🚀 開始啟動 (${totalAccounts} 個帳號)...`);
     
-    this.ipcService.send('one-click-start', {});
-    this.toastService.info('🚀 開始一鍵啟動...', 2000);
+    // 直接發送啟動命令，後端會嘗試連接所有帳號
+    this.ipcService.send('one-click-start', { forceRefresh: true });
+    this.toastService.info(`🚀 開始一鍵啟動，後端將自動連接 ${totalAccounts} 個帳號`, 3000);
   }
   
   oneClickStop() {
@@ -9742,6 +10333,42 @@ export class AppComponent implements OnDestroy, OnInit {
     };
   }
   
+  // 🆕 同步 leads 到資源中心
+  syncLeadsToResourceCenter(leads: any[]): void {
+    const mappedLeads = (leads || []).map((l: any) => this.mapLeadFromBackend(l));
+    this.contactsService.importLeadsDirectly(mappedLeads);
+    console.log('[Frontend] Synced', mappedLeads.length, 'leads to resource center');
+  }
+  
+  // 🆕 延遲加載剩餘的 leads 數據（後台靜默加載）
+  loadRemainingLeads(): void {
+    console.log('[Frontend] loadRemainingLeads called, loading:', this.leadsLoading(), 'hasMore:', this.leadsHasMore());
+    
+    if (this.leadsLoading()) {
+      console.log('[Frontend] ⏳ Already loading, skipping...');
+      return;
+    }
+    
+    // 🆕 允許強制加載（即使 hasMore 為 false，只要當前數據少於總數）
+    const currentCount = this.leads().length;
+    const total = this.leadsTotal();
+    if (currentCount >= total && total > 0) {
+      console.log('[Frontend] ✅ All data already loaded:', currentCount, '/', total);
+      return;
+    }
+    
+    console.log('[Frontend] 📥 Loading remaining leads:', currentCount, '/', total);
+    this.leadsLoading.set(true);
+    
+    // 請求所有剩餘的 leads
+    this.ipcService.send('get-leads-paginated', {
+      page: 1,
+      pageSize: 500,  // 加載全部
+      status: null,
+      search: null
+    });
+  }
+  
   // 安全的日期格式化，處理 Invalid Date
   safeFormatDate(date: any, format: string = 'MM/dd HH:mm'): string {
     if (!date) return '-';
@@ -9832,17 +10459,17 @@ export class AppComponent implements OnDestroy, OnInit {
   onDownloadTemplate() { this.accountLoaderService.downloadExcelTemplate(); }
   reloadSessionsAndAccounts() { this.accountLoaderService.reloadSessionsAndAccounts(); }
   
-  // QR 掃碼登入
+  // QR 掃碼登入 - 使用 DialogService 統一管理
   openQrLogin() {
-    this.showQrLoginDialog.set(true);
+    this.dialogService.openQrLogin();
   }
   
   closeQrLogin() {
-    this.showQrLoginDialog.set(false);
+    this.dialogService.closeQrLogin();
   }
   
   onQrLoginSuccess(data: any) {
-    this.showQrLoginDialog.set(false);
+    this.dialogService.closeQrLogin();
     this.toastService.success(`帳號 ${data.phone || ''} 已成功添加！`);
     // 重新載入帳號列表
     this.reloadSessionsAndAccounts();
@@ -10954,14 +11581,19 @@ export class AppComponent implements OnDestroy, OnInit {
   
   toggleSelectAllLeads() {
     if (this.isSelectAllLeads()) {
-      // Deselect all
+      // 取消全選
       this.selectedLeadIds.set(new Set());
       this.isSelectAllLeads.set(false);
     } else {
-      // Select all
-      const allIds = new Set(this.leads().map(l => l.id));
+      // 全選當前已加載的數據
+      const currentLeads = this.leads();
+      const allIds = new Set(currentLeads.map(l => l.id));
       this.selectedLeadIds.set(allIds);
       this.isSelectAllLeads.set(true);
+      
+      if (allIds.size > 0) {
+        this.toastService.success(`已選擇 ${allIds.size} 個客戶`);
+      }
     }
   }
   
@@ -10977,8 +11609,13 @@ export class AppComponent implements OnDestroy, OnInit {
   
   // 全選當前篩選的 leads
   selectAllFilteredLeads() {
-    const allIds = new Set(this.filteredLeads().map(l => l.id));
+    const currentLeads = this.filteredLeads();
+    const allIds = new Set(currentLeads.map(l => l.id));
     this.selectedLeadIds.set(allIds);
+    
+    if (allIds.size > 0) {
+      this.toastService.success(`已選擇 ${allIds.size} 個客戶`);
+    }
   }
   
   // 刪除確認狀態
@@ -12806,8 +13443,18 @@ export class AppComponent implements OnDestroy, OnInit {
   }
   
   trackByLogId(index: number, log: LogEntry): any {
-    // 使用 id 和 timestamp 的組合確保唯一性
-    return `${log.id}-${log.timestamp.getTime()}-${index}`;
+    // 🔧 使用 id 和 timestamp 的組合確保唯一性（安全處理不同類型的 timestamp）
+    let timeValue = 0;
+    if (log.timestamp) {
+      if (log.timestamp instanceof Date) {
+        timeValue = log.timestamp.getTime();
+      } else if (typeof log.timestamp === 'number') {
+        timeValue = log.timestamp;
+      } else if (typeof log.timestamp === 'string') {
+        timeValue = new Date(log.timestamp).getTime() || 0;
+      }
+    }
+    return `${log.id}-${timeValue}-${index}`;
   }
 
   // 檢查 alert.details 是否為有效的可顯示對象
@@ -13127,8 +13774,10 @@ export class AppComponent implements OnDestroy, OnInit {
       id: String(group.id),
       name: group.name || group.title || '未知群組',
       url: group.url || '',
+      telegramId: group.telegramId || group.telegram_id || '',  // 🔧 添加 Telegram ID
       memberCount: group.memberCount || group.member_count || 0,
-      accountPhone: group.accountPhone
+      accountPhone: group.accountPhone,
+      resourceType: group.resourceType || group.resource_type || 'group'  // 🆕 資源類型
     };
     
     this.memberExtractionGroup.set(groupInfo);
@@ -13141,6 +13790,43 @@ export class AppComponent implements OnDestroy, OnInit {
   closeMemberExtractionDialog(): void {
     this.showMemberExtractionDialog.set(false);
     this.memberExtractionGroup.set(null);
+  }
+  
+  /**
+   * 🔧 P0: 統一關閉成員提取對話框（同時關閉 DialogService 和本地狀態）
+   */
+  closeMemberExtractionDialogUnified(): void {
+    // 關閉本地狀態
+    this.showMemberExtractionDialog.set(false);
+    this.memberExtractionGroup.set(null);
+    // 關閉 DialogService 狀態
+    this.dialogService.closeMemberExtraction();
+  }
+  
+  /**
+   * 🆕 處理成員數刷新結果
+   * 更新對話框和群組列表中的成員數
+   */
+  handleMemberCountRefreshed(event: { groupId: string; memberCount: number }): void {
+    console.log('[Frontend] Member count refreshed:', event);
+    
+    // 更新對話框中的群組信息
+    const currentGroup = this.memberExtractionGroup();
+    if (currentGroup && currentGroup.id === event.groupId) {
+      this.memberExtractionGroup.set({
+        ...currentGroup,
+        memberCount: event.memberCount
+      });
+    }
+    
+    // 同時更新 monitoredGroups 中的數據
+    this.monitoredGroups.update(groups => 
+      groups.map(g => 
+        String(g.id) === event.groupId 
+          ? { ...g, memberCount: event.memberCount, member_count: event.memberCount }
+          : g
+      )
+    );
   }
   
   /**
@@ -13172,11 +13858,16 @@ export class AppComponent implements OnDestroy, OnInit {
       this.ipcService.send('extract-members', {
         chatId: chatId || group.url,
         username: chatId,
+        telegramId: group.telegramId,  // 🔧 添加 telegramId
         resourceId: group.id,
         groupName: group.name,
+        // 🔧 P0 修復：傳遞已加入群組的帳號
+        phone: event.config.accountPhone || group.accountPhone || null,
         limit: event.config.limit === -1 ? undefined : event.config.limit,
         filters: {
           bots: !event.config.filters.excludeBots,
+          // 🔧 修復：直接傳遞 onlineStatus 字符串，而不是布爾值
+          onlineStatus: event.config.filters.onlineStatus,  // 'all', 'online', 'recently', 'offline'
           offline: event.config.filters.onlineStatus === 'offline',
           online: event.config.filters.onlineStatus === 'online',
           chinese: event.config.filters.hasChinese,
@@ -13285,8 +13976,23 @@ export class AppComponent implements OnDestroy, OnInit {
    */
   refreshLeadsData(): void {
     console.log('[Frontend] Refreshing leads data for resource center...');
-    this.ipcService.send('get-leads', {});
-    this.toastService.info('正在刷新數據...', 1500);
+    
+    // 🆕 先用當前已加載的 leads 同步到資源中心
+    const currentLeads = this.leads();
+    if (currentLeads.length > 0) {
+      this.syncLeadsToResourceCenter(currentLeads);
+      console.log('[Frontend] Synced current leads to resource center:', currentLeads.length);
+    }
+    
+    // 如果還有更多數據未加載，觸發加載
+    if (this.leadsHasMore() && !this.leadsLoading()) {
+      this.loadRemainingLeads();
+      this.toastService.info(`正在加載更多數據... (當前 ${currentLeads.length} / ${this.leadsTotal()} 條)`, 2000);
+    } else if (this.leadsLoading()) {
+      this.toastService.info(`正在加載中... (當前 ${currentLeads.length} / ${this.leadsTotal()} 條)`, 2000);
+    } else {
+      this.toastService.success(`數據已同步 (共 ${currentLeads.length} 條)`);
+    }
   }
   
   /**

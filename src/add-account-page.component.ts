@@ -160,12 +160,24 @@ interface PlatformApiInfo {
               <!-- 輸入手機號 -->
               <div class="form-group">
                 <label>手機號碼 <span class="required">*</span></label>
-                <input 
-                  type="tel" 
-                  [(ngModel)]="phoneNumber"
-                  placeholder="+639952947692"
-                  class="form-input">
-                <span class="hint">請包含國家代碼，例如 +63, +86, +1</span>
+                <div class="input-with-prefix">
+                  <input 
+                    type="tel" 
+                    [ngModel]="phoneNumber"
+                    (ngModelChange)="onPhoneChange($event)"
+                    placeholder="+639952947692"
+                    class="form-input"
+                    [class.error]="phoneError()"
+                    [class.valid]="phoneValid()">
+                  @if (phoneValid()) {
+                    <span class="input-status valid">✓</span>
+                  }
+                </div>
+                @if (phoneError()) {
+                  <span class="error-text">{{ phoneError() }}</span>
+                } @else {
+                  <span class="hint">請包含國家代碼，例如 +63, +86, +1</span>
+                }
               </div>
 
               <div class="form-group">
@@ -190,7 +202,7 @@ interface PlatformApiInfo {
                 <button (click)="currentLoginMethod.set('select')" class="btn-secondary">← 返回</button>
                 <button 
                   (click)="sendVerificationCode()" 
-                  [disabled]="!phoneNumber || isSending()"
+                  [disabled]="!phoneValid() || isSending()"
                   class="btn-primary">
                   @if (isSending()) {
                     <span class="spinner"></span> 發送中...
@@ -852,6 +864,33 @@ interface PlatformApiInfo {
 
     .form-input.error {
       border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.05);
+    }
+    
+    .form-input.valid {
+      border-color: #22c55e;
+    }
+    
+    /* 🆕 輸入框帶狀態指示 */
+    .input-with-prefix {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    
+    .input-with-prefix .form-input {
+      flex: 1;
+      padding-right: 2.5rem;
+    }
+    
+    .input-status {
+      position: absolute;
+      right: 0.75rem;
+      font-size: 1rem;
+    }
+    
+    .input-status.valid {
+      color: #22c55e;
     }
 
     .form-input.code-input {
@@ -1570,6 +1609,10 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
   needs2FA = signal(false);
   resendCooldown = signal(0);
   
+  // 🆕 手機號碼驗證狀態
+  phoneError = signal<string>('');
+  phoneValid = signal(false);
+  
   // QR 登入
   deviceType = signal<'random' | 'ios' | 'android'>('random');
   qrImageBase64 = signal('');
@@ -1595,6 +1638,8 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
   
   private resendTimer: any = null;
   private qrTimer: any = null;
+  private sendTimeout: any = null;  // 🆕 發送超時
+  private verifyTimeout: any = null;  // 🆕 驗證超時（含 2FA）
   private ipcChannels: string[] = [];
 
   ngOnInit(): void {
@@ -1604,6 +1649,8 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.resendTimer) clearInterval(this.resendTimer);
     if (this.qrTimer) clearInterval(this.qrTimer);
+    if (this.sendTimeout) clearTimeout(this.sendTimeout);
+    if (this.verifyTimeout) clearTimeout(this.verifyTimeout);  // 🆕 清理驗證超時
     this.ipcChannels.forEach(ch => this.ipcService.cleanup(ch));
   }
 
@@ -1611,6 +1658,11 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
     // 需要驗證碼（後端發送驗證碼後的回調）
     this.ipcService.on('login-requires-code', (result: any) => {
       this.isSending.set(false);
+      // 🆕 清除超時
+      if (this.sendTimeout) {
+        clearTimeout(this.sendTimeout);
+        this.sendTimeout = null;
+      }
       if (result.phone === this.phoneNumber || result.accountId) {
         // 保存 phone_code_hash 用於後續驗證
         this.phoneCodeHash = result.phoneCodeHash;
@@ -1631,6 +1683,11 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
     // 登入成功
     this.ipcService.on('login-success', (result: any) => {
       this.isVerifying.set(false);
+      // 🆕 清除驗證超時
+      if (this.verifyTimeout) {
+        clearTimeout(this.verifyTimeout);
+        this.verifyTimeout = null;
+      }
       this.addedAccountInfo.set(result.userInfo || { phone: this.phoneNumber });
       this.currentStep.set(3);
       this.accountAdded.emit(result);
@@ -1641,6 +1698,11 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
     // 需要二步驗證
     this.ipcService.on('login-requires-2fa', (result: any) => {
       this.isVerifying.set(false);
+      // 🆕 清除驗證超時（等待用戶輸入 2FA 密碼）
+      if (this.verifyTimeout) {
+        clearTimeout(this.verifyTimeout);
+        this.verifyTimeout = null;
+      }
       this.needs2FA.set(true);
       this.toast.info('請輸入二步驗證密碼');
     });
@@ -1648,11 +1710,15 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
 
     // 登入失敗
     this.ipcService.on('login-error', (result: any) => {
-      this.isSending.set(false);
-      this.isVerifying.set(false);
-      this.toast.error(result.error || result.message || '登入失敗');
+      this.handleLoginError(result);
     });
     this.ipcChannels.push('login-error');
+
+    // 🆕 帳號登入錯誤（後端發送的完整錯誤事件）
+    this.ipcService.on('account-login-error', (result: any) => {
+      this.handleLoginError(result);
+    });
+    this.ipcChannels.push('account-login-error');
 
     // QR 登入
     this.ipcService.on('qr-login-created', (result: any) => {
@@ -1828,6 +1894,45 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
     this.addedAccountInfo.set(null);
   }
 
+  // 🆕 手機號碼即時驗證
+  validatePhone(phone: string): { valid: boolean; error: string } {
+    if (!phone) {
+      return { valid: false, error: '' };
+    }
+    
+    const trimmed = phone.trim();
+    
+    // 檢查是否以 + 開頭
+    if (!trimmed.startsWith('+')) {
+      return { valid: false, error: '號碼必須以 + 開頭，例如 +63、+86、+1' };
+    }
+    
+    // 去掉 + 後檢查是否只有數字
+    const numbersOnly = trimmed.slice(1);
+    if (!/^\d+$/.test(numbersOnly)) {
+      return { valid: false, error: '號碼只能包含數字（+ 號後面）' };
+    }
+    
+    // 檢查長度（國碼+號碼通常 10-15 位）
+    if (numbersOnly.length < 8) {
+      return { valid: false, error: '號碼長度不足（至少需要 8 位數字）' };
+    }
+    
+    if (numbersOnly.length > 15) {
+      return { valid: false, error: '號碼長度過長（最多 15 位數字）' };
+    }
+    
+    return { valid: true, error: '' };
+  }
+  
+  // 🆕 手機輸入變更處理
+  onPhoneChange(value: string): void {
+    this.phoneNumber = value;
+    const result = this.validatePhone(value);
+    this.phoneValid.set(result.valid);
+    this.phoneError.set(result.error);
+  }
+
   // 驗證碼登入
   sendVerificationCode(): void {
     const selectedApi = this.selectedApiCredential();
@@ -1837,11 +1942,26 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
     }
     
     if (!this.phoneNumber) {
+      this.phoneError.set('請輸入手機號碼');
       this.toast.error('請輸入手機號碼');
       return;
     }
     
+    // 🆕 先驗證格式
+    const validation = this.validatePhone(this.phoneNumber);
+    if (!validation.valid) {
+      this.phoneError.set(validation.error);
+      this.toast.error(validation.error);
+      return;
+    }
+    
+    // 🆕 清除之前的超時
+    if (this.sendTimeout) {
+      clearTimeout(this.sendTimeout);
+    }
+    
     this.isSending.set(true);
+    this.phoneError.set(''); // 清除錯誤
     
     // 第一步：添加帳戶
     this.ipcService.send('add-account', {
@@ -1862,12 +1982,33 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
         twoFactorPassword: this.twoFactorPassword || null
       });
     }, 500);
+    
+    // 🆕 30 秒超時保護 - 如果沒有收到回應則恢復按鈕狀態
+    this.sendTimeout = setTimeout(() => {
+      if (this.isSending()) {
+        this.isSending.set(false);
+        this.phoneError.set('請求超時，請檢查網絡連接後重試');
+        this.toast.error('發送驗證碼超時，請重試');
+      }
+    }, 30000);
   }
 
   submitVerificationCode(): void {
     if (!this.verificationCode) {
       this.toast.error('請輸入驗證碼');
       return;
+    }
+    
+    // 🆕 如果需要 2FA 但未輸入密碼
+    if (this.needs2FA() && !this.twoFactorPassword) {
+      this.toast.error('請輸入二步驗證密碼');
+      return;
+    }
+    
+    // 🆕 清除之前的驗證超時
+    if (this.verifyTimeout) {
+      clearTimeout(this.verifyTimeout);
+      this.verifyTimeout = null;
     }
     
     this.isVerifying.set(true);
@@ -1883,10 +2024,55 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
       apiId: selectedApi?.api_id,
       apiHash: selectedApi?.api_hash
     });
+    
+    // 🆕 30 秒驗證超時保護（含 2FA 驗證）
+    this.verifyTimeout = setTimeout(() => {
+      if (this.isVerifying()) {
+        this.isVerifying.set(false);
+        this.toast.error('驗證超時，請檢查網絡連接後重試');
+      }
+    }, 30000);
   }
 
   resendCode(): void {
     this.sendVerificationCode();
+  }
+
+  // 🆕 統一處理登入錯誤
+  private handleLoginError(result: any): void {
+    this.isSending.set(false);
+    this.isVerifying.set(false);
+    
+    // 清除所有超時
+    if (this.sendTimeout) {
+      clearTimeout(this.sendTimeout);
+      this.sendTimeout = null;
+    }
+    if (this.verifyTimeout) {
+      clearTimeout(this.verifyTimeout);
+      this.verifyTimeout = null;
+    }
+    
+    // 根據錯誤類型顯示友好訊息
+    const errorMessage = result.friendlyMessage || result.error || result.message || '登入失敗';
+    
+    // 2FA 密碼錯誤特殊處理
+    if (errorMessage.includes('2FA') && errorMessage.includes('密碼')) {
+      this.toast.error('二步驗證密碼錯誤，請重新輸入');
+      this.twoFactorPassword = '';  // 清空密碼輸入
+      return;
+    }
+    
+    // 驗證碼過期特殊處理
+    if (result.codeExpired) {
+      this.toast.error('驗證碼已過期，請重新發送');
+      this.codeStep.set(false);
+      this.verificationCode = '';
+      this.phoneCodeHash = '';
+      return;
+    }
+    
+    this.toast.error(errorMessage);
   }
 
   private startResendCooldown(): void {

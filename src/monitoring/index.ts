@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 監控模組導出
  */
 
@@ -23,3 +23,4 @@ export { MonitoringGroupsComponent } from './monitoring-groups.component';
 export { KeywordSetsComponent } from './keyword-sets.component';
 export { ChatTemplatesComponent } from './chat-templates.component';
 export { TriggerRulesComponent } from './trigger-rules.component';
+export { CollectedUsersComponent } from './collected-users.component';

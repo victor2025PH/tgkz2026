@@ -18,35 +18,35 @@ DIST_DIR = PROJECT_ROOT / 'dist-backend'
 
 def clean_build():
     """清理之前的構建文件"""
-    print("🧹 清理舊的構建文件...")
+    print("[CLEAN] Cleaning old build files...")
     
     dirs_to_clean = [BUILD_DIR, DIST_DIR]
     for dir_path in dirs_to_clean:
         if dir_path.exists():
             shutil.rmtree(dir_path)
-            print(f"  ✓ 已刪除: {dir_path}")
+            print(f"  [OK] Deleted: {dir_path}")
     
     # 清理 .spec 文件
     for spec_file in PROJECT_ROOT.glob('*.spec'):
         spec_file.unlink()
-        print(f"  ✓ 已刪除: {spec_file}")
+        print(f"  [OK] Deleted: {spec_file}")
 
 
 def install_pyinstaller():
     """確保 PyInstaller 已安裝"""
-    print("📦 檢查 PyInstaller...")
+    print("[CHECK] Checking PyInstaller...")
     try:
         import PyInstaller
-        print(f"  ✓ PyInstaller 版本: {PyInstaller.__version__}")
+        print(f"  [OK] PyInstaller version: {PyInstaller.__version__}")
     except ImportError:
-        print("  ⚠️ PyInstaller 未安裝，正在安裝...")
+        print("  [WARN] PyInstaller not installed, installing...")
         subprocess.run([sys.executable, '-m', 'pip', 'install', 'pyinstaller'], check=True)
-        print("  ✓ PyInstaller 安裝完成")
+        print("  [OK] PyInstaller installed")
 
 
 def create_spec_file():
     """創建 PyInstaller spec 文件"""
-    print("📝 創建 PyInstaller spec 文件...")
+    print("[SPEC] Creating PyInstaller spec file...")
     
     # 收集所有需要的模塊
     hidden_imports = [
@@ -224,14 +224,14 @@ exe = EXE(
     
     spec_path = PROJECT_ROOT / 'tg-matrix-backend.spec'
     spec_path.write_text(spec_content, encoding='utf-8')
-    print(f"  ✓ 已創建: {spec_path}")
+    print(f"  [OK] Created: {spec_path}")
     return spec_path
 
 
 def run_pyinstaller(spec_path):
     """運行 PyInstaller"""
-    print("🔨 編譯 Python 後端...")
-    print("  ⏳ 這可能需要幾分鐘，請耐心等待...")
+    print("[COMPILE] Compiling Python backend...")
+    print("  [WAIT] This may take a few minutes, please wait...")
     
     cmd = [
         sys.executable, '-m', 'PyInstaller',
@@ -246,20 +246,20 @@ def run_pyinstaller(spec_path):
     result = subprocess.run(cmd, cwd=str(PROJECT_ROOT))
     
     if result.returncode != 0:
-        print("❌ PyInstaller 編譯失敗!")
+        print("[ERROR] PyInstaller compilation failed!")
         return False
     
-    print("✅ PyInstaller 編譯成功!")
+    print("[SUCCESS] PyInstaller compilation completed!")
     return True
 
 
 def copy_to_release():
     """複製編譯結果到 release 目錄"""
-    print("📁 複製編譯結果...")
+    print("[COPY] Copying compiled files...")
     
     exe_path = DIST_DIR / 'tg-matrix-backend.exe'
     if not exe_path.exists():
-        print(f"  ❌ 未找到: {exe_path}")
+        print(f"  [ERROR] Not found: {exe_path}")
         return False
     
     # 複製到 backend-exe 目錄
@@ -271,15 +271,15 @@ def copy_to_release():
     
     # 獲取文件大小
     size_mb = target_exe.stat().st_size / (1024 * 1024)
-    print(f"  ✓ 已複製: {target_exe}")
-    print(f"  ✓ 文件大小: {size_mb:.1f} MB")
+    print(f"  [OK] Copied: {target_exe}")
+    print(f"  [OK] File size: {size_mb:.1f} MB")
     
     return True
 
 
 def create_sessions_dir():
     """創建必要的目錄結構"""
-    print("📁 創建目錄結構...")
+    print("[DIR] Creating directory structure...")
     
     dirs = [
         PROJECT_ROOT / 'backend-exe' / 'sessions',
@@ -288,14 +288,19 @@ def create_sessions_dir():
     
     for d in dirs:
         d.mkdir(parents=True, exist_ok=True)
-        print(f"  ✓ 創建: {d}")
+        print(f"  [OK] Created: {d}")
 
 
 def main():
     """主函數"""
+    # 設置輸出編碼
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    
     print("=" * 60)
-    print("🚀 TG-Matrix Python 後端編譯")
-    print("   將 Python 編譯為獨立 exe 文件")
+    print("[BUILD] TG-Matrix Python Backend Compilation")
+    print("   Compiling Python to standalone exe")
     print("=" * 60)
     print()
     
@@ -305,23 +310,23 @@ def main():
     spec_path = create_spec_file()
     
     if not run_pyinstaller(spec_path):
-        print("\n❌ 編譯失敗，請檢查錯誤信息")
+        print("\n[ERROR] Compilation failed, please check error messages")
         sys.exit(1)
     
     if not copy_to_release():
-        print("\n❌ 複製失敗")
+        print("\n[ERROR] Copy failed")
         sys.exit(1)
     
     create_sessions_dir()
     
     print()
     print("=" * 60)
-    print("✅ 編譯完成!")
+    print("[SUCCESS] Compilation completed!")
     print()
-    print("📦 輸出文件:")
+    print("[OUTPUT] Output file:")
     print(f"   {PROJECT_ROOT / 'backend-exe' / 'tg-matrix-backend.exe'}")
     print()
-    print("📋 下一步:")
+    print("[NEXT] Next steps:")
     print("   1. 運行 npm run dist:win 打包完整安裝程序")
     print("=" * 60)
 

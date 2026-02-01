@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TG-AI智控王 - 啟動中</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            color: white;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        .logo {
+            font-size: 48px;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+        .title {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .version {
+            font-size: 14px;
+            color: #64748b;
+            margin-bottom: 40px;
+        }
+        .loading-container {
+            width: 300px;
+            margin-bottom: 20px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #334155;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            width: 0%;
+            transition: width 0.3s ease;
+            animation: loading 2s infinite;
+        }
+        @keyframes loading {
+            0% { width: 0%; margin-left: 0; }
+            50% { width: 60%; margin-left: 20%; }
+            100% { width: 0%; margin-left: 100%; }
+        }
+        .status {
+            font-size: 14px;
+            color: #94a3b8;
+            text-align: center;
+            min-height: 20px;
+        }
+        .error-container {
+            display: none;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            max-width: 400px;
+            text-align: center;
+        }
+        .error-container.show {
+            display: block;
+        }
+        .error-title {
+            color: #f87171;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .error-message {
+            color: #fca5a5;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .retry-btn {
+            margin-top: 15px;
+            padding: 8px 20px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .retry-btn:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="logo">🤖</div>
+    <div class="title">TG-AI智控王</div>
+    <div class="version">v2.0.0-beta.1</div>
+    
+    <div class="loading-container">
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+    </div>
+    
+    <div class="status" id="status">正在初始化...</div>
+    
+    <div class="error-container" id="errorContainer">
+        <div class="error-title">⚠️ 啟動失敗</div>
+        <div class="error-message" id="errorMessage">
+            後端服務啟動失敗，請檢查是否有其他程序占用端口。
+        </div>
+        <button class="retry-btn" onclick="window.electronAPI?.retry()">重試</button>
+    </div>
+
+    <script>
+        // 接收來自主進程的狀態更新
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            
+            ipcRenderer.on('splash-status', (event, data) => {
+                const statusEl = document.getElementById('status');
+                const progressEl = document.getElementById('progressFill');
+                const errorContainer = document.getElementById('errorContainer');
+                const errorMessage = document.getElementById('errorMessage');
+                
+                if (data.error) {
+                    errorContainer.classList.add('show');
+                    errorMessage.textContent = data.error;
+                    statusEl.textContent = '啟動失敗';
+                    progressEl.style.animation = 'none';
+                    progressEl.style.width = '100%';
+                    progressEl.style.background = '#ef4444';
+                } else {
+                    statusEl.textContent = data.message || '正在載入...';
+                    if (data.progress) {
+                        progressEl.style.animation = 'none';
+                        progressEl.style.width = data.progress + '%';
+                    }
+                }
+            });
+            
+            // 重試按鈕
+            window.electronAPI = {
+                retry: () => ipcRenderer.send('splash-retry')
+            };
+        }
+    </script>
+</body>
+</html>

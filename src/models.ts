@@ -1,6 +1,6 @@
 
-export type AccountStatus = 'Online' | 'Offline' | 'Banned' | 'Logging in...' | 'Waiting Code' | 'Waiting 2FA' | 'Error' | 'Resting (Cooldown)' | 'Warming Up' | 'Proxy Error';
-export type AccountRole = 'Listener' | 'Sender' | 'Unassigned';
+export type AccountStatus = 'Online' | 'Offline' | 'Banned' | 'Logging in...' | 'Waiting Code' | 'Waiting 2FA' | 'Error' | 'Resting (Cooldown)' | 'Warming Up' | 'Proxy Error' | 'Connecting';
+export type AccountRole = 'Listener' | 'Sender' | 'Unassigned' | 'Explorer' | 'AI' | 'Backup';
 
 export interface TelegramAccount {
   id: number;
@@ -16,6 +16,8 @@ export interface TelegramAccount {
   group?: string; 
   twoFactorPassword?: string;
   selected?: boolean; // For bulk actions UI
+  name?: string; // 帳戶名稱/備註
+  is_connected?: boolean; // 是否已連接
   
   // Phase 2: IP Binding Fields
   ipBindingId?: string;
@@ -55,6 +57,7 @@ export interface KeywordSet {
     id: number;
     name: string;
     keywords: KeywordConfig[];
+    is_active?: boolean; // 是否啟用
 }
 
 export interface MonitoredGroup {
@@ -64,6 +67,7 @@ export interface MonitoredGroup {
     keywordSetIds: number[];
     telegram_id?: string;  // Telegram 群組 ID
     member_count?: number; // 成員數量
+    isActive?: boolean; // 是否啟用
 }
 
 export type LeadStatus = 'New' | 'Contacted' | 'Replied' | 'Follow-up' | 'Closed-Won' | 'Closed-Lost';

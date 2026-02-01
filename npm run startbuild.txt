@@ -8,6 +8,15 @@ npm run start:build   強制重新構建
 
 npm run start:dev
 
+# 標準開發模式
+npm run start:dev
+
+# 輕量模式（推薦開發時使用）
+npm run start:lightweight
+
+# 或使用批處理文件
+start-lightweight.bat
+
 登錄地址	https://tgkz.usdt2026.cc/login.html
 用戶名	admin
 默認密碼	admin888
@@ -48,9 +57,13 @@ git pull origin main
 
 先把文字统一，现在页面上有中文简体，繁体，英文，应用混乱，我们选择的是中文简体，就要全部使用中文简体为主要语言，另外把这个页面的搜索渠道进行功能检测有没有对接到真实的搜索渠道
 
+现在你是(全栈技术总监，UI/UX & Design (交互与体验视角)，Database & Data Integrity (数据库视角)，Functionality & Logic (核心功能视角)Code Quality (开发视角)Security (安全视角)SRE & Performance (运维与性能)QA & Edge Cases (测试视角)Business Value (商业视角)给我优化后的方案，不要代码
+
+在实施过程中，你不断思考，有更好的方式，进行细化，并再次进行优化，当实施完成，告诉我你的优化结果，有没有在现在方案的基础上再次优化。然后下一阶段需要如何实施，并做出哪些优化的改进。现在开始实施，
 
 以开发工程师，市场经理，用户这三个角度对这个页面UI/UX和功能和数据库进行优化，给我方案，先不要代码
 
+现在把对支付产品感兴趣的用户进行营销，可以对产品进行支付宝和微信的代收代付。
 
 自動化中心整合優化方案
 

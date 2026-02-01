@@ -533,11 +533,14 @@ export interface AccountInfo {
                 </div>
               </div>
               <div class="mt-2 flex items-center gap-4 text-xs text-slate-400">
-                <span>✅ 成功: {{ successCount() }}</span>
-                <span>⚠️ 跳過: {{ skippedCount() }}</span>
-                <span>❌ 失敗: {{ failedCount() }}</span>
+                <span class="text-green-400">✅ 成功: {{ successCount() }}</span>
+                <span class="text-amber-400">⚠️ 跳過: {{ skippedCount() }}</span>
+                <span class="text-red-400">❌ 失敗: {{ failedCount() }}</span>
                 <span>⏳ 預計剩餘: {{ estimatedRemaining() }}</span>
               </div>
+              <p class="mt-1 text-xs text-slate-500">
+                💡 成功包含：直接邀請 + 已發送邀請鏈接
+              </p>
             </div>
           }
           
@@ -596,7 +599,7 @@ export interface AccountInfo {
               [disabled]="!canInvite() || isInviting() || isCreatingGroup()"
               class="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 text-base shadow-lg shadow-emerald-500/20">
               @if (isCreatingGroup()) {
-                <span class="animate-spin">⏳</span> 創建群組中...
+                <span class="animate-spin">⏳</span> {{ createGroupProgressMessage() || '創建群組中...' }}
               } @else if (isInviting()) {
                 <span class="animate-spin">⏳</span> 拉群中...
               } @else if (groupSource() === 'create') {
@@ -624,6 +627,9 @@ export class BatchInviteDialogComponent implements OnInit, OnDestroy {
   // 輸出
   closeDialog = output<void>();
   inviteComplete = output<{ success: number; failed: number; skipped: number }>();
+  
+  // 🔧 Phase 2: 事件隔離 - 使用唯一 ID 跟踪邀請流程
+  private _currentInviteId = signal<string | null>(null);
   
   // 群組來源
   groupSource = signal<GroupSource>('existing');
@@ -675,6 +681,7 @@ export class BatchInviteDialogComponent implements OnInit, OnDestroy {
   // 創建群組狀態
   isCreatingGroup = signal(false);
   createdGroupId = signal<string | null>(null);
+  createGroupProgressMessage = signal<string>('');  // 🔧 P1: 進度提示
   
   // 監聯器清理
   private listeners: (() => void)[] = [];
@@ -738,6 +745,27 @@ export class BatchInviteDialogComponent implements OnInit, OnDestroy {
     this.listeners.push(cleanup1);
     
     const cleanup2 = this.ipc.on('batch-invite:complete', (data: any) => {
+      // 🔧 Phase 2 增強: 嚴格的事件隔離
+      // 1. 檢查對話框是否打開
+      // 2. 檢查是否有活躍的邀請
+      // 3. 檢查 inviteId 是否匹配（如果提供了的話）
+      const currentInviteId = this._currentInviteId();
+      
+      // 如果後端返回了 inviteId，嚴格匹配
+      if (data.inviteId && currentInviteId && data.inviteId !== currentInviteId) {
+        console.log('[BatchInvite] 忽略完成事件（inviteId 不匹配）:', data.inviteId, '!=', currentInviteId);
+        return;
+      }
+      
+      // 如果對話框未打開且沒有活躍邀請，忽略
+      if (!this.isOpen() && !this.isInviting() && !currentInviteId) {
+        console.log('[BatchInvite] 忽略完成事件（對話框未打開且無活躍邀請）');
+        return;
+      }
+      
+      // 清除邀請 ID
+      this._currentInviteId.set(null);
+      
       this.isInviting.set(false);
       this.isCreatingGroup.set(false);
       this.inviteComplete.emit({ 
@@ -745,7 +773,15 @@ export class BatchInviteDialogComponent implements OnInit, OnDestroy {
         failed: data.failed, 
         skipped: data.skipped 
       });
-      this.toast.success(`批量拉群完成：成功 ${data.success}，跳過 ${data.skipped}，失敗 ${data.failed}`);
+      
+      // 🔧 P1: 更友好的完成提示
+      if (data.success > 0) {
+        this.toast.success(`批量拉群完成：✅ 成功/已發送邀請 ${data.success} 人，⚠️ 跳過 ${data.skipped}，❌ 失敗 ${data.failed}`);
+      } else if (data.skipped > 0) {
+        this.toast.warning(`批量拉群完成：所有用戶已在群內或隱私限制`);
+      } else {
+        this.toast.error(`批量拉群失敗：無法邀請任何用戶，請檢查帳號狀態`);
+      }
     });
     this.listeners.push(cleanup2);
     
@@ -790,6 +826,13 @@ export class BatchInviteDialogComponent implements OnInit, OnDestroy {
       }
     });
     this.listeners.push(cleanup6);
+    
+    // 🔧 P1: 創建群組進度
+    const cleanup6b = this.ipc.on('create-group-progress', (data: { step: string, message: string }) => {
+      console.log('[BatchInvite] 創建進度:', data);
+      this.createGroupProgressMessage.set(data.message);
+    });
+    this.listeners.push(cleanup6b);
     
     // 創建群組結果
     const cleanup7 = this.ipc.on('create-group-result', (data: any) => {
@@ -923,17 +966,18 @@ export class BatchInviteDialogComponent implements OnInit, OnDestroy {
     }
     
     this.isCreatingGroup.set(true);
+    this.createGroupProgressMessage.set('正在準備創建群組...');  // 🔧 P1: 初始進度消息
     
-    // 設置 30 秒超時
+    // 🔧 P0: 設置 60 秒超時（創建超級群組需要更長時間）
     if (this.createGroupTimeout) {
       clearTimeout(this.createGroupTimeout);
     }
     this.createGroupTimeout = setTimeout(() => {
       if (this.isCreatingGroup()) {
         this.isCreatingGroup.set(false);
-        this.toast.error('創建群組超時，請檢查網絡連接或帳號狀態');
+        this.toast.error('創建群組超時，請檢查網絡連接或帳號狀態，或嘗試創建普通群組');
       }
-    }, 30000);
+    }, 60000);
     
     console.log('[BatchInvite] 開始創建群組:', {
       name: this.newGroupName,
@@ -967,14 +1011,19 @@ export class BatchInviteDialogComponent implements OnInit, OnDestroy {
   
   // 開始拉人到群組
   startInvitingToGroup(groupId: string, groupUrl: string) {
+    // 🔧 Phase 2: 生成唯一邀請 ID
+    const inviteId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this._currentInviteId.set(inviteId);
+    
     this.isInviting.set(true);
     this.invitedCount.set(0);
     this.successCount.set(0);
     this.failedCount.set(0);
     this.skippedCount.set(0);
     
-    // 發送到後端
+    // 發送到後端（帶上 inviteId）
     this.ipc.send('batch-invite:start', {
+      inviteId: inviteId,  // 🔧 Phase 2: 添加邀請 ID
       groupId: groupId,
       groupUrl: groupUrl,
       targets: this.targets().map(t => ({
@@ -993,6 +1042,7 @@ export class BatchInviteDialogComponent implements OnInit, OnDestroy {
     });
     
     this.toast.info('開始批量拉群...');
+    console.log('[BatchInvite] 開始邀請，inviteId:', inviteId);
   }
   
   close() {

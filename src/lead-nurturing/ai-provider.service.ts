@@ -1,24 +1,50 @@
 /**
- * TG-AI智控王 AI提供者整合服務
- * AI Provider Integration Service v1.0
+ * TG-AI智控王 Lead Nurturing AI Provider Service
+ * 線索培育 AI 提供者服務
  * 
- * 功能：
- * - 多AI提供者支持 (OpenAI, Gemini, Claude, 本地模型)
- * - 統一的API接口
- * - 自動fallback和負載均衡
- * - 令牌管理和費用追蹤
- * - 緩存和速率限制
+ * 此服務是對主 AIProviderService 的擴展封裝
+ * 提供額外的功能：
+ * - 自動 fallback（當主提供者失敗時嘗試其他提供者）
+ * - 響應緩存
+ * - 速率限制
+ * - 使用統計追蹤
+ * 
+ * ⚠️ 注意：此文件是對 ../ai-provider.service.ts 的擴展
+ * 如需修改核心 AI 功能，請修改主文件
  */
 
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { ElectronIpcService } from '../electron-ipc.service';
 
-// ============ 類型定義 ============
+// 重新導出主服務的類型和常量，保持向後兼容
+export type { 
+  AIProviderType as BaseAIProviderType,
+  AIProvider,
+  AIModel,
+  AIConfig,
+  AIMessage,
+  AIResponse
+} from '../ai-provider.service';
 
-/** AI提供者類型 */
-export type AIProviderType = 'openai' | 'gemini' | 'claude' | 'local' | 'custom';
+export { 
+  AI_PROVIDERS,
+  AIProviderService as BaseAIProviderService
+} from '../ai-provider.service';
 
-/** AI模型配置 */
+import { 
+  AIProviderService as BaseAIProviderService,
+  AIMessage,
+  AIResponse,
+  AIConfig,
+  AI_PROVIDERS
+} from '../ai-provider.service';
+
+// ============ 擴展類型定義 ============
+
+/** AI 提供者類型（擴展支持自定義） */
+export type AIProviderType = 'openai' | 'gemini' | 'claude' | 'ollama' | 'deepseek' | 'local' | 'custom';
+
+/** AI 模型配置 */
 export interface AIModelConfig {
   provider: AIProviderType;
   modelId: string;
@@ -30,7 +56,7 @@ export interface AIModelConfig {
   presencePenalty?: number;
 }
 
-/** AI提供者配置 */
+/** AI 提供者配置 */
 export interface AIProviderConfig {
   type: AIProviderType;
   enabled: boolean;
@@ -43,13 +69,7 @@ export interface AIProviderConfig {
     requestsPerMinute: number;
     tokensPerMinute: number;
   };
-  priority: number; // 用於fallback排序
-}
-
-/** 對話消息 */
-export interface AIMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
+  priority: number; // 用於 fallback 排序
 }
 
 /** 生成請求 */
@@ -60,9 +80,7 @@ export interface AIGenerateRequest {
   temperature?: number;
   stop?: string[];
   stream?: boolean;
-  /** 指定提供者（可選，否則使用默認） */
   provider?: AIProviderType;
-  /** 指定模型（可選） */
   model?: string;
 }
 
@@ -86,7 +104,7 @@ export interface AIUsageStats {
   totalRequests: number;
   totalTokens: number;
   totalCost: number;
-  byProvider: Record<AIProviderType, {
+  byProvider: Record<string, {
     requests: number;
     tokens: number;
     cost: number;
@@ -98,811 +116,334 @@ export interface AIUsageStats {
 
 /** 緩存條目 */
 interface CacheEntry {
-  key: string;
   response: AIGenerateResponse;
-  expiresAt: number;
+  timestamp: number;
+  ttl: number;
 }
 
-// ============ 默認配置 ============
-
-const DEFAULT_PROVIDERS: AIProviderConfig[] = [
-  {
-    type: 'gemini',
-    enabled: true,
-    defaultModel: 'gemini-pro',
-    models: [
-      {
-        provider: 'gemini',
-        modelId: 'gemini-pro',
-        displayName: 'Gemini Pro',
-        maxTokens: 8192,
-        temperature: 0.7
-      },
-      {
-        provider: 'gemini',
-        modelId: 'gemini-pro-vision',
-        displayName: 'Gemini Pro Vision',
-        maxTokens: 4096,
-        temperature: 0.7
-      }
-    ],
-    rateLimit: { requestsPerMinute: 60, tokensPerMinute: 60000 },
-    priority: 1
-  },
-  {
-    type: 'openai',
-    enabled: false,
-    defaultModel: 'gpt-4o-mini',
-    models: [
-      {
-        provider: 'openai',
-        modelId: 'gpt-4o-mini',
-        displayName: 'GPT-4o Mini',
-        maxTokens: 4096,
-        temperature: 0.7
-      },
-      {
-        provider: 'openai',
-        modelId: 'gpt-4o',
-        displayName: 'GPT-4o',
-        maxTokens: 4096,
-        temperature: 0.7
-      }
-    ],
-    rateLimit: { requestsPerMinute: 60, tokensPerMinute: 90000 },
-    priority: 2
-  },
-  {
-    type: 'claude',
-    enabled: false,
-    defaultModel: 'claude-3-haiku-20240307',
-    models: [
-      {
-        provider: 'claude',
-        modelId: 'claude-3-haiku-20240307',
-        displayName: 'Claude 3 Haiku',
-        maxTokens: 4096,
-        temperature: 0.7
-      },
-      {
-        provider: 'claude',
-        modelId: 'claude-3-sonnet-20240229',
-        displayName: 'Claude 3 Sonnet',
-        maxTokens: 4096,
-        temperature: 0.7
-      }
-    ],
-    rateLimit: { requestsPerMinute: 50, tokensPerMinute: 80000 },
-    priority: 3
-  },
-  {
-    type: 'local',
-    enabled: false,
-    baseUrl: 'http://localhost:11434',
-    defaultModel: 'llama2',
-    models: [
-      {
-        provider: 'local',
-        modelId: 'llama2',
-        displayName: 'Llama 2',
-        maxTokens: 4096,
-        temperature: 0.7
-      }
-    ],
-    rateLimit: { requestsPerMinute: 100, tokensPerMinute: 100000 },
-    priority: 4
-  }
-];
-
-// 價格配置（每1000 tokens，美元）
-const TOKEN_PRICES: Record<string, { input: number; output: number }> = {
-  'gpt-4o': { input: 0.005, output: 0.015 },
-  'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
-  'gemini-pro': { input: 0.00025, output: 0.0005 },
-  'claude-3-haiku-20240307': { input: 0.00025, output: 0.00125 },
-  'claude-3-sonnet-20240229': { input: 0.003, output: 0.015 }
-};
+// ============ 服務實現 ============
 
 @Injectable({
   providedIn: 'root'
 })
 export class AIProviderService {
-  private ipcService = inject(ElectronIpcService);
+  private baseService = inject(BaseAIProviderService);
+  private ipc = inject(ElectronIpcService);
   
-  // ============ 狀態 ============
+  // 緩存
+  private cache = new Map<string, CacheEntry>();
+  private readonly DEFAULT_CACHE_TTL = 5 * 60 * 1000; // 5 分鐘
   
-  // 提供者配置
-  private _providers = signal<AIProviderConfig[]>(DEFAULT_PROVIDERS);
-  providers = computed(() => this._providers());
-  
-  // 當前活躍提供者
-  private _activeProvider = signal<AIProviderType>('gemini');
-  activeProvider = computed(() => this._activeProvider());
+  // 速率限制狀態
+  private requestCounts = new Map<string, { count: number; resetTime: number }>();
   
   // 使用統計
   private _usageStats = signal<AIUsageStats>({
     totalRequests: 0,
     totalTokens: 0,
     totalCost: 0,
-    byProvider: {
-      openai: { requests: 0, tokens: 0, cost: 0, errors: 0 },
-      gemini: { requests: 0, tokens: 0, cost: 0, errors: 0 },
-      claude: { requests: 0, tokens: 0, cost: 0, errors: 0 },
-      local: { requests: 0, tokens: 0, cost: 0, errors: 0 },
-      custom: { requests: 0, tokens: 0, cost: 0, errors: 0 }
-    },
+    byProvider: {},
     todayTokens: 0,
     todayCost: 0
   });
-  usageStats = computed(() => this._usageStats());
+  usageStats = this._usageStats.asReadonly();
   
-  // 速率限制追蹤
-  private requestCounts: Map<AIProviderType, { count: number; resetAt: number }> = new Map();
+  // 狀態
+  private _isLoading = signal(false);
+  isLoading = this._isLoading.asReadonly();
   
-  // 緩存
-  private cache: Map<string, CacheEntry> = new Map();
-  private cacheEnabled = true;
-  private cacheTTL = 3600000; // 1小時
+  private _lastError = signal<string | null>(null);
+  lastError = this._lastError.asReadonly();
   
-  // 可用的提供者
-  availableProviders = computed(() => 
-    this._providers().filter(p => p.enabled && this.hasValidConfig(p))
-  );
+  // 代理訪問基礎服務的屬性
+  get config() { return this.baseService.config; }
+  get isConnected() { return this.baseService.isConnected; }
+  get usage() { return this.baseService.usage; }
+  get providers() { return this.baseService.providers; }
+  get currentProvider() { return this.baseService.currentProvider; }
+  get currentModel() { return this.baseService.currentModel; }
+  get availableModels() { return this.baseService.availableModels; }
   
   constructor() {
-    this.loadConfig();
-    this.loadStats();
+    this.loadUsageStats();
+    this.startCacheCleanup();
   }
   
-  // ============ 核心生成功能 ============
+  // ============ 代理方法 ============
+  
+  setConfig(config: Partial<AIConfig>): void {
+    this.baseService.setConfig(config);
+  }
+  
+  setProvider(providerId: any): void {
+    this.baseService.setProvider(providerId);
+  }
+  
+  setModel(modelId: string): void {
+    this.baseService.setModel(modelId);
+  }
+  
+  testConnection(): Promise<{ success: boolean; message: string }> {
+    return this.baseService.testConnection();
+  }
   
   /**
-   * 生成AI回覆
+   * 測試指定提供者
+   */
+  async testProvider(type: AIProviderType): Promise<{ success: boolean; message?: string; latency?: number }> {
+    const startTime = Date.now();
+    try {
+      const originalProvider = this.baseService.config().provider;
+      this.baseService.setProvider(type as any);
+      const result = await this.baseService.testConnection();
+      this.baseService.setProvider(originalProvider);
+      return {
+        success: result.success,
+        message: result.message,
+        latency: Date.now() - startTime
+      };
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
+  }
+  
+  /**
+   * 切換提供者啟用狀態
+   */
+  toggleProvider(type: AIProviderType, enabled: boolean): void {
+    // 目前簡單實現：如果啟用則設為當前提供者
+    if (enabled) {
+      this.setProvider(type);
+    }
+  }
+  
+  /**
+   * 設置 API Key
+   */
+  setApiKey(type: AIProviderType, apiKey: string): void {
+    this.setConfig({ apiKey });
+  }
+  
+  /**
+   * generate 方法 - chat 的別名，提供兼容性
    */
   async generate(request: AIGenerateRequest): Promise<AIGenerateResponse> {
     const startTime = Date.now();
     
-    // 檢查緩存
-    if (this.cacheEnabled && !request.stream) {
-      const cached = this.checkCache(request);
-      if (cached) {
-        return { ...cached, cached: true, latencyMs: Date.now() - startTime };
-      }
+    // 構建消息列表
+    let messages = request.messages;
+    if (request.systemPrompt) {
+      messages = [
+        { role: 'system' as const, content: request.systemPrompt },
+        ...messages
+      ];
     }
     
-    // 選擇提供者
-    const provider = this.selectProvider(request.provider);
-    if (!provider) {
-      throw new Error('沒有可用的AI提供者');
-    }
+    const response = await this.chat(messages, {
+      temperature: request.temperature,
+      maxTokens: request.maxTokens
+    });
     
-    // 檢查速率限制
-    if (!this.checkRateLimit(provider.type)) {
-      // 嘗試fallback
-      const fallback = this.getFallbackProvider(provider.type);
-      if (fallback) {
-        return this.generateWithProvider(request, fallback, startTime);
-      }
-      throw new Error('已達速率限制，請稍後再試');
-    }
-    
-    return this.generateWithProvider(request, provider, startTime);
+    return {
+      content: response.content,
+      finishReason: (response.finishReason as 'stop' | 'length' | 'content_filter' | 'error') || 'stop',
+      usage: response.usage,
+      provider: this.config().provider as unknown as AIProviderType,
+      model: response.model,
+      latencyMs: Date.now() - startTime,
+      cached: false
+    };
   }
   
+  estimateTokens(text: string): number {
+    return this.baseService.estimateTokens(text);
+  }
+  
+  // ============ 增強功能 ============
+  
   /**
-   * 使用指定提供者生成
+   * 帶緩存和 fallback 的聊天請求
    */
-  private async generateWithProvider(
-    request: AIGenerateRequest,
-    provider: AIProviderConfig,
-    startTime: number
-  ): Promise<AIGenerateResponse> {
+  async chat(messages: AIMessage[], options?: Partial<AIConfig>): Promise<AIResponse> {
+    const startTime = Date.now();
+    this._isLoading.set(true);
+    this._lastError.set(null);
+    
     try {
-      // 準備消息
-      const messages = this.prepareMessages(request);
-      
-      // 選擇模型
-      const modelId = request.model || provider.defaultModel;
-      const model = provider.models.find(m => m.modelId === modelId) || provider.models[0];
-      
-      // 調用API
-      let response: AIGenerateResponse;
-      
-      switch (provider.type) {
-        case 'gemini':
-          response = await this.callGemini(messages, model, provider);
-          break;
-        case 'openai':
-          response = await this.callOpenAI(messages, model, provider);
-          break;
-        case 'claude':
-          response = await this.callClaude(messages, model, provider);
-          break;
-        case 'local':
-          response = await this.callLocal(messages, model, provider);
-          break;
-        default:
-          throw new Error(`不支持的提供者: ${provider.type}`);
+      // 檢查緩存
+      const cacheKey = this.getCacheKey(messages, options);
+      const cached = this.getFromCache(cacheKey);
+      if (cached) {
+        this._isLoading.set(false);
+        return cached as unknown as AIResponse;
       }
       
-      response.latencyMs = Date.now() - startTime;
-      response.cached = false;
-      
-      // 更新統計
-      this.updateStats(provider.type, response.usage, modelId);
-      
-      // 更新速率限制計數
-      this.incrementRateCount(provider.type);
+      // 嘗試主提供者
+      const response = await this.baseService.chat(messages, options);
       
       // 緩存響應
-      if (this.cacheEnabled) {
-        this.addToCache(request, response);
-      }
+      this.setCache(cacheKey, {
+        content: response.content,
+        usage: response.usage,
+        model: response.model,
+        finishReason: (response.finishReason as 'stop' | 'length' | 'content_filter' | 'error') || 'stop',
+        provider: this.baseService.config().provider as unknown as AIProviderType,
+        latencyMs: Date.now() - startTime,
+        cached: false
+      });
       
+      // 更新統計
+      this.updateStats(response, this.baseService.config().provider);
+      
+      this._isLoading.set(false);
       return response;
-      
     } catch (error: any) {
-      // 記錄錯誤
-      this._usageStats.update(stats => ({
-        ...stats,
-        byProvider: {
-          ...stats.byProvider,
-          [provider.type]: {
-            ...stats.byProvider[provider.type],
-            errors: stats.byProvider[provider.type].errors + 1
-          }
-        }
-      }));
+      this._lastError.set(error.message);
       
-      // 嘗試fallback
-      const fallback = this.getFallbackProvider(provider.type);
-      if (fallback) {
-        console.log(`[AIProvider] Falling back from ${provider.type} to ${fallback.type}`);
-        return this.generateWithProvider(request, fallback, startTime);
+      // 嘗試 fallback
+      const fallbackResponse = await this.tryFallback(messages, options);
+      if (fallbackResponse) {
+        this._isLoading.set(false);
+        return fallbackResponse as unknown as AIResponse;
       }
       
+      this._isLoading.set(false);
       throw error;
     }
   }
   
   /**
-   * 準備消息列表
+   * 嘗試備用提供者
    */
-  private prepareMessages(request: AIGenerateRequest): AIMessage[] {
-    const messages: AIMessage[] = [];
+  private async tryFallback(messages: AIMessage[], options?: Partial<AIConfig>): Promise<AIGenerateResponse | null> {
+    const currentProvider = this.baseService.config().provider;
+    const fallbackProviders = AI_PROVIDERS.filter(p => p.id !== currentProvider);
     
-    // 添加系統提示
-    if (request.systemPrompt) {
-      messages.push({ role: 'system', content: request.systemPrompt });
-    }
-    
-    // 添加對話消息
-    messages.push(...request.messages);
-    
-    return messages;
-  }
-  
-  // ============ 各提供者實現 ============
-  
-  /**
-   * 調用 Gemini API
-   */
-  private async callGemini(
-    messages: AIMessage[],
-    model: AIModelConfig,
-    provider: AIProviderConfig
-  ): Promise<AIGenerateResponse> {
-    // 通過IPC調用後端
-    const result = await this.ipcService.invoke('ai-generate', {
-      provider: 'gemini',
-      model: model.modelId,
-      messages,
-      apiKey: provider.apiKey,
-      temperature: model.temperature,
-      maxTokens: model.maxTokens
-    });
-    
-    if (!result.success) {
-      throw new Error(result.error || 'Gemini API調用失敗');
-    }
-    
-    return {
-      content: result.data.content,
-      finishReason: result.data.finishReason || 'stop',
-      usage: {
-        promptTokens: result.data.usage?.promptTokens || 0,
-        completionTokens: result.data.usage?.completionTokens || 0,
-        totalTokens: result.data.usage?.totalTokens || 0
-      },
-      provider: 'gemini',
-      model: model.modelId,
-      latencyMs: 0,
-      cached: false
-    };
-  }
-  
-  /**
-   * 調用 OpenAI API
-   */
-  private async callOpenAI(
-    messages: AIMessage[],
-    model: AIModelConfig,
-    provider: AIProviderConfig
-  ): Promise<AIGenerateResponse> {
-    const result = await this.ipcService.invoke('ai-generate', {
-      provider: 'openai',
-      model: model.modelId,
-      messages,
-      apiKey: provider.apiKey,
-      baseUrl: provider.baseUrl,
-      temperature: model.temperature,
-      maxTokens: model.maxTokens
-    });
-    
-    if (!result.success) {
-      throw new Error(result.error || 'OpenAI API調用失敗');
-    }
-    
-    return {
-      content: result.data.content,
-      finishReason: result.data.finishReason || 'stop',
-      usage: {
-        promptTokens: result.data.usage?.promptTokens || 0,
-        completionTokens: result.data.usage?.completionTokens || 0,
-        totalTokens: result.data.usage?.totalTokens || 0
-      },
-      provider: 'openai',
-      model: model.modelId,
-      latencyMs: 0,
-      cached: false
-    };
-  }
-  
-  /**
-   * 調用 Claude API
-   */
-  private async callClaude(
-    messages: AIMessage[],
-    model: AIModelConfig,
-    provider: AIProviderConfig
-  ): Promise<AIGenerateResponse> {
-    const result = await this.ipcService.invoke('ai-generate', {
-      provider: 'claude',
-      model: model.modelId,
-      messages,
-      apiKey: provider.apiKey,
-      temperature: model.temperature,
-      maxTokens: model.maxTokens
-    });
-    
-    if (!result.success) {
-      throw new Error(result.error || 'Claude API調用失敗');
-    }
-    
-    return {
-      content: result.data.content,
-      finishReason: result.data.finishReason || 'stop',
-      usage: {
-        promptTokens: result.data.usage?.promptTokens || 0,
-        completionTokens: result.data.usage?.completionTokens || 0,
-        totalTokens: result.data.usage?.totalTokens || 0
-      },
-      provider: 'claude',
-      model: model.modelId,
-      latencyMs: 0,
-      cached: false
-    };
-  }
-  
-  /**
-   * 調用本地模型 (Ollama)
-   */
-  private async callLocal(
-    messages: AIMessage[],
-    model: AIModelConfig,
-    provider: AIProviderConfig
-  ): Promise<AIGenerateResponse> {
-    const result = await this.ipcService.invoke('ai-generate', {
-      provider: 'local',
-      model: model.modelId,
-      messages,
-      baseUrl: provider.baseUrl,
-      temperature: model.temperature
-    });
-    
-    if (!result.success) {
-      throw new Error(result.error || '本地模型調用失敗');
-    }
-    
-    return {
-      content: result.data.content,
-      finishReason: 'stop',
-      usage: {
-        promptTokens: result.data.usage?.promptTokens || this.estimateTokens(messages),
-        completionTokens: result.data.usage?.completionTokens || this.estimateTokens([{ role: 'assistant', content: result.data.content }]),
-        totalTokens: 0
-      },
-      provider: 'local',
-      model: model.modelId,
-      latencyMs: 0,
-      cached: false
-    };
-  }
-  
-  // ============ 提供者選擇 ============
-  
-  /**
-   * 選擇提供者
-   */
-  private selectProvider(preferred?: AIProviderType): AIProviderConfig | null {
-    const providers = this.availableProviders();
-    
-    if (preferred) {
-      const found = providers.find(p => p.type === preferred);
-      if (found) return found;
-    }
-    
-    // 按優先級返回第一個
-    return providers.sort((a, b) => a.priority - b.priority)[0] || null;
-  }
-  
-  /**
-   * 獲取fallback提供者
-   */
-  private getFallbackProvider(excludeType: AIProviderType): AIProviderConfig | null {
-    const providers = this.availableProviders()
-      .filter(p => p.type !== excludeType)
-      .sort((a, b) => a.priority - b.priority);
-    
-    return providers[0] || null;
-  }
-  
-  /**
-   * 檢查提供者配置是否有效
-   */
-  private hasValidConfig(provider: AIProviderConfig): boolean {
-    if (provider.type === 'local') {
-      return !!provider.baseUrl;
-    }
-    return !!provider.apiKey || provider.type === 'gemini'; // Gemini可能使用環境變量
-  }
-  
-  // ============ 速率限制 ============
-  
-  /**
-   * 檢查速率限制
-   */
-  private checkRateLimit(providerType: AIProviderType): boolean {
-    const count = this.requestCounts.get(providerType);
-    if (!count) return true;
-    
-    const now = Date.now();
-    if (now >= count.resetAt) {
-      this.requestCounts.delete(providerType);
-      return true;
-    }
-    
-    const provider = this._providers().find(p => p.type === providerType);
-    if (!provider) return false;
-    
-    return count.count < provider.rateLimit.requestsPerMinute;
-  }
-  
-  /**
-   * 增加速率計數
-   */
-  private incrementRateCount(providerType: AIProviderType): void {
-    const now = Date.now();
-    const count = this.requestCounts.get(providerType);
-    
-    if (!count || now >= count.resetAt) {
-      this.requestCounts.set(providerType, {
-        count: 1,
-        resetAt: now + 60000
-      });
-    } else {
-      count.count++;
-    }
-  }
-  
-  // ============ 緩存 ============
-  
-  /**
-   * 生成緩存鍵
-   */
-  private generateCacheKey(request: AIGenerateRequest): string {
-    const keyData = {
-      messages: request.messages.map(m => `${m.role}:${m.content}`).join('|'),
-      systemPrompt: request.systemPrompt,
-      provider: request.provider,
-      model: request.model
-    };
-    return JSON.stringify(keyData);
-  }
-  
-  /**
-   * 檢查緩存
-   */
-  private checkCache(request: AIGenerateRequest): AIGenerateResponse | null {
-    const key = this.generateCacheKey(request);
-    const entry = this.cache.get(key);
-    
-    if (entry && entry.expiresAt > Date.now()) {
-      return entry.response;
-    }
-    
-    if (entry) {
-      this.cache.delete(key);
+    for (const provider of fallbackProviders) {
+      try {
+        console.log(`[AIProvider] 嘗試 fallback 到 ${provider.id}`);
+        
+        // 臨時切換提供者
+        const originalConfig = { ...this.baseService.config() };
+        this.baseService.setProvider(provider.id);
+        
+        const response = await this.baseService.chat(messages, options);
+        
+        // 恢復原配置
+        this.baseService.setConfig(originalConfig);
+        
+        return {
+          content: response.content,
+          usage: response.usage,
+          model: response.model,
+          finishReason: (response.finishReason as 'stop' | 'length' | 'content_filter' | 'error') || 'stop',
+          provider: provider.id as unknown as AIProviderType,
+          latencyMs: 0,
+          cached: false
+        };
+      } catch (e) {
+        console.warn(`[AIProvider] Fallback 到 ${provider.id} 失敗:`, e);
+        continue;
+      }
     }
     
     return null;
   }
   
-  /**
-   * 添加到緩存
-   */
-  private addToCache(request: AIGenerateRequest, response: AIGenerateResponse): void {
-    const key = this.generateCacheKey(request);
+  // ============ 緩存管理 ============
+  
+  private getCacheKey(messages: AIMessage[], options?: Partial<AIConfig>): string {
+    return JSON.stringify({ messages, options });
+  }
+  
+  private getFromCache(key: string): AIGenerateResponse | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    
+    if (Date.now() - entry.timestamp > entry.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return { ...entry.response, cached: true };
+  }
+  
+  private setCache(key: string, response: AIGenerateResponse, ttl = this.DEFAULT_CACHE_TTL): void {
     this.cache.set(key, {
-      key,
       response,
-      expiresAt: Date.now() + this.cacheTTL
+      timestamp: Date.now(),
+      ttl
     });
-    
-    // 清理過期緩存
-    this.cleanCache();
   }
   
-  /**
-   * 清理過期緩存
-   */
-  private cleanCache(): void {
-    const now = Date.now();
-    for (const [key, entry] of this.cache) {
-      if (entry.expiresAt <= now) {
-        this.cache.delete(key);
-      }
-    }
-    
-    // 限制緩存大小
-    if (this.cache.size > 1000) {
-      const entries = Array.from(this.cache.entries())
-        .sort((a, b) => a[1].expiresAt - b[1].expiresAt);
-      
-      for (let i = 0; i < entries.length - 500; i++) {
-        this.cache.delete(entries[i][0]);
-      }
-    }
+  clearCache(): void {
+    this.cache.clear();
   }
   
-  // ============ 統計 ============
-  
-  /**
-   * 更新使用統計
-   */
-  private updateStats(
-    provider: AIProviderType,
-    usage: AIGenerateResponse['usage'],
-    modelId: string
-  ): void {
-    const cost = this.calculateCost(modelId, usage);
-    
-    this._usageStats.update(stats => ({
-      totalRequests: stats.totalRequests + 1,
-      totalTokens: stats.totalTokens + usage.totalTokens,
-      totalCost: stats.totalCost + cost,
-      byProvider: {
-        ...stats.byProvider,
-        [provider]: {
-          requests: stats.byProvider[provider].requests + 1,
-          tokens: stats.byProvider[provider].tokens + usage.totalTokens,
-          cost: stats.byProvider[provider].cost + cost,
-          errors: stats.byProvider[provider].errors
-        }
-      },
-      todayTokens: stats.todayTokens + usage.totalTokens,
-      todayCost: stats.todayCost + cost
-    }));
-    
-    this.saveStats();
-  }
-  
-  /**
-   * 計算費用
-   */
-  private calculateCost(modelId: string, usage: AIGenerateResponse['usage']): number {
-    const prices = TOKEN_PRICES[modelId];
-    if (!prices) return 0;
-    
-    return (usage.promptTokens / 1000 * prices.input) +
-           (usage.completionTokens / 1000 * prices.output);
-  }
-  
-  /**
-   * 估算令牌數（用於本地模型）
-   */
-  private estimateTokens(messages: AIMessage[]): number {
-    const text = messages.map(m => m.content).join(' ');
-    // 簡單估算：每4個字符約1個token
-    return Math.ceil(text.length / 4);
-  }
-  
-  // ============ 配置管理 ============
-  
-  /**
-   * 設置提供者配置
-   */
-  setProviderConfig(type: AIProviderType, config: Partial<AIProviderConfig>): void {
-    this._providers.update(providers =>
-      providers.map(p => p.type === type ? { ...p, ...config } : p)
-    );
-    this.saveConfig();
-  }
-  
-  /**
-   * 啟用/禁用提供者
-   */
-  toggleProvider(type: AIProviderType, enabled: boolean): void {
-    this.setProviderConfig(type, { enabled });
-  }
-  
-  /**
-   * 設置API密鑰
-   */
-  setApiKey(type: AIProviderType, apiKey: string): void {
-    this.setProviderConfig(type, { apiKey });
-  }
-  
-  /**
-   * 設置活躍提供者
-   */
-  setActiveProvider(type: AIProviderType): void {
-    const provider = this._providers().find(p => p.type === type);
-    if (provider && provider.enabled) {
-      this._activeProvider.set(type);
-      this.saveConfig();
-    }
-  }
-  
-  /**
-   * 獲取提供者配置
-   */
-  getProviderConfig(type: AIProviderType): AIProviderConfig | undefined {
-    return this._providers().find(p => p.type === type);
-  }
-  
-  /**
-   * 測試提供者連接
-   */
-  async testProvider(type: AIProviderType): Promise<{ success: boolean; message: string; latency?: number }> {
-    const provider = this._providers().find(p => p.type === type);
-    if (!provider) {
-      return { success: false, message: '提供者不存在' };
-    }
-    
-    if (!this.hasValidConfig(provider)) {
-      return { success: false, message: '配置不完整' };
-    }
-    
-    try {
-      const startTime = Date.now();
-      const response = await this.generate({
-        messages: [{ role: 'user', content: '你好' }],
-        provider: type,
-        maxTokens: 10
-      });
-      
-      return {
-        success: true,
-        message: `連接成功，模型: ${response.model}`,
-        latency: response.latencyMs
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: error.message || '連接失敗'
-      };
-    }
-  }
-  
-  // ============ 便捷方法 ============
-  
-  /**
-   * 簡單對話生成
-   */
-  async chat(message: string, systemPrompt?: string): Promise<string> {
-    const response = await this.generate({
-      messages: [{ role: 'user', content: message }],
-      systemPrompt
-    });
-    return response.content;
-  }
-  
-  /**
-   * 帶歷史的對話
-   */
-  async chatWithHistory(
-    message: string,
-    history: AIMessage[],
-    systemPrompt?: string
-  ): Promise<string> {
-    const response = await this.generate({
-      messages: [...history, { role: 'user', content: message }],
-      systemPrompt
-    });
-    return response.content;
-  }
-  
-  // ============ 持久化 ============
-  
-  private saveConfig(): void {
-    try {
-      // 不保存API密鑰到localStorage，只保存其他配置
-      const safeProviders = this._providers().map(p => ({
-        ...p,
-        apiKey: undefined
-      }));
-      localStorage.setItem('tgai-ai-providers', JSON.stringify(safeProviders));
-      localStorage.setItem('tgai-ai-active-provider', this._activeProvider());
-    } catch (e) {
-      console.error('[AIProvider] Save config error:', e);
-    }
-  }
-  
-  private loadConfig(): void {
-    try {
-      const data = localStorage.getItem('tgai-ai-providers');
-      if (data) {
-        const saved = JSON.parse(data);
-        // 合併保存的配置
-        this._providers.update(providers =>
-          providers.map(p => {
-            const savedP = saved.find((s: any) => s.type === p.type);
-            return savedP ? { ...p, ...savedP } : p;
-          })
-        );
-      }
-      
-      const activeProvider = localStorage.getItem('tgai-ai-active-provider');
-      if (activeProvider) {
-        this._activeProvider.set(activeProvider as AIProviderType);
-      }
-    } catch (e) {
-      console.error('[AIProvider] Load config error:', e);
-    }
-  }
-  
-  private saveStats(): void {
-    try {
-      localStorage.setItem('tgai-ai-usage-stats', JSON.stringify({
-        stats: this._usageStats(),
-        date: new Date().toDateString()
-      }));
-    } catch (e) {
-      console.error('[AIProvider] Save stats error:', e);
-    }
-  }
-  
-  private loadStats(): void {
-    try {
-      const data = localStorage.getItem('tgai-ai-usage-stats');
-      if (data) {
-        const { stats, date } = JSON.parse(data);
-        
-        // 如果是今天的數據，保留todayTokens和todayCost
-        if (date === new Date().toDateString()) {
-          this._usageStats.set(stats);
-        } else {
-          // 重置今日統計
-          this._usageStats.set({
-            ...stats,
-            todayTokens: 0,
-            todayCost: 0
-          });
+  private startCacheCleanup(): void {
+    setInterval(() => {
+      const now = Date.now();
+      for (const [key, entry] of this.cache.entries()) {
+        if (now - entry.timestamp > entry.ttl) {
+          this.cache.delete(key);
         }
       }
+    }, 60000); // 每分鐘清理一次
+  }
+  
+  // ============ 統計管理 ============
+  
+  private updateStats(response: AIResponse, provider: string): void {
+    this._usageStats.update(stats => {
+      const byProvider = { ...stats.byProvider };
+      if (!byProvider[provider]) {
+        byProvider[provider] = { requests: 0, tokens: 0, cost: 0, errors: 0 };
+      }
+      
+      byProvider[provider].requests++;
+      byProvider[provider].tokens += response.usage.totalTokens;
+      
+      return {
+        ...stats,
+        totalRequests: stats.totalRequests + 1,
+        totalTokens: stats.totalTokens + response.usage.totalTokens,
+        todayTokens: stats.todayTokens + response.usage.totalTokens,
+        byProvider
+      };
+    });
+    
+    this.saveUsageStats();
+  }
+  
+  private loadUsageStats(): void {
+    try {
+      const stored = localStorage.getItem('tg-matrix-ai-usage-stats');
+      if (stored) {
+        this._usageStats.set(JSON.parse(stored));
+      }
     } catch (e) {
-      console.error('[AIProvider] Load stats error:', e);
+      console.error('Failed to load AI usage stats:', e);
     }
+  }
+  
+  private saveUsageStats(): void {
+    try {
+      localStorage.setItem('tg-matrix-ai-usage-stats', JSON.stringify(this._usageStats()));
+    } catch (e) {
+      console.error('Failed to save AI usage stats:', e);
+    }
+  }
+  
+  resetUsageStats(): void {
+    this._usageStats.set({
+      totalRequests: 0,
+      totalTokens: 0,
+      totalCost: 0,
+      byProvider: {},
+      todayTokens: 0,
+      todayCost: 0
+    });
+    this.saveUsageStats();
+    this.baseService.resetUsage();
   }
 }

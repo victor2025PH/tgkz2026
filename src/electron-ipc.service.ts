@@ -310,6 +310,21 @@ export class ElectronIpcService implements OnDestroy {
         error: result.error
       });
     }
+    
+    // 🆕 初始狀態命令 - 觸發 initial-state 事件來確認連接
+    if (command === 'get-initial-state') {
+      this.triggerEvent('initial-state', result);
+    }
+    
+    // 🆕 監控狀態命令
+    if (command === 'get-monitoring-status') {
+      this.triggerEvent('monitoring-status', result);
+    }
+    
+    // 🆕 系統狀態命令
+    if (command === 'get-system-status') {
+      this.triggerEvent('system-status', result);
+    }
   }
   
   /**

@@ -566,7 +566,10 @@ export class DynamicTopicGeneratorService {
 只返回消息內容，不要其他說明。`;
 
     try {
-      const content = await this.aiProvider.chat(prompt);
+      const response = await this.aiProvider.chat([
+        { role: 'user', content: prompt }
+      ]);
+      const content = response.content;
       
       return {
         content: content.trim(),

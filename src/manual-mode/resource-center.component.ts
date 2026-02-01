@@ -15,6 +15,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { UnifiedContactsService, UnifiedContact, ContactType, ContactStatus, SourceType, DEFAULT_TAGS, STATUS_OPTIONS } from '../services/unified-contacts.service';
 import { ToastService } from '../toast.service';
+import { NavBridgeService } from '../services/nav-bridge.service';
 
 // Tab 類型
 type ResourceTab = 'all' | 'users' | 'groups' | 'channels';
@@ -47,6 +48,12 @@ type ResourceTab = 'all' | 'users' | 'groups' | 'channels';
           
           <!-- 操作按鈕 -->
           <div class="flex items-center gap-3">
+            <!-- 🆕 P1: 前往發送控制台快捷按鈕 -->
+            <button (click)="goToSendConsole()"
+                    class="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-600 hover:to-blue-600 transition-colors flex items-center gap-2">
+              <span>📤</span>
+              發送控制台
+            </button>
             <button (click)="syncData()"
                     [disabled]="contactsService.isSyncing()"
                     class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors flex items-center gap-2">
@@ -67,59 +74,51 @@ type ResourceTab = 'all' | 'users' | 'groups' | 'channels';
         </div>
       </div>
       
-      <!-- 統計卡片 -->
+      <!-- 🆕 簡化統計卡片 - 聚焦核心指標 -->
       <div class="p-4 border-b border-slate-700/30">
-        <!-- 第一行：類型統計 -->
-        <div class="grid grid-cols-5 gap-4 mb-4">
-          <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-            <div class="text-slate-400 text-sm mb-1">📊 總數</div>
-            <div class="text-2xl font-bold text-white">{{ contactsService.stats().total }}</div>
+        <div class="grid grid-cols-4 gap-4">
+          <!-- 總資源數 -->
+          <div class="bg-gradient-to-br from-slate-800/80 to-slate-800/40 rounded-xl p-4 border border-slate-700/50">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-slate-400 text-sm mb-1">📊 總資源</div>
+                <div class="text-3xl font-bold text-white">{{ contactsService.stats().total }}</div>
+              </div>
+              <div class="text-4xl opacity-20">📦</div>
+            </div>
           </div>
-          <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-            <div class="text-slate-400 text-sm mb-1">👤 成員</div>
-            <div class="text-2xl font-bold text-blue-400">{{ contactsService.stats().users }}</div>
+          
+          <!-- 本週新增 -->
+          <div class="bg-gradient-to-br from-emerald-900/30 to-slate-800/40 rounded-xl p-4 border border-emerald-700/30">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-emerald-400 text-sm mb-1">🆕 本週新增</div>
+                <div class="text-3xl font-bold text-emerald-400">+{{ contactsService.stats().recent_added }}</div>
+              </div>
+              <div class="text-4xl opacity-20">📈</div>
+            </div>
           </div>
-          <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-            <div class="text-slate-400 text-sm mb-1">👥 群組</div>
-            <div class="text-2xl font-bold text-green-400">{{ contactsService.stats().groups }}</div>
+          
+          <!-- 待跟進（新發現狀態） -->
+          <div class="bg-gradient-to-br from-blue-900/30 to-slate-800/40 rounded-xl p-4 border border-blue-700/30">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-blue-400 text-sm mb-1">🔔 待跟進</div>
+                <div class="text-3xl font-bold text-blue-400">{{ contactsService.stats().by_status?.['new'] || 0 }}</div>
+              </div>
+              <div class="text-4xl opacity-20">👋</div>
+            </div>
           </div>
-          <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-            <div class="text-slate-400 text-sm mb-1">📢 頻道</div>
-            <div class="text-2xl font-bold text-purple-400">{{ contactsService.stats().channels }}</div>
-          </div>
-          <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-            <div class="text-slate-400 text-sm mb-1">🆕 本週新增</div>
-            <div class="text-2xl font-bold text-emerald-400">+{{ contactsService.stats().recent_added }}</div>
-          </div>
-        </div>
-        
-        <!-- 🆕 第二行：來源分布 -->
-        <div class="flex items-center gap-6 text-sm">
-          <span class="text-slate-500">來源分布：</span>
-          <div class="flex items-center gap-1">
-            <span class="text-blue-400">👥</span>
-            <span class="text-slate-300">群組提取</span>
-            <span class="font-semibold text-blue-400 ml-1">{{ contactsService.stats().by_source?.['member'] || 0 }}</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <span class="text-orange-400">🎯</span>
-            <span class="text-slate-300">營銷漏斗</span>
-            <span class="font-semibold text-orange-400 ml-1">{{ contactsService.stats().by_source?.['lead'] || 0 }}</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <span class="text-green-400">🔍</span>
-            <span class="text-slate-300">資源發現</span>
-            <span class="font-semibold text-green-400 ml-1">{{ contactsService.stats().by_source?.['resource'] || 0 }}</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <span class="text-purple-400">✋</span>
-            <span class="text-slate-300">手動添加</span>
-            <span class="font-semibold text-purple-400 ml-1">{{ contactsService.stats().by_source?.['manual'] || 0 }}</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <span class="text-cyan-400">📥</span>
-            <span class="text-slate-300">批量導入</span>
-            <span class="font-semibold text-cyan-400 ml-1">{{ contactsService.stats().by_source?.['import'] || 0 }}</span>
+          
+          <!-- 已聯繫 -->
+          <div class="bg-gradient-to-br from-yellow-900/30 to-slate-800/40 rounded-xl p-4 border border-yellow-700/30">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-yellow-400 text-sm mb-1">💬 已聯繫</div>
+                <div class="text-3xl font-bold text-yellow-400">{{ contactsService.stats().by_status?.['contacted'] || 0 }}</div>
+              </div>
+              <div class="text-4xl opacity-20">✉️</div>
+            </div>
           </div>
         </div>
       </div>
@@ -206,8 +205,8 @@ type ResourceTab = 'all' | 'users' | 'groups' | 'channels';
             批量發送
           </button>
           <button (click)="sendToAISales()"
-                  class="px-3 py-1.5 bg-cyan-500/20 text-cyan-400 rounded-lg text-sm hover:bg-cyan-500/30">
-            加入 AI 銷售
+                  class="px-3 py-1.5 bg-cyan-500/20 text-cyan-400 rounded-lg text-sm hover:bg-cyan-500/30 flex items-center gap-1">
+            <span>📤</span> 加入發送隊列
           </button>
           <button (click)="confirmBatchDelete()"
                   class="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30">
@@ -473,6 +472,7 @@ type ResourceTab = 'all' | 'users' | 'groups' | 'channels';
 export class ResourceCenterComponent implements OnInit, OnDestroy {
   contactsService = inject(UnifiedContactsService);
   private toast = inject(ToastService);
+  private nav = inject(NavBridgeService);
   
   // 事件輸出
   sendMessageEvent = output<UnifiedContact>();
@@ -518,17 +518,16 @@ export class ResourceCenterComponent implements OnInit, OnDestroy {
   selectedBatchTags = signal<Set<string>>(new Set());
   
   ngOnInit() {
-    // 初始載入
-    this.contactsService.loadContacts();
-    this.contactsService.loadStats();
+    // 🆕 優化：不再獨立載入數據
+    // 資源中心現在直接使用 app.component 導入的 leads 數據
+    // 這樣確保與發送控制台數據一致
     
-    // 🆕 如果數據為空，自動觸發同步
-    setTimeout(() => {
-      if (this.contactsService.stats().total === 0 && !this.contactsService.isSyncing()) {
-        console.log('[ResourceCenter] No data found, auto-syncing...');
-        this.syncData();
-      }
-    }, 1500);
+    console.log('[ResourceCenter] Initialized, using imported leads data');
+    console.log('[ResourceCenter] Current contacts:', this.contactsService.contacts().length);
+    console.log('[ResourceCenter] Has imported data:', this.contactsService.hasData());
+    
+    // 只有在完全沒有數據時才提示用戶同步
+    // 不再自動觸發，避免無限循環
   }
   
   ngOnDestroy() {
@@ -565,11 +564,24 @@ export class ResourceCenterComponent implements OnInit, OnDestroy {
     this.currentPage.set(1);
   }
   
-  // 同步數據
+  // 同步數據 - 🔧 FIX: 直接調用後端同步
   syncData() {
-    // 🆕 請求父組件刷新 leads 數據，這會自動更新資源中心
+    console.log('[ResourceCenter] ========== SYNC DATA CLICKED ==========');
+    
+    // 防止重複點擊
+    if (this.contactsService.isSyncing()) {
+      console.log('[ResourceCenter] Already syncing, skip');
+      this.toast.warning('正在同步中，請稍候...', 2000);
+      return;
+    }
+    
+    // 🔧 FIX: 直接調用 IPC 同步命令
+    console.log('[ResourceCenter] Calling syncFromSources()...');
+    this.contactsService.syncFromSources();
+    this.toast.info('🔄 正在同步數據，請稍候...', 5000);
+    
+    // 同時通知父組件（向後兼容）
     this.refreshDataEvent.emit();
-    this.toast.info('正在刷新數據...', 2000);
   }
   
   // 搜索
@@ -670,7 +682,14 @@ export class ResourceCenterComponent implements OnInit, OnDestroy {
     }
     // 發射事件給父組件處理
     this.sendToAISalesEvent.emit(selected);
-    this.toast.success(`已將 ${selected.length} 個聯繫人加入 AI 銷售隊列`, 2000);
+    this.toast.success(`已將 ${selected.length} 個聯繫人加入發送隊列`, 2000);
+    // 清除選擇
+    this.contactsService.clearSelection();
+  }
+  
+  // 🆕 P1: 前往發送控制台
+  goToSendConsole() {
+    this.nav.navigateTo('leads');
   }
   
   // 批量標籤

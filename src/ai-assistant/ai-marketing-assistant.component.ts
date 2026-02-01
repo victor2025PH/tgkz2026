@@ -394,7 +394,7 @@ const INDUSTRY_TEMPLATES: { [key: string]: Partial<AIStrategyResult> } = {
                         高意向關鍵詞
                       </label>
                       <div class="flex flex-wrap gap-2">
-                        @for (keyword of strategyResult()!.keywords.highIntent; track keyword) {
+                        @for (keyword of strategyResult()!.keywords.highIntent; track $index) {
                           <span class="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-sm border border-emerald-500/30 cursor-pointer hover:bg-emerald-500/30 transition-all">
                             {{ keyword }}
                           </span>
@@ -412,7 +412,7 @@ const INDUSTRY_TEMPLATES: { [key: string]: Partial<AIStrategyResult> } = {
                         中意向關鍵詞
                       </label>
                       <div class="flex flex-wrap gap-2">
-                        @for (keyword of strategyResult()!.keywords.mediumIntent; track keyword) {
+                        @for (keyword of strategyResult()!.keywords.mediumIntent; track $index) {
                           <span class="px-3 py-1.5 bg-amber-500/20 text-amber-400 rounded-lg text-sm border border-amber-500/30 cursor-pointer hover:bg-amber-500/30 transition-all">
                             {{ keyword }}
                           </span>
@@ -430,7 +430,7 @@ const INDUSTRY_TEMPLATES: { [key: string]: Partial<AIStrategyResult> } = {
                         擴展關鍵詞
                       </label>
                       <div class="flex flex-wrap gap-2">
-                        @for (keyword of strategyResult()!.keywords.extended; track keyword) {
+                        @for (keyword of strategyResult()!.keywords.extended; track $index) {
                           <span class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm border border-slate-600 cursor-pointer hover:bg-slate-600 transition-all">
                             {{ keyword }}
                           </span>
@@ -559,6 +559,45 @@ const INDUSTRY_TEMPLATES: { [key: string]: Partial<AIStrategyResult> } = {
         
       </div>
       
+      <!-- 🔧 關鍵詞輸入對話框（替代 prompt） -->
+      @if (showKeywordDialog()) {
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
+             (click)="cancelAddKeyword()">
+          <div class="bg-slate-800 rounded-2xl p-6 w-full max-w-md mx-4 border border-slate-700 shadow-2xl"
+               (click)="$event.stopPropagation()">
+            <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <span class="text-xl">🏷️</span>
+              添加{{ getKeywordLevelLabel(keywordDialogLevel()) }}關鍵詞
+            </h3>
+            
+            <input type="text" 
+                   [(ngModel)]="newKeywordInput"
+                   (keydown.enter)="confirmAddKeyword()"
+                   (keydown.escape)="cancelAddKeyword()"
+                   placeholder="請輸入關鍵詞..."
+                   class="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl text-white 
+                          placeholder-slate-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 
+                          outline-none transition-all"
+                   autofocus />
+            
+            <div class="flex gap-3 mt-6">
+              <button (click)="cancelAddKeyword()"
+                      class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 
+                             rounded-xl transition-all font-medium">
+                取消
+              </button>
+              <button (click)="confirmAddKeyword()"
+                      [disabled]="!newKeywordInput.trim()"
+                      class="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 
+                             hover:from-purple-600 hover:to-pink-600 text-white rounded-xl 
+                             transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                確定添加
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+      
     </div>
   `,
   styles: [`
@@ -589,6 +628,11 @@ export class AiMarketingAssistantComponent implements OnInit {
   showModelSettings = signal(false);
   availableModels = this.aiStrategyService.availableModels;
   selectedModelId = this.aiStrategyService.selectedModelId;
+  
+  // 🔧 關鍵詞輸入對話框（替代 prompt）
+  showKeywordDialog = signal(false);
+  keywordDialogLevel = signal<'high' | 'medium' | 'extended'>('high');
+  newKeywordInput = '';
   localAIConfig = this.aiStrategyService.localAIConfig;
   generationStatus = this.aiStrategyService.generationStatus;
   
@@ -702,9 +746,11 @@ export class AiMarketingAssistantComponent implements OnInit {
         // 顯示使用的 AI 提供者
         const status = this.generationStatus();
         if (status.currentProvider === '模板回退') {
-          this.toastService.warning('AI 不可用，已使用智能模板生成');
+          this.toastService.warning('雲端 AI 連接失敗，已使用智能模板生成。請檢查 AI 中心配置。');
+        } else if (status.currentProvider.includes('本地')) {
+          this.toastService.success(`✅ 策略生成完成！使用：${status.currentProvider}`);
         } else {
-          this.toastService.success(`AI 策略生成完成！(${status.currentProvider})`);
+          this.toastService.success(`✅ AI 策略生成完成！(${status.currentProvider})`);
         }
       } else {
         this.toastService.error('策略生成失敗，請重試');
@@ -761,10 +807,19 @@ export class AiMarketingAssistantComponent implements OnInit {
     return '目標客戶群體';
   }
   
+  // 🔧 打開關鍵詞輸入對話框（替代 prompt）
   addKeyword(level: 'high' | 'medium' | 'extended') {
-    const keyword = prompt('請輸入關鍵詞:');
+    this.keywordDialogLevel.set(level);
+    this.newKeywordInput = '';
+    this.showKeywordDialog.set(true);
+  }
+  
+  // 🔧 確認添加關鍵詞
+  confirmAddKeyword() {
+    const keyword = this.newKeywordInput.trim();
     if (keyword && this.strategyResult()) {
       const result = { ...this.strategyResult()! };
+      const level = this.keywordDialogLevel();
       switch (level) {
         case 'high':
           result.keywords.highIntent = [...result.keywords.highIntent, keyword];
@@ -777,6 +832,24 @@ export class AiMarketingAssistantComponent implements OnInit {
           break;
       }
       this.strategyResult.set(result);
+      this.toastService.success(`已添加關鍵詞: ${keyword}`);
+    }
+    this.showKeywordDialog.set(false);
+    this.newKeywordInput = '';
+  }
+  
+  // 🔧 取消添加關鍵詞
+  cancelAddKeyword() {
+    this.showKeywordDialog.set(false);
+    this.newKeywordInput = '';
+  }
+  
+  // 🔧 獲取關鍵詞類型標籤
+  getKeywordLevelLabel(level: 'high' | 'medium' | 'extended'): string {
+    switch (level) {
+      case 'high': return '高意向';
+      case 'medium': return '中意向';
+      case 'extended': return '擴展';
     }
   }
   

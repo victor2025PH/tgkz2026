@@ -225,8 +225,11 @@ import { ConfirmDialogService } from '../confirm-dialog.service';
           <div class="w-[500px] bg-slate-900 h-full flex flex-col" (click)="$event.stopPropagation()">
             <!-- 標題 -->
             <div class="p-4 border-b border-slate-700 flex items-center justify-between">
-              <h3 class="text-lg font-bold text-white">
+              <h3 class="text-lg font-bold text-white flex items-center gap-2">
                 {{ isCreating() ? '新建關鍵詞集' : '編輯關鍵詞集' }}
+                @if (hasUnsavedChanges()) {
+                  <span class="w-2 h-2 bg-orange-500 rounded-full" title="有未保存的變更"></span>
+                }
               </h3>
               <button (click)="closeEditor()" class="p-2 hover:bg-slate-700 rounded-lg text-slate-400">
                 ✕
@@ -240,6 +243,7 @@ import { ConfirmDialogService } from '../confirm-dialog.service';
                 <label class="block text-sm font-medium text-slate-300 mb-2">詞集名稱</label>
                 <input type="text"
                        [(ngModel)]="editingSet.name"
+                       (ngModelChange)="markAsChanged()"
                        placeholder="例如：支付相關"
                        class="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-purple-500">
               </div>
@@ -248,6 +252,7 @@ import { ConfirmDialogService } from '../confirm-dialog.service';
               <div>
                 <label class="block text-sm font-medium text-slate-300 mb-2">匹配模式</label>
                 <select [(ngModel)]="editingSet.matchMode"
+                        (ngModelChange)="markAsChanged()"
                         class="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-purple-500">
                   <option value="fuzzy">模糊匹配</option>
                   <option value="exact">精確匹配</option>
@@ -314,17 +319,25 @@ import { ConfirmDialogService } from '../confirm-dialog.service';
             <!-- 底部按鈕 -->
             <div class="p-4 border-t border-slate-700 flex items-center gap-3">
               <button (click)="saveSet()"
-                      class="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg transition-colors">
-                {{ isCreating() ? '創建' : '保存' }}
+                      [disabled]="isSaving()"
+                      class="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                @if (isSaving()) {
+                  <span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  <span>保存中...</span>
+                } @else {
+                  <span>{{ isCreating() ? '創建' : '保存' }}</span>
+                }
               </button>
               @if (!isCreating()) {
                 <button (click)="deleteSet()"
-                        class="px-4 py-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors">
+                        [disabled]="isSaving()"
+                        class="px-4 py-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors disabled:opacity-50">
                   刪除
                 </button>
               }
               <button (click)="closeEditor()"
-                      class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">
+                      [disabled]="isSaving()"
+                      class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50">
                 取消
               </button>
             </div>
@@ -347,9 +360,12 @@ export class KeywordSetsComponent implements OnInit, OnDestroy {
   selectedSet = signal<KeywordSet | null>(null);
   isEditing = signal(false);
   isCreating = signal(false);
+  isSaving = signal(false);  // 🔧 新增：保存中狀態
+  hasUnsavedChanges = signal(false);  // 🔧 新增：未保存變更標記
   
   // 編輯狀態
   editingSet: KeywordSet = this.createEmptySet();
+  originalSet: KeywordSet | null = null;  // 🔧 新增：原始數據，用於比較變更
   newKeyword = '';
 
   private listeners: (() => void)[] = [];
@@ -366,12 +382,17 @@ export class KeywordSetsComponent implements OnInit, OnDestroy {
   setupListeners() {
     // 監聽保存結果
     const cleanup1 = this.ipcService.on('save-keyword-set-result', (data: any) => {
+      this.isSaving.set(false);  // 🔧 重置保存狀態
+      
       if (data.success) {
         this.toastService.success(this.isCreating() ? '✅ 詞集創建成功' : '✅ 詞集保存成功');
+        this.hasUnsavedChanges.set(false);  // 🔧 清除未保存標記
         this.stateService.refresh();
-        this.closeEditor();
+        // 🔧 直接關閉編輯器（不觸發未保存確認）
+        this.isEditing.set(false);
+        this.newKeyword = '';
       } else {
-        this.toastService.error(data.error || '保存失敗');
+        this.toastService.error(`❌ 保存失敗: ${data.error || '未知錯誤'}`);
       }
     });
     this.listeners.push(cleanup1);
@@ -381,8 +402,12 @@ export class KeywordSetsComponent implements OnInit, OnDestroy {
       if (data.success) {
         this.toastService.success('🗑️ 詞集已刪除');
         this.selectedSet.set(null);
+        this.hasUnsavedChanges.set(false);
         this.stateService.refresh();
-        this.closeEditor();
+        this.isEditing.set(false);
+        this.newKeyword = '';
+      } else {
+        this.toastService.error(`❌ 刪除失敗: ${data.error || '未知錯誤'}`);
       }
     });
     this.listeners.push(cleanup2);
@@ -411,20 +436,38 @@ export class KeywordSetsComponent implements OnInit, OnDestroy {
   selectSet(set: KeywordSet) {
     this.selectedSet.set(set);
     this.editingSet = { ...set, keywords: [...set.keywords] };
+    this.originalSet = JSON.parse(JSON.stringify(set));  // 🔧 深拷貝原始數據
     this.isCreating.set(false);
     this.isEditing.set(true);
+    this.hasUnsavedChanges.set(false);
   }
 
   createNewSet() {
     this.selectedSet.set(null);
     this.editingSet = this.createEmptySet();
+    this.originalSet = null;
     this.isCreating.set(true);
     this.isEditing.set(true);
+    this.hasUnsavedChanges.set(false);
   }
 
-  closeEditor() {
+  async closeEditor() {
+    // 🔧 檢查是否有未保存的變更
+    if (this.hasUnsavedChanges()) {
+      const confirmed = await this.confirmDialog.warning(
+        '未保存的變更',
+        '您有未保存的變更，確定要關閉嗎？'
+      );
+      if (!confirmed) return;
+    }
     this.isEditing.set(false);
     this.newKeyword = '';
+    this.hasUnsavedChanges.set(false);
+  }
+  
+  // 🔧 新增：標記有變更
+  markAsChanged() {
+    this.hasUnsavedChanges.set(true);
   }
 
   toggleSetActive(set: KeywordSet) {
@@ -456,10 +499,12 @@ export class KeywordSetsComponent implements OnInit, OnDestroy {
       isNew: true
     }];
     this.newKeyword = '';
+    this.markAsChanged();  // 🔧 標記有變更
   }
 
   removeKeyword(keyword: KeywordItem) {
     this.editingSet.keywords = this.editingSet.keywords.filter(k => k.id !== keyword.id);
+    this.markAsChanged();  // 🔧 標記有變更
   }
 
   async clearAllKeywords() {
@@ -469,6 +514,7 @@ export class KeywordSetsComponent implements OnInit, OnDestroy {
     );
     if (confirmed) {
       this.editingSet.keywords = [];
+      this.markAsChanged();  // 🔧 標記有變更
     }
   }
 
@@ -480,18 +526,26 @@ export class KeywordSetsComponent implements OnInit, OnDestroy {
       this.toastService.error('請輸入詞集名稱');
       return;
     }
+    
+    // 🔧 防止重複提交
+    if (this.isSaving()) {
+      return;
+    }
 
     const payload = {
       id: this.isCreating() ? null : parseInt(this.editingSet.id),
-      name: this.editingSet.name,
+      name: this.editingSet.name.trim(),
       keywords: this.editingSet.keywords.map(k => ({ text: k.text })),
       isActive: this.editingSet.isActive,
       matchMode: this.editingSet.matchMode
     };
     
     console.log('[KeywordSets] Sending save-keyword-set:', payload);
+    
+    // 🔧 顯示保存中狀態
+    this.isSaving.set(true);
     this.ipcService.send('save-keyword-set', payload);
-    this.toastService.info('正在保存...');
+    this.toastService.info('⏳ 正在保存...');
   }
 
   async deleteSet() {

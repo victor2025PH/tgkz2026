@@ -425,7 +425,7 @@ export type MessageSource = 'template' | 'custom' | 'ai';
               </label>
               <div class="max-h-32 overflow-y-auto p-3 bg-slate-800/30 rounded-xl border border-slate-700/50">
                 <div class="flex flex-wrap gap-2">
-                  @for (target of targets().slice(0, 20); track target.telegramId) {
+                  @for (target of targets().slice(0, 20); track $index) {
                     <span class="px-2 py-1 bg-slate-700 text-slate-300 rounded text-xs">
                       {{ target.displayName || target.firstName || target.username || target.telegramId }}
                     </span>
@@ -469,7 +469,7 @@ export type MessageSource = 'template' | 'custom' | 'ai';
                 <div class="mt-3 p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
                   <div class="text-xs text-red-400 font-medium mb-1">失敗原因：</div>
                   <div class="flex flex-wrap gap-2">
-                    @for (reason of failureReasonsList(); track reason.key) {
+                    @for (reason of failureReasonsList(); track $index) {
                       <span class="text-xs px-2 py-0.5 bg-red-500/20 text-red-300 rounded">
                         {{ reason.label }}: {{ reason.count }}
                       </span>

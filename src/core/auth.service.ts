@@ -596,6 +596,13 @@ export class AuthService {
       const refreshToken = localStorage.getItem(TOKEN_KEYS.REFRESH);
       const userJson = localStorage.getItem(TOKEN_KEYS.USER);
       
+      // 🆕 P0: 驗證 Token 格式有效性
+      if (accessToken && !this.isValidTokenFormat(accessToken)) {
+        console.warn('[Auth] Invalid token format, clearing session');
+        this.clearAuthState();
+        return;
+      }
+      
       if (accessToken) {
         this._accessToken.set(accessToken);
       }
@@ -603,20 +610,72 @@ export class AuthService {
         this._refreshToken.set(refreshToken);
       }
       if (userJson) {
-        this._user.set(JSON.parse(userJson));
+        try {
+          this._user.set(JSON.parse(userJson));
+        } catch {
+          console.warn('[Auth] Invalid user JSON, clearing');
+          this.clearAuthState();
+          return;
+        }
       }
       
-      // 驗證 token 有效性
+      // 驗證 token 有效性（異步）
       if (accessToken) {
         this.fetchCurrentUser().then(user => {
-          if (!user && refreshToken) {
-            this.refreshAccessToken();
+          if (!user) {
+            if (refreshToken) {
+              // 嘗試刷新 Token
+              this.refreshAccessToken().catch(() => {
+                console.warn('[Auth] Token refresh failed, clearing session');
+                this.clearAuthState();
+                // 🆕 重定向到登入頁
+                if (window.location.pathname !== '/auth/login') {
+                  this.router.navigate(['/auth/login']);
+                }
+              });
+            } else {
+              // 無 Refresh Token，清除並重定向
+              console.warn('[Auth] No valid token, clearing session');
+              this.clearAuthState();
+              if (window.location.pathname !== '/auth/login') {
+                this.router.navigate(['/auth/login']);
+              }
+            }
           }
+        }).catch(() => {
+          console.warn('[Auth] Token validation failed');
+          this.clearAuthState();
         });
       }
     } catch (e) {
       console.error('Restore session error:', e);
       this.clearAuthState();
+    }
+  }
+  
+  /**
+   * 驗證 Token 格式是否有效（JWT 格式檢查）
+   */
+  private isValidTokenFormat(token: string): boolean {
+    if (!token || token.length < 20) return false;
+    
+    // JWT 應該有 3 個部分用 . 分隔
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    
+    try {
+      // 嘗試解析 payload
+      const payload = JSON.parse(atob(parts[1]));
+      
+      // 檢查是否過期
+      if (payload.exp && Date.now() >= payload.exp * 1000) {
+        console.warn('[Auth] Token expired');
+        return false;
+      }
+      
+      return true;
+    } catch {
+      return false;
     }
   }
   

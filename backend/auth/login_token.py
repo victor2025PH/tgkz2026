@@ -383,3 +383,105 @@ def get_login_token_service() -> LoginTokenService:
     if _login_token_service is None:
         _login_token_service = LoginTokenService()
     return _login_token_service
+
+
+# ==================== 🆕 WebSocket 訂閱管理 ====================
+
+class LoginTokenSubscriptionManager:
+    """
+    登入 Token WebSocket 訂閱管理器
+    
+    管理前端客戶端對特定 Token 的訂閱，
+    當 Token 狀態變化時推送通知。
+    
+    優化設計：
+    1. 只通知訂閱了該 Token 的客戶端（非廣播）
+    2. 支持多客戶端訂閱同一 Token
+    3. 自動清理斷開的連接
+    """
+    
+    def __init__(self):
+        # token -> set of websocket connections
+        self._subscriptions: Dict[str, set] = {}
+        # websocket -> token (反向映射，方便清理)
+        self._ws_to_token: Dict[Any, str] = {}
+    
+    def subscribe(self, token: str, ws) -> None:
+        """訂閱 Token 狀態變化"""
+        if token not in self._subscriptions:
+            self._subscriptions[token] = set()
+        self._subscriptions[token].add(ws)
+        self._ws_to_token[ws] = token
+        logger.debug(f"WS subscribed to token {token[:8]}...")
+    
+    def unsubscribe(self, ws) -> None:
+        """取消訂閱"""
+        token = self._ws_to_token.pop(ws, None)
+        if token and token in self._subscriptions:
+            self._subscriptions[token].discard(ws)
+            if not self._subscriptions[token]:
+                del self._subscriptions[token]
+        logger.debug(f"WS unsubscribed from token")
+    
+    async def notify(self, token: str, status: str, data: Dict[str, Any] = None) -> int:
+        """
+        通知所有訂閱該 Token 的客戶端
+        
+        Returns:
+            通知的客戶端數量
+        """
+        import json
+        from datetime import datetime
+        
+        if token not in self._subscriptions:
+            return 0
+        
+        message = json.dumps({
+            'type': 'login_token_update',
+            'event': 'login_token_update',
+            'token': token[:16] + '...',  # 只返回部分 token
+            'status': status,
+            'data': data or {},
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+        notified = 0
+        dead_connections = []
+        
+        for ws in self._subscriptions[token]:
+            try:
+                await ws.send_str(message)
+                notified += 1
+            except Exception as e:
+                logger.debug(f"Failed to notify WS: {e}")
+                dead_connections.append(ws)
+        
+        # 清理失效連接
+        for ws in dead_connections:
+            self.unsubscribe(ws)
+        
+        logger.info(f"Notified {notified} clients for token {token[:8]}...")
+        return notified
+    
+    def get_subscriber_count(self, token: str) -> int:
+        """獲取 Token 的訂閱者數量"""
+        return len(self._subscriptions.get(token, set()))
+    
+    def cleanup_token(self, token: str) -> None:
+        """清理 Token 的所有訂閱"""
+        if token in self._subscriptions:
+            for ws in list(self._subscriptions[token]):
+                self._ws_to_token.pop(ws, None)
+            del self._subscriptions[token]
+
+
+# 全局訂閱管理器
+_subscription_manager: Optional[LoginTokenSubscriptionManager] = None
+
+
+def get_subscription_manager() -> LoginTokenSubscriptionManager:
+    """獲取全局訂閱管理器"""
+    global _subscription_manager
+    if _subscription_manager is None:
+        _subscription_manager = LoginTokenSubscriptionManager()
+    return _subscription_manager

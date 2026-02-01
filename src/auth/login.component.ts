@@ -125,50 +125,128 @@ import { FrontendSecurityService } from '../services/security.service';
         <span>{{ t('auth.or') }}</span>
       </div>
       
-      <!-- 🆕 多種 Telegram 登入方式 -->
-      <div class="social-login">
-        <!-- Deep Link 登入（推薦） -->
-        <button 
-          class="social-btn telegram full-width primary-telegram" 
-          (click)="openDeepLink()"
-          [disabled]="telegramLoading()"
-        >
-          @if (deepLinkLoading()) {
-            <span class="loading-spinner small"></span>
-            <span>等待確認中...</span>
-          } @else {
-            <span class="social-icon">📱</span>
-            <span>打開 Telegram App 登入</span>
-          }
-        </button>
+      <!-- 🆕 Phase 2: 多種 Telegram 登入方式（含 QR Code） -->
+      <div class="telegram-login-section">
+        <!-- 登入方式選擇器 -->
+        <div class="login-method-tabs">
+          <button 
+            class="method-tab" 
+            [class.active]="loginMethod() === 'qrcode'"
+            (click)="switchLoginMethod('qrcode')"
+          >
+            <span class="tab-icon">📷</span>
+            <span>掃碼登入</span>
+          </button>
+          <button 
+            class="method-tab" 
+            [class.active]="loginMethod() === 'deeplink'"
+            (click)="switchLoginMethod('deeplink')"
+          >
+            <span class="tab-icon">📱</span>
+            <span>App 登入</span>
+          </button>
+          <button 
+            class="method-tab" 
+            [class.active]="loginMethod() === 'widget'"
+            (click)="switchLoginMethod('widget')"
+          >
+            <span class="tab-icon">💬</span>
+            <span>網頁登入</span>
+          </button>
+        </div>
         
-        <!-- 倒計時和狀態提示 -->
-        @if (deepLinkLoading()) {
-          <div class="deep-link-status">
-            <div class="status-text">
-              請在 Telegram 中點擊「確認登入」按鈕
-            </div>
-            <div class="countdown">
-              剩餘時間: {{ deepLinkCountdown() }}s
-            </div>
-            <button class="cancel-btn" (click)="cancelDeepLink()">取消</button>
+        <!-- QR Code 登入（默認） -->
+        @if (loginMethod() === 'qrcode') {
+          <div class="qr-login-panel">
+            @if (qrCodeLoading()) {
+              <div class="qr-loading">
+                <span class="loading-spinner"></span>
+                <span>正在生成二維碼...</span>
+              </div>
+            } @else if (qrCodeUrl()) {
+              <div class="qr-container">
+                <div class="qr-code-wrapper">
+                  <img [src]="qrCodeUrl()" alt="Telegram 登入二維碼" class="qr-code-img" />
+                  @if (qrCodeExpired()) {
+                    <div class="qr-expired-overlay">
+                      <span class="expired-text">二維碼已過期</span>
+                      <button class="refresh-btn" (click)="refreshQRCode()">點擊刷新</button>
+                    </div>
+                  }
+                </div>
+                <div class="qr-instructions">
+                  <p class="step"><span class="step-num">1</span> 打開手機 Telegram</p>
+                  <p class="step"><span class="step-num">2</span> 掃描上方二維碼</p>
+                  <p class="step"><span class="step-num">3</span> 點擊確認登入</p>
+                </div>
+                @if (!qrCodeExpired()) {
+                  <div class="qr-countdown">
+                    <span class="ws-status" [class.connected]="wsConnected()">
+                      {{ wsConnected() ? '🟢 實時連接' : '🔴 重新連接中...' }}
+                    </span>
+                    <span class="countdown-text">{{ qrCountdown() }}s</span>
+                  </div>
+                }
+              </div>
+            } @else {
+              <button class="generate-qr-btn" (click)="generateQRCode()">
+                <span class="btn-icon">📷</span>
+                <span>生成二維碼</span>
+              </button>
+            }
+          </div>
+        }
+        
+        <!-- Deep Link 登入 -->
+        @if (loginMethod() === 'deeplink') {
+          <div class="deeplink-panel">
+            <button 
+              class="social-btn telegram full-width primary-telegram" 
+              (click)="openDeepLink()"
+              [disabled]="telegramLoading()"
+            >
+              @if (deepLinkLoading()) {
+                <span class="loading-spinner small"></span>
+                <span>等待確認中...</span>
+              } @else {
+                <span class="social-icon">📱</span>
+                <span>打開 Telegram App 登入</span>
+              }
+            </button>
+            
+            @if (deepLinkLoading()) {
+              <div class="deep-link-status">
+                <div class="status-text">
+                  請在 Telegram 中點擊「確認登入」按鈕
+                </div>
+                <div class="countdown">
+                  剩餘時間: {{ deepLinkCountdown() }}s
+                </div>
+                <button class="cancel-btn" (click)="cancelDeepLink()">取消</button>
+              </div>
+            }
           </div>
         }
         
         <!-- Widget 登入（備用） -->
-        <button 
-          class="social-btn telegram full-width secondary-telegram" 
-          (click)="initTelegramWidget()"
-          [disabled]="telegramLoading()"
-        >
-          @if (telegramLoading() && !deepLinkLoading()) {
-            <span class="loading-spinner small"></span>
-            <span>{{ t('auth.loadingTelegram') }}</span>
-          } @else {
-            <span class="social-icon">💬</span>
-            <span>使用 Telegram Widget 登入</span>
-          }
-        </button>
+        @if (loginMethod() === 'widget') {
+          <div class="widget-panel">
+            <button 
+              class="social-btn telegram full-width secondary-telegram" 
+              (click)="initTelegramWidget()"
+              [disabled]="telegramLoading()"
+            >
+              @if (telegramLoading() && !deepLinkLoading()) {
+                <span class="loading-spinner small"></span>
+                <span>{{ t('auth.loadingTelegram') }}</span>
+              } @else {
+                <span class="social-icon">💬</span>
+                <span>使用 Telegram Widget 登入</span>
+              }
+            </button>
+            <p class="widget-hint">適用於已在瀏覽器登入 Telegram 的用戶</p>
+          </div>
+        }
       </div>
       
       <!-- 註冊入口 -->
@@ -558,6 +636,215 @@ import { FrontendSecurityService } from '../services/security.service';
     .register-link a:hover {
       text-decoration: underline;
     }
+    
+    /* 🆕 Phase 2: 登入方式選擇器 */
+    .telegram-login-section {
+      margin-top: 0.5rem;
+    }
+    
+    .login-method-tabs {
+      display: flex;
+      gap: 0.25rem;
+      background: var(--bg-secondary, #1a1a1a);
+      padding: 0.25rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+    
+    .method-tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.5rem;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: var(--text-secondary, #888);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .method-tab:hover {
+      background: var(--bg-tertiary, #252525);
+      color: var(--text-primary, #fff);
+    }
+    
+    .method-tab.active {
+      background: linear-gradient(135deg, #0088cc, #0066aa);
+      color: #fff;
+    }
+    
+    .tab-icon {
+      font-size: 1.25rem;
+    }
+    
+    /* QR Code 面板 */
+    .qr-login-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5rem;
+      background: var(--bg-secondary, #1a1a1a);
+      border-radius: 12px;
+      border: 1px solid var(--border-color, #333);
+    }
+    
+    .qr-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 2rem;
+      color: var(--text-secondary, #888);
+    }
+    
+    .qr-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      width: 100%;
+    }
+    
+    .qr-code-wrapper {
+      position: relative;
+      padding: 1rem;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 136, 204, 0.2);
+    }
+    
+    .qr-code-img {
+      width: 180px;
+      height: 180px;
+      display: block;
+    }
+    
+    .qr-expired-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+    }
+    
+    .expired-text {
+      color: #f87171;
+      font-size: 0.875rem;
+    }
+    
+    .refresh-btn {
+      padding: 0.5rem 1rem;
+      background: linear-gradient(135deg, #0088cc, #0066aa);
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    
+    .refresh-btn:hover {
+      transform: scale(1.05);
+    }
+    
+    .qr-instructions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      width: 100%;
+    }
+    
+    .qr-instructions .step {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--text-secondary, #888);
+      font-size: 0.875rem;
+      margin: 0;
+    }
+    
+    .step-num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.5rem;
+      height: 1.5rem;
+      background: linear-gradient(135deg, #0088cc, #0066aa);
+      border-radius: 50%;
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    
+    .qr-countdown {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 0.5rem 0;
+      border-top: 1px solid var(--border-color, #333);
+      margin-top: 0.5rem;
+    }
+    
+    .ws-status {
+      font-size: 0.75rem;
+      color: #f87171;
+    }
+    
+    .ws-status.connected {
+      color: #4ade80;
+    }
+    
+    .countdown-text {
+      font-size: 0.875rem;
+      color: var(--text-secondary, #888);
+    }
+    
+    .generate-qr-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 1rem 2rem;
+      background: linear-gradient(135deg, #0088cc, #0066aa);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .generate-qr-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 136, 204, 0.3);
+    }
+    
+    .btn-icon {
+      font-size: 1.25rem;
+    }
+    
+    /* Deep Link 面板 */
+    .deeplink-panel, .widget-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    .widget-hint {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-secondary, #888);
+      margin: 0;
+    }
   `]
 })
 export class LoginComponent implements OnInit, OnDestroy {
@@ -586,6 +873,17 @@ export class LoginComponent implements OnInit, OnDestroy {
   private deepLinkPollInterval: any = null;
   private deepLinkCountdownInterval: any = null;
   
+  // 🆕 Phase 2: QR Code + WebSocket 登入狀態
+  loginMethod = signal<'qrcode' | 'deeplink' | 'widget'>('qrcode');  // 默認 QR Code
+  qrCodeLoading = signal(false);
+  qrCodeUrl = signal<string | null>(null);
+  qrCodeExpired = signal(false);
+  qrCountdown = signal(300);
+  wsConnected = signal(false);
+  private qrToken = '';
+  private qrWebSocket: WebSocket | null = null;
+  private qrCountdownInterval: any = null;
+  
   // P1.5: 安全增強 - 登入限制
   isLocked = computed(() => this.security.isLocked());
   lockoutRemaining = computed(() => this.security.lockoutRemaining());
@@ -599,6 +897,21 @@ export class LoginComponent implements OnInit, OnDestroy {
   ngOnInit() {
     // 檢查登入限制狀態
     this.checkLoginLimit();
+    
+    // 🆕 智能檢測：移動端默認使用 Deep Link，桌面端使用 QR Code
+    if (this.isMobileDevice()) {
+      this.loginMethod.set('deeplink');
+    } else {
+      // 桌面端自動生成 QR Code
+      this.generateQRCode();
+    }
+  }
+  
+  /**
+   * 檢測是否為移動設備
+   */
+  private isMobileDevice(): boolean {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   }
   
   ngOnDestroy() {
@@ -606,6 +919,8 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.lockoutCleanup?.();
     // 清理 Deep Link 輪詢
     this.cancelDeepLink();
+    // 清理 QR Code WebSocket
+    this.cleanupQRCode();
   }
   
   private checkLoginLimit() {
@@ -916,6 +1231,248 @@ export class LoginComponent implements OnInit, OnDestroy {
     
     // 每 2 秒輪詢一次
     this.deepLinkPollInterval = setInterval(pollStatus, 2000);
+  }
+  
+  // ==================== 🆕 Phase 2: QR Code + WebSocket 登入 ====================
+  
+  /**
+   * 切換登入方式
+   */
+  switchLoginMethod(method: 'qrcode' | 'deeplink' | 'widget') {
+    // 清理當前方式的資源
+    if (this.loginMethod() === 'qrcode' && method !== 'qrcode') {
+      this.cleanupQRCode();
+    }
+    if (this.loginMethod() === 'deeplink' && method !== 'deeplink') {
+      this.cancelDeepLink();
+    }
+    
+    this.loginMethod.set(method);
+    this.error.set(null);
+    
+    // 如果切換到 QR Code，自動生成
+    if (method === 'qrcode' && !this.qrCodeUrl()) {
+      this.generateQRCode();
+    }
+  }
+  
+  /**
+   * 生成 QR Code
+   */
+  async generateQRCode() {
+    this.qrCodeLoading.set(true);
+    this.qrCodeExpired.set(false);
+    this.error.set(null);
+    
+    try {
+      // 1. 調用 API 生成登入 Token
+      const response = await fetch('/api/v1/auth/login-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'qr_code' })
+      });
+      
+      const result = await response.json();
+      
+      if (!result.success || !result.data) {
+        this.error.set(result.error || '無法生成二維碼');
+        this.qrCodeLoading.set(false);
+        return;
+      }
+      
+      const { token, deep_link_url, expires_in } = result.data;
+      this.qrToken = token;
+      this.qrCountdown.set(expires_in || 300);
+      
+      // 2. 生成 QR Code 圖片（使用 Google Chart API 或本地生成）
+      const qrDataUrl = this.generateQRCodeImage(deep_link_url);
+      this.qrCodeUrl.set(qrDataUrl);
+      
+      // 3. 建立 WebSocket 連接
+      this.connectWebSocket(token);
+      
+      // 4. 開始倒計時
+      this.startQRCountdown();
+      
+    } catch (e: any) {
+      console.error('[QRCode] Error:', e);
+      this.error.set(e.message || '生成二維碼失敗');
+    } finally {
+      this.qrCodeLoading.set(false);
+    }
+  }
+  
+  /**
+   * 生成 QR Code 圖片 URL
+   * 使用 Google Chart API（簡單可靠）
+   */
+  private generateQRCodeImage(data: string): string {
+    // 方案1: Google Chart API（需要網絡）
+    const encoded = encodeURIComponent(data);
+    return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encoded}&bgcolor=ffffff&color=000000&margin=10`;
+    
+    // 備選方案: 本地生成（需要 qrcode 庫）
+    // 如果需要離線支持，可以使用 qrcode.js
+  }
+  
+  /**
+   * 刷新 QR Code
+   */
+  refreshQRCode() {
+    this.cleanupQRCode();
+    this.generateQRCode();
+  }
+  
+  /**
+   * 清理 QR Code 資源
+   */
+  private cleanupQRCode() {
+    // 關閉 WebSocket
+    if (this.qrWebSocket) {
+      this.qrWebSocket.close();
+      this.qrWebSocket = null;
+    }
+    
+    // 清理倒計時
+    if (this.qrCountdownInterval) {
+      clearInterval(this.qrCountdownInterval);
+      this.qrCountdownInterval = null;
+    }
+    
+    // 重置狀態
+    this.qrToken = '';
+    this.qrCodeUrl.set(null);
+    this.qrCodeExpired.set(false);
+    this.wsConnected.set(false);
+  }
+  
+  /**
+   * 開始 QR Code 倒計時
+   */
+  private startQRCountdown() {
+    if (this.qrCountdownInterval) {
+      clearInterval(this.qrCountdownInterval);
+    }
+    
+    this.qrCountdownInterval = setInterval(() => {
+      const current = this.qrCountdown();
+      if (current <= 0) {
+        this.qrCodeExpired.set(true);
+        clearInterval(this.qrCountdownInterval);
+        this.qrCountdownInterval = null;
+      } else {
+        this.qrCountdown.set(current - 1);
+      }
+    }, 1000);
+  }
+  
+  /**
+   * 建立 WebSocket 連接
+   */
+  private connectWebSocket(token: string) {
+    // 關閉現有連接
+    if (this.qrWebSocket) {
+      this.qrWebSocket.close();
+    }
+    
+    // 構建 WebSocket URL
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const wsUrl = `${protocol}//${host}/ws/login-token/${token}`;
+    
+    console.log('[WebSocket] Connecting to:', wsUrl);
+    
+    try {
+      this.qrWebSocket = new WebSocket(wsUrl);
+      
+      this.qrWebSocket.onopen = () => {
+        console.log('[WebSocket] Connected');
+        this.wsConnected.set(true);
+      };
+      
+      this.qrWebSocket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('[WebSocket] Message:', data);
+          
+          // 處理不同類型的消息
+          if (data.type === 'login_success' || data.event === 'login_confirmed') {
+            // 登入成功！
+            this.handleLoginSuccess(data.data);
+          } else if (data.type === 'login_token_update') {
+            // Token 狀態更新
+            if (data.status === 'confirmed') {
+              // 狀態已確認，發送 check_status 獲取完整數據
+              this.qrWebSocket?.send(JSON.stringify({ type: 'check_status' }));
+            }
+          } else if (data.status === 'confirmed' && data.data?.access_token) {
+            // 直接包含 token 的確認消息
+            this.handleLoginSuccess(data.data);
+          }
+        } catch (e) {
+          console.error('[WebSocket] Parse error:', e);
+        }
+      };
+      
+      this.qrWebSocket.onclose = () => {
+        console.log('[WebSocket] Disconnected');
+        this.wsConnected.set(false);
+        
+        // 如果未過期且未成功，嘗試重連
+        if (!this.qrCodeExpired() && this.qrToken) {
+          setTimeout(() => {
+            if (this.qrToken && !this.qrCodeExpired()) {
+              console.log('[WebSocket] Reconnecting...');
+              this.connectWebSocket(this.qrToken);
+            }
+          }, 3000);
+        }
+      };
+      
+      this.qrWebSocket.onerror = (error) => {
+        console.error('[WebSocket] Error:', error);
+        this.wsConnected.set(false);
+      };
+      
+      // 設置心跳
+      const heartbeat = setInterval(() => {
+        if (this.qrWebSocket?.readyState === WebSocket.OPEN) {
+          this.qrWebSocket.send(JSON.stringify({ type: 'ping' }));
+        } else {
+          clearInterval(heartbeat);
+        }
+      }, 15000);
+      
+    } catch (e) {
+      console.error('[WebSocket] Create error:', e);
+      this.wsConnected.set(false);
+    }
+  }
+  
+  /**
+   * 處理登入成功
+   */
+  private handleLoginSuccess(data: any) {
+    console.log('[Login] Success:', data);
+    
+    // 清理資源
+    this.cleanupQRCode();
+    this.cancelDeepLink();
+    
+    // 保存 Token
+    if (data.access_token) {
+      localStorage.setItem('tgm_access_token', data.access_token);
+    }
+    if (data.refresh_token) {
+      localStorage.setItem('tgm_refresh_token', data.refresh_token);
+    }
+    if (data.user) {
+      localStorage.setItem('tgm_user', JSON.stringify(data.user));
+    }
+    
+    // 跳轉到目標頁面
+    const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
+    window.location.href = returnUrl;
   }
   
   // ==================== Telegram Widget 登入 ====================

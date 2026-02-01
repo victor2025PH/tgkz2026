@@ -284,6 +284,10 @@ class HttpApiServer:
             status: HTTP 狀態碼
             events: 前端需要觸發的事件列表，格式: [{'name': 'event-name', 'data': {...}}]
         """
+        # 確保 data 不是 None
+        if data is None:
+            data = {'success': True}
+        
         response_data = {
             **data,
             'timestamp': datetime.now().isoformat(),

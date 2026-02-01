@@ -10,6 +10,7 @@
 
 import sqlite3
 import os
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple
 import logging
@@ -218,6 +219,212 @@ class AuthService:
         except Exception as e:
             logger.exception(f"Registration error: {e}")
             return {'success': False, 'error': str(e)}
+        finally:
+            db.close()
+    
+    async def register_oauth(
+        self,
+        provider: str,
+        provider_id: str,
+        email: str = None,
+        username: str = None,
+        display_name: str = None,
+        avatar_url: str = None
+    ) -> Dict[str, Any]:
+        """
+        OAuth 用戶註冊
+        
+        為第三方登入用戶創建帳號（無密碼）
+        
+        Args:
+            provider: OAuth 提供者（telegram, google 等）
+            provider_id: 提供者的用戶 ID
+            email: 郵箱（可選，Telegram 不提供）
+            username: 用戶名
+            display_name: 顯示名稱
+            avatar_url: 頭像 URL
+        """
+        db = self._get_db()
+        try:
+            # 檢查是否已存在
+            existing = db.execute(
+                "SELECT id FROM users WHERE auth_provider = ? AND oauth_id = ?",
+                (provider, provider_id)
+            ).fetchone()
+            
+            if existing:
+                return {
+                    'success': True,
+                    'user_id': existing['id'],
+                    'is_existing': True
+                }
+            
+            # 檢查用戶名是否可用
+            if username:
+                existing = db.execute(
+                    "SELECT id FROM users WHERE username = ?", (username.lower(),)
+                ).fetchone()
+                if existing:
+                    # 添加數字後綴
+                    base_username = username.lower()
+                    counter = 1
+                    while True:
+                        new_username = f"{base_username}_{counter}"
+                        existing = db.execute(
+                            "SELECT id FROM users WHERE username = ?", (new_username,)
+                        ).fetchone()
+                        if not existing:
+                            username = new_username
+                            break
+                        counter += 1
+            
+            # 創建用戶
+            user = User(
+                email=email.lower() if email else None,
+                username=username.lower() if username else f"{provider}_{provider_id}",
+                password_hash=None,  # OAuth 用戶無密碼
+                display_name=display_name or username,
+                avatar_url=avatar_url,
+                auth_provider=provider,
+                oauth_id=provider_id,
+                role=UserRole.FREE,
+                subscription_tier='free',
+                is_verified=True  # OAuth 用戶自動驗證
+            )
+            
+            # 設置配額
+            tier = SUBSCRIPTION_TIERS.get('free', {})
+            user.max_accounts = tier.get('max_accounts', 3)
+            user.max_api_calls = tier.get('max_api_calls', 1000)
+            
+            db.execute('''
+                INSERT INTO users (
+                    id, email, username, password_hash, display_name, avatar_url,
+                    auth_provider, oauth_id, role, subscription_tier, 
+                    max_accounts, max_api_calls, is_verified
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                user.id, user.email, user.username, user.password_hash,
+                user.display_name, user.avatar_url,
+                provider, provider_id,
+                user.role.value, user.subscription_tier,
+                user.max_accounts, user.max_api_calls, 1
+            ))
+            db.commit()
+            
+            # 記錄審計
+            self._log_audit(db, user.id, 'oauth_register', details={
+                'provider': provider, 
+                'provider_id': provider_id
+            })
+            
+            logger.info(f"OAuth user registered: {user.id} via {provider}")
+            
+            return {
+                'success': True,
+                'user_id': user.id,
+                'is_existing': False
+            }
+            
+        except Exception as e:
+            logger.exception(f"OAuth registration error: {e}")
+            return {'success': False, 'error': str(e)}
+        finally:
+            db.close()
+    
+    async def get_user_by_telegram_id(self, telegram_id: str) -> Optional[User]:
+        """
+        通過 Telegram ID 獲取用戶
+        
+        Args:
+            telegram_id: Telegram 用戶 ID
+        
+        Returns:
+            User 對象，不存在返回 None
+        """
+        db = self._get_db()
+        try:
+            row = db.execute(
+                "SELECT * FROM users WHERE auth_provider = 'telegram' AND oauth_id = ?",
+                (telegram_id,)
+            ).fetchone()
+            
+            if not row:
+                return None
+            
+            return User.from_dict(dict(row))
+            
+        except Exception as e:
+            logger.error(f"Error getting user by telegram_id: {e}")
+            return None
+        finally:
+            db.close()
+    
+    async def create_session(
+        self, 
+        user_id: str, 
+        device_info: Dict[str, Any] = None
+    ) -> Dict[str, str]:
+        """
+        為用戶創建會話
+        
+        Args:
+            user_id: 用戶 ID
+            device_info: 設備信息
+        
+        Returns:
+            包含 access_token 和 refresh_token 的字典
+        """
+        db = self._get_db()
+        try:
+            # 獲取用戶信息
+            user = await self.get_user(user_id)
+            if not user:
+                return {'error': '用戶不存在'}
+            
+            # 生成 token
+            access_token, refresh_token = generate_tokens(
+                user.id, user.email or '', 
+                user.role.value if hasattr(user.role, 'value') else str(user.role)
+            )
+            
+            # 創建會話
+            session_id = str(uuid.uuid4())
+            expires_at = datetime.now() + timedelta(days=7)
+            
+            device_info = device_info or {}
+            
+            db.execute('''
+                INSERT INTO user_sessions (
+                    id, user_id, access_token, refresh_token,
+                    device_name, device_type, ip_address, user_agent,
+                    expires_at, last_activity_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (
+                session_id, user_id, access_token, refresh_token,
+                device_info.get('device_name', 'Unknown'),
+                device_info.get('device_type', 'web'),
+                device_info.get('ip_address', ''),
+                device_info.get('user_agent', ''),
+                expires_at.isoformat()
+            ))
+            db.commit()
+            
+            # 更新最後登入時間
+            db.execute(
+                "UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (user_id,)
+            )
+            db.commit()
+            
+            return {
+                'access_token': access_token,
+                'refresh_token': refresh_token
+            }
+            
+        except Exception as e:
+            logger.exception(f"Session creation error: {e}")
+            return {'error': str(e)}
         finally:
             db.close()
     

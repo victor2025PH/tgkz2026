@@ -193,6 +193,59 @@ export class AuthService {
   }
   
   /**
+   * 獲取 Telegram OAuth 配置
+   */
+  async getTelegramConfig(): Promise<{ enabled: boolean; bot_username?: string }> {
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/oauth/telegram/config`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        return result.data;
+      }
+      
+      return { enabled: false };
+    } catch (e) {
+      console.error('Failed to get Telegram config:', e);
+      return { enabled: false };
+    }
+  }
+  
+  /**
+   * Telegram OAuth 登入
+   */
+  async telegramLogin(authData: any): Promise<{ success: boolean; error?: string }> {
+    this._isLoading.set(true);
+    
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/oauth/telegram`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(authData)
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // 設置認證狀態
+        this.setAuthState({
+          user: result.user,
+          access_token: result.access_token,
+          refresh_token: result.refresh_token
+        });
+        this.scheduleTokenRefresh();
+        return { success: true };
+      }
+      
+      return { success: false, error: result.error || 'Telegram 登入失敗' };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Telegram 登入失敗' };
+    } finally {
+      this._isLoading.set(false);
+    }
+  }
+  
+  /**
    * 登出
    */
   async logout(): Promise<void> {

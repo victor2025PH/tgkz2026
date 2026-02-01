@@ -139,6 +139,12 @@ class HttpApiServer:
         self.app.router.add_post('/api/v1/auth/verify-code', self.verify_code)
         self.app.router.add_post('/api/v1/auth/submit-2fa', self.submit_2fa)
         
+        # OAuth 第三方登入
+        self.app.router.add_post('/api/v1/oauth/telegram', self.oauth_telegram)
+        self.app.router.add_get('/api/v1/oauth/telegram/config', self.oauth_telegram_config)
+        self.app.router.add_post('/api/v1/oauth/google', self.oauth_google)
+        self.app.router.add_get('/api/v1/oauth/providers', self.oauth_providers)
+        
         # API 憑證
         self.app.router.add_get('/api/v1/credentials', self.get_credentials)
         self.app.router.add_post('/api/v1/credentials', self.add_credential)
@@ -586,6 +592,152 @@ class HttpApiServer:
         """提交 2FA 密碼"""
         data = await request.json()
         result = await self._execute_command('submit-2fa-password', data)
+        return self._json_response(result)
+    
+    # ==================== OAuth 第三方登入 ====================
+    
+    async def oauth_telegram(self, request):
+        """
+        Telegram OAuth 登入
+        
+        接收 Telegram Login Widget 返回的數據，驗證後創建或綁定用戶
+        """
+        try:
+            data = await request.json()
+            
+            # 1. 驗證 Telegram 數據
+            from auth.oauth_telegram import get_telegram_oauth_service
+            oauth_service = get_telegram_oauth_service()
+            
+            success, tg_user, error = await oauth_service.authenticate(data)
+            if not success:
+                return self._json_response({
+                    'success': False, 
+                    'error': error or 'Telegram 認證失敗'
+                }, 401)
+            
+            # 2. 查找或創建用戶
+            from auth.service import get_auth_service
+            auth_service = get_auth_service()
+            
+            # 嘗試通過 telegram_id 查找現有用戶
+            user = await auth_service.get_user_by_telegram_id(str(tg_user.id))
+            
+            if user:
+                # 已有用戶，直接登入
+                logger.info(f"Telegram OAuth: existing user {user.id}")
+            else:
+                # 新用戶，自動註冊
+                logger.info(f"Telegram OAuth: creating new user for TG {tg_user.id}")
+                
+                # 生成唯一用戶名
+                username = tg_user.username or f"tg_{tg_user.id}"
+                
+                # 創建用戶（無密碼，僅限 OAuth 登入）
+                reg_result = await auth_service.register_oauth(
+                    provider='telegram',
+                    provider_id=str(tg_user.id),
+                    email=None,  # Telegram 不提供 email
+                    username=username,
+                    display_name=tg_user.full_name,
+                    avatar_url=tg_user.photo_url
+                )
+                
+                if not reg_result.get('success'):
+                    return self._json_response(reg_result, 400)
+                
+                user = await auth_service.get_user(reg_result.get('user_id'))
+            
+            if not user:
+                return self._json_response({
+                    'success': False,
+                    'error': '無法創建用戶'
+                }, 500)
+            
+            # 3. 創建會話並返回令牌
+            device_info = {
+                'ip_address': request.headers.get('X-Forwarded-For', 
+                              request.headers.get('X-Real-IP', 
+                              request.remote or '')),
+                'user_agent': request.headers.get('User-Agent', ''),
+                'device_type': 'web',
+                'device_name': 'Telegram OAuth'
+            }
+            
+            tokens = await auth_service.create_session(user.id, device_info)
+            
+            return self._json_response({
+                'success': True,
+                'access_token': tokens.get('access_token'),
+                'refresh_token': tokens.get('refresh_token'),
+                'user': user.to_dict() if hasattr(user, 'to_dict') else {
+                    'id': user.id,
+                    'username': user.username,
+                    'display_name': getattr(user, 'display_name', user.username),
+                    'avatar_url': getattr(user, 'avatar_url', None),
+                    'role': getattr(user, 'role', 'free')
+                },
+                'is_new_user': not user  # 標記是否為新用戶
+            })
+            
+        except Exception as e:
+            logger.error(f"Telegram OAuth error: {e}")
+            import traceback
+            traceback.print_exc()
+            return self._json_response({
+                'success': False, 
+                'error': f'OAuth 處理失敗: {str(e)}'
+            }, 500)
+    
+    async def oauth_telegram_config(self, request):
+        """獲取 Telegram OAuth 配置（用於前端 Widget）"""
+        import os
+        bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', '')
+        
+        return self._json_response({
+            'success': True,
+            'data': {
+                'bot_username': bot_username,
+                'enabled': bool(bot_username and os.environ.get('TELEGRAM_BOT_TOKEN'))
+            }
+        })
+    
+    async def oauth_google(self, request):
+        """Google OAuth 登入（待實現）"""
+        return self._json_response({
+            'success': False,
+            'error': 'Google OAuth 尚未實現',
+            'code': 'NOT_IMPLEMENTED'
+        }, 501)
+    
+    async def oauth_providers(self, request):
+        """獲取可用的 OAuth 提供者列表"""
+        import os
+        
+        providers = []
+        
+        # Telegram
+        if os.environ.get('TELEGRAM_BOT_TOKEN'):
+            providers.append({
+                'id': 'telegram',
+                'name': 'Telegram',
+                'enabled': True,
+                'icon': 'telegram'
+            })
+        
+        # Google（預留）
+        if os.environ.get('GOOGLE_CLIENT_ID'):
+            providers.append({
+                'id': 'google',
+                'name': 'Google',
+                'enabled': True,
+                'icon': 'google'
+            })
+        
+        return self._json_response({
+            'success': True,
+            'data': providers
+        })
         return self._json_response(result)
     
     # ==================== API 憑證 ====================

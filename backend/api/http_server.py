@@ -168,6 +168,9 @@ class HttpApiServer:
         self.app.router.add_post('/webhook/telegram', self.telegram_webhook)
         self.app.router.add_post('/webhook/telegram/{token}', self.telegram_webhook)
         
+        # 🆕 登入 Token WebSocket（實時狀態推送）
+        self.app.router.add_get('/ws/login-token/{token}', self.login_token_websocket)
+        
         # 郵箱驗證和密碼重置
         self.app.router.add_post('/api/v1/auth/send-verification', self.send_verification_email)
         self.app.router.add_post('/api/v1/auth/verify-email', self.verify_email)
@@ -1111,6 +1114,19 @@ class HttpApiServer:
                     'error': error
                 }, 400)
             
+            # 🆕 推送 WebSocket 通知給訂閱的客戶端
+            try:
+                from auth.login_token import get_subscription_manager
+                manager = get_subscription_manager()
+                
+                await manager.notify(token, 'confirmed', {
+                    'telegram_id': telegram_id,
+                    'telegram_username': telegram_username,
+                    'telegram_first_name': telegram_first_name
+                })
+            except Exception as notify_err:
+                logger.warning(f"Failed to notify WS: {notify_err}")
+            
             return self._json_response({
                 'success': True,
                 'message': '登入已確認'
@@ -1145,6 +1161,150 @@ class HttpApiServer:
             import traceback
             traceback.print_exc()
             return self._json_response({'ok': False, 'error': str(e)}, 500)
+    
+    async def login_token_websocket(self, request):
+        """
+        🆕 登入 Token 專用 WebSocket
+        
+        前端連接此端點訂閱特定 Token 的狀態變化，
+        當用戶在 Telegram 確認登入時會收到實時推送。
+        
+        URL: /ws/login-token/{token}
+        """
+        from auth.login_token import get_login_token_service, get_subscription_manager
+        
+        token = request.match_info['token']
+        service = get_login_token_service()
+        manager = get_subscription_manager()
+        
+        # 驗證 Token 存在且有效
+        login_token = service.get_token(token)
+        if not login_token:
+            return web.Response(status=404, text='Token not found')
+        
+        if login_token.is_expired():
+            return web.Response(status=410, text='Token expired')
+        
+        # 創建 WebSocket 連接
+        ws = web.WebSocketResponse(
+            heartbeat=15.0,
+            receive_timeout=300.0  # 5 分鐘超時（與 Token 過期時間一致）
+        )
+        await ws.prepare(request)
+        
+        # 訂閱 Token 狀態變化
+        manager.subscribe(token, ws)
+        logger.info(f"Login token WS connected for {token[:8]}...")
+        
+        # 發送當前狀態
+        await ws.send_json({
+            'type': 'connected',
+            'event': 'login_token_connected',
+            'token': token[:16] + '...',
+            'status': login_token.status.value,
+            'expires_in': max(0, int((login_token.expires_at - datetime.utcnow()).total_seconds())),
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+        try:
+            async for msg in ws:
+                if msg.type == web.WSMsgType.TEXT:
+                    try:
+                        data = json.loads(msg.data)
+                        msg_type = data.get('type')
+                        
+                        # 心跳
+                        if msg_type == 'ping':
+                            # 檢查 Token 最新狀態
+                            status, user_data = service.check_token_status(token)
+                            await ws.send_json({
+                                'type': 'pong',
+                                'status': status,
+                                'data': user_data,
+                                'timestamp': datetime.utcnow().isoformat()
+                            })
+                            
+                            # 如果已確認，推送完整數據後關閉連接
+                            if status == 'confirmed' and user_data:
+                                await self._send_login_success(ws, token, user_data)
+                                break
+                                
+                        # 主動查詢狀態
+                        elif msg_type == 'check_status':
+                            status, user_data = service.check_token_status(token)
+                            await ws.send_json({
+                                'type': 'status_update',
+                                'status': status,
+                                'data': user_data,
+                                'timestamp': datetime.utcnow().isoformat()
+                            })
+                            
+                            if status == 'confirmed' and user_data:
+                                await self._send_login_success(ws, token, user_data)
+                                break
+                        
+                    except json.JSONDecodeError:
+                        await ws.send_json({'type': 'error', 'error': 'Invalid JSON'})
+                        
+                elif msg.type in (web.WSMsgType.ERROR, web.WSMsgType.CLOSE):
+                    break
+                    
+        except asyncio.CancelledError:
+            logger.debug(f"Login token WS cancelled for {token[:8]}...")
+        except Exception as e:
+            logger.error(f"Login token WS error: {e}")
+        finally:
+            manager.unsubscribe(ws)
+            logger.info(f"Login token WS disconnected for {token[:8]}...")
+        
+        return ws
+    
+    async def _send_login_success(self, ws, token: str, user_data: dict):
+        """發送登入成功消息（含 JWT Token）"""
+        from auth.service import get_auth_service
+        
+        auth_service = get_auth_service()
+        
+        # 查找或創建用戶
+        user = await auth_service.get_user_by_telegram_id(user_data['telegram_id'])
+        
+        if not user:
+            user = auth_service.create_user_from_telegram(
+                telegram_id=user_data['telegram_id'],
+                username=user_data.get('telegram_username'),
+                first_name=user_data.get('telegram_first_name', 'Telegram User')
+            )
+        
+        if user:
+            # 生成 JWT Token
+            access_token = auth_service.generate_jwt_token(user.id, user.role)
+            refresh_token = auth_service.generate_refresh_token(user.id)
+            
+            await ws.send_json({
+                'type': 'login_success',
+                'event': 'login_confirmed',
+                'status': 'confirmed',
+                'data': {
+                    'access_token': access_token,
+                    'refresh_token': refresh_token,
+                    'user': {
+                        'id': user.id,
+                        'username': user.username,
+                        'display_name': user.display_name or user.username,
+                        'email': user.email,
+                        'avatar_url': user.avatar_url,
+                        'subscription_tier': user.subscription_tier,
+                        'role': user.role
+                    }
+                },
+                'timestamp': datetime.utcnow().isoformat()
+            })
+        else:
+            await ws.send_json({
+                'type': 'error',
+                'error': '無法創建用戶',
+                'timestamp': datetime.utcnow().isoformat()
+            })
     
     # ==================== OAuth 授權重定向 ====================
     

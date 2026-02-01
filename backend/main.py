@@ -3029,7 +3029,12 @@ class BackendService:
                     AppError(ErrorType.VALIDATION_ERROR, error_message, {"errors": errors}),
                     {"command": "add-account", "payload": payload}
                 )
-                return
+                # 🆕 返回錯誤結果（HTTP API 模式需要）
+                return {
+                    "success": False,
+                    "error": error_message,
+                    "errors": errors
+                }
             
             print(f"[Backend] Validation passed, checking for existing account/session...", file=sys.stderr)
             
@@ -3270,6 +3275,14 @@ class BackendService:
             self._cache.pop("accounts", None)
             self._cache_timestamps.pop("accounts", None)
             self.send_event("accounts-updated", accounts)
+            
+            # 🆕 返回成功結果（HTTP API 模式需要）
+            return {
+                "success": True,
+                "account_id": account_id,
+                "phone": phone,
+                "message": f"账户 {phone} 添加成功"
+            }
         
         except ValidationError as e:
             import sys
@@ -3553,7 +3566,7 @@ class BackendService:
                     can_retry_sms = result.get('canRetrySMS', False) or result.get('can_retry_sms', False)
                     wait_seconds = result.get('waitSeconds', None)
                     
-                    self.send_event("login-requires-code", {
+                    event_data = {
                         "accountId": account_id,
                         "phone": phone,
                         "phoneCodeHash": phone_code_hash,
@@ -3562,11 +3575,21 @@ class BackendService:
                         "message": message,  # Include message
                         "canRetrySMS": can_retry_sms,  # Include canRetrySMS flag
                         "waitSeconds": wait_seconds  # Include wait seconds if available
-                    })
+                    }
+                    self.send_event("login-requires-code", event_data)
                     print(f"[Backend] login-requires-code event sent successfully", file=sys.stderr)
                     # State: Requesting Code -> Waiting Code
                     await db.update_account(account_id, {"status": "Waiting Code"})
                     print(f"[Backend] Account status updated to 'Waiting Code'", file=sys.stderr)
+                    # 🆕 返回結果（HTTP API 模式需要）
+                    return {
+                        "success": True,
+                        "requires_code": True,
+                        "phone": phone,
+                        "phone_code_hash": phone_code_hash,
+                        "send_type": send_type,
+                        "message": message
+                    }
                 elif result.get('requires_2fa'):
                     # Need 2FA password
                     self.send_event("login-requires-2fa", {
@@ -3574,6 +3597,13 @@ class BackendService:
                         "phone": phone
                     })
                     await db.update_account(account_id, {"status": "Waiting 2FA"})
+                    # 🆕 返回結果（HTTP API 模式需要）
+                    return {
+                        "success": True,
+                        "requires_2fa": True,
+                        "phone": phone,
+                        "message": "需要二步驗證密碼"
+                    }
                 else:
                     # Successfully logged in
                     await db.update_account(account_id, {"status": result.get('status', 'Online')})
@@ -3719,6 +3749,20 @@ class BackendService:
                     self._cache_timestamps.pop("accounts", None)
                     self.send_event("accounts-updated", accounts)
                     print(f"[Backend] Sent accounts-updated after successful login for {phone}", file=sys.stderr)
+                    
+                    # 🆕 返回結果（HTTP API 模式需要）
+                    return {
+                        "success": True,
+                        "status": "Online",
+                        "phone": phone,
+                        "account_id": account_id,
+                        "user_info": {
+                            "phone": phone,
+                            "firstName": account.get('firstName') or user_info.get('first_name', ''),
+                            "lastName": account.get('lastName') or user_info.get('last_name', ''),
+                            "username": account.get('username') or user_info.get('username', '')
+                        }
+                    }
             else:
                 # Login failed
                 import sys
@@ -3740,7 +3784,13 @@ class BackendService:
                         "floodWait": flood_wait
                     })
                     await db.update_account(account_id, {"status": "Offline"})
-                    return
+                    # 🆕 返回結果（HTTP API 模式需要）
+                    return {
+                        "success": False,
+                        "error": friendly_msg,
+                        "flood_wait": flood_wait,
+                        "phone": phone
+                    }
                 
                 await db.update_account(account_id, {"status": error_status})
                 
@@ -3844,6 +3894,14 @@ class BackendService:
                     "message": error_message,
                     "friendlyMessage": friendly_msg
                 })
+                
+                # 🆕 返回錯誤結果（HTTP API 模式需要）
+                return {
+                    "success": False,
+                    "error": friendly_msg,
+                    "phone": phone,
+                    "status": error_status
+                }
             
             # Update accounts list
             accounts = await db.get_all_accounts()

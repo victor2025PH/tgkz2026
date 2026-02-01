@@ -64,7 +64,7 @@ Authorization: Bearer <access_token>
 # 服務器配置
 SERVERS = [
     {
-        "url": "https://tgw.usdt2006.cc",
+        "url": "https://tgw.usdt2026.cc",
         "description": "生產環境"
     },
     {

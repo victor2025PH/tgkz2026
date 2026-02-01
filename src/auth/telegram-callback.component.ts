@@ -109,16 +109,47 @@ export class TelegramCallbackComponent implements OnInit {
   
   async ngOnInit() {
     try {
-      // 獲取 URL 參數（Telegram 回調數據）
-      const params = this.route.snapshot.queryParams;
+      // 🔧 優化：支持多種 Telegram 回調格式
+      let authData: any = null;
       
-      // 檢查必要參數
-      if (!params['id'] || !params['hash']) {
-        // 嘗試從 fragment 獲取
+      // 1. 嘗試從 hash fragment 獲取 tgAuthResult（Telegram OAuth 標準格式）
+      const hash = window.location.hash;
+      if (hash && hash.includes('tgAuthResult=')) {
+        const match = hash.match(/tgAuthResult=([^&]+)/);
+        if (match && match[1]) {
+          try {
+            // 解碼 base64 並解析 JSON
+            const decoded = atob(match[1]);
+            authData = JSON.parse(decoded);
+            console.log('Telegram auth data from tgAuthResult:', authData);
+          } catch (e) {
+            console.error('Failed to parse tgAuthResult:', e);
+          }
+        }
+      }
+      
+      // 2. 嘗試從 query params 獲取
+      if (!authData) {
+        const params = this.route.snapshot.queryParams;
+        if (params['id'] && params['hash']) {
+          authData = {
+            id: params['id'],
+            first_name: params['first_name'],
+            last_name: params['last_name'],
+            username: params['username'],
+            photo_url: params['photo_url'],
+            auth_date: params['auth_date'],
+            hash: params['hash']
+          };
+        }
+      }
+      
+      // 3. 嘗試從 fragment params 獲取（舊格式）
+      if (!authData) {
         const fragment = this.route.snapshot.fragment;
-        if (fragment) {
+        if (fragment && fragment.includes('id=')) {
           const fragmentParams = new URLSearchParams(fragment);
-          await this.processTelegramAuth({
+          authData = {
             id: fragmentParams.get('id'),
             first_name: fragmentParams.get('first_name'),
             last_name: fragmentParams.get('last_name'),
@@ -126,22 +157,16 @@ export class TelegramCallbackComponent implements OnInit {
             photo_url: fragmentParams.get('photo_url'),
             auth_date: fragmentParams.get('auth_date'),
             hash: fragmentParams.get('hash')
-          });
-        } else {
-          throw new Error('缺少 Telegram 認證數據');
+          };
         }
-      } else {
-        // 從 query params 獲取
-        await this.processTelegramAuth({
-          id: params['id'],
-          first_name: params['first_name'],
-          last_name: params['last_name'],
-          username: params['username'],
-          photo_url: params['photo_url'],
-          auth_date: params['auth_date'],
-          hash: params['hash']
-        });
       }
+      
+      if (!authData || !authData.id) {
+        throw new Error('缺少 Telegram 認證數據');
+      }
+      
+      await this.processTelegramAuth(authData);
+      
     } catch (e: any) {
       console.error('Telegram callback error:', e);
       this.error.set(e.message || 'Telegram 登入失敗');

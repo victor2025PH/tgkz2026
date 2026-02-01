@@ -190,4 +190,93 @@ def register_contacts_handlers(backend_service):
         """獲取成員統計"""
         return await backend_service.handle_get_member_stats(payload) if hasattr(backend_service, 'handle_get_member_stats') else None
     
+    # ==================== 歷史消息收集 ====================
+    
+    @router.register('collect-users-from-history', category=CommandCategory.CONTACTS, description='從歷史消息收集用戶')
+    async def handle_collect_users_from_history(payload: Dict[str, Any], context: CommandContext):
+        """從歷史消息收集用戶"""
+        return await backend_service.handle_collect_users_from_history(payload) if hasattr(backend_service, 'handle_collect_users_from_history') else None
+    
+    @router.register('collect-users-from-history-advanced', category=CommandCategory.CONTACTS, description='進階歷史消息收集')
+    async def handle_collect_users_from_history_advanced(payload: Dict[str, Any], context: CommandContext):
+        """進階歷史消息收集"""
+        return await backend_service.handle_collect_users_from_history_advanced(payload) if hasattr(backend_service, 'handle_collect_users_from_history_advanced') else None
+    
+    @router.register('get-history-collection-stats', category=CommandCategory.CONTACTS, description='獲取歷史收集統計')
+    async def handle_get_history_collection_stats(payload: Dict[str, Any], context: CommandContext):
+        """獲取歷史收集統計"""
+        return await backend_service.handle_get_history_collection_stats(payload) if hasattr(backend_service, 'handle_get_history_collection_stats') else None
+    
+    @router.register('get-group-collected-stats', category=CommandCategory.CONTACTS, description='獲取群組收集統計')
+    async def handle_get_group_collected_stats(payload: Dict[str, Any], context: CommandContext):
+        """獲取群組收集統計"""
+        return await backend_service.handle_get_group_collected_stats(payload) if hasattr(backend_service, 'handle_get_group_collected_stats') else None
+    
+    @router.register('get-collected-users-count', category=CommandCategory.CONTACTS, description='獲取已收集用戶數量')
+    async def handle_get_collected_users_count(payload: Dict[str, Any], context: CommandContext):
+        """獲取已收集用戶數量"""
+        return await backend_service.handle_get_collected_users_count(payload) if hasattr(backend_service, 'handle_get_collected_users_count') else None
+    
+    @router.register('check-group-monitoring-status', category=CommandCategory.CONTACTS, description='檢查群組監控狀態')
+    async def handle_check_group_monitoring_status(payload: Dict[str, Any], context: CommandContext):
+        """檢查群組監控狀態"""
+        return await backend_service.handle_check_group_monitoring_status(payload) if hasattr(backend_service, 'handle_check_group_monitoring_status') else None
+    
+    # ==================== P4 優化：數據導出與管理 ====================
+    
+    @router.register('export-members', category=CommandCategory.CONTACTS, description='導出成員數據')
+    async def handle_export_members(payload: Dict[str, Any], context: CommandContext):
+        """導出成員數據"""
+        return await backend_service.handle_export_members(payload) if hasattr(backend_service, 'handle_export_members') else None
+    
+    @router.register('deduplicate-members', category=CommandCategory.CONTACTS, description='去重成員數據')
+    async def handle_deduplicate_members(payload: Dict[str, Any], context: CommandContext):
+        """去重成員數據"""
+        return await backend_service.handle_deduplicate_members(payload) if hasattr(backend_service, 'handle_deduplicate_members') else None
+    
+    @router.register('batch-tag-members', category=CommandCategory.CONTACTS, description='批量標籤成員')
+    async def handle_batch_tag_members(payload: Dict[str, Any], context: CommandContext):
+        """批量標籤成員"""
+        return await backend_service.handle_batch_tag_members(payload) if hasattr(backend_service, 'handle_batch_tag_members') else None
+    
+    @router.register('get-all-tags', category=CommandCategory.CONTACTS, description='獲取所有標籤')
+    async def handle_get_all_tags(payload: Dict[str, Any], context: CommandContext):
+        """獲取所有標籤"""
+        return await backend_service.handle_get_all_tags(payload) if hasattr(backend_service, 'handle_get_all_tags') else None
+    
+    @router.register('get-group-profile', category=CommandCategory.CONTACTS, description='獲取群組畫像')
+    async def handle_get_group_profile(payload: Dict[str, Any], context: CommandContext):
+        """獲取群組畫像"""
+        return await backend_service.handle_get_group_profile(payload) if hasattr(backend_service, 'handle_get_group_profile') else None
+    
+    @router.register('compare-groups', category=CommandCategory.CONTACTS, description='比較群組')
+    async def handle_compare_groups(payload: Dict[str, Any], context: CommandContext):
+        """比較群組"""
+        return await backend_service.handle_compare_groups(payload) if hasattr(backend_service, 'handle_compare_groups') else None
+    
+    @router.register('recalculate-scores', category=CommandCategory.CONTACTS, description='重新計算評分')
+    async def handle_recalculate_scores(payload: Dict[str, Any], context: CommandContext):
+        """重新計算評分"""
+        return await backend_service.handle_recalculate_scores(payload) if hasattr(backend_service, 'handle_recalculate_scores') else None
+    
+    @router.register('get-extraction-stats', category=CommandCategory.CONTACTS, description='獲取提取統計')
+    async def handle_get_extraction_stats(payload: Dict[str, Any], context: CommandContext):
+        """獲取提取統計"""
+        return await backend_service.handle_get_extraction_stats(payload) if hasattr(backend_service, 'handle_get_extraction_stats') else None
+    
+    @router.register('start-background-extraction', category=CommandCategory.CONTACTS, description='啟動背景提取')
+    async def handle_start_background_extraction(payload: Dict[str, Any], context: CommandContext):
+        """啟動背景提取"""
+        return await backend_service.handle_start_background_extraction(payload) if hasattr(backend_service, 'handle_start_background_extraction') else None
+    
+    @router.register('get-background-tasks', category=CommandCategory.CONTACTS, description='獲取背景任務')
+    async def handle_get_background_tasks(payload: Dict[str, Any], context: CommandContext):
+        """獲取背景任務"""
+        return await backend_service.handle_get_background_tasks(payload) if hasattr(backend_service, 'handle_get_background_tasks') else None
+    
+    @router.register('clear-extraction-cache', category=CommandCategory.CONTACTS, description='清除提取緩存')
+    async def handle_clear_extraction_cache(payload: Dict[str, Any], context: CommandContext):
+        """清除提取緩存"""
+        return await backend_service.handle_clear_extraction_cache(payload) if hasattr(backend_service, 'handle_clear_extraction_cache') else None
+    
     logger.info(f'Registered {len([c for c in router.get_commands(CommandCategory.CONTACTS)])} contacts handlers')

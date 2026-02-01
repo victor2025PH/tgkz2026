@@ -80,6 +80,39 @@ export interface MemberStats {
           <p class="page-desc">管理和分析提取的 Telegram 成員數據</p>
         </div>
         <div class="header-actions">
+          <!-- P4: 高級工具按鈕組 -->
+          <div class="relative inline-block" style="position: relative;">
+            <button (click)="showAdvancedMenu.set(!showAdvancedMenu())" class="btn-secondary">
+              🛠️ 高級工具 ▾
+            </button>
+            @if (showAdvancedMenu()) {
+              <div class="absolute right-0 mt-2 w-56 bg-slate-800 rounded-xl shadow-xl border border-slate-700 py-2 z-50" style="position: absolute; right: 0; margin-top: 8px; width: 240px;">
+                <button (click)="deduplicateMembers(); showAdvancedMenu.set(false)" class="w-full px-4 py-2 text-left hover:bg-slate-700 flex items-center gap-2" style="display: flex; align-items: center; padding: 8px 16px;">
+                  🔄 智能去重
+                  <span class="ml-auto text-xs text-slate-400" style="margin-left: auto; font-size: 11px; color: #94a3b8;">跨群組合併</span>
+                </button>
+                <button (click)="recalculateScores(); showAdvancedMenu.set(false)" class="w-full px-4 py-2 text-left hover:bg-slate-700 flex items-center gap-2" style="display: flex; align-items: center; padding: 8px 16px;">
+                  📊 重算評分
+                  <span class="ml-auto text-xs text-slate-400" style="margin-left: auto; font-size: 11px; color: #94a3b8;">更新價值等級</span>
+                </button>
+                <div class="border-t border-slate-700 my-1" style="border-top: 1px solid #334155; margin: 4px 0;"></div>
+                <button (click)="showGroupProfile(); showAdvancedMenu.set(false)" class="w-full px-4 py-2 text-left hover:bg-slate-700 flex items-center gap-2" style="display: flex; align-items: center; padding: 8px 16px;">
+                  📈 群組畫像
+                  <span class="ml-auto text-xs text-slate-400" style="margin-left: auto; font-size: 11px; color: #94a3b8;">質量分析</span>
+                </button>
+                <button (click)="compareGroups(); showAdvancedMenu.set(false)" class="w-full px-4 py-2 text-left hover:bg-slate-700 flex items-center gap-2" style="display: flex; align-items: center; padding: 8px 16px;">
+                  📊 群組對比
+                  <span class="ml-auto text-xs text-slate-400" style="margin-left: auto; font-size: 11px; color: #94a3b8;">多群對比</span>
+                </button>
+                <div class="border-t border-slate-700 my-1" style="border-top: 1px solid #334155; margin: 4px 0;"></div>
+                <button (click)="viewExtractionStats(); showAdvancedMenu.set(false)" class="w-full px-4 py-2 text-left hover:bg-slate-700 flex items-center gap-2" style="display: flex; align-items: center; padding: 8px 16px;">
+                  📉 提取統計
+                  <span class="ml-auto text-xs text-slate-400" style="margin-left: auto; font-size: 11px; color: #94a3b8;">成功率/效能</span>
+                </button>
+              </div>
+            }
+          </div>
+          
           <button (click)="refreshMembers()" [disabled]="isLoading()" class="btn-secondary">
             <span [class.animate-spin]="isLoading()">🔄</span>
             {{ isLoading() ? '載入中...' : '刷新' }}
@@ -1776,6 +1809,9 @@ export class MemberDatabaseComponent implements OnInit, OnDestroy {
   newTagName = '';
   suggestedTags = ['高意向', '幣圈', 'DeFi', 'NFT', '投資', '交易', '量化', '礦工', '開發者', '運營'];
 
+  // P4 高級功能菜單
+  showAdvancedMenu = signal(false);
+
   ngOnInit(): void {
     this.loadMembers();
     this.setupEventListeners();
@@ -2386,5 +2422,134 @@ export class MemberDatabaseComponent implements OnInit, OnDestroy {
     URL.revokeObjectURL(url);
 
     this.toastService.success(`✅ 已導出 ${members.length} 個成員`);
+  }
+
+  // ==================== P4 高級功能 ====================
+
+  /**
+   * 智能去重 - 跨群組合併重複成員
+   */
+  deduplicateMembers(): void {
+    this.toastService.info('🔄 正在執行智能去重...');
+    this.ipcService.send('deduplicate-members', {});
+    
+    // 監聽去重結果
+    const cleanup = this.ipcService.on('members-deduplicated', (data: any) => {
+      cleanup();
+      if (data.success) {
+        this.toastService.success(`✅ 去重完成！合併了 ${data.mergedCount || 0} 個重複成員`);
+        this.loadMembers(); // 重新載入數據
+      } else {
+        this.toastService.error(`去重失敗: ${data.error}`);
+      }
+    });
+  }
+
+  /**
+   * 重新計算評分 - 更新所有成員的價值等級
+   */
+  recalculateScores(): void {
+    this.toastService.info('📊 正在重新計算評分...');
+    this.ipcService.send('recalculate-scores', {});
+    
+    // 監聯評分結果
+    const cleanup = this.ipcService.on('scores-recalculated', (data: any) => {
+      cleanup();
+      if (data.success) {
+        this.toastService.success(`✅ 評分計算完成！更新了 ${data.updatedCount || 0} 個成員`);
+        this.loadMembers(); // 重新載入數據
+      } else {
+        this.toastService.error(`計算失敗: ${data.error}`);
+      }
+    });
+  }
+
+  /**
+   * 顯示群組畫像 - 分析當前選中群組的質量
+   */
+  showGroupProfile(): void {
+    if (!this.selectedSource) {
+      this.toastService.warning('請先選擇一個來源群組');
+      return;
+    }
+    
+    this.toastService.info('📈 正在生成群組畫像...');
+    this.ipcService.send('get-group-profile', { chatId: this.selectedSource });
+    
+    // 監聽畫像結果
+    const cleanup = this.ipcService.on('group-profile-result', (data: any) => {
+      cleanup();
+      if (data.success && data.profile) {
+        const p = data.profile;
+        // 使用 toast 顯示摘要，未來可改為對話框
+        this.toastService.success(`
+          📊 群組畫像：
+          質量分數: ${p.qualityScore}/100
+          總成員: ${p.totalMembers}
+          Premium: ${p.premiumRate}%
+          活躍率: ${p.activeRate}%
+        `.trim());
+      } else {
+        this.toastService.error(`獲取畫像失敗: ${data.error}`);
+      }
+    });
+  }
+
+  /**
+   * 群組對比 - 比較多個群組的成員質量
+   */
+  compareGroups(): void {
+    const sources = this.sourceGroups();
+    if (sources.length < 2) {
+      this.toastService.warning('需要至少2個群組才能進行對比');
+      return;
+    }
+    
+    // 選擇前5個群組進行對比
+    const chatIds = sources.slice(0, 5).map(s => s.group);
+    
+    this.toastService.info('📊 正在對比群組...');
+    this.ipcService.send('compare-groups', { chatIds });
+    
+    // 監聽對比結果
+    const cleanup = this.ipcService.on('groups-compared', (data: any) => {
+      cleanup();
+      if (data.success && data.comparison) {
+        const c = data.comparison;
+        this.toastService.success(`
+          📊 群組對比完成！
+          最高質量: ${c.bestGroup?.name || '未知'}
+          平均質量: ${c.avgQuality}/100
+          對比群組數: ${c.groupCount}
+        `.trim());
+      } else {
+        this.toastService.error(`對比失敗: ${data.error}`);
+      }
+    });
+  }
+
+  /**
+   * 查看提取統計 - 顯示提取成功率和效能
+   */
+  viewExtractionStats(): void {
+    this.toastService.info('📉 正在獲取提取統計...');
+    this.ipcService.send('get-extraction-stats', {});
+    
+    // 監聽統計結果
+    const cleanup = this.ipcService.on('extraction-stats-result', (data: any) => {
+      cleanup();
+      if (data.success && data.stats) {
+        const s = data.stats;
+        this.toastService.success(`
+          📉 提取統計：
+          成功率: ${s.successRate}%
+          總提取: ${s.totalExtractions}
+          成功: ${s.successCount}
+          失敗: ${s.failedCount}
+        `.trim());
+      } else {
+        this.toastService.error(`獲取統計失敗: ${data.error}`);
+      }
+    });
   }
 }

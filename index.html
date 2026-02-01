@@ -4,16 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Content Security Policy - 安全策略 -->
+  <!-- CSP 暫時放寬以支持 Telegram OAuth -->
   <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self';
-    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://esm.sh https://cdn.tailwindcss.com https://telegram.org https://oauth.telegram.org;
-    style-src 'self' 'unsafe-inline';
+    default-src 'self' https:;
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
+    style-src 'self' 'unsafe-inline' https:;
     img-src 'self' data: blob: https: file: local-file:;
-    font-src 'self' data:;
-    connect-src 'self' https://esm.sh https://generativelanguage.googleapis.com https://*.googleapis.com https://telegram.org https://oauth.telegram.org https://*.telegram.org wss: ws: http://localhost:*;
+    font-src 'self' data: https:;
+    connect-src 'self' https: wss: ws: http://localhost:*;
     media-src 'self' blob:;
     object-src 'none';
-    frame-src https://oauth.telegram.org https://telegram.org;
+    frame-src https:;
   ">
   <base href="/">
   <title>TG-AI智控王</title>

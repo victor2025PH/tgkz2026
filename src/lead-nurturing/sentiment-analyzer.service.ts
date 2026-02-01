@@ -475,10 +475,13 @@ export class SentimentAnalyzerService {
 消息: "${message}"`;
 
     try {
-      const response = await this.aiProvider.chat(prompt);
+      const response = await this.aiProvider.chat([
+        { role: 'user', content: prompt }
+      ]);
+      const responseContent = response.content;
       
       // 嘗試解析JSON
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         return {

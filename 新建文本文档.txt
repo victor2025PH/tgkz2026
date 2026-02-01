@@ -1,0 +1,21 @@
+9SfkPg4GRWf7DM8P
+165.154.210.154
+新密码
+TgMatrix2026!
+
+tgw.usdt2006.cc
+
+ssh ubuntu@165.154.210.154
+# 密碼: TgMatrix2026!
+ 啟動服務
+sudo docker compose up -d
+
+
+查看後端日誌
+ssh ubuntu@165.154.210.154 "
+cd /opt/tg-matrix && docker-compose logs -f api --tail=100"
+
+查看後端日誌
+cd /opt/tg-matrix
+
+sudo docker-compose logs -f --tail=100 api

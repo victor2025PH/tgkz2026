@@ -1,54 +1,46 @@
-# electron-builder 配置文件
-# TG-AI智控王 安裝程序打包配置（完整版 - 包含編譯後端）
+# TG-AI智控王 Electron Builder 配置
+# 用於打包 Windows/Mac/Linux 安裝程序
+# 版本: 2.1.0 全功能版
 
-appId: com.tgai.smartking.app
+appId: com.tgmatrix.app
 productName: TG-AI智控王
-copyright: Copyright © 2026 TG-AI智控王
+copyright: Copyright © 2026
 
-# 目錄配置
 directories:
   output: release
   buildResources: build-resources
 
-# 文件包含/排除規則
+# 包含的文件
 files:
-  - "dist/**/*"
-  - "electron.js"
-  - "preload.js"
-  - "auto-ai-setup.js"
-  - "package.json"
-  - "default-config/**/*"
-  # 不包含 backend Python 源碼（使用編譯好的 exe）
-  - "!backend/**"
-  - "!**/*.log"
-  - "!**/node_modules/.cache"
+  - electron.js
+  - preload.js
+  - index.html
+  - index.tsx
+  - metadata.json
+  - security-electron.js
+  - auto-ai-setup.js
+  - splash.html
+  - package.json
+  - dist/**/*
+  - default-config/**/*
+  - electron/**/*
 
-# 額外資源（不打包到 asar，保持可執行）
+# 額外資源（後端 exe 等）
 extraResources:
-  # 優先使用編譯好的 exe 後端
-  - from: "backend-exe"
-    to: "backend-exe"
+  - from: backend-exe
+    to: backend-exe
     filter:
       - "**/*"
-  # 默認配置
-  - from: "default-config"
-    to: "default-config"
-  # 備用：如果沒有 exe，包含 Python 源碼
-  - from: "backend"
-    to: "backend"
-    filter:
-      - "**/*.py"
-      - "!**/__pycache__"
-      - "!**/*.pyc"
-      - "!**/*.db"
       - "!**/sessions/**"
-      - "!**/chroma_db/**"
-      - "!**/chroma_rag_db/**"
-
-# asar 配置
-asar: true
-asarUnpack:
-  - "**/*.node"
+      - "!**/data/**"
+      - "!**/logs/**"
+      - "!**/*.db"
+      - "!**/*.log"
+  - from: default-config
+    to: default-config
+  # 🆕 包含 VC++ 運行時安裝程序
+  - from: build-resources/vc_redist.x64.exe
+    to: vc_redist.x64.exe
 
 # Windows 配置
 win:
@@ -56,43 +48,39 @@ win:
     - target: nsis
       arch:
         - x64
-  # icon: build-resources/icon.ico  # 暫時不使用圖標，使用默認圖標
-  artifactName: "${productName}-Setup-${version}.${ext}"
+  artifactName: ${productName}-${version}-Setup.${ext}
+  icon: build-resources/icon.ico
+  requestedExecutionLevel: asInvoker
+  sign: null
+  signingHashAlgorithms: null
 
 # NSIS 安裝程序配置
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  allowElevation: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: TG-AI智控王
-  installerLanguages:
-    - zh_CN
-    - en_US
-  language: 2052
+  runAfterFinish: true
+  menuCategory: false
+  perMachine: false
+  installerIcon: build-resources/icon.ico
+  uninstallerIcon: build-resources/icon.ico
+  installerHeaderIcon: build-resources/icon.ico
+  deleteAppDataOnUninstall: false
+  include: build-resources/installer.nsh
+  license: null
 
-# macOS 配置
+# Mac 配置
 mac:
   target:
     - target: dmg
       arch:
         - x64
         - arm64
-  # icon: build-resources/icon.icns  # 暫時不使用圖標，使用默認圖標
   category: public.app-category.productivity
-  artifactName: "${productName}-${version}-${arch}.${ext}"
-
-dmg:
-  contents:
-    - x: 130
-      y: 220
-    - x: 410
-      y: 220
-      type: link
-      path: /Applications
-  window:
-    width: 540
-    height: 380
+  icon: build-resources/icon.icns
 
 # Linux 配置
 linux:
@@ -100,14 +88,8 @@ linux:
     - target: AppImage
       arch:
         - x64
-  # icon: build-resources/icons  # 暫時註釋，等圖標準備好後再啟用
-  category: Office
-  artifactName: "${productName}-${version}.${ext}"
-
-# 發布配置
-publish:
-  provider: generic
-  url: https://releases.tg-matrix.com
-
-# 構建後鉤子
-afterPack: ./build-scripts/after-pack.js
+    - target: deb
+      arch:
+        - x64
+  category: Network
+  icon: build-resources

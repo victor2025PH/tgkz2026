@@ -347,6 +347,26 @@ export class AIProviderService {
   async chat(messages: AIMessage[], options?: Partial<AIConfig>): Promise<AIResponse> {
     const config = { ...this._config(), ...options };
     
+    // 🔧 確保 baseUrl 正確設置
+    if (!config.baseUrl || config.baseUrl.startsWith('/')) {
+      const provider = AI_PROVIDERS.find(p => p.id === config.provider);
+      if (provider?.baseUrl) {
+        config.baseUrl = provider.baseUrl;
+        console.log(`[AIProvider] 使用提供商默認 baseUrl: ${config.baseUrl}`);
+      }
+    }
+    
+    // 🔧 驗證配置
+    if (!config.baseUrl) {
+      throw new Error(`未配置 ${config.provider} 的 API 端點`);
+    }
+    
+    if (config.provider !== 'ollama' && !config.apiKey) {
+      throw new Error(`未配置 ${config.provider} 的 API Key`);
+    }
+    
+    console.log(`[AIProvider] 調用 ${config.provider}/${config.model}, baseUrl: ${config.baseUrl}`);
+    
     switch (config.provider) {
       case 'gemini':
         return this.chatGemini(messages, config);
@@ -385,6 +405,8 @@ export class AIProviderService {
   private async chatGemini(messages: AIMessage[], config: AIConfig): Promise<AIResponse> {
     const url = `${config.baseUrl}/models/${config.model}:generateContent?key=${config.apiKey}`;
     
+    console.log(`[AIProvider] Gemini URL: ${url.replace(config.apiKey, '***')}`);
+    
     // 轉換消息格式
     const contents = messages
       .filter(m => m.role !== 'system')
@@ -409,9 +431,17 @@ export class AIProviderService {
       })
     });
     
+    // 🔧 檢查響應類型
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error(`[AIProvider] Gemini 返回非 JSON 響應:`, text.substring(0, 200));
+      throw new Error(`Gemini API 返回錯誤格式 (${response.status}): 可能是 URL 配置錯誤`);
+    }
+    
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error?.message || 'Gemini API error');
+      throw new Error(error.error?.message || `Gemini API error: ${response.status}`);
     }
     
     const data = await response.json();
@@ -434,6 +464,8 @@ export class AIProviderService {
   private async chatOpenAI(messages: AIMessage[], config: AIConfig): Promise<AIResponse> {
     const url = `${config.baseUrl}/chat/completions`;
     
+    console.log(`[AIProvider] OpenAI URL: ${url}`);
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -449,9 +481,17 @@ export class AIProviderService {
       })
     });
     
+    // 🔧 檢查響應類型
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error(`[AIProvider] OpenAI 返回非 JSON 響應:`, text.substring(0, 200));
+      throw new Error(`OpenAI API 返回錯誤格式 (${response.status}): 可能是 URL 配置錯誤`);
+    }
+    
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error?.message || 'OpenAI API error');
+      throw new Error(error.error?.message || `OpenAI API error: ${response.status}`);
     }
     
     const data = await response.json();
@@ -473,6 +513,8 @@ export class AIProviderService {
   
   private async chatClaude(messages: AIMessage[], config: AIConfig): Promise<AIResponse> {
     const url = `${config.baseUrl}/messages`;
+    
+    console.log(`[AIProvider] Claude URL: ${url}`);
     
     // 分離 system 消息
     const systemMessage = messages.find(m => m.role === 'system');
@@ -496,9 +538,17 @@ export class AIProviderService {
       })
     });
     
+    // 🔧 檢查響應類型
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error(`[AIProvider] Claude 返回非 JSON 響應:`, text.substring(0, 200));
+      throw new Error(`Claude API 返回錯誤格式 (${response.status}): 可能是 URL 配置錯誤`);
+    }
+    
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error?.message || 'Claude API error');
+      throw new Error(error.error?.message || `Claude API error: ${response.status}`);
     }
     
     const data = await response.json();
@@ -522,6 +572,8 @@ export class AIProviderService {
     // DeepSeek 使用 OpenAI 兼容 API
     const url = `${config.baseUrl}/chat/completions`;
     
+    console.log(`[AIProvider] DeepSeek URL: ${url}`);
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -537,9 +589,17 @@ export class AIProviderService {
       })
     });
     
+    // 🔧 檢查響應類型
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error(`[AIProvider] DeepSeek 返回非 JSON 響應:`, text.substring(0, 200));
+      throw new Error(`DeepSeek API 返回錯誤格式 (${response.status}): 可能是 URL 配置錯誤`);
+    }
+    
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error?.message || 'DeepSeek API error');
+      throw new Error(error.error?.message || `DeepSeek API error: ${response.status}`);
     }
     
     const data = await response.json();

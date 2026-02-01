@@ -49,8 +49,10 @@ export interface ExtractionGroupInfo {
   id: string;
   name: string;
   url?: string;
+  telegramId?: string;  // 🔧 添加 Telegram 數字 ID
   memberCount: number;
   accountPhone?: string;
+  resourceType?: 'group' | 'channel' | 'supergroup';  // 🆕 資源類型
 }
 
 // 提取結果接口
@@ -73,7 +75,7 @@ type QuickTemplate = 'quick' | 'deep' | 'precise';
   imports: [CommonModule, FormsModule],
   template: `
     @if (isOpen()) {
-      <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4"
            (click)="onBackdropClick($event)">
         <div class="bg-slate-900 rounded-2xl w-full max-w-xl shadow-2xl border border-slate-700/50 overflow-hidden max-h-[90vh] flex flex-col"
              (click)="$event.stopPropagation()">
@@ -114,14 +116,143 @@ type QuickTemplate = 'quick' | 'deep' | 'precise';
                     <p class="text-sm text-slate-400">{{ group()!.url || '私密群組' }}</p>
                   </div>
                   <div class="text-right">
-                    <p class="text-lg font-bold text-emerald-400">{{ group()!.memberCount | number }}</p>
-                    <p class="text-xs text-slate-500">成員數</p>
+                    @if (group()!.memberCount > 0) {
+                      <p class="text-lg font-bold text-emerald-400">{{ group()!.memberCount | number }}</p>
+                      <p class="text-xs text-slate-500">成員數</p>
+                    } @else {
+                      <p class="text-lg font-bold text-amber-400">?</p>
+                      <p class="text-xs text-amber-400">無數據</p>
+                    }
                   </div>
                 </div>
               </div>
+              
+              <!-- 🆕 成員數為 0 時的錯誤提示 -->
+              @if (group()!.memberCount === 0) {
+                <div class="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                  <div class="flex items-start gap-3">
+                    <span class="text-xl">⚠️</span>
+                    <div class="flex-1">
+                      <p class="font-medium text-amber-400 mb-1">無法獲取成員數據</p>
+                      <p class="text-sm text-slate-400 mb-3">可能原因：</p>
+                      <ul class="text-sm text-slate-400 space-y-1 list-disc list-inside mb-3">
+                        <li>尚未加入該群組</li>
+                        <li>群組已變為私有</li>
+                        <li>頻道類型不支持提取成員</li>
+                        <li>帳號被踢出群組</li>
+                      </ul>
+                      <div class="flex gap-2">
+                        <button (click)="refreshMemberCount()"
+                                [disabled]="isRefreshingCount()"
+                                class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-sm transition-colors flex items-center gap-1">
+                          @if (isRefreshingCount()) {
+                            <span class="animate-spin">⏳</span>
+                            <span>獲取中...</span>
+                          } @else {
+                            <span>🔄</span>
+                            <span>重新獲取成員數</span>
+                          }
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+              
+              <!-- 🆕 頻道類型警告 -->
+              @if (isChannel()) {
+                <div class="p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                  <div class="flex items-start gap-3">
+                    <span class="text-xl">🚫</span>
+                    <div class="flex-1">
+                      <p class="font-medium text-red-400 mb-1">頻道不支持成員提取</p>
+                      <p class="text-sm text-slate-400">
+                        Telegram 頻道（Channel）沒有成員列表，只有訂閱者。
+                        如需獲取訂閱者信息，請使用頻道分析功能。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              }
+              
+              <!-- 🆕 權限錯誤提示（API 返回的錯誤） -->
+              @if (extractionError()) {
+                <div class="p-4 rounded-xl"
+                     [class.bg-red-500/10]="extractionError()!.code === 'ADMIN_REQUIRED'"
+                     [class.border-red-500/30]="extractionError()!.code === 'ADMIN_REQUIRED'"
+                     [class.bg-amber-500/10]="extractionError()!.code !== 'ADMIN_REQUIRED'"
+                     [class.border-amber-500/30]="extractionError()!.code !== 'ADMIN_REQUIRED'"
+                     class="border">
+                  <div class="flex items-start gap-3">
+                    <span class="text-xl">{{ extractionError()!.code === 'ADMIN_REQUIRED' ? '🔒' : '⚠️' }}</span>
+                    <div class="flex-1">
+                      <p class="font-medium mb-1"
+                         [class.text-red-400]="extractionError()!.code === 'ADMIN_REQUIRED'"
+                         [class.text-amber-400]="extractionError()!.code !== 'ADMIN_REQUIRED'">
+                        {{ extractionError()!.title }}
+                      </p>
+                      <p class="text-sm text-slate-400 mb-2">{{ extractionError()!.reason }}</p>
+                      
+                      <!-- 🔧 修改：提供實際可行的替代方案 -->
+                      @if (extractionError()!.code === 'ADMIN_REQUIRED') {
+                        <div class="p-3 bg-slate-800/50 rounded-lg mb-3">
+                          <p class="text-sm text-slate-300 mb-2">📋 替代方案：</p>
+                          <ul class="text-sm text-slate-400 space-y-1.5">
+                            <li class="flex items-start gap-2">
+                              <span class="text-emerald-400">1.</span>
+                              <span>確保群組監控已開啟，系統會自動記錄發言用戶</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                              <span class="text-emerald-400">2.</span>
+                              <span>在「已收集用戶」標籤頁查看監控期間收集的用戶</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                              <span class="text-emerald-400">3.</span>
+                              <span>或聯繫群主獲取管理員權限</span>
+                            </li>
+                          </ul>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                          <button (click)="checkMonitoringStatus()"
+                                  class="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-sm transition-colors flex items-center gap-2">
+                            <span>📡</span>
+                            <span>確認監控狀態</span>
+                          </button>
+                          <button (click)="collectFromHistory()"
+                                  class="px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg text-sm transition-colors flex items-center gap-2">
+                            <span>🔄</span>
+                            <span>從歷史收集</span>
+                          </button>
+                          <button (click)="viewCollectedUsers()"
+                                  class="px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-lg text-sm transition-colors flex items-center gap-2">
+                            <span>👥</span>
+                            <span>查看已收集 ({{ collectedUsersCount() }})</span>
+                          </button>
+                        </div>
+                      } @else {
+                        <div class="p-3 bg-slate-800/50 rounded-lg">
+                          <p class="text-sm text-cyan-400 flex items-center gap-2">
+                            <span>💡</span>
+                            <span>{{ extractionError()!.suggestion }}</span>
+                          </p>
+                        </div>
+                      }
+                      
+                      @if (extractionError()!.canAutoJoin) {
+                        <button (click)="joinGroup()"
+                                class="mt-3 px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-sm transition-colors flex items-center gap-2">
+                          <span>➕</span>
+                          <span>加入群組</span>
+                        </button>
+                      }
+                    </div>
+                  </div>
+                </div>
+              }
             }
             
             <!-- 快速模板 -->
+            @if (!isChannel()) {
             <div>
               <label class="block text-sm font-medium text-slate-300 mb-3">
                 ⚡ 快速模板
@@ -338,6 +469,7 @@ type QuickTemplate = 'quick' | 'deep' | 'precise';
                 </div>
               }
             </div>
+            }
             
           </div>
           
@@ -384,6 +516,10 @@ export class MemberExtractionDialogComponent implements OnInit, OnDestroy {
   
   closeDialog = output<void>();
   startExtractionEvent = output<{ group: ExtractionGroupInfo; config: MemberExtractionConfig }>();
+  memberCountRefreshed = output<{ groupId: string; memberCount: number }>();  // 🆕 成員數刷新事件
+  enableMonitoringEvent = output<ExtractionGroupInfo>();  // 🆕 開啟監控事件
+  joinGroupEvent = output<ExtractionGroupInfo>();  // 🆕 加入群組事件
+  viewCollectedUsersEvent = output<ExtractionGroupInfo>();  // 🆕 查看已收集用戶事件
   
   // 服務注入
   private ipcService = inject(ElectronIpcService);
@@ -392,12 +528,29 @@ export class MemberExtractionDialogComponent implements OnInit, OnDestroy {
   // 狀態
   showAdvanced = signal(false);
   selectedTemplate = signal<QuickTemplate>('quick');
+  isRefreshingCount = signal(false);  // 🆕 刷新成員數狀態
+  
+  // 🆕 提取錯誤狀態
+  extractionError = signal<{
+    code: string;
+    title: string;
+    reason: string;
+    suggestion: string;
+    alternative?: string;
+    canAutoJoin?: boolean;
+  } | null>(null);
+  
+  // 🆕 已收集用戶數量
+  collectedUsersCount = signal(0);
+  
+  // 🆕 監控狀態
+  isMonitoring = signal(false);
   
   // 配置數據
   config = signal<MemberExtractionConfig>({
     limit: 100,
     filters: {
-      onlineStatus: 'online',
+      onlineStatus: 'all',  // 🔧 FIX: 默認提取所有成員，而非只提取在線
       hasChinese: null,
       hasUsername: null,
       isPremium: null,
@@ -449,14 +602,24 @@ export class MemberExtractionDialogComponent implements OnInit, OnDestroy {
     return Math.min(limit, groupSize, this.remainingQuota());
   });
   
+  // 🆕 是否是頻道類型（頻道不支持成員提取）
+  isChannel = computed(() => {
+    return this.group()?.resourceType === 'channel';
+  });
+  
   canStart = computed(() => {
-    return this.group() && this.estimatedCount() > 0;
+    const group = this.group();
+    if (!group) return false;
+    if (this.isChannel()) return false;  // 🆕 頻道不可提取
+    return this.estimatedCount() > 0;
   });
   
   private listeners: (() => void)[] = [];
   
   ngOnInit() {
     this.loadQuota();
+    this.listenForExtractionErrors();
+    this.loadCollectedUsersCount();  // 🆕 加載已收集用戶數量
   }
   
   ngOnDestroy() {
@@ -475,6 +638,93 @@ export class MemberExtractionDialogComponent implements OnInit, OnDestroy {
     this.listeners.push(cleanup);
     
     this.ipcService.send('get-extraction-quota', {});
+  }
+  
+  // 🆕 監聽提取錯誤
+  private listenForExtractionErrors() {
+    const cleanup = this.ipcService.on('members-extracted', (data: {
+      success: boolean;
+      resourceId?: string | number;
+      error?: string;
+      error_code?: string;
+      error_details?: {
+        reason?: string;
+        suggestion?: string;
+        can_auto_join?: boolean;
+        alternative?: string;
+      };
+    }) => {
+      const group = this.group();
+      if (!group || String(data.resourceId) !== String(group.id)) return;
+      
+      if (!data.success && data.error_code) {
+        // 🆕 解析並顯示詳細錯誤
+        const details = data.error_details || {};
+        const errorMap: Record<string, { title: string; defaultReason: string }> = {
+          'ADMIN_REQUIRED': {
+            title: '需要管理員權限',
+            defaultReason: '此群組設置了成員列表只對管理員可見'
+          },
+          'PEER_ID_INVALID': {
+            title: '帳號尚未連接此群組',
+            defaultReason: 'Telegram 要求帳號必須先加入群組'
+          },
+          'NOT_PARTICIPANT': {
+            title: '帳號不是群組成員',
+            defaultReason: '當前帳號尚未加入此群組'
+          },
+          'CHANNEL_PRIVATE': {
+            title: '私有群組',
+            defaultReason: '這是一個私有群組，需要先加入'
+          },
+          'CHANNEL_INVALID': {
+            title: '無效的群組',
+            defaultReason: '群組可能已被刪除或 ID 無效'
+          },
+          'USERNAME_NOT_OCCUPIED': {
+            title: '無法解析群組',
+            defaultReason: '這可能是私有群組，沒有公開的 username'
+          }
+        };
+        
+        const errorInfo = errorMap[data.error_code] || {
+          title: '提取失敗',
+          defaultReason: data.error || '未知錯誤'
+        };
+        
+        this.extractionError.set({
+          code: data.error_code,
+          title: errorInfo.title,
+          reason: details.reason || errorInfo.defaultReason,
+          suggestion: details.suggestion || '請稍後重試或嘗試其他方式',
+          alternative: details.alternative === 'monitor_messages' ? 'monitor' : undefined,
+          canAutoJoin: details.can_auto_join
+        });
+      } else if (data.success) {
+        // 成功時清除錯誤
+        this.extractionError.set(null);
+      }
+    });
+    this.listeners.push(cleanup);
+  }
+  
+  // 🆕 開啟消息監控（替代方案）
+  enableMonitoring() {
+    const group = this.group();
+    if (group) {
+      this.enableMonitoringEvent.emit(group);
+      this.toast.info('📡 正在開啟消息監控，將自動收集發言用戶');
+      this.close();
+    }
+  }
+  
+  // 🆕 加入群組
+  joinGroup() {
+    const group = this.group();
+    if (group) {
+      this.joinGroupEvent.emit(group);
+      this.toast.info('➕ 正在嘗試加入群組...');
+    }
   }
   
   // 選擇快速模板
@@ -569,6 +819,49 @@ export class MemberExtractionDialogComponent implements OnInit, OnDestroy {
     }));
   }
   
+  // 🆕 刷新成員數
+  refreshMemberCount() {
+    const groupInfo = this.group();
+    if (!groupInfo) return;
+    
+    this.isRefreshingCount.set(true);
+    
+    // 監聯後端回應
+    const cleanup = this.ipcService.on('group-member-count-result', (data: any) => {
+      this.isRefreshingCount.set(false);
+      cleanup();
+      
+      if (data.success && data.memberCount > 0) {
+        // 更新本地群組信息
+        this.toast.success(`✅ 成功獲取成員數：${data.memberCount} 人`);
+        // 觸發父組件更新
+        this.memberCountRefreshed.emit({
+          groupId: groupInfo.id,
+          memberCount: data.memberCount
+        });
+      } else {
+        this.toast.error(data.error || '無法獲取成員數，請確認已加入該群組');
+      }
+    });
+    this.listeners.push(cleanup);
+    
+    // 發送刷新請求 - 🔧 修復：同時傳入 telegramId
+    this.ipcService.send('get-group-member-count', {
+      groupId: groupInfo.id,
+      url: groupInfo.url,
+      telegramId: groupInfo.telegramId || groupInfo.id,
+      accountPhone: groupInfo.accountPhone
+    });
+    
+    // 超時處理
+    setTimeout(() => {
+      if (this.isRefreshingCount()) {
+        this.isRefreshingCount.set(false);
+        this.toast.error('獲取成員數超時，請稍後重試');
+      }
+    }, 15000);
+  }
+  
   // 開始提取
   startExtraction() {
     const groupInfo = this.group();
@@ -578,7 +871,7 @@ export class MemberExtractionDialogComponent implements OnInit, OnDestroy {
     }
     
     if (this.estimatedCount() === 0) {
-      this.toast.warning('配額不足，無法提取');
+      this.toast.warning('成員數據不可用，請先點擊「重新獲取成員數」');
       return;
     }
     
@@ -600,5 +893,106 @@ export class MemberExtractionDialogComponent implements OnInit, OnDestroy {
     if (event.target === event.currentTarget) {
       this.close();
     }
+  }
+  
+  // 🆕 確認監控狀態
+  checkMonitoringStatus() {
+    const group = this.group();
+    if (!group) return;
+    
+    // 發送檢查監控狀態請求
+    this.ipcService.send('get-group-monitoring-status', {
+      groupId: group.id,
+      telegramId: group.telegramId
+    });
+    
+    // 監聽響應
+    const cleanup = this.ipcService.on('group-monitoring-status', (data: {
+      groupId: string;
+      isMonitoring: boolean;
+      collectedUsers: number;
+    }) => {
+      if (String(data.groupId) === String(group.id)) {
+        this.isMonitoring.set(data.isMonitoring);
+        this.collectedUsersCount.set(data.collectedUsers || 0);
+        
+        if (data.isMonitoring) {
+          this.toast.success(`✅ 監控已開啟，已收集 ${data.collectedUsers} 位用戶`);
+        } else {
+          this.toast.warning('⚠️ 監控未開啟，請在群組詳情中開啟監控');
+        }
+        cleanup();
+      }
+    });
+    this.listeners.push(cleanup);
+    
+    this.toast.info('🔍 正在檢查監控狀態...');
+  }
+  
+  // 🆕 查看已收集用戶
+  viewCollectedUsers() {
+    const group = this.group();
+    if (group) {
+      this.viewCollectedUsersEvent.emit(group);
+      this.close();
+    }
+  }
+  
+  // 🆕 從歷史消息收集用戶
+  collectFromHistory() {
+    const group = this.group();
+    if (!group) return;
+    
+    this.toast.info('🔄 正在從歷史消息中收集用戶...');
+    
+    this.ipcService.send('collect-users-from-history', {
+      groupId: group.id,
+      telegramId: group.telegramId,
+      limit: 500
+    });
+    
+    const cleanup = this.ipcService.on('collect-from-history-result', (data: {
+      groupId: string;
+      success: boolean;
+      collected?: number;
+      newUsers?: number;
+      error?: string;
+    }) => {
+      if (String(data.groupId) === String(group.id)) {
+        cleanup();
+        
+        if (data.success) {
+          this.toast.success(`✅ 收集完成！共 ${data.collected} 位用戶，新增 ${data.newUsers || 0} 位`);
+          // 更新已收集用戶數量
+          this.collectedUsersCount.update(c => c + (data.newUsers || 0));
+        } else {
+          this.toast.error(data.error || '收集失敗');
+        }
+      }
+    });
+    this.listeners.push(cleanup);
+  }
+  
+  // 🆕 加載已收集用戶數量
+  private loadCollectedUsersCount() {
+    const group = this.group();
+    if (!group) return;
+    
+    // 發送請求獲取已收集用戶數量
+    this.ipcService.send('get-collected-users-count', {
+      groupId: group.id,
+      sourceType: 'monitoring'
+    });
+    
+    const cleanup = this.ipcService.on('collected-users-count', (data: {
+      groupId: string;
+      count: number;
+    }) => {
+      if (String(data.groupId) === String(group.id)) {
+        this.collectedUsersCount.set(data.count || 0);
+        cleanup();
+      }
+    });
+    this.listeners.push(cleanup);
   }
 }

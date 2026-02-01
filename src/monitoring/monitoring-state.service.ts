@@ -36,10 +36,13 @@ export interface MonitoringGroup {
   id: string;
   name: string;
   url?: string;
+  telegramId?: string;  // 🔧 FIX: 添加 Telegram 數字 ID，用於私有群組
   memberCount: number;
   isMonitoring: boolean;
   linkedKeywordSets: string[];
   accountPhone?: string;
+  resourceType?: 'group' | 'channel' | 'supergroup';  // 🆕 群組類型
+  canExtractMembers?: boolean;  // 🆕 是否可以提取成員
   stats?: {
     matchesToday: number;
     matchesWeek: number;
@@ -113,6 +116,14 @@ export class MonitoringStateService implements OnDestroy {
   private _isLoading = signal(false);
   private _lastUpdated = signal<Date | null>(null);
   
+  // === AI 狀態 Signals ===
+  private _aiProcessing = signal<Map<string, { user: string; startTime: Date }>>(new Map());
+  private _aiStats = signal<{ totalReplies: number; successRate: number; avgResponseTime: number }>({
+    totalReplies: 0,
+    successRate: 100,
+    avgResponseTime: 0
+  });
+  
   // === 公開的只讀 Signals ===
   readonly accounts = this._accounts.asReadonly();
   readonly groups = this._groups.asReadonly();
@@ -121,6 +132,8 @@ export class MonitoringStateService implements OnDestroy {
   readonly triggerRules = this._triggerRules.asReadonly();
   readonly isLoading = this._isLoading.asReadonly();
   readonly lastUpdated = this._lastUpdated.asReadonly();
+  readonly aiProcessing = this._aiProcessing.asReadonly();
+  readonly aiStats = this._aiStats.asReadonly();
   
   // === 計算屬性 ===
   
@@ -265,6 +278,13 @@ export class MonitoringStateService implements OnDestroy {
     });
     this.listeners.push(cleanup1);
     
+    // 🔧 FIX: 監聽 initial-state-config 事件（漸進式加載）
+    const cleanup1b = this.ipcService.on('initial-state-config', (data: any) => {
+      console.log('[StateService] Received initial-state-config');
+      this.processInitialState(data);
+    });
+    this.listeners.push(cleanup1b);
+    
     // 監聽 accounts-updated 事件
     const cleanup2 = this.ipcService.on('accounts-updated', (accounts: any[]) => {
       this.updateAccounts(accounts);
@@ -312,23 +332,114 @@ export class MonitoringStateService implements OnDestroy {
       }
     });
     this.listeners.push(cleanup7);
+    
+    // 監聽 AI 私信處理事件
+    const cleanup8 = this.ipcService.on('private-message-received', (data: any) => {
+      if (data.userId && data.username) {
+        this.markAiProcessing(data.userId, data.username);
+      }
+    });
+    this.listeners.push(cleanup8);
+    
+    // 監聽 AI 回覆發送事件
+    const cleanup9 = this.ipcService.on('ai-response-sent', (data: any) => {
+      if (data.userId) {
+        this.markAiCompleted(data.userId, true);
+      }
+    });
+    this.listeners.push(cleanup9);
+    
+    // 監聯 AI 建議生成完成事件（半自動模式）
+    const cleanup10 = this.ipcService.on('ai-suggestion-ready', (data: any) => {
+      if (data.userId) {
+        this.markAiCompleted(data.userId, true);
+      }
+    });
+    this.listeners.push(cleanup10);
   }
+  
+  // === AI 狀態管理 ===
+  
+  private markAiProcessing(userId: string, username: string) {
+    const current = new Map(this._aiProcessing());
+    current.set(userId, { user: username, startTime: new Date() });
+    this._aiProcessing.set(current);
+  }
+  
+  private markAiCompleted(userId: string, success: boolean) {
+    const current = new Map(this._aiProcessing());
+    const entry = current.get(userId);
+    
+    if (entry) {
+      const responseTime = Date.now() - entry.startTime.getTime();
+      current.delete(userId);
+      this._aiProcessing.set(current);
+      
+      // 更新統計
+      const stats = this._aiStats();
+      const totalReplies = stats.totalReplies + 1;
+      const successRate = success 
+        ? ((stats.successRate * stats.totalReplies + 100) / totalReplies)
+        : ((stats.successRate * stats.totalReplies) / totalReplies);
+      const avgResponseTime = ((stats.avgResponseTime * stats.totalReplies) + responseTime) / totalReplies;
+      
+      this._aiStats.set({
+        totalReplies,
+        successRate: Math.round(successRate),
+        avgResponseTime: Math.round(avgResponseTime)
+      });
+    }
+  }
+  
+  // 獲取正在處理的 AI 請求數
+  readonly aiProcessingCount = computed(() => this._aiProcessing().size);
   
   // === 數據加載 ===
   
-  loadAll() {
-    this._isLoading.set(true);
-    this.ipcService.send('get-initial-state');
-    this.ipcService.send('get-trigger-rules', {});
+  // 🔧 性能優化：防止重複加載
+  private _loadAllTimeout: any = null;
+  private _lastLoadTime = 0;
+  private _isInitialLoadDone = false;
+  
+  loadAll(force = false) {
+    const now = Date.now();
+    
+    // 🔧 性能優化：如果 3 秒內已經加載過，跳過（除非強制刷新）
+    if (!force && this._isInitialLoadDone && (now - this._lastLoadTime) < 3000) {
+      console.log('[StateService] Skipping loadAll - recently loaded');
+      return;
+    }
+    
+    // 🔧 性能優化：防抖動，300ms 內的多次調用合併為一次
+    if (this._loadAllTimeout) {
+      clearTimeout(this._loadAllTimeout);
+    }
+    
+    this._loadAllTimeout = setTimeout(() => {
+      this._isLoading.set(true);
+      this._lastLoadTime = Date.now();
+      console.log('[StateService] Loading all data...');
+      this.ipcService.send('get-initial-state');
+      // 🔧 FIX: 明確請求所有需要的數據，不依賴 initial-state 包含全部
+      this.ipcService.send('get-monitored-groups', {});  // 🆕 添加監控群組請求
+      this.ipcService.send('get-trigger-rules', {});
+      this.ipcService.send('get-chat-templates', {});
+      this.ipcService.send('get-keyword-sets', {});
+      this._isInitialLoadDone = true;
+      this._loadAllTimeout = null;
+    }, 300);
   }
   
   refresh() {
-    this.loadAll();
+    console.log('[StateService] Refreshing all data...');
+    this.loadAll(true);  // 強制刷新
   }
   
   // === 數據處理 ===
   
   private processInitialState(data: any) {
+    console.log('[StateService] Processing initial state, keys:', Object.keys(data));
+    
     if (data.accounts) {
       this.updateAccounts(data.accounts);
     }
@@ -340,6 +451,14 @@ export class MonitoringStateService implements OnDestroy {
     }
     if (data.chatTemplates) {
       this.updateChatTemplates(data.chatTemplates);
+    }
+    // 🔧 FIX: 也從 initial-state 處理 messageTemplates（後端可能用這個名字）
+    if (data.messageTemplates && !data.chatTemplates) {
+      this.updateChatTemplates(data.messageTemplates);
+    }
+    // 🔧 FIX: 也處理 triggerRules（如果 initial-state 包含）
+    if (data.triggerRules) {
+      this.updateTriggerRules(data.triggerRules);
     }
     
     this._isLoading.set(false);
@@ -385,6 +504,7 @@ export class MonitoringStateService implements OnDestroy {
         id: String(g.id),
         name: g.name || g.title || g.url || '未知群組',
         url: g.url || g.link || '',
+        telegramId: g.telegram_id || g.telegramId || '',  // 🔧 FIX: 添加 Telegram 數字 ID
         memberCount: g.memberCount || g.member_count || 0,
         isMonitoring: g.is_active !== false,
         linkedKeywordSets,
@@ -410,6 +530,19 @@ export class MonitoringStateService implements OnDestroy {
       groups.map(g => 
         g.id === groupId 
           ? { ...g, linkedKeywordSets } 
+          : g
+      )
+    );
+  }
+  
+  /**
+   * 🆕 更新單個群組的成員數
+   */
+  updateGroupMemberCount(groupId: string, memberCount: number) {
+    this._groups.update(groups => 
+      groups.map(g => 
+        g.id === groupId 
+          ? { ...g, memberCount } 
           : g
       )
     );

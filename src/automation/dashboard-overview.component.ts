@@ -18,7 +18,7 @@ import { ElectronIpcService } from '../electron-ipc.service';
 // 即時活動項
 interface ActivityItem {
   id: string;
-  type: 'match' | 'reply' | 'lead' | 'join' | 'error';
+  type: 'match' | 'reply' | 'lead' | 'join' | 'error' | 'system' | 'message';
   message: string;
   detail?: string;
   timestamp: Date;
@@ -567,6 +567,64 @@ export class DashboardOverviewComponent implements OnInit, OnDestroy {
       });
     });
     this.listeners.push(cleanup3);
+    
+    // 🔧 P1修復: 監聽 new-lead-captured 事件（後端實際發送的事件名）
+    const cleanup4 = this.ipcService.on('new-lead-captured', (data: any) => {
+      this.addActivity({
+        type: 'lead',
+        message: `捕獲新 Lead: @${data.username || data.user_id}`,
+        detail: `來自群組: ${data.sourceGroup || data.source_group}`,
+        icon: '✨'
+      });
+    });
+    this.listeners.push(cleanup4);
+    
+    // 🔧 P1修復: 監聽監控相關的 log-entry 事件
+    const cleanup5 = this.ipcService.on('log-entry', (data: { message: string; level: string }) => {
+      // 只顯示重要的監控相關日誌
+      if (data.message.includes('匹配') || data.message.includes('監控') || 
+          data.message.includes('Lead') || data.message.includes('回覆')) {
+        const icon = data.level === 'success' ? '✅' : 
+                     data.level === 'warning' ? '⚠️' : 
+                     data.level === 'error' ? '❌' : 'ℹ️';
+        this.addActivity({
+          type: 'system',
+          message: data.message,
+          icon
+        });
+      }
+    });
+    this.listeners.push(cleanup5);
+    
+    // 🔧 P1修復: 監聽監控啟動/停止事件
+    const cleanup6 = this.ipcService.on('monitoring-started', (data: any) => {
+      this.addActivity({
+        type: 'system',
+        message: data?.message || '監控已啟動',
+        icon: '🚀'
+      });
+    });
+    this.listeners.push(cleanup6);
+    
+    const cleanup7 = this.ipcService.on('monitoring-stopped', () => {
+      this.addActivity({
+        type: 'system',
+        message: '監控已停止',
+        icon: '⏹️'
+      });
+    });
+    this.listeners.push(cleanup7);
+    
+    // 🔧 P1修復: 監聽私信事件
+    const cleanup8 = this.ipcService.on('private-message-received', (data: any) => {
+      this.addActivity({
+        type: 'message',
+        message: `收到私信: @${data.from_username || data.user_id}`,
+        detail: data.text?.substring(0, 50) + (data.text?.length > 50 ? '...' : ''),
+        icon: '💬'
+      });
+    });
+    this.listeners.push(cleanup8);
   }
 
   addActivity(activity: Omit<ActivityItem, 'id' | 'timestamp'>) {

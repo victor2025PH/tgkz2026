@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TG-Matrix API 文檔</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { 
+            font-size: 2.5rem; 
+            margin-bottom: 1rem;
+            background: linear-gradient(90deg, #00d4ff, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .meta { color: #888; margin-bottom: 2rem; }
+        .stats { 
+            display: flex; 
+            gap: 1rem; 
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        .stat { 
+            background: rgba(255,255,255,0.05);
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .stat-value { font-size: 1.5rem; font-weight: bold; color: #00d4ff; }
+        .stat-label { font-size: 0.875rem; color: #888; }
+        .category { 
+            background: rgba(255,255,255,0.03);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .category h2 { 
+            font-size: 1.25rem; 
+            margin-bottom: 1rem;
+            color: #00d4ff;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .category-badge {
+            font-size: 0.75rem;
+            background: rgba(0,212,255,0.2);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { 
+            padding: 0.75rem; 
+            text-align: left; 
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        th { 
+            font-weight: 500; 
+            color: #888;
+            font-size: 0.875rem;
+        }
+        code { 
+            background: rgba(0,212,255,0.1);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-family: 'Monaco', 'Consolas', monospace;
+            color: #00d4ff;
+        }
+        .search { 
+            margin-bottom: 2rem;
+            position: relative;
+        }
+        .search input { 
+            width: 100%;
+            padding: 1rem 1rem 1rem 3rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 0.5rem;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-size: 1rem;
+        }
+        .search input:focus { 
+            outline: none;
+            border-color: #00d4ff;
+        }
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TG-Matrix API 文檔</h1>
+        <p class="meta">自動生成於 2026-01-25 01:46:35</p>
+        
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value">193</div>
+                <div class="stat-label">總命令數</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">9</div>
+                <div class="stat-label">命令類別</div>
+            </div>
+        </div>
+        
+        <div class="search">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="searchInput" placeholder="搜索命令..." onkeyup="filterCommands()">
+        </div>
+
+        <div class="category" data-category="account">
+            <h2>
+                帳號管理
+                <span class="category-badge">39 命令</span>
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 30%">命令</th>
+                        <th>描述</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="command-row" data-command="add-account">
+                        <td><code>add-account</code></td>
+                        <td>添加帳號</td>
+                    </tr>
+                    <tr class="command-row" data-command="batch-update-accounts">
+                        <td><code>batch-update-accounts</code></td>
+                        <td>批量update 帳號</td>
+                    </tr>
+                    <tr class="command-row" data-command="bulk-assign-group">
+                        <td><code>bulk-assign-group</code></td>
+                        <td>批量assign 群組</td>
+                    </tr>
+                    <tr class="command-row" data-command="bulk-assign-role">
+                        <td><code>bulk-assign-role</code></td>
+                        <td>批量assign role</td>
+                    </tr>
+                    <tr class="command-row" data-command="bulk-delete-accounts">
+                        <td><code>bulk-delete-accounts</code></td>
+                        <td>批量delete 帳號</td>
+                    </tr>
+                    <tr class="command-row" data-command="check-account-status">
+                        <td><code>check-account-status</code></td>
+                        <td>check帳號 狀態</td>
+                    </tr>
+                    <tr class="command-row" data-command="credential-cancel-scrape">
+                        <td><code>credential-cancel-scrape</code></td>
+                        <td>credentialcancel scrape</td>
+                    </tr>
+                    <tr class="command-row" data-command="credential-get-all">
+                        <td><code>credential-get-all</code></td>
+                        <td>credentialget all</td>
+                    </tr>
+                    <tr class="command-row" data-command="credential-get-status">
+                        <td><code>credential-get-status</code></td>
+                        <td>credentialget 狀態</td>
+                    </tr>
+                    <tr class="command-row" data-command="credential-start-scrape">
+                        <td><code>credential-start-scrape</code></td>
+                        <td>credentialstart scrape</td>
+                    </tr>
+                    <tr class="command-row" data-command="credential-submit-code">
+                        <td><code>credential-submit-code</code></td>
+                        <td>credentialsubmit code</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-accounts">
+                        <td><code>get-accounts</code></td>
+                        <td>獲取帳號</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-groups">
+                        <td><code>get-groups</code></td>
+                        <td>獲取群組</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-personas">
+                        <td><code>get-personas</code></td>
+                        <td>獲取personas</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-tags">
+                        <td><code>get-tags</code></td>
+                        <td>獲取tags</td>
+                    </tr>
+                    <tr class="command-row" data-command="ip-bind">
+                        <td><code>ip-bind</code></td>
+                        <td>ipbind</td>
+                    </tr>
+                    <tr class="command-row" data-command="ip-get-all-bindings">
+                        <td><code>ip-get-all-bindings</code></td>
+                        <td>ipget all bindings</td>
+                    </tr>
+                    <tr class="command-row" data-command="ip-get-binding">
+                        <td><code>ip-get-binding</code></td>
+                        <td>ipget binding</td>
+                    </tr>
+                    <tr class="command-row" data-command="ip-get-statistics">
+                        <td><code>ip-get-statistics</code></td>
+                        <td>ipget statistics</td>
+                    </tr>
+                    <tr class="command-row" data-command="ip-unbind">
+                        <td><code>ip-unbind</code></td>
+                        <td>ipunbind</td>
+                    </tr>
+                    <tr class="command-row" data-command="ip-verify-binding">
+                        <td><code>ip-verify-binding</code></td>
+                        <td>ipverify binding</td>
+                    </tr>
+                    <tr class="command-row" data-command="login-account">
+                        <td><code>login-account</code></td>
+                        <td>login帳號</td>
+                    </tr>
+                    <tr class="command-row" data-command="logout-account">
+                        <td><code>logout-account</code></td>
+                        <td>logout帳號</td>
+                    </tr>
+                    <tr class="command-row" data-command="qr-login-cancel">
+                        <td><code>qr-login-cancel</code></td>
+                        <td>qrlogin cancel</td>
+                    </tr>
+                    <tr class="command-row" data-command="qr-login-create">
+                        <td><code>qr-login-create</code></td>
+                        <td>qrlogin create</td>
+                    </tr>
+                    <tr class="command-row" data-command="qr-login-refresh">
+                        <td><code>qr-login-refresh</code></td>
+                        <td>qrlogin refresh</td>
+                    </tr>
+                    <tr class="command-row" data-command="qr-login-status">
+                        <td><code>qr-login-status</code></td>
+                        <td>qrlogin 狀態</td>
+                    </tr>
+                    <tr class="command-row" data-command="qr-login-submit-2fa">
+                        <td><code>qr-login-submit-2fa</code></td>
+                        <td>qrlogin submit 2fa</td>
+                    </tr>
+                    <tr class="command-row" data-command="remove-account">
+                        <td><code>remove-account</code></td>
+                        <td>移除帳號</td>
+                    </tr>
+                    <tr class="command-row" data-command="resend-code">
+                        <td><code>resend-code</code></td>
+                        <td>resendcode</td>
+                    </tr>
+                    <tr class="command-row" data-command="save-groups">
+                        <td><code>save-groups</code></td>
+                        <td>保存群組</td>
+                    </tr>
+                    <tr class="command-row" data-command="save-personas">
+                        <td><code>save-personas</code></td>
+                        <td>保存personas</td>
+                    </tr>
+                    <tr class="command-row" data-command="save-tags">
+                        <td><code>save-tags</code></td>
+                        <td>保存tags</td>
+                    </tr>
+                    <tr class="command-row" data-command="submit-2fa-password">
+                        <td><code>submit-2fa-password</code></td>
+                        <td>submit2fa password</td>
+                    </tr>
+                    <tr class="command-row" data-command="sync-account-info">
+                        <td><code>sync-account-info</code></td>
+                        <td>同步帳號 info</td>
+                    </tr>
+                    <tr class="command-row" data-command="test-proxy">
+                        <td><code>test-proxy</code></td>
+                        <td>測試proxy</td>
+                    </tr>
+                    <tr class="command-row" data-command="update-account">
+                        <td><code>update-account</code></td>
+                        <td>更新帳號</td>
+                    </tr>
+                    <tr class="command-row" data-command="update-account-data">
+                        <td><code>update-account-data</code></td>
+                        <td>更新帳號 data</td>
+                    </tr>
+                    <tr class="command-row" data-command="verify-code">
+                        <td><code>verify-code</code></td>
+                        <td>verifycode</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="category" data-category="ads">
+            <h2>
+                廣告系統
+                <span class="category-badge">9 命令</span>
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 30%">命令</th>
+                        <th>描述</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="command-row" data-command="create-ad-campaign">
+                        <td><code>create-ad-campaign</code></td>
+                        <td>創建ad 活動</td>
+                    </tr>
+                    <tr class="command-row" data-command="delete-ad-campaign">
+                        <td><code>delete-ad-campaign</code></td>
+                        <td>刪除ad 活動</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-ad-campaigns">
+                        <td><code>get-ad-campaigns</code></td>
+                        <td>獲取ad 活動</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-ad-stats">
+                        <td><code>get-ad-stats</code></td>
+                        <td>獲取ad stats</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-ad-templates">
+                        <td><code>get-ad-templates</code></td>
+                        <td>獲取ad 模板</td>
+                    </tr>
+                    <tr class="command-row" data-command="preview-ad">
+                        <td><code>preview-ad</code></td>
+                        <td>previewad</td>
+                    </tr>
+                    <tr class="command-row" data-command="start-ad-campaign">
+                        <td><code>start-ad-campaign</code></td>
+                        <td>啟動ad 活動</td>
+                    </tr>
+                    <tr class="command-row" data-command="stop-ad-campaign">
+                        <td><code>stop-ad-campaign</code></td>
+                        <td>停止ad 活動</td>
+                    </tr>
+                    <tr class="command-row" data-command="update-ad-campaign">
+                        <td><code>update-ad-campaign</code></td>
+                        <td>更新ad 活動</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="category" data-category="ai">
+            <h2>
+                AI 服務
+                <span class="category-badge">26 命令</span>
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 30%">命令</th>
+                        <th>描述</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="command-row" data-command="add-knowledge">
+                        <td><code>add-knowledge</code></td>
+                        <td>添加knowledge</td>
+                    </tr>
+                    <tr class="command-row" data-command="ai-analyze-conversation">
+                        <td><code>ai-analyze-conversation</code></td>
+                        <td>aianalyze conversation</td>
+                    </tr>
+                    <tr class="command-row" data-command="ai-apply-strategy">
+                        <td><code>ai-apply-strategy</code></td>
+                        <td>aiapply strategy</td>
+                    </tr>
+                    <tr class="command-row" data-command="ai-generate-group-names">
+                        <td><code>ai-generate-group-names</code></td>
+                        <td>aigenerate 群組 names</td>
+                    </tr>
+                    <tr class="command-row" data-command="ai-generate-message">
+                        <td><code>ai-generate-message</code></td>
+                        <td>aigenerate 消息</td>
+                    </tr>
+                    <tr class="command-row" data-command="ai-generate-response">
+                        <td><code>ai-generate-response</code></td>
+                        <td>aigenerate response</td>
+                    </tr>
+                    <tr class="command-row" data-command="ai-generate-welcome">
+                        <td><code>ai-generate-welcome</code></td>
+                        <td>aigenerate welcome</td>
+                    </tr>
+                    <tr class="command-row" data-command="ai-get-strategies">
+                        <td><code>ai-get-strategies</code></td>
+                        <td>aiget strategies</td>
+                    </tr>
+                    <tr class="command-row" data-command="ai-memory-clear">
+                        <td><code>ai-memory-clear</code></td>
+                        <td>aimemory clear</td>
+                    </tr>
+                    <tr class="command-row" data-command="ai-memory-get">
+                        <td><code>ai-memory-get</code></td>
+                        <td>aimemory get</td>
+                    </tr>
+                    <tr class="command-row" data-command="ai-memory-save">
+                        <td><code>ai-memory-save</code></td>
+                        <td>aimemory save</td>
+                    </tr>
+                    <tr class="command-row" data-command="ai-save-strategy">
+                        <td><code>ai-save-strategy</code></td>
+                        <td>aisave strategy</td>
+                    </tr>
+                    <tr class="command-row" data-command="ai-suggest-reply">
+                        <td><code>ai-suggest-reply</code></td>
+                        <td>aisuggest reply</td>
+                    </tr>
+                    <tr class="command-row" data-command="clear-knowledge">
+                        <td><code>clear-knowledge</code></td>
+                        <td>clearknowledge</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-ai-models">
+                        <td><code>get-ai-models</code></td>
+                        <td>獲取AI models</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-ai-settings">
+                        <td><code>get-ai-settings</code></td>
+                        <td>獲取AI 設置</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-ai-usage">
+                        <td><code>get-ai-usage</code></td>
+                        <td>獲取AI usage</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-knowledge-stats">
+                        <td><code>get-knowledge-stats</code></td>
+                        <td>獲取knowledge stats</td>
+                    </tr>
+                    <tr class="command-row" data-command="learn-from-history">
+                        <td><code>learn-from-history</code></td>
+                        <td>learnfrom history</td>
+                    </tr>
+                    <tr class="command-row" data-command="rag-add-document">
+                        <td><code>rag-add-document</code></td>
+                        <td>ragadd document</td>
+                    </tr>
+                    <tr class="command-row" data-command="rag-get-status">
+                        <td><code>rag-get-status</code></td>
+                        <td>ragget 狀態</td>
+                    </tr>
+                    <tr class="command-row" data-command="rag-search">
+                        <td><code>rag-search</code></td>
+                        <td>ragsearch</td>
+                    </tr>
+                    <tr class="command-row" data-command="remove-knowledge">
+                        <td><code>remove-knowledge</code></td>
+                        <td>移除knowledge</td>
+                    </tr>
+                    <tr class="command-row" data-command="save-ai-settings">
+                        <td><code>save-ai-settings</code></td>
+                        <td>保存AI 設置</td>
+                    </tr>
+                    <tr class="command-row" data-command="search-knowledge">
+                        <td><code>search-knowledge</code></td>
+                        <td>searchknowledge</td>
+                    </tr>
+                    <tr class="command-row" data-command="test-ai-connection">
+                        <td><code>test-ai-connection</code></td>
+                        <td>測試AI connection</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="category" data-category="analytics">
+            <h2>
+                數據分析
+                <span class="category-badge">8 命令</span>
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 30%">命令</th>
+                        <th>描述</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="command-row" data-command="export-report">
+                        <td><code>export-report</code></td>
+                        <td>exportreport</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-analytics">
+                        <td><code>get-analytics</code></td>
+                        <td>獲取analytics</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-conversion-stats">
+                        <td><code>get-conversion-stats</code></td>
+                        <td>獲取conversion stats</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-dashboard-stats">
+                        <td><code>get-dashboard-stats</code></td>
+                        <td>獲取dashboard stats</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-group-stats">
+                        <td><code>get-group-stats</code></td>
+                        <td>獲取群組 stats</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-message-stats">
+                        <td><code>get-message-stats</code></td>
+                        <td>獲取消息 stats</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-user-stats">
+                        <td><code>get-user-stats</code></td>
+                        <td>獲取用戶 stats</td>
+                    </tr>
+                    <tr class="command-row" data-command="schedule-report">
+                        <td><code>schedule-report</code></td>
+                        <td>schedulereport</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="category" data-category="automation">
+            <h2>
+                自動化
+                <span class="category-badge">34 命令</span>
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 30%">命令</th>
+                        <th>描述</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="command-row" data-command="add-campaign">
+                        <td><code>add-campaign</code></td>
+                        <td>添加活動</td>
+                    </tr>
+                    <tr class="command-row" data-command="add-group">
+                        <td><code>add-group</code></td>
+                        <td>添加群組</td>
+                    </tr>
+                    <tr class="command-row" data-command="add-keyword">
+                        <td><code>add-keyword</code></td>
+                        <td>添加關鍵詞</td>
+                    </tr>
+                    <tr class="command-row" data-command="add-keyword-set">
+                        <td><code>add-keyword-set</code></td>
+                        <td>添加關鍵詞 set</td>
+                    </tr>
+                    <tr class="command-row" data-command="bind-keyword-set">
+                        <td><code>bind-keyword-set</code></td>
+                        <td>bind關鍵詞 set</td>
+                    </tr>
+                    <tr class="command-row" data-command="delete-keyword-set">
+                        <td><code>delete-keyword-set</code></td>
+                        <td>刪除關鍵詞 set</td>
+                    </tr>
+                    <tr class="command-row" data-command="delete-trigger-rule">
+                        <td><code>delete-trigger-rule</code></td>
+                        <td>刪除trigger 規則</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-campaign-stats">
+                        <td><code>get-campaign-stats</code></td>
+                        <td>獲取活動 stats</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-campaigns">
+                        <td><code>get-campaigns</code></td>
+                        <td>獲取活動</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-group-members">
+                        <td><code>get-group-members</code></td>
+                        <td>獲取群組 members</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-keyword-sets">
+                        <td><code>get-keyword-sets</code></td>
+                        <td>獲取關鍵詞 sets</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-monitored-groups">
+                        <td><code>get-monitored-groups</code></td>
+                        <td>獲取monitored 群組</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-system-status">
+                        <td><code>get-system-status</code></td>
+                        <td>獲取system 狀態</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-trigger-rules">
+                        <td><code>get-trigger-rules</code></td>
+                        <td>獲取trigger 規則</td>
+                    </tr>
+                    <tr class="command-row" data-command="join-group">
+                        <td><code>join-group</code></td>
+                        <td>join群組</td>
+                    </tr>
+                    <tr class="command-row" data-command="leave-group">
+                        <td><code>leave-group</code></td>
+                        <td>leave群組</td>
+                    </tr>
+                    <tr class="command-row" data-command="one-click-start">
+                        <td><code>one-click-start</code></td>
+                        <td>oneclick start</td>
+                    </tr>
+                    <tr class="command-row" data-command="one-click-stop">
+                        <td><code>one-click-stop</code></td>
+                        <td>oneclick stop</td>
+                    </tr>
+                    <tr class="command-row" data-command="pause-monitoring">
+                        <td><code>pause-monitoring</code></td>
+                        <td>pausemonitoring</td>
+                    </tr>
+                    <tr class="command-row" data-command="remove-campaign">
+                        <td><code>remove-campaign</code></td>
+                        <td>移除活動</td>
+                    </tr>
+                    <tr class="command-row" data-command="remove-group">
+                        <td><code>remove-group</code></td>
+                        <td>移除群組</td>
+                    </tr>
+                    <tr class="command-row" data-command="remove-keyword">
+                        <td><code>remove-keyword</code></td>
+                        <td>移除關鍵詞</td>
+                    </tr>
+                    <tr class="command-row" data-command="remove-keyword-set">
+                        <td><code>remove-keyword-set</code></td>
+                        <td>移除關鍵詞 set</td>
+                    </tr>
+                    <tr class="command-row" data-command="resume-monitoring">
+                        <td><code>resume-monitoring</code></td>
+                        <td>resumemonitoring</td>
+                    </tr>
+                    <tr class="command-row" data-command="save-keyword-set">
+                        <td><code>save-keyword-set</code></td>
+                        <td>保存關鍵詞 set</td>
+                    </tr>
+                    <tr class="command-row" data-command="save-trigger-rule">
+                        <td><code>save-trigger-rule</code></td>
+                        <td>保存trigger 規則</td>
+                    </tr>
+                    <tr class="command-row" data-command="search-groups">
+                        <td><code>search-groups</code></td>
+                        <td>search群組</td>
+                    </tr>
+                    <tr class="command-row" data-command="start-campaign">
+                        <td><code>start-campaign</code></td>
+                        <td>啟動活動</td>
+                    </tr>
+                    <tr class="command-row" data-command="start-monitoring">
+                        <td><code>start-monitoring</code></td>
+                        <td>啟動monitoring</td>
+                    </tr>
+                    <tr class="command-row" data-command="stop-campaign">
+                        <td><code>stop-campaign</code></td>
+                        <td>停止活動</td>
+                    </tr>
+                    <tr class="command-row" data-command="stop-monitoring">
+                        <td><code>stop-monitoring</code></td>
+                        <td>停止monitoring</td>
+                    </tr>
+                    <tr class="command-row" data-command="test-trigger-rule">
+                        <td><code>test-trigger-rule</code></td>
+                        <td>測試trigger 規則</td>
+                    </tr>
+                    <tr class="command-row" data-command="toggle-trigger-rule">
+                        <td><code>toggle-trigger-rule</code></td>
+                        <td>切換trigger 規則</td>
+                    </tr>
+                    <tr class="command-row" data-command="unbind-keyword-set">
+                        <td><code>unbind-keyword-set</code></td>
+                        <td>unbind關鍵詞 set</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="category" data-category="contacts">
+            <h2>
+                客戶管理
+                <span class="category-badge">20 命令</span>
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 30%">命令</th>
+                        <th>描述</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="command-row" data-command="add-lead">
+                        <td><code>add-lead</code></td>
+                        <td>添加線索</td>
+                    </tr>
+                    <tr class="command-row" data-command="assign-lead">
+                        <td><code>assign-lead</code></td>
+                        <td>assign線索</td>
+                    </tr>
+                    <tr class="command-row" data-command="blacklist-user">
+                        <td><code>blacklist-user</code></td>
+                        <td>blacklist用戶</td>
+                    </tr>
+                    <tr class="command-row" data-command="cancel-extraction">
+                        <td><code>cancel-extraction</code></td>
+                        <td>取消extraction</td>
+                    </tr>
+                    <tr class="command-row" data-command="delete-lead">
+                        <td><code>delete-lead</code></td>
+                        <td>刪除線索</td>
+                    </tr>
+                    <tr class="command-row" data-command="export-collected-users">
+                        <td><code>export-collected-users</code></td>
+                        <td>exportcollected 用戶</td>
+                    </tr>
+                    <tr class="command-row" data-command="extract-members">
+                        <td><code>extract-members</code></td>
+                        <td>extractmembers</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-collected-users">
+                        <td><code>get-collected-users</code></td>
+                        <td>獲取collected 用戶</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-extraction-status">
+                        <td><code>get-extraction-status</code></td>
+                        <td>獲取extraction 狀態</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-funnel-stats">
+                        <td><code>get-funnel-stats</code></td>
+                        <td>獲取funnel stats</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-funnel-users">
+                        <td><code>get-funnel-users</code></td>
+                        <td>獲取funnel 用戶</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-lead-details">
+                        <td><code>get-lead-details</code></td>
+                        <td>獲取線索 details</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-leads">
+                        <td><code>get-leads</code></td>
+                        <td>獲取線索</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-tracked-users">
+                        <td><code>get-tracked-users</code></td>
+                        <td>獲取tracked 用戶</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-user-activity">
+                        <td><code>get-user-activity</code></td>
+                        <td>獲取用戶 activity</td>
+                    </tr>
+                    <tr class="command-row" data-command="track-user">
+                        <td><code>track-user</code></td>
+                        <td>track用戶</td>
+                    </tr>
+                    <tr class="command-row" data-command="untrack-user">
+                        <td><code>untrack-user</code></td>
+                        <td>untrack用戶</td>
+                    </tr>
+                    <tr class="command-row" data-command="update-funnel-stage">
+                        <td><code>update-funnel-stage</code></td>
+                        <td>更新funnel stage</td>
+                    </tr>
+                    <tr class="command-row" data-command="update-lead">
+                        <td><code>update-lead</code></td>
+                        <td>更新線索</td>
+                    </tr>
+                    <tr class="command-row" data-command="update-lead-stage">
+                        <td><code>update-lead-stage</code></td>
+                        <td>更新線索 stage</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="category" data-category="messaging">
+            <h2>
+                消息系統
+                <span class="category-badge">18 命令</span>
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 30%">命令</th>
+                        <th>描述</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="command-row" data-command="add-template">
+                        <td><code>add-template</code></td>
+                        <td>添加模板</td>
+                    </tr>
+                    <tr class="command-row" data-command="clear-queue">
+                        <td><code>clear-queue</code></td>
+                        <td>clear隊列</td>
+                    </tr>
+                    <tr class="command-row" data-command="delete-chat-template">
+                        <td><code>delete-chat-template</code></td>
+                        <td>刪除chat 模板</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-chat-history">
+                        <td><code>get-chat-history</code></td>
+                        <td>獲取chat history</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-chat-templates">
+                        <td><code>get-chat-templates</code></td>
+                        <td>獲取chat 模板</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-private-messages">
+                        <td><code>get-private-messages</code></td>
+                        <td>獲取private 消息</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-queue-status">
+                        <td><code>get-queue-status</code></td>
+                        <td>獲取隊列 狀態</td>
+                    </tr>
+                    <tr class="command-row" data-command="pause-queue">
+                        <td><code>pause-queue</code></td>
+                        <td>pause隊列</td>
+                    </tr>
+                    <tr class="command-row" data-command="queue-message">
+                        <td><code>queue-message</code></td>
+                        <td>queue消息</td>
+                    </tr>
+                    <tr class="command-row" data-command="remove-template">
+                        <td><code>remove-template</code></td>
+                        <td>移除模板</td>
+                    </tr>
+                    <tr class="command-row" data-command="resume-queue">
+                        <td><code>resume-queue</code></td>
+                        <td>resume隊列</td>
+                    </tr>
+                    <tr class="command-row" data-command="save-chat-history">
+                        <td><code>save-chat-history</code></td>
+                        <td>保存chat history</td>
+                    </tr>
+                    <tr class="command-row" data-command="save-chat-template">
+                        <td><code>save-chat-template</code></td>
+                        <td>保存chat 模板</td>
+                    </tr>
+                    <tr class="command-row" data-command="send-direct-message">
+                        <td><code>send-direct-message</code></td>
+                        <td>發送direct 消息</td>
+                    </tr>
+                    <tr class="command-row" data-command="send-group-message">
+                        <td><code>send-group-message</code></td>
+                        <td>發送群組 消息</td>
+                    </tr>
+                    <tr class="command-row" data-command="send-message">
+                        <td><code>send-message</code></td>
+                        <td>發送消息</td>
+                    </tr>
+                    <tr class="command-row" data-command="send-private-message">
+                        <td><code>send-private-message</code></td>
+                        <td>發送private 消息</td>
+                    </tr>
+                    <tr class="command-row" data-command="toggle-template-status">
+                        <td><code>toggle-template-status</code></td>
+                        <td>切換模板 狀態</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="category" data-category="multi_role">
+            <h2>
+                多角色協作
+                <span class="category-badge">15 命令</span>
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 30%">命令</th>
+                        <th>描述</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="command-row" data-command="delete-role">
+                        <td><code>delete-role</code></td>
+                        <td>刪除role</td>
+                    </tr>
+                    <tr class="command-row" data-command="delete-scenario">
+                        <td><code>delete-scenario</code></td>
+                        <td>刪除scenario</td>
+                    </tr>
+                    <tr class="command-row" data-command="delete-script">
+                        <td><code>delete-script</code></td>
+                        <td>刪除script</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-collaboration-status">
+                        <td><code>get-collaboration-status</code></td>
+                        <td>獲取collaboration 狀態</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-roles">
+                        <td><code>get-roles</code></td>
+                        <td>獲取roles</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-scenarios">
+                        <td><code>get-scenarios</code></td>
+                        <td>獲取scenarios</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-scripts">
+                        <td><code>get-scripts</code></td>
+                        <td>獲取scripts</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-swarm-status">
+                        <td><code>get-swarm-status</code></td>
+                        <td>獲取swarm 狀態</td>
+                    </tr>
+                    <tr class="command-row" data-command="save-role">
+                        <td><code>save-role</code></td>
+                        <td>保存role</td>
+                    </tr>
+                    <tr class="command-row" data-command="save-scenario">
+                        <td><code>save-scenario</code></td>
+                        <td>保存scenario</td>
+                    </tr>
+                    <tr class="command-row" data-command="save-script">
+                        <td><code>save-script</code></td>
+                        <td>保存script</td>
+                    </tr>
+                    <tr class="command-row" data-command="start-collaboration">
+                        <td><code>start-collaboration</code></td>
+                        <td>啟動collaboration</td>
+                    </tr>
+                    <tr class="command-row" data-command="start-swarm">
+                        <td><code>start-swarm</code></td>
+                        <td>啟動swarm</td>
+                    </tr>
+                    <tr class="command-row" data-command="stop-collaboration">
+                        <td><code>stop-collaboration</code></td>
+                        <td>停止collaboration</td>
+                    </tr>
+                    <tr class="command-row" data-command="stop-swarm">
+                        <td><code>stop-swarm</code></td>
+                        <td>停止swarm</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="category" data-category="system">
+            <h2>
+                系統管理
+                <span class="category-badge">24 命令</span>
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 30%">命令</th>
+                        <th>描述</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="command-row" data-command="backup-database">
+                        <td><code>backup-database</code></td>
+                        <td>backupdatabase</td>
+                    </tr>
+                    <tr class="command-row" data-command="clear-alerts">
+                        <td><code>clear-alerts</code></td>
+                        <td>clearalerts</td>
+                    </tr>
+                    <tr class="command-row" data-command="clear-logs">
+                        <td><code>clear-logs</code></td>
+                        <td>clear日誌</td>
+                    </tr>
+                    <tr class="command-row" data-command="create-group">
+                        <td><code>create-group</code></td>
+                        <td>創建群組</td>
+                    </tr>
+                    <tr class="command-row" data-command="delete-api-credential">
+                        <td><code>delete-api-credential</code></td>
+                        <td>刪除api credential</td>
+                    </tr>
+                    <tr class="command-row" data-command="dismiss-alert">
+                        <td><code>dismiss-alert</code></td>
+                        <td>dismissalert</td>
+                    </tr>
+                    <tr class="command-row" data-command="export-logs">
+                        <td><code>export-logs</code></td>
+                        <td>export日誌</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-alerts">
+                        <td><code>get-alerts</code></td>
+                        <td>獲取alerts</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-api-credentials">
+                        <td><code>get-api-credentials</code></td>
+                        <td>獲取api credentials</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-backup-status">
+                        <td><code>get-backup-status</code></td>
+                        <td>獲取backup 狀態</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-created-groups">
+                        <td><code>get-created-groups</code></td>
+                        <td>獲取created 群組</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-initial-state">
+                        <td><code>get-initial-state</code></td>
+                        <td>獲取initial state</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-logs">
+                        <td><code>get-logs</code></td>
+                        <td>獲取日誌</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-migration-status">
+                        <td><code>get-migration-status</code></td>
+                        <td>獲取migration 狀態</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-performance">
+                        <td><code>get-performance</code></td>
+                        <td>獲取performance</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-settings">
+                        <td><code>get-settings</code></td>
+                        <td>獲取設置</td>
+                    </tr>
+                    <tr class="command-row" data-command="get-system-info">
+                        <td><code>get-system-info</code></td>
+                        <td>獲取system info</td>
+                    </tr>
+                    <tr class="command-row" data-command="graceful-shutdown">
+                        <td><code>graceful-shutdown</code></td>
+                        <td>gracefulshutdown</td>
+                    </tr>
+                    <tr class="command-row" data-command="reset-settings">
+                        <td><code>reset-settings</code></td>
+                        <td>reset設置</td>
+                    </tr>
+                    <tr class="command-row" data-command="restore-database">
+                        <td><code>restore-database</code></td>
+                        <td>restoredatabase</td>
+                    </tr>
+                    <tr class="command-row" data-command="run-migrations">
+                        <td><code>run-migrations</code></td>
+                        <td>runmigrations</td>
+                    </tr>
+                    <tr class="command-row" data-command="save-api-credential">
+                        <td><code>save-api-credential</code></td>
+                        <td>保存api credential</td>
+                    </tr>
+                    <tr class="command-row" data-command="save-settings">
+                        <td><code>save-settings</code></td>
+                        <td>保存設置</td>
+                    </tr>
+                    <tr class="command-row" data-command="test-api-credential">
+                        <td><code>test-api-credential</code></td>
+                        <td>測試api credential</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <script>
+            function filterCommands() {
+                const query = document.getElementById('searchInput').value.toLowerCase();
+                const rows = document.querySelectorAll('.command-row');
+                
+                rows.forEach(row => {
+                    const command = row.dataset.command.toLowerCase();
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = (command.includes(query) || text.includes(query)) ? '' : 'none';
+                });
+                
+                // 隱藏空類別
+                document.querySelectorAll('.category').forEach(cat => {
+                    const visibleRows = cat.querySelectorAll('.command-row[style=""]').length +
+                                       cat.querySelectorAll('.command-row:not([style])').length;
+                    cat.style.display = visibleRows > 0 ? '' : 'none';
+                });
+            }
+        </script>
+    </div>
+</body>
+</html>

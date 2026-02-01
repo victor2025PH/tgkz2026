@@ -434,7 +434,10 @@ export class PerformanceMonitorComponent implements OnInit, OnDestroy {
   setupEventListeners() {
     // Listen for performance summary response
     this.ipcService.on('performance-summary', (data: PerformanceSummary) => {
-      this.summary.set(data);
+      // 🔧 修復：驗證數據完整性，避免 undefined 錯誤
+      if (data && data.cpu && data.memory && typeof data.cpu.current === 'number') {
+        this.summary.set(data);
+      }
     });
 
     // Listen for performance metrics response

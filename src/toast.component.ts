@@ -11,7 +11,7 @@ import { ToastService, Toast } from './toast.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="fixed top-4 right-4 z-50 space-y-3 max-w-md">
+    <div class="fixed top-4 right-4 z-[9999] space-y-3 max-w-md">
       @for(toast of toasts(); track toast.id) {
         <div 
           class="toast-item rounded-xl shadow-2xl backdrop-blur-md border animate-slide-in overflow-hidden"

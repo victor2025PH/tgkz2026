@@ -12,8 +12,7 @@ import { LoadingService } from './loading.service';
   imports: [CommonModule],
   template: `
     @if(loadingService.isLoading()) {
-      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center"
-           [@fadeInOut]>
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center animate-fade-in">
         <div class="bg-slate-800 rounded-2xl p-8 shadow-2xl border border-slate-700 max-w-sm w-full mx-4">
           <!-- Spinner 模式 -->
           @if(!hasProgress()) {
@@ -62,6 +61,9 @@ import { LoadingService } from './loading.service';
     }
     :host {
       display: contents;
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.2s ease-out;
     }
   `]
 })

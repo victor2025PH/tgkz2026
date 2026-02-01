@@ -74,7 +74,7 @@ type SelectMode = 'recommend' | 'pool' | 'manual';
             <div class="recommended-card">
               <div class="recommend-badge">⭐ 推薦</div>
               <div class="api-info">
-                <div class="api-name">{{ recommendedApi()!.name }}</div>
+                <div class="api-name">{{ safeDisplayName(recommendedApi()!.name, recommendedApi()!.api_id) }}</div>
                 <div class="api-id">ID: {{ recommendedApi()!.api_id }}</div>
               </div>
               <div class="api-quota">
@@ -117,7 +117,7 @@ type SelectMode = 'recommend' | 'pool' | 'manual';
                   [class.disabled]="!api.is_active || api.account_count >= api.max_accounts"
                   (click)="selectPoolApi(api)">
                   <div class="api-item-info">
-                    <span class="api-item-name">{{ api.name }}</span>
+                    <span class="api-item-name">{{ safeDisplayName(api.name, api.api_id) }}</span>
                     <span class="api-item-id">ID: {{ api.api_id }}</span>
                   </div>
                   <div class="api-item-right">
@@ -209,7 +209,7 @@ type SelectMode = 'recommend' | 'pool' | 'manual';
         <div class="selected-display">
           <div class="selected-info">
             <span class="selected-label">已選擇：</span>
-            <span class="selected-name">{{ selectedApi()!.name || 'API ' + selectedApi()!.api_id }}</span>
+            <span class="selected-name">{{ safeDisplayName(selectedApi()!.name, selectedApi()!.api_id) }}</span>
             <span class="selected-id">ID: {{ selectedApi()!.api_id }}</span>
           </div>
           <button (click)="clearSelection()" class="clear-btn">✕</button>
@@ -635,6 +635,38 @@ export class ApiSelectorComponent implements OnInit, OnDestroy {
   isLoading = signal(false);
   apiList = signal<ApiCredential[]>([]);
   selectedApi = signal<SelectedApi | null>(null);
+  
+  // 🆕 安全顯示 API 名稱（處理編碼問題）
+  safeDisplayName(name: string | undefined, apiId: string): string {
+    if (!name) return `API ${apiId}`;
+    
+    // 檢測亂碼：包含無法識別的字符或替換字符
+    // 常見亂碼特徵：
+    // 1. Unicode 替換字符 \uFFFD
+    // 2. 控制字符 \u0000-\u001F
+    // 3. 顯示為 � 的字符
+    // 4. 非常規 UTF-8 錯誤解碼的字符模式
+    const hasGarbledChars = /[\uFFFD\u0000-\u001F]/.test(name) || 
+                           name.includes('�') ||
+                           // 檢測常見的編碼錯誤模式（如 Big5/GBK 被錯誤解碼）
+                           /[\uE000-\uF8FF]/.test(name) ||
+                           // 檢測字符中有過多的私用區字符
+                           (name.match(/[\u4E00-\u9FFF]/g)?.length || 0) === 0 && 
+                           /[^\x00-\x7F]/.test(name) && 
+                           name.length < 10;
+    
+    if (hasGarbledChars) {
+      return `API ${apiId}`;
+    }
+    
+    // 額外檢查：如果名稱看起來像亂碼（大量非中英文字符）
+    const validChars = name.replace(/[\u4E00-\u9FFF\u3400-\u4DBF\uF900-\uFAFF\w\s\-_@#$%&*()+=\[\]{}|;:'",.<>?/\\]/g, '');
+    if (validChars.length > name.length * 0.3) {
+      return `API ${apiId}`;
+    }
+    
+    return name;
+  }
 
   // 推薦 API
   recommendedApi = signal<ApiCredential | null>(null);
@@ -679,6 +711,18 @@ export class ApiSelectorComponent implements OnInit, OnDestroy {
       }
     });
     this.ipcChannels.push('api-credentials-updated');
+
+    // 🆕 監聽 API 憑據添加結果
+    this.ipcService.on('api-credential-added', (data: any) => {
+      if (data.success) {
+        this.toast.success('✅ API 憑據已保存到 API 池');
+        // 刷新列表以顯示新添加的 API
+        this.loadApiList();
+      } else {
+        this.toast.error(`保存失敗: ${data.error || '未知錯誤'}`);
+      }
+    });
+    this.ipcChannels.push('api-credential-added');
   }
 
   private loadApiList(): void {
@@ -704,15 +748,16 @@ export class ApiSelectorComponent implements OnInit, OnDestroy {
   useRecommended(): void {
     const api = this.recommendedApi();
     if (api && api.api_hash) {
+      const safeName = this.safeDisplayName(api.name, api.api_id);
       const selected: SelectedApi = {
         api_id: api.api_id,
         api_hash: api.api_hash,
-        name: api.name,
+        name: safeName,
         source: 'pool'
       };
       this.selectedApi.set(selected);
       this.apiSelected.emit(selected);
-      this.toast.success(`已選擇 ${api.name}`);
+      this.toast.success(`已選擇 ${safeName}`);
     } else if (api) {
       // 如果沒有 hash，提示用戶
       this.toast.error('此 API 缺少 Hash，請重新添加');
@@ -728,15 +773,16 @@ export class ApiSelectorComponent implements OnInit, OnDestroy {
     const apiId = this.selectedPoolApi();
     const api = this.apiList().find(a => a.api_id === apiId);
     if (api && api.api_hash) {
+      const safeName = this.safeDisplayName(api.name, api.api_id);
       const selected: SelectedApi = {
         api_id: api.api_id,
         api_hash: api.api_hash,
-        name: api.name,
+        name: safeName,
         source: 'pool'
       };
       this.selectedApi.set(selected);
       this.apiSelected.emit(selected);
-      this.toast.success(`已選擇 ${api.name}`);
+      this.toast.success(`已選擇 ${safeName}`);
     }
   }
 

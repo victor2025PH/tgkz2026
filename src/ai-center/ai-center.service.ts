@@ -10,6 +10,7 @@ import {
   AICenterConfig, 
   AIModelConfig, 
   KnowledgeBase, 
+  KnowledgeItem,
   SmartRule, 
   AIUsageStats,
   DEFAULT_AI_CONFIG,
@@ -66,6 +67,9 @@ export class AICenterService {
   defaultModel = computed(() => 
     this.config().models.find(m => m.id === this.config().defaultModelId)
   );
+  // 🔧 FIX: 暴露知識庫列表供組件使用
+  knowledgeBases = computed(() => this.config().knowledgeBases);
+  activeKnowledgeBaseId = computed(() => this.config().activeKnowledgeBaseId);
   activeKnowledgeBase = computed(() => 
     this.config().knowledgeBases.find(kb => kb.id === this.config().activeKnowledgeBaseId)
   );
@@ -80,6 +84,10 @@ export class AICenterService {
   isConnected = computed(() => 
     this.config().models.some(m => m.isConnected)
   );
+  
+  // 🔧 正在測試的模型 ID 列表
+  private _testingModelIds = signal<Set<string>>(new Set());
+  testingModelIds = computed(() => this._testingModelIds());
   
   // 本地 AI 模型
   localModels = computed(() => 
@@ -144,15 +152,32 @@ export class AICenterService {
     // 監聽模型測試結果
     this.ipcService.on('ai-model-tested', (data: any) => {
       console.log('[AI] 測試結果:', data);
+      
+      // 🔧 移除測試中狀態
+      if (data.modelId) {
+        this._testingModelIds.update(set => {
+          const newSet = new Set(set);
+          newSet.delete(String(data.modelId));
+          return newSet;
+        });
+      }
+      
       if (data.isConnected) {
-        const preview = data.responsePreview ? ` (${data.responsePreview})` : '';
-        this.toastService.success(`AI 模型 ${data.modelName || ''} 連接成功！${preview}`);
+        // 🔧 P0+P2 優化：顯示延遲時間、回覆預覽和可用模型
+        const latency = data.latencyMs ? `延遲: ${data.latencyMs}ms` : '';
+        const preview = data.responsePreview ? `\n回覆: "${data.responsePreview.substring(0, 50)}${data.responsePreview.length > 50 ? '...' : ''}"` : '';
+        const models = data.availableModels?.length > 0 ? `\n可用模型: ${data.availableModels.slice(0, 3).join(', ')}${data.availableModels.length > 3 ? '...' : ''}` : '';
+        this.toastService.success(`✓ AI 模型 ${data.modelName || ''} 連接成功！\n${latency}${preview}${models}`);
       } else {
         this.toastService.error(`連接失敗: ${data.error || '未知錯誤'}`);
       }
       // 更新本地狀態
       if (data.modelId) {
-        this.updateModel(String(data.modelId), { isConnected: data.isConnected });
+        this.updateModel(String(data.modelId), { 
+          isConnected: data.isConnected,
+          // 🔧 P0 優化：存儲最後測試時間
+          lastTestedAt: new Date().toISOString()
+        });
       }
     });
     
@@ -171,12 +196,68 @@ export class AICenterService {
       }
     });
     
-    // 監聽模型用途分配保存結果
+    // 監聯模型用途分配保存結果
     this.ipcService.on('model-usage-saved', (data: any) => {
       if (data.success) {
         console.log('[AI] 模型用途分配已保存');
       } else {
         this.toastService.error(`保存失敗: ${data.error || '未知錯誤'}`);
+      }
+    });
+    
+    // 🆕 監聽知識庫創建結果
+    this.ipcService.on('knowledge-base-added', (data: any) => {
+      console.log('[AI] 知識庫創建結果:', data);
+      if (data.success) {
+        this.toastService.success(`知識庫「${data.name}」創建成功`);
+        // 刷新知識庫列表（如果有的話）
+      } else {
+        this.toastService.error(`創建失敗: ${data.error || '未知錯誤'}`);
+      }
+    });
+    
+    // 🆕 監聽知識庫條目添加結果
+    this.ipcService.on('knowledge-item-added', (data: any) => {
+      console.log('[AI] 知識條目添加結果:', data);
+      if (data.success) {
+        this.toastService.success(`知識條目「${data.title}」已添加`);
+      } else {
+        this.toastService.error(`添加失敗: ${data.error || '未知錯誤'}`);
+      }
+    });
+    
+    // 🆕 監聽 AI 生成知識庫結果
+    this.ipcService.on('ai-knowledge-generated', (data: any) => {
+      console.log('[AI] AI 生成知識庫結果:', data);
+      if (data.success && data.items) {
+        this.handleGeneratedKnowledge(data.kbId, data.items);
+        this.toastService.success(`✨ AI 已生成 ${data.items.length} 條知識`);
+      } else {
+        this.toastService.error(`生成失敗: ${data.error || '未知錯誤'}`);
+      }
+    });
+    
+    // 🆕 監聽行業模板應用結果
+    this.ipcService.on('industry-template-applied', (data: any) => {
+      console.log('[AI] 行業模板應用結果:', data);
+      if (data.success && data.items) {
+        this.handleGeneratedKnowledge(data.kbId, data.items);
+        this.toastService.success(`📚 已應用「${data.templateName}」模板，添加 ${data.items.length} 條知識`);
+      } else {
+        this.toastService.error(`應用失敗: ${data.error || '未知錯誤'}`);
+      }
+    });
+    
+    // 🆕 監聽從聊天學習結果
+    this.ipcService.on('chat-learning-complete', (data: any) => {
+      console.log('[AI] 聊天學習結果:', data);
+      if (data.success && data.items) {
+        this.handleGeneratedKnowledge(data.kbId, data.items);
+        this.toastService.success(`💬 從聊天記錄學習了 ${data.items.length} 條知識`);
+      } else if (data.success && (!data.items || data.items.length === 0)) {
+        this.toastService.info('未發現可學習的優質回覆');
+      } else {
+        this.toastService.error(`學習失敗: ${data.error || '未知錯誤'}`);
       }
     });
   }
@@ -315,6 +396,19 @@ export class AICenterService {
     const model = this.config().models.find(m => m.id === id);
     if (!model) return false;
     
+    // 🔧 檢查是否已在測試中
+    if (this._testingModelIds().has(id)) {
+      console.log('[AI] 模型已在測試中，跳過:', id);
+      return false;
+    }
+    
+    // 🔧 添加到測試中列表
+    this._testingModelIds.update(set => {
+      const newSet = new Set(set);
+      newSet.add(id);
+      return newSet;
+    });
+    
     const extModel = model as ExtendedAIModelConfig;
     
     // 通過後端測試連接
@@ -326,6 +420,15 @@ export class AICenterService {
       apiEndpoint: model.apiEndpoint,
       isLocal: extModel.isLocal
     });
+    
+    // 🔧 60 秒超時保護（自動移除測試中狀態）
+    setTimeout(() => {
+      this._testingModelIds.update(set => {
+        const newSet = new Set(set);
+        newSet.delete(id);
+        return newSet;
+      });
+    }, 60000);
     
     // 返回 true 表示測試請求已發送，實際結果通過事件返回
     return true;
@@ -364,6 +467,16 @@ export class AICenterService {
       activeKnowledgeBaseId: c.activeKnowledgeBaseId || id
     }));
     
+    // 🆕 同步到後端數據庫（Toast 由事件監聽器處理，避免重複）
+    this.ipcService.send('add-knowledge-base', {
+      id,
+      name,
+      description,
+      category: 'general'
+    });
+    
+    // 🔧 FIX: 移除這裡的 Toast，由 knowledge-base-added 事件統一處理
+    
     return id;
   }
   
@@ -388,6 +501,114 @@ export class AICenterService {
   
   setActiveKnowledgeBase(id: string) {
     this.config.update(c => ({ ...c, activeKnowledgeBaseId: id }));
+  }
+  
+  // 🆕 添加知識條目
+  addKnowledgeItem(kbId: string, item: { title: string; content: string; category?: string }) {
+    const itemId = `item_${Date.now()}`;
+    const now = new Date().toISOString();
+    const newItem: KnowledgeItem = {
+      id: itemId,
+      title: item.title,
+      content: item.content,
+      category: (item.category || 'custom') as 'product' | 'faq' | 'sales' | 'objection' | 'custom',
+      keywords: [],
+      priority: 1,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    // 更新本地狀態
+    this.config.update(c => ({
+      ...c,
+      knowledgeBases: c.knowledgeBases.map(kb => 
+        kb.id === kbId 
+          ? { ...kb, items: [...kb.items, newItem], updatedAt: new Date().toISOString() }
+          : kb
+      )
+    }));
+    
+    // 同步到後端
+    this.ipcService.send('add-knowledge-item', {
+      kbId,
+      id: itemId,
+      title: item.title,
+      content: item.content,
+      category: item.category || 'general'
+    });
+    
+    return itemId;
+  }
+  
+  // 🆕 刪除知識條目
+  deleteKnowledgeItem(kbId: string, itemId: string) {
+    this.config.update(c => ({
+      ...c,
+      knowledgeBases: c.knowledgeBases.map(kb => 
+        kb.id === kbId 
+          ? { ...kb, items: kb.items.filter(i => i.id !== itemId), updatedAt: new Date().toISOString() }
+          : kb
+      )
+    }));
+    
+    // 同步到後端
+    this.ipcService.send('delete-knowledge-item', {
+      kbId,
+      itemId
+    });
+  }
+  
+  // 🆕 AI 自動生成知識庫
+  generateKnowledgeBase(kbId: string, businessDescription: string) {
+    // 發送到後端進行 AI 生成
+    this.ipcService.send('ai-generate-knowledge', {
+      kbId,
+      businessDescription
+    });
+  }
+  
+  // 🆕 處理 AI 生成的知識條目
+  handleGeneratedKnowledge(kbId: string, items: Array<{ title: string; content: string; category: string }>) {
+    const now = new Date().toISOString();
+    
+    const newItems: KnowledgeItem[] = items.map((item, index) => ({
+      id: `item_${Date.now()}_${index}`,
+      title: item.title,
+      content: item.content,
+      category: (item.category || 'custom') as 'product' | 'faq' | 'sales' | 'objection' | 'custom',
+      keywords: [],
+      priority: 1,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    }));
+    
+    // 更新本地狀態
+    this.config.update(c => ({
+      ...c,
+      knowledgeBases: c.knowledgeBases.map(kb => 
+        kb.id === kbId 
+          ? { ...kb, items: [...kb.items, ...newItems], updatedAt: now }
+          : kb
+      )
+    }));
+  }
+  
+  // 🆕 應用行業模板
+  applyIndustryTemplate(kbId: string, templateId: string) {
+    this.ipcService.send('apply-industry-template', {
+      kbId,
+      templateId
+    });
+  }
+  
+  // 🆕 從聊天記錄學習
+  learnFromChatHistory(kbId: string) {
+    this.ipcService.send('learn-from-chat-history', {
+      kbId,
+      days: 7  // 最近 7 天
+    });
   }
   
   // ========== 智能規則管理 ==========
@@ -434,6 +655,39 @@ export class AICenterService {
       ...c,
       conversationStrategy: { ...c.conversationStrategy, ...updates }
     }));
+  }
+  
+  /**
+   * 🔧 保存對話策略到後端
+   */
+  async saveConversationStrategyToBackend(strategy: {
+    style: string;
+    responseLength: string;
+    useEmoji: boolean;
+    customPersona: string;
+  }): Promise<void> {
+    console.log('[AI] 保存對話策略:', strategy);
+    
+    // 發送到後端
+    this.ipcService.send('save-conversation-strategy', strategy);
+    
+    // 同時更新本地狀態
+    this.updateConversationStrategy({
+      style: strategy.style as any,
+      responseLength: strategy.responseLength as any,
+      useEmoji: strategy.useEmoji,
+      customPromptPrefix: strategy.customPersona  // 🔧 FIX: 使用正確的屬性名
+    });
+    
+    this.toastService.success('對話策略已保存');
+  }
+  
+  /**
+   * 🔧 從後端載入對話策略
+   */
+  loadConversationStrategyFromBackend(): void {
+    console.log('[AI] 載入對話策略...');
+    this.ipcService.send('get-conversation-strategy', {});
   }
   
   // ========== 設置管理 ==========

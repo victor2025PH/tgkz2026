@@ -12,6 +12,7 @@ import { Injectable, signal, inject, computed } from '@angular/core';
 import { AIProviderService, AIMessage, AIResponse, AI_PROVIDERS } from '../ai-provider.service';
 import { AICenterService } from '../ai-center/ai-center.service';
 import { ToastService } from '../toast.service';
+import { ElectronIpcService } from '../electron-ipc.service';
 import { AIStrategyResult } from './ai-marketing-assistant.component';
 
 // AI 模型選項
@@ -32,6 +33,16 @@ export interface GenerationStatus {
   currentProvider: string;
   progress: number;
   message: string;
+}
+
+// 🔧 已保存的策略
+export interface SavedStrategy {
+  id: string;
+  name: string;
+  strategy: AIStrategyResult;
+  createdAt: string;
+  updatedAt: string;
+  usedCount: number;
 }
 
 // 策略生成 Prompt
@@ -80,6 +91,7 @@ export class AIStrategyService {
   private aiProviderService = inject(AIProviderService);
   private aiCenterService = inject(AICenterService);
   private toastService = inject(ToastService);
+  private ipcService = inject(ElectronIpcService);
 
   // ============ 狀態 ============
   
@@ -108,6 +120,14 @@ export class AIStrategyService {
     message: ''
   });
   generationStatus = this._generationStatus.asReadonly();
+  
+  // 🔧 已保存的策略列表
+  private _savedStrategies = signal<SavedStrategy[]>([]);
+  savedStrategies = this._savedStrategies.asReadonly();
+  
+  // 🔧 當前策略
+  private _currentStrategy = signal<AIStrategyResult | null>(null);
+  currentStrategy = this._currentStrategy.asReadonly();
 
   // 計算屬性
   selectedModel = computed(() => 
@@ -294,7 +314,7 @@ export class AIStrategyService {
 
   /**
    * 生成 AI 營銷策略
-   * 優先使用本地 AI，失敗後回退到雲端
+   * 🔧 根據用戶選擇的模型來調用 AI
    */
   async generateStrategy(userInput: string): Promise<AIStrategyResult | null> {
     const prompt = STRATEGY_GENERATION_PROMPT.replace('{USER_INPUT}', userInput);
@@ -303,56 +323,121 @@ export class AIStrategyService {
       { role: 'user', content: prompt }
     ];
 
-    // 1. 優先嘗試本地 AI
-    this._generationStatus.set({
-      isGenerating: true,
-      currentProvider: '本地 Ollama',
-      progress: 20,
-      message: '正在使用本地 AI 分析...'
-    });
+    // 🔧 獲取用戶選擇的模型
+    const selected = this.selectedModel();
+    const modelName = selected?.name || '本地 AI';
+    const isLocal = selected?.isLocal ?? true;
+    
+    console.log(`[AIStrategy] 使用模型: ${modelName}, isLocal: ${isLocal}`);
 
-    try {
-      const localResult = await this.callLocalAI(messages);
-      if (localResult) {
-        const strategy = this.parseStrategyResponse(localResult);
-        if (strategy) {
-          this._generationStatus.set({
-            isGenerating: false,
-            currentProvider: '本地 Ollama',
-            progress: 100,
-            message: '生成完成！'
-          });
-          return strategy;
+    // 🔧 根據選擇的模型類型調用
+    if (isLocal) {
+      // ========== 本地 AI ==========
+      this._generationStatus.set({
+        isGenerating: true,
+        currentProvider: modelName,
+        progress: 20,
+        message: `正在使用 ${modelName} 分析...`
+      });
+
+      try {
+        const localResult = await this.callLocalAI(messages);
+        if (localResult) {
+          const strategy = this.parseStrategyResponse(localResult);
+          if (strategy) {
+            this._generationStatus.set({
+              isGenerating: false,
+              currentProvider: modelName,
+              progress: 100,
+              message: '生成完成！'
+            });
+            return strategy;
+          }
         }
+      } catch (error: any) {
+        console.warn(`[AIStrategy] ${modelName} 失敗:`, error.message);
+        this.toastService.warning(`${modelName} 調用失敗，嘗試雲端回退...`);
       }
-    } catch (error: any) {
-      console.warn('[AIStrategy] 本地 AI 失敗，嘗試雲端回退:', error.message);
-    }
+      
+      // 本地失敗，回退到雲端
+      this._generationStatus.set({
+        isGenerating: true,
+        currentProvider: '雲端 AI (回退)',
+        progress: 50,
+        message: '本地 AI 不可用，正在使用雲端 AI...'
+      });
 
-    // 2. 回退到雲端 AI
-    this._generationStatus.set({
-      isGenerating: true,
-      currentProvider: '雲端 AI',
-      progress: 50,
-      message: '本地 AI 不可用，正在使用雲端 AI...'
-    });
-
-    try {
-      const cloudResult = await this.callCloudAI(messages);
-      if (cloudResult) {
-        const strategy = this.parseStrategyResponse(cloudResult);
-        if (strategy) {
-          this._generationStatus.set({
-            isGenerating: false,
-            currentProvider: '雲端 AI',
-            progress: 100,
-            message: '生成完成！'
-          });
-          return strategy;
+      try {
+        const cloudResult = await this.callCloudAI(messages);
+        if (cloudResult) {
+          const strategy = this.parseStrategyResponse(cloudResult);
+          if (strategy) {
+            this._generationStatus.set({
+              isGenerating: false,
+              currentProvider: '雲端 AI',
+              progress: 100,
+              message: '生成完成！'
+            });
+            return strategy;
+          }
         }
+      } catch (error: any) {
+        console.warn('[AIStrategy] 雲端 AI 回退失敗:', error.message);
       }
-    } catch (error: any) {
-      console.warn('[AIStrategy] 雲端 AI 失敗，使用模板回退:', error.message);
+    } else {
+      // ========== 雲端 AI（用戶明確選擇） ==========
+      this._generationStatus.set({
+        isGenerating: true,
+        currentProvider: modelName,
+        progress: 30,
+        message: `正在使用 ${modelName} 分析...`
+      });
+
+      try {
+        // 🔧 使用選定的模型調用
+        const cloudResult = await this.callSelectedCloudModel(messages, selected!);
+        if (cloudResult) {
+          const strategy = this.parseStrategyResponse(cloudResult);
+          if (strategy) {
+            this._generationStatus.set({
+              isGenerating: false,
+              currentProvider: modelName,
+              progress: 100,
+              message: '生成完成！'
+            });
+            return strategy;
+          }
+        }
+      } catch (error: any) {
+        console.warn(`[AIStrategy] ${modelName} 失敗:`, error.message);
+        this.toastService.warning(`${modelName} 調用失敗，嘗試其他模型...`);
+      }
+
+      // 選定的雲端模型失敗，嘗試其他雲端模型
+      this._generationStatus.set({
+        isGenerating: true,
+        currentProvider: '其他雲端模型',
+        progress: 60,
+        message: '嘗試其他可用模型...'
+      });
+
+      try {
+        const cloudResult = await this.callCloudAI(messages);
+        if (cloudResult) {
+          const strategy = this.parseStrategyResponse(cloudResult);
+          if (strategy) {
+            this._generationStatus.set({
+              isGenerating: false,
+              currentProvider: '雲端 AI',
+              progress: 100,
+              message: '生成完成！'
+            });
+            return strategy;
+          }
+        }
+      } catch (error: any) {
+        console.warn('[AIStrategy] 所有雲端 AI 失敗:', error.message);
+      }
     }
 
     // 3. 最終回退到模板
@@ -407,9 +492,22 @@ export class AIStrategyService {
 
   /**
    * 調用雲端 AI
+   * 🔧 優先使用後端 IPC 代理，保護 API Key 並避免 CORS 問題
    */
   private async callCloudAI(messages: AIMessage[]): Promise<string | null> {
-    // 嘗試從 AI 中心獲取已配置的模型（優先已連接的）
+    // 🔧 方式 1：通過後端 IPC 代理調用（推薦）
+    try {
+      console.log('[AIStrategy] 嘗試通過後端 IPC 調用 AI...');
+      const result = await this.callAIViaBackend(messages);
+      if (result) {
+        console.log('[AIStrategy] 後端 IPC 調用成功');
+        return result;
+      }
+    } catch (error) {
+      console.warn('[AIStrategy] 後端 IPC 調用失敗:', error);
+    }
+    
+    // 🔧 方式 2：前端直接調用（備用）
     const allModels = this.aiCenterService.models();
     const connectedModels = allModels.filter(m => m.isConnected && !(m as any).isLocal);
     const modelsToTry = connectedModels.length > 0 ? connectedModels : allModels.filter(m => !(m as any).isLocal && m.apiKey);
@@ -446,6 +544,82 @@ export class AIStrategyService {
     }
 
     return null;
+  }
+  
+  /**
+   * 🔧 通過後端 IPC 調用 AI（保護 API Key）
+   */
+  private callAIViaBackend(messages: AIMessage[]): Promise<string | null> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.ipcService.off('ai-response', handler);
+        reject(new Error('後端 AI 調用超時'));
+      }, 60000); // 60 秒超時
+      
+      const handler = (result: any) => {
+        clearTimeout(timeout);
+        this.ipcService.off('ai-response', handler);
+        
+        if (result.success && result.response) {
+          resolve(result.response);
+        } else if (result.error) {
+          reject(new Error(result.error));
+        } else {
+          resolve(null);
+        }
+      };
+      
+      this.ipcService.on('ai-response', handler);
+      
+      // 🔧 轉換消息格式為後端期望的格式
+      const systemMessage = messages.find(m => m.role === 'system');
+      const userMessage = messages.find(m => m.role === 'user');
+      
+      // 獲取本地 AI 配置
+      const localConfig = this._localAIConfig();
+      
+      // 發送請求到後端
+      this.ipcService.send('generate-ai-response', {
+        userId: 'strategy-generator',
+        message: userMessage?.content || '',
+        systemPrompt: systemMessage?.content || '',
+        localAiEndpoint: localConfig.endpoint,
+        localAiModel: localConfig.model
+      });
+    });
+  }
+  
+  /**
+   * 🔧 調用選定的雲端模型
+   */
+  private async callSelectedCloudModel(messages: AIMessage[], selectedModel: AIModelOption): Promise<string | null> {
+    // 從 AI 中心找到對應的完整模型配置
+    const allModels = this.aiCenterService.models();
+    const modelConfig = allModels.find(m => m.id === selectedModel.id);
+    
+    if (!modelConfig) {
+      console.warn(`[AIStrategy] 找不到模型配置: ${selectedModel.id}`);
+      return null;
+    }
+    
+    if (!modelConfig.apiKey && !modelConfig.isConnected) {
+      console.warn(`[AIStrategy] 模型 ${selectedModel.name} 未配置 API Key`);
+      this.toastService.error(`請先在 AI 中心配置 ${selectedModel.name} 的 API Key`);
+      return null;
+    }
+    
+    console.log(`[AIStrategy] 調用選定模型: ${modelConfig.modelName}, provider: ${modelConfig.provider}`);
+    
+    // 使用 AIProviderService 調用
+    this.aiProviderService.setConfig({
+      provider: modelConfig.provider as any,
+      model: modelConfig.modelName,
+      apiKey: modelConfig.apiKey,
+      baseUrl: modelConfig.apiEndpoint
+    });
+    
+    const response = await this.aiProviderService.chat(messages);
+    return response.content;
   }
   
   /**
@@ -649,6 +823,9 @@ export class AIStrategyService {
           this._selectedModelId.set(config.selectedModelId);
         }
       }
+      
+      // 🔧 加載已保存的策略
+      this.loadSavedStrategies();
     } catch (e) {
       console.error('Failed to load AI strategy config:', e);
     }
@@ -662,6 +839,98 @@ export class AIStrategyService {
       }));
     } catch (e) {
       console.error('Failed to save AI strategy config:', e);
+    }
+  }
+  
+  // ============ 🔧 策略持久化 ============
+  
+  /**
+   * 加載已保存的策略
+   */
+  private loadSavedStrategies(): void {
+    try {
+      const stored = localStorage.getItem('ai-saved-strategies');
+      if (stored) {
+        const strategies = JSON.parse(stored) as SavedStrategy[];
+        this._savedStrategies.set(strategies);
+        console.log(`[AIStrategy] 已加載 ${strategies.length} 個保存的策略`);
+      }
+    } catch (e) {
+      console.error('Failed to load saved strategies:', e);
+    }
+  }
+  
+  /**
+   * 保存策略
+   */
+  saveStrategy(strategy: AIStrategyResult, name?: string): SavedStrategy {
+    const savedStrategy: SavedStrategy = {
+      id: `strategy-${Date.now()}`,
+      name: name || `${strategy.industry} - ${new Date().toLocaleDateString('zh-TW')}`,
+      strategy,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      usedCount: 0
+    };
+    
+    const strategies = [...this._savedStrategies(), savedStrategy];
+    this._savedStrategies.set(strategies);
+    this._currentStrategy.set(strategy);
+    
+    // 保存到 localStorage
+    try {
+      localStorage.setItem('ai-saved-strategies', JSON.stringify(strategies));
+    } catch (e) {
+      console.error('Failed to save strategies:', e);
+    }
+    
+    this.toastService.success('策略已保存！');
+    return savedStrategy;
+  }
+  
+  /**
+   * 加載策略
+   */
+  loadStrategy(strategyId: string): AIStrategyResult | null {
+    const saved = this._savedStrategies().find(s => s.id === strategyId);
+    if (saved) {
+      // 更新使用次數
+      saved.usedCount++;
+      saved.updatedAt = new Date().toISOString();
+      
+      this._currentStrategy.set(saved.strategy);
+      this.persistStrategies();
+      
+      return saved.strategy;
+    }
+    return null;
+  }
+  
+  /**
+   * 刪除策略
+   */
+  deleteStrategy(strategyId: string): void {
+    const strategies = this._savedStrategies().filter(s => s.id !== strategyId);
+    this._savedStrategies.set(strategies);
+    this.persistStrategies();
+    this.toastService.success('策略已刪除');
+  }
+  
+  /**
+   * 設置當前策略
+   */
+  setCurrentStrategy(strategy: AIStrategyResult | null): void {
+    this._currentStrategy.set(strategy);
+  }
+  
+  /**
+   * 持久化策略列表
+   */
+  private persistStrategies(): void {
+    try {
+      localStorage.setItem('ai-saved-strategies', JSON.stringify(this._savedStrategies()));
+    } catch (e) {
+      console.error('Failed to persist strategies:', e);
     }
   }
 }

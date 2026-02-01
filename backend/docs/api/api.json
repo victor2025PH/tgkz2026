@@ -1,0 +1,1212 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-01-25T01:46:35.623103",
+  "title": "TG-Matrix API",
+  "description": "TG-AI 智控王後端 API 文檔",
+  "categories": {
+    "account": {
+      "name": "account",
+      "commands": [
+        {
+          "name": "add-account",
+          "description": "添加帳號",
+          "handler": "handle_add_account",
+          "aliases": []
+        },
+        {
+          "name": "login-account",
+          "description": "login帳號",
+          "handler": "handle_login_account",
+          "aliases": []
+        },
+        {
+          "name": "logout-account",
+          "description": "logout帳號",
+          "handler": "handle_logout_account",
+          "aliases": []
+        },
+        {
+          "name": "remove-account",
+          "description": "移除帳號",
+          "handler": "handle_remove_account",
+          "aliases": []
+        },
+        {
+          "name": "check-account-status",
+          "description": "check帳號 狀態",
+          "handler": "handle_check_account_status",
+          "aliases": []
+        },
+        {
+          "name": "update-account",
+          "description": "更新帳號",
+          "handler": "handle_update_account",
+          "aliases": []
+        },
+        {
+          "name": "update-account-data",
+          "description": "更新帳號 data",
+          "handler": "handle_update_account_data",
+          "aliases": []
+        },
+        {
+          "name": "sync-account-info",
+          "description": "同步帳號 info",
+          "handler": "handle_sync_account_info",
+          "aliases": []
+        },
+        {
+          "name": "test-proxy",
+          "description": "測試proxy",
+          "handler": "handle_test_proxy",
+          "aliases": []
+        },
+        {
+          "name": "get-accounts",
+          "description": "獲取帳號",
+          "handler": "handle_get_accounts",
+          "aliases": []
+        },
+        {
+          "name": "bulk-assign-role",
+          "description": "批量assign role",
+          "handler": "handle_bulk_assign_role",
+          "aliases": []
+        },
+        {
+          "name": "bulk-assign-group",
+          "description": "批量assign 群組",
+          "handler": "handle_bulk_assign_group",
+          "aliases": []
+        },
+        {
+          "name": "bulk-delete-accounts",
+          "description": "批量delete 帳號",
+          "handler": "handle_bulk_delete_accounts",
+          "aliases": []
+        },
+        {
+          "name": "batch-update-accounts",
+          "description": "批量update 帳號",
+          "handler": "handle_batch_update_accounts",
+          "aliases": []
+        },
+        {
+          "name": "save-tags",
+          "description": "保存tags",
+          "handler": "handle_save_tags",
+          "aliases": []
+        },
+        {
+          "name": "get-tags",
+          "description": "獲取tags",
+          "handler": "handle_get_tags",
+          "aliases": []
+        },
+        {
+          "name": "save-groups",
+          "description": "保存群組",
+          "handler": "handle_save_groups",
+          "aliases": []
+        },
+        {
+          "name": "get-groups",
+          "description": "獲取群組",
+          "handler": "handle_get_groups",
+          "aliases": []
+        },
+        {
+          "name": "save-personas",
+          "description": "保存personas",
+          "handler": "handle_save_personas",
+          "aliases": []
+        },
+        {
+          "name": "get-personas",
+          "description": "獲取personas",
+          "handler": "handle_get_personas",
+          "aliases": []
+        },
+        {
+          "name": "qr-login-create",
+          "description": "qrlogin create",
+          "handler": "handle_qr_login_create",
+          "aliases": []
+        },
+        {
+          "name": "qr-login-status",
+          "description": "qrlogin 狀態",
+          "handler": "handle_qr_login_status",
+          "aliases": []
+        },
+        {
+          "name": "qr-login-refresh",
+          "description": "qrlogin refresh",
+          "handler": "handle_qr_login_refresh",
+          "aliases": []
+        },
+        {
+          "name": "qr-login-submit-2fa",
+          "description": "qrlogin submit 2fa",
+          "handler": "handle_qr_login_submit_2fa",
+          "aliases": []
+        },
+        {
+          "name": "qr-login-cancel",
+          "description": "qrlogin cancel",
+          "handler": "handle_qr_login_cancel",
+          "aliases": []
+        },
+        {
+          "name": "ip-bind",
+          "description": "ipbind",
+          "handler": "handle_ip_bind",
+          "aliases": []
+        },
+        {
+          "name": "ip-unbind",
+          "description": "ipunbind",
+          "handler": "handle_ip_unbind",
+          "aliases": []
+        },
+        {
+          "name": "ip-get-binding",
+          "description": "ipget binding",
+          "handler": "handle_ip_get_binding",
+          "aliases": []
+        },
+        {
+          "name": "ip-get-all-bindings",
+          "description": "ipget all bindings",
+          "handler": "handle_ip_get_all_bindings",
+          "aliases": []
+        },
+        {
+          "name": "ip-get-statistics",
+          "description": "ipget statistics",
+          "handler": "handle_ip_get_statistics",
+          "aliases": []
+        },
+        {
+          "name": "ip-verify-binding",
+          "description": "ipverify binding",
+          "handler": "handle_ip_verify_binding",
+          "aliases": []
+        },
+        {
+          "name": "credential-start-scrape",
+          "description": "credentialstart scrape",
+          "handler": "handle_credential_start_scrape",
+          "aliases": []
+        },
+        {
+          "name": "credential-submit-code",
+          "description": "credentialsubmit code",
+          "handler": "handle_credential_submit_code",
+          "aliases": []
+        },
+        {
+          "name": "credential-get-status",
+          "description": "credentialget 狀態",
+          "handler": "handle_credential_get_status",
+          "aliases": []
+        },
+        {
+          "name": "credential-get-all",
+          "description": "credentialget all",
+          "handler": "handle_credential_get_all",
+          "aliases": []
+        },
+        {
+          "name": "credential-cancel-scrape",
+          "description": "credentialcancel scrape",
+          "handler": "handle_credential_cancel_scrape",
+          "aliases": []
+        },
+        {
+          "name": "verify-code",
+          "description": "verifycode",
+          "handler": "handle_verify_code",
+          "aliases": []
+        },
+        {
+          "name": "submit-2fa-password",
+          "description": "submit2fa password",
+          "handler": "handle_submit_2fa_password",
+          "aliases": []
+        },
+        {
+          "name": "resend-code",
+          "description": "resendcode",
+          "handler": "handle_resend_code",
+          "aliases": []
+        }
+      ]
+    },
+    "messaging": {
+      "name": "messaging",
+      "commands": [
+        {
+          "name": "send-message",
+          "description": "發送消息",
+          "handler": "handle_send_message",
+          "aliases": []
+        },
+        {
+          "name": "send-private-message",
+          "description": "發送private 消息",
+          "handler": "handle_send_private_message",
+          "aliases": []
+        },
+        {
+          "name": "send-group-message",
+          "description": "發送群組 消息",
+          "handler": "handle_send_group_message",
+          "aliases": []
+        },
+        {
+          "name": "send-direct-message",
+          "description": "發送direct 消息",
+          "handler": "handle_send_direct_message",
+          "aliases": []
+        },
+        {
+          "name": "queue-message",
+          "description": "queue消息",
+          "handler": "handle_queue_message",
+          "aliases": []
+        },
+        {
+          "name": "get-queue-status",
+          "description": "獲取隊列 狀態",
+          "handler": "handle_get_queue_status",
+          "aliases": []
+        },
+        {
+          "name": "clear-queue",
+          "description": "clear隊列",
+          "handler": "handle_clear_queue",
+          "aliases": []
+        },
+        {
+          "name": "pause-queue",
+          "description": "pause隊列",
+          "handler": "handle_pause_queue",
+          "aliases": []
+        },
+        {
+          "name": "resume-queue",
+          "description": "resume隊列",
+          "handler": "handle_resume_queue",
+          "aliases": []
+        },
+        {
+          "name": "get-chat-history",
+          "description": "獲取chat history",
+          "handler": "handle_get_chat_history",
+          "aliases": []
+        },
+        {
+          "name": "save-chat-history",
+          "description": "保存chat history",
+          "handler": "handle_save_chat_history",
+          "aliases": []
+        },
+        {
+          "name": "get-private-messages",
+          "description": "獲取private 消息",
+          "handler": "handle_get_private_messages",
+          "aliases": []
+        },
+        {
+          "name": "add-template",
+          "description": "添加模板",
+          "handler": "handle_add_template",
+          "aliases": []
+        },
+        {
+          "name": "remove-template",
+          "description": "移除模板",
+          "handler": "handle_remove_template",
+          "aliases": []
+        },
+        {
+          "name": "toggle-template-status",
+          "description": "切換模板 狀態",
+          "handler": "handle_toggle_template_status",
+          "aliases": []
+        },
+        {
+          "name": "get-chat-templates",
+          "description": "獲取chat 模板",
+          "handler": "handle_get_chat_templates",
+          "aliases": []
+        },
+        {
+          "name": "save-chat-template",
+          "description": "保存chat 模板",
+          "handler": "handle_save_chat_template",
+          "aliases": []
+        },
+        {
+          "name": "delete-chat-template",
+          "description": "刪除chat 模板",
+          "handler": "handle_delete_chat_template",
+          "aliases": []
+        }
+      ]
+    },
+    "automation": {
+      "name": "automation",
+      "commands": [
+        {
+          "name": "start-monitoring",
+          "description": "啟動monitoring",
+          "handler": "handle_start_monitoring",
+          "aliases": []
+        },
+        {
+          "name": "stop-monitoring",
+          "description": "停止monitoring",
+          "handler": "handle_stop_monitoring",
+          "aliases": []
+        },
+        {
+          "name": "pause-monitoring",
+          "description": "pausemonitoring",
+          "handler": "handle_pause_monitoring",
+          "aliases": []
+        },
+        {
+          "name": "resume-monitoring",
+          "description": "resumemonitoring",
+          "handler": "handle_resume_monitoring",
+          "aliases": []
+        },
+        {
+          "name": "one-click-start",
+          "description": "oneclick start",
+          "handler": "handle_one_click_start",
+          "aliases": []
+        },
+        {
+          "name": "one-click-stop",
+          "description": "oneclick stop",
+          "handler": "handle_one_click_stop",
+          "aliases": []
+        },
+        {
+          "name": "get-system-status",
+          "description": "獲取system 狀態",
+          "handler": "handle_get_system_status",
+          "aliases": []
+        },
+        {
+          "name": "add-group",
+          "description": "添加群組",
+          "handler": "handle_add_group",
+          "aliases": []
+        },
+        {
+          "name": "remove-group",
+          "description": "移除群組",
+          "handler": "handle_remove_group",
+          "aliases": []
+        },
+        {
+          "name": "join-group",
+          "description": "join群組",
+          "handler": "handle_join_group",
+          "aliases": []
+        },
+        {
+          "name": "leave-group",
+          "description": "leave群組",
+          "handler": "handle_leave_group",
+          "aliases": []
+        },
+        {
+          "name": "get-monitored-groups",
+          "description": "獲取monitored 群組",
+          "handler": "handle_get_monitored_groups",
+          "aliases": []
+        },
+        {
+          "name": "search-groups",
+          "description": "search群組",
+          "handler": "handle_search_groups",
+          "aliases": []
+        },
+        {
+          "name": "get-group-members",
+          "description": "獲取群組 members",
+          "handler": "handle_get_group_members",
+          "aliases": []
+        },
+        {
+          "name": "add-keyword-set",
+          "description": "添加關鍵詞 set",
+          "handler": "handle_add_keyword_set",
+          "aliases": []
+        },
+        {
+          "name": "remove-keyword-set",
+          "description": "移除關鍵詞 set",
+          "handler": "handle_remove_keyword_set",
+          "aliases": []
+        },
+        {
+          "name": "get-keyword-sets",
+          "description": "獲取關鍵詞 sets",
+          "handler": "handle_get_keyword_sets",
+          "aliases": []
+        },
+        {
+          "name": "save-keyword-set",
+          "description": "保存關鍵詞 set",
+          "handler": "handle_save_keyword_set",
+          "aliases": []
+        },
+        {
+          "name": "delete-keyword-set",
+          "description": "刪除關鍵詞 set",
+          "handler": "handle_delete_keyword_set",
+          "aliases": []
+        },
+        {
+          "name": "bind-keyword-set",
+          "description": "bind關鍵詞 set",
+          "handler": "handle_bind_keyword_set",
+          "aliases": []
+        },
+        {
+          "name": "unbind-keyword-set",
+          "description": "unbind關鍵詞 set",
+          "handler": "handle_unbind_keyword_set",
+          "aliases": []
+        },
+        {
+          "name": "add-keyword",
+          "description": "添加關鍵詞",
+          "handler": "handle_add_keyword",
+          "aliases": []
+        },
+        {
+          "name": "remove-keyword",
+          "description": "移除關鍵詞",
+          "handler": "handle_remove_keyword",
+          "aliases": []
+        },
+        {
+          "name": "get-trigger-rules",
+          "description": "獲取trigger 規則",
+          "handler": "handle_get_trigger_rules",
+          "aliases": []
+        },
+        {
+          "name": "save-trigger-rule",
+          "description": "保存trigger 規則",
+          "handler": "handle_save_trigger_rule",
+          "aliases": []
+        },
+        {
+          "name": "delete-trigger-rule",
+          "description": "刪除trigger 規則",
+          "handler": "handle_delete_trigger_rule",
+          "aliases": []
+        },
+        {
+          "name": "toggle-trigger-rule",
+          "description": "切換trigger 規則",
+          "handler": "handle_toggle_trigger_rule",
+          "aliases": []
+        },
+        {
+          "name": "test-trigger-rule",
+          "description": "測試trigger 規則",
+          "handler": "handle_test_trigger_rule",
+          "aliases": []
+        },
+        {
+          "name": "add-campaign",
+          "description": "添加活動",
+          "handler": "handle_add_campaign",
+          "aliases": []
+        },
+        {
+          "name": "remove-campaign",
+          "description": "移除活動",
+          "handler": "handle_remove_campaign",
+          "aliases": []
+        },
+        {
+          "name": "start-campaign",
+          "description": "啟動活動",
+          "handler": "handle_start_campaign",
+          "aliases": []
+        },
+        {
+          "name": "stop-campaign",
+          "description": "停止活動",
+          "handler": "handle_stop_campaign",
+          "aliases": []
+        },
+        {
+          "name": "get-campaigns",
+          "description": "獲取活動",
+          "handler": "handle_get_campaigns",
+          "aliases": []
+        },
+        {
+          "name": "get-campaign-stats",
+          "description": "獲取活動 stats",
+          "handler": "handle_get_campaign_stats",
+          "aliases": []
+        }
+      ]
+    },
+    "ai": {
+      "name": "ai",
+      "commands": [
+        {
+          "name": "ai-generate-response",
+          "description": "aigenerate response",
+          "handler": "handle_ai_generate_response",
+          "aliases": []
+        },
+        {
+          "name": "ai-generate-message",
+          "description": "aigenerate 消息",
+          "handler": "handle_ai_generate_message",
+          "aliases": []
+        },
+        {
+          "name": "ai-generate-group-names",
+          "description": "aigenerate 群組 names",
+          "handler": "handle_ai_generate_group_names",
+          "aliases": []
+        },
+        {
+          "name": "ai-generate-welcome",
+          "description": "aigenerate welcome",
+          "handler": "handle_ai_generate_welcome",
+          "aliases": []
+        },
+        {
+          "name": "ai-analyze-conversation",
+          "description": "aianalyze conversation",
+          "handler": "handle_ai_analyze_conversation",
+          "aliases": []
+        },
+        {
+          "name": "ai-suggest-reply",
+          "description": "aisuggest reply",
+          "handler": "handle_ai_suggest_reply",
+          "aliases": []
+        },
+        {
+          "name": "get-ai-settings",
+          "description": "獲取AI 設置",
+          "handler": "handle_get_ai_settings",
+          "aliases": []
+        },
+        {
+          "name": "save-ai-settings",
+          "description": "保存AI 設置",
+          "handler": "handle_save_ai_settings",
+          "aliases": []
+        },
+        {
+          "name": "test-ai-connection",
+          "description": "測試AI connection",
+          "handler": "handle_test_ai_connection",
+          "aliases": []
+        },
+        {
+          "name": "get-ai-models",
+          "description": "獲取AI models",
+          "handler": "handle_get_ai_models",
+          "aliases": []
+        },
+        {
+          "name": "get-ai-usage",
+          "description": "獲取AI usage",
+          "handler": "handle_get_ai_usage",
+          "aliases": []
+        },
+        {
+          "name": "learn-from-history",
+          "description": "learnfrom history",
+          "handler": "handle_learn_from_history",
+          "aliases": []
+        },
+        {
+          "name": "get-knowledge-stats",
+          "description": "獲取knowledge stats",
+          "handler": "handle_get_knowledge_stats",
+          "aliases": []
+        },
+        {
+          "name": "search-knowledge",
+          "description": "searchknowledge",
+          "handler": "handle_search_knowledge",
+          "aliases": []
+        },
+        {
+          "name": "add-knowledge",
+          "description": "添加knowledge",
+          "handler": "handle_add_knowledge",
+          "aliases": []
+        },
+        {
+          "name": "remove-knowledge",
+          "description": "移除knowledge",
+          "handler": "handle_remove_knowledge",
+          "aliases": []
+        },
+        {
+          "name": "clear-knowledge",
+          "description": "clearknowledge",
+          "handler": "handle_clear_knowledge",
+          "aliases": []
+        },
+        {
+          "name": "rag-search",
+          "description": "ragsearch",
+          "handler": "handle_rag_search",
+          "aliases": []
+        },
+        {
+          "name": "rag-add-document",
+          "description": "ragadd document",
+          "handler": "handle_rag_add_document",
+          "aliases": []
+        },
+        {
+          "name": "rag-get-status",
+          "description": "ragget 狀態",
+          "handler": "handle_rag_get_status",
+          "aliases": []
+        },
+        {
+          "name": "ai-memory-get",
+          "description": "aimemory get",
+          "handler": "handle_ai_memory_get",
+          "aliases": []
+        },
+        {
+          "name": "ai-memory-save",
+          "description": "aimemory save",
+          "handler": "handle_ai_memory_save",
+          "aliases": []
+        },
+        {
+          "name": "ai-memory-clear",
+          "description": "aimemory clear",
+          "handler": "handle_ai_memory_clear",
+          "aliases": []
+        },
+        {
+          "name": "ai-get-strategies",
+          "description": "aiget strategies",
+          "handler": "handle_ai_get_strategies",
+          "aliases": []
+        },
+        {
+          "name": "ai-save-strategy",
+          "description": "aisave strategy",
+          "handler": "handle_ai_save_strategy",
+          "aliases": []
+        },
+        {
+          "name": "ai-apply-strategy",
+          "description": "aiapply strategy",
+          "handler": "handle_ai_apply_strategy",
+          "aliases": []
+        }
+      ]
+    },
+    "contacts": {
+      "name": "contacts",
+      "commands": [
+        {
+          "name": "get-leads",
+          "description": "獲取線索",
+          "handler": "handle_get_leads",
+          "aliases": []
+        },
+        {
+          "name": "add-lead",
+          "description": "添加線索",
+          "handler": "handle_add_lead",
+          "aliases": []
+        },
+        {
+          "name": "update-lead",
+          "description": "更新線索",
+          "handler": "handle_update_lead",
+          "aliases": []
+        },
+        {
+          "name": "delete-lead",
+          "description": "刪除線索",
+          "handler": "handle_delete_lead",
+          "aliases": []
+        },
+        {
+          "name": "get-lead-details",
+          "description": "獲取線索 details",
+          "handler": "handle_get_lead_details",
+          "aliases": []
+        },
+        {
+          "name": "update-lead-stage",
+          "description": "更新線索 stage",
+          "handler": "handle_update_lead_stage",
+          "aliases": []
+        },
+        {
+          "name": "assign-lead",
+          "description": "assign線索",
+          "handler": "handle_assign_lead",
+          "aliases": []
+        },
+        {
+          "name": "get-tracked-users",
+          "description": "獲取tracked 用戶",
+          "handler": "handle_get_tracked_users",
+          "aliases": []
+        },
+        {
+          "name": "track-user",
+          "description": "track用戶",
+          "handler": "handle_track_user",
+          "aliases": []
+        },
+        {
+          "name": "untrack-user",
+          "description": "untrack用戶",
+          "handler": "handle_untrack_user",
+          "aliases": []
+        },
+        {
+          "name": "get-user-activity",
+          "description": "獲取用戶 activity",
+          "handler": "handle_get_user_activity",
+          "aliases": []
+        },
+        {
+          "name": "get-collected-users",
+          "description": "獲取collected 用戶",
+          "handler": "handle_get_collected_users",
+          "aliases": []
+        },
+        {
+          "name": "export-collected-users",
+          "description": "exportcollected 用戶",
+          "handler": "handle_export_collected_users",
+          "aliases": []
+        },
+        {
+          "name": "blacklist-user",
+          "description": "blacklist用戶",
+          "handler": "handle_blacklist_user",
+          "aliases": []
+        },
+        {
+          "name": "extract-members",
+          "description": "extractmembers",
+          "handler": "handle_extract_members",
+          "aliases": []
+        },
+        {
+          "name": "get-extraction-status",
+          "description": "獲取extraction 狀態",
+          "handler": "handle_get_extraction_status",
+          "aliases": []
+        },
+        {
+          "name": "cancel-extraction",
+          "description": "取消extraction",
+          "handler": "handle_cancel_extraction",
+          "aliases": []
+        },
+        {
+          "name": "get-funnel-stats",
+          "description": "獲取funnel stats",
+          "handler": "handle_get_funnel_stats",
+          "aliases": []
+        },
+        {
+          "name": "update-funnel-stage",
+          "description": "更新funnel stage",
+          "handler": "handle_update_funnel_stage",
+          "aliases": []
+        },
+        {
+          "name": "get-funnel-users",
+          "description": "獲取funnel 用戶",
+          "handler": "handle_get_funnel_users",
+          "aliases": []
+        }
+      ]
+    },
+    "system": {
+      "name": "system",
+      "commands": [
+        {
+          "name": "get-initial-state",
+          "description": "獲取initial state",
+          "handler": "handle_get_initial_state",
+          "aliases": []
+        },
+        {
+          "name": "graceful-shutdown",
+          "description": "gracefulshutdown",
+          "handler": "handle_graceful_shutdown",
+          "aliases": []
+        },
+        {
+          "name": "get-settings",
+          "description": "獲取設置",
+          "handler": "handle_get_settings",
+          "aliases": []
+        },
+        {
+          "name": "save-settings",
+          "description": "保存設置",
+          "handler": "handle_save_settings",
+          "aliases": []
+        },
+        {
+          "name": "reset-settings",
+          "description": "reset設置",
+          "handler": "handle_reset_settings",
+          "aliases": []
+        },
+        {
+          "name": "get-logs",
+          "description": "獲取日誌",
+          "handler": "handle_get_logs",
+          "aliases": []
+        },
+        {
+          "name": "clear-logs",
+          "description": "clear日誌",
+          "handler": "handle_clear_logs",
+          "aliases": []
+        },
+        {
+          "name": "export-logs",
+          "description": "export日誌",
+          "handler": "handle_export_logs",
+          "aliases": []
+        },
+        {
+          "name": "get-performance",
+          "description": "獲取performance",
+          "handler": "handle_get_performance",
+          "aliases": []
+        },
+        {
+          "name": "get-system-info",
+          "description": "獲取system info",
+          "handler": "handle_get_system_info",
+          "aliases": []
+        },
+        {
+          "name": "backup-database",
+          "description": "backupdatabase",
+          "handler": "handle_backup_database",
+          "aliases": []
+        },
+        {
+          "name": "restore-database",
+          "description": "restoredatabase",
+          "handler": "handle_restore_database",
+          "aliases": []
+        },
+        {
+          "name": "get-backup-status",
+          "description": "獲取backup 狀態",
+          "handler": "handle_get_backup_status",
+          "aliases": []
+        },
+        {
+          "name": "run-migrations",
+          "description": "runmigrations",
+          "handler": "handle_run_migrations",
+          "aliases": []
+        },
+        {
+          "name": "get-migration-status",
+          "description": "獲取migration 狀態",
+          "handler": "handle_get_migration_status",
+          "aliases": []
+        },
+        {
+          "name": "get-alerts",
+          "description": "獲取alerts",
+          "handler": "handle_get_alerts",
+          "aliases": []
+        },
+        {
+          "name": "dismiss-alert",
+          "description": "dismissalert",
+          "handler": "handle_dismiss_alert",
+          "aliases": []
+        },
+        {
+          "name": "clear-alerts",
+          "description": "clearalerts",
+          "handler": "handle_clear_alerts",
+          "aliases": []
+        },
+        {
+          "name": "get-api-credentials",
+          "description": "獲取api credentials",
+          "handler": "handle_get_api_credentials",
+          "aliases": []
+        },
+        {
+          "name": "save-api-credential",
+          "description": "保存api credential",
+          "handler": "handle_save_api_credential",
+          "aliases": []
+        },
+        {
+          "name": "delete-api-credential",
+          "description": "刪除api credential",
+          "handler": "handle_delete_api_credential",
+          "aliases": []
+        },
+        {
+          "name": "test-api-credential",
+          "description": "測試api credential",
+          "handler": "handle_test_api_credential",
+          "aliases": []
+        },
+        {
+          "name": "create-group",
+          "description": "創建群組",
+          "handler": "handle_create_group",
+          "aliases": []
+        },
+        {
+          "name": "get-created-groups",
+          "description": "獲取created 群組",
+          "handler": "handle_get_created_groups",
+          "aliases": []
+        }
+      ]
+    },
+    "multi_role": {
+      "name": "multi_role",
+      "commands": [
+        {
+          "name": "get-roles",
+          "description": "獲取roles",
+          "handler": "handle_get_roles",
+          "aliases": []
+        },
+        {
+          "name": "save-role",
+          "description": "保存role",
+          "handler": "handle_save_role",
+          "aliases": []
+        },
+        {
+          "name": "delete-role",
+          "description": "刪除role",
+          "handler": "handle_delete_role",
+          "aliases": []
+        },
+        {
+          "name": "get-scenarios",
+          "description": "獲取scenarios",
+          "handler": "handle_get_scenarios",
+          "aliases": []
+        },
+        {
+          "name": "save-scenario",
+          "description": "保存scenario",
+          "handler": "handle_save_scenario",
+          "aliases": []
+        },
+        {
+          "name": "delete-scenario",
+          "description": "刪除scenario",
+          "handler": "handle_delete_scenario",
+          "aliases": []
+        },
+        {
+          "name": "get-scripts",
+          "description": "獲取scripts",
+          "handler": "handle_get_scripts",
+          "aliases": []
+        },
+        {
+          "name": "save-script",
+          "description": "保存script",
+          "handler": "handle_save_script",
+          "aliases": []
+        },
+        {
+          "name": "delete-script",
+          "description": "刪除script",
+          "handler": "handle_delete_script",
+          "aliases": []
+        },
+        {
+          "name": "start-collaboration",
+          "description": "啟動collaboration",
+          "handler": "handle_start_collaboration",
+          "aliases": []
+        },
+        {
+          "name": "stop-collaboration",
+          "description": "停止collaboration",
+          "handler": "handle_stop_collaboration",
+          "aliases": []
+        },
+        {
+          "name": "get-collaboration-status",
+          "description": "獲取collaboration 狀態",
+          "handler": "handle_get_collaboration_status",
+          "aliases": []
+        },
+        {
+          "name": "get-swarm-status",
+          "description": "獲取swarm 狀態",
+          "handler": "handle_get_swarm_status",
+          "aliases": []
+        },
+        {
+          "name": "start-swarm",
+          "description": "啟動swarm",
+          "handler": "handle_start_swarm",
+          "aliases": []
+        },
+        {
+          "name": "stop-swarm",
+          "description": "停止swarm",
+          "handler": "handle_stop_swarm",
+          "aliases": []
+        }
+      ]
+    },
+    "ads": {
+      "name": "ads",
+      "commands": [
+        {
+          "name": "get-ad-campaigns",
+          "description": "獲取ad 活動",
+          "handler": "handle_get_ad_campaigns",
+          "aliases": []
+        },
+        {
+          "name": "create-ad-campaign",
+          "description": "創建ad 活動",
+          "handler": "handle_create_ad_campaign",
+          "aliases": []
+        },
+        {
+          "name": "update-ad-campaign",
+          "description": "更新ad 活動",
+          "handler": "handle_update_ad_campaign",
+          "aliases": []
+        },
+        {
+          "name": "delete-ad-campaign",
+          "description": "刪除ad 活動",
+          "handler": "handle_delete_ad_campaign",
+          "aliases": []
+        },
+        {
+          "name": "start-ad-campaign",
+          "description": "啟動ad 活動",
+          "handler": "handle_start_ad_campaign",
+          "aliases": []
+        },
+        {
+          "name": "stop-ad-campaign",
+          "description": "停止ad 活動",
+          "handler": "handle_stop_ad_campaign",
+          "aliases": []
+        },
+        {
+          "name": "get-ad-stats",
+          "description": "獲取ad stats",
+          "handler": "handle_get_ad_stats",
+          "aliases": []
+        },
+        {
+          "name": "get-ad-templates",
+          "description": "獲取ad 模板",
+          "handler": "handle_get_ad_templates",
+          "aliases": []
+        },
+        {
+          "name": "preview-ad",
+          "description": "previewad",
+          "handler": "handle_preview_ad",
+          "aliases": []
+        }
+      ]
+    },
+    "analytics": {
+      "name": "analytics",
+      "commands": [
+        {
+          "name": "get-analytics",
+          "description": "獲取analytics",
+          "handler": "handle_get_analytics",
+          "aliases": []
+        },
+        {
+          "name": "get-dashboard-stats",
+          "description": "獲取dashboard stats",
+          "handler": "handle_get_dashboard_stats",
+          "aliases": []
+        },
+        {
+          "name": "get-conversion-stats",
+          "description": "獲取conversion stats",
+          "handler": "handle_get_conversion_stats",
+          "aliases": []
+        },
+        {
+          "name": "get-message-stats",
+          "description": "獲取消息 stats",
+          "handler": "handle_get_message_stats",
+          "aliases": []
+        },
+        {
+          "name": "get-user-stats",
+          "description": "獲取用戶 stats",
+          "handler": "handle_get_user_stats",
+          "aliases": []
+        },
+        {
+          "name": "get-group-stats",
+          "description": "獲取群組 stats",
+          "handler": "handle_get_group_stats",
+          "aliases": []
+        },
+        {
+          "name": "export-report",
+          "description": "exportreport",
+          "handler": "handle_export_report",
+          "aliases": []
+        },
+        {
+          "name": "schedule-report",
+          "description": "schedulereport",
+          "handler": "handle_schedule_report",
+          "aliases": []
+        }
+      ]
+    }
+  },
+  "total_commands": 193
+}

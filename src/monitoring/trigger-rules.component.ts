@@ -2,7 +2,7 @@
  * 觸發規則管理頁面
  * 定義關鍵詞匹配後的響應動作
  */
-import { Component, signal, computed, inject, OnInit, OnDestroy } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, OnDestroy, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MonitoringStateService } from './monitoring-state.service';
@@ -769,6 +769,16 @@ export class TriggerRulesComponent implements OnInit, OnDestroy {
   isLoading = signal(false);
   filterStatus = 'all';
   
+  // 🔧 FIX: 從 StateService 同步數據
+  private stateEffect = effect(() => {
+    const stateRules = this.stateService.triggerRules();
+    if (stateRules.length > 0 && this.rules().length === 0) {
+      console.log('[TriggerRules] Syncing from StateService:', stateRules.length, 'rules');
+      this.rules.set(stateRules as TriggerRule[]);
+      this.isLoading.set(false);
+    }
+  });
+  
   // 向導狀態
   showWizard = signal(false);
   wizardStep = signal(1);
@@ -818,10 +828,24 @@ export class TriggerRulesComponent implements OnInit, OnDestroy {
   });
   
   private listeners: (() => void)[] = [];
+  // 🔧 FIX: 添加重試計數
+  private retryCount = 0;
+  private readonly MAX_RETRIES = 3;
   
   ngOnInit() {
-    this.stateService.loadAll();
+    // 🔧 FIX: 先設置監聯器，再發送請求，確保不會丟失事件
     this.setupListeners();
+    
+    // 🔧 FIX: 先檢查 StateService 是否已有數據
+    const stateRules = this.stateService.triggerRules();
+    if (stateRules.length > 0) {
+      console.log('[TriggerRules] Using existing StateService data:', stateRules.length, 'rules');
+      this.rules.set(stateRules as TriggerRule[]);
+    } else {
+      // 沒有數據則請求加載
+      this.stateService.loadAll();
+    }
+    
     this.loadRules();
     this.loadAISettings();
   }
@@ -832,9 +856,14 @@ export class TriggerRulesComponent implements OnInit, OnDestroy {
   
   private setupListeners() {
     const cleanup1 = this.ipcService.on('trigger-rules-result', (data: any) => {
+      console.log('[TriggerRules] Received trigger-rules-result:', data);
       this.isLoading.set(false);
+      this.retryCount = 0;  // 重置重試計數
       if (data.success) {
         this.rules.set(data.rules || []);
+      } else if (data.error) {
+        console.error('[TriggerRules] Error loading rules:', data.error);
+        this.toastService.error('加載規則失敗: ' + data.error);
       }
     });
     this.listeners.push(cleanup1);
@@ -880,7 +909,19 @@ export class TriggerRulesComponent implements OnInit, OnDestroy {
   
   loadRules() {
     this.isLoading.set(true);
+    console.log('[TriggerRules] Sending get-trigger-rules request');
     this.ipcService.send('get-trigger-rules', {});
+    
+    // 🔧 FIX: 添加超時重試機制
+    setTimeout(() => {
+      if (this.isLoading() && this.rules().length === 0 && this.retryCount < this.MAX_RETRIES) {
+        this.retryCount++;
+        console.log(`[TriggerRules] Retrying... (${this.retryCount}/${this.MAX_RETRIES})`);
+        this.ipcService.send('get-trigger-rules', {});
+      } else if (this.isLoading()) {
+        this.isLoading.set(false);
+      }
+    }, 3000);
   }
   
   loadAISettings() {
@@ -889,6 +930,7 @@ export class TriggerRulesComponent implements OnInit, OnDestroy {
   }
   
   refreshData() {
+    this.retryCount = 0;  // 🔧 FIX: 刷新時重置重試計數
     this.loadRules();
     this.stateService.loadAll();
   }

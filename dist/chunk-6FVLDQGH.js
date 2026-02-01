@@ -1,7 +1,7 @@
 import {
   guestGuard
-} from "./chunk-MEX7FZNY.js";
-import "./chunk-U7RNLJAQ.js";
+} from "./chunk-N57L3E3X.js";
+import "./chunk-7DUCTZ33.js";
 import "./chunk-6TNMQ6CH.js";
 import "./chunk-7CO55ZOM.js";
 import "./chunk-Y4VZODST.js";
@@ -19,36 +19,36 @@ var AUTH_ROUTES = [
       },
       {
         path: "login",
-        loadComponent: () => import("./chunk-BQOX2M25.js").then((m) => m.LoginComponent),
+        loadComponent: () => import("./chunk-HMSAUVLK.js").then((m) => m.LoginComponent),
         canActivate: [guestGuard],
         title: "Login - TG-Matrix"
       },
       {
         path: "register",
-        loadComponent: () => import("./chunk-NSZY4XAK.js").then((m) => m.RegisterComponent),
+        loadComponent: () => import("./chunk-MOWUUDTD.js").then((m) => m.RegisterComponent),
         canActivate: [guestGuard],
         title: "Register - TG-Matrix"
       },
       {
         path: "forgot-password",
-        loadComponent: () => import("./chunk-QEUO46WJ.js").then((m) => m.ForgotPasswordComponent),
+        loadComponent: () => import("./chunk-KINC6UUY.js").then((m) => m.ForgotPasswordComponent),
         canActivate: [guestGuard],
         title: "Forgot Password - TG-Matrix"
       },
       {
         path: "verify-email",
-        loadComponent: () => import("./chunk-72UIW3OM.js").then((m) => m.VerifyEmailComponent),
+        loadComponent: () => import("./chunk-FRG7A5N4.js").then((m) => m.VerifyEmailComponent),
         title: "Verify Email - TG-Matrix"
       },
       {
         path: "reset-password",
-        loadComponent: () => import("./chunk-X6P5UJQP.js").then((m) => m.ResetPasswordComponent),
+        loadComponent: () => import("./chunk-EICLMRSF.js").then((m) => m.ResetPasswordComponent),
         canActivate: [guestGuard],
         title: "Reset Password - TG-Matrix"
       },
       {
         path: "telegram-callback",
-        loadComponent: () => import("./chunk-H2SPYNUB.js").then((m) => m.TelegramCallbackComponent),
+        loadComponent: () => import("./chunk-IEU5ZTCQ.js").then((m) => m.TelegramCallbackComponent),
         title: "Telegram Login - TG-Matrix"
       }
     ]
@@ -57,4 +57,4 @@ var AUTH_ROUTES = [
 export {
   AUTH_ROUTES
 };
-//# sourceMappingURL=chunk-7QUGDPIB.js.map
+//# sourceMappingURL=chunk-6FVLDQGH.js.map

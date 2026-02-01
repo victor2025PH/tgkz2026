@@ -171,6 +171,11 @@ class HttpApiServer:
         # 🆕 登入 Token WebSocket（實時狀態推送）
         self.app.router.add_get('/ws/login-token/{token}', self.login_token_websocket)
         
+        # 🆕 Phase 4: 設備管理
+        self.app.router.add_get('/api/v1/auth/devices', self.get_user_devices)
+        self.app.router.add_delete('/api/v1/auth/devices/{session_id}', self.revoke_device)
+        self.app.router.add_post('/api/v1/auth/devices/revoke-all', self.revoke_all_devices)
+        
         # 郵箱驗證和密碼重置
         self.app.router.add_post('/api/v1/auth/send-verification', self.send_verification_email)
         self.app.router.add_post('/api/v1/auth/verify-email', self.verify_email)
@@ -1171,6 +1176,136 @@ class HttpApiServer:
                 'error': str(e)
             }, 500)
     
+    # ==================== 🆕 Phase 4: 設備管理 ====================
+    
+    async def get_user_devices(self, request):
+        """
+        獲取用戶所有已登入設備
+        
+        需要認證，返回設備列表
+        """
+        try:
+            from auth.device_session import get_device_session_service
+            
+            # 獲取當前用戶（從 JWT）
+            user = request.get('user')
+            if not user:
+                return self._json_response({
+                    'success': False,
+                    'error': '未認證'
+                }, 401)
+            
+            user_id = user.get('user_id') or user.get('id')
+            
+            # 獲取當前設備 ID（基於請求信息）
+            ip_address = request.headers.get('X-Forwarded-For', request.remote)
+            user_agent = request.headers.get('User-Agent', '')
+            import hashlib
+            current_device_id = hashlib.sha256(f"{ip_address}:{user_agent}".encode()).hexdigest()[:32]
+            
+            # 獲取設備列表
+            service = get_device_session_service()
+            devices = service.get_user_devices(user_id, current_device_id)
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'devices': [d.to_dict() for d in devices],
+                    'total': len(devices),
+                    'max_devices': service.MAX_DEVICES_PER_USER
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Get devices error: {e}")
+            import traceback
+            traceback.print_exc()
+            return self._json_response({
+                'success': False,
+                'error': str(e)
+            }, 500)
+    
+    async def revoke_device(self, request):
+        """
+        撤銷指定設備的登入
+        
+        用戶登出某個設備
+        """
+        try:
+            from auth.device_session import get_device_session_service
+            
+            user = request.get('user')
+            if not user:
+                return self._json_response({
+                    'success': False,
+                    'error': '未認證'
+                }, 401)
+            
+            user_id = user.get('user_id') or user.get('id')
+            session_id = request.match_info['session_id']
+            
+            service = get_device_session_service()
+            success = service.revoke_session(user_id, session_id)
+            
+            if success:
+                return self._json_response({
+                    'success': True,
+                    'message': '設備已登出'
+                })
+            else:
+                return self._json_response({
+                    'success': False,
+                    'error': '設備不存在或已登出'
+                }, 404)
+                
+        except Exception as e:
+            logger.error(f"Revoke device error: {e}")
+            return self._json_response({
+                'success': False,
+                'error': str(e)
+            }, 500)
+    
+    async def revoke_all_devices(self, request):
+        """
+        登出除當前設備外的所有設備
+        
+        安全功能：一鍵登出
+        """
+        try:
+            from auth.device_session import get_device_session_service
+            
+            user = request.get('user')
+            if not user:
+                return self._json_response({
+                    'success': False,
+                    'error': '未認證'
+                }, 401)
+            
+            user_id = user.get('user_id') or user.get('id')
+            
+            # 從請求體獲取當前會話 ID
+            try:
+                body = await request.json()
+                current_session_id = body.get('current_session_id', '')
+            except:
+                current_session_id = ''
+            
+            service = get_device_session_service()
+            count = service.revoke_all_other_sessions(user_id, current_session_id)
+            
+            return self._json_response({
+                'success': True,
+                'message': f'已登出 {count} 個設備',
+                'revoked_count': count
+            })
+                
+        except Exception as e:
+            logger.error(f"Revoke all devices error: {e}")
+            return self._json_response({
+                'success': False,
+                'error': str(e)
+            }, 500)
+    
     async def telegram_webhook(self, request):
         """
         處理 Telegram Bot Webhook 回調
@@ -1289,11 +1424,17 @@ class HttpApiServer:
         
         return ws
     
-    async def _send_login_success(self, ws, token: str, user_data: dict):
-        """發送登入成功消息（含 JWT Token）"""
+    async def _send_login_success(self, ws, token: str, user_data: dict, request=None):
+        """
+        發送登入成功消息（含 JWT Token）
+        
+        🆕 Phase 4: 創建設備會話 + 新設備通知
+        """
         from auth.service import get_auth_service
+        from auth.device_session import get_device_session_service
         
         auth_service = get_auth_service()
+        device_service = get_device_session_service()
         
         # 查找或創建用戶
         user = await auth_service.get_user_by_telegram_id(user_data['telegram_id'])
@@ -1310,6 +1451,29 @@ class HttpApiServer:
             access_token = auth_service.generate_jwt_token(user.id, user.role)
             refresh_token = auth_service.generate_refresh_token(user.id)
             
+            # 🆕 Phase 4: 創建設備會話
+            ip_address = None
+            user_agent = None
+            if hasattr(ws, '_req') and ws._req:
+                ip_address = ws._req.headers.get('X-Forwarded-For', ws._req.remote)
+                user_agent = ws._req.headers.get('User-Agent', '')
+            
+            device_session, is_new_device = device_service.create_session(
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                refresh_token=refresh_token
+            )
+            
+            # 🆕 如果是新設備，發送 Telegram 通知
+            if is_new_device:
+                await self._notify_new_device_login(
+                    user=user,
+                    telegram_id=user_data['telegram_id'],
+                    device_name=device_session.device_name,
+                    ip_address=ip_address
+                )
+            
             await ws.send_json({
                 'type': 'login_success',
                 'event': 'login_confirmed',
@@ -1317,6 +1481,8 @@ class HttpApiServer:
                 'data': {
                     'access_token': access_token,
                     'refresh_token': refresh_token,
+                    'session_id': device_session.id,  # 🆕 返回會話 ID
+                    'is_new_device': is_new_device,    # 🆕 標記新設備
                     'user': {
                         'id': user.id,
                         'username': user.username,
@@ -1335,6 +1501,61 @@ class HttpApiServer:
                 'error': '無法創建用戶',
                 'timestamp': datetime.utcnow().isoformat()
             })
+    
+    async def _notify_new_device_login(
+        self, 
+        user, 
+        telegram_id: str, 
+        device_name: str, 
+        ip_address: str
+    ):
+        """
+        🆕 Phase 4: 新設備登入通知
+        
+        向用戶的 Telegram 發送安全提醒
+        """
+        try:
+            import os
+            import aiohttp
+            
+            bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+            if not bot_token:
+                return
+            
+            from datetime import datetime
+            current_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+            
+            # 構建通知消息
+            message = f"""
+🔔 *新設備登入通知*
+
+您的帳號剛剛在新設備上登入：
+
+📱 設備: {device_name}
+📍 IP: {ip_address[:ip_address.rfind('.')] + '.*' if ip_address and '.' in ip_address else '未知'}
+⏰ 時間: {current_time}
+
+如果這不是您的操作，請立即：
+1. 前往「設置 → 安全 → 設備管理」登出該設備
+2. 更改密碼（如有）
+3. 聯繫客服
+
+_如果這是您本人操作，請忽略此消息_
+"""
+            
+            api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            
+            async with aiohttp.ClientSession() as session:
+                await session.post(api_url, json={
+                    'chat_id': telegram_id,
+                    'text': message,
+                    'parse_mode': 'Markdown'
+                })
+            
+            logger.info(f"New device notification sent to TG user {telegram_id}")
+            
+        except Exception as e:
+            logger.warning(f"Failed to send new device notification: {e}")
     
     # ==================== OAuth 授權重定向 ====================
     

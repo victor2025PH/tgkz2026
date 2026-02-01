@@ -1600,6 +1600,10 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (data.user) {
       localStorage.setItem('tgm_user', JSON.stringify(data.user));
     }
+    // 🆕 Phase 4: 保存會話 ID（用於設備管理）
+    if (data.session_id) {
+      localStorage.setItem('tgm_session_id', data.session_id);
+    }
     
     // 🆕 Phase 3: 顯示成功動畫
     this.successUserName.set(data.user?.display_name || data.user?.username || 'User');

@@ -490,17 +490,21 @@ export class AuthService {
   /**
    * 獲取會話列表
    */
+  /**
+   * 🆕 Phase 4: 獲取用戶所有設備
+   */
   async getSessions(): Promise<any[]> {
     const token = this._accessToken();
     if (!token) return [];
     
     try {
-      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/sessions`, {
+      // 使用新的設備管理 API
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/devices`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
       const result = await response.json();
-      return result.success ? result.data : [];
+      return result.success ? (result.data?.devices || []) : [];
     } catch (e) {
       return [];
     }
@@ -509,12 +513,16 @@ export class AuthService {
   /**
    * 撤銷會話
    */
+  /**
+   * 🆕 Phase 4: 撤銷指定設備會話
+   */
   async revokeSession(sessionId: string): Promise<boolean> {
     const token = this._accessToken();
     if (!token) return false;
     
     try {
-      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/sessions/${sessionId}`, {
+      // 使用新的設備管理 API
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/devices/${sessionId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -523,6 +531,33 @@ export class AuthService {
       return result.success;
     } catch (e) {
       return false;
+    }
+  }
+  
+  /**
+   * 🆕 Phase 4: 登出除當前設備外的所有設備
+   */
+  async revokeAllOtherSessions(): Promise<number> {
+    const token = this._accessToken();
+    if (!token) return 0;
+    
+    try {
+      // 獲取當前會話 ID（如果有保存的話）
+      const currentSessionId = localStorage.getItem('tgm_session_id') || '';
+      
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/devices/revoke-all`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ current_session_id: currentSessionId })
+      });
+      
+      const result = await response.json();
+      return result.success ? (result.revoked_count || 0) : 0;
+    } catch (e) {
+      return 0;
     }
   }
   

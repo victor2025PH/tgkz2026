@@ -223,16 +223,30 @@ class MemberExtractionService:
                 "type": level
             })
     
-    def _emit_progress(self, chat_id: str, current: int, total: int, status: str = "extracting"):
-        """發送提取進度"""
+    def _emit_progress(self, chat_id: str, current: int, total: int, status: str = "extracting", 
+                       start_time: float = None, speed: float = None):
+        """發送提取進度 - 🆕 P3 優化：包含預估時間"""
         if self.event_callback:
-            self.event_callback("extraction-progress", {
+            progress_data = {
                 "chat_id": chat_id,
                 "current": current,
                 "total": total,
                 "percentage": round(current / total * 100, 1) if total > 0 else 0,
                 "status": status
-            })
+            }
+            
+            # 🆕 P3：計算預估剩餘時間
+            if start_time and current > 0:
+                elapsed = time.time() - start_time
+                current_speed = current / elapsed if elapsed > 0 else 0
+                remaining = total - current
+                if current_speed > 0 and remaining > 0:
+                    estimated_seconds = int(remaining / current_speed)
+                    progress_data["estimatedSeconds"] = estimated_seconds
+                    progress_data["speed"] = round(current_speed, 1)
+                    progress_data["elapsedSeconds"] = int(elapsed)
+            
+            self.event_callback("extraction-progress", progress_data)
     
     def _get_available_client(self) -> Tuple[str, Client]:
         """獲取可用客戶端"""
@@ -515,12 +529,13 @@ class MemberExtractionService:
                     
                     batch_count += 1
                     
-                    # 發送進度
+                    # 發送進度 - 🆕 P3：包含預估時間
                     if batch_count % 50 == 0:
                         self._emit_progress(
                             str(chat.id), 
                             batch_count, 
-                            min(result['total_members'], max_members)
+                            min(result['total_members'], max_members),
+                            start_time=start_time
                         )
                     
                     # 批次保存
@@ -1156,6 +1171,44 @@ class MemberExtractionService:
             'by_status': {r['online_status']: r['count'] for r in status_results},
             'by_level': {r['value_level']: r['count'] for r in level_results}
         }
+    
+    # 🆕 P3 優化：帶過濾條件的計數（用於分頁）
+    async def count_members_filtered(
+        self,
+        online_only: bool = False,
+        min_value_level: str = None,
+        source_chat_id: str = None,
+        not_contacted: bool = False
+    ) -> int:
+        """統計符合條件的成員總數"""
+        conditions = []
+        params = []
+        
+        if online_only:
+            conditions.append("online_status IN ('online', 'recently')")
+        
+        if min_value_level:
+            level_order = {'S': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1}
+            min_order = level_order.get(min_value_level, 1)
+            valid_levels = [k for k, v in level_order.items() if v >= min_order]
+            if valid_levels:
+                placeholders = ','.join(['?' for _ in valid_levels])
+                conditions.append(f"value_level IN ({placeholders})")
+                params.extend(valid_levels)
+        
+        if source_chat_id:
+            conditions.append("groups LIKE ?")
+            params.append(f'%{source_chat_id}%')
+        
+        if not_contacted:
+            conditions.append("(contacted = 0 OR contacted IS NULL)")
+        
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        
+        query = f"SELECT COUNT(*) as count FROM extracted_members WHERE {where_clause}"
+        result = await db.fetch_one(query, tuple(params))
+        
+        return result['count'] if result else 0
     
     # ==================== 成員狀態更新 ====================
     

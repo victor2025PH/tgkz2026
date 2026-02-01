@@ -366,4 +366,210 @@ export class AdminService {
       return {};
     }
   }
+  
+  // ==================== 配額監控 ====================
+  
+  async getQuotaOverview(): Promise<any> {
+    try {
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/quota/overview`
+      ).toPromise();
+      return res;
+    } catch (e) {
+      console.error('Get quota overview error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+  
+  async getQuotaRankings(
+    quotaType: string = 'daily_messages',
+    period: string = 'today',
+    limit: number = 20
+  ): Promise<any> {
+    try {
+      const params = new URLSearchParams({
+        type: quotaType,
+        period,
+        limit: String(limit)
+      });
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/quota/rankings?${params}`
+      ).toPromise();
+      return res;
+    } catch (e) {
+      console.error('Get quota rankings error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+  
+  async getQuotaAlerts(alertType?: string, page: number = 1): Promise<any> {
+    try {
+      const params = new URLSearchParams({ page: String(page) });
+      if (alertType) params.set('alert_type', alertType);
+      
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/quota/alerts?${params}`
+      ).toPromise();
+      return res;
+    } catch (e) {
+      console.error('Get quota alerts error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+  
+  async adjustUserQuota(
+    userId: string,
+    quotaType: string,
+    newValue: number,
+    reason?: string
+  ): Promise<any> {
+    try {
+      const res = await this.http.post<any>(
+        `${this.apiUrl}/api/v1/admin/quota/adjust`,
+        { user_id: userId, quota_type: quotaType, new_value: newValue, reason }
+      ).toPromise();
+      return res;
+    } catch (e) {
+      console.error('Adjust user quota error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+  
+  async batchAdjustQuotas(
+    userIds: string[],
+    quotaType: string,
+    newValue: number,
+    reason?: string
+  ): Promise<any> {
+    try {
+      const res = await this.http.post<any>(
+        `${this.apiUrl}/api/v1/admin/quota/batch-adjust`,
+        { user_ids: userIds, quota_type: quotaType, new_value: newValue, reason }
+      ).toPromise();
+      return res;
+    } catch (e) {
+      console.error('Batch adjust quotas error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+  
+  async exportQuotaReport(
+    startDate?: string,
+    endDate?: string,
+    quotaTypes?: string[]
+  ): Promise<any> {
+    try {
+      const params = new URLSearchParams();
+      if (startDate) params.set('start_date', startDate);
+      if (endDate) params.set('end_date', endDate);
+      if (quotaTypes?.length) params.set('types', quotaTypes.join(','));
+      
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/quota/export?${params}`
+      ).toPromise();
+      return res;
+    } catch (e) {
+      console.error('Export quota report error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+  
+  async resetDailyQuotas(): Promise<any> {
+    try {
+      const res = await this.http.post<any>(
+        `${this.apiUrl}/api/v1/admin/quota/reset-daily`,
+        {}
+      ).toPromise();
+      return res;
+    } catch (e) {
+      console.error('Reset daily quotas error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  // ==================== 計費管理 ====================
+
+  async getBillingOverview(): Promise<any> {
+    try {
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/billing/overview`
+      ).toPromise();
+      return res;
+    } catch (e) {
+      console.error('Get billing overview error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  async getAllBills(
+    page: number = 1,
+    pageSize: number = 20,
+    status?: string,
+    type?: string,
+    userId?: string
+  ): Promise<any> {
+    try {
+      let url = `${this.apiUrl}/api/v1/admin/billing/bills?page=${page}&page_size=${pageSize}`;
+      if (status) url += `&status=${status}`;
+      if (type) url += `&type=${type}`;
+      if (userId) url += `&user_id=${userId}`;
+      
+      const res = await this.http.get<any>(url).toPromise();
+      return res;
+    } catch (e) {
+      console.error('Get all bills error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  async processRefund(billId: string, refundAmount: number, reason: string): Promise<any> {
+    try {
+      const res = await this.http.post<any>(
+        `${this.apiUrl}/api/v1/admin/billing/refund`,
+        { bill_id: billId, refund_amount: refundAmount, reason }
+      ).toPromise();
+      return res;
+    } catch (e) {
+      console.error('Process refund error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  async freezeUserQuota(userId: string, reason: string, durationHours: number = 24): Promise<any> {
+    try {
+      const res = await this.http.post<any>(
+        `${this.apiUrl}/api/v1/admin/billing/freeze`,
+        { user_id: userId, reason, duration_hours: durationHours }
+      ).toPromise();
+      return res;
+    } catch (e) {
+      console.error('Freeze user quota error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  async unfreezeUserQuota(userId: string): Promise<any> {
+    try {
+      const res = await this.http.post<any>(
+        `${this.apiUrl}/api/v1/admin/billing/unfreeze`,
+        { user_id: userId }
+      ).toPromise();
+      return res;
+    } catch (e) {
+      console.error('Unfreeze user quota error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  async getFrozenUsers(): Promise<any> {
+    try {
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/billing/frozen-users`
+      ).toPromise();
+      return res;
+    } catch (e) {
+      console.error('Get frozen users error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
 }

@@ -8,11 +8,12 @@
  * 4. 年付優惠
  */
 
-import { Component, inject, signal, computed, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { I18nService } from '../i18n.service';
+import { QuotaService, MembershipLevel } from '../services/quota.service';
 
 interface PricingPlan {
   id: string;
@@ -23,6 +24,8 @@ interface PricingPlan {
   maxAccounts: number;
   highlighted: boolean;
   badge?: string;
+  icon?: string;
+  quotas?: Record<string, number>;
 }
 
 @Component({
@@ -143,7 +146,7 @@ interface PricingPlan {
             </tr>
           </thead>
           <tbody>
-            @for (feature of featuresList; track feature.key) {
+            @for (feature of featuresList(); track feature.key) {
               <tr>
                 <td>{{ feature.name }}</td>
                 @for (plan of plans; track plan.id) {
@@ -530,107 +533,235 @@ interface PricingPlan {
     }
   `]
 })
-export class UpgradeViewComponent {
+export class UpgradeViewComponent implements OnInit {
   private authService = inject(AuthService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private i18n = inject(I18nService);
+  private quotaService = inject(QuotaService);
   
   // 狀態
   billingCycle = signal<'monthly' | 'yearly'>('monthly');
   isUpgrading = signal(false);
   selectedPlan = signal<string | null>(null);
+  isLoading = signal(true);
   
   // 從路由參數獲取
   requiredTier = signal<string | null>(null);
   
   currentTier = this.authService.subscriptionTier;
   
-  // 方案配置
-  plans: PricingPlan[] = [
+  // 動態方案配置
+  private _plans = signal<PricingPlan[]>([]);
+  
+  // 計算屬性：顯示的方案列表
+  plans = computed(() => {
+    const dynamicPlans = this._plans();
+    return dynamicPlans.length > 0 ? dynamicPlans : this.defaultPlans;
+  });
+  
+  // 默認方案（回退）
+  private defaultPlans: PricingPlan[] = [
     {
-      id: 'free',
-      name: '免費版',
+      id: 'bronze',
+      name: '青銅戰士',
       price: 0,
       yearlyPrice: 0,
       maxAccounts: 3,
+      icon: '🥉',
       features: [
         '3 個 Telegram 帳號',
-        '基礎監控功能',
-        '基礎 AI 回覆',
-        '社區支持'
+        '每日 50 條消息',
+        '每日 10 次 AI 調用',
+        '基礎功能'
       ],
       highlighted: false
     },
     {
-      id: 'basic',
-      name: '基礎版',
-      price: 29,
-      yearlyPrice: 23,
-      maxAccounts: 10,
-      features: [
-        '10 個 Telegram 帳號',
-        '完整監控功能',
-        '模板庫訪問',
-        '郵件支持',
-        '數據導出'
-      ],
-      highlighted: false
-    },
-    {
-      id: 'pro',
-      name: '專業版',
+      id: 'silver',
+      name: '白銀衛士',
       price: 99,
       yearlyPrice: 79,
-      maxAccounts: 50,
+      maxAccounts: 10,
+      icon: '🥈',
       features: [
-        '50 個 Telegram 帳號',
-        '高級 AI 引擎',
-        '多角色協作',
-        'API 訪問',
-        '優先支持',
-        '團隊協作'
+        '10 個 Telegram 帳號',
+        '每日 200 條消息',
+        '每日 50 次 AI 調用',
+        '模板庫訪問'
+      ],
+      highlighted: false
+    },
+    {
+      id: 'gold',
+      name: '黃金獵手',
+      price: 299,
+      yearlyPrice: 239,
+      maxAccounts: 30,
+      icon: '🥇',
+      features: [
+        '30 個 Telegram 帳號',
+        '每日 500 條消息',
+        '每日 100 次 AI 調用',
+        '多角色協作'
       ],
       highlighted: true,
       badge: '最受歡迎'
     },
     {
-      id: 'enterprise',
-      name: '企業版',
+      id: 'diamond',
+      name: '鑽石王者',
+      price: 599,
+      yearlyPrice: 479,
+      maxAccounts: 100,
+      icon: '💎',
+      features: [
+        '100 個 Telegram 帳號',
+        '每日 2000 條消息',
+        '每日 500 次 AI 調用',
+        'API 訪問'
+      ],
+      highlighted: false
+    },
+    {
+      id: 'star',
+      name: '星耀傳奇',
+      price: 999,
+      yearlyPrice: 799,
+      maxAccounts: 500,
+      icon: '⭐',
+      features: [
+        '500 個 Telegram 帳號',
+        '每日 10000 條消息',
+        '每日 2000 次 AI 調用',
+        '優先支持'
+      ],
+      highlighted: false
+    },
+    {
+      id: 'king',
+      name: '王者至尊',
       price: -1,
       yearlyPrice: -1,
       maxAccounts: 999,
+      icon: '👑',
       features: [
         '無限 Telegram 帳號',
-        '定制 AI 模型',
-        '專屬客戶經理',
-        'SLA 保障',
-        '私有部署選項',
-        '培訓服務'
+        '無限消息',
+        '無限 AI 調用',
+        '專屬服務'
       ],
       highlighted: false
     }
   ];
-  
-  // 功能對比列表
-  featuresList = [
-    { key: 'accounts', name: '帳號數量', values: { free: '3', basic: '10', pro: '50', enterprise: '無限' } },
-    { key: 'monitoring', name: '群組監控', values: { free: '基礎', basic: '完整', pro: '完整', enterprise: '完整' } },
-    { key: 'ai', name: 'AI 回覆', values: { free: '基礎', basic: '標準', pro: '高級', enterprise: '定制' } },
-    { key: 'templates', name: '模板庫', values: { free: false, basic: true, pro: true, enterprise: true } },
-    { key: 'multiRole', name: '多角色協作', values: { free: false, basic: false, pro: true, enterprise: true } },
-    { key: 'api', name: 'API 訪問', values: { free: false, basic: false, pro: true, enterprise: true } },
-    { key: 'team', name: '團隊協作', values: { free: false, basic: false, pro: true, enterprise: true } },
-    { key: 'support', name: '支持', values: { free: '社區', basic: '郵件', pro: '優先', enterprise: '專屬' } }
-  ];
-  
-  constructor() {
+
+  async ngOnInit() {
     // 從路由參數獲取需要的方案
     const required = this.route.snapshot.queryParams['required'];
     if (required) {
       this.requiredTier.set(required);
     }
+    
+    // 加載動態方案數據
+    await this.loadMembershipLevels();
   }
+  
+  private async loadMembershipLevels() {
+    this.isLoading.set(true);
+    try {
+      await this.quotaService.loadMembershipLevels();
+      const levels = this.quotaService.levels();
+      
+      if (levels.length > 0) {
+        const plans: PricingPlan[] = levels.map((level, index) => ({
+          id: level.level,
+          name: level.name,
+          price: level.prices?.month || 0,
+          yearlyPrice: Math.floor((level.prices?.month || 0) * 0.8),
+          maxAccounts: level.quotas?.tg_accounts || 0,
+          icon: level.icon,
+          features: this.generateFeatures(level),
+          highlighted: level.level === 'gold',
+          badge: level.level === 'gold' ? '最受歡迎' : undefined,
+          quotas: level.quotas
+        }));
+        
+        this._plans.set(plans);
+      }
+    } catch (error) {
+      console.error('Failed to load membership levels:', error);
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+  
+  private generateFeatures(level: MembershipLevel): string[] {
+    const features: string[] = [];
+    const quotas = level.quotas || {};
+    
+    if (quotas.tg_accounts) {
+      features.push(quotas.tg_accounts === -1 ? '無限 Telegram 帳號' : `${quotas.tg_accounts} 個 Telegram 帳號`);
+    }
+    if (quotas.daily_messages) {
+      features.push(quotas.daily_messages === -1 ? '無限消息' : `每日 ${quotas.daily_messages} 條消息`);
+    }
+    if (quotas.ai_calls) {
+      features.push(quotas.ai_calls === -1 ? '無限 AI 調用' : `每日 ${quotas.ai_calls} 次 AI 調用`);
+    }
+    
+    // 添加功能特性
+    if (level.features?.length) {
+      features.push(...level.features.slice(0, 3));
+    }
+    
+    return features;
+  }
+  
+  // 功能對比列表（動態生成）
+  featuresList = computed(() => {
+    const levels = this.plans();
+    const levelIds = levels.map(l => l.id);
+    
+    return [
+      { 
+        key: 'accounts', 
+        name: '帳號數量', 
+        values: Object.fromEntries(levels.map(l => [l.id, l.maxAccounts === 999 ? '無限' : l.maxAccounts.toString()]))
+      },
+      { 
+        key: 'messages', 
+        name: '每日消息', 
+        values: Object.fromEntries(levels.map(l => {
+          const quota = l.quotas?.daily_messages;
+          return [l.id, quota === -1 ? '無限' : quota?.toString() || '-'];
+        }))
+      },
+      { 
+        key: 'ai', 
+        name: 'AI 調用', 
+        values: Object.fromEntries(levels.map(l => {
+          const quota = l.quotas?.ai_calls;
+          return [l.id, quota === -1 ? '無限' : quota?.toString() || '-'];
+        }))
+      },
+      { 
+        key: 'groups', 
+        name: '群組數量', 
+        values: Object.fromEntries(levels.map(l => {
+          const quota = l.quotas?.groups;
+          return [l.id, quota === -1 ? '無限' : quota?.toString() || '-'];
+        }))
+      },
+      { 
+        key: 'support', 
+        name: '技術支持', 
+        values: Object.fromEntries(levels.map((l, i) => {
+          const supports = ['社區', '郵件', '優先', '專屬', 'VIP', '至尊'];
+          return [l.id, supports[Math.min(i, supports.length - 1)]];
+        }))
+      }
+    ];
+  });
   
   t(key: string): string {
     return this.i18n.t(key);

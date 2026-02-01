@@ -201,16 +201,59 @@ async def usage_tracking_middleware(request, handler):
 
 # ==================== 配額檢查中間件 ====================
 
-# 需要配額檢查的路徑
+# 需要配額檢查的路徑配置
+# 格式: {路徑前綴: (配額類型, 消耗數量, 是否自動消耗)}
 QUOTA_CHECK_PATHS = {
-    '/api/v1/accounts': 'accounts',
-    '/api/v1/ai/': 'api_calls',
-    '/api/v1/messages/send': 'api_calls',
+    # 帳號管理
+    '/api/v1/accounts': ('tg_accounts', 1, False),  # 添加帳號
+    
+    # 消息發送
+    '/api/v1/messages/send': ('daily_messages', 1, True),
+    '/api/v1/messages/batch': ('daily_messages', 10, True),  # 批量消息
+    '/api/v1/command': ('daily_messages', 1, False),  # 命令端點（部分命令需要）
+    
+    # AI 調用
+    '/api/v1/ai/': ('ai_calls', 1, True),
+    '/api/v1/ai/chat': ('ai_calls', 1, True),
+    '/api/v1/ai/analyze': ('ai_calls', 2, True),  # 分析消耗更多
+    '/api/v1/ai/generate': ('ai_calls', 3, True),  # 生成消耗更多
+    
+    # 群組管理
+    '/api/v1/groups': ('groups', 1, False),
+    
+    # 關鍵詞
+    '/api/v1/keywords': ('keyword_sets', 1, False),
+    
+    # 自動回覆
+    '/api/v1/automation/rules': ('auto_reply_rules', 1, False),
+    
+    # 定時任務
+    '/api/v1/scheduled': ('scheduled_tasks', 1, False),
+}
+
+# 需要消息配額檢查的命令
+MESSAGE_QUOTA_COMMANDS = {
+    'send-private-message', 'send-group-message', 'send-batch-messages',
+    'reply-message', 'forward-message', 'broadcast-message'
+}
+
+# 需要 AI 配額檢查的命令
+AI_QUOTA_COMMANDS = {
+    'ai-analyze', 'ai-generate', 'ai-chat', 'smart-reply',
+    'generate-marketing-content', 'analyze-leads'
 }
 
 @web.middleware
 async def quota_check_middleware(request, handler):
-    """配額檢查"""
+    """
+    配額檢查中間件（增強版）
+    
+    功能：
+    1. 路徑級配額檢查
+    2. 命令級配額檢查
+    3. 自動配額消耗
+    4. 詳細錯誤響應（含升級建議）
+    """
     path = request.path
     method = request.method
     
@@ -222,37 +265,92 @@ async def quota_check_middleware(request, handler):
     if not tenant or not tenant.user_id:
         return await handler(request)
     
-    # Electron 模式跳過
-    if tenant.is_electron_mode:
+    # Electron 模式跳過配額檢查
+    if getattr(tenant, 'is_electron_mode', False) or \
+       os.environ.get('ELECTRON_MODE', 'false').lower() == 'true':
         return await handler(request)
     
-    # 檢查是否需要配額檢查
+    # 確定配額類型和數量
     quota_type = None
-    for check_path, q_type in QUOTA_CHECK_PATHS.items():
+    quota_amount = 1
+    auto_consume = False
+    
+    # 1. 路徑匹配
+    for check_path, config in QUOTA_CHECK_PATHS.items():
         if path.startswith(check_path):
-            quota_type = q_type
+            quota_type, quota_amount, auto_consume = config
             break
+    
+    # 2. 命令端點特殊處理
+    if path.endswith('/command') and not quota_type:
+        try:
+            # 嘗試讀取請求體獲取命令名
+            body = await request.json()
+            command = body.get('command', '')
+            
+            if command in MESSAGE_QUOTA_COMMANDS:
+                quota_type = 'daily_messages'
+                auto_consume = True
+            elif command in AI_QUOTA_COMMANDS:
+                quota_type = 'ai_calls'
+                auto_consume = True
+            
+            # 恢復請求體供後續處理
+            request['_body_cache'] = body
+        except:
+            pass
     
     if not quota_type:
         return await handler(request)
     
     # 執行配額檢查
     try:
-        from core.usage_tracker import get_usage_tracker
-        tracker = get_usage_tracker()
-        result = await tracker.check_quota(quota_type, tenant.user_id)
+        from core.quota_service import get_quota_service, QuotaExceededException
+        service = get_quota_service()
+        result = service.check_quota(tenant.user_id, quota_type, quota_amount)
         
-        if not result['allowed']:
+        # 將檢查結果附加到請求
+        request['quota_check'] = result
+        
+        if not result.allowed:
+            # 配額不足，返回詳細錯誤
             return web.json_response({
                 'success': False,
-                'error': f'{quota_type} 配額已用盡',
+                'error': result.message or f'{quota_type} 配額已用盡',
                 'code': 'QUOTA_EXCEEDED',
-                'quota': result
+                'quota_type': quota_type,
+                'quota': {
+                    'limit': result.limit,
+                    'used': result.used,
+                    'remaining': result.remaining,
+                    'percentage': result.percentage,
+                    'reset_at': result.reset_at.isoformat() if result.reset_at else None
+                },
+                'upgrade_suggestion': result.upgrade_suggestion,
+                'tier': tenant.subscription_tier
             }, status=429)
+        
+        # 執行請求
+        response = await handler(request)
+        
+        # 如果請求成功且需要自動消耗配額
+        if response.status < 400 and auto_consume:
+            try:
+                service.consume_quota(
+                    tenant.user_id, 
+                    quota_type, 
+                    quota_amount,
+                    context=f"path:{path}"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to consume quota: {e}")
+        
+        return response
+        
     except Exception as e:
         logger.warning(f"Quota check error: {e}")
-    
-    return await handler(request)
+        # 配額檢查失敗不應阻止請求，降級處理
+        return await handler(request)
 
 
 # ==================== 錯誤處理中間件 ====================
@@ -406,3 +504,125 @@ def require_feature(feature: str):
         return wrapper
     
     return decorator
+
+
+def require_quota(quota_type: str, amount: int = 1, auto_consume: bool = True):
+    """
+    裝飾器：要求配額
+    
+    Usage:
+        @require_quota('daily_messages', 1)
+        async def send_message(request):
+            ...
+        
+        @require_quota('ai_calls', 2, auto_consume=False)
+        async def ai_analyze(request):
+            # 手動控制消耗
+            ...
+    
+    Args:
+        quota_type: 配額類型
+        amount: 消耗數量
+        auto_consume: 是否在成功後自動消耗配額
+    """
+    def decorator(fn):
+        @wraps(fn)
+        async def wrapper(request, *args, **kwargs):
+            tenant = request.get('tenant')
+            
+            # Electron 模式跳過
+            if os.environ.get('ELECTRON_MODE', 'false').lower() == 'true':
+                return await fn(request, *args, **kwargs)
+            
+            if not tenant or not tenant.user_id:
+                return web.json_response({
+                    'success': False,
+                    'error': '需要登入',
+                    'code': 'UNAUTHORIZED'
+                }, status=401)
+            
+            # 檢查配額
+            try:
+                from core.quota_service import get_quota_service
+                service = get_quota_service()
+                result = service.check_quota(tenant.user_id, quota_type, amount)
+                
+                if not result.allowed:
+                    return web.json_response({
+                        'success': False,
+                        'error': result.message or f'{quota_type} 配額不足',
+                        'code': 'QUOTA_EXCEEDED',
+                        'quota_type': quota_type,
+                        'quota': result.to_dict(),
+                        'upgrade_suggestion': result.upgrade_suggestion
+                    }, status=429)
+                
+                # 執行函數
+                response = await fn(request, *args, **kwargs)
+                
+                # 自動消耗配額
+                if auto_consume and getattr(response, 'status', 200) < 400:
+                    service.consume_quota(
+                        tenant.user_id, 
+                        quota_type, 
+                        amount,
+                        context=f"handler:{fn.__name__}"
+                    )
+                
+                return response
+                
+            except Exception as e:
+                logger.warning(f"Quota check failed: {e}")
+                # 配額檢查失敗不阻止請求
+                return await fn(request, *args, **kwargs)
+        
+        return wrapper
+    
+    return decorator
+
+
+# ==================== 配額消耗輔助函數 ====================
+
+async def consume_quota_for_user(
+    user_id: str, 
+    quota_type: str, 
+    amount: int = 1,
+    context: str = None
+) -> bool:
+    """
+    為用戶消耗配額
+    
+    用於在業務邏輯中手動消耗配額
+    
+    Returns:
+        是否成功消耗
+    """
+    try:
+        from core.quota_service import get_quota_service
+        service = get_quota_service()
+        success, result = service.consume_quota(user_id, quota_type, amount, context)
+        return success
+    except Exception as e:
+        logger.warning(f"Failed to consume quota: {e}")
+        return True  # 失敗時不阻止業務
+
+
+async def check_quota_for_user(
+    user_id: str, 
+    quota_type: str, 
+    amount: int = 1
+) -> Dict[str, Any]:
+    """
+    檢查用戶配額
+    
+    Returns:
+        配額檢查結果
+    """
+    try:
+        from core.quota_service import get_quota_service
+        service = get_quota_service()
+        result = service.check_quota(user_id, quota_type, amount)
+        return result.to_dict()
+    except Exception as e:
+        logger.warning(f"Failed to check quota: {e}")
+        return {'allowed': True, 'unlimited': True}

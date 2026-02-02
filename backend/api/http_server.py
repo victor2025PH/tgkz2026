@@ -1876,7 +1876,7 @@ class HttpApiServer:
                 except Exception as geo_err:
                     logger.debug(f"Geo security check error: {geo_err}")
             
-            await ws.send_json({
+            login_payload = {
                 'type': 'login_success',
                 'event': 'login_confirmed',
                 'status': 'confirmed',
@@ -1896,7 +1896,10 @@ class HttpApiServer:
                     }
                 },
                 'timestamp': datetime.utcnow().isoformat()
-            })
+            }
+            logger.info(f"[LoginSuccess] Sending to WS, user={user.id}, token_len={len(access_token)}")
+            await ws.send_json(login_payload)
+            logger.info(f"[LoginSuccess] ✅ Message sent successfully to WS")
         else:
             await ws.send_json({
                 'type': 'error',
@@ -1921,9 +1924,13 @@ class HttpApiServer:
         
         for ws in subscribers:
             try:
+                logger.info(f"[LoginSuccess] Processing subscriber, ws_state={ws.closed if hasattr(ws, 'closed') else 'unknown'}")
                 await self._send_login_success(ws, token, user_data)
+                logger.info(f"[LoginSuccess] ✅ Subscriber processed successfully")
             except Exception as e:
-                logger.warning(f"Failed to send login success to subscriber: {e}")
+                logger.error(f"[LoginSuccess] ❌ Failed to send login success: {e}")
+                import traceback
+                traceback.print_exc()
     
     async def _notify_new_device_login(
         self, 
@@ -5863,13 +5870,20 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
     
     async def get_initial_state(self, request):
         """獲取初始狀態"""
+        # 🔍 調試：檢查 Authorization header
+        auth_header = request.headers.get('Authorization', '')
+        logger.info(f"[Debug] get_initial_state - Auth header: {auth_header[:50] if auth_header else 'MISSING'}...")
+        
         result = await self._execute_command('get-initial-state')
         return self._json_response(result)
     
     # ==================== WebSocket ====================
     
     async def websocket_handler(self, request):
-        """WebSocket 處理器 - 實時通訊，支持心跳"""
+        """WebSocket 處理器 - 實時通訊，支持心跳
+        
+        🆕 優化：注入租戶上下文到 WebSocket 會話
+        """
         ws = web.WebSocketResponse(
             heartbeat=30.0,  # 服務器端心跳間隔
             receive_timeout=60.0  # 接收超時
@@ -5878,7 +5892,21 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
         
         self.websocket_clients.add(ws)
         client_id = id(ws)
-        logger.info(f"WebSocket client {client_id} connected. Total: {len(self.websocket_clients)}")
+        
+        # 🆕 獲取租戶信息（如果已認證）
+        tenant_id = request.get('tenant_id')
+        tenant_info = None
+        if tenant_id:
+            tenant = request.get('tenant')
+            if tenant:
+                tenant_info = {
+                    'user_id': tenant.user_id,
+                    'email': getattr(tenant, 'email', ''),
+                    'role': getattr(tenant, 'role', 'free'),
+                    'subscription_tier': getattr(tenant, 'subscription_tier', 'free')
+                }
+        
+        logger.info(f"WebSocket client {client_id} connected (tenant: {tenant_id}). Total: {len(self.websocket_clients)}")
         
         # 發送連接確認
         await ws.send_json({
@@ -5886,7 +5914,8 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
             'event': 'connected',
             'data': {
                 'client_id': client_id,
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now().isoformat(),
+                'tenant': tenant_info  # 🆕 包含租戶信息
             }
         })
         

@@ -8,6 +8,11 @@ TG-Matrix 核心模組
 - 支付服務
 - 數據導出
 - 系統監控
+
+🆕 v2.0 更新：
+- 統一表定義（tenant_schema）
+- 異常類型（tenant_exceptions）
+- 增強的備份與回滾
 """
 
 from .tenant_context import (
@@ -18,7 +23,68 @@ from .tenant_context import (
     get_user_id,
     require_tenant,
     tenant_query,
-    TenantAwareQuery
+    TenantAwareQuery,
+    # 🆕 數據庫級隔離支持
+    get_tenant_connection,
+    get_system_connection,
+    get_connection_for_table
+)
+
+# 🆕 統一表定義（唯一數據源）
+from .tenant_schema import (
+    TENANT_TABLES,
+    SYSTEM_TABLES,
+    SCHEMA_VERSION,
+    TableCategory,
+    is_tenant_table,
+    is_system_table,
+    get_table_category,
+    get_all_tables,
+    get_critical_tables,
+    TENANT_DB_SCHEMA,
+    SYSTEM_DB_SCHEMA
+)
+
+# 🆕 異常類型
+from .tenant_exceptions import (
+    TenantError,
+    TenantConnectionError,
+    TenantContextError,
+    TenantNotFoundError,
+    TenantNotAuthenticatedError,
+    MigrationError,
+    MigrationInProgressError,
+    MigrationValidationError,
+    MigrationRollbackError,
+    BackupError,
+    RestoreError,
+    QuotaExceededError,
+    FeatureNotAvailableError,
+    ConnectionPoolExhaustedError
+)
+
+# 多租戶數據庫管理
+from .tenant_database import (
+    TenantDatabaseManager,
+    get_tenant_db_manager,
+    LOCAL_USER_ID,
+    TENANTS_DIR,
+    BACKUPS_DIR
+)
+
+# 🆕 數據庫操作輔助
+from .db_operations import (
+    TenantDB,
+    QueryBuilder,
+    get_tenant_db
+)
+
+# 🆕 多租戶初始化
+from .tenant_init import (
+    initialize_tenant_system,
+    check_migration_needed,
+    get_tenant_system_status,
+    get_database_connection
 )
 
 from .usage_tracker import (
@@ -255,6 +321,56 @@ __all__ = [
     'require_tenant',
     'tenant_query',
     'TenantAwareQuery',
+    'get_tenant_connection',
+    'get_system_connection',
+    'get_connection_for_table',
+    
+    # 🆕 統一表定義
+    'TENANT_TABLES',
+    'SYSTEM_TABLES',
+    'SCHEMA_VERSION',
+    'TableCategory',
+    'is_tenant_table',
+    'is_system_table',
+    'get_table_category',
+    'get_all_tables',
+    'get_critical_tables',
+    'TENANT_DB_SCHEMA',
+    'SYSTEM_DB_SCHEMA',
+    
+    # 🆕 異常類型
+    'TenantError',
+    'TenantConnectionError',
+    'TenantContextError',
+    'TenantNotFoundError',
+    'TenantNotAuthenticatedError',
+    'MigrationError',
+    'MigrationInProgressError',
+    'MigrationValidationError',
+    'MigrationRollbackError',
+    'BackupError',
+    'RestoreError',
+    'QuotaExceededError',
+    'FeatureNotAvailableError',
+    'ConnectionPoolExhaustedError',
+    
+    # 多租戶數據庫管理
+    'TenantDatabaseManager',
+    'get_tenant_db_manager',
+    'LOCAL_USER_ID',
+    'TENANTS_DIR',
+    'BACKUPS_DIR',
+    
+    # 🆕 數據庫操作輔助
+    'TenantDB',
+    'QueryBuilder',
+    'get_tenant_db',
+    
+    # 多租戶初始化
+    'initialize_tenant_system',
+    'check_migration_needed',
+    'get_tenant_system_status',
+    'get_database_connection',
     
     # 使用量追蹤
     'UsageStats',

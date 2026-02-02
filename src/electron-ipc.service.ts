@@ -388,9 +388,10 @@ export class ElectronIpcService implements OnDestroy {
         'Content-Type': 'application/json',
       };
       
-      // 添加認證頭（SaaS 模式）
-      if (this.authToken) {
-        headers['Authorization'] = `Bearer ${this.authToken}`;
+      // 添加認證頭（SaaS 模式）- 動態從 localStorage 讀取
+      const token = this.authToken || localStorage.getItem('tgm_access_token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
       
       const fetchOptions: RequestInit = {

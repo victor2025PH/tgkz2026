@@ -180,47 +180,97 @@ type TabId = 'profile' | 'security' | 'sessions' | 'apiKeys';
           <!-- 登入設備 -->
           @if (activeTab() === 'sessions') {
             <div class="settings-section">
-              <h2>{{ t('auth.sessions') }}</h2>
-              <p class="section-desc">管理您在各設備上的登入狀態</p>
+              <div class="section-header">
+                <div>
+                  <h2>{{ t('auth.sessions') }}</h2>
+                  <p class="section-desc">管理您在各設備上的登入狀態</p>
+                </div>
+                <button class="btn-refresh" (click)="loadSessions()" [disabled]="isLoadingSessions()">
+                  <span [class.spinning]="isLoadingSessions()">🔄</span>
+                </button>
+              </div>
+              
+              <!-- 🆕 設備統計 -->
+              <div class="device-stats">
+                <div class="stat-item">
+                  <span class="stat-value">{{ sessions().length }}</span>
+                  <span class="stat-label">已登入設備</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-value">{{ getActiveDevicesCount() }}</span>
+                  <span class="stat-label">最近活躍</span>
+                </div>
+              </div>
               
               @if (isLoadingSessions()) {
-                <div class="loading-state">載入中...</div>
+                <div class="loading-state">
+                  <div class="loading-spinner"></div>
+                  <span>載入設備列表...</span>
+                </div>
               } @else {
                 <div class="sessions-list">
                   @for (session of sessions(); track session.id) {
                     <div class="session-item" [class.current]="session.is_current">
-                      <div class="session-icon">
+                      <div class="session-icon" [class]="'device-' + (session.device_type || 'unknown')">
                         {{ getDeviceIcon(session.device_type) }}
                       </div>
                       <div class="session-info">
-                        <strong>{{ session.device_name || '未知設備' }}</strong>
-                        <span class="session-meta">
-                          {{ session.ip_address }} · 
-                          最後活動: {{ formatDate(session.last_activity_at) }}
+                        <div class="session-header">
+                          <strong>{{ session.device_name || '未知設備' }}</strong>
+                          @if (session.is_current) {
+                            <span class="current-badge">✓ 當前設備</span>
+                          }
+                        </div>
+                        <div class="session-details">
+                          <span class="detail-item">
+                            <span class="detail-icon">🌐</span>
+                            {{ session.browser || '未知瀏覽器' }}
+                          </span>
+                          <span class="detail-item">
+                            <span class="detail-icon">📍</span>
+                            {{ session.location || formatIpAddress(session.ip_address) }}
+                          </span>
+                        </div>
+                        <span class="session-time">
+                          @if (session.is_current) {
+                            目前在線
+                          } @else {
+                            最後活動: {{ formatRelativeTime(session.last_activity_at) }}
+                          }
                         </span>
-                        @if (session.is_current) {
-                          <span class="current-badge">當前設備</span>
-                        }
                       </div>
                       @if (!session.is_current) {
                         <button 
-                          class="btn-danger-small"
-                          (click)="revokeSession(session.id)"
+                          class="btn-revoke"
+                          (click)="confirmRevokeSession(session)"
+                          [disabled]="revokingSessionId() === session.id"
                         >
-                          {{ t('userSettings.revokeSession') }}
+                          @if (revokingSessionId() === session.id) {
+                            <span class="btn-spinner"></span>
+                          } @else {
+                            登出
+                          }
                         </button>
                       }
+                    </div>
+                  } @empty {
+                    <div class="empty-state">
+                      <span class="empty-icon">📱</span>
+                      <p>沒有找到登入設備</p>
                     </div>
                   }
                 </div>
                 
                 @if (sessions().length > 1) {
-                  <button 
-                    class="btn-danger"
-                    (click)="revokeAllSessions()"
-                  >
-                    {{ t('userSettings.revokeAllSessions') }}
-                  </button>
+                  <div class="session-actions">
+                    <button 
+                      class="btn-danger-outline"
+                      (click)="confirmRevokeAllSessions()"
+                    >
+                      🚫 {{ t('userSettings.revokeAllSessions') }}
+                    </button>
+                    <p class="action-hint">這將登出除當前設備外的所有其他設備</p>
+                  </div>
                 }
               }
             </div>
@@ -524,11 +574,231 @@ type TabId = 'profile' | 'security' | 'sessions' | 'apiKeys';
     .current-badge {
       display: inline-block;
       padding: 0.125rem 0.5rem;
-      background: var(--primary, #3b82f6);
+      background: linear-gradient(135deg, #10b981, #059669);
       border-radius: 4px;
       font-size: 0.625rem;
       color: white;
       margin-left: 0.5rem;
+    }
+
+    /* 🆕 增強的設備管理樣式 */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1.5rem;
+    }
+
+    .btn-refresh {
+      background: transparent;
+      border: 1px solid var(--border-color, #333);
+      border-radius: 8px;
+      padding: 0.5rem;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.2s;
+    }
+
+    .btn-refresh:hover {
+      background: var(--bg-primary, #0f0f0f);
+      border-color: var(--primary, #3b82f6);
+    }
+
+    .btn-refresh .spinning {
+      display: inline-block;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .device-stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-item {
+      background: var(--bg-primary, #0f0f0f);
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .stat-value {
+      display: block;
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-secondary, #888);
+    }
+
+    .session-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1.25rem;
+      background: var(--bg-primary, #0f0f0f);
+      border-radius: 12px;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .session-item:hover {
+      border-color: var(--border-color, #333);
+    }
+
+    .session-item.current {
+      border-color: #10b981;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), transparent);
+    }
+
+    .session-icon {
+      font-size: 2rem;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-secondary, #1a1a1a);
+      border-radius: 12px;
+    }
+
+    .session-icon.device-desktop { background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.1)); }
+    .session-icon.device-mobile { background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1)); }
+    .session-icon.device-web { background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.1)); }
+
+    .session-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .session-info strong {
+      font-size: 0.95rem;
+    }
+
+    .session-details {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .detail-item {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.8rem;
+      color: var(--text-secondary, #888);
+    }
+
+    .detail-icon {
+      font-size: 0.9rem;
+    }
+
+    .session-time {
+      font-size: 0.75rem;
+      color: var(--text-muted, #666);
+    }
+
+    .btn-revoke {
+      background: transparent;
+      border: 1px solid #f87171;
+      color: #f87171;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+      min-width: 60px;
+    }
+
+    .btn-revoke:hover {
+      background: rgba(248, 113, 113, 0.1);
+    }
+
+    .btn-revoke:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(248, 113, 113, 0.3);
+      border-top-color: #f87171;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .session-actions {
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border-color, #333);
+      text-align: center;
+    }
+
+    .btn-danger-outline {
+      background: transparent;
+      border: 1px solid #ef4444;
+      color: #ef4444;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .btn-danger-outline:hover {
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .action-hint {
+      font-size: 0.75rem;
+      color: var(--text-muted, #666);
+      margin-top: 0.5rem;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-secondary, #888);
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      display: block;
+      margin-bottom: 1rem;
+      opacity: 0.5;
+    }
+
+    .loading-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 3rem;
+      color: var(--text-secondary, #888);
+    }
+
+    .loading-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border-color, #333);
+      border-top-color: var(--primary, #3b82f6);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
     }
     
     /* API 金鑰 */
@@ -665,6 +935,7 @@ export class UserSettingsViewComponent implements OnInit {
   // 會話
   sessions = signal<any[]>([]);
   isLoadingSessions = signal(false);
+  revokingSessionId = signal<string | null>(null);
   
   // API 金鑰
   apiKeys = signal<any[]>([]);
@@ -747,19 +1018,94 @@ export class UserSettingsViewComponent implements OnInit {
   }
   
   /**
-   * 🆕 Phase 4: 登出除當前設備外的所有設備
+   * 🆕 確認登出單個設備
    */
-  async revokeAllSessions() {
-    if (!confirm('確定要登出所有其他設備嗎？這將要求在這些設備上重新登入。')) {
+  async confirmRevokeSession(session: any) {
+    const deviceName = session.device_name || '未知設備';
+    if (!confirm(`確定要登出「${deviceName}」嗎？\n\n該設備將需要重新登入才能使用。`)) {
       return;
     }
     
+    this.revokingSessionId.set(session.id);
+    try {
+      await this.revokeSession(session.id);
+    } finally {
+      this.revokingSessionId.set(null);
+    }
+  }
+  
+  /**
+   * 🆕 確認登出所有設備
+   */
+  async confirmRevokeAllSessions() {
+    const otherDevices = this.sessions().filter(s => !s.is_current);
+    if (otherDevices.length === 0) {
+      alert('沒有其他設備需要登出');
+      return;
+    }
+    
+    if (!confirm(`確定要登出所有其他 ${otherDevices.length} 個設備嗎？\n\n這些設備將需要重新登入才能使用。`)) {
+      return;
+    }
+    
+    await this.revokeAllSessions();
+  }
+  
+  /**
+   * 🆕 Phase 4: 登出除當前設備外的所有設備
+   */
+  async revokeAllSessions() {
     const count = await this.authService.revokeAllOtherSessions();
     if (count > 0) {
       // 刷新設備列表
       await this.loadSessions();
       alert(`已成功登出 ${count} 個設備`);
     }
+  }
+  
+  /**
+   * 🆕 獲取最近活躍設備數量（24小時內）
+   */
+  getActiveDevicesCount(): number {
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    return this.sessions().filter(s => {
+      if (s.is_current) return true;
+      if (!s.last_activity_at) return false;
+      return new Date(s.last_activity_at).getTime() > oneDayAgo;
+    }).length;
+  }
+  
+  /**
+   * 🆕 格式化 IP 地址（隱藏最後一段）
+   */
+  formatIpAddress(ip: string): string {
+    if (!ip) return '未知位置';
+    const parts = ip.split('.');
+    if (parts.length === 4) {
+      return `${parts[0]}.${parts[1]}.${parts[2]}.*`;
+    }
+    return ip;
+  }
+  
+  /**
+   * 🆕 格式化相對時間
+   */
+  formatRelativeTime(dateStr: string): string {
+    if (!dateStr) return '未知';
+    
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return '剛剛';
+    if (diffMins < 60) return `${diffMins} 分鐘前`;
+    if (diffHours < 24) return `${diffHours} 小時前`;
+    if (diffDays < 7) return `${diffDays} 天前`;
+    
+    return this.formatDate(dateStr);
   }
   
   createApiKey() {

@@ -415,12 +415,14 @@ class LoginTokenService:
     @staticmethod
     def generate_qr_image(data: str, size: int = 200, with_logo: bool = True) -> Optional[str]:
         """
-        生成 QR Code 圖片（Base64 格式）
+        🆕 生成美化的 QR Code 圖片（Base64 格式）
         
         優化：
         1. 本地生成，不依賴外部 API
-        2. 可選添加 Logo
-        3. 高容錯率確保掃描可靠性
+        2. 品牌漸變色設計
+        3. 精美的中央 Logo
+        4. 高容錯率確保掃描可靠性
+        5. 圓角優化設計
         
         Args:
             data: 要編碼的數據（通常是 Deep Link URL）
@@ -435,50 +437,135 @@ class LoginTokenService:
             return None
         
         try:
-            # 使用高容錯率（H = 30%）
+            from PIL import ImageDraw, ImageFont
+            
+            # 🆕 品牌顏色
+            BRAND_PRIMARY = '#0088cc'    # Telegram 藍
+            BRAND_SECONDARY = '#6366f1'  # 紫色
+            BRAND_GRADIENT_START = '#0ea5e9'  # 亮藍
+            BRAND_GRADIENT_END = '#8b5cf6'    # 紫色
+            
+            # 使用高容錯率（H = 30%），支持中央 Logo
             qr = qrcode.QRCode(
-                version=None,  # 自動選擇最佳版本
+                version=None,
                 error_correction=qrcode.constants.ERROR_CORRECT_H,
                 box_size=10,
-                border=2
+                border=3  # 稍大的邊框
             )
             qr.add_data(data)
             qr.make(fit=True)
             
-            # 生成圖片
-            img = qr.make_image(fill_color="#0088cc", back_color="white")
+            # 獲取 QR 矩陣
+            qr_matrix = qr.modules
+            qr_size = len(qr_matrix)
+            box_size = 10
+            border = 3
             
-            # 調整大小
+            # 計算實際圖片大小
+            img_size = (qr_size + border * 2) * box_size
+            
+            # 創建白色背景的 RGBA 圖片
+            img = Image.new('RGBA', (img_size, img_size), (255, 255, 255, 255))
+            draw = ImageDraw.Draw(img)
+            
+            # 🆕 繪製漸變色 QR Code 方塊
+            for row in range(qr_size):
+                for col in range(qr_size):
+                    if qr_matrix[row][col]:
+                        # 計算漸變顏色（從左上到右下）
+                        progress = (row + col) / (qr_size * 2)
+                        
+                        # 從 BRAND_GRADIENT_START 到 BRAND_GRADIENT_END 的漸變
+                        r1, g1, b1 = int('0e', 16), int('a5', 16), int('e9', 16)  # 亮藍
+                        r2, g2, b2 = int('8b', 16), int('5c', 16), int('f6', 16)  # 紫色
+                        
+                        r = int(r1 + (r2 - r1) * progress)
+                        g = int(g1 + (g2 - g1) * progress)
+                        b = int(b1 + (b2 - b1) * progress)
+                        
+                        color = (r, g, b, 255)
+                        
+                        x = (col + border) * box_size
+                        y = (row + border) * box_size
+                        
+                        # 🆕 繪製圓角方塊
+                        corner_radius = box_size // 4
+                        draw.rounded_rectangle(
+                            [x + 1, y + 1, x + box_size - 1, y + box_size - 1],
+                            radius=corner_radius,
+                            fill=color
+                        )
+            
+            # 調整到目標大小
             img = img.resize((size, size), Image.Resampling.LANCZOS)
             
-            # 可選：添加 Telegram Logo 到中央
+            # 🆕 添加精美的品牌 Logo 到中央
             if with_logo:
                 try:
-                    # 創建一個簡單的中央圓形標記
-                    from PIL import ImageDraw
                     draw = ImageDraw.Draw(img)
                     center = size // 2
-                    radius = size // 8
-                    # 白色圓形背景
+                    logo_size = size // 5  # Logo 佔整體的 1/5
+                    
+                    # 白色圓形背景（帶陰影效果）
+                    shadow_offset = 2
+                    # 陰影
                     draw.ellipse(
-                        [center - radius, center - radius, center + radius, center + radius],
-                        fill='white',
-                        outline='#0088cc',
-                        width=2
+                        [center - logo_size // 2 + shadow_offset, 
+                         center - logo_size // 2 + shadow_offset,
+                         center + logo_size // 2 + shadow_offset, 
+                         center + logo_size // 2 + shadow_offset],
+                        fill=(0, 0, 0, 30)
                     )
-                    # Telegram 藍色內圓
-                    inner_radius = radius - 4
+                    # 白色背景
                     draw.ellipse(
-                        [center - inner_radius, center - inner_radius, 
-                         center + inner_radius, center + inner_radius],
-                        fill='#0088cc'
+                        [center - logo_size // 2, center - logo_size // 2,
+                         center + logo_size // 2, center + logo_size // 2],
+                        fill=(255, 255, 255, 255),
+                        outline=(14, 165, 233, 255),  # 品牌藍邊框
+                        width=3
                     )
+                    
+                    # 🆕 繪製 TG-Matrix Logo（簡化的 "TG" 字樣）
+                    inner_size = logo_size - 16
+                    inner_x = center - inner_size // 2
+                    inner_y = center - inner_size // 2
+                    
+                    # 漸變色內圓
+                    for i in range(inner_size):
+                        progress = i / inner_size
+                        r = int(14 + (139 - 14) * progress)
+                        g = int(165 + (92 - 165) * progress)
+                        b = int(233 + (246 - 233) * progress)
+                        
+                        if i < inner_size - 1:
+                            draw.arc(
+                                [inner_x + i // 3, inner_y + i // 3,
+                                 inner_x + inner_size - i // 3, inner_y + inner_size - i // 3],
+                                0, 360,
+                                fill=(r, g, b, 255),
+                                width=2
+                            )
+                    
+                    # 中央填充
+                    center_fill_size = inner_size // 2
+                    draw.ellipse(
+                        [center - center_fill_size // 2, center - center_fill_size // 2,
+                         center + center_fill_size // 2, center + center_fill_size // 2],
+                        fill=(14, 165, 233, 255)  # 品牌藍
+                    )
+                    
                 except Exception as e:
                     logger.debug(f"Logo overlay skipped: {e}")
             
+            # 轉換為 RGB（PNG 不支持 RGBA 的某些情況）
+            if img.mode == 'RGBA':
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                background.paste(img, mask=img.split()[3])
+                img = background
+            
             # 轉換為 Base64
             buffer = io.BytesIO()
-            img.save(buffer, format='PNG', optimize=True)
+            img.save(buffer, format='PNG', optimize=True, quality=95)
             buffer.seek(0)
             
             base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
@@ -486,6 +573,8 @@ class LoginTokenService:
             
         except Exception as e:
             logger.error(f"Failed to generate QR code: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     @staticmethod

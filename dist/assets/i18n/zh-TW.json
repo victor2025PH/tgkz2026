@@ -724,7 +724,13 @@
     "noToken": "缺少登入 Token",
     "tokenInvalid": "登入 Token 無效",
     "networkError": "網絡錯誤，請重試",
-    "backToLogin": "返回登入頁面"
+    "backToLogin": "返回登入頁面",
+    "botBlockedTitle": "需要開啟 Bot 對話",
+    "botBlockedDesc": "您尚未與我們的 Bot 建立對話，無法發送確認消息。",
+    "openBotFirst": "開啟 Bot 對話",
+    "botBlockedHint": "點擊上方按鈕開啟 Bot，然後點擊「開始」建立對話",
+    "retryAfterUnblock": "已開啟，重新嘗試",
+    "redirecting": "電腦端將自動跳轉..."
   },
   "subscription": {
     "free": "免費版",

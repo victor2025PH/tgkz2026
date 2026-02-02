@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["angular:styles/component:css;111f7226c2605cecfbf4d6542766b57c0ec854b8541cdec21b407e17363e709e;D:/tgkz2026/src/components/workflow-monitor.component.ts"],
-  "sourcesContent": ["\n    .workflow-monitor {\n      padding: 1.5rem;\n    }\n  "],
-  "mappings": ";AACI,CAAC;AACC,WAAS;AACX;",
-  "names": []
-}

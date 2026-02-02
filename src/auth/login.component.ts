@@ -34,9 +34,9 @@ import { FrontendSecurityService } from '../services/security.service';
                 <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
               </svg>
             </div>
-            <h3 class="success-title">登入成功</h3>
-            <p class="success-user">歡迎回來，{{ successUserName() }}</p>
-            <p class="success-hint">正在跳轉...</p>
+            <h3 class="success-title">{{ t('auth.loginSuccess') }}</h3>
+            <p class="success-user">{{ t('auth.welcomeBackUser') }}，{{ successUserName() }}</p>
+            <p class="success-hint">{{ t('auth.redirecting') }}</p>
           </div>
         </div>
       }
@@ -49,8 +49,8 @@ import { FrontendSecurityService } from '../services/security.service';
         <div class="lockout-alert">
           <span class="lockout-icon">🔒</span>
           <div class="lockout-content">
-            <span class="lockout-title">帳號暫時鎖定</span>
-            <span class="lockout-time">請等待 {{ lockoutRemaining() }} 秒後重試</span>
+            <span class="lockout-title">{{ t('auth.accountLocked') }}</span>
+            <span class="lockout-time">{{ t('auth.waitSeconds', {seconds: lockoutRemaining()}) }}</span>
           </div>
         </div>
       }
@@ -152,7 +152,7 @@ import { FrontendSecurityService } from '../services/security.service';
             (click)="switchLoginMethod('qrcode')"
           >
             <span class="tab-icon">📷</span>
-            <span>掃碼登入</span>
+            <span>{{ t('auth.qrCodeLogin') }}</span>
           </button>
           <button 
             class="method-tab" 
@@ -160,7 +160,7 @@ import { FrontendSecurityService } from '../services/security.service';
             (click)="switchLoginMethod('deeplink')"
           >
             <span class="tab-icon">📱</span>
-            <span>App 登入</span>
+            <span>{{ t('auth.appLogin') }}</span>
           </button>
           <button 
             class="method-tab" 
@@ -168,7 +168,7 @@ import { FrontendSecurityService } from '../services/security.service';
             (click)="switchLoginMethod('widget')"
           >
             <span class="tab-icon">💬</span>
-            <span>網頁登入</span>
+            <span>{{ t('auth.webLogin') }}</span>
           </button>
         </div>
         
@@ -178,28 +178,28 @@ import { FrontendSecurityService } from '../services/security.service';
             @if (qrCodeLoading()) {
               <div class="qr-loading">
                 <span class="loading-spinner"></span>
-                <span>正在生成二維碼...</span>
+                <span>{{ t('auth.generatingQR') }}</span>
               </div>
             } @else if (qrCodeUrl()) {
               <div class="qr-container">
                 <div class="qr-code-wrapper">
-                  <img [src]="qrCodeUrl()" alt="Telegram 登入二維碼" class="qr-code-img" />
+                  <img [src]="qrCodeUrl()" [alt]="t('auth.telegramLoginQR')" class="qr-code-img" />
                   @if (qrCodeExpired()) {
                     <div class="qr-expired-overlay">
-                      <span class="expired-text">二維碼已過期</span>
-                      <button class="refresh-btn" (click)="refreshQRCode()">點擊刷新</button>
+                      <span class="expired-text">{{ t('auth.qrExpired') }}</span>
+                      <button class="refresh-btn" (click)="refreshQRCode()">{{ t('auth.clickToRefresh') }}</button>
                     </div>
                   }
                 </div>
                 <div class="qr-instructions">
-                  <p class="step"><span class="step-num">1</span> 打開手機 Telegram</p>
-                  <p class="step"><span class="step-num">2</span> 掃描上方二維碼</p>
-                  <p class="step"><span class="step-num">3</span> 點擊確認登入</p>
+                  <p class="step"><span class="step-num">1</span> {{ t('auth.openTelegram') }}</p>
+                  <p class="step"><span class="step-num">2</span> {{ t('auth.scanQRCode') }}</p>
+                  <p class="step"><span class="step-num">3</span> {{ t('auth.confirmLogin') }}</p>
                 </div>
                 @if (!qrCodeExpired()) {
                   <div class="qr-countdown">
                     <span class="ws-status" [class.connected]="wsConnected()">
-                      {{ wsConnected() ? '🟢 實時連接' : '🔴 重新連接中...' }}
+                      {{ wsConnected() ? ('🟢 ' + t('auth.realtimeConnected')) : ('🔴 ' + t('auth.reconnecting')) }}
                     </span>
                     <span class="countdown-text">{{ qrCountdown() }}s</span>
                   </div>
@@ -208,7 +208,7 @@ import { FrontendSecurityService } from '../services/security.service';
             } @else {
               <button class="generate-qr-btn" (click)="generateQRCode()">
                 <span class="btn-icon">📷</span>
-                <span>生成二維碼</span>
+                <span>{{ t('auth.generateQRCode') }}</span>
               </button>
             }
           </div>
@@ -224,22 +224,22 @@ import { FrontendSecurityService } from '../services/security.service';
             >
               @if (deepLinkLoading()) {
                 <span class="loading-spinner small"></span>
-                <span>等待確認中...</span>
+                <span>{{ t('auth.waitingConfirm') }}</span>
               } @else {
                 <span class="social-icon">📱</span>
-                <span>打開 Telegram App 登入</span>
+                <span>{{ t('auth.openTelegramApp') }}</span>
               }
             </button>
             
             @if (deepLinkLoading()) {
               <div class="deep-link-status">
                 <div class="status-text">
-                  請在 Telegram 中點擊「確認登入」按鈕
+                  {{ t('auth.clickConfirmInTelegram') }}
                 </div>
                 <div class="countdown">
-                  剩餘時間: {{ deepLinkCountdown() }}s
+                  {{ t('auth.remainingTime', {seconds: deepLinkCountdown()}) }}
                 </div>
-                <button class="cancel-btn" (click)="cancelDeepLink()">取消</button>
+                <button class="cancel-btn" (click)="cancelDeepLink()">{{ t('auth.cancel') }}</button>
               </div>
             }
           </div>
@@ -258,10 +258,10 @@ import { FrontendSecurityService } from '../services/security.service';
                 <span>{{ t('auth.loadingTelegram') }}</span>
               } @else {
                 <span class="social-icon">💬</span>
-                <span>使用 Telegram Widget 登入</span>
+                <span>{{ t('auth.useTelegramWidget') }}</span>
               }
             </button>
-            <p class="widget-hint">適用於已在瀏覽器登入 Telegram 的用戶</p>
+            <p class="widget-hint">{{ t('auth.widgetHint') }}</p>
           </div>
         }
       </div>

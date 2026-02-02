@@ -133,20 +133,38 @@ async def authenticate_request(request) -> AuthContext:
         AuthContext 對象
     """
     ctx = AuthContext()
+    path = request.path
+    
+    # 🔍 調試日誌
+    auth_header = request.headers.get('Authorization', '')
+    logger.info(f"[AuthDebug] {path} - Auth header present: {bool(auth_header)}, value: {auth_header[:50] if auth_header else 'NONE'}...")
     
     # 1. 嘗試 Bearer Token 認證
     token = extract_token(request)
+    logger.info(f"[AuthDebug] {path} - Token extracted: {bool(token)}")
+    
     if token:
         payload = verify_token(token)
+        logger.info(f"[AuthDebug] {path} - Token verified: {bool(payload)}, payload: {payload}")
+        
         if payload:
             auth_service = get_auth_service()
             user = await auth_service.get_user(payload.get('sub'))
+            logger.info(f"[AuthDebug] {path} - User found: {bool(user)}, active: {user.is_active if user else 'N/A'}")
+            
             if user and user.is_active:
                 ctx.user = user
                 ctx.token = token
                 ctx.is_authenticated = True
                 ctx.auth_method = 'token'
+                logger.info(f"[AuthDebug] {path} - ✅ Authentication successful for user: {user.id}")
                 return ctx
+            else:
+                logger.warning(f"[AuthDebug] {path} - ❌ User not found or inactive")
+        else:
+            logger.warning(f"[AuthDebug] {path} - ❌ Token verification failed")
+    else:
+        logger.info(f"[AuthDebug] {path} - No token provided")
     
     # 2. 嘗試 API Key 認證
     api_key = extract_api_key(request)
@@ -169,6 +187,7 @@ def create_auth_middleware():
     1. 認證請求（Bearer Token / API Key）
     2. 注入認證上下文到請求
     3. 注入租戶上下文（用於數據隔離）
+    4. 🆕 注入租戶數據庫連接（數據庫級隔離）
     """
     from aiohttp import web
     import os
@@ -184,7 +203,15 @@ def create_auth_middleware():
             set_current_tenant = lambda x: None
             clear_current_tenant = lambda: None
         
+        # 🆕 導入租戶數據庫管理器
+        try:
+            from core.tenant_database import get_tenant_db_manager, LOCAL_USER_ID
+        except ImportError:
+            get_tenant_db_manager = None
+            LOCAL_USER_ID = 'local_user'
+        
         tenant_token = None
+        tenant_id = None
         
         try:
             # 檢查是否為公開路由
@@ -196,6 +223,12 @@ def create_auth_middleware():
             # 認證請求
             ctx = await authenticate_request(request)
             request['auth'] = ctx
+            
+            # 🆕 確定租戶 ID
+            if ctx.is_authenticated and ctx.user:
+                tenant_id = ctx.user.id
+            elif os.environ.get('ELECTRON_MODE', 'false').lower() == 'true':
+                tenant_id = LOCAL_USER_ID
             
             # 🆕 注入租戶上下文
             if TenantContext:
@@ -224,6 +257,19 @@ def create_auth_middleware():
                         max_api_calls=-1
                     )
                     tenant_token = set_current_tenant(tenant)
+            
+            # 🆕 注入租戶數據庫連接
+            if get_tenant_db_manager and tenant_id:
+                db_manager = get_tenant_db_manager()
+                request['tenant_db'] = db_manager.get_tenant_connection(tenant_id)
+                request['system_db'] = db_manager.get_system_connection()
+                request['tenant_id'] = tenant_id
+            
+            # 🆕 向後兼容：將 tenant 上下文也注入到 request['tenant']
+            # 這樣現有使用 request.get('tenant') 的代碼仍然可以工作
+            if TenantContext and tenant_token:
+                from core.tenant_context import get_current_tenant
+                request['tenant'] = get_current_tenant()
             
             # 如果需要認證但未認證
             if not ctx.is_authenticated:

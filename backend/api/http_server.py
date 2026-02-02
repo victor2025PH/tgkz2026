@@ -971,33 +971,35 @@ class HttpApiServer:
             
             # 構建 URLs
             bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', 'TGSmartKingBot')
-            site_url = os.environ.get('SITE_URL', 'https://tgw.usdt2026.cc')
             
-            # Deep Link（備用，用於手動點擊）
+            # 🆕 簡化方案：QR Code 直接使用 Deep Link
+            # 新用戶掃碼會自動發送 /start login_xxx
             deep_link_url = f"https://t.me/{bot_username}?start=login_{login_token.token}"
             
-            # 🆕 中轉頁面 URL（QR Code 使用此 URL）
-            # 流程：掃碼 → 打開中轉頁 → Telegram Widget 授權 → 後端推送確認消息到 Bot
-            scan_login_url = f"{site_url}/auth/scan-login?token={login_token.token}"
+            # 🆕 生成 6 位驗證碼（供老用戶手動輸入）
+            import random
+            verify_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
             
-            # 🆕 QR Code 使用中轉頁面 URL（而非 Deep Link）
-            qr_image = LoginTokenService.generate_qr_image(scan_login_url, size=qr_size)
+            # 保存驗證碼到 Token（更新數據庫）
+            service.update_verify_code(login_token.token, verify_code)
             
-            # 如果本地生成失敗，提供備用 URL（也使用中轉頁面）
-            qr_fallback_url = LoginTokenService.get_fallback_qr_url(scan_login_url, size=qr_size) if not qr_image else None
+            # 🆕 QR Code 直接使用 Deep Link（簡單直接）
+            qr_image = LoginTokenService.generate_qr_image(deep_link_url, size=qr_size)
+            
+            # 如果本地生成失敗，提供備用 URL
+            qr_fallback_url = LoginTokenService.get_fallback_qr_url(deep_link_url, size=qr_size) if not qr_image else None
             
             return self._json_response({
                 'success': True,
                 'data': {
                     'token': login_token.token,
                     'token_id': login_token.id,
-                    'deep_link_url': deep_link_url,      # Telegram Deep Link（中轉頁用）
-                    'scan_login_url': scan_login_url,    # 🆕 掃碼中轉頁 URL
+                    'deep_link_url': deep_link_url,      # Telegram Deep Link（QR Code 內容）
+                    'verify_code': verify_code,          # 🆕 6 位驗證碼（老用戶手動輸入）
                     'bot_username': bot_username,
                     'expires_in': 300,  # 5 分鐘
                     'expires_at': login_token.expires_at.isoformat(),
-                    # 🆕 Phase 3: QR Code 數據（內容是 scan_login_url）
-                    'qr_image': qr_image,           # Base64 圖片（優先使用）
+                    'qr_image': qr_image,           # Base64 圖片
                     'qr_fallback_url': qr_fallback_url  # 備用外部 URL
                 }
             })

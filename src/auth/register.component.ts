@@ -160,7 +160,7 @@ import { I18nService } from '../i18n.service';
         <button 
           type="submit" 
           class="submit-btn"
-          [disabled]="!canSubmit()"
+          [disabled]="!canSubmit"
         >
           @if (isLoading()) {
             <span class="loading-spinner"></span>
@@ -417,15 +417,17 @@ export class RegisterComponent {
   error = signal<string | null>(null);
   passwordStrength = signal(0);
   
-  // 計算屬性
-  canSubmit = computed(() => 
-    this.email && 
-    this.password && 
-    this.password === this.confirmPassword &&
-    this.agreeTerms &&
-    this.passwordStrength() >= 2 &&
-    !this.isLoading()
-  );
+  // 計算屬性 - 使用 getter 而非 computed，因為依賴的是普通屬性
+  get canSubmit(): boolean {
+    return !!(
+      this.email && 
+      this.password && 
+      this.password === this.confirmPassword &&
+      this.agreeTerms &&
+      this.passwordStrength() >= 2 &&
+      !this.isLoading()
+    );
+  }
   
   passwordStrengthText = computed(() => {
     const strength = this.passwordStrength();
@@ -455,7 +457,7 @@ export class RegisterComponent {
   }
   
   async onSubmit() {
-    if (!this.canSubmit()) return;
+    if (!this.canSubmit) return;
     
     this.isLoading.set(true);
     this.error.set(null);

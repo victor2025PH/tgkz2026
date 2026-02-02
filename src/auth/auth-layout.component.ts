@@ -46,31 +46,31 @@ import { I18nService, SupportedLocale } from '../i18n.service';
             <span class="logo-icon">📱</span>
             <span class="logo-text">TG-Matrix</span>
           </div>
-          <h1 class="brand-title">智能 Telegram 營銷平台</h1>
+          <h1 class="brand-title">{{ t('brand.title') }}</h1>
           <p class="brand-desc">
-            自動化群組管理、AI 智能對話、多帳號協作
+            {{ t('brand.description') }}
           </p>
           
           <div class="features">
             <div class="feature-item">
               <span class="feature-icon">🤖</span>
               <div class="feature-text">
-                <strong>AI 驅動</strong>
-                <span>智能對話引擎，自動回覆更自然</span>
+                <strong>{{ t('brand.feature1Title') }}</strong>
+                <span>{{ t('brand.feature1Desc') }}</span>
               </div>
             </div>
             <div class="feature-item">
               <span class="feature-icon">📊</span>
               <div class="feature-text">
-                <strong>數據分析</strong>
-                <span>深度洞察用戶行為和轉化率</span>
+                <strong>{{ t('brand.feature2Title') }}</strong>
+                <span>{{ t('brand.feature2Desc') }}</span>
               </div>
             </div>
             <div class="feature-item">
               <span class="feature-icon">🔒</span>
               <div class="feature-text">
-                <strong>安全可靠</strong>
-                <span>端到端加密，保護您的數據</span>
+                <strong>{{ t('brand.feature3Title') }}</strong>
+                <span>{{ t('brand.feature3Desc') }}</span>
               </div>
             </div>
           </div>
@@ -249,6 +249,10 @@ export class AuthLayoutComponent {
   private i18n = inject(I18nService);
   
   currentLocale = this.i18n.locale;
+  
+  t(key: string, params?: Record<string, string | number>): string {
+    return this.i18n.t(key, params);
+  }
   
   setLocale(locale: SupportedLocale): void {
     this.i18n.setLocale(locale);

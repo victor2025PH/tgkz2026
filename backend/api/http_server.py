@@ -968,20 +968,20 @@ class HttpApiServer:
                 user_agent=user_agent
             )
             
-            # 構建 Telegram Deep Link URL（用於中轉頁面）
+            # 構建 Telegram Deep Link URL
+            # 🆕 QR Code 直接使用 Deep Link，掃碼後直接打開 Telegram Bot
             bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', 'TGSmartKingBot')
             deep_link_url = f"https://t.me/{bot_username}?start=login_{login_token.token}"
             
-            # 🆕 構建掃碼中轉頁面 URL（普通 HTTPS，任何相機都能識別）
-            # 這是 QR Code 實際包含的內容
+            # 備用：中轉頁面 URL（保留用於其他場景）
             site_url = os.environ.get('SITE_URL', 'https://tgw.usdt2026.cc')
             scan_login_url = f"{site_url}/auth/scan-login?token={login_token.token}"
             
-            # 🆕 Phase 3: 本地生成 QR Code（使用中轉頁面 URL）
-            qr_image = LoginTokenService.generate_qr_image(scan_login_url, size=qr_size)
+            # 🆕 QR Code 使用 Deep Link（掃碼直接打開 Telegram）
+            qr_image = LoginTokenService.generate_qr_image(deep_link_url, size=qr_size)
             
             # 如果本地生成失敗，提供備用 URL
-            qr_fallback_url = LoginTokenService.get_fallback_qr_url(scan_login_url, size=qr_size) if not qr_image else None
+            qr_fallback_url = LoginTokenService.get_fallback_qr_url(deep_link_url, size=qr_size) if not qr_image else None
             
             return self._json_response({
                 'success': True,

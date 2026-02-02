@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["angular:styles/component:css;3795be331242ee5703bf8f23ff931e0b07a7b9f45a24b8698f70953f8ee6d86e;D:/tgkz2026/src/membership-ui.component.ts"],
-  "sourcesContent": ["\n    @keyframes slide-up {\n      from { transform: translateY(100%); opacity: 0; }\n      to { transform: translateY(0); opacity: 1; }\n    }\n    .animate-slide-up { animation: slide-up 0.3s ease-out; }\n  "],
-  "mappings": ";AACI,WAAW;AACT;AAAO,eAAW,WAAW;AAAO,aAAS;AAAG;AAChD;AAAK,eAAW,WAAW;AAAI,aAAS;AAAG;AAC7C;AACA,CAAC;AAAmB,aAAW,SAAS,KAAK;AAAU;",
-  "names": []
-}

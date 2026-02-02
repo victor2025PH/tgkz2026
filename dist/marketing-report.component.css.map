@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["angular:styles/component:css;e0bdd4b4da253e0b88f450891191075c2b7afefb6816a81486ae58ae3eead0d5;D:/tgkz2026/src/components/marketing-report.component.ts"],
-  "sourcesContent": ["\n    .marketing-report {\n      max-width: 1400px;\n      margin: 0 auto;\n    }\n  "],
-  "mappings": ";AACI,CAAC;AACC,aAAW;AACX,UAAQ,EAAE;AACZ;",
-  "names": []
-}

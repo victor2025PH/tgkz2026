@@ -1063,7 +1063,8 @@ class HttpApiServer:
                     }, 500)
                 
                 # 生成 JWT Token
-                access_token = generate_access_token(user.id, user.email or '', user.role)
+                role_str = user.role.value if hasattr(user.role, 'value') else user.role
+                access_token = generate_access_token(user.id, user.email or '', role_str)
                 refresh_token = generate_refresh_token(user.id)
                 
                 return self._json_response({
@@ -1079,7 +1080,7 @@ class HttpApiServer:
                             'email': user.email,
                             'avatar_url': user.avatar_url,
                             'subscription_tier': user.subscription_tier,
-                            'role': user.role
+                            'role': user.role.value if hasattr(user.role, 'value') else user.role
                         }
                     }
                 })
@@ -1823,7 +1824,8 @@ class HttpApiServer:
         
         if user:
             # 生成 JWT Token
-            access_token = generate_access_token(user.id, user.email or '', user.role)
+            role_str = user.role.value if hasattr(user.role, 'value') else user.role
+            access_token = generate_access_token(user.id, user.email or '', role_str)
             refresh_token = generate_refresh_token(user.id)
             
             # 🆕 Phase 4: 創建設備會話
@@ -1885,7 +1887,7 @@ class HttpApiServer:
                         'email': user.email,
                         'avatar_url': user.avatar_url,
                         'subscription_tier': user.subscription_tier,
-                        'role': user.role
+                        'role': user.role.value if hasattr(user.role, 'value') else user.role
                     }
                 },
                 'timestamp': datetime.utcnow().isoformat()

@@ -1022,6 +1022,7 @@ class HttpApiServer:
         try:
             from auth.login_token import get_login_token_service
             from auth.service import get_auth_service
+            from auth.utils import generate_access_token, generate_refresh_token
             
             token = request.match_info['token']
             service = get_login_token_service()
@@ -1062,8 +1063,8 @@ class HttpApiServer:
                     }, 500)
                 
                 # 生成 JWT Token
-                access_token = auth_service.generate_jwt_token(user.id, user.role)
-                refresh_token = auth_service.generate_refresh_token(user.id)
+                access_token = generate_access_token(user.id, user.email or '', user.role)
+                refresh_token = generate_refresh_token(user.id)
                 
                 return self._json_response({
                     'success': True,
@@ -1797,6 +1798,7 @@ class HttpApiServer:
         """
         from auth.service import get_auth_service
         from auth.device_session import get_device_session_service
+        from auth.utils import generate_access_token, generate_refresh_token
         
         # 🆕 安全導入 geo_security（可選模組）
         geo_service = None
@@ -1821,8 +1823,8 @@ class HttpApiServer:
         
         if user:
             # 生成 JWT Token
-            access_token = auth_service.generate_jwt_token(user.id, user.role)
-            refresh_token = auth_service.generate_refresh_token(user.id)
+            access_token = generate_access_token(user.id, user.email or '', user.role)
+            refresh_token = generate_refresh_token(user.id)
             
             # 🆕 Phase 4: 創建設備會話
             ip_address = None

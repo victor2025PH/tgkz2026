@@ -162,7 +162,7 @@ class TelegramBotHandler:
     
     async def _handle_message(self, message: Dict[str, Any]) -> Optional[str]:
         """處理普通消息"""
-        text = message.get('text', '')
+        text = message.get('text', '').strip()
         chat_id = message.get('chat', {}).get('id')
         user = message.get('from', {})
         
@@ -188,7 +188,36 @@ class TelegramBotHandler:
         elif text.startswith('/help'):
             return await self._send_help(chat_id)
         
+        # 🆕 處理 6 位驗證碼輸入（老用戶登入）
+        elif text.isdigit() and len(text) == 6:
+            return await self._handle_verify_code(chat_id, user, text)
+        
         return None
+    
+    async def _handle_verify_code(self, chat_id: int, user: Dict[str, Any], code: str) -> str:
+        """
+        🆕 處理驗證碼登入（老用戶）
+        
+        流程：
+        1. 用戶在網頁看到 6 位驗證碼
+        2. 用戶打開 Bot，輸入驗證碼
+        3. Bot 驗證後顯示確認按鈕
+        """
+        from auth.login_token import get_login_token_service
+        
+        logger.info(f"[Bot] Processing verify code: {code} from user: {user.get('id')}")
+        
+        service = get_login_token_service()
+        login_token = service.get_token_by_verify_code(code)
+        
+        if not login_token:
+            # 驗證碼無效或過期
+            error_msg = get_message('login_expired', user)
+            await self._send_message(chat_id, f"❌ 驗證碼無效或已過期\n\n請返回網頁獲取新的驗證碼。")
+            return "驗證碼無效"
+        
+        # 驗證碼有效，顯示確認按鈕
+        return await self._handle_login_confirm(chat_id, user, login_token.token)
     
     async def _handle_callback(self, callback: Dict[str, Any]) -> Optional[str]:
         """

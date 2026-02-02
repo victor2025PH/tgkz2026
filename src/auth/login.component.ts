@@ -196,6 +196,14 @@ import { FrontendSecurityService } from '../services/security.service';
                   <p class="step"><span class="step-num">2</span> {{ t('auth.scanQRCode') }}</p>
                   <p class="step"><span class="step-num">3</span> {{ t('auth.confirmLogin') }}</p>
                 </div>
+                
+                <!-- 🆕 驗證碼（老用戶備用） -->
+                @if (verifyCode()) {
+                  <div class="verify-code-section">
+                    <p class="verify-hint">掃碼無效？在 Bot 中輸入驗證碼：</p>
+                    <div class="verify-code">{{ verifyCode() }}</div>
+                  </div>
+                }
                 @if (!qrCodeExpired()) {
                   <div class="qr-countdown">
                     <span class="ws-status" [class.connected]="wsConnected()">
@@ -795,6 +803,33 @@ import { FrontendSecurityService } from '../services/security.service';
       width: 1.5rem;
       height: 1.5rem;
       background: linear-gradient(135deg, #0088cc, #0066aa);
+    }
+
+    /* 🆕 驗證碼樣式 */
+    .verify-code-section {
+      margin-top: 1.25rem;
+      padding-top: 1.25rem;
+      border-top: 1px dashed var(--border-color, #333);
+      text-align: center;
+    }
+
+    .verify-hint {
+      font-size: 0.8rem;
+      color: var(--text-muted, #666);
+      margin-bottom: 0.75rem;
+    }
+
+    .verify-code {
+      font-family: 'Courier New', monospace;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.15), rgba(139, 92, 246, 0.15));
+      border: 2px solid rgba(14, 165, 233, 0.3);
+      border-radius: 12px;
+      color: #0ea5e9;
+      display: inline-block;
       border-radius: 50%;
       color: #fff;
       font-size: 0.75rem;
@@ -996,6 +1031,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   qrCodeExpired = signal(false);
   qrCountdown = signal(300);
   wsConnected = signal(false);
+  verifyCode = signal<string | null>(null);  // 🆕 6 位驗證碼
   private qrToken = '';
   private qrWebSocket: WebSocket | null = null;
   private qrCountdownInterval: any = null;
@@ -1409,11 +1445,14 @@ export class LoginComponent implements OnInit, OnDestroy {
         return;
       }
       
-      const { token, deep_link_url, expires_in, qr_image, qr_fallback_url } = result.data;
+      const { token, deep_link_url, expires_in, qr_image, qr_fallback_url, verify_code } = result.data;
       this.qrToken = token;
       this.qrCountdown.set(expires_in || 300);
       
-      // 🆕 Phase 3: 優先使用後端生成的 QR Code（離線支持）
+      // 🆕 保存驗證碼（老用戶備用）
+      this.verifyCode.set(verify_code || null);
+      
+      // 優先使用後端生成的 QR Code
       const qrDataUrl = qr_image || qr_fallback_url || this.generateQRCodeImage(deep_link_url);
       this.qrCodeUrl.set(qrDataUrl);
       

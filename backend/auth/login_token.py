@@ -133,11 +133,18 @@ class LoginTokenService:
                     telegram_first_name TEXT,
                     ip_address TEXT,
                     user_agent TEXT,
+                    verify_code TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     expires_at TIMESTAMP NOT NULL,
                     confirmed_at TIMESTAMP
                 )
             ''')
+            
+            # 🆕 添加 verify_code 欄位（如果不存在）
+            try:
+                db.execute('ALTER TABLE login_tokens ADD COLUMN verify_code TEXT')
+            except:
+                pass  # 欄位已存在
             
             # 創建索引
             db.execute('CREATE INDEX IF NOT EXISTS idx_login_tokens_token ON login_tokens(token)')
@@ -370,6 +377,59 @@ class LoginTokenService:
                     (status, token)
                 )
             db.commit()
+        finally:
+            db.close()
+    
+    def update_verify_code(self, token: str, verify_code: str):
+        """
+        🆕 更新 Token 的驗證碼
+        
+        用於老用戶手動輸入驗證碼登入
+        """
+        db = self._get_db()
+        try:
+            db.execute(
+                'UPDATE login_tokens SET verify_code = ? WHERE token = ?',
+                (verify_code, token)
+            )
+            db.commit()
+        finally:
+            db.close()
+    
+    def get_token_by_verify_code(self, verify_code: str) -> Optional['LoginToken']:
+        """
+        🆕 通過驗證碼查找 Token
+        
+        用於老用戶在 Bot 中輸入驗證碼
+        """
+        db = self._get_db()
+        try:
+            cursor = db.execute(
+                '''SELECT * FROM login_tokens 
+                   WHERE verify_code = ? 
+                   AND status = 'pending' 
+                   AND expires_at > datetime('now')
+                   ORDER BY created_at DESC LIMIT 1''',
+                (verify_code,)
+            )
+            row = cursor.fetchone()
+            if row:
+                return LoginToken(
+                    id=row['id'],
+                    token=row['token'],
+                    type=LoginTokenType(row['type']) if row['type'] else LoginTokenType.DEEP_LINK,
+                    status=LoginTokenStatus(row['status']) if row['status'] else LoginTokenStatus.PENDING,
+                    user_id=row['user_id'],
+                    telegram_id=row['telegram_id'],
+                    telegram_username=row['telegram_username'],
+                    telegram_first_name=row['telegram_first_name'],
+                    ip_address=row['ip_address'],
+                    user_agent=row['user_agent'],
+                    created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
+                    expires_at=datetime.fromisoformat(row['expires_at']) if row['expires_at'] else None,
+                    confirmed_at=datetime.fromisoformat(row['confirmed_at']) if row['confirmed_at'] else None
+                )
+            return None
         finally:
             db.close()
     

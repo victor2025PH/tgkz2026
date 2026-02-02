@@ -173,11 +173,15 @@ class TelegramBotHandler:
         if text.startswith('/start'):
             parts = text.split(' ', 1)
             if len(parts) > 1 and parts[1].startswith('login_'):
-                # Deep Link 登入
+                # Deep Link 登入（新用戶）
                 token = parts[1][6:]  # 移除 "login_" 前綴
-                return await self._handle_login_confirm(chat_id, user, token)
+                # 🆕 直接自動確認登入，不需要用戶點擊
+                return await self._auto_confirm_login(chat_id, user, token)
             else:
-                # 普通 /start
+                # 🆕 普通 /start - 檢查是否有待處理的登入請求，自動確認
+                pending_result = await self._check_and_auto_confirm(chat_id, user)
+                if pending_result:
+                    return pending_result
                 return await self._send_welcome(chat_id, user)
         
         # /login 命令
@@ -194,14 +198,68 @@ class TelegramBotHandler:
         
         return None
     
+    async def _auto_confirm_login(self, chat_id: int, user: Dict[str, Any], token: str) -> str:
+        """
+        🆕 自動確認登入（不需要用戶點擊確認按鈕）
+        
+        類似 Telemetrio 的流程：
+        1. 用戶點擊網頁上的「打開 Telegram」
+        2. Bot 收到 /start login_xxx
+        3. Bot 自動確認登入
+        4. 網頁自動跳轉
+        """
+        logger.info(f"[Bot] Auto confirming login for token: {token[:8]}... user: {user.get('id')}")
+        
+        # 直接確認登入
+        result = await self._confirm_login(token, user)
+        
+        if result['success']:
+            # 發送成功消息
+            success_msg = get_message('login_success', user)
+            await self._send_message(chat_id, success_msg)
+            return "自動登入成功"
+        else:
+            # 發送錯誤消息
+            error_msg = get_message('login_failed', user, error=result['message'])
+            await self._send_message(chat_id, error_msg)
+            return f"自動登入失敗: {result['message']}"
+    
+    async def _check_and_auto_confirm(self, chat_id: int, user: Dict[str, Any]) -> Optional[str]:
+        """
+        🆕 檢查是否有待處理的登入請求，自動確認
+        
+        解決老用戶問題：
+        - 老用戶發送 /start 時沒有 login_ 參數
+        - 檢查是否有最近 5 分鐘內創建的待處理 Token
+        - 如果有，自動確認登入
+        """
+        from auth.login_token import get_login_token_service
+        
+        telegram_id = str(user.get('id', ''))
+        if not telegram_id:
+            return None
+        
+        logger.info(f"[Bot] Checking pending login for TG user: {telegram_id}")
+        
+        service = get_login_token_service()
+        
+        # 查找最近的待處理 Token
+        pending_token = service.get_pending_token_for_telegram_user(telegram_id)
+        
+        if pending_token:
+            logger.info(f"[Bot] Found pending token for user: {pending_token.token[:8]}...")
+            return await self._auto_confirm_login(chat_id, user, pending_token.token)
+        
+        return None
+    
     async def _handle_verify_code(self, chat_id: int, user: Dict[str, Any], code: str) -> str:
         """
-        🆕 處理驗證碼登入（老用戶）
+        🆕 處理驗證碼登入（備用方案）
         
         流程：
         1. 用戶在網頁看到 6 位驗證碼
         2. 用戶打開 Bot，輸入驗證碼
-        3. Bot 驗證後顯示確認按鈕
+        3. Bot 自動確認登入
         """
         from auth.login_token import get_login_token_service
         
@@ -212,12 +270,11 @@ class TelegramBotHandler:
         
         if not login_token:
             # 驗證碼無效或過期
-            error_msg = get_message('login_expired', user)
             await self._send_message(chat_id, f"❌ 驗證碼無效或已過期\n\n請返回網頁獲取新的驗證碼。")
             return "驗證碼無效"
         
-        # 驗證碼有效，顯示確認按鈕
-        return await self._handle_login_confirm(chat_id, user, login_token.token)
+        # 🆕 自動確認登入（不需要點擊按鈕）
+        return await self._auto_confirm_login(chat_id, user, login_token.token)
     
     async def _handle_callback(self, callback: Dict[str, Any]) -> Optional[str]:
         """
@@ -407,7 +464,7 @@ class TelegramBotHandler:
             return {'success': False, 'message': f'系統錯誤: {str(e)}'}
     
     async def _send_welcome(self, chat_id: int, user: Dict[str, Any]) -> str:
-        """發送歡迎消息（含登入驗證碼提示）"""
+        """發送歡迎消息"""
         user_name = user.get('first_name', 'User')
         
         message = f"""
@@ -417,19 +474,15 @@ class TelegramBotHandler:
 
 這個 Bot 用於網頁登入驗證。
 
+🔗 如需登入網頁後台，請：
+1. 在網頁點擊「打開 Telegram」
+2. 返回此對話確認
+
 ━━━━━━━━━━━━━━━
-🔐 *網頁登入方法*
-
-請在網頁的 QR Code 下方找到 6 位驗證碼，然後在此輸入：
-
-例如：`482619`
-
-輸入後會出現確認按鈕，點擊即可完成登入。
+💡 *備用方法*：輸入網頁顯示的 6 位驗證碼
 ━━━━━━━━━━━━━━━
 
-📖 可用命令：
-/login - 登入說明
-/help - 幫助信息
+📖 /help - 幫助信息
 """
         
         await self._send_message(chat_id, message, parse_mode="Markdown")

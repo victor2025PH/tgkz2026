@@ -724,7 +724,13 @@
     "noToken": "缺少登录 Token",
     "tokenInvalid": "登录 Token 无效",
     "networkError": "网络错误，请重试",
-    "backToLogin": "返回登录页面"
+    "backToLogin": "返回登录页面",
+    "botBlockedTitle": "需要开启 Bot 对话",
+    "botBlockedDesc": "您尚未与我们的 Bot 建立对话，无法发送确认消息。",
+    "openBotFirst": "开启 Bot 对话",
+    "botBlockedHint": "点击上方按钮开启 Bot，然后点击「开始」建立对话",
+    "retryAfterUnblock": "已开启，重新尝试",
+    "redirecting": "电脑端将自动跳转..."
   },
   "subscription": {
     "free": "免费版",

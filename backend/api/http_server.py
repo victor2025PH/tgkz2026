@@ -1291,21 +1291,60 @@ class HttpApiServer:
             # 發送確認消息到用戶 Telegram
             bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', 'tgzkw_bot')
             
+            # 🆕 獲取用戶語言偏好（從請求頭）
+            accept_language = request.headers.get('Accept-Language', 'zh-TW')
+            user_lang = 'zh-TW'  # 默認繁體中文
+            if 'zh-CN' in accept_language or 'zh-Hans' in accept_language:
+                user_lang = 'zh-CN'
+            elif 'en' in accept_language:
+                user_lang = 'en'
+            
+            # 🆕 多語言消息模板
+            messages = {
+                'zh-TW': {
+                    'title': '🔐 *登入確認請求*',
+                    'body': '您正在請求登入 TG-Matrix 後台。',
+                    'source': '📍 來源：網頁掃碼登入',
+                    'warning': '⚠️ 如果這不是您的操作，請忽略此消息。',
+                    'confirm': '✅ 確認登入',
+                    'cancel': '❌ 取消'
+                },
+                'zh-CN': {
+                    'title': '🔐 *登录确认请求*',
+                    'body': '您正在请求登录 TG-Matrix 后台。',
+                    'source': '📍 来源：网页扫码登录',
+                    'warning': '⚠️ 如果这不是您的操作，请忽略此消息。',
+                    'confirm': '✅ 确认登录',
+                    'cancel': '❌ 取消'
+                },
+                'en': {
+                    'title': '🔐 *Login Confirmation*',
+                    'body': 'You are requesting to log in to TG-Matrix Dashboard.',
+                    'source': '📍 Source: Web QR Code Login',
+                    'warning': '⚠️ If this wasn\'t you, please ignore this message.',
+                    'confirm': '✅ Confirm Login',
+                    'cancel': '❌ Cancel'
+                }
+            }
+            
+            msg = messages.get(user_lang, messages['zh-TW'])
+            time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
             # 構建確認消息
-            message_text = f"""🔐 *登入確認請求*
+            message_text = f"""{msg['title']}
 
-您正在請求登入 TG-Matrix 後台。
+{msg['body']}
 
-📍 來源：網頁掃碼登入
-⏰ 時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+{msg['source']}
+⏰ {time_str}
 
-⚠️ 如果這不是您的操作，請忽略此消息。"""
+{msg['warning']}"""
 
             # 構建 Inline Keyboard
             keyboard = {
                 "inline_keyboard": [[
-                    {"text": "✅ 確認登入", "callback_data": f"confirm_login_{token}"},
-                    {"text": "❌ 取消", "callback_data": f"cancel_login_{token}"}
+                    {"text": msg['confirm'], "callback_data": f"confirm_login_{token}"},
+                    {"text": msg['cancel'], "callback_data": f"cancel_login_{token}"}
                 ]]
             }
             

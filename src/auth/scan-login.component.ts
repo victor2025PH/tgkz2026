@@ -35,11 +35,29 @@ interface TelegramUser {
 }
 
 interface TokenStatus {
-  status: 'loading' | 'valid' | 'expired' | 'confirmed' | 'error' | 'authorizing' | 'sending';
+  status: 'loading' | 'valid' | 'expired' | 'confirmed' | 'error' | 'authorizing' | 'sending' | 'bot_blocked';
   message?: string;
   botUsername?: string;
   deepLinkUrl?: string;
   expiresIn?: number;
+  botLink?: string;  // 🆕 用於 Bot 封鎖時的開啟連結
+}
+
+// 🆕 設備類型檢測
+type DeviceType = 'ios' | 'android' | 'desktop' | 'unknown';
+
+function detectDevice(): DeviceType {
+  const ua = navigator.userAgent.toLowerCase();
+  if (/iphone|ipad|ipod/.test(ua)) return 'ios';
+  if (/android/.test(ua)) return 'android';
+  if (/windows|macintosh|linux/.test(ua) && !/mobile/.test(ua)) return 'desktop';
+  return 'unknown';
+}
+
+// 🆕 檢查是否為移動設備
+function isMobile(): boolean {
+  const device = detectDevice();
+  return device === 'ios' || device === 'android';
 }
 
 @Component({
@@ -133,12 +151,48 @@ interface TokenStatus {
           </div>
         }
 
-        <!-- Confirmed -->
+        <!-- 🆕 Bot 被封鎖提示 -->
+        @if (tokenStatus().status === 'bot_blocked') {
+          <div class="status-section bot-blocked">
+            <div class="warning-icon">🤖</div>
+            <h2>{{ t('scanLogin.botBlockedTitle') }}</h2>
+            <p>{{ t('scanLogin.botBlockedDesc') }}</p>
+            
+            <a 
+              [href]="tokenStatus().botLink" 
+              class="telegram-btn primary"
+              target="_blank"
+            >
+              <span class="btn-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                  <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                </svg>
+              </span>
+              <span>{{ t('scanLogin.openBotFirst') }}</span>
+            </a>
+            
+            <p class="hint">{{ t('scanLogin.botBlockedHint') }}</p>
+            
+            <button class="retry-btn" (click)="retryAfterUnblock()">
+              {{ t('scanLogin.retryAfterUnblock') }}
+            </button>
+          </div>
+        }
+
+        <!-- Confirmed - 🆕 增強動畫效果 -->
         @if (tokenStatus().status === 'confirmed') {
-          <div class="status-section confirmed">
-            <div class="success-icon">✅</div>
+          <div class="status-section confirmed" [class.animate]="showSuccessAnimation()">
+            <div class="success-animation">
+              <div class="checkmark-circle">
+                <svg class="checkmark" viewBox="0 0 52 52">
+                  <circle class="checkmark-circle-bg" cx="26" cy="26" r="25" fill="none"/>
+                  <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                </svg>
+              </div>
+            </div>
             <h2>{{ t('scanLogin.successTitle') }}</h2>
             <p>{{ t('scanLogin.successDesc') }}</p>
+            <p class="redirect-hint">{{ t('scanLogin.redirecting') }}</p>
           </div>
         }
 
@@ -433,6 +487,106 @@ interface TokenStatus {
     .status-section.error h2 {
       color: #f87171;
     }
+
+    /* 🆕 Bot 封鎖樣式 */
+    .status-section.bot-blocked .warning-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+    }
+
+    .status-section.bot-blocked h2 {
+      color: #fbbf24;
+    }
+
+    .telegram-btn.primary {
+      background: linear-gradient(135deg, #0088cc, #0066aa);
+      box-shadow: 0 4px 15px rgba(0, 136, 204, 0.4);
+    }
+
+    .hint {
+      color: #64748b;
+      font-size: 0.8rem;
+      margin: 1rem 0;
+    }
+
+    /* 🆕 成功動畫 */
+    .success-animation {
+      margin: 1rem 0 2rem;
+    }
+
+    .checkmark-circle {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto;
+    }
+
+    .checkmark {
+      width: 100%;
+      height: 100%;
+    }
+
+    .checkmark-circle-bg {
+      stroke: #4ade80;
+      stroke-width: 2;
+      stroke-dasharray: 157;
+      stroke-dashoffset: 157;
+      animation: circle-draw 0.6s ease-out forwards;
+    }
+
+    .checkmark-check {
+      stroke: #4ade80;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 48;
+      stroke-dashoffset: 48;
+      animation: check-draw 0.4s 0.4s ease-out forwards;
+    }
+
+    @keyframes circle-draw {
+      to { stroke-dashoffset: 0; }
+    }
+
+    @keyframes check-draw {
+      to { stroke-dashoffset: 0; }
+    }
+
+    .status-section.confirmed.animate {
+      animation: success-scale 0.5s ease-out;
+    }
+
+    @keyframes success-scale {
+      0% { transform: scale(0.8); opacity: 0; }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .redirect-hint {
+      color: #64748b;
+      font-size: 0.85rem;
+      margin-top: 1rem;
+      animation: blink 1.5s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* 🆕 設備提示樣式 */
+    .device-hint {
+      background: rgba(0, 136, 204, 0.1);
+      border: 1px solid rgba(0, 136, 204, 0.3);
+      border-radius: 8px;
+      padding: 0.75rem;
+      margin: 1rem 0;
+      color: #60a5fa;
+      font-size: 0.85rem;
+    }
+
+    .device-hint .icon {
+      margin-right: 0.5rem;
+    }
   `]
 })
 export class ScanLoginComponent implements OnInit, OnDestroy, AfterViewInit {
@@ -444,14 +598,23 @@ export class ScanLoginComponent implements OnInit, OnDestroy, AfterViewInit {
   countdown = signal(0);
   waitingConfirm = signal(false);
   telegramUser = signal<TelegramUser | null>(null);
+  showSuccessAnimation = signal(false);
+  deviceType = signal<DeviceType>('unknown');
 
   private token = '';
   private botUsername = '';
   private countdownInterval: any = null;
   private pollInterval: any = null;
   private widgetLoaded = false;
+  
+  // 🆕 LocalStorage 鍵
+  private readonly SAVED_TG_USER_KEY = 'tg_matrix_saved_user';
 
   ngOnInit() {
+    // 🆕 檢測設備類型
+    this.deviceType.set(detectDevice());
+    console.log('Device type:', this.deviceType());
+    
     // 從 URL 獲取 token
     this.token = this.route.snapshot.queryParams['token'] || '';
     
@@ -468,6 +631,41 @@ export class ScanLoginComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // 驗證 Token
     this.verifyToken();
+    
+    // 🆕 檢查是否有保存的用戶（記住授權功能）
+    this.checkSavedUser();
+  }
+  
+  /**
+   * 🆕 檢查是否有保存的 Telegram 用戶
+   */
+  private checkSavedUser() {
+    try {
+      const savedUserStr = localStorage.getItem(this.SAVED_TG_USER_KEY);
+      if (savedUserStr) {
+        const savedUser = JSON.parse(savedUserStr) as TelegramUser;
+        // 檢查授權是否過期（24小時）
+        const authTime = savedUser.auth_date * 1000;
+        const now = Date.now();
+        const hoursSinceAuth = (now - authTime) / (1000 * 60 * 60);
+        
+        if (hoursSinceAuth < 24) {
+          console.log('Found saved user, auto-sending confirmation...');
+          this.telegramUser.set(savedUser);
+          // 自動發送確認（延遲等待 token 驗證完成）
+          setTimeout(() => {
+            if (this.tokenStatus().status === 'valid') {
+              this.sendConfirmationToUser(savedUser);
+            }
+          }, 500);
+        } else {
+          // 授權過期，清除
+          localStorage.removeItem(this.SAVED_TG_USER_KEY);
+        }
+      }
+    } catch (e) {
+      console.error('Error checking saved user:', e);
+    }
   }
 
   ngAfterViewInit() {
@@ -511,18 +709,34 @@ export class ScanLoginComponent implements OnInit, OnDestroy, AfterViewInit {
       const result = await response.json();
 
       if (result.success) {
+        // 🆕 保存用戶信息（記住授權）
+        this.saveUser(user);
+        
         // 成功發送，等待用戶在 Telegram 確認
         this.tokenStatus.update(s => ({ ...s, status: 'valid' }));
         this.waitingConfirm.set(true);
         this.startPolling();
         
-        // 可選：自動打開 Telegram
-        // window.location.href = `tg://resolve?domain=${this.botUsername}`;
+        // 🆕 在移動設備上自動打開 Telegram
+        if (isMobile()) {
+          setTimeout(() => {
+            window.location.href = `tg://resolve?domain=${this.botUsername}`;
+          }, 1000);
+        }
       } else {
-        this.tokenStatus.set({
-          status: 'error',
-          message: result.error || this.t('scanLogin.sendFailed')
-        });
+        // 🆕 檢測 Bot 封鎖情況
+        if (result.need_start_bot) {
+          this.tokenStatus.set({
+            status: 'bot_blocked',
+            message: result.error,
+            botLink: result.bot_link || `https://t.me/${this.botUsername}`
+          });
+        } else {
+          this.tokenStatus.set({
+            status: 'error',
+            message: result.error || this.t('scanLogin.sendFailed')
+          });
+        }
       }
     } catch (e: any) {
       console.error('Send confirmation error:', e);
@@ -530,6 +744,31 @@ export class ScanLoginComponent implements OnInit, OnDestroy, AfterViewInit {
         status: 'error',
         message: this.t('scanLogin.networkError')
       });
+    }
+  }
+  
+  /**
+   * 🆕 保存用戶信息到 LocalStorage
+   */
+  private saveUser(user: TelegramUser) {
+    try {
+      localStorage.setItem(this.SAVED_TG_USER_KEY, JSON.stringify(user));
+    } catch (e) {
+      console.error('Error saving user:', e);
+    }
+  }
+  
+  /**
+   * 🆕 Bot 解封後重試
+   */
+  retryAfterUnblock() {
+    const user = this.telegramUser();
+    if (user) {
+      this.tokenStatus.set({ status: 'sending' });
+      this.sendConfirmationToUser(user);
+    } else {
+      // 重新加載頁面
+      window.location.reload();
     }
   }
 
@@ -655,7 +894,17 @@ export class ScanLoginComponent implements OnInit, OnDestroy, AfterViewInit {
           if (result.data.status === 'confirmed') {
             clearInterval(this.pollInterval);
             this.waitingConfirm.set(false);
+            
+            // 🆕 顯示成功動畫
+            this.showSuccessAnimation.set(true);
             this.tokenStatus.set({ status: 'confirmed' });
+            
+            // 🆕 動畫結束後可以關閉頁面或顯示提示
+            setTimeout(() => {
+              // 如果在移動設備上，提示用戶可以關閉頁面
+              // 電腦端會通過 WebSocket 自動跳轉
+            }, 2000);
+            
           } else if (result.data.status === 'expired') {
             clearInterval(this.pollInterval);
             this.waitingConfirm.set(false);

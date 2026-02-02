@@ -724,7 +724,13 @@
     "noToken": "Missing login token",
     "tokenInvalid": "Invalid login token",
     "networkError": "Network error, please try again",
-    "backToLogin": "Back to Login"
+    "backToLogin": "Back to Login",
+    "botBlockedTitle": "Need to Start Bot Chat",
+    "botBlockedDesc": "You haven't started a conversation with our Bot yet, so we can't send you a confirmation message.",
+    "openBotFirst": "Open Bot Chat",
+    "botBlockedHint": "Click the button above to open the Bot, then click 'Start' to begin.",
+    "retryAfterUnblock": "Done, Try Again",
+    "redirecting": "Desktop will redirect automatically..."
   },
   "subscription": {
     "free": "Free",

@@ -414,24 +414,52 @@ class LoginTokenService:
             )
             row = cursor.fetchone()
             if row:
-                return LoginToken(
-                    id=row['id'],
-                    token=row['token'],
-                    type=LoginTokenType(row['type']) if row['type'] else LoginTokenType.DEEP_LINK,
-                    status=LoginTokenStatus(row['status']) if row['status'] else LoginTokenStatus.PENDING,
-                    user_id=row['user_id'],
-                    telegram_id=row['telegram_id'],
-                    telegram_username=row['telegram_username'],
-                    telegram_first_name=row['telegram_first_name'],
-                    ip_address=row['ip_address'],
-                    user_agent=row['user_agent'],
-                    created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
-                    expires_at=datetime.fromisoformat(row['expires_at']) if row['expires_at'] else None,
-                    confirmed_at=datetime.fromisoformat(row['confirmed_at']) if row['confirmed_at'] else None
-                )
+                return self._row_to_token(row)
             return None
         finally:
             db.close()
+    
+    def get_pending_token_for_telegram_user(self, telegram_id: str) -> Optional['LoginToken']:
+        """
+        🆕 查找待處理的登入 Token（自動確認用）
+        
+        當用戶發送 /start 時，查找最近 60 秒內創建的待處理 Token
+        如果只有一個，自動確認（假設是這個用戶的請求）
+        """
+        db = self._get_db()
+        try:
+            # 查找最近 60 秒內創建的待處理 Token
+            cursor = db.execute(
+                '''SELECT * FROM login_tokens 
+                   WHERE status = 'pending' 
+                   AND expires_at > datetime('now')
+                   AND created_at > datetime('now', '-60 seconds')
+                   ORDER BY created_at DESC LIMIT 1'''
+            )
+            row = cursor.fetchone()
+            if row:
+                return self._row_to_token(row)
+            return None
+        finally:
+            db.close()
+    
+    def _row_to_token(self, row) -> 'LoginToken':
+        """將數據庫行轉換為 LoginToken 對象"""
+        return LoginToken(
+            id=row['id'],
+            token=row['token'],
+            type=LoginTokenType(row['type']) if row['type'] else LoginTokenType.DEEP_LINK,
+            status=LoginTokenStatus(row['status']) if row['status'] else LoginTokenStatus.PENDING,
+            user_id=row['user_id'],
+            telegram_id=row['telegram_id'],
+            telegram_username=row['telegram_username'],
+            telegram_first_name=row['telegram_first_name'],
+            ip_address=row['ip_address'],
+            user_agent=row['user_agent'],
+            created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
+            expires_at=datetime.fromisoformat(row['expires_at']) if row['expires_at'] else None,
+            confirmed_at=datetime.fromisoformat(row['confirmed_at']) if row['confirmed_at'] else None
+        )
     
     def _row_to_token(self, row) -> LoginToken:
         """將數據庫行轉換為 LoginToken 對象"""

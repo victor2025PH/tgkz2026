@@ -969,20 +969,22 @@ class HttpApiServer:
                 user_agent=user_agent
             )
             
-            # 構建 Telegram Deep Link URL
-            # 🆕 QR Code 直接使用 Deep Link，掃碼後直接打開 Telegram Bot
+            # 構建 URLs
             bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', 'TGSmartKingBot')
+            site_url = os.environ.get('SITE_URL', 'https://tgw.usdt2026.cc')
+            
+            # Deep Link（備用，用於手動點擊）
             deep_link_url = f"https://t.me/{bot_username}?start=login_{login_token.token}"
             
-            # 備用：中轉頁面 URL（保留用於其他場景）
-            site_url = os.environ.get('SITE_URL', 'https://tgw.usdt2026.cc')
+            # 🆕 中轉頁面 URL（QR Code 使用此 URL）
+            # 流程：掃碼 → 打開中轉頁 → Telegram Widget 授權 → 後端推送確認消息到 Bot
             scan_login_url = f"{site_url}/auth/scan-login?token={login_token.token}"
             
-            # 🆕 QR Code 使用 Deep Link（掃碼直接打開 Telegram）
-            qr_image = LoginTokenService.generate_qr_image(deep_link_url, size=qr_size)
+            # 🆕 QR Code 使用中轉頁面 URL（而非 Deep Link）
+            qr_image = LoginTokenService.generate_qr_image(scan_login_url, size=qr_size)
             
-            # 如果本地生成失敗，提供備用 URL
-            qr_fallback_url = LoginTokenService.get_fallback_qr_url(deep_link_url, size=qr_size) if not qr_image else None
+            # 如果本地生成失敗，提供備用 URL（也使用中轉頁面）
+            qr_fallback_url = LoginTokenService.get_fallback_qr_url(scan_login_url, size=qr_size) if not qr_image else None
             
             return self._json_response({
                 'success': True,

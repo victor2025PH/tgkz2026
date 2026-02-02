@@ -351,6 +351,28 @@ class LoginTokenService:
         finally:
             db.close()
     
+    def update_token_status(self, token: str, status: str, telegram_id: Optional[str] = None):
+        """
+        🆕 更新 Token 狀態（公開方法）
+        
+        用於中轉頁面發送確認消息後更新狀態
+        """
+        db = self._get_db()
+        try:
+            if telegram_id:
+                db.execute(
+                    'UPDATE login_tokens SET status = ?, telegram_id = ? WHERE token = ?',
+                    (status, telegram_id, token)
+                )
+            else:
+                db.execute(
+                    'UPDATE login_tokens SET status = ? WHERE token = ?',
+                    (status, token)
+                )
+            db.commit()
+        finally:
+            db.close()
+    
     def _row_to_token(self, row) -> LoginToken:
         """將數據庫行轉換為 LoginToken 對象"""
         return LoginToken(

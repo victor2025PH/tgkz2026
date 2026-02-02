@@ -1793,15 +1793,21 @@ class HttpApiServer:
         發送登入成功消息（含 JWT Token）
         
         🆕 Phase 4: 創建設備會話 + 新設備通知
-        🆕 Phase 5: 地理安全檢查
+        🆕 Phase 5: 地理安全檢查（可選）
         """
         from auth.service import get_auth_service
         from auth.device_session import get_device_session_service
-        from auth.geo_security import get_geo_security
+        
+        # 🆕 安全導入 geo_security（可選模組）
+        geo_service = None
+        try:
+            from auth.geo_security import get_geo_security
+            geo_service = get_geo_security()
+        except ImportError:
+            logger.debug("geo_security module not available, skipping geo checks")
         
         auth_service = get_auth_service()
         device_service = get_device_session_service()
-        geo_service = get_geo_security()
         
         # 查找或創建用戶
         user = await auth_service.get_user_by_telegram_id(user_data['telegram_id'])
@@ -1841,9 +1847,9 @@ class HttpApiServer:
                     ip_address=ip_address
                 )
             
-            # 🆕 Phase 5: 地理安全檢查
+            # 🆕 Phase 5: 地理安全檢查（可選）
             security_warning = None
-            if ip_address:
+            if ip_address and geo_service:
                 try:
                     is_suspicious, alert = await geo_service.check_login_location(user.id, ip_address)
                     if is_suspicious and alert:

@@ -1186,18 +1186,23 @@ class HttpApiServer:
                     'error': error
                 }, 400)
             
-            # 🆕 推送 WebSocket 通知給訂閱的客戶端
+            # 🆕 推送 WebSocket 通知給訂閱的客戶端（直接發送完整登入數據）
             try:
                 from auth.login_token import get_subscription_manager
                 manager = get_subscription_manager()
                 
-                await manager.notify(token, 'confirmed', {
-                    'telegram_id': telegram_id,
-                    'telegram_username': telegram_username,
-                    'telegram_first_name': telegram_first_name
-                })
+                # 直接發送完整登入數據到訂閱的 WebSocket
+                await self._send_login_success_to_subscribers(
+                    manager, token, {
+                        'telegram_id': telegram_id,
+                        'telegram_username': telegram_username,
+                        'telegram_first_name': telegram_first_name
+                    }
+                )
             except Exception as notify_err:
                 logger.warning(f"Failed to notify WS: {notify_err}")
+                import traceback
+                traceback.print_exc()
             
             return self._json_response({
                 'success': True,
@@ -1898,6 +1903,27 @@ class HttpApiServer:
                 'error': '無法創建用戶',
                 'timestamp': datetime.utcnow().isoformat()
             })
+    
+    async def _send_login_success_to_subscribers(self, manager, token: str, user_data: dict):
+        """
+        🆕 向所有訂閱的 WebSocket 客戶端發送登入成功消息
+        
+        解決問題：原來的 notify() 只發送狀態更新，不包含 JWT Token
+        """
+        from auth.login_token import LoginTokenSubscriptionManager
+        
+        if token not in manager._subscriptions:
+            logger.warning(f"No subscribers for token {token[:8]}...")
+            return
+        
+        subscribers = list(manager._subscriptions.get(token, set()))
+        logger.info(f"Sending login success to {len(subscribers)} subscribers for token {token[:8]}...")
+        
+        for ws in subscribers:
+            try:
+                await self._send_login_success(ws, token, user_data)
+            except Exception as e:
+                logger.warning(f"Failed to send login success to subscriber: {e}")
     
     async def _notify_new_device_login(
         self, 

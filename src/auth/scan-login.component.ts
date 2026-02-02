@@ -1,22 +1,41 @@
 /**
- * 掃碼登入中轉頁面
+ * 掃碼登入中轉頁面 - 優化版
  * 
- * 流程：
+ * 🆕 新流程（解決回訪用戶問題）：
  * 1. 用戶用手機相機掃描 QR Code
- * 2. 打開此頁面（HTTPS URL，任何相機都能識別）
- * 3. 頁面驗證 Token 有效性
- * 4. 顯示「在 Telegram 中確認登入」按鈕
- * 5. 用戶點擊按鈕 → 打開 Telegram Bot
- * 6. 在 Bot 中確認 → 電腦端自動登入
+ * 2. 打開此頁面
+ * 3. 頁面顯示 Telegram 授權按鈕（Login Widget）
+ * 4. 用戶點擊授權 → 獲取 Telegram ID
+ * 5. 後端主動向用戶 Telegram 發送確認消息
+ * 6. 用戶在 Bot 中點擊確認 → 電腦端自動登入
+ * 
+ * 核心改變：不再依賴 /start 命令，而是後端主動推送
  */
 
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { I18nService } from '../i18n.service';
 
+// 全局 Telegram Widget 回調聲明
+declare global {
+  interface Window {
+    onTelegramAuth: (user: TelegramUser) => void;
+  }
+}
+
+interface TelegramUser {
+  id: number;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number;
+  hash: string;
+}
+
 interface TokenStatus {
-  status: 'loading' | 'valid' | 'expired' | 'confirmed' | 'error';
+  status: 'loading' | 'valid' | 'expired' | 'confirmed' | 'error' | 'authorizing' | 'sending';
   message?: string;
   botUsername?: string;
   deepLinkUrl?: string;
@@ -44,16 +63,24 @@ interface TokenStatus {
           </div>
         }
 
-        <!-- Valid Token - 顯示確認按鈕 -->
+        <!-- Valid Token - 顯示 Telegram 授權按鈕 -->
         @if (tokenStatus().status === 'valid') {
           <div class="status-section valid">
             <div class="info-icon">📱</div>
             <h2>{{ t('scanLogin.confirmTitle') }}</h2>
-            <p class="description">{{ t('scanLogin.confirmDesc') }}</p>
+            <p class="description">{{ t('scanLogin.authDesc') }}</p>
+            
+            <!-- 🆕 Telegram Login Widget 容器 -->
+            <div class="telegram-widget-container" id="telegram-login-widget"></div>
+            
+            <!-- 備用方案：手動打開 Telegram -->
+            <div class="divider">
+              <span>{{ t('scanLogin.or') }}</span>
+            </div>
             
             <a 
               [href]="tokenStatus().deepLinkUrl" 
-              class="telegram-btn"
+              class="telegram-btn secondary"
               (click)="onTelegramClick()"
             >
               <span class="btn-icon">
@@ -61,7 +88,7 @@ interface TokenStatus {
                   <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
                 </svg>
               </span>
-              <span>{{ t('scanLogin.openTelegram') }}</span>
+              <span>{{ t('scanLogin.openTelegramManual') }}</span>
             </a>
 
             @if (countdown() > 0) {
@@ -73,17 +100,26 @@ interface TokenStatus {
             <div class="steps">
               <div class="step">
                 <span class="step-num">1</span>
-                <span>{{ t('scanLogin.step1') }}</span>
+                <span>{{ t('scanLogin.stepAuth') }}</span>
               </div>
               <div class="step">
                 <span class="step-num">2</span>
-                <span>{{ t('scanLogin.step2') }}</span>
+                <span>{{ t('scanLogin.stepConfirm') }}</span>
               </div>
               <div class="step">
                 <span class="step-num">3</span>
-                <span>{{ t('scanLogin.step3') }}</span>
+                <span>{{ t('scanLogin.stepDone') }}</span>
               </div>
             </div>
+          </div>
+        }
+        
+        <!-- 🆕 正在發送確認消息 -->
+        @if (tokenStatus().status === 'sending') {
+          <div class="status-section sending">
+            <div class="spinner"></div>
+            <h2>{{ t('scanLogin.sendingTitle') }}</h2>
+            <p>{{ t('scanLogin.sendingDesc') }}</p>
           </div>
         }
 
@@ -232,6 +268,48 @@ interface TokenStatus {
       transform: translateY(0);
     }
 
+    .telegram-btn.secondary {
+      background: transparent;
+      border: 1px solid #0088cc;
+      box-shadow: none;
+    }
+
+    .telegram-btn.secondary:hover {
+      background: rgba(0, 136, 204, 0.1);
+      box-shadow: none;
+    }
+
+    .telegram-widget-container {
+      display: flex;
+      justify-content: center;
+      margin: 1.5rem 0;
+      min-height: 48px;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      margin: 1.5rem 0;
+      color: #64748b;
+      font-size: 0.85rem;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .divider span {
+      padding: 0 1rem;
+    }
+
+    .status-section.sending h2 {
+      color: #60a5fa;
+    }
+
     .btn-icon {
       display: flex;
       align-items: center;
@@ -357,7 +435,7 @@ interface TokenStatus {
     }
   `]
 })
-export class ScanLoginComponent implements OnInit, OnDestroy {
+export class ScanLoginComponent implements OnInit, OnDestroy, AfterViewInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private i18n = inject(I18nService);
@@ -365,10 +443,13 @@ export class ScanLoginComponent implements OnInit, OnDestroy {
   tokenStatus = signal<TokenStatus>({ status: 'loading' });
   countdown = signal(0);
   waitingConfirm = signal(false);
+  telegramUser = signal<TelegramUser | null>(null);
 
   private token = '';
+  private botUsername = '';
   private countdownInterval: any = null;
   private pollInterval: any = null;
+  private widgetLoaded = false;
 
   ngOnInit() {
     // 從 URL 獲取 token
@@ -382,8 +463,100 @@ export class ScanLoginComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // 設置全局回調函數
+    window.onTelegramAuth = this.handleTelegramAuth.bind(this);
+
     // 驗證 Token
     this.verifyToken();
+  }
+
+  ngAfterViewInit() {
+    // 在視圖初始化後加載 Telegram Widget（如果需要）
+  }
+
+  /**
+   * 🆕 處理 Telegram Login Widget 授權回調
+   */
+  handleTelegramAuth(user: TelegramUser) {
+    console.log('Telegram auth received:', user);
+    this.telegramUser.set(user);
+    
+    // 更新狀態為"正在發送確認消息"
+    this.tokenStatus.update(s => ({ ...s, status: 'sending' }));
+    
+    // 調用後端 API 發送確認消息
+    this.sendConfirmationToUser(user);
+  }
+
+  /**
+   * 🆕 調用後端 API，讓 Bot 主動發送確認消息給用戶
+   */
+  async sendConfirmationToUser(user: TelegramUser) {
+    try {
+      const response = await fetch(`/api/v1/auth/login-token/${this.token}/send-confirmation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          telegram_id: user.id,
+          telegram_username: user.username,
+          telegram_first_name: user.first_name,
+          telegram_last_name: user.last_name,
+          auth_date: user.auth_date,
+          hash: user.hash
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // 成功發送，等待用戶在 Telegram 確認
+        this.tokenStatus.update(s => ({ ...s, status: 'valid' }));
+        this.waitingConfirm.set(true);
+        this.startPolling();
+        
+        // 可選：自動打開 Telegram
+        // window.location.href = `tg://resolve?domain=${this.botUsername}`;
+      } else {
+        this.tokenStatus.set({
+          status: 'error',
+          message: result.error || this.t('scanLogin.sendFailed')
+        });
+      }
+    } catch (e: any) {
+      console.error('Send confirmation error:', e);
+      this.tokenStatus.set({
+        status: 'error',
+        message: this.t('scanLogin.networkError')
+      });
+    }
+  }
+
+  /**
+   * 🆕 加載 Telegram Login Widget
+   */
+  private loadTelegramWidget() {
+    if (this.widgetLoaded || !this.botUsername) return;
+    
+    const container = document.getElementById('telegram-login-widget');
+    if (!container) return;
+
+    // 清空容器
+    container.innerHTML = '';
+
+    // 創建 script 標籤
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = 'https://telegram.org/js/telegram-widget.js?22';
+    script.setAttribute('data-telegram-login', this.botUsername);
+    script.setAttribute('data-size', 'large');
+    script.setAttribute('data-radius', '10');
+    script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+    script.setAttribute('data-request-access', 'write');
+    
+    container.appendChild(script);
+    this.widgetLoaded = true;
   }
 
   ngOnDestroy() {
@@ -424,6 +597,9 @@ export class ScanLoginComponent implements OnInit, OnDestroy {
         return;
       }
 
+      // 保存 Bot username 供 Widget 使用
+      this.botUsername = bot_username || 'tgzkw_bot';
+
       // Token 有效
       this.tokenStatus.set({
         status: 'valid',
@@ -435,6 +611,11 @@ export class ScanLoginComponent implements OnInit, OnDestroy {
       // 啟動倒計時
       this.countdown.set(expires_in || 300);
       this.startCountdown();
+      
+      // 🆕 延遲加載 Telegram Widget（等待 DOM 渲染完成）
+      setTimeout(() => {
+        this.loadTelegramWidget();
+      }, 100);
 
     } catch (e: any) {
       console.error('Token verification error:', e);

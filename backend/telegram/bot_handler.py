@@ -407,7 +407,7 @@ class TelegramBotHandler:
             return {'success': False, 'message': f'系統錯誤: {str(e)}'}
     
     async def _send_welcome(self, chat_id: int, user: Dict[str, Any]) -> str:
-        """發送歡迎消息"""
+        """發送歡迎消息（含登入驗證碼提示）"""
         user_name = user.get('first_name', 'User')
         
         message = f"""
@@ -417,10 +417,18 @@ class TelegramBotHandler:
 
 這個 Bot 用於網頁登入驗證。
 
-🔗 如需登入，請在網頁點擊「打開 Telegram 登入」按鈕，然後在此確認。
+━━━━━━━━━━━━━━━
+🔐 *網頁登入方法*
+
+請在網頁的 QR Code 下方找到 6 位驗證碼，然後在此輸入：
+
+例如：`482619`
+
+輸入後會出現確認按鈕，點擊即可完成登入。
+━━━━━━━━━━━━━━━
 
 📖 可用命令：
-/login - 獲取登入說明
+/login - 登入說明
 /help - 幫助信息
 """
         

@@ -705,8 +705,8 @@ export class AuthService {
     if (parts.length !== 3) return false;
     
     try {
-      // 嘗試解析 payload
-      const payload = JSON.parse(atob(parts[1]));
+      // 嘗試解析 payload（處理 URL-safe Base64）
+      const payload = JSON.parse(this.base64UrlDecode(parts[1]));
       
       // 檢查是否過期
       if (payload.exp && Date.now() >= payload.exp * 1000) {
@@ -718,6 +718,19 @@ export class AuthService {
     } catch {
       return false;
     }
+  }
+  
+  /**
+   * 解碼 URL-safe Base64（處理後端 JWT 編碼）
+   */
+  private base64UrlDecode(str: string): string {
+    // 將 URL-safe 字符替換回標準 Base64
+    let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    // 補齊 padding
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+    return atob(base64);
   }
   
   private scheduleTokenRefresh(): void {

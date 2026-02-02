@@ -239,6 +239,7 @@ class TelegramBotHandler:
         """
         處理 Deep Link 登入確認
         
+        🆕 優化：先驗證 Token 有效性
         🆕 Phase 3: 多語言支持
         
         Args:
@@ -247,6 +248,41 @@ class TelegramBotHandler:
             token: 登入 Token
         """
         from datetime import datetime
+        
+        logger.info(f"[Bot] Processing login confirm for token: {token[:8]}... user: {user.get('id')}")
+        
+        # 🆕 先驗證 Token 有效性
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self.internal_api}/api/v1/auth/login-token/{token}",
+                    timeout=aiohttp.ClientTimeout(total=5)
+                ) as resp:
+                    result = await resp.json()
+                    
+                    if not result.get('success'):
+                        logger.warning(f"[Bot] Token not found: {token[:8]}...")
+                        error_msg = get_message('login_expired', user)
+                        await self._send_message(chat_id, error_msg)
+                        return "Token 不存在"
+                    
+                    token_status = result.get('data', {}).get('status', '')
+                    
+                    if token_status == 'expired':
+                        logger.warning(f"[Bot] Token expired: {token[:8]}...")
+                        error_msg = get_message('login_expired', user)
+                        await self._send_message(chat_id, error_msg)
+                        return "Token 已過期"
+                    
+                    if token_status == 'confirmed':
+                        logger.info(f"[Bot] Token already confirmed: {token[:8]}...")
+                        success_msg = get_message('login_success', user)
+                        await self._send_message(chat_id, success_msg)
+                        return "已確認登入"
+                        
+        except Exception as e:
+            logger.error(f"[Bot] Token verification failed: {e}")
+            # 驗證失敗不阻止流程，繼續顯示確認按鈕
         
         user_name = user.get('first_name', 'User')
         current_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
@@ -282,14 +318,21 @@ class TelegramBotHandler:
 {warning}
 """
         
-        await self._send_message(
+        logger.info(f"[Bot] Sending login confirmation message to {chat_id}")
+        
+        sent = await self._send_message(
             chat_id, 
             message, 
             reply_markup=keyboard,
             parse_mode="Markdown"
         )
         
-        return "登入確認請求已發送"
+        if sent:
+            logger.info(f"[Bot] Login confirmation sent successfully to {chat_id}")
+            return "登入確認請求已發送"
+        else:
+            logger.error(f"[Bot] Failed to send login confirmation to {chat_id}")
+            return "發送確認請求失敗"
     
     async def _confirm_login(self, token: str, user: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -297,13 +340,18 @@ class TelegramBotHandler:
         
         調用內部 API 確認登入
         """
+        logger.info(f"[Bot] Confirming login for token: {token[:8]}... user: {user.get('id')}")
+        
         try:
             # 獲取 Bot 密鑰（用於 API 驗證）
             bot_secret = self.bot_token.split(':')[-1][:16] if self.bot_token else ''
             
+            confirm_url = f"{self.internal_api}/api/v1/auth/login-token/{token}/confirm"
+            logger.info(f"[Bot] Calling confirm API: {confirm_url}")
+            
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{self.internal_api}/api/v1/auth/login-token/{token}/confirm",
+                    confirm_url,
                     json={
                         'bot_secret': bot_secret,
                         'telegram_id': str(user.get('id', '')),
@@ -313,15 +361,20 @@ class TelegramBotHandler:
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as resp:
                     result = await resp.json()
+                    logger.info(f"[Bot] Confirm API response: {result}")
                     
                     if result.get('success'):
-                        logger.info(f"Login confirmed for TG user {user.get('id')}")
+                        logger.info(f"[Bot] Login confirmed successfully for TG user {user.get('id')}")
                         return {'success': True, 'message': '登入成功！'}
                     else:
-                        return {'success': False, 'message': result.get('error', '確認失敗')}
+                        error_msg = result.get('error', '確認失敗')
+                        logger.warning(f"[Bot] Confirm failed: {error_msg}")
+                        return {'success': False, 'message': error_msg}
         
         except Exception as e:
-            logger.error(f"Confirm login error: {e}")
+            logger.error(f"[Bot] Confirm login error: {e}")
+            import traceback
+            traceback.print_exc()
             return {'success': False, 'message': f'系統錯誤: {str(e)}'}
     
     async def _send_welcome(self, chat_id: int, user: Dict[str, Any]) -> str:
@@ -401,6 +454,8 @@ class TelegramBotHandler:
             if parse_mode:
                 payload['parse_mode'] = parse_mode
             
+            logger.info(f"[Bot] Sending message to {chat_id}, has_buttons={reply_markup is not None}")
+            
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     f"{self.api_base}/sendMessage",
@@ -408,10 +463,16 @@ class TelegramBotHandler:
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as resp:
                     result = await resp.json()
+                    if result.get('ok'):
+                        logger.info(f"[Bot] Message sent successfully to {chat_id}")
+                    else:
+                        logger.error(f"[Bot] Failed to send message: {result}")
                     return result.get('ok', False)
         
         except Exception as e:
-            logger.error(f"Send message error: {e}")
+            logger.error(f"[Bot] Send message error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     async def _answer_callback(self, callback_id: str, text: str) -> bool:

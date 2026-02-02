@@ -968,26 +968,32 @@ class HttpApiServer:
                 user_agent=user_agent
             )
             
-            # 構建 Deep Link URL
+            # 構建 Telegram Deep Link URL（用於中轉頁面）
             bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', 'TGSmartKingBot')
             deep_link_url = f"https://t.me/{bot_username}?start=login_{login_token.token}"
             
-            # 🆕 Phase 3: 本地生成 QR Code
-            qr_image = LoginTokenService.generate_qr_image(deep_link_url, size=qr_size)
+            # 🆕 構建掃碼中轉頁面 URL（普通 HTTPS，任何相機都能識別）
+            # 這是 QR Code 實際包含的內容
+            site_url = os.environ.get('SITE_URL', 'https://tgw.usdt2026.cc')
+            scan_login_url = f"{site_url}/auth/scan-login?token={login_token.token}"
+            
+            # 🆕 Phase 3: 本地生成 QR Code（使用中轉頁面 URL）
+            qr_image = LoginTokenService.generate_qr_image(scan_login_url, size=qr_size)
             
             # 如果本地生成失敗，提供備用 URL
-            qr_fallback_url = LoginTokenService.get_fallback_qr_url(deep_link_url, size=qr_size) if not qr_image else None
+            qr_fallback_url = LoginTokenService.get_fallback_qr_url(scan_login_url, size=qr_size) if not qr_image else None
             
             return self._json_response({
                 'success': True,
                 'data': {
                     'token': login_token.token,
                     'token_id': login_token.id,
-                    'deep_link_url': deep_link_url,
+                    'deep_link_url': deep_link_url,      # Telegram Deep Link（中轉頁用）
+                    'scan_login_url': scan_login_url,    # 🆕 掃碼中轉頁 URL
                     'bot_username': bot_username,
                     'expires_in': 300,  # 5 分鐘
                     'expires_at': login_token.expires_at.isoformat(),
-                    # 🆕 Phase 3: QR Code 數據
+                    # 🆕 Phase 3: QR Code 數據（內容是 scan_login_url）
                     'qr_image': qr_image,           # Base64 圖片（優先使用）
                     'qr_fallback_url': qr_fallback_url  # 備用外部 URL
                 }
@@ -1073,9 +1079,27 @@ class HttpApiServer:
                 })
             
             # 其他狀態（pending, scanned）
+            # 🆕 返回 deep_link_url 供中轉頁面使用
+            import os
+            bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', 'TGSmartKingBot')
+            deep_link_url = f"https://t.me/{bot_username}?start=login_{token}"
+            
+            # 獲取 Token 對象以計算剩餘時間
+            login_token = service.get_token(token)
+            expires_in = 0
+            if login_token and login_token.expires_at:
+                from datetime import datetime
+                remaining = (login_token.expires_at - datetime.utcnow()).total_seconds()
+                expires_in = max(0, int(remaining))
+            
             return self._json_response({
                 'success': True,
-                'data': {'status': status}
+                'data': {
+                    'status': status,
+                    'deep_link_url': deep_link_url,  # 🆕 Telegram Deep Link
+                    'bot_username': bot_username,
+                    'expires_in': expires_in
+                }
             })
             
         except Exception as e:
@@ -1433,8 +1457,22 @@ class HttpApiServer:
             from telegram.bot_handler import get_bot_handler
             
             update = await request.json()
+            logger.info(f"[Webhook] Received update: {update.get('update_id')}")
+            
+            # 提取消息內容用於日誌
+            message = update.get('message', {})
+            callback = update.get('callback_query', {})
+            if message:
+                text = message.get('text', '')
+                chat_id = message.get('chat', {}).get('id')
+                logger.info(f"[Webhook] Message from {chat_id}: {text[:100]}")
+            elif callback:
+                data = callback.get('data', '')
+                logger.info(f"[Webhook] Callback: {data}")
+            
             handler = get_bot_handler()
-            await handler.handle_update(update)
+            result = await handler.handle_update(update)
+            logger.info(f"[Webhook] Handler result: {result}")
             
             return self._json_response({'ok': True})
             

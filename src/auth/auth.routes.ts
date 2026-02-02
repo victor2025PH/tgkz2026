@@ -48,6 +48,11 @@ export const AUTH_ROUTES: Routes = [
         path: 'telegram-callback',
         loadComponent: () => import('./telegram-callback.component').then(m => m.TelegramCallbackComponent),
         title: 'Telegram Login - TG-Matrix'
+      },
+      {
+        path: 'scan-login',
+        loadComponent: () => import('./scan-login.component').then(m => m.ScanLoginComponent),
+        title: 'Scan Login - TG-Matrix'
       }
     ]
   }

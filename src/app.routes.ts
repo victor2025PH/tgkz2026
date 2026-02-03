@@ -95,6 +95,25 @@ export const routes: Routes = [
     title: '支付中心',
     canActivate: [authGuard]
   },
+  // 🆕 Phase 0: 錢包系統
+  {
+    path: 'wallet',
+    loadComponent: () => import('./views/wallet-view.component').then(m => m.WalletViewComponent),
+    title: '我的錢包',
+    canActivate: [authGuard]
+  },
+  {
+    path: 'wallet/transactions',
+    loadComponent: () => import('./views/wallet-transactions.component').then(m => m.WalletTransactionsComponent),
+    title: '交易記錄',
+    canActivate: [authGuard]
+  },
+  {
+    path: 'wallet/recharge',
+    loadComponent: () => import('./views/wallet-recharge.component').then(m => m.WalletRechargeComponent),
+    title: '充值中心',
+    canActivate: [authGuard]
+  },
   // 營銷功能 - 需要會員權限
   {
     path: 'leads',
@@ -198,6 +217,11 @@ export const VIEW_ROUTE_MAP: Record<string, string> = {
   'dashboard': '/dashboard',
   'accounts': '/accounts',
   'settings': '/settings',
+  
+  // 🆕 錢包系統
+  'wallet': '/wallet',
+  'wallet-transactions': '/wallet/transactions',
+  'wallet-recharge': '/wallet/recharge',
   
   // 🆕 營銷任務中心（核心入口）
   'marketing-hub': '/marketing-hub',

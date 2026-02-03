@@ -390,8 +390,15 @@ export class ElectronIpcService implements OnDestroy {
       
       // 添加認證頭（SaaS 模式）- 動態從 localStorage 讀取
       const token = this.authToken || localStorage.getItem('tgm_access_token');
+      console.log(`[Web Mode] Token check for ${command}:`, {
+        hasAuthToken: !!this.authToken,
+        hasLocalStorageToken: !!localStorage.getItem('tgm_access_token'),
+        tokenPrefix: token ? token.substring(0, 30) + '...' : 'NONE'
+      });
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        console.warn(`[Web Mode] ⚠️ No token available for ${command}`);
       }
       
       const fetchOptions: RequestInit = {
@@ -1358,16 +1365,24 @@ export class ElectronIpcService implements OnDestroy {
   
   /**
    * 🆕 Web 模式：HTTP invoke
+   * 🔧 修復：添加 Authorization header
    */
   private async httpInvoke(command: string, payload: any): Promise<any> {
     try {
       const url = `${this.apiBaseUrl}/api/command`;
       
+      // 🔧 修復：添加認證 Token
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      const token = this.authToken || localStorage.getItem('tgm_access_token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ command, payload })
       });
       

@@ -6052,7 +6052,25 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
     def _get_admin_db(self):
         """獲取管理員數據庫連接"""
         import sqlite3
-        db_path = os.environ.get('DATABASE_PATH', './data/tgmatrix.db')
+        # 嘗試多個可能的數據庫路徑
+        possible_paths = [
+            os.environ.get('DATABASE_PATH', ''),
+            '/app/data/tgmatrix.db',  # Docker 容器路徑
+            './data/tgmatrix.db',
+            '../data/tgmatrix.db',
+            os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
+        ]
+        
+        db_path = None
+        for path in possible_paths:
+            if path and os.path.exists(path):
+                db_path = path
+                break
+        
+        if not db_path:
+            db_path = possible_paths[1] if os.path.exists('/app') else possible_paths[2]
+        
+        logger.info(f"Using database path: {db_path}")
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         return conn
@@ -6108,13 +6126,14 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
             conn.close()
             
             # 生成 JWT
+            import time
             secret = os.environ.get('JWT_SECRET', 'tgmatrix-jwt-secret-2026')
             token = jwt.encode({
                 'admin_id': admin['id'],
                 'username': admin['username'],
                 'role': admin['role'],
                 'type': 'admin',
-                'exp': datetime.utcnow().timestamp() + 86400 * 7  # 7 天有效
+                'exp': int(time.time()) + 86400 * 7  # 7 天有效（整數時間戳）
             }, secret, algorithm='HS256')
             
             return web.json_response({
@@ -6130,8 +6149,10 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
                 }
             })
         except Exception as e:
+            import traceback
             logger.error(f"Admin login error: {e}")
-            return web.json_response({'success': False, 'message': str(e)})
+            logger.error(traceback.format_exc())
+            return web.json_response({'success': False, 'message': f'服務器錯誤: {str(e)}'})
     
     async def admin_panel_logout(self, request: web.Request) -> web.Response:
         """管理員登出"""

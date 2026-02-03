@@ -36,6 +36,8 @@ except ImportError:
     admin_handlers = None
 
 # 🆕 Phase 0 (Wallet): 導入錢包模塊
+WALLET_IMPORT_ERROR = None
+
 try:
     from wallet.handlers import setup_wallet_routes, wallet_handlers
     from wallet.admin_handlers import setup_admin_wallet_routes, admin_wallet_handlers
@@ -49,6 +51,7 @@ try:
     print("✅ Wallet module imported successfully")
 except ImportError as e:
     import traceback
+    WALLET_IMPORT_ERROR = f"ImportError: {e}\n{traceback.format_exc()}"
     print(f"⚠️ Wallet module import failed: {e}")
     traceback.print_exc()
     WALLET_MODULE_AVAILABLE = False
@@ -62,6 +65,7 @@ except ImportError as e:
     finance_report_handlers = None
 except Exception as e:
     import traceback
+    WALLET_IMPORT_ERROR = f"Exception: {e}\n{traceback.format_exc()}"
     print(f"⚠️ Wallet module error: {e}")
     traceback.print_exc()
     WALLET_MODULE_AVAILABLE = False
@@ -706,6 +710,7 @@ class HttpApiServer:
         
         return self._json_response({
             'wallet_module_available': WALLET_MODULE_AVAILABLE,
+            'wallet_import_error': WALLET_IMPORT_ERROR,
             'wallet_path': wallet_path,
             'wallet_exists': wallet_exists,
             'wallet_files': wallet_files[:20],

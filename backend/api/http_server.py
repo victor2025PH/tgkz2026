@@ -27,6 +27,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from aiohttp import web
 import aiohttp_cors
 
+# 🆕 Phase 1: 導入管理後台模塊
+try:
+    from admin import admin_handlers, audit_log, AuditAction
+    ADMIN_MODULE_AVAILABLE = True
+except ImportError:
+    ADMIN_MODULE_AVAILABLE = False
+    admin_handlers = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -404,15 +412,23 @@ class HttpApiServer:
         self.app.router.add_get('/ws', self.websocket_handler)
         self.app.router.add_get('/api/v1/ws', self.websocket_handler)
         
-        # 🆕 管理後台 API（兼容 /api/admin/ 路徑）
-        self.app.router.add_post('/api/admin/login', self.admin_panel_login)
+        # 🆕 管理後台 API（Phase 1 優化版）
+        if ADMIN_MODULE_AVAILABLE and admin_handlers:
+            # 使用新的處理器（帶審計日誌）
+            self.app.router.add_post('/api/admin/login', admin_handlers.login)
+            self.app.router.add_post('/api/admin/change-password', admin_handlers.change_password)
+            self.app.router.add_get('/api/admin/dashboard', admin_handlers.get_dashboard)
+            self.app.router.add_get('/api/admin/users', admin_handlers.get_users)
+            self.app.router.add_post('/api/admin/users/{user_id}/extend', admin_handlers.extend_user)
+            self.app.router.add_post('/api/admin/users/{user_id}/ban', admin_handlers.ban_user)
+            self.app.router.add_get('/api/admin/audit-logs', admin_handlers.get_audit_logs)
+            self.app.router.add_get('/api/admin/audit-stats', admin_handlers.get_audit_stats)
+            logger.info("✅ Admin module loaded with Phase 1 features")
+        
+        # 保留舊的處理器作為後備（或未遷移的功能）
         self.app.router.add_post('/api/admin/logout', self.admin_panel_logout)
         self.app.router.add_get('/api/admin/verify', self.admin_panel_verify)
-        self.app.router.add_get('/api/admin/dashboard', self.admin_panel_dashboard)
-        self.app.router.add_get('/api/admin/users', self.admin_panel_users)
         self.app.router.add_get('/api/admin/users/{user_id}', self.admin_panel_user_detail)
-        self.app.router.add_post('/api/admin/users/{user_id}/extend', self.admin_panel_user_extend)
-        self.app.router.add_post('/api/admin/users/{user_id}/ban', self.admin_panel_user_ban)
         self.app.router.add_get('/api/admin/licenses', self.admin_panel_licenses)
         self.app.router.add_post('/api/admin/licenses/generate', self.admin_panel_generate_licenses)
         self.app.router.add_post('/api/admin/licenses/disable', self.admin_panel_disable_license)
@@ -424,7 +440,6 @@ class HttpApiServer:
         self.app.router.add_get('/api/admin/quotas', self.admin_panel_quotas)
         self.app.router.add_get('/api/admin/announcements', self.admin_panel_announcements)
         self.app.router.add_post('/api/admin/announcements', self.admin_panel_create_announcement)
-        self.app.router.add_post('/api/admin/change-password', self.admin_panel_change_password)
         self.app.router.add_get('/api/admin/admins', self.admin_panel_list_admins)
         self.app.router.add_post('/api/admin/admins', self.admin_panel_create_admin)
         self.app.router.add_get('/api/admin/referral-stats', self.admin_panel_referral_stats)

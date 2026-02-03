@@ -89,6 +89,13 @@ export class ElectronIpcService implements OnDestroy {
     
     console.log(`[Web Mode] API URL: ${this.apiBaseUrl}`);
     
+    // 🔧 修復：從 localStorage 恢復 Token（確保頁面刷新後 WebSocket 帶認證）
+    const savedToken = localStorage.getItem('tgm_access_token');
+    if (savedToken) {
+      console.log('[Web Mode] Found saved token, using for WebSocket auth');
+      this.authToken = savedToken;
+    }
+    
     // 連接 WebSocket
     this.connectWebSocket();
   }
@@ -115,7 +122,16 @@ export class ElectronIpcService implements OnDestroy {
       wsUrl = `${protocol}//${window.location.host}/ws`;
     }
     
-    console.log(`[Web Mode] Connecting WebSocket: ${wsUrl} (attempt ${this.wsReconnectAttempts + 1})`);
+    // 🔧 修復：添加認證 Token 到 WebSocket 連接
+    const token = this.authToken || localStorage.getItem('tgm_access_token');
+    if (token) {
+      wsUrl += `?token=${encodeURIComponent(token)}`;
+    }
+    
+    console.log(`[Web Mode] Connecting WebSocket: ${wsUrl.split('?')[0]} (attempt ${this.wsReconnectAttempts + 1}, hasToken: ${!!token})`);
+    
+    // 如果沒有 Token，標記連接未認證，稍後重連
+    const wsHasAuth = !!token;
     
     try {
       this.ws = new WebSocket(wsUrl);
@@ -344,9 +360,29 @@ export class ElectronIpcService implements OnDestroy {
   
   /**
    * 設置認證 Token（供 AuthService 調用）
+   * 🔧 優化：Token 設置後重新連接 WebSocket 以傳遞認證
    */
   setAuthToken(token: string | null): void {
+    const hadToken = !!this.authToken;
     this.authToken = token;
+    
+    // 如果設置了新 Token，重新連接 WebSocket 帶認證
+    if (token && !hadToken && this.isWebMode) {
+      console.log('[Web Mode] Token set, reconnecting WebSocket with auth...');
+      this.reconnectWebSocketWithAuth();
+    }
+  }
+  
+  /**
+   * 🆕 重新連接 WebSocket 帶認證
+   */
+  private reconnectWebSocketWithAuth(): void {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    this.wsReconnectAttempts = 0;
+    this.connectWebSocket();
   }
   
   /**

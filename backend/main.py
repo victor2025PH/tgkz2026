@@ -22348,6 +22348,17 @@ class BackendService:
             pool = get_api_credential_pool(data_dir)
             print(f"[Backend] API pool loaded, credentials count: {len(pool.credentials)}", file=sys.stderr)
 
+            # 🆕 獲取當前用戶 ID（多租戶隔離）
+            owner_user_id = None
+            try:
+                from core.tenant_context import get_current_tenant
+                tenant = get_current_tenant()
+                if tenant and tenant.user_id:
+                    owner_user_id = tenant.user_id
+                    print(f"[Backend] API credentials filter by user: {owner_user_id}", file=sys.stderr)
+            except ImportError:
+                pass
+
             # 每次獲取時同步使用計數，確保準確性
             accounts = await db.get_all_accounts()
             print(f"[Backend] Got {len(accounts)} accounts for API sync", file=sys.stderr)
@@ -22355,9 +22366,9 @@ class BackendService:
 
             statistics = pool.get_statistics()
             print(f"[Backend] API statistics: {statistics}", file=sys.stderr)
-            # 傳遞帳號數據以獲取正確的綁定帳號列表
-            credentials = pool.list_credentials(include_hash=True, accounts=accounts)
-            print(f"[Backend] Sending {len(credentials)} API credentials to frontend", file=sys.stderr)
+            # 🆕 傳遞 owner_user_id 進行多租戶過濾
+            credentials = pool.list_credentials(include_hash=True, accounts=accounts, owner_user_id=owner_user_id)
+            print(f"[Backend] Sending {len(credentials)} API credentials to frontend (filtered by user)", file=sys.stderr)
 
             response = {
                 "success": True,
@@ -22415,12 +22426,23 @@ class BackendService:
                 })
                 return
             
+            # 🆕 獲取當前用戶 ID（多租戶隔離）
+            owner_user_id = ""
+            try:
+                from core.tenant_context import get_current_tenant
+                tenant = get_current_tenant()
+                if tenant and tenant.user_id:
+                    owner_user_id = tenant.user_id
+            except ImportError:
+                pass
+            
             success = pool.add_credential(
                 api_id=api_id,
                 api_hash=api_hash,
                 name=name or f"API_{api_id[-4:]}",
                 source=source,
-                max_accounts=max_accounts
+                max_accounts=max_accounts,
+                owner_user_id=owner_user_id  # 🆕 多租戶隔離
             )
             
             if success:
@@ -22457,7 +22479,17 @@ class BackendService:
                 })
                 return
             
-            success = pool.remove_credential(api_id)
+            # 🆕 獲取當前用戶 ID（多租戶隔離）
+            owner_user_id = None
+            try:
+                from core.tenant_context import get_current_tenant
+                tenant = get_current_tenant()
+                if tenant and tenant.user_id:
+                    owner_user_id = tenant.user_id
+            except ImportError:
+                pass
+            
+            success = pool.remove_credential(api_id, owner_user_id=owner_user_id)
             
             if success:
                 self.send_event("api-credential-removed", {"success": True})

@@ -216,7 +216,10 @@
                             </select>
                         </div>
                         <div class="text-sm text-gray-400">
-                            共 {{ filteredUsers.length }} 個用戶
+                            共 {{ userPagination.total || filteredUsers.length }} 個用戶
+                            <span v-if="userPagination.total_pages > 1" class="ml-2">
+                                (第 {{ userPagination.page }}/{{ userPagination.total_pages }} 頁)
+                            </span>
                         </div>
                     </div>
                     
@@ -238,12 +241,16 @@
                                     class="border-t border-gray-700 table-row-hover transition-colors">
                                     <td class="px-6 py-4">
                                         <div class="flex items-center">
-                                            <div class="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center mr-3 text-lg">
-                                                {{ user.email ? user.email[0].toUpperCase() : '?' }}
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center mr-3 text-lg font-bold">
+                                                {{ user.avatarLetter || '?' }}
                                             </div>
                                             <div>
-                                                <p class="font-medium">{{ user.email || user.nickname || '未設置' }}</p>
-                                                <p class="text-sm text-gray-400">{{ (user.machineId || '').slice(0,16) }}...</p>
+                                                <p class="font-medium">{{ user.displayName }}</p>
+                                                <p class="text-sm text-gray-400">
+                                                    <span v-if="user.telegramUsername">@{{ user.telegramUsername }}</span>
+                                                    <span v-else-if="user.email">{{ user.email }}</span>
+                                                    <span v-else>{{ user.userId?.slice(0,12) }}...</span>
+                                                </p>
                                             </div>
                                         </div>
                                     </td>
@@ -337,18 +344,18 @@
                                     class="border-t border-gray-700 table-row-hover">
                                     <td class="px-6 py-4">
                                         <div class="flex items-center">
-                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-orange-500 to-red-500 flex items-center justify-center mr-3">
-                                                {{ user.email ? user.email[0].toUpperCase() : '?' }}
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-orange-500 to-red-500 flex items-center justify-center mr-3 font-bold">
+                                                {{ (user.nickname || user.email || '?')[0].toUpperCase() }}
                                             </div>
                                             <div>
-                                                <p class="font-medium">{{ user.email || '未設置' }}</p>
-                                                <p class="text-sm text-gray-400">{{ user.user_id }}</p>
+                                                <p class="font-medium">{{ user.nickname || user.email || user.telegram_username || '未設置' }}</p>
+                                                <p class="text-sm text-gray-400">{{ user.user_id?.slice(0,12) }}...</p>
                                             </div>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4">
                                         <span :class="'rank-' + user.level" class="font-medium">
-                                            {{ user.level_icon }} {{ user.level_name }}
+                                            {{ user.level_icon || '⚔️' }} {{ user.level_name || getLevelName(user.level) }}
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 text-orange-400">

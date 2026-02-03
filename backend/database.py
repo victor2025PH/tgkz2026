@@ -2614,7 +2614,10 @@ class Database:
             return None
     
     async def add_account(self, account_data: Dict[str, Any]) -> int:
-        """添加帳號"""
+        """添加帳號
+        
+        🆕 多租戶支持：自動設置 owner_user_id
+        """
         try:
             accounts_db_path = self._get_accounts_db_path()
             accounts_db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2639,6 +2642,18 @@ class Database:
                     return f'[{col}]'
                 return col
 
+            # 🆕 自動設置 owner_user_id（多租戶支持）
+            if 'owner_user_id' not in account_data:
+                try:
+                    from core.tenant_context import get_current_tenant
+                    tenant = get_current_tenant()
+                    if tenant and tenant.user_id:
+                        account_data['owner_user_id'] = tenant.user_id
+                    else:
+                        account_data['owner_user_id'] = 'local_user'
+                except ImportError:
+                    account_data['owner_user_id'] = 'local_user'
+
             # 定義有效的列名（與表結構匹配）
             valid_columns = {
                 'phone', 'apiId', 'apiHash', 'proxy', 'group', 'role', 'status',
@@ -2649,7 +2664,7 @@ class Database:
                 'dailySendCount', 'dailySendLimit', 'healthScore',
                 'nickname', 'notes', 'aiEnabled', 'aiModel', 'aiPersonality',
                 'firstName', 'lastName', 'username', 'bio', 'avatarPath', 'telegramId',
-                'tags'  # 標籤（JSON 字符串）
+                'tags', 'owner_user_id'  # 🆕 添加 owner_user_id
             }
 
             # tags 需要轉換為 JSON 字符串
@@ -2700,8 +2715,14 @@ class Database:
             traceback.print_exc()
             raise
     
-    async def get_all_accounts(self) -> List[Dict]:
-        """獲取所有帳號"""
+    async def get_all_accounts(self, owner_user_id: str = None) -> List[Dict]:
+        """獲取所有帳號
+        
+        🆕 多租戶支持：
+        - 如果提供 owner_user_id，只返回該用戶的帳號
+        - 如果未提供，嘗試從租戶上下文獲取
+        - Electron 模式下返回所有帳號
+        """
         try:
             accounts_db_path = self._get_accounts_db_path()
             if not accounts_db_path.exists():
@@ -2712,12 +2733,35 @@ class Database:
             # 確保表存在
             await self._ensure_accounts_table(accounts_db_path)
             
+            # 🆕 獲取租戶上下文
+            if owner_user_id is None:
+                try:
+                    from core.tenant_context import get_current_tenant
+                    tenant = get_current_tenant()
+                    if tenant and tenant.user_id:
+                        owner_user_id = tenant.user_id
+                except ImportError:
+                    pass
+            
+            # 🆕 構建查詢（支持多租戶過濾）
+            import os
+            is_electron = os.environ.get('ELECTRON_MODE', 'false').lower() == 'true'
+            
+            if is_electron or not owner_user_id:
+                # Electron 模式或無用戶上下文：返回所有帳號
+                query = 'SELECT * FROM accounts ORDER BY id'
+                params = ()
+            else:
+                # SaaS 模式：只返回當前用戶的帳號
+                query = 'SELECT * FROM accounts WHERE owner_user_id = ? OR owner_user_id IS NULL OR owner_user_id = "local_user" ORDER BY id'
+                params = (owner_user_id,)
+            
             if not HAS_AIOSQLITE:
                 # 同步回退
                 conn = sqlite3.connect(str(accounts_db_path))
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
-                cursor.execute('SELECT * FROM accounts ORDER BY id')
+                cursor.execute(query, params)
                 rows = cursor.fetchall()
                 conn.close()
                 return [dict(row) for row in rows]
@@ -2725,11 +2769,13 @@ class Database:
             # 異步方式
             async with aiosqlite.connect(str(accounts_db_path)) as conn:
                 conn.row_factory = aiosqlite.Row
-                cursor = await conn.execute('SELECT * FROM accounts ORDER BY id')
+                cursor = await conn.execute(query, params)
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
         except Exception as e:
             print(f"Error getting all accounts: {e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     async def update_account(self, account_id: int, updates: Dict[str, Any]) -> bool:

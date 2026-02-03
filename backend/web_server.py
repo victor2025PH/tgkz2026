@@ -19,6 +19,14 @@ logger = logging.getLogger(__name__)
 # 確保能導入本地模組
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# 🆕 診斷: 檢查 wallet 目錄
+wallet_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wallet')
+if os.path.exists(wallet_dir):
+    wallet_files = os.listdir(wallet_dir)
+    logger.info(f"✅ Wallet directory found: {len(wallet_files)} files")
+else:
+    logger.warning(f"⚠️ Wallet directory NOT found: {wallet_dir}")
+
 
 async def init_backend():
     """初始化後端服務"""

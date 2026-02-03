@@ -134,8 +134,8 @@
                             <div class="flex items-center justify-between">
                                 <div>
                                     <p class="text-blue-100">總用戶數</p>
-                                    <p class="text-3xl font-bold mt-2">{{ stats.totalUsers.toLocaleString() }}</p>
-                                    <p class="text-blue-200 text-sm mt-1">+{{ stats.newUsersToday }} 今日新增</p>
+                                    <p class="text-3xl font-bold mt-2">{{ (stats.totalUsers || 0).toLocaleString() }}</p>
+                                    <p class="text-blue-200 text-sm mt-1">+{{ stats.newUsersToday || 0 }} 今日新增</p>
                                 </div>
                                 <span class="text-5xl opacity-50">👥</span>
                             </div>
@@ -144,8 +144,8 @@
                             <div class="flex items-center justify-between">
                                 <div>
                                     <p class="text-green-100">付費用戶</p>
-                                    <p class="text-3xl font-bold mt-2">{{ stats.paidUsers.toLocaleString() }}</p>
-                                    <p class="text-green-200 text-sm mt-1">轉化率 {{ stats.conversionRate }}%</p>
+                                    <p class="text-3xl font-bold mt-2">{{ (stats.paidUsers || 0).toLocaleString() }}</p>
+                                    <p class="text-green-200 text-sm mt-1">轉化率 {{ stats.conversionRate || 0 }}%</p>
                                 </div>
                                 <span class="text-5xl opacity-50">💎</span>
                             </div>
@@ -154,8 +154,8 @@
                             <div class="flex items-center justify-between">
                                 <div>
                                     <p class="text-purple-100">總收入</p>
-                                    <p class="text-3xl font-bold mt-2">{{ stats.totalRevenue.toLocaleString() }} USDT</p>
-                                    <p class="text-purple-200 text-sm mt-1">+{{ stats.revenueToday }} USDT 今日</p>
+                                    <p class="text-3xl font-bold mt-2">{{ (stats.totalRevenue || 0).toLocaleString() }} USDT</p>
+                                    <p class="text-purple-200 text-sm mt-1">+{{ stats.revenueToday || 0 }} USDT 今日</p>
                                 </div>
                                 <span class="text-5xl opacity-50">💰</span>
                             </div>
@@ -164,8 +164,8 @@
                             <div class="flex items-center justify-between">
                                 <div>
                                     <p class="text-orange-100">可用卡密</p>
-                                    <p class="text-3xl font-bold mt-2">{{ stats.unusedLicenses.toLocaleString() }}</p>
-                                    <p class="text-orange-200 text-sm mt-1">共 {{ stats.totalLicenses }} 張</p>
+                                    <p class="text-3xl font-bold mt-2">{{ (stats.unusedLicenses || 0).toLocaleString() }}</p>
+                                    <p class="text-orange-200 text-sm mt-1">共 {{ stats.totalLicenses || 0 }} 張</p>
                                 </div>
                                 <span class="text-5xl opacity-50">🎟️</span>
                             </div>

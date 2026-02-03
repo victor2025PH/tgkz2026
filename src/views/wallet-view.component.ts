@@ -38,6 +38,12 @@ import {
           <button class="action-btn" (click)="showTransactions()">
             📜 交易記錄
           </button>
+          <button class="action-btn" (click)="showOrders()">
+            📋 充值訂單
+          </button>
+          <button class="action-btn" (click)="showAnalytics()">
+            📊 消費分析
+          </button>
         </div>
       </div>
 
@@ -642,6 +648,14 @@ export class WalletViewComponent implements OnInit {
   
   showTransactions() {
     this.router.navigate(['/wallet/transactions']);
+  }
+
+  showOrders() {
+    this.router.navigate(['/wallet/orders']);
+  }
+
+  showAnalytics() {
+    this.router.navigate(['/wallet/analytics']);
   }
   
   formatCents(cents: number): string {

@@ -105,14 +105,15 @@ jobs:
           ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 deploy-server << 'ENDSSH'
             cd /opt/tg-matrix
             
-            # 重新創建容器（確保新的 volume 掛載生效）
+            # 重新創建 nginx 容器（確保新的 volume 掛載生效）
             sudo docker compose up -d --force-recreate web
             
-            # 重啟 API 服務
-            sudo docker compose restart api
+            # 重建並重啟 API 服務（後端代碼更新時需要）
+            sudo docker compose build api
+            sudo docker compose up -d --force-recreate api
             
             # 等待服務啟動
-            sleep 10
+            sleep 15
             
             # 顯示狀態
             sudo docker compose ps

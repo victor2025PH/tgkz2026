@@ -650,6 +650,374 @@ class AdminHandlers:
         stats = audit_log.get_stats(days)
         
         return success_response(stats)
+    
+    # ==================== 卡密管理 ====================
+    
+    @handle_exception
+    async def get_licenses(self, request: web.Request) -> web.Response:
+        """獲取卡密列表"""
+        admin = self._require_auth(request)
+        
+        conn = self.adapter.get_connection()
+        try:
+            cursor = conn.cursor()
+            
+            # 檢查 licenses 表是否存在
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='licenses'")
+            if not cursor.fetchone():
+                return success_response({
+                    'licenses': [],
+                    'stats': {'total': 0, 'unused': 0, 'used': 0, 'disabled': 0}
+                })
+            
+            # 獲取卡密列表
+            cursor.execute('''
+                SELECT license_key, level, duration_days, status, 
+                       created_at, used_at, used_by, notes
+                FROM licenses 
+                ORDER BY created_at DESC 
+                LIMIT 500
+            ''')
+            
+            level_config = {
+                'S': {'name': '白銀精英', 'icon': '🥈'},
+                'G': {'name': '黃金大師', 'icon': '🥇'},
+                'D': {'name': '鑽石王牌', 'icon': '💎'},
+                'T': {'name': '星耀傳說', 'icon': '🌟'},
+                'K': {'name': '榮耀王者', 'icon': '👑'},
+                'silver': {'name': '白銀精英', 'icon': '🥈'},
+                'gold': {'name': '黃金大師', 'icon': '🥇'},
+                'diamond': {'name': '鑽石王牌', 'icon': '💎'},
+                'star': {'name': '星耀傳說', 'icon': '🌟'},
+                'king': {'name': '榮耀王者', 'icon': '👑'}
+            }
+            
+            licenses = []
+            for row in cursor.fetchall():
+                l = dict(row)
+                level = l.get('level', 'S')
+                config = level_config.get(level, {'name': level, 'icon': '🎫'})
+                licenses.append({
+                    'key': l.get('license_key', ''),
+                    'level': level,
+                    'levelName': config['name'],
+                    'levelIcon': config['icon'],
+                    'durationDays': l.get('duration_days', 30),
+                    'status': l.get('status', 'unused'),
+                    'createdAt': l.get('created_at', ''),
+                    'usedAt': l.get('used_at', ''),
+                    'usedBy': l.get('used_by', ''),
+                    'notes': l.get('notes', '')
+                })
+            
+            # 統計
+            cursor.execute("SELECT status, COUNT(*) as count FROM licenses GROUP BY status")
+            stats_raw = {row['status']: row['count'] for row in cursor.fetchall()}
+            
+            return success_response({
+                'licenses': licenses,
+                'stats': {
+                    'total': sum(stats_raw.values()),
+                    'unused': stats_raw.get('unused', 0),
+                    'used': stats_raw.get('used', 0),
+                    'disabled': stats_raw.get('disabled', 0)
+                }
+            })
+            
+        finally:
+            conn.close()
+    
+    @handle_exception
+    async def generate_licenses(self, request: web.Request) -> web.Response:
+        """生成卡密"""
+        import secrets
+        import string
+        
+        admin = self._require_auth(request)
+        data = await request.json()
+        
+        level = data.get('level', 'S')
+        duration_days = int(data.get('duration', data.get('duration_days', 30)))
+        count = min(int(data.get('count', 1)), 100)  # 最多一次生成 100 個
+        notes = data.get('notes', '')
+        
+        conn = self.adapter.get_connection()
+        ip_address = self._get_client_ip(request)
+        
+        try:
+            cursor = conn.cursor()
+            
+            # 確保 licenses 表存在
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS licenses (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    license_key TEXT UNIQUE NOT NULL,
+                    level TEXT NOT NULL,
+                    duration_days INTEGER DEFAULT 30,
+                    status TEXT DEFAULT 'unused',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_by INTEGER,
+                    used_at TIMESTAMP,
+                    used_by TEXT,
+                    notes TEXT
+                )
+            ''')
+            
+            # 生成卡密
+            generated = []
+            alphabet = string.ascii_uppercase + string.digits
+            
+            for _ in range(count):
+                # 格式: XXXX-XXXX-XXXX-XXXX
+                key = '-'.join([''.join(secrets.choice(alphabet) for _ in range(4)) for _ in range(4)])
+                
+                try:
+                    cursor.execute('''
+                        INSERT INTO licenses (license_key, level, duration_days, created_by, notes)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (key, level, duration_days, admin['admin_id'], notes))
+                    generated.append(key)
+                except Exception as e:
+                    logger.warning(f"Failed to insert license {key}: {e}")
+            
+            conn.commit()
+            
+            # 審計日誌
+            audit_log.log(
+                action=AuditAction.LICENSE_GENERATE,
+                admin_id=admin['admin_id'],
+                admin_username=admin['username'],
+                resource_type="license",
+                new_value={
+                    'level': level,
+                    'duration_days': duration_days,
+                    'count': len(generated)
+                },
+                description=f"生成 {len(generated)} 張 {level} 級卡密",
+                ip_address=ip_address,
+                status="success"
+            )
+            
+            return success_response({
+                'generated': generated,
+                'count': len(generated)
+            }, message=f"成功生成 {len(generated)} 張卡密")
+            
+        except Exception as e:
+            audit_log.log(
+                action=AuditAction.LICENSE_GENERATE,
+                admin_id=admin['admin_id'],
+                admin_username=admin['username'],
+                resource_type="license",
+                status="failed",
+                error_message=str(e)
+            )
+            raise
+        finally:
+            conn.close()
+    
+    @handle_exception
+    async def disable_license(self, request: web.Request) -> web.Response:
+        """禁用卡密"""
+        admin = self._require_auth(request)
+        data = await request.json()
+        
+        license_key = data.get('license_key', data.get('key', ''))
+        if not license_key:
+            return error_response(ErrorCode.VALIDATION_REQUIRED_FIELD, details={'field': 'license_key'})
+        
+        conn = self.adapter.get_connection()
+        ip_address = self._get_client_ip(request)
+        
+        try:
+            cursor = conn.cursor()
+            
+            # 獲取原始狀態
+            cursor.execute('SELECT status FROM licenses WHERE license_key = ?', (license_key,))
+            row = cursor.fetchone()
+            
+            if not row:
+                return error_response(ErrorCode.LICENSE_NOT_FOUND)
+            
+            old_status = row['status']
+            
+            # 更新狀態
+            cursor.execute(
+                "UPDATE licenses SET status = 'disabled' WHERE license_key = ?",
+                (license_key,)
+            )
+            conn.commit()
+            
+            # 審計日誌
+            audit_log.log(
+                action=AuditAction.LICENSE_DISABLE,
+                admin_id=admin['admin_id'],
+                admin_username=admin['username'],
+                resource_type="license",
+                resource_id=license_key,
+                old_value={'status': old_status},
+                new_value={'status': 'disabled'},
+                description=f"禁用卡密 {license_key[:8]}...",
+                ip_address=ip_address,
+                status="success"
+            )
+            
+            return success_response(message="卡密已禁用")
+            
+        finally:
+            conn.close()
+    
+    # ==================== 訂單管理 ====================
+    
+    @handle_exception
+    async def get_orders(self, request: web.Request) -> web.Response:
+        """獲取訂單列表"""
+        admin = self._require_auth(request)
+        
+        status_filter = request.query.get('status', '')
+        
+        conn = self.adapter.get_connection()
+        try:
+            cursor = conn.cursor()
+            
+            # 檢查 orders 表是否存在
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'")
+            if not cursor.fetchone():
+                return success_response({
+                    'orders': [],
+                    'stats': {'total': 0, 'pending': 0, 'paid': 0, 'cancelled': 0}
+                })
+            
+            # 構建查詢
+            if status_filter:
+                cursor.execute('''
+                    SELECT * FROM orders 
+                    WHERE status = ?
+                    ORDER BY created_at DESC 
+                    LIMIT 500
+                ''', (status_filter,))
+            else:
+                cursor.execute('''
+                    SELECT * FROM orders 
+                    ORDER BY created_at DESC 
+                    LIMIT 500
+                ''')
+            
+            orders = []
+            for row in cursor.fetchall():
+                o = dict(row)
+                orders.append({
+                    'orderId': o.get('order_id', o.get('id', '')),
+                    'userId': o.get('user_id', ''),
+                    'level': o.get('level', o.get('product_level', '')),
+                    'duration': o.get('duration_days', o.get('duration', 30)),
+                    'amount': o.get('amount', 0),
+                    'status': o.get('status', 'pending'),
+                    'paymentMethod': o.get('payment_method', ''),
+                    'createdAt': o.get('created_at', ''),
+                    'paidAt': o.get('paid_at', '')
+                })
+            
+            # 統計
+            cursor.execute("SELECT status, COUNT(*) as count FROM orders GROUP BY status")
+            stats_raw = {row['status']: row['count'] for row in cursor.fetchall()}
+            
+            return success_response({
+                'orders': orders,
+                'stats': {
+                    'total': sum(stats_raw.values()),
+                    'pending': stats_raw.get('pending', 0),
+                    'paid': stats_raw.get('paid', 0),
+                    'cancelled': stats_raw.get('cancelled', 0)
+                }
+            })
+            
+        finally:
+            conn.close()
+    
+    @handle_exception
+    async def confirm_order(self, request: web.Request) -> web.Response:
+        """確認訂單支付"""
+        admin = self._require_auth(request)
+        data = await request.json()
+        
+        order_id = data.get('order_id', data.get('orderId', ''))
+        if not order_id:
+            return error_response(ErrorCode.VALIDATION_REQUIRED_FIELD, details={'field': 'order_id'})
+        
+        conn = self.adapter.get_connection()
+        ip_address = self._get_client_ip(request)
+        
+        try:
+            cursor = conn.cursor()
+            
+            # 獲取訂單信息
+            cursor.execute('SELECT * FROM orders WHERE order_id = ? OR id = ?', (order_id, order_id))
+            order = cursor.fetchone()
+            
+            if not order:
+                return error_response(ErrorCode.ORDER_NOT_FOUND)
+            
+            order = dict(order)
+            
+            if order['status'] == 'paid':
+                return error_response(ErrorCode.ORDER_ALREADY_PAID)
+            
+            # 更新訂單狀態
+            cursor.execute('''
+                UPDATE orders SET 
+                    status = 'paid',
+                    paid_at = CURRENT_TIMESTAMP,
+                    confirmed_by = ?
+                WHERE order_id = ? OR id = ?
+            ''', (admin['admin_id'], order_id, order_id))
+            
+            # 更新用戶會員（如果有 user_id）
+            user_id = order.get('user_id')
+            if user_id:
+                schema = self.adapter.detect_schema(conn)
+                duration = order.get('duration_days', order.get('duration', 30))
+                level = order.get('level', order.get('product_level', 'silver'))
+                
+                # 更新到期時間
+                query, id_field = self.adapter.get_update_expires_query(schema)
+                cursor.execute(query, (duration, user_id))
+                
+                # 更新等級
+                query, id_field = self.adapter.get_update_level_query(schema)
+                cursor.execute(query, (level, user_id))
+            
+            conn.commit()
+            
+            # 審計日誌
+            audit_log.log(
+                action=AuditAction.ORDER_CONFIRM,
+                admin_id=admin['admin_id'],
+                admin_username=admin['username'],
+                resource_type="order",
+                resource_id=str(order_id),
+                old_value={'status': order['status']},
+                new_value={'status': 'paid'},
+                description=f"確認訂單支付 {order_id}",
+                ip_address=ip_address,
+                status="success"
+            )
+            
+            return success_response(message="訂單已確認支付")
+            
+        except Exception as e:
+            audit_log.log(
+                action=AuditAction.ORDER_CONFIRM,
+                admin_id=admin['admin_id'],
+                admin_username=admin['username'],
+                resource_type="order",
+                resource_id=str(order_id),
+                status="failed",
+                error_message=str(e)
+            )
+            raise
+        finally:
+            conn.close()
 
 
 # 全局實例

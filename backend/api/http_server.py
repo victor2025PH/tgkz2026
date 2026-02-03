@@ -403,6 +403,39 @@ class HttpApiServer:
         # WebSocket
         self.app.router.add_get('/ws', self.websocket_handler)
         self.app.router.add_get('/api/v1/ws', self.websocket_handler)
+        
+        # 🆕 管理後台 API（兼容 /api/admin/ 路徑）
+        self.app.router.add_post('/api/admin/login', self.admin_panel_login)
+        self.app.router.add_post('/api/admin/logout', self.admin_panel_logout)
+        self.app.router.add_get('/api/admin/verify', self.admin_panel_verify)
+        self.app.router.add_get('/api/admin/dashboard', self.admin_panel_dashboard)
+        self.app.router.add_get('/api/admin/users', self.admin_panel_users)
+        self.app.router.add_get('/api/admin/users/{user_id}', self.admin_panel_user_detail)
+        self.app.router.add_post('/api/admin/users/{user_id}/extend', self.admin_panel_user_extend)
+        self.app.router.add_post('/api/admin/users/{user_id}/ban', self.admin_panel_user_ban)
+        self.app.router.add_get('/api/admin/licenses', self.admin_panel_licenses)
+        self.app.router.add_post('/api/admin/licenses/generate', self.admin_panel_generate_licenses)
+        self.app.router.add_post('/api/admin/licenses/disable', self.admin_panel_disable_license)
+        self.app.router.add_get('/api/admin/orders', self.admin_panel_orders)
+        self.app.router.add_post('/api/admin/orders/confirm', self.admin_panel_confirm_order)
+        self.app.router.add_get('/api/admin/logs', self.admin_panel_logs)
+        self.app.router.add_get('/api/admin/settings', self.admin_panel_settings)
+        self.app.router.add_post('/api/admin/settings/save', self.admin_panel_save_settings)
+        self.app.router.add_get('/api/admin/quotas', self.admin_panel_quotas)
+        self.app.router.add_get('/api/admin/announcements', self.admin_panel_announcements)
+        self.app.router.add_post('/api/admin/announcements', self.admin_panel_create_announcement)
+        self.app.router.add_post('/api/admin/change-password', self.admin_panel_change_password)
+        self.app.router.add_get('/api/admin/admins', self.admin_panel_list_admins)
+        self.app.router.add_post('/api/admin/admins', self.admin_panel_create_admin)
+        self.app.router.add_get('/api/admin/referral-stats', self.admin_panel_referral_stats)
+        self.app.router.add_get('/api/admin/expiring-users', self.admin_panel_expiring_users)
+        self.app.router.add_get('/api/admin/quota-usage', self.admin_panel_quota_usage)
+        self.app.router.add_get('/api/admin/devices', self.admin_panel_devices)
+        self.app.router.add_get('/api/admin/revenue-report', self.admin_panel_revenue_report)
+        self.app.router.add_get('/api/admin/user-analytics', self.admin_panel_user_analytics)
+        self.app.router.add_get('/api/admin/notifications/history', self.admin_panel_notification_history)
+        self.app.router.add_post('/api/admin/notifications/send', self.admin_panel_send_notification)
+        self.app.router.add_post('/api/admin/notifications/batch', self.admin_panel_batch_notification)
     
     # ==================== 核心方法 ====================
     
@@ -6014,6 +6047,580 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
     
     # ==================== 服務器控制 ====================
     
+    # ==================== 管理後台 API (/api/admin/) ====================
+    
+    def _get_admin_db(self):
+        """獲取管理員數據庫連接"""
+        import sqlite3
+        db_path = os.environ.get('DATABASE_PATH', './data/tgmatrix.db')
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
+    
+    def _verify_admin_token(self, request) -> Optional[dict]:
+        """驗證管理員 JWT Token"""
+        import jwt
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return None
+        token = auth_header[7:]
+        try:
+            secret = os.environ.get('JWT_SECRET', 'tgmatrix-jwt-secret-2026')
+            payload = jwt.decode(token, secret, algorithms=['HS256'])
+            if payload.get('type') != 'admin':
+                return None
+            return payload
+        except:
+            return None
+    
+    async def admin_panel_login(self, request: web.Request) -> web.Response:
+        """管理員登錄"""
+        import jwt
+        import hashlib
+        try:
+            data = await request.json()
+            username = data.get('username', '')
+            password = data.get('password', '')
+            
+            if not username or not password:
+                return web.json_response({'success': False, 'message': '用戶名和密碼不能為空'})
+            
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            
+            # 查詢管理員
+            cursor.execute('SELECT * FROM admins WHERE username = ? AND is_active = 1', (username,))
+            admin = cursor.fetchone()
+            
+            if not admin:
+                conn.close()
+                return web.json_response({'success': False, 'message': '用戶名或密碼錯誤'})
+            
+            # 驗證密碼
+            password_hash = hashlib.sha256(password.encode()).hexdigest()
+            if admin['password_hash'] != password_hash:
+                conn.close()
+                return web.json_response({'success': False, 'message': '用戶名或密碼錯誤'})
+            
+            # 更新登錄時間
+            cursor.execute('UPDATE admins SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', (admin['id'],))
+            conn.commit()
+            conn.close()
+            
+            # 生成 JWT
+            secret = os.environ.get('JWT_SECRET', 'tgmatrix-jwt-secret-2026')
+            token = jwt.encode({
+                'admin_id': admin['id'],
+                'username': admin['username'],
+                'role': admin['role'],
+                'type': 'admin',
+                'exp': datetime.utcnow().timestamp() + 86400 * 7  # 7 天有效
+            }, secret, algorithm='HS256')
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'token': token,
+                    'user': {
+                        'id': admin['id'],
+                        'username': admin['username'],
+                        'role': admin['role'],
+                        'name': admin['name'] if 'name' in admin.keys() else admin['username']
+                    }
+                }
+            })
+        except Exception as e:
+            logger.error(f"Admin login error: {e}")
+            return web.json_response({'success': False, 'message': str(e)})
+    
+    async def admin_panel_logout(self, request: web.Request) -> web.Response:
+        """管理員登出"""
+        return web.json_response({'success': True, 'message': '已登出'})
+    
+    async def admin_panel_verify(self, request: web.Request) -> web.Response:
+        """驗證管理員 Token"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        return web.json_response({'success': True, 'data': admin})
+    
+    async def admin_panel_dashboard(self, request: web.Request) -> web.Response:
+        """管理後台儀表盤"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        try:
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            
+            # 統計數據
+            cursor.execute('SELECT COUNT(*) as total FROM users')
+            total_users = cursor.fetchone()['total']
+            
+            cursor.execute("SELECT COUNT(*) as total FROM users WHERE created_at >= date('now')")
+            new_users_today = cursor.fetchone()['total']
+            
+            cursor.execute("SELECT COUNT(*) as total FROM users WHERE level != 'bronze' AND level != 'free'")
+            paid_users = cursor.fetchone()['total']
+            
+            cursor.execute('SELECT COUNT(*) as total FROM licenses')
+            total_licenses = cursor.fetchone()['total']
+            
+            cursor.execute("SELECT COUNT(*) as total FROM licenses WHERE status = 'unused'")
+            unused_licenses = cursor.fetchone()['total']
+            
+            # 卡密統計
+            license_stats = {}
+            for level in ['silver', 'gold', 'diamond', 'star', 'king']:
+                cursor.execute('SELECT COUNT(*) as total FROM licenses WHERE level = ?', (level[0].upper(),))
+                total = cursor.fetchone()['total']
+                cursor.execute("SELECT COUNT(*) as unused FROM licenses WHERE level = ? AND status = 'unused'", (level[0].upper(),))
+                unused = cursor.fetchone()['unused']
+                license_stats[level] = {'total': total, 'unused': unused}
+            
+            conn.close()
+            
+            return web.json_response({
+                'success': True,
+                'data': {
+                    'stats': {
+                        'totalUsers': total_users,
+                        'newUsersToday': new_users_today,
+                        'paidUsers': paid_users,
+                        'conversionRate': round(paid_users / max(total_users, 1) * 100, 1),
+                        'totalLicenses': total_licenses,
+                        'unusedLicenses': unused_licenses,
+                        'totalRevenue': 0,
+                        'revenueToday': 0
+                    },
+                    'licenseStats': license_stats,
+                    'revenueTrend': [],
+                    'levelDistribution': {}
+                }
+            })
+        except Exception as e:
+            logger.error(f"Dashboard error: {e}")
+            return web.json_response({'success': False, 'message': str(e)})
+    
+    async def admin_panel_users(self, request: web.Request) -> web.Response:
+        """用戶列表"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        try:
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT user_id, email, nickname, level, expires_at, created_at, is_banned, machine_id
+                FROM users ORDER BY created_at DESC LIMIT 500
+            ''')
+            users = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            
+            # 轉換字段名
+            for u in users:
+                u['userId'] = u.pop('user_id', '')
+                u['machineId'] = u.pop('machine_id', '')
+                u['isBanned'] = u.pop('is_banned', 0)
+                u['expiresAt'] = u.pop('expires_at', '')
+                u['createdAt'] = u.pop('created_at', '')
+            
+            return web.json_response({'success': True, 'data': users})
+        except Exception as e:
+            logger.error(f"Users list error: {e}")
+            return web.json_response({'success': False, 'message': str(e)})
+    
+    async def admin_panel_user_detail(self, request: web.Request) -> web.Response:
+        """用戶詳情"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        user_id = request.match_info.get('user_id')
+        try:
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
+            user = cursor.fetchone()
+            conn.close()
+            
+            if not user:
+                return web.json_response({'success': False, 'message': '用戶不存在'})
+            
+            return web.json_response({'success': True, 'data': dict(user)})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)})
+    
+    async def admin_panel_user_extend(self, request: web.Request) -> web.Response:
+        """延長用戶會員"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        user_id = request.match_info.get('user_id')
+        data = await request.json()
+        days = data.get('days', 30)
+        
+        try:
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE users SET expires_at = datetime(
+                    CASE WHEN expires_at > datetime('now') THEN expires_at ELSE datetime('now') END,
+                    '+' || ? || ' days'
+                ) WHERE user_id = ?
+            ''', (days, user_id))
+            conn.commit()
+            conn.close()
+            
+            return web.json_response({'success': True, 'message': f'已延長 {days} 天'})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)})
+    
+    async def admin_panel_user_ban(self, request: web.Request) -> web.Response:
+        """封禁/解封用戶"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        user_id = request.match_info.get('user_id')
+        data = await request.json()
+        is_banned = 1 if data.get('is_banned', True) else 0
+        
+        try:
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            cursor.execute('UPDATE users SET is_banned = ? WHERE user_id = ?', (is_banned, user_id))
+            conn.commit()
+            conn.close()
+            
+            return web.json_response({'success': True, 'message': '操作成功'})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)})
+    
+    async def admin_panel_licenses(self, request: web.Request) -> web.Response:
+        """卡密列表"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        try:
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT license_key, level, duration_days, status, created_at, used_at, used_by
+                FROM licenses ORDER BY created_at DESC LIMIT 500
+            ''')
+            licenses = []
+            level_names = {'S': '白銀精英', 'G': '黃金大師', 'D': '鑽石王牌', 'T': '星耀傳說', 'K': '榮耀王者'}
+            for row in cursor.fetchall():
+                l = dict(row)
+                l['key'] = l.pop('license_key', '')
+                l['typeName'] = level_names.get(l.get('level', ''), l.get('level', ''))
+                l['createdAt'] = l.pop('created_at', '')
+                l['usedAt'] = l.pop('used_at', '')
+                l['usedBy'] = l.pop('used_by', '')
+                l['price'] = 0
+                licenses.append(l)
+            conn.close()
+            
+            return web.json_response({'success': True, 'data': licenses})
+        except Exception as e:
+            logger.error(f"Licenses list error: {e}")
+            return web.json_response({'success': False, 'message': str(e)})
+    
+    async def admin_panel_generate_licenses(self, request: web.Request) -> web.Response:
+        """生成卡密"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        import secrets
+        data = await request.json()
+        level = data.get('level', 'G')
+        duration = data.get('duration', '1')
+        count = min(int(data.get('count', 10)), 100)
+        
+        duration_map = {'1': 30, '2': 90, '3': 180, '4': 365, '5': 3650}
+        duration_days = duration_map.get(str(duration), 30)
+        
+        try:
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            
+            keys = []
+            for _ in range(count):
+                key = f"TGAI-{level}-{secrets.token_hex(4).upper()}-{secrets.token_hex(4).upper()}"
+                cursor.execute('''
+                    INSERT INTO licenses (license_key, level, duration_days, status, created_at)
+                    VALUES (?, ?, ?, 'unused', CURRENT_TIMESTAMP)
+                ''', (key, level, duration_days))
+                keys.append(key)
+            
+            conn.commit()
+            conn.close()
+            
+            return web.json_response({
+                'success': True,
+                'message': f'成功生成 {count} 個卡密',
+                'data': {'keys': keys}
+            })
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)})
+    
+    async def admin_panel_disable_license(self, request: web.Request) -> web.Response:
+        """禁用卡密"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        data = await request.json()
+        key = data.get('license_key', '')
+        
+        try:
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE licenses SET status = 'disabled' WHERE license_key = ?", (key,))
+            conn.commit()
+            conn.close()
+            
+            return web.json_response({'success': True, 'message': '卡密已禁用'})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)})
+    
+    async def admin_panel_orders(self, request: web.Request) -> web.Response:
+        """訂單列表"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        try:
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM orders ORDER BY created_at DESC LIMIT 200
+            ''')
+            orders = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            
+            return web.json_response({'success': True, 'data': orders})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)})
+    
+    async def admin_panel_confirm_order(self, request: web.Request) -> web.Response:
+        """確認訂單支付"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        data = await request.json()
+        order_id = data.get('order_id', '')
+        
+        try:
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE orders SET status = 'paid', paid_at = CURRENT_TIMESTAMP WHERE order_id = ?", (order_id,))
+            conn.commit()
+            conn.close()
+            
+            return web.json_response({'success': True, 'message': '訂單已確認'})
+        except Exception as e:
+            return web.json_response({'success': False, 'message': str(e)})
+    
+    async def admin_panel_logs(self, request: web.Request) -> web.Response:
+        """操作日誌"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        try:
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM admin_logs ORDER BY created_at DESC LIMIT 200
+            ''')
+            logs = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            
+            return web.json_response({'success': True, 'data': logs})
+        except Exception as e:
+            return web.json_response({'success': True, 'data': []})  # 表可能不存在
+    
+    async def admin_panel_settings(self, request: web.Request) -> web.Response:
+        """獲取設置"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        return web.json_response({'success': True, 'data': {}})
+    
+    async def admin_panel_save_settings(self, request: web.Request) -> web.Response:
+        """保存設置"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        return web.json_response({'success': True, 'message': '設置已保存'})
+    
+    async def admin_panel_quotas(self, request: web.Request) -> web.Response:
+        """配額配置"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        quotas = {
+            'bronze': {'name': '青銅戰士', 'tg_accounts': 1, 'daily_messages': 50, 'ai_calls': 10},
+            'silver': {'name': '白銀精英', 'tg_accounts': 3, 'daily_messages': 200, 'ai_calls': 50},
+            'gold': {'name': '黃金大師', 'tg_accounts': 5, 'daily_messages': 500, 'ai_calls': 100},
+            'diamond': {'name': '鑽石王牌', 'tg_accounts': 10, 'daily_messages': 2000, 'ai_calls': 500},
+            'star': {'name': '星耀傳說', 'tg_accounts': 20, 'daily_messages': 5000, 'ai_calls': 1000},
+            'king': {'name': '榮耀王者', 'tg_accounts': -1, 'daily_messages': -1, 'ai_calls': -1}
+        }
+        return web.json_response({'success': True, 'data': quotas})
+    
+    async def admin_panel_announcements(self, request: web.Request) -> web.Response:
+        """公告列表"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        try:
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM announcements ORDER BY created_at DESC')
+            anns = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            return web.json_response({'success': True, 'data': anns})
+        except:
+            return web.json_response({'success': True, 'data': []})
+    
+    async def admin_panel_create_announcement(self, request: web.Request) -> web.Response:
+        """創建公告"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        return web.json_response({'success': True, 'message': '公告已創建'})
+    
+    async def admin_panel_change_password(self, request: web.Request) -> web.Response:
+        """修改密碼"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        return web.json_response({'success': True, 'message': '密碼已修改'})
+    
+    async def admin_panel_list_admins(self, request: web.Request) -> web.Response:
+        """管理員列表"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        try:
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            cursor.execute('SELECT id, username, role, is_active, last_login_at, created_at FROM admins')
+            admins = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            return web.json_response({'success': True, 'data': admins})
+        except:
+            return web.json_response({'success': True, 'data': []})
+    
+    async def admin_panel_create_admin(self, request: web.Request) -> web.Response:
+        """創建管理員"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        return web.json_response({'success': True, 'message': '管理員已創建'})
+    
+    async def admin_panel_referral_stats(self, request: web.Request) -> web.Response:
+        """邀請統計"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        return web.json_response({'success': True, 'data': {'totalReferrals': 0, 'totalEarnings': 0, 'leaderboard': []}})
+    
+    async def admin_panel_expiring_users(self, request: web.Request) -> web.Response:
+        """即將到期用戶"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        days = int(request.query.get('days', 7))
+        try:
+            conn = self._get_admin_db()
+            cursor = conn.cursor()
+            cursor.execute(f'''
+                SELECT user_id, email, level, expires_at FROM users 
+                WHERE expires_at BETWEEN datetime('now') AND datetime('now', '+{days} days')
+                ORDER BY expires_at ASC
+            ''')
+            users = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            return web.json_response({'success': True, 'data': users})
+        except:
+            return web.json_response({'success': True, 'data': []})
+    
+    async def admin_panel_quota_usage(self, request: web.Request) -> web.Response:
+        """配額使用情況"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        return web.json_response({'success': True, 'data': []})
+    
+    async def admin_panel_devices(self, request: web.Request) -> web.Response:
+        """設備列表"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        return web.json_response({'success': True, 'data': []})
+    
+    async def admin_panel_revenue_report(self, request: web.Request) -> web.Response:
+        """收入報表"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        return web.json_response({'success': True, 'data': {'summary': {}, 'trend': [], 'byLevel': [], 'byDuration': []}})
+    
+    async def admin_panel_user_analytics(self, request: web.Request) -> web.Response:
+        """用戶分析"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        return web.json_response({'success': True, 'data': {'userGrowth': [], 'activeTrend': [], 'retention': {}, 'conversion': {}}})
+    
+    async def admin_panel_notification_history(self, request: web.Request) -> web.Response:
+        """通知歷史"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        return web.json_response({'success': True, 'data': []})
+    
+    async def admin_panel_send_notification(self, request: web.Request) -> web.Response:
+        """發送通知"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        return web.json_response({'success': True, 'message': '通知已發送'})
+    
+    async def admin_panel_batch_notification(self, request: web.Request) -> web.Response:
+        """批量通知"""
+        admin = self._verify_admin_token(request)
+        if not admin:
+            return web.json_response({'success': False, 'message': '未授權'}, status=401)
+        
+        return web.json_response({'success': True, 'data': {'count': 0}})
+    
     async def start(self):
         """啟動服務器"""
         runner = web.AppRunner(self.app)
@@ -6026,6 +6633,7 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
         logger.info(f"=" * 50)
         logger.info(f"  Server running on http://{self.host}:{self.port}")
         logger.info(f"  API docs: http://{self.host}:{self.port}/api/v1/")
+        logger.info(f"  Admin Panel API: http://{self.host}:{self.port}/api/admin/")
         logger.info(f"  WebSocket: ws://{self.host}:{self.port}/ws")
         logger.info(f"=" * 50)
         

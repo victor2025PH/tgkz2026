@@ -7,6 +7,7 @@ import { Component, signal, computed, inject, OnInit, OnDestroy, ChangeDetectorR
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, DeviceInfo, UsageStats } from './auth.service';
+import { Router } from '@angular/router';
 import { DeviceService } from './device.service';
 import { I18nService } from './i18n.service';
 import { ToastService } from './toast.service';
@@ -20,14 +21,31 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
   imports: [CommonModule, FormsModule],
   template: `
     <div class="profile-container">
+      <!-- 🔧 加載中狀態 -->
+      @if (isLoadingUser()) {
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+          <span>正在加載用戶信息...</span>
+        </div>
+      }
+      
+      <!-- 🔧 錯誤提示 -->
+      @if (userLoadError()) {
+        <div class="error-alert">
+          <span class="error-icon">⚠️</span>
+          <span>{{ userLoadError() }}</span>
+          <button class="retry-btn" (click)="ensureUserLoaded()">重試</button>
+        </div>
+      }
+      
       <!-- 用戶頭部信息 -->
       <div class="profile-header">
         <div class="avatar-section">
           <div class="avatar">
-            {{ user()?.username?.charAt(0).toUpperCase() || '?' }}
+            {{ user()?.username?.charAt(0).toUpperCase() || user()?.display_name?.charAt(0).toUpperCase() || '?' }}
           </div>
           <div class="user-info">
-            <h2 class="username">{{ user()?.username || '未登入' }}</h2>
+            <h2 class="username">{{ user()?.display_name || user()?.username || (isLoadingUser() ? '載入中...' : '未登入') }}</h2>
             <p class="email">{{ user()?.email || '未設置郵箱' }}</p>
             <div class="membership-badge" [class]="'level-' + membershipLevel()">
               {{ getMembershipIcon() }} {{ getMembershipName() }}
@@ -37,8 +55,12 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
             </div>
           </div>
         </div>
-        <button (click)="onLogout()" class="logout-btn">
-          🚪 退出
+        <button (click)="onLogout()" class="logout-btn" [disabled]="isLoggingOut()">
+          @if (isLoggingOut()) {
+            <span class="logout-spinner"></span> 退出中...
+          } @else {
+            🚪 退出
+          }
         </button>
       </div>
       
@@ -526,8 +548,27 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
       transition: all 0.2s;
     }
     
-    .logout-btn:hover {
+    .logout-btn:hover:not(:disabled) {
       background: rgba(239, 68, 68, 0.2);
+    }
+    
+    .logout-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+    
+    .logout-spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(239, 68, 68, 0.3);
+      border-top-color: #ef4444;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
     
     .tabs {
@@ -935,6 +976,62 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
       padding: 2rem;
       color: var(--text-muted, #94a3b8);
     }
+    
+    /* 🆕 加載中遮罩 */
+    .loading-overlay {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      padding: 1.5rem;
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.2);
+      border-radius: 1rem;
+      margin-bottom: 1rem;
+      color: var(--primary, #06b6d4);
+    }
+    
+    .loading-overlay .loading-spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid rgba(6, 182, 212, 0.3);
+      border-top-color: #06b6d4;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    /* 🆕 錯誤提示 */
+    .error-alert {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 0.5rem;
+      color: #fca5a5;
+      margin-bottom: 1rem;
+    }
+    
+    .error-icon {
+      font-size: 1.25rem;
+    }
+    
+    .retry-btn {
+      margin-left: auto;
+      padding: 0.375rem 0.75rem;
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: 0.375rem;
+      color: #fca5a5;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .retry-btn:hover {
+      background: rgba(239, 68, 68, 0.3);
+    }
   `]
 })
 export class ProfileComponent implements OnInit, OnDestroy {
@@ -944,6 +1041,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   private toast = inject(ToastService);
   private licenseClient = inject(LicenseClientService);
   private cdr = inject(ChangeDetectorRef);
+  private router = inject(Router);
   
   // 用於清理事件監聽
   private membershipUpdateHandler: ((event: Event) => void) | null = null;
@@ -952,6 +1050,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   activeTab = signal<ProfileTab>('account');
   showChangePassword = signal(false);
   isUnbinding = signal(false);
+  isLoggingOut = signal(false);  // 🆕 登出動畫狀態
   
   // 表單
   passwordForm = { oldPassword: '', newPassword: '', confirmPassword: '' };
@@ -979,7 +1078,14 @@ export class ProfileComponent implements OnInit, OnDestroy {
     return `https://tg-matrix.com/invite?code=${this.inviteCode()}`;
   });
   
+  // 🆕 加載狀態
+  isLoadingUser = signal(false);
+  userLoadError = signal<string | null>(null);
+  
   async ngOnInit(): Promise<void> {
+    // 🔧 修復：確保用戶信息已加載
+    await this.ensureUserLoaded();
+    
     this.currentDeviceCode.set(await this.deviceService.getDeviceCode());
     this.currentDeviceName.set(this.deviceService.getDeviceName());
     
@@ -1006,6 +1112,39 @@ export class ProfileComponent implements OnInit, OnDestroy {
     // 清理事件監聽
     if (this.membershipUpdateHandler) {
       window.removeEventListener('membership-updated', this.membershipUpdateHandler);
+    }
+  }
+  
+  /**
+   * 🔧 修復：確保用戶信息已加載
+   * 如果沒有用戶信息，主動從後端獲取
+   */
+  async ensureUserLoaded(): Promise<void> {
+    // 如果已有用戶信息，直接返回
+    if (this.user()?.username) {
+      console.log('[Profile] User already loaded:', this.user()?.username);
+      return;
+    }
+    
+    this.isLoadingUser.set(true);
+    this.userLoadError.set(null);
+    
+    try {
+      console.log('[Profile] Fetching user info...');
+      const user = await this.authService.fetchCurrentUser();
+      
+      if (user) {
+        console.log('[Profile] User loaded successfully:', user.username);
+      } else {
+        console.warn('[Profile] No user returned from API');
+        this.userLoadError.set('無法獲取用戶信息');
+      }
+    } catch (error: any) {
+      console.error('[Profile] Failed to load user:', error);
+      this.userLoadError.set(error.message || '加載失敗');
+    } finally {
+      this.isLoadingUser.set(false);
+      this.cdr.detectChanges();
     }
   }
   
@@ -1076,7 +1215,16 @@ export class ProfileComponent implements OnInit, OnDestroy {
   }
   
   async onLogout(): Promise<void> {
+    console.log('[Profile] Logging out...');
+    // 🆕 顯示登出動畫
+    this.isLoggingOut.set(true);
+    
+    // 等待動畫顯示
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // 🆕 事件驅動：只需調用 logout，事件會自動廣播到所有服務
     await this.authService.logout();
+    // logout() 內部已處理跳轉
   }
   
   async onChangePassword(): Promise<void> {

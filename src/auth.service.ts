@@ -3,10 +3,13 @@
  * 處理登入、退出、Token 管理、用戶狀態
  */
 
-import { Injectable, signal, computed, inject, Injector } from '@angular/core';
+import { Injectable, signal, computed, inject, Injector, OnDestroy } from '@angular/core';
+import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { DeviceService } from './device.service';
 import { MembershipLevel } from './membership.service';
 import { LicenseClientService } from './license-client.service';
+import { AuthEventsService, AUTH_STORAGE_KEYS } from './core/auth-events.service';
 
 // 用戶信息接口
 export interface User {
@@ -77,10 +80,15 @@ export interface UsageStats {
 }
 
 @Injectable({ providedIn: 'root' })
-export class AuthService {
+export class AuthService implements OnDestroy {
   private deviceService = inject(DeviceService);
   private injector = inject(Injector);
   private licenseClient = inject(LicenseClientService);
+  private router = inject(Router);
+  private authEvents = inject(AuthEventsService);
+  
+  // 事件訂閱
+  private eventSubscription: Subscription | null = null;
   
   // ========== 免登錄完整版配置 ==========
   // 僅在 Electron/IPC 模式下啟用，SaaS 模式必須登入
@@ -149,6 +157,27 @@ export class AuthService {
       return;
     }
     
+    // 🆕 訂閱認證事件（處理來自核心服務的登入/登出通知）
+    this.eventSubscription = this.authEvents.authEvents$.subscribe(event => {
+      if (event.type === 'logout') {
+        console.log('[LegacyAuthService] Received logout event, clearing state');
+        this.clearLocalAuthInternal();
+        this._isAuthenticated.set(false);
+        this._user.set(null);
+        this._token.set(null);
+        this._devices.set([]);
+        this._usageStats.set(null);
+      } else if (event.type === 'login') {
+        // 🔧 P0 修復：同步登入狀態到老版服務
+        console.log('[LegacyAuthService] Received login event, syncing state');
+        this.syncFromStorage();
+      } else if (event.type === 'user_update') {
+        // 🔧 同步用戶信息更新
+        console.log('[LegacyAuthService] Received user_update event');
+        this.syncFromStorage();
+      }
+    });
+    
     // 應用啟動時檢查本地存儲的登入狀態（異步執行，不阻塞渲染）
     // 使用 setTimeout 確保不阻塞 Angular 初始化
     setTimeout(() => {
@@ -158,6 +187,10 @@ export class AuthService {
         this._isAuthenticated.set(false);
       });
     }, 0);
+  }
+  
+  ngOnDestroy(): void {
+    this.eventSubscription?.unsubscribe();
   }
 
   /**
@@ -222,6 +255,80 @@ export class AuthService {
       // 確保錯誤時也顯示登入頁面
       this._isAuthenticated.set(false);
     }
+  }
+  
+  /**
+   * 🆕 從後端獲取當前用戶信息
+   * 用於刷新用戶狀態或驗證 Token 有效性
+   */
+  async fetchCurrentUser(): Promise<User | null> {
+    try {
+      const token = this._token() || localStorage.getItem('tgm_access_token');
+      if (!token) {
+        console.log('[AuthService] fetchCurrentUser: No token available');
+        return null;
+      }
+      
+      // 獲取 API 基礎 URL
+      const apiBaseUrl = this.getApiBaseUrl();
+      
+      console.log('[AuthService] fetchCurrentUser: Fetching from', apiBaseUrl);
+      const response = await fetch(`${apiBaseUrl}/api/v1/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!response.ok) {
+        console.warn(`[AuthService] fetchCurrentUser: HTTP ${response.status}`);
+        return null;
+      }
+      
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        // 轉換為本地 User 格式
+        const rawUser = result.data;
+        const user: User = {
+          id: rawUser.id || 0,
+          username: rawUser.username || rawUser.display_name || 'User',
+          email: rawUser.email || undefined,
+          phone: rawUser.phone || undefined,
+          avatar: rawUser.avatar_url || rawUser.avatar || undefined,
+          membershipLevel: this.tierToLevel(rawUser.subscription_tier || rawUser.membershipLevel || 'free'),
+          membershipExpires: rawUser.membershipExpires || rawUser.subscription_expires || undefined,
+          inviteCode: rawUser.inviteCode || rawUser.invite_code || '',
+          invitedCount: rawUser.invitedCount || rawUser.invited_count || 0,
+          createdAt: rawUser.createdAt || rawUser.created_at || new Date().toISOString(),
+          lastLogin: rawUser.lastLogin || rawUser.last_login_at || new Date().toISOString(),
+          status: rawUser.status || (rawUser.is_active ? 'active' : 'suspended')
+        };
+        
+        console.log('[AuthService] fetchCurrentUser: Success', user.username);
+        this._user.set(user);
+        // 更新 localStorage
+        localStorage.setItem('tgm_user', JSON.stringify(result.data));
+        return user;
+      }
+      
+      console.warn('[AuthService] fetchCurrentUser: API returned', result);
+      return null;
+    } catch (e) {
+      console.error('[AuthService] fetchCurrentUser error:', e);
+      return null;
+    }
+  }
+  
+  /**
+   * 獲取 API 基礎 URL
+   */
+  private getApiBaseUrl(): string {
+    // 開發環境
+    if (typeof window !== 'undefined') {
+      if (window.location.hostname === 'localhost' && window.location.port === '4200') {
+        return 'http://localhost:8000';
+      }
+    }
+    // 生產環境
+    return '';
   }
   
   /**
@@ -349,12 +456,19 @@ export class AuthService {
     } catch (error) {
       console.error('退出 API 調用失敗:', error);
     } finally {
-      this.clearLocalAuth();
+      // 🆕 廣播登出事件，通知所有訂閱者（包括核心服務）
+      this.authEvents.emitLogout();
+      
+      // 清除本服務狀態
+      this.clearLocalAuthInternal();
       this._isAuthenticated.set(false);
       this._user.set(null);
       this._token.set(null);
       this._devices.set([]);
       this._usageStats.set(null);
+      
+      // 🔧 修復：退出後跳轉到登入頁面
+      this.router.navigate(['/auth/login']);
     }
   }
 
@@ -660,15 +774,63 @@ export class AuthService {
   }
 
   /**
-   * 清除本地認證數據
+   * 清除本地認證數據（公開，會發送事件）
    */
   private clearLocalAuth(): void {
-    // 🔧 清除所有認證相關的本地存儲
-    localStorage.removeItem('tgm_auth_token');
-    localStorage.removeItem('tgm_access_token');
-    localStorage.removeItem('tgm_refresh_token');
-    localStorage.removeItem('tgm_user');
-    localStorage.removeItem('tgm_session_id');
+    this.authEvents.emitLogout();
+    this.clearLocalAuthInternal();
+  }
+  
+  /**
+   * 內部清除方法（不發送事件，避免循環）
+   */
+  private clearLocalAuthInternal(): void {
+    // 🆕 使用集中式清除方法
+    this.authEvents.clearAllAuthStorage();
+  }
+
+  /**
+   * 🔧 P0 修復：從 localStorage 同步狀態
+   * 當收到 login 事件時調用，確保老版服務狀態與核心服務同步
+   */
+  private syncFromStorage(): void {
+    try {
+      const storedToken = this.authEvents.getStoredToken();
+      const storedUser = this.authEvents.getStoredUser();
+      
+      if (storedToken && storedUser) {
+        // 標準化用戶數據格式
+        const user: User = {
+          id: storedUser.id || 0,
+          username: storedUser.username || storedUser.display_name || 'User',
+          email: storedUser.email || undefined,
+          phone: storedUser.phone || undefined,
+          avatar: storedUser.avatar_url || storedUser.avatar || undefined,
+          membershipLevel: this.tierToLevel(storedUser.subscription_tier || storedUser.membershipLevel || 'free'),
+          membershipExpires: storedUser.membershipExpires || storedUser.subscription_expires || undefined,
+          inviteCode: storedUser.inviteCode || storedUser.invite_code || '',
+          invitedCount: storedUser.invitedCount || storedUser.invited_count || 0,
+          createdAt: storedUser.createdAt || storedUser.created_at || new Date().toISOString(),
+          lastLogin: storedUser.lastLogin || storedUser.last_login_at || new Date().toISOString(),
+          status: storedUser.status || (storedUser.is_active ? 'active' : 'suspended')
+        };
+        
+        // 更新 Signal 狀態
+        this._token.set(storedToken);
+        this._user.set(user);
+        this._isAuthenticated.set(true);
+        
+        console.log('[LegacyAuthService] State synced from storage:', user.username);
+        
+        // 異步載入設備和使用統計
+        this.loadDevices().catch(err => console.error('載入設備列表失敗:', err));
+        this.loadUsageStats().catch(err => console.error('載入使用統計失敗:', err));
+      } else {
+        console.warn('[LegacyAuthService] No valid auth data in storage');
+      }
+    } catch (error) {
+      console.error('[LegacyAuthService] Error syncing from storage:', error);
+    }
   }
 
   /**

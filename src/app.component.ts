@@ -51,6 +51,8 @@ import { BatchInviteDialogComponent, BatchInviteTarget } from './dialogs/batch-i
 import { MemberExtractionDialogComponent, MemberExtractionConfig, ExtractionGroupInfo } from './dialogs/member-extraction-dialog.component';
 import { AIStrategyResult } from './ai-assistant/ai-marketing-assistant.component';
 import { CommandPaletteComponent } from './components/command-palette.component';
+import { NetworkStatusComponent } from './core/network-status.component';
+import { AuthTransitionComponent } from './core/auth-transition.component';
 // EmptyStateComponent 暫時未使用
 import { FeedbackService } from './components/feedback-animation.component';
 import { ErrorHandlerService } from './services/error-handler.service';
@@ -169,6 +171,8 @@ interface SuccessOverlayConfig {
     BatchSendDialogComponent, BatchInviteDialogComponent, MemberExtractionDialogComponent,
     // 命令面板（模板中使用）
     CommandPaletteComponent,
+    // 🆕 網絡狀態和認證過渡動畫
+    NetworkStatusComponent, AuthTransitionComponent,
   ],
   providers: [AccountLoaderService, ToastService],
   // 路由動畫改用 CSS 過渡效果

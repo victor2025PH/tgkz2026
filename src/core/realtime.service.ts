@@ -9,7 +9,10 @@
  */
 
 import { Injectable, inject, signal, computed, OnDestroy } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { AuthService } from './auth.service';
+import { NetworkService } from './network.service';
+import { AuthEventsService } from './auth-events.service';
 import { environment } from '../environments/environment';
 
 export interface RealtimeEvent {
@@ -25,11 +28,17 @@ export type EventHandler = (event: RealtimeEvent) => void;
 })
 export class RealtimeService implements OnDestroy {
   private authService = inject(AuthService);
+  private networkService = inject(NetworkService);
+  private authEvents = inject(AuthEventsService);
   
   // WebSocket
   private ws: WebSocket | null = null;
   private reconnectTimer: any = null;
   private heartbeatTimer: any = null;
+  
+  // 訂閱
+  private networkSubscription: Subscription | null = null;
+  private authSubscription: Subscription | null = null;
   
   // 配置
   private readonly HEARTBEAT_INTERVAL = 30000; // 30 秒
@@ -58,11 +67,15 @@ export class RealtimeService implements OnDestroy {
     // 監聽認證狀態變化
     if (environment.apiMode === 'http') {
       this.initConnectionWatcher();
+      this.initNetworkWatcher();
+      this.initAuthWatcher();
     }
   }
   
   ngOnDestroy() {
     this.disconnect();
+    this.networkSubscription?.unsubscribe();
+    this.authSubscription?.unsubscribe();
   }
   
   /**
@@ -83,6 +96,38 @@ export class RealtimeService implements OnDestroy {
     
     // 初始檢查
     setTimeout(checkAuth, 1000);
+  }
+  
+  /**
+   * 🆕 監聽網絡狀態變化
+   * 網絡恢復後立即嘗試重連
+   */
+  private initNetworkWatcher() {
+    this.networkSubscription = this.networkService.online$.subscribe(isOnline => {
+      if (isOnline && this.authService.isAuthenticated() && !this._isConnected()) {
+        console.log('[RealtimeService] Network restored, reconnecting WebSocket...');
+        // 重置重連計數
+        this._reconnectAttempts.set(0);
+        // 立即嘗試重連
+        this.connect();
+      }
+    });
+  }
+  
+  /**
+   * 🆕 監聽認證事件
+   * 登入時自動連接，登出時斷開
+   */
+  private initAuthWatcher() {
+    this.authSubscription = this.authEvents.authEvents$.subscribe(event => {
+      if (event.type === 'login') {
+        console.log('[RealtimeService] Login event, connecting WebSocket...');
+        setTimeout(() => this.connect(), 500);
+      } else if (event.type === 'logout') {
+        console.log('[RealtimeService] Logout event, disconnecting WebSocket...');
+        this.disconnect();
+      }
+    });
   }
   
   /**

@@ -27,6 +27,13 @@ from .wallet_service import (
 from .transaction_service import (
     TransactionService, get_transaction_service
 )
+from .recharge_service import (
+    RechargeService, get_recharge_service
+)
+from .usdt_service import (
+    UsdtPaymentService, get_usdt_service,
+    UsdtPaymentWatcher, get_usdt_watcher
+)
 
 __all__ = [
     # 枚舉
@@ -37,4 +44,7 @@ __all__ = [
     # 服務
     'WalletService', 'get_wallet_service', 'init_wallet_service',
     'TransactionService', 'get_transaction_service',
+    'RechargeService', 'get_recharge_service',
+    'UsdtPaymentService', 'get_usdt_service',
+    'UsdtPaymentWatcher', 'get_usdt_watcher',
 ]

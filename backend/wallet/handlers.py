@@ -14,7 +14,9 @@ from aiohttp import web
 
 from .wallet_service import get_wallet_service, WalletServiceError
 from .transaction_service import get_transaction_service
-from .models import ConsumeCategory, TransactionType
+from .recharge_service import get_recharge_service
+from .usdt_service import get_usdt_service
+from .models import ConsumeCategory, TransactionType, RechargeStatus
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,7 @@ class WalletHandlers:
     def __init__(self):
         self.wallet_service = get_wallet_service()
         self.transaction_service = get_transaction_service()
+        self.recharge_service = get_recharge_service()
     
     def _get_client_ip(self, request: web.Request) -> str:
         """獲取客戶端 IP"""
@@ -376,6 +379,294 @@ class WalletHandlers:
         except Exception as e:
             logger.error(f"Check balance error: {e}")
             return self._error_response(str(e), "CHECK_BALANCE_ERROR", 500)
+    
+    # ==================== 充值訂單 ====================
+    
+    async def create_recharge_order(self, request: web.Request) -> web.Response:
+        """
+        創建充值訂單
+        
+        POST /api/wallet/recharge/create
+        {
+            "amount": 3000,  // 分
+            "payment_method": "usdt_trc20"
+        }
+        """
+        try:
+            user = self._require_auth(request)
+            user_id = user.get('user_id') or user.get('sub') or user.get('id')
+            
+            if not user_id:
+                return self._error_response("無法識別用戶", "INVALID_USER")
+            
+            data = await request.json()
+            
+            amount = data.get('amount')
+            if not amount or amount < 500:  # 最低 $5
+                return self._error_response("最低充值金額為 $5", "INVALID_AMOUNT")
+            
+            payment_method = data.get('payment_method', 'usdt_trc20')
+            payment_channel = data.get('payment_channel', 'direct')
+            
+            success, message, order = self.recharge_service.create_order(
+                user_id=user_id,
+                amount=amount,
+                payment_method=payment_method,
+                payment_channel=payment_channel,
+                ip_address=self._get_client_ip(request)
+            )
+            
+            if success and order:
+                return self._success_response({
+                    "order": order.to_dict(),
+                    "payment_info": self._get_payment_info(order)
+                }, message)
+            else:
+                return self._error_response(message, "CREATE_ORDER_FAILED")
+            
+        except web.HTTPUnauthorized:
+            raise
+        except Exception as e:
+            logger.error(f"Create recharge order error: {e}")
+            return self._error_response(str(e), "CREATE_ORDER_ERROR", 500)
+    
+    def _get_payment_info(self, order) -> Dict[str, Any]:
+        """根據支付方式返回支付信息"""
+        info = {
+            "order_no": order.order_no,
+            "amount": order.amount,
+            "amount_display": f"${order.amount / 100:.2f}",
+            "bonus_amount": order.bonus_amount,
+            "bonus_display": f"+${order.bonus_amount / 100:.2f}" if order.bonus_amount > 0 else "",
+            "fee": order.fee,
+            "actual_amount": order.actual_amount,
+            "actual_display": f"${order.actual_amount / 100:.2f}",
+            "payment_method": order.payment_method,
+            "expired_at": order.expired_at,
+        }
+        
+        # USDT 專用信息
+        if order.payment_method in ['usdt_trc20', 'usdt_erc20']:
+            info.update({
+                "usdt_network": order.usdt_network,
+                "usdt_address": order.usdt_address,
+                "usdt_amount": order.usdt_amount,
+                "usdt_rate": order.usdt_rate,
+            })
+        
+        return info
+    
+    async def get_recharge_order(self, request: web.Request) -> web.Response:
+        """獲取充值訂單詳情"""
+        try:
+            user = self._require_auth(request)
+            user_id = user.get('user_id') or user.get('sub') or user.get('id')
+            
+            order_no = request.match_info.get('order_no')
+            if not order_no:
+                return self._error_response("訂單號不能為空", "MISSING_ORDER_NO")
+            
+            order = self.recharge_service.get_order(order_no)
+            
+            if not order:
+                return self._error_response("訂單不存在", "ORDER_NOT_FOUND", 404)
+            
+            # 驗證訂單歸屬
+            if order.user_id != user_id:
+                return self._error_response("無權訪問此訂單", "FORBIDDEN", 403)
+            
+            return self._success_response({
+                "order": order.to_dict(),
+                "payment_info": self._get_payment_info(order)
+            })
+            
+        except web.HTTPUnauthorized:
+            raise
+        except Exception as e:
+            logger.error(f"Get recharge order error: {e}")
+            return self._error_response(str(e), "GET_ORDER_ERROR", 500)
+    
+    async def get_recharge_orders(self, request: web.Request) -> web.Response:
+        """獲取用戶充值訂單列表"""
+        try:
+            user = self._require_auth(request)
+            user_id = user.get('user_id') or user.get('sub') or user.get('id')
+            
+            if not user_id:
+                return self._error_response("無法識別用戶", "INVALID_USER")
+            
+            page = int(request.query.get('page', 1))
+            page_size = min(int(request.query.get('page_size', 20)), 50)
+            status = request.query.get('status')
+            
+            orders, total = self.recharge_service.get_user_orders(
+                user_id=user_id,
+                status=status,
+                page=page,
+                page_size=page_size
+            )
+            
+            return self._success_response({
+                "orders": [o.to_dict() for o in orders],
+                "pagination": {
+                    "page": page,
+                    "page_size": page_size,
+                    "total": total,
+                    "total_pages": (total + page_size - 1) // page_size
+                }
+            })
+            
+        except web.HTTPUnauthorized:
+            raise
+        except Exception as e:
+            logger.error(f"Get recharge orders error: {e}")
+            return self._error_response(str(e), "GET_ORDERS_ERROR", 500)
+    
+    async def mark_recharge_paid(self, request: web.Request) -> web.Response:
+        """
+        用戶確認已支付
+        
+        POST /api/wallet/recharge/{order_no}/paid
+        {
+            "tx_hash": "optional_usdt_tx_hash"
+        }
+        """
+        try:
+            user = self._require_auth(request)
+            user_id = user.get('user_id') or user.get('sub') or user.get('id')
+            
+            order_no = request.match_info.get('order_no')
+            if not order_no:
+                return self._error_response("訂單號不能為空", "MISSING_ORDER_NO")
+            
+            order = self.recharge_service.get_order(order_no)
+            
+            if not order:
+                return self._error_response("訂單不存在", "ORDER_NOT_FOUND", 404)
+            
+            if order.user_id != user_id:
+                return self._error_response("無權操作此訂單", "FORBIDDEN", 403)
+            
+            data = await request.json() if request.body_exists else {}
+            tx_hash = data.get('tx_hash', '')
+            
+            success, message = self.recharge_service.mark_paid(
+                order_no,
+                usdt_tx_hash=tx_hash
+            )
+            
+            if success:
+                return self._success_response({"order_no": order_no}, message)
+            else:
+                return self._error_response(message, "MARK_PAID_FAILED")
+            
+        except web.HTTPUnauthorized:
+            raise
+        except Exception as e:
+            logger.error(f"Mark recharge paid error: {e}")
+            return self._error_response(str(e), "MARK_PAID_ERROR", 500)
+    
+    async def cancel_recharge_order(self, request: web.Request) -> web.Response:
+        """取消充值訂單"""
+        try:
+            user = self._require_auth(request)
+            user_id = user.get('user_id') or user.get('sub') or user.get('id')
+            
+            order_no = request.match_info.get('order_no')
+            if not order_no:
+                return self._error_response("訂單號不能為空", "MISSING_ORDER_NO")
+            
+            order = self.recharge_service.get_order(order_no)
+            
+            if not order:
+                return self._error_response("訂單不存在", "ORDER_NOT_FOUND", 404)
+            
+            if order.user_id != user_id:
+                return self._error_response("無權操作此訂單", "FORBIDDEN", 403)
+            
+            success, message = self.recharge_service.cancel_order(order_no, "用戶取消")
+            
+            if success:
+                return self._success_response({"order_no": order_no}, message)
+            else:
+                return self._error_response(message, "CANCEL_FAILED")
+            
+        except web.HTTPUnauthorized:
+            raise
+        except Exception as e:
+            logger.error(f"Cancel recharge order error: {e}")
+            return self._error_response(str(e), "CANCEL_ERROR", 500)
+    
+    async def check_recharge_status(self, request: web.Request) -> web.Response:
+        """
+        檢查充值訂單狀態
+        用於前端輪詢
+        """
+        try:
+            user = self._require_auth(request)
+            user_id = user.get('user_id') or user.get('sub') or user.get('id')
+            
+            order_no = request.match_info.get('order_no')
+            if not order_no:
+                return self._error_response("訂單號不能為空", "MISSING_ORDER_NO")
+            
+            order = self.recharge_service.get_order(order_no)
+            
+            if not order:
+                return self._error_response("訂單不存在", "ORDER_NOT_FOUND", 404)
+            
+            if order.user_id != user_id:
+                return self._error_response("無權訪問此訂單", "FORBIDDEN", 403)
+            
+            # 檢查是否已過期
+            if order.status == RechargeStatus.PENDING.value and order.expired_at:
+                expired_at = datetime.fromisoformat(order.expired_at.replace('Z', '+00:00'))
+                if datetime.now(expired_at.tzinfo) > expired_at:
+                    self.recharge_service.expire_orders()
+                    order = self.recharge_service.get_order(order_no)
+            
+            return self._success_response({
+                "order_no": order.order_no,
+                "status": order.status,
+                "is_confirmed": order.status == RechargeStatus.CONFIRMED.value,
+                "is_pending": order.status in [RechargeStatus.PENDING.value, RechargeStatus.PAID.value],
+                "is_expired": order.status == RechargeStatus.EXPIRED.value,
+                "confirmed_at": order.confirmed_at,
+            })
+            
+        except web.HTTPUnauthorized:
+            raise
+        except Exception as e:
+            logger.error(f"Check recharge status error: {e}")
+            return self._error_response(str(e), "CHECK_STATUS_ERROR", 500)
+    
+    # ==================== 支付回調（公開）====================
+    
+    async def payment_callback(self, request: web.Request) -> web.Response:
+        """
+        第三方支付回調（公開端點，無需認證）
+        
+        POST /api/wallet/callback/{provider}
+        """
+        try:
+            provider = request.match_info.get('provider', '')
+            
+            if provider in ['alipay', 'wechat', 'epay']:
+                # 處理第三方支付回調
+                data = await request.post() if request.content_type == 'application/x-www-form-urlencoded' else await request.json()
+                
+                # TODO: 驗證簽名
+                # TODO: 處理回調邏輯
+                
+                logger.info(f"Payment callback from {provider}: {data}")
+                
+                return web.Response(text="success")
+            
+            return web.Response(text="unknown provider", status=400)
+            
+        except Exception as e:
+            logger.error(f"Payment callback error: {e}")
+            return web.Response(text="error", status=500)
 
 
 # ==================== 路由設置 ====================
@@ -405,7 +696,18 @@ def setup_wallet_routes(app: web.Application):
     app.router.add_post('/api/wallet/consume', handlers.consume)
     app.router.add_post('/api/wallet/check-balance', handlers.check_balance)
     
-    logger.info("✅ Wallet API routes registered")
+    # Phase 1: 充值訂單
+    app.router.add_post('/api/wallet/recharge/create', handlers.create_recharge_order)
+    app.router.add_get('/api/wallet/recharge/orders', handlers.get_recharge_orders)
+    app.router.add_get('/api/wallet/recharge/{order_no}', handlers.get_recharge_order)
+    app.router.add_post('/api/wallet/recharge/{order_no}/paid', handlers.mark_recharge_paid)
+    app.router.add_post('/api/wallet/recharge/{order_no}/cancel', handlers.cancel_recharge_order)
+    app.router.add_get('/api/wallet/recharge/{order_no}/status', handlers.check_recharge_status)
+    
+    # 支付回調（公開）
+    app.router.add_post('/api/wallet/callback/{provider}', handlers.payment_callback)
+    
+    logger.info("✅ Wallet API routes registered (Phase 0 + Phase 1)")
 
 
 # 全局處理器實例

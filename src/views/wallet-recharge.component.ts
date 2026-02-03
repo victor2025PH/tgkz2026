@@ -12,7 +12,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { WalletService, RechargePackage } from '../services/wallet.service';
+import { WalletService, RechargePackage, RechargeOrder, PaymentInfo } from '../services/wallet.service';
 
 type PaymentMethod = 'usdt_trc20' | 'alipay' | 'wechat' | 'bank';
 
@@ -184,8 +184,8 @@ type PaymentMethod = 'usdt_trc20' | 'alipay' | 'wechat' | 'bank';
               </div>
               
               <div class="address-box">
-                <div class="network-badge">TRC20 (TRON)</div>
-                <div class="address">{{ usdtAddress }}</div>
+                <div class="network-badge">{{ usdtNetwork() }} {{ usdtNetwork() === 'TRC20' ? '(TRON)' : '(Ethereum)' }}</div>
+                <div class="address">{{ usdtAddress() }}</div>
                 <button class="copy-btn" (click)="copyAddress()">複製地址</button>
               </div>
               
@@ -669,7 +669,10 @@ export class WalletRechargeComponent implements OnInit {
   loading = signal(false);
   showUsdtModal = signal(false);
   
-  usdtAddress = 'TYourTRC20WalletAddressHere';  // TODO: 從配置獲取
+  // 當前訂單信息
+  currentOrder = signal<RechargeOrder | null>(null);
+  paymentInfo = signal<PaymentInfo | null>(null);
+  pollingStatus = signal(false);
   
   // 計算屬性
   rechargeAmount = computed(() => {
@@ -706,8 +709,20 @@ export class WalletRechargeComponent implements OnInit {
   });
   
   usdtAmount = computed(() => {
+    const info = this.paymentInfo();
+    if (info?.usdt_amount) {
+      return info.usdt_amount.toFixed(2);
+    }
     const usd = this.payAmount() / 100;
     return usd.toFixed(2);
+  });
+  
+  usdtAddress = computed(() => {
+    return this.paymentInfo()?.usdt_address || 'TYourTRC20WalletAddressHere';
+  });
+  
+  usdtNetwork = computed(() => {
+    return this.paymentInfo()?.usdt_network || 'TRC20';
   });
   
   canProceed = computed(() => {
@@ -761,34 +776,97 @@ export class WalletRechargeComponent implements OnInit {
   async proceed() {
     if (!this.canProceed()) return;
     
-    const method = this.selectedMethod();
+    this.loading.set(true);
     
-    if (method === 'usdt_trc20') {
-      this.showUsdtModal.set(true);
-    } else {
-      // TODO: 其他支付方式
-      alert('此支付方式即將上線');
+    try {
+      // 創建充值訂單
+      const result = await this.walletService.createRechargeOrder({
+        amount: this.rechargeAmount(),
+        paymentMethod: this.selectedMethod()
+      });
+      
+      if (result.success && result.order && result.paymentInfo) {
+        this.currentOrder.set(result.order);
+        this.paymentInfo.set(result.paymentInfo);
+        
+        const method = this.selectedMethod();
+        
+        if (method === 'usdt_trc20' || method === 'usdt_erc20') {
+          this.showUsdtModal.set(true);
+        } else {
+          // TODO: 其他支付方式
+          alert('此支付方式即將上線');
+        }
+      } else {
+        alert(result.error || '創建訂單失敗');
+      }
+    } catch (error) {
+      console.error('Create order error:', error);
+      alert('創建訂單失敗');
+    } finally {
+      this.loading.set(false);
     }
   }
   
   closeUsdtModal() {
     this.showUsdtModal.set(false);
+    this.pollingStatus.set(false);
   }
   
   copyAddress() {
-    navigator.clipboard.writeText(this.usdtAddress);
+    const address = this.usdtAddress();
+    navigator.clipboard.writeText(address);
     alert('地址已複製');
   }
   
   async confirmUsdtPayment() {
-    // TODO: 創建充值訂單並輪詢狀態
+    const order = this.currentOrder();
+    if (!order) {
+      alert('訂單不存在');
+      return;
+    }
+    
     this.loading.set(true);
     
-    setTimeout(() => {
-      this.loading.set(false);
+    try {
+      // 標記訂單為已支付
+      const markResult = await this.walletService.markRechargeOrderPaid(order.order_no);
+      
+      if (!markResult.success) {
+        alert(markResult.error || '標記支付狀態失敗');
+        this.loading.set(false);
+        return;
+      }
+      
+      // 開始輪詢訂單狀態
+      this.pollingStatus.set(true);
       this.showUsdtModal.set(false);
-      alert('我們將在確認收到款項後為您充值，請稍候...');
+      
+      alert('已收到您的支付確認，系統正在處理中...\n到賬後將自動更新餘額。');
+      
+      // 後台輪詢
+      this.pollOrderStatus(order.order_no);
+      
+      // 先返回錢包頁
       this.router.navigate(['/wallet']);
-    }, 1500);
+      
+    } catch (error) {
+      console.error('Confirm payment error:', error);
+      alert('確認支付失敗');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+  
+  private async pollOrderStatus(orderNo: string) {
+    const result = await this.walletService.pollRechargeOrderStatus(orderNo, 10000, 36);
+    
+    if (result.confirmed) {
+      // 充值成功，刷新錢包
+      await this.walletService.loadWallet();
+      console.log('Recharge confirmed:', orderNo);
+    }
+    
+    this.pollingStatus.set(false);
   }
 }

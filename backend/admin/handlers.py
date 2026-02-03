@@ -1060,7 +1060,7 @@ class AdminHandlers:
         
         # 審計日誌
         audit_log.log(
-            action=AuditAction.SETTING_UPDATE,
+            action=AuditAction.PROXY_ADD,
             admin_id=admin['admin_id'],
             admin_username=admin['username'],
             resource_type="proxy",
@@ -1090,7 +1090,7 @@ class AdminHandlers:
         
         if success:
             audit_log.log(
-                action=AuditAction.SETTING_UPDATE,
+                action=AuditAction.PROXY_DELETE,
                 admin_id=admin['admin_id'],
                 admin_username=admin['username'],
                 resource_type="proxy",
@@ -1148,7 +1148,7 @@ class AdminHandlers:
         
         if proxy:
             audit_log.log(
-                action=AuditAction.SETTING_UPDATE,
+                action=AuditAction.PROXY_ASSIGN,
                 admin_id=admin['admin_id'],
                 admin_username=admin['username'],
                 resource_type="proxy",
@@ -1183,7 +1183,7 @@ class AdminHandlers:
         
         if success:
             audit_log.log(
-                action=AuditAction.SETTING_UPDATE,
+                action=AuditAction.PROXY_RELEASE,
                 admin_id=admin['admin_id'],
                 admin_username=admin['username'],
                 resource_type="proxy",

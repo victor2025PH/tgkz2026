@@ -60,6 +60,12 @@ class AuditAction(Enum):
     # ORDER
     ORDER_VIEW = ("order.view", AuditCategory.ORDER, "查看訂單")
     ORDER_CONFIRM = ("order.confirm", AuditCategory.ORDER, "確認支付")
+    
+    # PROXY
+    PROXY_ADD = ("proxy.add", AuditCategory.SYSTEM, "添加代理")
+    PROXY_DELETE = ("proxy.delete", AuditCategory.SYSTEM, "刪除代理")
+    PROXY_ASSIGN = ("proxy.assign", AuditCategory.SYSTEM, "分配代理")
+    PROXY_RELEASE = ("proxy.release", AuditCategory.SYSTEM, "釋放代理")
     ORDER_REFUND = ("order.refund", AuditCategory.ORDER, "退款")
     ORDER_CANCEL = ("order.cancel", AuditCategory.ORDER, "取消訂單")
     

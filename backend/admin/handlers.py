@@ -1019,6 +1019,191 @@ class AdminHandlers:
         finally:
             conn.close()
 
+    # ============ 代理池管理 ============
+
+    @handle_exception
+    async def get_proxies(self, request: web.Request) -> web.Response:
+        """獲取代理列表"""
+        admin = await self._verify_admin_token(request)
+        
+        from .proxy_pool import get_proxy_pool
+        pool = get_proxy_pool()
+        
+        # 查詢參數
+        status = request.query.get('status')
+        page = int(request.query.get('page', 1))
+        page_size = int(request.query.get('page_size', 50))
+        
+        result = pool.get_proxies(status=status, page=page, page_size=page_size)
+        
+        return success_response(data=result)
+
+    @handle_exception
+    async def add_proxies(self, request: web.Request) -> web.Response:
+        """批量添加代理"""
+        admin = await self._verify_admin_token(request)
+        data = await request.json()
+        ip_address = request.headers.get('X-Forwarded-For', request.remote)
+        
+        from .proxy_pool import get_proxy_pool
+        pool = get_proxy_pool()
+        
+        proxies = data.get('proxies', [])
+        if not proxies:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="請提供代理列表")
+        
+        result = pool.add_proxies_batch(proxies)
+        
+        # 審計日誌
+        audit_log.log(
+            action=AuditAction.SETTING_UPDATE,
+            admin_id=admin['admin_id'],
+            admin_username=admin['username'],
+            resource_type="proxy",
+            description=f"批量添加代理: 成功 {result['success']} 個, 失敗 {result['failed']} 個",
+            ip_address=ip_address,
+            status="success"
+        )
+        
+        return success_response(data=result, message=f"成功添加 {result['success']} 個代理")
+
+    @handle_exception
+    async def delete_proxy(self, request: web.Request) -> web.Response:
+        """刪除代理"""
+        admin = await self._verify_admin_token(request)
+        ip_address = request.headers.get('X-Forwarded-For', request.remote)
+        
+        proxy_id = request.match_info.get('proxy_id')
+        if not proxy_id:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="缺少代理 ID")
+        
+        from .proxy_pool import get_proxy_pool
+        pool = get_proxy_pool()
+        
+        success = pool.delete_proxy(proxy_id)
+        
+        if success:
+            audit_log.log(
+                action=AuditAction.SETTING_UPDATE,
+                admin_id=admin['admin_id'],
+                admin_username=admin['username'],
+                resource_type="proxy",
+                resource_id=proxy_id,
+                description=f"刪除代理 {proxy_id}",
+                ip_address=ip_address,
+                status="success"
+            )
+            return success_response(message="代理已刪除")
+        else:
+            raise AdminError(ErrorCode.RESOURCE_NOT_FOUND, message="代理不存在")
+
+    @handle_exception
+    async def test_proxy(self, request: web.Request) -> web.Response:
+        """測試代理連通性"""
+        admin = await self._verify_admin_token(request)
+        
+        proxy_id = request.match_info.get('proxy_id')
+        if not proxy_id:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="缺少代理 ID")
+        
+        from .proxy_pool import get_proxy_pool
+        pool = get_proxy_pool()
+        
+        result = await pool.test_proxy(proxy_id)
+        
+        return success_response(data=result)
+
+    @handle_exception
+    async def assign_proxy(self, request: web.Request) -> web.Response:
+        """手動分配代理給帳號"""
+        admin = await self._verify_admin_token(request)
+        data = await request.json()
+        ip_address = request.headers.get('X-Forwarded-For', request.remote)
+        
+        account_id = data.get('account_id')
+        phone = data.get('phone')
+        proxy_id = data.get('proxy_id')  # 可選，為空則自動分配
+        
+        if not account_id and not phone:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="需要提供帳號ID或手機號")
+        
+        from .proxy_pool import get_proxy_pool
+        pool = get_proxy_pool()
+        
+        proxy = pool.assign_proxy_to_account(
+            account_id=account_id or '',
+            phone=phone or '',
+            proxy_id=proxy_id
+        )
+        
+        if proxy:
+            audit_log.log(
+                action=AuditAction.SETTING_UPDATE,
+                admin_id=admin['admin_id'],
+                admin_username=admin['username'],
+                resource_type="proxy",
+                resource_id=proxy.id,
+                description=f"分配代理 {proxy.host}:{proxy.port} 給帳號 {phone or account_id}",
+                ip_address=ip_address,
+                status="success"
+            )
+            return success_response(data=proxy.to_dict(), message="代理已分配")
+        else:
+            raise AdminError(ErrorCode.RESOURCE_NOT_FOUND, message="沒有可用的代理")
+
+    @handle_exception
+    async def release_proxy(self, request: web.Request) -> web.Response:
+        """釋放帳號的代理"""
+        admin = await self._verify_admin_token(request)
+        data = await request.json()
+        ip_address = request.headers.get('X-Forwarded-For', request.remote)
+        
+        account_id = data.get('account_id')
+        phone = data.get('phone')
+        
+        if not account_id and not phone:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="需要提供帳號ID或手機號")
+        
+        from .proxy_pool import get_proxy_pool
+        pool = get_proxy_pool()
+        
+        success = pool.release_proxy(account_id=account_id, phone=phone)
+        
+        if success:
+            audit_log.log(
+                action=AuditAction.SETTING_UPDATE,
+                admin_id=admin['admin_id'],
+                admin_username=admin['username'],
+                resource_type="proxy",
+                description=f"釋放帳號 {phone or account_id} 的代理",
+                ip_address=ip_address,
+                status="success"
+            )
+            return success_response(message="代理已釋放")
+        else:
+            return success_response(message="該帳號沒有綁定代理")
+
+    @handle_exception
+    async def get_account_proxy(self, request: web.Request) -> web.Response:
+        """獲取帳號綁定的代理"""
+        admin = await self._verify_admin_token(request)
+        
+        account_id = request.query.get('account_id')
+        phone = request.query.get('phone')
+        
+        if not account_id and not phone:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="需要提供帳號ID或手機號")
+        
+        from .proxy_pool import get_proxy_pool
+        pool = get_proxy_pool()
+        
+        proxy = pool.get_proxy_for_account(account_id=account_id, phone=phone)
+        
+        if proxy:
+            return success_response(data=proxy.to_dict())
+        else:
+            return success_response(data=None, message="該帳號沒有綁定代理")
+
 
 # 全局實例
 admin_handlers = AdminHandlers()

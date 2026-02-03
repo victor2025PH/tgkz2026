@@ -156,6 +156,9 @@ class HttpApiServer:
         self.app.router.add_get('/health', self.health_check)
         self.app.router.add_get('/api/health', self.health_check)
         
+        # 診斷端點
+        self.app.router.add_get('/api/debug/modules', self.debug_modules)
+        
         # 通用命令端點（核心）
         self.app.router.add_post('/api/command', self.handle_command)
         self.app.router.add_post('/api/v1/command', self.handle_command)
@@ -689,6 +692,25 @@ class HttpApiServer:
             'timestamp': datetime.now().isoformat(),
             'backend_ready': self.backend_service is not None,
             'wallet_module': WALLET_MODULE_AVAILABLE
+        })
+    
+    async def debug_modules(self, request):
+        """診斷模塊狀態"""
+        import os
+        import sys
+        
+        # 檢查 wallet 目錄
+        wallet_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'wallet')
+        wallet_exists = os.path.exists(wallet_path)
+        wallet_files = os.listdir(wallet_path) if wallet_exists else []
+        
+        return self._json_response({
+            'wallet_module_available': WALLET_MODULE_AVAILABLE,
+            'wallet_path': wallet_path,
+            'wallet_exists': wallet_exists,
+            'wallet_files': wallet_files[:20],
+            'python_path': sys.path[:5],
+            'cwd': os.getcwd()
         })
     
     async def handle_command(self, request):

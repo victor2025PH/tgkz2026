@@ -40,6 +40,46 @@ class AdminHandlers:
     
     def __init__(self):
         self.adapter = user_adapter
+        self._ensure_admins_table()
+    
+    def _ensure_admins_table(self):
+        """確保 admins 表有必要的字段"""
+        try:
+            conn = self.adapter.get_connection()
+            cursor = conn.cursor()
+            
+            # 檢查表是否存在
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='admins'")
+            if not cursor.fetchone():
+                conn.close()
+                return
+            
+            # 獲取現有列
+            cursor.execute("PRAGMA table_info(admins)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            # 添加缺失的列
+            new_columns = {
+                'must_change_password': 'INTEGER DEFAULT 1',
+                'password_changed_at': 'TIMESTAMP',
+                'failed_login_count': 'INTEGER DEFAULT 0',
+                'locked_until': 'TIMESTAMP',
+                'last_login_ip': 'TEXT'
+            }
+            
+            for col_name, col_def in new_columns.items():
+                if col_name not in columns:
+                    try:
+                        cursor.execute(f'ALTER TABLE admins ADD COLUMN {col_name} {col_def}')
+                        logger.info(f"Added column {col_name} to admins table")
+                    except Exception as e:
+                        logger.warning(f"Could not add column {col_name}: {e}")
+            
+            conn.commit()
+            conn.close()
+            
+        except Exception as e:
+            logger.warning(f"Error ensuring admins table: {e}")
     
     def _get_client_ip(self, request: web.Request) -> str:
         """獲取客戶端 IP"""
@@ -94,12 +134,8 @@ class AdminHandlers:
         cursor = conn.cursor()
         
         try:
-            # 查詢管理員
-            cursor.execute('''
-                SELECT id, username, password_hash, role, name, is_active,
-                       must_change_password, failed_login_count, locked_until
-                FROM admins WHERE username = ?
-            ''', (username,))
+            # 查詢管理員（使用 SELECT * 兼容舊表結構）
+            cursor.execute('SELECT * FROM admins WHERE username = ?', (username,))
             admin = cursor.fetchone()
             
             ip_address = self._get_client_ip(request)
@@ -145,22 +181,24 @@ class AdminHandlers:
             # 驗證密碼
             password_hash = password_validator.hash_password(password)
             if admin['password_hash'] != password_hash:
-                # 增加失敗次數
+                # 增加失敗次數（兼容沒有這些字段的舊表）
                 failed_count = (admin.get('failed_login_count') or 0) + 1
-                if failed_count >= 5:
-                    # 鎖定 15 分鐘
-                    cursor.execute('''
-                        UPDATE admins SET 
-                            failed_login_count = ?,
-                            locked_until = datetime('now', '+15 minutes')
-                        WHERE id = ?
-                    ''', (failed_count, admin['id']))
-                else:
-                    cursor.execute(
-                        'UPDATE admins SET failed_login_count = ? WHERE id = ?',
-                        (failed_count, admin['id'])
-                    )
-                conn.commit()
+                try:
+                    if failed_count >= 5:
+                        cursor.execute('''
+                            UPDATE admins SET 
+                                failed_login_count = ?,
+                                locked_until = datetime('now', '+15 minutes')
+                            WHERE id = ?
+                        ''', (failed_count, admin['id']))
+                    else:
+                        cursor.execute(
+                            'UPDATE admins SET failed_login_count = ? WHERE id = ?',
+                            (failed_count, admin['id'])
+                        )
+                    conn.commit()
+                except Exception as e:
+                    logger.warning(f"Could not update failed_login_count: {e}")
                 
                 audit_log.log(
                     action=AuditAction.ADMIN_LOGIN,
@@ -174,15 +212,22 @@ class AdminHandlers:
                 
                 return error_response(ErrorCode.AUTH_PASSWORD_INCORRECT)
             
-            # 登錄成功，清除失敗計數
-            cursor.execute('''
-                UPDATE admins SET 
-                    failed_login_count = 0,
-                    locked_until = NULL,
-                    last_login_at = CURRENT_TIMESTAMP,
-                    last_login_ip = ?
-                WHERE id = ?
-            ''', (ip_address, admin['id']))
+            # 登錄成功，清除失敗計數（兼容舊表）
+            try:
+                cursor.execute('''
+                    UPDATE admins SET 
+                        failed_login_count = 0,
+                        locked_until = NULL,
+                        last_login_at = CURRENT_TIMESTAMP,
+                        last_login_ip = ?
+                    WHERE id = ?
+                ''', (ip_address, admin['id']))
+            except Exception:
+                # 回退到簡單更新
+                cursor.execute(
+                    'UPDATE admins SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?',
+                    (admin['id'],)
+                )
             conn.commit()
             
             # 檢查是否需要修改密碼

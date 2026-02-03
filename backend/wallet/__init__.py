@@ -61,6 +61,30 @@ from .withdraw_service import (
 from .withdraw_handlers import (
     setup_withdraw_routes, withdraw_handlers
 )
+from .redeem_service import (
+    RedeemService, get_redeem_service
+)
+from .redeem_handlers import (
+    setup_redeem_routes, redeem_handlers
+)
+from .payment_password_service import (
+    PaymentPasswordService, get_pay_password_service
+)
+from .pay_password_handlers import (
+    setup_pay_password_routes, pay_password_handlers
+)
+from .coupon_service import (
+    CouponService, get_coupon_service
+)
+from .coupon_handlers import (
+    setup_coupon_routes, coupon_handlers
+)
+from .finance_report_service import (
+    FinanceReportService, get_finance_report_service
+)
+from .finance_report_handlers import (
+    setup_finance_report_routes, finance_report_handlers
+)
 
 __all__ = [
     # 枚舉
@@ -85,4 +109,12 @@ __all__ = [
     'start_notification_service', 'stop_notification_service',
     'WithdrawService', 'get_withdraw_service',
     'setup_withdraw_routes', 'withdraw_handlers',
+    'RedeemService', 'get_redeem_service',
+    'setup_redeem_routes', 'redeem_handlers',
+    'PaymentPasswordService', 'get_pay_password_service',
+    'setup_pay_password_routes', 'pay_password_handlers',
+    'CouponService', 'get_coupon_service',
+    'setup_coupon_routes', 'coupon_handlers',
+    'FinanceReportService', 'get_finance_report_service',
+    'setup_finance_report_routes', 'finance_report_handlers',
 ]

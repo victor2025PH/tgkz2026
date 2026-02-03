@@ -312,8 +312,18 @@ createApp({
             isLoading.value = true;
             const result = await apiRequest('/admin/dashboard');
             if (result.success) {
-                const data = result.data;
-                stats.value = data.stats;
+                const data = result.data || result;  // 兼容新舊格式
+                // 合併 stats，保留默認值
+                stats.value = {
+                    totalUsers: data.stats?.totalUsers ?? 0,
+                    newUsersToday: data.stats?.newUsersToday ?? 0,
+                    paidUsers: data.stats?.paidUsers ?? 0,
+                    conversionRate: data.stats?.conversionRate ?? 0,
+                    totalRevenue: data.stats?.totalRevenue ?? 0,
+                    revenueToday: data.stats?.revenueToday ?? 0,
+                    totalLicenses: data.stats?.totalLicenses ?? data.licenseStats?.total ?? 0,
+                    unusedLicenses: data.stats?.unusedLicenses ?? data.licenseStats?.unused ?? 0
+                };
                 licenseStats.value = data.licenseStats || licenseStats.value;
                 revenueTrend.value = data.revenueTrend || [];
                 levelDistribution.value = data.levelDistribution || {};

@@ -16,6 +16,7 @@ import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { I18nService } from '../i18n.service';
 import { FrontendSecurityService } from '../services/security.service';
+import { ElectronIpcService } from '../electron-ipc.service';
 
 @Component({
   selector: 'app-login',
@@ -1004,6 +1005,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private i18n = inject(I18nService);
   private security = inject(FrontendSecurityService);
+  private ipcService = inject(ElectronIpcService);
   
   // 表單數據
   email = '';
@@ -1251,6 +1253,9 @@ export class LoginComponent implements OnInit, OnDestroy {
           localStorage.setItem('tgm_refresh_token', authData.refresh_token);
         }
         localStorage.setItem('tgm_user', JSON.stringify(authData.user));
+        
+        // 🔧 修復：通知 IpcService 更新 Token
+        this.ipcService.setAuthToken(authData.access_token);
         
         // 登入成功，重定向
         const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
@@ -1623,38 +1628,57 @@ export class LoginComponent implements OnInit, OnDestroy {
    * 🆕 Phase 3: 添加成功動畫
    */
   private handleLoginSuccess(data: any) {
-    console.log('[Login] Success:', data);
+    console.log('[Login] Success - Full data:', JSON.stringify(data));
+    console.log('[Login] access_token exists:', !!data?.access_token);
+    
+    if (!data?.access_token) {
+      console.error('[Login] ❌ No access_token in data!');
+      this.error.set('登入失敗：未收到認證令牌');
+      return;
+    }
     
     // 清理資源
     this.cleanupQRCode();
     this.cancelDeepLink();
     
-    // 保存 Token
-    if (data.access_token) {
-      localStorage.setItem('tgm_access_token', data.access_token);
-    }
-    if (data.refresh_token) {
-      localStorage.setItem('tgm_refresh_token', data.refresh_token);
-    }
-    if (data.user) {
-      localStorage.setItem('tgm_user', JSON.stringify(data.user));
-    }
-    // 🆕 Phase 4: 保存會話 ID（用於設備管理）
-    if (data.session_id) {
-      localStorage.setItem('tgm_session_id', data.session_id);
-    }
+    // 🆕 使用 AuthService 設置會話（確保狀態同步）
+    this.authService.setSession({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      user: data.user,
+      session_id: data.session_id
+    });
+    
+    // 🔧 修復：通知 IpcService 重新連接帶認證的 WebSocket
+    this.ipcService.setAuthToken(data.access_token);
+    
+    console.log('[Login] ✅ Session set via AuthService');
+    console.log('[Login] isAuthenticated:', this.authService.isAuthenticated());
     
     // 🆕 Phase 3: 顯示成功動畫
-    this.successUserName.set(data.user?.display_name || data.user?.username || 'User');
+    this.successUserName.set(data?.user?.display_name || data?.user?.username || 'User');
     this.loginSuccess.set(true);
     
     // 記住登入方式偏好
     this.saveLoginPreference();
     
-    // 延遲跳轉，讓用戶看到成功動畫
+    // 🔧 使用 Angular Router 跳轉（避免完全刷新頁面）
     const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
+    console.log('[Login] Will navigate to:', returnUrl, 'in 1.5 seconds');
+    
     setTimeout(() => {
-      window.location.href = returnUrl;
+      console.log('[Login] Navigating now...');
+      console.log('[Login] Final check - isAuthenticated:', this.authService.isAuthenticated());
+      console.log('[Login] Final check - accessToken:', !!this.authService.accessToken());
+      
+      // 使用 Angular Router 導航（保持 SPA 狀態）
+      this.router.navigateByUrl(returnUrl).then(() => {
+        console.log('[Login] ✅ Navigation complete');
+      }).catch(err => {
+        console.error('[Login] Navigation error:', err);
+        // 備用：使用 location.href
+        window.location.href = returnUrl;
+      });
     }, 1500);  // 1.5 秒後跳轉
   }
   

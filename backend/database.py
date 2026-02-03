@@ -2738,24 +2738,34 @@ class Database:
                 try:
                     from core.tenant_context import get_current_tenant
                     tenant = get_current_tenant()
+                    print(f"[DEBUG get_all_accounts] tenant context: {tenant}")
+                    if tenant:
+                        print(f"[DEBUG get_all_accounts] tenant.user_id: {tenant.user_id}")
                     if tenant and tenant.user_id:
                         owner_user_id = tenant.user_id
-                except ImportError:
-                    pass
+                        print(f"[DEBUG get_all_accounts] ✅ Got owner_user_id: {owner_user_id}")
+                    else:
+                        print(f"[DEBUG get_all_accounts] ❌ No tenant or user_id available")
+                except ImportError as e:
+                    print(f"[DEBUG get_all_accounts] ❌ ImportError: {e}")
             
             # 🆕 構建查詢（支持多租戶過濾）
             import os
             is_electron = os.environ.get('ELECTRON_MODE', 'false').lower() == 'true'
             
+            print(f"[DEBUG get_all_accounts] is_electron: {is_electron}, owner_user_id: {owner_user_id}")
+            
             if is_electron or not owner_user_id:
                 # Electron 模式或無用戶上下文：返回所有帳號
                 query = 'SELECT * FROM accounts ORDER BY id'
                 params = ()
+                print(f"[DEBUG get_all_accounts] ⚠️ Returning ALL accounts (no filter)")
             else:
                 # SaaS 模式：只返回當前用戶的帳號
                 # 🔧 注意：不再包含 local_user，實現真正的數據隔離
                 query = 'SELECT * FROM accounts WHERE owner_user_id = ? ORDER BY id'
                 params = (owner_user_id,)
+                print(f"[DEBUG get_all_accounts] ✅ Filtering by owner_user_id: {owner_user_id}")
             
             if not HAS_AIOSQLITE:
                 # 同步回退

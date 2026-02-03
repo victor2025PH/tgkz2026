@@ -6376,7 +6376,7 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
             return web.json_response({'success': False, 'message': str(e)})
     
     async def admin_panel_user_extend(self, request: web.Request) -> web.Response:
-        """延長用戶會員"""
+        """延長用戶會員 - 支持兩種表結構"""
         admin = self._verify_admin_token(request)
         if not admin:
             return web.json_response({'success': False, 'message': '未授權'}, status=401)
@@ -6384,42 +6384,101 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
         user_id = request.match_info.get('user_id')
         data = await request.json()
         days = data.get('days', 30)
+        new_level = data.get('level', '')
         
         try:
             conn = self._get_admin_db()
             cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE users SET expires_at = datetime(
-                    CASE WHEN expires_at > datetime('now') THEN expires_at ELSE datetime('now') END,
-                    '+' || ? || ' days'
-                ) WHERE user_id = ?
-            ''', (days, user_id))
+            
+            # 檢查表結構
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            if 'subscription_expires' in columns:
+                # auth/service.py 格式
+                cursor.execute('''
+                    UPDATE users SET 
+                        subscription_expires = datetime(
+                            CASE WHEN subscription_expires > datetime('now') 
+                                 THEN subscription_expires 
+                                 ELSE datetime('now') 
+                            END,
+                            '+' || ? || ' days'
+                        ),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (days, user_id))
+                
+                # 如果指定了新等級
+                if new_level:
+                    cursor.execute('UPDATE users SET subscription_tier = ? WHERE id = ?', (new_level, user_id))
+            else:
+                # database.py 格式
+                cursor.execute('''
+                    UPDATE users SET 
+                        expires_at = datetime(
+                            CASE WHEN expires_at > datetime('now') 
+                                 THEN expires_at 
+                                 ELSE datetime('now') 
+                            END,
+                            '+' || ? || ' days'
+                        ),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = ?
+                ''', (days, user_id))
+                
+                if new_level:
+                    cursor.execute('UPDATE users SET membership_level = ? WHERE user_id = ?', (new_level, user_id))
+            
             conn.commit()
             conn.close()
             
-            return web.json_response({'success': True, 'message': f'已延長 {days} 天'})
+            msg = f'已延長 {days} 天'
+            if new_level:
+                msg += f'，等級升級為 {new_level}'
+            return web.json_response({'success': True, 'message': msg})
         except Exception as e:
+            import traceback
+            logger.error(f"Extend user error: {e}")
+            logger.error(traceback.format_exc())
             return web.json_response({'success': False, 'message': str(e)})
     
     async def admin_panel_user_ban(self, request: web.Request) -> web.Response:
-        """封禁/解封用戶"""
+        """封禁/解封用戶 - 支持兩種表結構"""
         admin = self._verify_admin_token(request)
         if not admin:
             return web.json_response({'success': False, 'message': '未授權'}, status=401)
         
         user_id = request.match_info.get('user_id')
         data = await request.json()
-        is_banned = 1 if data.get('is_banned', True) else 0
+        is_banned = data.get('is_banned', True)
         
         try:
             conn = self._get_admin_db()
             cursor = conn.cursor()
-            cursor.execute('UPDATE users SET is_banned = ? WHERE user_id = ?', (is_banned, user_id))
+            
+            # 檢查表結構
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            if 'is_active' in columns and 'is_banned' not in columns:
+                # auth/service.py 格式（使用 is_active）
+                is_active = 0 if is_banned else 1
+                cursor.execute('UPDATE users SET is_active = ? WHERE id = ?', (is_active, user_id))
+            else:
+                # database.py 格式（使用 is_banned）
+                ban_value = 1 if is_banned else 0
+                cursor.execute('UPDATE users SET is_banned = ? WHERE user_id = ?', (ban_value, user_id))
+            
             conn.commit()
             conn.close()
             
-            return web.json_response({'success': True, 'message': '操作成功'})
+            action = '封禁' if is_banned else '解封'
+            return web.json_response({'success': True, 'message': f'用戶已{action}'})
         except Exception as e:
+            import traceback
+            logger.error(f"Ban user error: {e}")
+            logger.error(traceback.format_exc())
             return web.json_response({'success': False, 'message': str(e)})
     
     async def admin_panel_licenses(self, request: web.Request) -> web.Response:

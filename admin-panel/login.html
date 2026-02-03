@@ -178,9 +178,11 @@
                 const showServerConfig = ref(false);
                 const serverUrl = ref(API_SERVER);
                 
-                // 檢查是否需要配置服務器
+                // 檢查是否需要配置服務器（只有 GitHub Pages 需要）
                 onMounted(() => {
-                    if (!API_SERVER && !window.location.hostname.match(/localhost|127\.0\.0\.1/)) {
+                    // 只有當訪問 github.io 時才需要配置 API 服務器
+                    const isGitHubPages = window.location.hostname.endsWith('.github.io');
+                    if (!API_SERVER && isGitHubPages) {
                         showServerConfig.value = true;
                     }
                 });
@@ -214,8 +216,8 @@
                             storage.setItem('admin_token', result.data.token);
                             storage.setItem('admin_user', JSON.stringify(result.data.user));
                             
-                            // 跳轉到管理後台
-                            window.location.href = '/';
+                            // 跳轉到管理後台（使用相對路徑）
+                            window.location.href = 'index.html';
                         } else {
                             error.value = result.message || '登錄失敗';
                         }

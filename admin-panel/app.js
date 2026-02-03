@@ -13,8 +13,8 @@ const { createApp, ref, computed, onMounted, watch, reactive } = Vue;
 const API_SERVER = localStorage.getItem('api_server') || '';
 const API_BASE = API_SERVER ? `${API_SERVER}/api` : '/api';
 
-// 如果未配置服務器且不是本地訪問，顯示配置提示
-if (!API_SERVER && !window.location.hostname.match(/localhost|127\.0\.0\.1/)) {
+// 如果未配置服務器且是 GitHub Pages，顯示配置提示
+if (!API_SERVER && window.location.hostname.endsWith('.github.io')) {
     console.warn('⚠️ 未配置 API 服務器地址，請在瀏覽器控制台執行：');
     console.warn('localStorage.setItem("api_server", "https://your-api-server.com")');
 }
@@ -39,7 +39,7 @@ function logout() {
     localStorage.removeItem('admin_user');
     sessionStorage.removeItem('admin_token');
     sessionStorage.removeItem('admin_user');
-    window.location.href = '/login.html';
+    window.location.href = 'login.html';  // 使用相對路徑
 }
 
 async function apiRequest(endpoint, options = {}) {

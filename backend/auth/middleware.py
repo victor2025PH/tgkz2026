@@ -94,20 +94,29 @@ class AuthContext:
 
 def extract_token(request) -> Optional[str]:
     """從請求中提取 Token"""
+    # 🔍 調試：記錄請求信息
+    path = getattr(request, 'path', 'unknown')
+    query_string = str(request.query) if hasattr(request, 'query') else 'N/A'
+    logger.info(f"[TokenExtract] {path} - query: {query_string[:100]}...")
+    
     # 從 Authorization header
     auth_header = request.headers.get('Authorization', '')
     if auth_header.startswith('Bearer '):
+        logger.info(f"[TokenExtract] Found token in Authorization header")
         return auth_header[7:]
     
     # 從 query parameter
     if hasattr(request, 'query') and 'token' in request.query:
+        logger.info(f"[TokenExtract] Found token in query parameter")
         return request.query['token']
     
     # 從 cookie
     cookies = request.cookies
     if 'access_token' in cookies:
+        logger.info(f"[TokenExtract] Found token in cookie")
         return cookies['access_token']
     
+    logger.info(f"[TokenExtract] No token found in any source")
     return None
 
 

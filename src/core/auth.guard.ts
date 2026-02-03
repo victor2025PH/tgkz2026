@@ -31,17 +31,31 @@ export const authGuard: CanActivateFn = (
     return true;
   }
   
-  // SaaS 模式：嚴格檢查認證狀態
-  if (authService.isAuthenticated()) {
-    // 額外驗證：確保有有效的 token
-    const token = authService.accessToken();
-    if (token && token.length > 10) {
-      return true;
-    }
+  // SaaS 模式：檢查認證狀態
+  // 🔧 修復：只檢查 Token 是否存在，不要清除可能有效的會話
+  const token = authService.accessToken();
+  
+  // 也檢查 localStorage 中的 Token（可能尚未同步到 AuthService）
+  const localToken = localStorage.getItem('tgm_access_token');
+  
+  console.log('[AuthGuard] Checking auth:', {
+    isAuthenticated: authService.isAuthenticated(),
+    hasServiceToken: !!token,
+    hasLocalToken: !!localToken
+  });
+  
+  if (token && token.length > 10) {
+    return true;
   }
   
-  // 清除可能的無效狀態
-  authService.clearSession();
+  // 🔧 備用檢查：如果 localStorage 中有 Token，允許訪問
+  if (localToken && localToken.length > 10) {
+    console.log('[AuthGuard] Using localStorage token fallback');
+    return true;
+  }
+  
+  // 🔧 只有在確定沒有 Token 時才清除（不要過早清除）
+  // authService.clearSession();  // 移除這行，避免過早清除有效會話
   
   // 保存原始 URL 用於登入後重定向
   const returnUrl = state.url;

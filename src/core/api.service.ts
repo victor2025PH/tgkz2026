@@ -202,13 +202,19 @@ export class ApiService {
     const config = this._config();
     const url = `${config.baseUrl}/api/command`;
     
+    // 🔧 獲取認證 Token
+    const token = localStorage.getItem('tgm_access_token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     try {
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // TODO: 添加認證 token
-        },
+        headers,
         body: JSON.stringify({ command: cmd, payload })
       });
       

@@ -1272,9 +1272,13 @@ export class LoginComponent implements OnInit, OnDestroy {
   
   // ==================== 🆕 Deep Link 登入 ====================
   
+  // 🆕 Deep Link WebSocket
+  private deepLinkWebSocket: WebSocket | null = null;
+  
   /**
    * 打開 Telegram Deep Link 登入
-   * 流程：生成 Token → 打開 Telegram App → 用戶確認 → 輪詢結果
+   * 🔧 修復：使用 WebSocket 替代輪詢，確保實時接收登錄確認
+   * 流程：生成 Token → 建立 WebSocket → 打開 Telegram App → 用戶確認 → WebSocket 接收通知
    */
   async openDeepLink() {
     this.error.set(null);
@@ -1302,11 +1306,16 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.deepLinkToken = token;
       this.deepLinkCountdown.set(expires_in || 300);
       
-      // 2. 打開 Telegram Deep Link
+      console.log('[DeepLink] Token generated:', token.substring(0, 8) + '...');
+      
+      // 2. 🆕 建立 WebSocket 連接（優先使用實時通知）
+      this.connectDeepLinkWebSocket(token);
+      
+      // 3. 打開 Telegram Deep Link
       console.log('[DeepLink] Opening:', deep_link_url);
       window.open(deep_link_url, '_blank');
       
-      // 3. 開始倒計時
+      // 4. 開始倒計時
       this.deepLinkCountdownInterval = setInterval(() => {
         const current = this.deepLinkCountdown();
         if (current <= 0) {
@@ -1317,7 +1326,7 @@ export class LoginComponent implements OnInit, OnDestroy {
         }
       }, 1000);
       
-      // 4. 開始輪詢登入狀態
+      // 5. 🆕 備用輪詢（WebSocket 失敗時使用）
       this.startPollingLoginStatus();
       
     } catch (e: any) {
@@ -1329,9 +1338,68 @@ export class LoginComponent implements OnInit, OnDestroy {
   }
   
   /**
+   * 🆕 建立 Deep Link WebSocket 連接
+   */
+  private connectDeepLinkWebSocket(token: string) {
+    // 關閉現有連接
+    if (this.deepLinkWebSocket) {
+      this.deepLinkWebSocket.close();
+    }
+    
+    // 構建 WebSocket URL
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const wsUrl = `${protocol}//${host}/ws/login-token/${token}`;
+    
+    console.log('[DeepLink WS] Connecting to:', wsUrl);
+    
+    try {
+      this.deepLinkWebSocket = new WebSocket(wsUrl);
+      
+      this.deepLinkWebSocket.onopen = () => {
+        console.log('[DeepLink WS] ✅ Connected');
+      };
+      
+      this.deepLinkWebSocket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('[DeepLink WS] Message received:', data);
+          
+          // 處理登入成功消息
+          if (data.type === 'login_success' || data.event === 'login_confirmed') {
+            console.log('[DeepLink WS] 🎉 Login confirmed via WebSocket!');
+            this.handleLoginSuccess(data.data);
+          } else if (data.status === 'confirmed' && data.data?.access_token) {
+            console.log('[DeepLink WS] 🎉 Login confirmed (direct)!');
+            this.handleLoginSuccess(data.data);
+          }
+        } catch (e) {
+          console.error('[DeepLink WS] Parse error:', e);
+        }
+      };
+      
+      this.deepLinkWebSocket.onclose = () => {
+        console.log('[DeepLink WS] Disconnected');
+      };
+      
+      this.deepLinkWebSocket.onerror = (error) => {
+        console.warn('[DeepLink WS] Error (will fallback to polling):', error);
+      };
+      
+    } catch (e) {
+      console.warn('[DeepLink WS] Failed to create WebSocket:', e);
+    }
+  }
+  
+  /**
    * 取消 Deep Link 登入
    */
   cancelDeepLink() {
+    // 🆕 關閉 WebSocket
+    if (this.deepLinkWebSocket) {
+      this.deepLinkWebSocket.close();
+      this.deepLinkWebSocket = null;
+    }
     if (this.deepLinkPollInterval) {
       clearInterval(this.deepLinkPollInterval);
       this.deepLinkPollInterval = null;
@@ -1346,7 +1414,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   }
   
   /**
-   * 輪詢登入狀態
+   * 輪詢登入狀態（備用方案，WebSocket 失敗時使用）
    */
   private startPollingLoginStatus() {
     if (this.deepLinkPollInterval) {
@@ -1357,33 +1425,29 @@ export class LoginComponent implements OnInit, OnDestroy {
       if (!this.deepLinkToken) return;
       
       try {
+        console.log('[DeepLink Poll] Checking status...');
         const response = await fetch(`/api/v1/auth/login-token/${this.deepLinkToken}`);
         const result = await response.json();
         
+        console.log('[DeepLink Poll] Response:', result);
+        
         if (!result.success) {
-          console.warn('[DeepLink] Poll error:', result.error);
+          console.warn('[DeepLink Poll] Error:', result.error);
           return;
         }
         
         const { status, access_token, refresh_token, user } = result.data || {};
         
+        console.log('[DeepLink Poll] Status:', status, 'Has Token:', !!access_token);
+        
         if (status === 'confirmed' && access_token) {
           // 登入成功！
-          console.log('[DeepLink] Login confirmed!');
-          this.cancelDeepLink();
-          
-          // 保存 Token
-          localStorage.setItem('tgm_access_token', access_token);
-          if (refresh_token) {
-            localStorage.setItem('tgm_refresh_token', refresh_token);
-          }
-          if (user) {
-            localStorage.setItem('tgm_user', JSON.stringify(user));
-          }
-          
-          // 跳轉到目標頁面
-          const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
-          window.location.href = returnUrl;
+          console.log('[DeepLink Poll] 🎉 Login confirmed via polling!');
+          this.handleLoginSuccess({
+            access_token,
+            refresh_token,
+            user
+          });
           
         } else if (status === 'expired') {
           this.cancelDeepLink();
@@ -1392,15 +1456,18 @@ export class LoginComponent implements OnInit, OnDestroy {
         // pending 狀態繼續輪詢
         
       } catch (e) {
-        console.error('[DeepLink] Poll error:', e);
+        console.error('[DeepLink Poll] Error:', e);
       }
     };
     
-    // 立即執行一次
-    pollStatus();
-    
-    // 每 2 秒輪詢一次
-    this.deepLinkPollInterval = setInterval(pollStatus, 2000);
+    // 3 秒後開始輪詢（給 WebSocket 一點時間連接）
+    setTimeout(() => {
+      if (this.deepLinkToken) {
+        pollStatus();
+        // 每 2 秒輪詢一次
+        this.deepLinkPollInterval = setInterval(pollStatus, 2000);
+      }
+    }, 3000);
   }
   
   // ==================== 🆕 Phase 2: QR Code + WebSocket 登入 ====================

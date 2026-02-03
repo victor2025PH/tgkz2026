@@ -8,9 +8,11 @@
  * 4. 離線支持
  */
 
-import { Injectable, inject, signal, computed, effect } from '@angular/core';
+import { Injectable, inject, signal, computed, effect, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { ApiService } from './api.service';
+import { AuthEventsService, AUTH_STORAGE_KEYS } from './auth-events.service';
 
 // 用戶模型
 export interface User {
@@ -27,6 +29,10 @@ export interface User {
   two_factor_enabled: boolean;
   created_at: string;
   last_login_at: string;
+  // 🆕 邀請相關字段
+  invite_code?: string;
+  inviteCode?: string;
+  invited_count?: number;
 }
 
 // 認證狀態
@@ -54,19 +60,19 @@ export interface RegisterRequest {
   display_name?: string;
 }
 
-// Token 存儲鍵
-const TOKEN_KEYS = {
-  ACCESS: 'tgm_access_token',
-  REFRESH: 'tgm_refresh_token',
-  USER: 'tgm_user'
-};
+// Token 存儲鍵（使用集中定義）
+const TOKEN_KEYS = AUTH_STORAGE_KEYS;
 
 @Injectable({
   providedIn: 'root'
 })
-export class AuthService {
+export class AuthService implements OnDestroy {
   private api = inject(ApiService);
   private router = inject(Router);
+  private authEvents = inject(AuthEventsService);
+  
+  // 事件訂閱
+  private eventSubscription: Subscription | null = null;
   
   // 狀態信號
   private _user = signal<User | null>(null);
@@ -79,7 +85,8 @@ export class AuthService {
   
   // 公開的計算屬性
   readonly user = computed(() => this._user());
-  readonly isAuthenticated = computed(() => !!this._user() && !!this._accessToken());
+  // 🔧 修復：只需要 Token 存在即可認為已認證（user 可以延遲加載）
+  readonly isAuthenticated = computed(() => !!this._accessToken());
   readonly isLoading = computed(() => this._isLoading());
   readonly accessToken = computed(() => this._accessToken());
   
@@ -101,26 +108,40 @@ export class AuthService {
   });
   
   
+  // 🔧 標記是否已完成初始化，避免 effect 在初始化時刪除 localStorage
+  private _initialized = false;
+  
   constructor() {
     // 初始化時恢復狀態
     this.restoreSession();
+    this._initialized = true;
     
-    // Token 變化時自動保存
+    // 🆕 訂閱認證事件（處理來自其他服務的登出通知）
+    this.eventSubscription = this.authEvents.authEvents$.subscribe(event => {
+      if (event.type === 'logout') {
+        console.log('[CoreAuthService] Received logout event, clearing state');
+        this.clearAuthStateInternal();
+      }
+    });
+    
+    // Token 變化時自動保存 - 🔧 修復：只在初始化後才執行刪除操作
     effect(() => {
       const token = this._accessToken();
       if (token) {
-        localStorage.setItem(TOKEN_KEYS.ACCESS, token);
-      } else {
-        localStorage.removeItem(TOKEN_KEYS.ACCESS);
+        localStorage.setItem(TOKEN_KEYS.ACCESS_TOKEN, token);
+      } else if (this._initialized) {
+        // 🔧 只有在初始化完成後，才刪除 localStorage
+        // 避免在構造函數中因為初始值 null 而刪除已保存的 Token
+        localStorage.removeItem(TOKEN_KEYS.ACCESS_TOKEN);
       }
     });
     
     effect(() => {
       const token = this._refreshToken();
       if (token) {
-        localStorage.setItem(TOKEN_KEYS.REFRESH, token);
-      } else {
-        localStorage.removeItem(TOKEN_KEYS.REFRESH);
+        localStorage.setItem(TOKEN_KEYS.REFRESH_TOKEN, token);
+      } else if (this._initialized) {
+        localStorage.removeItem(TOKEN_KEYS.REFRESH_TOKEN);
       }
     });
     
@@ -128,10 +149,14 @@ export class AuthService {
       const user = this._user();
       if (user) {
         localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(user));
-      } else {
+      } else if (this._initialized) {
         localStorage.removeItem(TOKEN_KEYS.USER);
       }
     });
+  }
+  
+  ngOnDestroy(): void {
+    this.eventSubscription?.unsubscribe();
   }
   
   // ==================== 公開方法 ====================
@@ -172,13 +197,21 @@ export class AuthService {
         body: JSON.stringify({
           email: request.email,
           password: request.password,
-          device_name: request.device_name || this.getDeviceName()
+          device_name: request.device_name || this.getDeviceName(),
+          remember: request.remember || false // 🆕 傳遞記住登入選項
         })
       });
       
       const result = await response.json();
       
       if (result.success && result.data) {
+        // 🆕 保存記住狀態
+        if (request.remember) {
+          localStorage.setItem('tgm_remember_me', 'true');
+        } else {
+          localStorage.removeItem('tgm_remember_me');
+        }
+        
         this.setAuthState(result.data);
         this.scheduleTokenRefresh();
         return { success: true };
@@ -263,8 +296,12 @@ export class AuthService {
     } catch (e) {
       console.error('Logout error:', e);
     } finally {
-      this.clearAuthState();
-      this.router.navigate(['/login']);
+      // 🆕 廣播登出事件，通知所有訂閱者
+      this.authEvents.emitLogout();
+      // 清除本服務狀態
+      this.clearAuthStateInternal();
+      // 🔧 修復：使用正確的登入頁面路徑
+      this.router.navigate(['/auth/login']);
     }
   }
   
@@ -399,28 +436,52 @@ export class AuthService {
   
   /**
    * 獲取當前用戶信息
+   * 🔧 優化：同時檢查 Signal 和 localStorage，確保 Token 總能被讀取
    */
   async fetchCurrentUser(): Promise<User | null> {
-    const token = this._accessToken();
+    // 🔧 修復：同時檢查 Signal 和 localStorage
+    const token = this._accessToken() || localStorage.getItem(TOKEN_KEYS.ACCESS_TOKEN);
     if (!token) {
+      console.log('[AuthService] fetchCurrentUser: No token available');
       return null;
     }
     
+    // 確保 Signal 同步（防止不一致）
+    if (!this._accessToken() && token) {
+      this._accessToken.set(token);
+    }
+    
     try {
+      console.log('[AuthService] fetchCurrentUser: Fetching user info...');
       const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
+      // 🔧 處理非 200 響應
+      if (!response.ok) {
+        console.warn(`[AuthService] fetchCurrentUser: HTTP ${response.status}`);
+        if (response.status === 401) {
+          // Token 無效，清除認證狀態
+          console.warn('[AuthService] Token invalid, clearing session');
+          // 不直接清除，讓調用者決定如何處理
+        }
+        return null;
+      }
+      
       const result = await response.json();
       
       if (result.success && result.data) {
+        console.log('[AuthService] fetchCurrentUser: Success', result.data.username);
         this._user.set(result.data);
+        // 🔧 同步更新 localStorage（確保一致性）
+        localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(result.data));
         return result.data;
       }
       
+      console.warn('[AuthService] fetchCurrentUser: API returned', result);
       return null;
     } catch (e) {
-      console.error('Fetch user error:', e);
+      console.error('[AuthService] fetchCurrentUser error:', e);
       return null;
     }
   }
@@ -579,13 +640,175 @@ export class AuthService {
   
   /**
    * 獲取認證 Header
+   * 🔧 修復：同時檢查 Signal 和 localStorage，確保 Token 總能被讀取
    */
   getAuthHeaders(): Record<string, string> {
-    const token = this._accessToken();
+    const token = this._accessToken() || localStorage.getItem('tgm_access_token');
     if (token) {
       return { 'Authorization': `Bearer ${token}` };
     }
     return {};
+  }
+  
+  // ==================== 🆕 設備管理 ====================
+  
+  /**
+   * 獲取所有綁定設備
+   */
+  async getDevices(): Promise<any[]> {
+    const token = this._accessToken();
+    if (!token) return [];
+    
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/devices`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const result = await response.json();
+      return result.success ? (result.data?.devices || result.devices || []) : [];
+    } catch (e) {
+      console.error('Failed to get devices:', e);
+      return [];
+    }
+  }
+  
+  /**
+   * 綁定新設備
+   */
+  async bindDevice(deviceCode: string, deviceName: string): Promise<{ success: boolean; message: string }> {
+    const token = this._accessToken();
+    if (!token) {
+      return { success: false, message: '未登入' };
+    }
+    
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/devices`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ device_code: deviceCode, device_name: deviceName })
+      });
+      
+      const result = await response.json();
+      return { success: result.success, message: result.message || (result.success ? '綁定成功' : '綁定失敗') };
+    } catch (e: any) {
+      return { success: false, message: e.message || '綁定失敗' };
+    }
+  }
+  
+  /**
+   * 解綁設備
+   */
+  async unbindDevice(deviceId: string | number): Promise<{ success: boolean; message: string }> {
+    const token = this._accessToken();
+    if (!token) {
+      return { success: false, message: '未登入' };
+    }
+    
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/devices/${deviceId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const result = await response.json();
+      return { success: result.success, message: result.message || (result.success ? '解綁成功' : '解綁失敗') };
+    } catch (e: any) {
+      return { success: false, message: e.message || '解綁失敗' };
+    }
+  }
+  
+  // ==================== 🆕 會員管理 ====================
+  
+  /**
+   * 獲取使用統計
+   */
+  async getUsageStats(): Promise<any> {
+    const token = this._accessToken();
+    if (!token) return null;
+    
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/usage-stats`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const result = await response.json();
+      return result.success ? result.data : null;
+    } catch (e) {
+      console.error('Failed to get usage stats:', e);
+      return null;
+    }
+  }
+  
+  /**
+   * 激活卡密（續費/升級會員）
+   */
+  async activateLicense(licenseKey: string): Promise<{ success: boolean; message: string; data?: any }> {
+    const token = this._accessToken();
+    if (!token) {
+      return { success: false, message: '未登入' };
+    }
+    
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/license/activate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ license_key: licenseKey })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // 更新用戶信息
+        await this.fetchCurrentUser();
+        // 廣播用戶更新事件
+        this.authEvents.emitUserUpdate(this._user());
+      }
+      
+      return { 
+        success: result.success, 
+        message: result.message || (result.success ? '激活成功' : '激活失敗'),
+        data: result.data 
+      };
+    } catch (e: any) {
+      return { success: false, message: e.message || '激活失敗' };
+    }
+  }
+  
+  /**
+   * 獲取邀請獎勵信息
+   */
+  async getInviteRewards(): Promise<{ inviteCode: string; invitedCount: number; rewardDays: number }> {
+    const token = this._accessToken();
+    const user = this._user();
+    
+    const defaultResult = {
+      inviteCode: user?.invite_code || user?.inviteCode || '',
+      invitedCount: 0,
+      rewardDays: 0
+    };
+    
+    if (!token) return defaultResult;
+    
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/invite-rewards`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const result = await response.json();
+      return result.success ? {
+        inviteCode: result.data?.invite_code || defaultResult.inviteCode,
+        invitedCount: result.data?.invited_count || 0,
+        rewardDays: result.data?.reward_days || 0
+      } : defaultResult;
+    } catch (e) {
+      return defaultResult;
+    }
   }
   
   // ==================== 私有方法 ====================
@@ -599,24 +822,63 @@ export class AuthService {
     if (data.access_token) {
       this._accessToken.set(data.access_token);
       // 🔧 同步保存到 localStorage
-      localStorage.setItem(TOKEN_KEYS.ACCESS, data.access_token);
+      localStorage.setItem(TOKEN_KEYS.ACCESS_TOKEN, data.access_token);
     }
     if (data.refresh_token) {
       this._refreshToken.set(data.refresh_token);
       // 🔧 同步保存到 localStorage
-      localStorage.setItem(TOKEN_KEYS.REFRESH, data.refresh_token);
+      localStorage.setItem(TOKEN_KEYS.REFRESH_TOKEN, data.refresh_token);
     }
+  }
+  
+  /**
+   * 設置會話（公開方法）
+   * 🆕 用於登入成功後直接設置認證狀態
+   */
+  setSession(data: { access_token?: string; refresh_token?: string; user?: any; session_id?: string }): void {
+    console.log('[AuthService] setSession called:', {
+      hasAccessToken: !!data.access_token,
+      hasRefreshToken: !!data.refresh_token,
+      hasUser: !!data.user
+    });
+    
+    // 先直接保存到 localStorage（確保持久化）
+    if (data.access_token) {
+      localStorage.setItem(TOKEN_KEYS.ACCESS_TOKEN, data.access_token);
+      this._accessToken.set(data.access_token);
+    }
+    if (data.refresh_token) {
+      localStorage.setItem(TOKEN_KEYS.REFRESH_TOKEN, data.refresh_token);
+      this._refreshToken.set(data.refresh_token);
+    }
+    if (data.user) {
+      localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(data.user));
+      this._user.set(data.user);
+    }
+    if (data.session_id) {
+      localStorage.setItem(TOKEN_KEYS.SESSION_ID, data.session_id);
+    }
+    
+    // 🆕 廣播登入事件
+    this.authEvents.emitLogin(data);
+    
+    console.log('[AuthService] setSession complete, isAuthenticated:', this.isAuthenticated());
   }
   
   /**
    * 清除會話（公開方法）
    * 用於認證守衛發現無效狀態時清理
+   * 🆕 同時廣播事件通知其他服務
    */
   clearSession(): void {
-    this.clearAuthState();
+    this.authEvents.emitLogout();
+    this.clearAuthStateInternal();
   }
   
-  private clearAuthState(): void {
+  /**
+   * 內部清除狀態（不發送事件，避免循環）
+   */
+  private clearAuthStateInternal(): void {
     this._user.set(null);
     this._accessToken.set(null);
     this._refreshToken.set(null);
@@ -626,16 +888,24 @@ export class AuthService {
       this.refreshTimer = null;
     }
     
-    localStorage.removeItem(TOKEN_KEYS.ACCESS);
-    localStorage.removeItem(TOKEN_KEYS.REFRESH);
-    localStorage.removeItem(TOKEN_KEYS.USER);
+    // 🆕 使用集中式清除方法
+    this.authEvents.clearAllAuthStorage();
+  }
+  
+  /**
+   * @deprecated 使用 clearAuthStateInternal 代替
+   */
+  private clearAuthState(): void {
+    this.clearAuthStateInternal();
   }
   
   private restoreSession(): void {
     try {
-      const accessToken = localStorage.getItem(TOKEN_KEYS.ACCESS);
-      const refreshToken = localStorage.getItem(TOKEN_KEYS.REFRESH);
+      const accessToken = localStorage.getItem(TOKEN_KEYS.ACCESS_TOKEN);
+      const refreshToken = localStorage.getItem(TOKEN_KEYS.REFRESH_TOKEN);
       const userJson = localStorage.getItem(TOKEN_KEYS.USER);
+      
+      console.log('[Auth] restoreSession - accessToken:', !!accessToken, 'refreshToken:', !!refreshToken, 'user:', !!userJson);
       
       // 🆕 P0: 驗證 Token 格式有效性
       if (accessToken && !this.isValidTokenFormat(accessToken)) {
@@ -645,6 +915,7 @@ export class AuthService {
       }
       
       if (accessToken) {
+        console.log('[Auth] Setting accessToken signal');
         this._accessToken.set(accessToken);
       }
       if (refreshToken) {
@@ -653,6 +924,7 @@ export class AuthService {
       if (userJson) {
         try {
           this._user.set(JSON.parse(userJson));
+          console.log('[Auth] User restored from localStorage');
         } catch {
           console.warn('[Auth] Invalid user JSON, clearing');
           this.clearAuthState();
@@ -660,32 +932,25 @@ export class AuthService {
         }
       }
       
-      // 驗證 token 有效性（異步）
-      if (accessToken) {
-        this.fetchCurrentUser().then(user => {
-          if (!user) {
-            if (refreshToken) {
-              // 嘗試刷新 Token
-              this.refreshAccessToken().catch(() => {
-                console.warn('[Auth] Token refresh failed, clearing session');
-                this.clearAuthState();
-                // 🆕 重定向到登入頁
-                if (window.location.pathname !== '/auth/login') {
-                  this.router.navigate(['/auth/login']);
-                }
-              });
-            } else {
-              // 無 Refresh Token，清除並重定向
-              console.warn('[Auth] No valid token, clearing session');
-              this.clearAuthState();
-              if (window.location.pathname !== '/auth/login') {
-                this.router.navigate(['/auth/login']);
+      // 🔧 修復：Token 有效性會在實際 API 請求時由後端驗證
+      console.log('[Auth] Session restored successfully');
+      
+      // 🔧 優化：如果有 Token 但沒有用戶信息，立即獲取（不等待）
+      if (accessToken && !userJson) {
+        console.log('[Auth] Token exists but no user info, fetching immediately...');
+        // 使用 queueMicrotask 確保在構造函數完成後執行
+        queueMicrotask(() => {
+          if (this._accessToken()) {
+            this.fetchCurrentUser().then(user => {
+              if (user) {
+                console.log('[Auth] User info fetched successfully:', user.username);
+              } else {
+                console.warn('[Auth] Failed to fetch user info');
               }
-            }
+            }).catch(e => {
+              console.warn('[Auth] Error fetching user info:', e);
+            });
           }
-        }).catch(() => {
-          console.warn('[Auth] Token validation failed');
-          this.clearAuthState();
         });
       }
     } catch (e) {
@@ -738,8 +1003,13 @@ export class AuthService {
       clearTimeout(this.refreshTimer);
     }
     
-    // 在 token 過期前 5 分鐘刷新
-    const refreshIn = 55 * 60 * 1000; // 55 分鐘
+    // 🆕 根據"記住我"狀態調整刷新間隔
+    const rememberMe = localStorage.getItem('tgm_remember_me') === 'true';
+    // 普通：55 分鐘刷新，記住我：23 小時刷新（假設後端 Token 有效期 1 小時/24 小時）
+    const refreshIn = rememberMe ? 23 * 60 * 60 * 1000 : 55 * 60 * 1000;
+    
+    console.log(`[AuthService] Scheduling token refresh in ${refreshIn / 60000} minutes (rememberMe: ${rememberMe})`);
+    
     this.refreshTimer = setTimeout(() => {
       this.refreshAccessToken();
     }, refreshIn);

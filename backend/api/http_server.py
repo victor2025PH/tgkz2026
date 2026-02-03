@@ -41,6 +41,10 @@ try:
     from wallet.admin_handlers import setup_admin_wallet_routes, admin_wallet_handlers
     from wallet.purchase_handlers import setup_purchase_routes, purchase_handlers
     from wallet.withdraw_handlers import setup_withdraw_routes, withdraw_handlers
+    from wallet.redeem_handlers import setup_redeem_routes, redeem_handlers
+    from wallet.pay_password_handlers import setup_pay_password_routes, pay_password_handlers
+    from wallet.coupon_handlers import setup_coupon_routes, coupon_handlers
+    from wallet.finance_report_handlers import setup_finance_report_routes, finance_report_handlers
     WALLET_MODULE_AVAILABLE = True
 except ImportError:
     WALLET_MODULE_AVAILABLE = False
@@ -48,6 +52,10 @@ except ImportError:
     admin_wallet_handlers = None
     purchase_handlers = None
     withdraw_handlers = None
+    redeem_handlers = None
+    pay_password_handlers = None
+    coupon_handlers = None
+    finance_report_handlers = None
 
 logger = logging.getLogger(__name__)
 
@@ -518,7 +526,43 @@ class HttpApiServer:
                 self.app.router.add_post('/api/admin/withdraws/{order_no}/approve', withdraw_handlers.admin_approve_withdraw)
                 self.app.router.add_post('/api/admin/withdraws/{order_no}/reject', withdraw_handlers.admin_reject_withdraw)
                 self.app.router.add_post('/api/admin/withdraws/{order_no}/complete', withdraw_handlers.admin_complete_withdraw)
-            logger.info("✅ Wallet module loaded with Phase 0-4 (Full + Business Integration)")
+            # Phase 5: 兌換碼
+            if redeem_handlers:
+                self.app.router.add_post('/api/wallet/redeem', redeem_handlers.redeem_code)
+                self.app.router.add_get('/api/wallet/redeem/records', redeem_handlers.get_redeem_records)
+                self.app.router.add_post('/api/admin/redeem/create', redeem_handlers.admin_create_code)
+                self.app.router.add_post('/api/admin/redeem/batch', redeem_handlers.admin_batch_create)
+                self.app.router.add_get('/api/admin/redeem/codes', redeem_handlers.admin_list_codes)
+                self.app.router.add_post('/api/admin/redeem/{code_id}/disable', redeem_handlers.admin_disable_code)
+                self.app.router.add_post('/api/admin/redeem/{code_id}/enable', redeem_handlers.admin_enable_code)
+            # Phase 5: 支付密碼
+            if pay_password_handlers:
+                self.app.router.add_get('/api/wallet/pay-password/status', pay_password_handlers.get_status)
+                self.app.router.add_post('/api/wallet/pay-password/set', pay_password_handlers.set_password)
+                self.app.router.add_post('/api/wallet/pay-password/verify', pay_password_handlers.verify_password)
+                self.app.router.add_post('/api/wallet/pay-password/change', pay_password_handlers.change_password)
+                self.app.router.add_post('/api/wallet/pay-password/remove', pay_password_handlers.remove_password)
+                self.app.router.add_post('/api/admin/users/{user_id}/pay-password/reset', pay_password_handlers.admin_reset_password)
+            # Phase 5: 優惠券
+            if coupon_handlers:
+                self.app.router.add_get('/api/wallet/coupons', coupon_handlers.get_my_coupons)
+                self.app.router.add_get('/api/wallet/coupons/applicable', coupon_handlers.get_applicable_coupons)
+                self.app.router.add_post('/api/wallet/coupons/claim', coupon_handlers.claim_coupon)
+                self.app.router.add_post('/api/wallet/coupons/use', coupon_handlers.use_coupon)
+                self.app.router.add_post('/api/admin/coupons/templates', coupon_handlers.admin_create_template)
+                self.app.router.add_get('/api/admin/coupons/templates', coupon_handlers.admin_list_templates)
+                self.app.router.add_post('/api/admin/coupons/issue', coupon_handlers.admin_issue_coupon)
+            # Phase 5: 財務報表
+            if finance_report_handlers:
+                self.app.router.add_get('/api/admin/finance/overview', finance_report_handlers.get_overview)
+                self.app.router.add_get('/api/admin/finance/daily', finance_report_handlers.get_daily_report)
+                self.app.router.add_get('/api/admin/finance/range', finance_report_handlers.get_range_report)
+                self.app.router.add_get('/api/admin/finance/trend', finance_report_handlers.get_trend)
+                self.app.router.add_get('/api/admin/finance/categories', finance_report_handlers.get_category_stats)
+                self.app.router.add_get('/api/admin/finance/top-users', finance_report_handlers.get_top_users)
+                self.app.router.add_get('/api/admin/finance/monthly', finance_report_handlers.get_monthly_summary)
+                self.app.router.add_get('/api/admin/finance/export', finance_report_handlers.export_report)
+            logger.info("✅ Wallet module loaded with Phase 0-5 (Full Features + Enhancements)")
         
         # 保留舊的處理器作為後備（或未遷移的功能）
         self.app.router.add_post('/api/admin/logout', self.admin_panel_logout)

@@ -2753,7 +2753,8 @@ class Database:
                 params = ()
             else:
                 # SaaS 模式：只返回當前用戶的帳號
-                query = 'SELECT * FROM accounts WHERE owner_user_id = ? OR owner_user_id IS NULL OR owner_user_id = "local_user" ORDER BY id'
+                # 🔧 注意：不再包含 local_user，實現真正的數據隔離
+                query = 'SELECT * FROM accounts WHERE owner_user_id = ? ORDER BY id'
                 params = (owner_user_id,)
             
             if not HAS_AIOSQLITE:

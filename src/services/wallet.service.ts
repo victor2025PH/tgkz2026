@@ -736,4 +736,150 @@ export class WalletService {
     };
     return labels[status] || { text: status, color: '#666' };
   }
+
+  // ==================== Phase 2: 消費接入 ====================
+
+  /**
+   * 統一消費接口
+   */
+  async consumeUnified(options: {
+    amount: number;
+    category: string;
+    description: string;
+    referenceId?: string;
+    referenceType?: string;
+    orderId?: string;
+  }): Promise<{ 
+    success: boolean; 
+    transactionId?: string;
+    balanceBefore?: number;
+    balanceAfter?: number;
+    error?: string;
+  }> {
+    try {
+      const response = await this.api.post<any>('/api/wallet/consume/unified', {
+        amount: options.amount,
+        category: options.category,
+        description: options.description,
+        reference_id: options.referenceId,
+        reference_type: options.referenceType,
+        order_id: options.orderId
+      });
+      
+      if (response?.success) {
+        // 刷新錢包
+        await this.loadWallet();
+        
+        return {
+          success: true,
+          transactionId: response.data?.transaction_id,
+          balanceBefore: response.data?.balance_before,
+          balanceAfter: response.data?.balance_after
+        };
+      }
+      
+      return { success: false, error: response?.error || '消費失敗' };
+    } catch (error) {
+      console.error('Consume unified error:', error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * 檢查消費限額
+   */
+  async checkConsumeLimit(amount: number, category: string): Promise<{
+    canConsume: boolean;
+    limitPassed: boolean;
+    limitError?: string;
+    requiresPassword: boolean;
+    balanceSufficient: boolean;
+    balanceInfo: any;
+  }> {
+    try {
+      const response = await this.api.get<any>(
+        `/api/wallet/consume/limit?amount=${amount}&category=${category}`
+      );
+      
+      if (response?.success && response?.data) {
+        return {
+          canConsume: response.data.can_consume,
+          limitPassed: response.data.limit_passed,
+          limitError: response.data.limit_error,
+          requiresPassword: response.data.requires_password,
+          balanceSufficient: response.data.balance_sufficient,
+          balanceInfo: response.data.balance_info
+        };
+      }
+      
+      return {
+        canConsume: false,
+        limitPassed: false,
+        requiresPassword: false,
+        balanceSufficient: false,
+        balanceInfo: null
+      };
+    } catch (error) {
+      console.error('Check consume limit error:', error);
+      return {
+        canConsume: false,
+        limitPassed: false,
+        requiresPassword: false,
+        balanceSufficient: false,
+        balanceInfo: null
+      };
+    }
+  }
+
+  /**
+   * 獲取消費摘要
+   */
+  async getConsumeSummary(days: number = 30): Promise<any> {
+    try {
+      const response = await this.api.get<any>(`/api/wallet/consume/summary?days=${days}`);
+      
+      if (response?.success && response?.data) {
+        return response.data;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Get consume summary error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 退款
+   */
+  async refund(originalOrderId: string, amount?: number, reason?: string): Promise<{
+    success: boolean;
+    transactionId?: string;
+    refundAmount?: number;
+    error?: string;
+  }> {
+    try {
+      const response = await this.api.post<any>('/api/wallet/refund', {
+        original_order_id: originalOrderId,
+        amount,
+        reason
+      });
+      
+      if (response?.success) {
+        // 刷新錢包
+        await this.loadWallet();
+        
+        return {
+          success: true,
+          transactionId: response.data?.transaction_id,
+          refundAmount: response.data?.refund_amount
+        };
+      }
+      
+      return { success: false, error: response?.error || '退款失敗' };
+    } catch (error) {
+      console.error('Refund error:', error);
+      return { success: false, error: String(error) };
+    }
+  }
 }

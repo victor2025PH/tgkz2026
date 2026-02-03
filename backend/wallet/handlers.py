@@ -16,6 +16,7 @@ from .wallet_service import get_wallet_service, WalletServiceError
 from .transaction_service import get_transaction_service
 from .recharge_service import get_recharge_service
 from .usdt_service import get_usdt_service
+from .consume_service import get_consume_service, ConsumeRequest
 from .models import ConsumeCategory, TransactionType, RechargeStatus
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ class WalletHandlers:
         self.wallet_service = get_wallet_service()
         self.transaction_service = get_transaction_service()
         self.recharge_service = get_recharge_service()
+        self.consume_service = get_consume_service()
     
     def _get_client_ip(self, request: web.Request) -> str:
         """獲取客戶端 IP"""
@@ -640,6 +642,187 @@ class WalletHandlers:
             logger.error(f"Check recharge status error: {e}")
             return self._error_response(str(e), "CHECK_STATUS_ERROR", 500)
     
+    # ==================== Phase 2: 統一消費接口 ====================
+    
+    async def consume_unified(self, request: web.Request) -> web.Response:
+        """
+        統一消費接口
+        
+        POST /api/wallet/consume/unified
+        {
+            "amount": 500,
+            "category": "ip_proxy",
+            "description": "購買香港靜態IP",
+            "reference_id": "proxy_123",
+            "reference_type": "static_proxy",
+            "order_id": "ORD123456"
+        }
+        """
+        try:
+            user = self._require_auth(request)
+            user_id = user.get('user_id') or user.get('sub') or user.get('id')
+            
+            if not user_id:
+                return self._error_response("無法識別用戶", "INVALID_USER")
+            
+            data = await request.json()
+            
+            req = ConsumeRequest(
+                user_id=user_id,
+                amount=data.get('amount', 0),
+                category=data.get('category', 'other'),
+                description=data.get('description', ''),
+                reference_id=data.get('reference_id', ''),
+                reference_type=data.get('reference_type', ''),
+                order_id=data.get('order_id', ''),
+                skip_password=True,  # 前端已確認
+                ip_address=self._get_client_ip(request)
+            )
+            
+            if req.amount <= 0:
+                return self._error_response("金額必須大於0", "INVALID_AMOUNT")
+            
+            result = self.consume_service.consume(req)
+            
+            if result.success:
+                return self._success_response({
+                    "transaction_id": result.transaction_id,
+                    "order_id": result.order_id,
+                    "balance_before": result.balance_before,
+                    "balance_after": result.balance_after,
+                    "amount": result.amount,
+                    "bonus_used": result.bonus_used
+                }, result.message)
+            else:
+                if result.requires_password:
+                    return self._error_response(
+                        "需要密碼確認", "REQUIRES_PASSWORD"
+                    )
+                return self._error_response(result.message, "CONSUME_FAILED")
+            
+        except web.HTTPUnauthorized:
+            raise
+        except Exception as e:
+            logger.error(f"Unified consume error: {e}")
+            return self._error_response(str(e), "CONSUME_ERROR", 500)
+    
+    async def check_consume_limit(self, request: web.Request) -> web.Response:
+        """
+        檢查消費限額
+        
+        GET /api/wallet/consume/limit?amount=5000&category=ip_proxy
+        """
+        try:
+            user = self._require_auth(request)
+            user_id = user.get('user_id') or user.get('sub') or user.get('id')
+            
+            if not user_id:
+                return self._error_response("無法識別用戶", "INVALID_USER")
+            
+            amount = int(request.query.get('amount', 0))
+            category = request.query.get('category', 'other')
+            
+            # 檢查限額
+            passed, error = self.consume_service._check_limits(user_id, amount, category)
+            
+            # 檢查是否需要密碼
+            requires_password = self.consume_service.requires_password(
+                user_id, amount, category
+            )
+            
+            # 檢查餘額
+            balance_info = self.consume_service.check_balance(user_id, amount)
+            
+            return self._success_response({
+                "can_consume": passed and balance_info['sufficient'],
+                "limit_passed": passed,
+                "limit_error": error if not passed else None,
+                "requires_password": requires_password,
+                "balance_sufficient": balance_info['sufficient'],
+                "balance_info": balance_info
+            })
+            
+        except web.HTTPUnauthorized:
+            raise
+        except Exception as e:
+            logger.error(f"Check consume limit error: {e}")
+            return self._error_response(str(e), "CHECK_LIMIT_ERROR", 500)
+    
+    async def get_consume_summary(self, request: web.Request) -> web.Response:
+        """
+        獲取消費摘要
+        
+        GET /api/wallet/consume/summary?days=30
+        """
+        try:
+            user = self._require_auth(request)
+            user_id = user.get('user_id') or user.get('sub') or user.get('id')
+            
+            if not user_id:
+                return self._error_response("無法識別用戶", "INVALID_USER")
+            
+            days = int(request.query.get('days', 30))
+            
+            summary = self.consume_service.get_consume_summary(user_id, days)
+            
+            return self._success_response(summary)
+            
+        except web.HTTPUnauthorized:
+            raise
+        except Exception as e:
+            logger.error(f"Get consume summary error: {e}")
+            return self._error_response(str(e), "GET_SUMMARY_ERROR", 500)
+    
+    async def refund_transaction(self, request: web.Request) -> web.Response:
+        """
+        退款
+        
+        POST /api/wallet/refund
+        {
+            "original_order_id": "ORD123456",
+            "amount": 500,  // 可選，默認全額
+            "reason": "用戶取消"
+        }
+        """
+        try:
+            user = self._require_auth(request)
+            user_id = user.get('user_id') or user.get('sub') or user.get('id')
+            
+            if not user_id:
+                return self._error_response("無法識別用戶", "INVALID_USER")
+            
+            data = await request.json()
+            
+            original_order_id = data.get('original_order_id')
+            if not original_order_id:
+                return self._error_response("原訂單號不能為空", "MISSING_ORDER_ID")
+            
+            amount = data.get('amount')  # 可選
+            reason = data.get('reason', '')
+            
+            result = self.consume_service.refund(
+                user_id=user_id,
+                original_order_id=original_order_id,
+                amount=amount,
+                reason=reason
+            )
+            
+            if result.success:
+                return self._success_response({
+                    "transaction_id": result.transaction_id,
+                    "order_id": result.order_id,
+                    "balance_after": result.balance_after,
+                    "refund_amount": result.amount
+                }, result.message)
+            else:
+                return self._error_response(result.message, "REFUND_FAILED")
+            
+        except web.HTTPUnauthorized:
+            raise
+        except Exception as e:
+            logger.error(f"Refund error: {e}")
+            return self._error_response(str(e), "REFUND_ERROR", 500)
+    
     # ==================== 支付回調（公開）====================
     
     async def payment_callback(self, request: web.Request) -> web.Response:
@@ -707,7 +890,13 @@ def setup_wallet_routes(app: web.Application):
     # 支付回調（公開）
     app.router.add_post('/api/wallet/callback/{provider}', handlers.payment_callback)
     
-    logger.info("✅ Wallet API routes registered (Phase 0 + Phase 1)")
+    # Phase 2: 統一消費接口
+    app.router.add_post('/api/wallet/consume/unified', handlers.consume_unified)
+    app.router.add_get('/api/wallet/consume/limit', handlers.check_consume_limit)
+    app.router.add_get('/api/wallet/consume/summary', handlers.get_consume_summary)
+    app.router.add_post('/api/wallet/refund', handlers.refund_transaction)
+    
+    logger.info("✅ Wallet API routes registered (Phase 0 + Phase 1 + Phase 2)")
 
 
 # 全局處理器實例

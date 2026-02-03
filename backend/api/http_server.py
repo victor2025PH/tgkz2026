@@ -479,7 +479,12 @@ class HttpApiServer:
             self.app.router.add_get('/api/wallet/recharge/{order_no}/status', wallet_handlers.check_recharge_status)
             # 支付回調（公開）
             self.app.router.add_post('/api/wallet/callback/{provider}', wallet_handlers.payment_callback)
-            logger.info("✅ Wallet module loaded with Phase 0 & Phase 1 (Recharge) features")
+            # Phase 2: 統一消費接口
+            self.app.router.add_post('/api/wallet/consume/unified', wallet_handlers.consume_unified)
+            self.app.router.add_get('/api/wallet/consume/limit', wallet_handlers.check_consume_limit)
+            self.app.router.add_get('/api/wallet/consume/summary', wallet_handlers.get_consume_summary)
+            self.app.router.add_post('/api/wallet/refund', wallet_handlers.refund_transaction)
+            logger.info("✅ Wallet module loaded with Phase 0, 1, 2 (Recharge + Consume) features")
         
         # 保留舊的處理器作為後備（或未遷移的功能）
         self.app.router.add_post('/api/admin/logout', self.admin_panel_logout)

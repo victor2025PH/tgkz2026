@@ -34,6 +34,10 @@ from .usdt_service import (
     UsdtPaymentService, get_usdt_service,
     UsdtPaymentWatcher, get_usdt_watcher
 )
+from .consume_service import (
+    ConsumeService, get_consume_service,
+    ConsumeRequest, ConsumeResult, ConsumeError
+)
 
 __all__ = [
     # 枚舉
@@ -47,4 +51,6 @@ __all__ = [
     'RechargeService', 'get_recharge_service',
     'UsdtPaymentService', 'get_usdt_service',
     'UsdtPaymentWatcher', 'get_usdt_watcher',
+    'ConsumeService', 'get_consume_service',
+    'ConsumeRequest', 'ConsumeResult', 'ConsumeError',
 ]

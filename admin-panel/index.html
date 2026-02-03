@@ -95,9 +95,14 @@
                             <p class="text-xs text-gray-400">{{ adminUser?.role === 'super_admin' ? '超級管理員' : '管理員' }}</p>
                         </div>
                     </div>
-                    <button @click="handleLogout" class="text-gray-400 hover:text-red-400 transition-colors p-2" title="登出">
-                        🚪
-                    </button>
+                    <div class="flex gap-1">
+                        <button @click="openPasswordModal" class="text-gray-400 hover:text-blue-400 transition-colors p-2" title="修改密碼">
+                            🔑
+                        </button>
+                        <button @click="handleLogout" class="text-gray-400 hover:text-red-400 transition-colors p-2" title="登出">
+                            🚪
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -639,46 +644,117 @@
                     </div>
                 </div>
                 
-                <!-- ==================== 操作日誌 ==================== -->
+                <!-- ==================== 審計日誌 ==================== -->
                 <div v-if="currentPage === 'logs'">
+                    <!-- 統計卡片 -->
+                    <div class="grid grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4">
+                            <p class="text-blue-200 text-sm">認證操作</p>
+                            <p class="text-2xl font-bold mt-1">{{ logsStats.by_category?.auth || 0 }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-green-600 to-green-700 rounded-xl p-4">
+                            <p class="text-green-200 text-sm">用戶管理</p>
+                            <p class="text-2xl font-bold mt-1">{{ logsStats.by_category?.user || 0 }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl p-4">
+                            <p class="text-purple-200 text-sm">卡密操作</p>
+                            <p class="text-2xl font-bold mt-1">{{ logsStats.by_category?.license || 0 }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-orange-600 to-orange-700 rounded-xl p-4">
+                            <p class="text-orange-200 text-sm">訂單操作</p>
+                            <p class="text-2xl font-bold mt-1">{{ logsStats.by_category?.order || 0 }}</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 篩選工具欄 -->
+                    <div class="flex gap-4 mb-4">
+                        <select v-model="logsFilter.category" @change="filterLogs"
+                                class="bg-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">全部類型</option>
+                            <option value="auth">🔐 認證操作</option>
+                            <option value="user">👤 用戶管理</option>
+                            <option value="license">🎟️ 卡密操作</option>
+                            <option value="order">💰 訂單操作</option>
+                            <option value="system">⚙️ 系統設置</option>
+                        </select>
+                        <select v-model="logsFilter.status" @change="filterLogs"
+                                class="bg-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">全部狀態</option>
+                            <option value="success">✅ 成功</option>
+                            <option value="failed">❌ 失敗</option>
+                        </select>
+                        <div class="flex-grow"></div>
+                        <div class="text-sm text-gray-400 flex items-center">
+                            共 {{ logsPagination.total }} 條記錄
+                        </div>
+                    </div>
+                    
+                    <!-- 日誌列表 -->
                     <div class="bg-gray-800 rounded-xl overflow-hidden">
                         <table class="w-full">
                             <thead class="bg-gray-700">
                                 <tr>
-                                    <th class="text-left px-6 py-4 font-medium">時間</th>
-                                    <th class="text-left px-6 py-4 font-medium">操作員</th>
-                                    <th class="text-left px-6 py-4 font-medium">操作類型</th>
-                                    <th class="text-left px-6 py-4 font-medium">操作</th>
-                                    <th class="text-left px-6 py-4 font-medium">詳情</th>
+                                    <th class="text-left px-6 py-4 font-medium w-40">時間</th>
+                                    <th class="text-left px-6 py-4 font-medium w-28">操作員</th>
+                                    <th class="text-left px-6 py-4 font-medium w-32">類型</th>
+                                    <th class="text-left px-6 py-4 font-medium">操作描述</th>
+                                    <th class="text-left px-6 py-4 font-medium w-24">狀態</th>
+                                    <th class="text-left px-6 py-4 font-medium w-32">IP 地址</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="log in logs" :key="log.id" 
+                                <tr v-for="log in logs" :key="log.log_id" 
                                     class="border-t border-gray-700 table-row-hover transition-colors">
-                                    <td class="px-6 py-4 text-gray-400 text-sm">{{ formatDate(log.createdAt || log.created_at) }}</td>
-                                    <td class="px-6 py-4 font-medium">{{ log.username }}</td>
+                                    <td class="px-6 py-4 text-gray-400 text-sm">{{ log.formattedTime }}</td>
+                                    <td class="px-6 py-4 font-medium">{{ log.admin_username }}</td>
                                     <td class="px-6 py-4">
                                         <span class="px-2 py-1 rounded text-sm bg-gray-700">
-                                            {{ log.action_type || log.actionType || '-' }}
+                                            {{ log.actionIcon }} {{ log.action_description }}
                                         </span>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <span class="px-2 py-1 rounded text-sm"
-                                              :class="getActionClass(log.action)">
-                                            {{ log.action }}
+                                        <div class="text-sm">{{ log.description }}</div>
+                                        <div v-if="log.resource_id" class="text-xs text-gray-500 mt-1">
+                                            {{ log.resource_type }}: {{ log.resource_id.slice(0, 12) }}...
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span :class="log.statusClass" class="text-sm font-medium">
+                                            {{ log.status === 'success' ? '✓ 成功' : '✗ 失敗' }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 text-gray-400 text-sm max-w-xs truncate">
-                                        {{ log.details || '-' }}
-                                    </td>
+                                    <td class="px-6 py-4 text-gray-500 text-sm font-mono">{{ log.ip_address }}</td>
                                 </tr>
                                 <tr v-if="logs.length === 0">
-                                    <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                                    <td colspan="6" class="px-6 py-12 text-center text-gray-500">
                                         暫無操作日誌
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <!-- 分頁 -->
+                    <div v-if="logsPagination.total_pages > 1" class="flex justify-center items-center gap-2 mt-6">
+                        <button @click="goToLogsPage(1)" :disabled="logsPagination.page === 1"
+                                class="px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                            &laquo;
+                        </button>
+                        <button @click="goToLogsPage(logsPagination.page - 1)" :disabled="logsPagination.page === 1"
+                                class="px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                            &lsaquo;
+                        </button>
+                        <span class="px-4 py-2 text-gray-400">
+                            第 {{ logsPagination.page }} / {{ logsPagination.total_pages }} 頁
+                        </span>
+                        <button @click="goToLogsPage(logsPagination.page + 1)" :disabled="logsPagination.page === logsPagination.total_pages"
+                                class="px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                            &rsaquo;
+                        </button>
+                        <button @click="goToLogsPage(logsPagination.total_pages)" :disabled="logsPagination.page === logsPagination.total_pages"
+                                class="px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                            &raquo;
+                        </button>
                     </div>
                 </div>
                 
@@ -1660,6 +1736,92 @@
                             :disabled="isGenerating"
                             class="gradient-bg hover:opacity-90 px-6 py-2 rounded-lg font-medium transition-opacity disabled:opacity-50">
                         {{ isGenerating ? '生成中...' : '生成卡密' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ==================== 修改密碼彈窗 ==================== -->
+        <div v-if="showPasswordModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div class="bg-gray-800 rounded-xl p-6 w-[450px] border border-gray-700">
+                <h3 class="text-xl font-bold mb-6 flex items-center">
+                    <span class="text-2xl mr-2">🔑</span>
+                    修改密碼
+                </h3>
+                
+                <!-- 錯誤提示 -->
+                <div v-if="passwordErrors.length > 0" class="bg-red-500/20 border border-red-500/50 rounded-lg p-3 mb-4">
+                    <ul class="text-red-400 text-sm list-disc list-inside">
+                        <li v-for="err in passwordErrors" :key="err">{{ err }}</li>
+                    </ul>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">舊密碼</label>
+                        <input type="password" v-model="passwordForm.oldPassword"
+                               class="w-full bg-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="請輸入當前密碼">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">新密碼</label>
+                        <input type="password" v-model="passwordForm.newPassword"
+                               @input="checkPasswordStrength"
+                               class="w-full bg-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="請輸入新密碼">
+                        <!-- 密碼強度指示器 -->
+                        <div class="mt-2">
+                            <div class="flex gap-1 mb-1">
+                                <div class="h-1 flex-1 rounded" 
+                                     :class="passwordStrength.score >= 1 ? (passwordStrength.label === 'weak' ? 'bg-red-500' : passwordStrength.label === 'medium' ? 'bg-yellow-500' : 'bg-green-500') : 'bg-gray-600'"></div>
+                                <div class="h-1 flex-1 rounded" 
+                                     :class="passwordStrength.score >= 3 ? (passwordStrength.label === 'medium' ? 'bg-yellow-500' : 'bg-green-500') : 'bg-gray-600'"></div>
+                                <div class="h-1 flex-1 rounded" 
+                                     :class="passwordStrength.score >= 5 ? 'bg-green-500' : 'bg-gray-600'"></div>
+                            </div>
+                            <p class="text-xs" :class="{
+                                'text-red-400': passwordStrength.label === 'weak',
+                                'text-yellow-400': passwordStrength.label === 'medium',
+                                'text-green-400': passwordStrength.label === 'strong'
+                            }">
+                                {{ passwordStrength.label === 'weak' ? '弱' : passwordStrength.label === 'medium' ? '中等' : passwordStrength.label === 'strong' ? '強' : '' }}
+                                <span v-if="passwordStrength.suggestions.length" class="text-gray-500 ml-2">
+                                    {{ passwordStrength.suggestions[0] }}
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">確認新密碼</label>
+                        <input type="password" v-model="passwordForm.confirmPassword"
+                               class="w-full bg-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="請再次輸入新密碼">
+                        <p v-if="passwordForm.confirmPassword && passwordForm.newPassword !== passwordForm.confirmPassword" 
+                           class="text-red-400 text-xs mt-1">兩次輸入的密碼不一致</p>
+                    </div>
+                </div>
+                
+                <!-- 密碼規則說明 -->
+                <div class="bg-gray-700/50 rounded-lg p-3 mt-4 text-xs text-gray-400">
+                    <p class="font-medium mb-1">密碼要求：</p>
+                    <ul class="list-disc list-inside space-y-0.5">
+                        <li>至少 8 個字符</li>
+                        <li>包含大寫和小寫字母</li>
+                        <li>包含至少一個數字</li>
+                    </ul>
+                </div>
+                
+                <div class="flex justify-end gap-4 mt-6">
+                    <button @click="showPasswordModal = false" 
+                            class="px-6 py-2 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors">
+                        取消
+                    </button>
+                    <button @click="changePassword"
+                            :disabled="!passwordForm.oldPassword || !passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirmPassword"
+                            class="gradient-bg hover:opacity-90 px-6 py-2 rounded-lg font-medium transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
+                        確認修改
                     </button>
                 </div>
             </div>

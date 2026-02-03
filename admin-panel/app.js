@@ -77,10 +77,20 @@ createApp({
         const showAnnouncementModal = ref(false);
         const showUserModal = ref(false);
         const showCouponModal = ref(false);
+        const showPasswordModal = ref(false);
         const isLoading = ref(true);
         const isGenerating = ref(false);
         const lastUpdate = ref(null);
         const adminUser = ref(getCurrentUser());
+        
+        // 密碼修改表單
+        const passwordForm = reactive({
+            oldPassword: '',
+            newPassword: '',
+            confirmPassword: ''
+        });
+        const passwordErrors = ref([]);
+        const passwordStrength = ref({ score: 0, label: '', errors: [], suggestions: [] });
         
         // 用戶詳情
         const userDetail = ref(null);
@@ -186,8 +196,15 @@ createApp({
         const orderSearch = ref('');
         const orderStatusFilter = ref('');
         
-        // 日誌數據
+        // 日誌數據（審計日誌）
         const logs = ref([]);
+        const logsPagination = ref({ total: 0, page: 1, page_size: 20, total_pages: 1 });
+        const logsFilter = reactive({
+            category: '',
+            status: '',
+            adminId: ''
+        });
+        const logsStats = ref({});
         
         // 即將到期用戶
         const expiringUsers = ref([]);
@@ -453,10 +470,150 @@ createApp({
             }
         };
         
-        const loadLogs = async () => {
-            const result = await apiRequest('/admin/logs');
+        const loadLogs = async (page = 1) => {
+            // 構建查詢參數
+            let url = `/admin/audit-logs?page=${page}&page_size=20`;
+            if (logsFilter.category) url += `&category=${logsFilter.category}`;
+            if (logsFilter.status) url += `&status=${logsFilter.status}`;
+            if (logsFilter.adminId) url += `&admin_id=${logsFilter.adminId}`;
+            
+            const result = await apiRequest(url);
             if (result.success) {
-                logs.value = result.data;
+                const data = result.data || result;
+                logs.value = (data.logs || []).map(log => ({
+                    ...log,
+                    // 格式化時間
+                    formattedTime: log.created_at ? new Date(log.created_at).toLocaleString('zh-TW') : '',
+                    // 操作類型圖標
+                    actionIcon: getActionIcon(log.action_category),
+                    // 狀態樣式
+                    statusClass: log.status === 'success' ? 'text-green-400' : 'text-red-400'
+                }));
+                if (data.pagination) {
+                    logsPagination.value = data.pagination;
+                }
+            }
+        };
+        
+        const loadLogsStats = async () => {
+            const result = await apiRequest('/admin/audit-stats?days=7');
+            if (result.success) {
+                logsStats.value = result.data || result;
+            }
+        };
+        
+        const getActionIcon = (category) => {
+            const icons = {
+                'auth': '🔐',
+                'user': '👤',
+                'license': '🎟️',
+                'order': '💰',
+                'system': '⚙️',
+                'notification': '📨'
+            };
+            return icons[category] || '📝';
+        };
+        
+        const goToLogsPage = (page) => {
+            if (page >= 1 && page <= logsPagination.value.total_pages) {
+                loadLogs(page);
+            }
+        };
+        
+        const filterLogs = () => {
+            loadLogs(1);
+        };
+        
+        // ============ 密碼修改 ============
+        
+        const openPasswordModal = () => {
+            passwordForm.oldPassword = '';
+            passwordForm.newPassword = '';
+            passwordForm.confirmPassword = '';
+            passwordErrors.value = [];
+            passwordStrength.value = { score: 0, label: '', errors: [], suggestions: [] };
+            showPasswordModal.value = true;
+        };
+        
+        const checkPasswordStrength = () => {
+            const pwd = passwordForm.newPassword;
+            let score = 0;
+            const errors = [];
+            const suggestions = [];
+            
+            // 長度檢查
+            if (pwd.length < 8) {
+                errors.push('密碼長度至少 8 個字符');
+            } else if (pwd.length >= 12) {
+                score += 2;
+            } else {
+                score += 1;
+            }
+            
+            // 複雜度檢查
+            if (/[A-Z]/.test(pwd)) score += 1; else errors.push('需要包含大寫字母');
+            if (/[a-z]/.test(pwd)) score += 1; else errors.push('需要包含小寫字母');
+            if (/\d/.test(pwd)) score += 1; else errors.push('需要包含數字');
+            if (/[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(pwd)) {
+                score += 1;
+            } else {
+                suggestions.push('添加特殊字符可以提高安全性');
+            }
+            
+            // 常見密碼檢查
+            const weakPasswords = ['password', 'admin888', '123456', 'qwerty'];
+            if (weakPasswords.some(w => pwd.toLowerCase().includes(w))) {
+                errors.push('密碼過於常見');
+                score = Math.max(0, score - 2);
+            }
+            
+            // 確定強度標籤
+            let label = 'weak';
+            if (score >= 5) label = 'strong';
+            else if (score >= 3) label = 'medium';
+            
+            passwordStrength.value = { score, label, errors, suggestions };
+        };
+        
+        const changePassword = async () => {
+            passwordErrors.value = [];
+            
+            // 驗證
+            if (!passwordForm.oldPassword) {
+                passwordErrors.value.push('請輸入舊密碼');
+            }
+            if (!passwordForm.newPassword) {
+                passwordErrors.value.push('請輸入新密碼');
+            }
+            if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+                passwordErrors.value.push('兩次輸入的密碼不一致');
+            }
+            if (passwordStrength.value.errors.length > 0) {
+                passwordErrors.value.push(...passwordStrength.value.errors);
+            }
+            
+            if (passwordErrors.value.length > 0) {
+                return;
+            }
+            
+            const result = await apiRequest('/admin/change-password', {
+                method: 'POST',
+                body: JSON.stringify({
+                    old_password: passwordForm.oldPassword,
+                    new_password: passwordForm.newPassword,
+                    confirm_password: passwordForm.confirmPassword
+                })
+            });
+            
+            if (result.success) {
+                showToast('密碼修改成功', 'success');
+                showPasswordModal.value = false;
+                // 更新 token
+                if (result.data?.token) {
+                    localStorage.setItem('admin_token', result.data.token);
+                }
+            } else {
+                passwordErrors.value.push(result.error?.message || result.message || '密碼修改失敗');
             }
         };
         
@@ -1592,7 +1749,7 @@ createApp({
             else if (newPage === 'quotas') await loadQuotaStats();
             else if (newPage === 'notifications') await loadNotificationHistory();
             else if (newPage === 'devices') await loadDevices();
-            else if (newPage === 'logs') await loadLogs();
+            else if (newPage === 'logs') { await loadLogs(); await loadLogsStats(); }
             else if (newPage === 'admins') await loadAdmins();
             else if (newPage === 'referrals') await loadReferralStats();
             else if (newPage === 'announcements') await loadAnnouncements();
@@ -1636,6 +1793,14 @@ createApp({
             filteredOrders,
             confirmPayment,
             logs,
+            logsPagination,
+            logsFilter,
+            logsStats,
+            loadLogs,
+            loadLogsStats,
+            goToLogsPage,
+            filterLogs,
+            getActionIcon,
             admins,
             showAdminModal,
             editingAdmin,
@@ -1659,6 +1824,13 @@ createApp({
             showAnnouncementModal,
             showUserModal,
             showCouponModal,
+            showPasswordModal,
+            passwordForm,
+            passwordErrors,
+            passwordStrength,
+            openPasswordModal,
+            checkPasswordStrength,
+            changePassword,
             generateForm,
             extendForm,
             isLoading,

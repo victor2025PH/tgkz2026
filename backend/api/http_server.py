@@ -162,6 +162,7 @@ class HttpApiServer:
         
         # 診斷端點
         self.app.router.add_get('/api/debug/modules', self.debug_modules)
+        self.app.router.add_get('/api/debug/deploy', self.debug_deploy)
         
         # 通用命令端點（核心）
         self.app.router.add_post('/api/command', self.handle_command)
@@ -716,6 +717,24 @@ class HttpApiServer:
             'wallet_files': wallet_files[:20],
             'python_path': sys.path[:5],
             'cwd': os.getcwd()
+        })
+    
+    async def debug_deploy(self, request):
+        """部署診斷"""
+        import os
+        
+        deploy_version = "unknown"
+        try:
+            from deploy_test import DEPLOY_VERSION
+            deploy_version = DEPLOY_VERSION
+        except:
+            pass
+        
+        return self._json_response({
+            'deploy_version': deploy_version,
+            'http_server_version': '2026-02-04-0410',
+            'wallet_available': WALLET_MODULE_AVAILABLE,
+            'wallet_error': WALLET_IMPORT_ERROR
         })
     
     async def handle_command(self, request):

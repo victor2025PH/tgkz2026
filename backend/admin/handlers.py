@@ -97,7 +97,8 @@ class AdminHandlers:
         token = auth_header[7:]
         try:
             payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            if payload.get('type') != 'admin':
+            # 允許 admin 和 admin_temp 類型
+            if payload.get('type') not in ('admin', 'admin_temp'):
                 return None
             return payload
         except jwt.ExpiredSignatureError:
@@ -230,17 +231,17 @@ class AdminHandlers:
                 )
             conn.commit()
             
-            # 檢查是否需要修改密碼
-            must_change = admin.get('must_change_password', 1)
+            # 檢查是否需要修改密碼（暫時禁用，等前端實現密碼修改頁面）
+            must_change = admin.get('must_change_password', 0)  # 默認不強制
             
-            # 生成 JWT
-            token_type = 'admin_temp' if must_change else 'admin'
+            # 生成 JWT（暫時總是返回正式 token）
+            token_type = 'admin'  # 暫時禁用臨時 token
             token = jwt.encode({
                 'admin_id': admin['id'],
                 'username': admin['username'],
                 'role': admin['role'],
                 'type': token_type,
-                'exp': int(time.time()) + (300 if must_change else JWT_EXPIRES_SECONDS)
+                'exp': int(time.time()) + JWT_EXPIRES_SECONDS
             }, JWT_SECRET, algorithm=JWT_ALGORITHM)
             
             # 記錄成功審計
@@ -263,9 +264,10 @@ class AdminHandlers:
                 }
             }
             
-            if must_change:
-                response_data['require_password_change'] = True
-                response_data['password_rules'] = PasswordPolicy().to_dict()
+            # 暫時不強制修改密碼，等前端實現相關頁面
+            # if must_change:
+            #     response_data['require_password_change'] = True
+            #     response_data['password_rules'] = PasswordPolicy().to_dict()
             
             return success_response(response_data)
             

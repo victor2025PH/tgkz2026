@@ -30,6 +30,7 @@ class ApiCredential:
     account_count: int = 0  # 已分配的帳號數量
     max_accounts: int = 5  # 最大帳號數量（推薦值）
     is_public: bool = False  # 是否為公共 API（不推薦使用）
+    owner_user_id: str = ""  # 🆕 多租戶支持：擁有者用戶 ID
 
 
 class ApiCredentialPool:
@@ -145,7 +146,8 @@ class ApiCredentialPool:
         api_hash: str,
         name: str = "",
         source: str = "",
-        max_accounts: int = 5
+        max_accounts: int = 5,
+        owner_user_id: str = ""
     ) -> bool:
         """
         添加新的 API 憑據
@@ -156,14 +158,15 @@ class ApiCredentialPool:
             name: 備註名稱
             source: 來源（申請的手機號等）
             max_accounts: 最大帳號數量
+            owner_user_id: 🆕 擁有者用戶 ID（多租戶隔離）
             
         Returns:
             是否添加成功
         """
-        # 檢查是否已存在
+        # 🆕 多租戶：同一用戶不能重複添加相同 API ID
         for cred in self.credentials:
-            if cred.api_id == api_id:
-                print(f"[ApiCredentialPool] API ID {api_id} already exists", file=sys.stderr)
+            if cred.api_id == api_id and cred.owner_user_id == owner_user_id:
+                print(f"[ApiCredentialPool] API ID {api_id} already exists for user {owner_user_id}", file=sys.stderr)
                 return False
                 
         # 驗證格式
@@ -188,7 +191,8 @@ class ApiCredentialPool:
             is_active=True,
             account_count=0,
             max_accounts=max_accounts,
-            is_public=False
+            is_public=False,
+            owner_user_id=owner_user_id  # 🆕 多租戶隔離
         )
         
         self.credentials.append(new_cred)
@@ -197,10 +201,19 @@ class ApiCredentialPool:
         print(f"[ApiCredentialPool] Added new credential: {api_id}", file=sys.stderr)
         return True
         
-    def remove_credential(self, api_id: str) -> bool:
-        """移除 API 憑據"""
+    def remove_credential(self, api_id: str, owner_user_id: str = None) -> bool:
+        """移除 API 憑據
+        
+        Args:
+            api_id: API ID
+            owner_user_id: 🆕 擁有者用戶 ID（多租戶：只能刪除自己的憑據）
+        """
         for i, cred in enumerate(self.credentials):
             if cred.api_id == api_id:
+                # 🆕 多租戶檢查：如果指定了 owner_user_id，只能刪除自己的憑據
+                if owner_user_id and cred.owner_user_id and cred.owner_user_id != owner_user_id:
+                    print(f"[ApiCredentialPool] Cannot remove: not owner ({cred.owner_user_id} != {owner_user_id})", file=sys.stderr)
+                    return False
                 self.credentials.pop(i)
                 self.save()
                 print(f"[ApiCredentialPool] Removed credential: {api_id}", file=sys.stderr)
@@ -306,13 +319,14 @@ class ApiCredentialPool:
             ]
         }
         
-    def list_credentials(self, include_hash: bool = True, accounts: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    def list_credentials(self, include_hash: bool = True, accounts: List[Dict[str, Any]] = None, owner_user_id: str = None) -> List[Dict[str, Any]]:
         """
         列出所有憑據
 
         Args:
             include_hash: 是否包含 api_hash（本地應用需要）
             accounts: 帳號列表，用於獲取每個 API 綁定的帳號詳情
+            owner_user_id: 🆕 擁有者用戶 ID（多租戶過濾）
         """
         # 構建 API ID 到帳號列表的映射
         api_to_accounts: Dict[str, List[Dict[str, Any]]] = {}
@@ -334,6 +348,9 @@ class ApiCredentialPool:
         
         result = []
         for c in self.credentials:
+            # 🆕 多租戶過濾：只返回屬於當前用戶的憑據
+            if owner_user_id and c.owner_user_id and c.owner_user_id != owner_user_id:
+                continue
             api_id_str = str(c.api_id)
             bound_accounts = api_to_accounts.get(api_id_str, [])
             

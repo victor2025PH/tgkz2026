@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["angular:styles/component:css;9696bea4aad6db1554403469d0f9f92bad766e4d576fd736536d2e08ba05fb81;D:/tgkz2026/src/onboarding.component.ts"],
+  "sourcesContent": ["\n    @keyframes bounce-slow {\n      0%, 100% { transform: translateY(0); }\n      50% { transform: translateY(-8px); }\n    }\n    .animate-bounce-slow {\n      animation: bounce-slow 2s ease-in-out infinite;\n    }\n  "],
+  "mappings": ";AACI,WAAW;AACT;AAAW,eAAW,WAAW;AAAI;AACrC;AAAM,eAAW,WAAW;AAAO;AACrC;AACA,CAAC;AACC,aAAW,YAAY,GAAG,YAAY;AACxC;",
+  "names": []
+}

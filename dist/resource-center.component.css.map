@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["angular:styles/component:css;1e2e16f59079d65deb71285438eb7b08c47fa5ed2dc0b475483ed36327c3c413;D:/tgkz2026/src/manual-mode/resource-center.component.ts"],
+  "sourcesContent": ["\n    .resource-center {\n      min-height: 100vh;\n    }\n  "],
+  "mappings": ";AACI,CAAC;AACC,cAAY;AACd;",
+  "names": []
+}

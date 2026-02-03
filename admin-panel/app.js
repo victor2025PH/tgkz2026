@@ -401,7 +401,18 @@ createApp({
         const loadLicenses = async () => {
             const result = await apiRequest('/admin/licenses');
             if (result.success) {
-                licenses.value = result.data;
+                // 兼容新舊格式
+                const rawLicenses = result.data?.licenses || result.data || result.licenses || [];
+                licenses.value = Array.isArray(rawLicenses) ? rawLicenses.map(l => ({
+                    ...l,
+                    // 標準化字段
+                    key: l.key || l.license_key,
+                    level: l.level || 'S',
+                    status: l.status || 'unused',
+                    createdAt: l.createdAt || l.created_at || '',
+                    usedAt: l.usedAt || l.used_at || '',
+                    usedBy: l.usedBy || l.used_by || ''
+                })) : [];
             }
         };
         
@@ -412,7 +423,17 @@ createApp({
             }
             const result = await apiRequest(url);
             if (result.success) {
-                orders.value = result.data;
+                // 兼容新舊格式
+                const rawOrders = result.data?.orders || result.data || result.orders || [];
+                orders.value = Array.isArray(rawOrders) ? rawOrders.map(o => ({
+                    ...o,
+                    orderId: o.orderId || o.order_id || o.id,
+                    userId: o.userId || o.user_id,
+                    amount: o.amount || 0,
+                    status: o.status || 'pending',
+                    createdAt: o.createdAt || o.created_at || '',
+                    paidAt: o.paidAt || o.paid_at || ''
+                })) : [];
             }
         };
         

@@ -415,25 +415,31 @@ class HttpApiServer:
         # 🆕 管理後台 API（Phase 1 優化版）
         if ADMIN_MODULE_AVAILABLE and admin_handlers:
             # 使用新的處理器（帶審計日誌）
+            # 認證
             self.app.router.add_post('/api/admin/login', admin_handlers.login)
             self.app.router.add_post('/api/admin/change-password', admin_handlers.change_password)
+            # 儀表盤
             self.app.router.add_get('/api/admin/dashboard', admin_handlers.get_dashboard)
+            # 用戶管理
             self.app.router.add_get('/api/admin/users', admin_handlers.get_users)
             self.app.router.add_post('/api/admin/users/{user_id}/extend', admin_handlers.extend_user)
             self.app.router.add_post('/api/admin/users/{user_id}/ban', admin_handlers.ban_user)
+            # 卡密管理 (Phase 2)
+            self.app.router.add_get('/api/admin/licenses', admin_handlers.get_licenses)
+            self.app.router.add_post('/api/admin/licenses/generate', admin_handlers.generate_licenses)
+            self.app.router.add_post('/api/admin/licenses/disable', admin_handlers.disable_license)
+            # 訂單管理 (Phase 2)
+            self.app.router.add_get('/api/admin/orders', admin_handlers.get_orders)
+            self.app.router.add_post('/api/admin/orders/confirm', admin_handlers.confirm_order)
+            # 審計日誌
             self.app.router.add_get('/api/admin/audit-logs', admin_handlers.get_audit_logs)
             self.app.router.add_get('/api/admin/audit-stats', admin_handlers.get_audit_stats)
-            logger.info("✅ Admin module loaded with Phase 1 features")
+            logger.info("✅ Admin module loaded with Phase 2 features")
         
         # 保留舊的處理器作為後備（或未遷移的功能）
         self.app.router.add_post('/api/admin/logout', self.admin_panel_logout)
         self.app.router.add_get('/api/admin/verify', self.admin_panel_verify)
         self.app.router.add_get('/api/admin/users/{user_id}', self.admin_panel_user_detail)
-        self.app.router.add_get('/api/admin/licenses', self.admin_panel_licenses)
-        self.app.router.add_post('/api/admin/licenses/generate', self.admin_panel_generate_licenses)
-        self.app.router.add_post('/api/admin/licenses/disable', self.admin_panel_disable_license)
-        self.app.router.add_get('/api/admin/orders', self.admin_panel_orders)
-        self.app.router.add_post('/api/admin/orders/confirm', self.admin_panel_confirm_order)
         self.app.router.add_get('/api/admin/logs', self.admin_panel_logs)
         self.app.router.add_get('/api/admin/settings', self.admin_panel_settings)
         self.app.router.add_post('/api/admin/settings/save', self.admin_panel_save_settings)

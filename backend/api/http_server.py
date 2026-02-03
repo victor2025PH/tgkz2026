@@ -5941,9 +5941,38 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
                         request_id = data.get('request_id')
                         
                         if command:
-                            result = await self._execute_command(command, payload)
-                            result['request_id'] = request_id
-                            await ws.send_json(result)
+                            # 🔧 修復：在執行命令前設置租戶上下文
+                            tenant_token = None
+                            try:
+                                if tenant_id:
+                                    from core.tenant_context import TenantContext, set_current_tenant, clear_current_tenant
+                                    tenant = request.get('tenant')
+                                    if tenant:
+                                        # 使用請求中的租戶信息
+                                        tenant_token = set_current_tenant(tenant)
+                                        logger.debug(f"[WS] Set tenant context: {tenant.user_id}")
+                                    else:
+                                        # 從請求中創建租戶上下文
+                                        auth_ctx = request.get('auth')
+                                        if auth_ctx and auth_ctx.is_authenticated and auth_ctx.user:
+                                            ws_tenant = TenantContext(
+                                                user_id=auth_ctx.user.id,
+                                                email=auth_ctx.user.email or '',
+                                                role=auth_ctx.user.role.value if hasattr(auth_ctx.user.role, 'value') else str(auth_ctx.user.role),
+                                                subscription_tier=auth_ctx.user.subscription_tier or 'free',
+                                                max_accounts=auth_ctx.user.max_accounts or 3
+                                            )
+                                            tenant_token = set_current_tenant(ws_tenant)
+                                            logger.debug(f"[WS] Created tenant context from auth: {ws_tenant.user_id}")
+                                
+                                result = await self._execute_command(command, payload)
+                                result['request_id'] = request_id
+                                await ws.send_json(result)
+                            finally:
+                                # 清理租戶上下文
+                                if tenant_token:
+                                    from core.tenant_context import clear_current_tenant
+                                    clear_current_tenant(tenant_token)
                         
                     except json.JSONDecodeError as e:
                         logger.warning(f"WebSocket invalid JSON: {e}")

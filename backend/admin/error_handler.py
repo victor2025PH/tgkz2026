@@ -219,10 +219,14 @@ def handle_exception(func):
         except AdminError as e:
             return web.json_response(e.to_response(), status=e.http_status)
         except Exception as e:
-            logger.exception(f"Unhandled exception in {func.__name__}: {e}")
+            import traceback
+            tb = traceback.format_exc()
+            logger.exception(f"Unhandled exception in {func.__name__}: {e}\n{tb}")
+            # 臨時：總是返回詳細錯誤信息以便調試
             error = AdminError(
                 ErrorCode.SYSTEM_INTERNAL_ERROR,
-                message=str(e) if DEBUG else "服務器內部錯誤",
+                message=f"{type(e).__name__}: {str(e)}",
+                details={'traceback': tb.split('\n')[-5:]} if not DEBUG else {'traceback': tb},
                 http_status=500
             )
             return web.json_response(error.to_response(), status=500)

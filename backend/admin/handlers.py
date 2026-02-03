@@ -1024,7 +1024,7 @@ class AdminHandlers:
     @handle_exception
     async def get_proxies(self, request: web.Request) -> web.Response:
         """獲取代理列表"""
-        admin = await self._verify_admin_token(request)
+        admin = await self._verify_token(request)
         
         from .proxy_pool import get_proxy_pool
         pool = get_proxy_pool()
@@ -1041,7 +1041,7 @@ class AdminHandlers:
     @handle_exception
     async def add_proxies(self, request: web.Request) -> web.Response:
         """批量添加代理"""
-        admin = await self._verify_admin_token(request)
+        admin = await self._verify_token(request)
         data = await request.json()
         ip_address = request.headers.get('X-Forwarded-For', request.remote)
         
@@ -1070,7 +1070,7 @@ class AdminHandlers:
     @handle_exception
     async def delete_proxy(self, request: web.Request) -> web.Response:
         """刪除代理"""
-        admin = await self._verify_admin_token(request)
+        admin = await self._verify_token(request)
         ip_address = request.headers.get('X-Forwarded-For', request.remote)
         
         proxy_id = request.match_info.get('proxy_id')
@@ -1100,7 +1100,7 @@ class AdminHandlers:
     @handle_exception
     async def test_proxy(self, request: web.Request) -> web.Response:
         """測試代理連通性"""
-        admin = await self._verify_admin_token(request)
+        admin = await self._verify_token(request)
         
         proxy_id = request.match_info.get('proxy_id')
         if not proxy_id:
@@ -1116,7 +1116,7 @@ class AdminHandlers:
     @handle_exception
     async def assign_proxy(self, request: web.Request) -> web.Response:
         """手動分配代理給帳號"""
-        admin = await self._verify_admin_token(request)
+        admin = await self._verify_token(request)
         data = await request.json()
         ip_address = request.headers.get('X-Forwarded-For', request.remote)
         
@@ -1154,7 +1154,7 @@ class AdminHandlers:
     @handle_exception
     async def release_proxy(self, request: web.Request) -> web.Response:
         """釋放帳號的代理"""
-        admin = await self._verify_admin_token(request)
+        admin = await self._verify_token(request)
         data = await request.json()
         ip_address = request.headers.get('X-Forwarded-For', request.remote)
         
@@ -1186,7 +1186,7 @@ class AdminHandlers:
     @handle_exception
     async def get_account_proxy(self, request: web.Request) -> web.Response:
         """獲取帳號綁定的代理"""
-        admin = await self._verify_admin_token(request)
+        admin = await self._verify_token(request)
         
         account_id = request.query.get('account_id')
         phone = request.query.get('phone')

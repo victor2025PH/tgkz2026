@@ -165,6 +165,7 @@ createApp({
         const users = ref([]);
         const userSearch = ref('');
         const userFilter = ref('all');
+        const userPagination = ref({ total: 0, page: 1, page_size: 50, total_pages: 1 });
         
         // 卡密數據
         const licenses = ref([]);
@@ -337,7 +338,63 @@ createApp({
         const loadUsers = async () => {
             const result = await apiRequest('/admin/users');
             if (result.success) {
-                users.value = result.data;
+                // 兼容新舊 API 格式
+                const rawUsers = result.data?.users || result.data || result.users || [];
+                
+                // 等級配置
+                const levelConfig = {
+                    free: { icon: '⚔️', name: '青銅戰士' },
+                    bronze: { icon: '⚔️', name: '青銅戰士' },
+                    silver: { icon: '🥈', name: '白銀精英' },
+                    gold: { icon: '🥇', name: '黃金大師' },
+                    diamond: { icon: '💎', name: '鑽石王牌' },
+                    star: { icon: '🌟', name: '星耀傳說' },
+                    king: { icon: '👑', name: '榮耀王者' }
+                };
+                
+                // 標準化用戶數據，添加 Fallback
+                users.value = rawUsers.map(user => {
+                    const level = user.level || user.membership_level || user.subscription_tier || 'free';
+                    const config = levelConfig[level] || levelConfig.free;
+                    const userId = user.userId || user.user_id || user.id || '';
+                    
+                    // 顯示名 Fallback 鏈
+                    const displayName = user.nickname || user.display_name || user.name || 
+                                       user.telegramUsername || user.telegram_username || 
+                                       user.email?.split('@')[0] || 
+                                       (userId ? `用戶_${userId.slice(-6)}` : '匿名用戶');
+                    
+                    return {
+                        ...user,
+                        userId,
+                        displayName,
+                        // 首字母（用於頭像）
+                        avatarLetter: (displayName[0] || '?').toUpperCase(),
+                        // 等級信息
+                        level,
+                        levelIcon: config.icon,
+                        levelName: config.name,
+                        // 狀態
+                        isBanned: !!(user.isBanned || user.is_banned) || user.is_active === 0,
+                        isLifetime: level === 'king' || user.isLifetime,
+                        // 到期時間
+                        expiresAt: user.expiresAt || user.expires_at || user.subscription_expires || '',
+                        // Telegram 信息
+                        telegramUsername: user.telegramUsername || user.telegram_username || '',
+                        telegramId: user.telegramId || user.telegram_id || '',
+                        // 邀請和消費
+                        totalInvites: user.totalInvites || user.total_invites || 0,
+                        totalSpent: user.totalSpent || user.total_spent || 0,
+                        // 時間
+                        createdAt: user.createdAt || user.created_at || '',
+                        lastLoginAt: user.lastLoginAt || user.last_login_at || ''
+                    };
+                });
+                
+                // 保存分頁信息
+                if (result.data?.pagination) {
+                    userPagination.value = result.data.pagination;
+                }
             }
         };
         
@@ -1545,6 +1602,7 @@ createApp({
             users,
             userSearch,
             userFilter,
+            userPagination,
             filteredUsers,
             licenses,
             licenseFilter,

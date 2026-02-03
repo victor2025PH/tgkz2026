@@ -347,9 +347,11 @@ createApp({
         
         const loadUsers = async () => {
             const result = await apiRequest('/admin/users');
+            console.log('[loadUsers] API result:', result);
             if (result.success) {
                 // 兼容新舊 API 格式
                 const rawUsers = result.data?.users || result.data || result.users || [];
+                console.log('[loadUsers] rawUsers count:', rawUsers.length, 'first user:', rawUsers[0]);
                 
                 // 等級配置
                 const levelConfig = {
@@ -401,9 +403,12 @@ createApp({
                     };
                 });
                 
+                console.log('[loadUsers] processed users count:', users.value.length, 'first:', users.value[0]);
+                
                 // 保存分頁信息
                 if (result.data?.pagination) {
                     userPagination.value = result.data.pagination;
+                    console.log('[loadUsers] pagination:', userPagination.value);
                 }
             }
         };

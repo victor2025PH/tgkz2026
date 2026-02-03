@@ -105,8 +105,8 @@ jobs:
           ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 deploy-server << 'ENDSSH'
             cd /opt/tg-matrix
             
-            # 重啟服務（不重建以加快速度）
-            sudo docker compose restart api
+            # 重啟服務（包括 nginx 以加載新配置）
+            sudo docker compose restart web api
             
             # 等待服務啟動
             sleep 10

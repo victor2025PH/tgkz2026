@@ -434,7 +434,15 @@ class HttpApiServer:
             # 審計日誌
             self.app.router.add_get('/api/admin/audit-logs', admin_handlers.get_audit_logs)
             self.app.router.add_get('/api/admin/audit-stats', admin_handlers.get_audit_stats)
-            logger.info("✅ Admin module loaded with Phase 2 features")
+            # 代理池管理 (Phase 3+)
+            self.app.router.add_get('/api/admin/proxies', admin_handlers.get_proxies)
+            self.app.router.add_post('/api/admin/proxies', admin_handlers.add_proxies)
+            self.app.router.add_delete('/api/admin/proxies/{proxy_id}', admin_handlers.delete_proxy)
+            self.app.router.add_post('/api/admin/proxies/{proxy_id}/test', admin_handlers.test_proxy)
+            self.app.router.add_post('/api/admin/proxies/assign', admin_handlers.assign_proxy)
+            self.app.router.add_post('/api/admin/proxies/release', admin_handlers.release_proxy)
+            self.app.router.add_get('/api/admin/proxies/account', admin_handlers.get_account_proxy)
+            logger.info("✅ Admin module loaded with Phase 2 & Proxy Pool features")
         
         # 保留舊的處理器作為後備（或未遷移的功能）
         self.app.router.add_post('/api/admin/logout', self.admin_panel_logout)

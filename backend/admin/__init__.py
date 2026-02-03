@@ -7,6 +7,7 @@ Phase 1: 基礎穩固
 ├── audit_logger.py     - 操作審計日誌
 ├── error_handler.py    - 錯誤處理系統
 ├── password_policy.py  - 密碼策略管理
+├── proxy_pool.py       - 靜態代理池管理
 └── handlers.py         - API 處理器
 """
 
@@ -18,6 +19,9 @@ from .error_handler import (
 from .password_policy import (
     PasswordValidator, PasswordPolicy, PasswordValidationResult,
     PasswordHistoryManager, password_validator, password_history
+)
+from .proxy_pool import (
+    ProxyPoolManager, StaticProxy, ProxyStatus, ProxyType, get_proxy_pool
 )
 from .handlers import AdminHandlers, admin_handlers
 
@@ -31,6 +35,8 @@ __all__ = [
     # Password Policy
     'PasswordValidator', 'PasswordPolicy', 'PasswordValidationResult',
     'PasswordHistoryManager', 'password_validator', 'password_history',
+    # Proxy Pool
+    'ProxyPoolManager', 'StaticProxy', 'ProxyStatus', 'ProxyType', 'get_proxy_pool',
     # Handlers
     'AdminHandlers', 'admin_handlers'
 ]

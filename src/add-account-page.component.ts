@@ -181,12 +181,46 @@ interface PlatformApiInfo {
               </div>
 
               <div class="form-group">
-                <label>代理設置（可選）</label>
-                <input 
-                  type="text" 
-                  [(ngModel)]="proxyAddress"
-                  placeholder="socks5://host:port 或留空"
-                  class="form-input">
+                <label>代理設置</label>
+                <div class="proxy-options">
+                  <label class="proxy-option">
+                    <input type="radio" name="proxyMode" value="auto" [(ngModel)]="proxyMode">
+                    <span class="option-content">
+                      <span class="option-icon">🌐</span>
+                      <span class="option-text">
+                        <strong>自動分配靜態代理</strong>
+                        <small>從代理池自動分配，防封推薦</small>
+                      </span>
+                    </span>
+                  </label>
+                  <label class="proxy-option">
+                    <input type="radio" name="proxyMode" value="manual" [(ngModel)]="proxyMode">
+                    <span class="option-content">
+                      <span class="option-icon">✏️</span>
+                      <span class="option-text">
+                        <strong>手動輸入代理</strong>
+                        <small>使用自己的代理地址</small>
+                      </span>
+                    </span>
+                  </label>
+                  <label class="proxy-option">
+                    <input type="radio" name="proxyMode" value="none" [(ngModel)]="proxyMode">
+                    <span class="option-content">
+                      <span class="option-icon">🚫</span>
+                      <span class="option-text">
+                        <strong>不使用代理</strong>
+                        <small>直接連接，有封號風險</small>
+                      </span>
+                    </span>
+                  </label>
+                </div>
+                @if (proxyMode === 'manual') {
+                  <input 
+                    type="text" 
+                    [(ngModel)]="proxyAddress"
+                    placeholder="socks5://user:pass@host:port"
+                    class="form-input mt-2">
+                }
               </div>
 
               <div class="form-group">
@@ -845,6 +879,65 @@ interface PlatformApiInfo {
     }
 
     .required { color: #ef4444; }
+    
+    /* 代理選項樣式 */
+    .proxy-options {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    
+    .proxy-option {
+      display: flex;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      background: var(--bg-secondary, #1e293b);
+      border: 2px solid transparent;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .proxy-option:hover {
+      background: var(--bg-tertiary, #334155);
+    }
+    
+    .proxy-option:has(input:checked) {
+      border-color: var(--accent-color, #8b5cf6);
+      background: rgba(139, 92, 246, 0.1);
+    }
+    
+    .proxy-option input[type="radio"] {
+      display: none;
+    }
+    
+    .proxy-option .option-content {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .proxy-option .option-icon {
+      font-size: 1.5rem;
+    }
+    
+    .proxy-option .option-text {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .proxy-option .option-text strong {
+      font-size: 0.9rem;
+      color: var(--text-primary, #f1f5f9);
+    }
+    
+    .proxy-option .option-text small {
+      font-size: 0.75rem;
+      color: var(--text-secondary, #94a3b8);
+    }
+    
+    .mt-2 { margin-top: 0.5rem; }
 
     .form-input {
       width: 100%;
@@ -1603,6 +1696,7 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
   verificationCode = '';
   twoFactorPassword = '';
   proxyAddress = '';
+  proxyMode = 'auto';  // 'auto' | 'manual' | 'none'
   codeStep = signal(false);
   isSending = signal(false);
   isVerifying = signal(false);
@@ -1885,6 +1979,7 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
     this.verificationCode = '';
     this.twoFactorPassword = '';
     this.proxyAddress = '';
+    this.proxyMode = 'auto';
     this.phoneCodeHash = '';
     this.loginAccountId = '';
     this.codeStep.set(false);
@@ -1963,12 +2058,15 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
     this.isSending.set(true);
     this.phoneError.set(''); // 清除錯誤
     
+    // 🆕 根據代理模式獲取代理值
+    const proxyValue = this.getProxyValue();
+    
     // 第一步：添加帳戶
     this.ipcService.send('add-account', {
       phone: this.phoneNumber,
       apiId: selectedApi.api_id,
       apiHash: selectedApi.api_hash,
-      proxy: this.proxyAddress || null,
+      proxy: proxyValue,
       twoFactorPassword: this.twoFactorPassword || null
     });
     
@@ -1978,7 +2076,7 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
         phone: this.phoneNumber,
         apiId: selectedApi.api_id,
         apiHash: selectedApi.api_hash,
-        proxy: this.proxyAddress || null,
+        proxy: proxyValue,
         twoFactorPassword: this.twoFactorPassword || null
       });
     }, 500);
@@ -2032,6 +2130,24 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
         this.toast.error('驗證超時，請檢查網絡連接後重試');
       }
     }, 30000);
+  }
+
+  /**
+   * 根據代理模式獲取代理值
+   * - 'auto': 返回 'auto'，後端自動從代理池分配
+   * - 'manual': 返回用戶輸入的代理地址
+   * - 'none': 返回 null，不使用代理
+   */
+  private getProxyValue(): string | null {
+    switch (this.proxyMode) {
+      case 'auto':
+        return 'auto';  // 後端會識別這個特殊值並自動分配
+      case 'manual':
+        return this.proxyAddress || null;
+      case 'none':
+      default:
+        return null;
+    }
   }
 
   resendCode(): void {
@@ -2097,7 +2213,7 @@ export class AddAccountPageComponent implements OnInit, OnDestroy {
     }
     
     this.ipcService.send('qr-login-create', {
-      proxy: this.proxyAddress || null,
+      proxy: this.getProxyValue(),
       deviceType: this.deviceType() === 'random' ? null : this.deviceType(),
       customApiId: selectedApi.api_id,
       customApiHash: selectedApi.api_hash

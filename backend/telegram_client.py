@@ -739,8 +739,34 @@ class TelegramClientManager:
             # Get session path
             session_path = config.get_session_path(phone)
             
+            # 🆕 自動代理分配：如果沒有指定代理，嘗試從代理池自動分配
+            effective_proxy = proxy
+            if not proxy or proxy == 'auto':
+                try:
+                    from admin.proxy_pool import get_proxy_pool
+                    pool = get_proxy_pool()
+                    
+                    # 先檢查帳號是否已有綁定的代理
+                    existing_proxy = pool.get_proxy_for_account(phone=phone)
+                    if existing_proxy:
+                        effective_proxy = existing_proxy.to_url()
+                        print(f"[TelegramClient] Using existing proxy for {phone}: {existing_proxy.host}:{existing_proxy.port}", file=sys.stderr)
+                    elif proxy == 'auto':
+                        # 自動分配新代理
+                        assigned = pool.assign_proxy_to_account(account_id='', phone=phone)
+                        if assigned:
+                            effective_proxy = assigned.to_url()
+                            print(f"[TelegramClient] Auto-assigned proxy for {phone}: {assigned.host}:{assigned.port}", file=sys.stderr)
+                        else:
+                            print(f"[TelegramClient] No available proxy in pool for {phone}", file=sys.stderr)
+                            effective_proxy = None
+                except ImportError:
+                    print(f"[TelegramClient] Proxy pool module not available", file=sys.stderr)
+                except Exception as e:
+                    print(f"[TelegramClient] Proxy pool error: {e}", file=sys.stderr)
+            
             # Parse proxy
-            proxy_dict = self._parse_proxy(proxy)
+            proxy_dict = self._parse_proxy(effective_proxy)
             
             # Generate device fingerprint if not provided (防封)
             if not device_model or not system_version or not app_version:

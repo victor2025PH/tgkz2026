@@ -154,6 +154,7 @@ createApp({
             { id: 'notifications', name: '批量通知', icon: '📨' },
             { id: 'announcements', name: '公告管理', icon: '📢' },
             { id: 'devices', name: '設備管理', icon: '💻' },
+            { id: 'proxies', name: '代理池管理', icon: '🌐' },
             { id: 'logs', name: '操作日誌', icon: '📝' },
             { id: 'admins', name: '管理員', icon: '👤' },
             { id: 'settings', name: '系統設置', icon: '⚙️' },
@@ -203,6 +204,18 @@ createApp({
             category: '',
             status: '',
             adminId: ''
+        });
+        
+        // 🆕 代理池數據
+        const proxies = ref([]);
+        const proxyStats = ref({ total: 0, available: 0, assigned: 0, failed: 0 });
+        const proxyPagination = ref({ total: 0, page: 1, page_size: 50, total_pages: 1 });
+        const proxyFilter = ref('');  // all, available, assigned, failed
+        const showProxyModal = ref(false);
+        const proxyForm = reactive({
+            text: '',  // 批量添加的文本
+            provider: '',
+            country: ''
         });
         const logsStats = ref({});
         
@@ -498,6 +511,149 @@ createApp({
             if (result.success) {
                 logsStats.value = result.data || result;
             }
+        };
+        
+        // ============ 代理池管理 ============
+        
+        const loadProxies = async () => {
+            const params = new URLSearchParams();
+            if (proxyFilter.value) params.append('status', proxyFilter.value);
+            params.append('page', proxyPagination.value.page);
+            params.append('page_size', proxyPagination.value.page_size);
+            
+            const result = await apiRequest(`/admin/proxies?${params}`);
+            if (result.success) {
+                const data = result.data || result;
+                proxies.value = data.proxies || [];
+                proxyStats.value = data.stats || { total: 0, available: 0, assigned: 0, failed: 0 };
+                proxyPagination.value = data.pagination || proxyPagination.value;
+            }
+        };
+        
+        const openProxyModal = () => {
+            proxyForm.text = '';
+            proxyForm.provider = '';
+            proxyForm.country = '';
+            showProxyModal.value = true;
+        };
+        
+        const addProxies = async () => {
+            if (!proxyForm.text.trim()) {
+                showToast('請輸入代理列表', 'error');
+                return;
+            }
+            
+            // 解析輸入：每行一個代理
+            const lines = proxyForm.text.split('\n').filter(l => l.trim());
+            const proxyList = lines.map(line => {
+                const trimmed = line.trim();
+                // 支持格式：socks5://host:port 或 host:port:user:pass
+                if (trimmed.includes('://')) {
+                    return trimmed;
+                } else {
+                    // 簡單格式：host:port 或 host:port:user:pass
+                    const parts = trimmed.split(':');
+                    if (parts.length >= 2) {
+                        const [host, port, user, pass] = parts;
+                        let url = `socks5://${host}:${port}`;
+                        if (user && pass) {
+                            url = `socks5://${user}:${pass}@${host}:${port}`;
+                        }
+                        return {
+                            type: 'socks5',
+                            host,
+                            port: parseInt(port),
+                            username: user || null,
+                            password: pass || null,
+                            provider: proxyForm.provider || null,
+                            country: proxyForm.country || null
+                        };
+                    }
+                }
+                return trimmed;
+            });
+            
+            const result = await apiRequest('/admin/proxies', {
+                method: 'POST',
+                body: JSON.stringify({ proxies: proxyList })
+            });
+            
+            if (result.success) {
+                const data = result.data || result;
+                showToast(`成功添加 ${data.success} 個代理，失敗 ${data.failed} 個`, 'success');
+                showProxyModal.value = false;
+                await loadProxies();
+            } else {
+                showToast('添加代理失敗: ' + (result.message || result.error?.message), 'error');
+            }
+        };
+        
+        const deleteProxy = async (proxyId) => {
+            if (!confirm('確定要刪除此代理嗎？')) return;
+            
+            const result = await apiRequest(`/admin/proxies/${proxyId}`, {
+                method: 'DELETE'
+            });
+            
+            if (result.success) {
+                showToast('代理已刪除', 'success');
+                await loadProxies();
+            }
+        };
+        
+        const testProxy = async (proxyId) => {
+            showToast('正在測試代理...', 'info');
+            
+            const result = await apiRequest(`/admin/proxies/${proxyId}/test`, {
+                method: 'POST'
+            });
+            
+            if (result.success && result.data?.success) {
+                showToast(`測試成功！延遲: ${result.data.latency}ms`, 'success');
+                await loadProxies();
+            } else {
+                showToast('測試失敗: ' + (result.data?.error || '連接失敗'), 'error');
+                await loadProxies();
+            }
+        };
+        
+        const releaseProxy = async (proxy) => {
+            if (!confirm(`確定要釋放此代理 ${proxy.host}:${proxy.port} 嗎？`)) return;
+            
+            const result = await apiRequest('/admin/proxies/release', {
+                method: 'POST',
+                body: JSON.stringify({
+                    phone: proxy.assigned_phone,
+                    account_id: proxy.assigned_account_id
+                })
+            });
+            
+            if (result.success) {
+                showToast('代理已釋放', 'success');
+                await loadProxies();
+            }
+        };
+        
+        const getProxyStatusClass = (status) => {
+            const classes = {
+                'available': 'text-green-400',
+                'assigned': 'text-blue-400',
+                'testing': 'text-yellow-400',
+                'failed': 'text-red-400',
+                'disabled': 'text-gray-400'
+            };
+            return classes[status] || 'text-gray-400';
+        };
+        
+        const getProxyStatusText = (status) => {
+            const texts = {
+                'available': '可用',
+                'assigned': '已分配',
+                'testing': '測試中',
+                'failed': '失敗',
+                'disabled': '已禁用'
+            };
+            return texts[status] || status;
         };
         
         const getActionIcon = (category) => {
@@ -1723,6 +1879,7 @@ createApp({
             else if (newPage === 'notifications') await loadNotificationHistory();
             else if (newPage === 'devices') await loadDevices();
             else if (newPage === 'logs') { await loadLogs(); await loadLogsStats(); }
+            else if (newPage === 'proxies') await loadProxies();
             else if (newPage === 'admins') await loadAdmins();
             else if (newPage === 'referrals') await loadReferralStats();
             else if (newPage === 'announcements') await loadAnnouncements();
@@ -1774,6 +1931,21 @@ createApp({
             goToLogsPage,
             filterLogs,
             getActionIcon,
+            // 代理池
+            proxies,
+            proxyStats,
+            proxyPagination,
+            proxyFilter,
+            showProxyModal,
+            proxyForm,
+            loadProxies,
+            openProxyModal,
+            addProxies,
+            deleteProxy,
+            testProxy,
+            releaseProxy,
+            getProxyStatusClass,
+            getProxyStatusText,
             admins,
             showAdminModal,
             editingAdmin,

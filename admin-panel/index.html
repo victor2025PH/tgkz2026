@@ -758,6 +758,167 @@
                     </div>
                 </div>
                 
+                <!-- ==================== 代理池管理 ==================== -->
+                <div v-if="currentPage === 'proxies'">
+                    <!-- 統計卡片 -->
+                    <div class="grid grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gradient-to-r from-green-600 to-green-700 rounded-xl p-4">
+                            <p class="text-green-200 text-sm">可用代理</p>
+                            <p class="text-2xl font-bold mt-1">{{ proxyStats.available || 0 }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4">
+                            <p class="text-blue-200 text-sm">已分配</p>
+                            <p class="text-2xl font-bold mt-1">{{ proxyStats.assigned || 0 }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-red-600 to-red-700 rounded-xl p-4">
+                            <p class="text-red-200 text-sm">失敗</p>
+                            <p class="text-2xl font-bold mt-1">{{ proxyStats.failed || 0 }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl p-4">
+                            <p class="text-purple-200 text-sm">總計</p>
+                            <p class="text-2xl font-bold mt-1">{{ proxyStats.total || 0 }}</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 操作欄 -->
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="flex gap-4">
+                            <select v-model="proxyFilter" @change="loadProxies" 
+                                    class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2">
+                                <option value="">全部狀態</option>
+                                <option value="available">可用</option>
+                                <option value="assigned">已分配</option>
+                                <option value="failed">失敗</option>
+                                <option value="disabled">已禁用</option>
+                            </select>
+                        </div>
+                        <button @click="openProxyModal" 
+                                class="gradient-bg hover:opacity-90 px-6 py-2 rounded-lg font-medium transition-opacity">
+                            ➕ 批量添加代理
+                        </button>
+                    </div>
+                    
+                    <!-- 代理列表 -->
+                    <div class="glass-card rounded-2xl p-6">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="text-gray-400 text-sm">
+                                    <th class="text-left px-6 py-4 font-medium">代理地址</th>
+                                    <th class="text-left px-6 py-4 font-medium">類型</th>
+                                    <th class="text-left px-6 py-4 font-medium">狀態</th>
+                                    <th class="text-left px-6 py-4 font-medium">綁定帳號</th>
+                                    <th class="text-left px-6 py-4 font-medium">延遲</th>
+                                    <th class="text-left px-6 py-4 font-medium">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="proxy in proxies" :key="proxy.id" 
+                                    class="border-t border-gray-700 table-row-hover">
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center">
+                                            <span class="text-lg mr-2">🌐</span>
+                                            <div>
+                                                <p class="font-medium">{{ proxy.host }}:{{ proxy.port }}</p>
+                                                <p class="text-sm text-gray-400" v-if="proxy.country || proxy.provider">
+                                                    {{ proxy.country || '' }} {{ proxy.provider || '' }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-2 py-1 rounded bg-gray-700 text-sm">{{ proxy.proxy_type?.toUpperCase() }}</span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span :class="getProxyStatusClass(proxy.status)" class="font-medium">
+                                            {{ getProxyStatusText(proxy.status) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span v-if="proxy.assigned_phone" class="text-blue-400">
+                                            📱 {{ proxy.assigned_phone }}
+                                        </span>
+                                        <span v-else class="text-gray-500">-</span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span v-if="proxy.last_check_latency" class="text-green-400">
+                                            {{ proxy.last_check_latency }}ms
+                                        </span>
+                                        <span v-else class="text-gray-500">-</span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex gap-2">
+                                            <button @click="testProxy(proxy.id)" 
+                                                    class="text-blue-400 hover:text-blue-300 text-sm">測試</button>
+                                            <button v-if="proxy.status === 'assigned'" @click="releaseProxy(proxy)" 
+                                                    class="text-yellow-400 hover:text-yellow-300 text-sm">釋放</button>
+                                            <button @click="deleteProxy(proxy.id)" 
+                                                    class="text-red-400 hover:text-red-300 text-sm">刪除</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="proxies.length === 0">
+                                    <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                                        暫無代理，點擊上方按鈕添加
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 使用說明 -->
+                    <div class="mt-6 glass-card rounded-xl p-4">
+                        <h4 class="font-medium mb-2">📖 使用說明</h4>
+                        <ul class="text-sm text-gray-400 space-y-1">
+                            <li>• 添加靜態代理後，新登錄的 Telegram 帳號將自動分配可用代理</li>
+                            <li>• 每個帳號綁定固定代理，避免 IP 變化觸發風控</li>
+                            <li>• 建議使用 <span class="text-blue-400">靜態ISP代理</span> 以獲得最高信任度</li>
+                            <li>• 支持格式：<code class="bg-gray-700 px-1 rounded">socks5://user:pass@host:port</code> 或 <code class="bg-gray-700 px-1 rounded">host:port</code></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- 添加代理彈窗 -->
+                <div v-if="showProxyModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-lg">
+                        <h3 class="text-xl font-bold mb-4">🌐 批量添加代理</h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">代理列表（每行一個）</label>
+                                <textarea v-model="proxyForm.text" 
+                                          class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 h-40"
+                                          placeholder="支持格式：
+socks5://user:pass@host:port
+socks5://host:port
+host:port:user:pass
+host:port"></textarea>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">服務商（可選）</label>
+                                    <input v-model="proxyForm.provider" type="text" 
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                           placeholder="如：Blurpath">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">國家/地區（可選）</label>
+                                    <input v-model="proxyForm.country" type="text" 
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                           placeholder="如：US, HK">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button @click="showProxyModal = false" 
+                                    class="px-6 py-2 rounded-lg bg-gray-700 hover:bg-gray-600">取消</button>
+                            <button @click="addProxies" 
+                                    class="px-6 py-2 rounded-lg gradient-bg hover:opacity-90">添加代理</button>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- ==================== 管理員管理 ==================== -->
                 <div v-if="currentPage === 'admins'">
                     <div class="flex justify-end mb-6">
@@ -2190,6 +2351,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=20260203-3"></script>
+    <script src="app.js?v=20260203-4"></script>
 </body>
 </html>

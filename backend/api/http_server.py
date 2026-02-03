@@ -6201,7 +6201,7 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
         return web.json_response({'success': True, 'data': admin})
     
     async def admin_panel_dashboard(self, request: web.Request) -> web.Response:
-        """管理後台儀表盤"""
+        """管理後台儀表盤 - 支持兩種表結構"""
         admin = self._verify_admin_token(request)
         if not admin:
             return web.json_response({'success': False, 'message': '未授權'}, status=401)
@@ -6210,30 +6210,60 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
             conn = self._get_admin_db()
             cursor = conn.cursor()
             
-            # 統計數據
+            # 檢查 users 表結構
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            # 統計用戶數
             cursor.execute('SELECT COUNT(*) as total FROM users')
             total_users = cursor.fetchone()['total']
             
             cursor.execute("SELECT COUNT(*) as total FROM users WHERE created_at >= date('now')")
             new_users_today = cursor.fetchone()['total']
             
-            cursor.execute("SELECT COUNT(*) as total FROM users WHERE level != 'bronze' AND level != 'free'")
+            # 付費用戶統計（根據表結構調整查詢）
+            if 'subscription_tier' in columns:
+                # auth/service.py 格式
+                cursor.execute("SELECT COUNT(*) as total FROM users WHERE subscription_tier NOT IN ('free', 'bronze')")
+            elif 'membership_level' in columns:
+                # database.py 格式
+                cursor.execute("SELECT COUNT(*) as total FROM users WHERE membership_level NOT IN ('free', 'bronze')")
+            else:
+                cursor.execute("SELECT 0 as total")
             paid_users = cursor.fetchone()['total']
             
-            cursor.execute('SELECT COUNT(*) as total FROM licenses')
-            total_licenses = cursor.fetchone()['total']
-            
-            cursor.execute("SELECT COUNT(*) as total FROM licenses WHERE status = 'unused'")
-            unused_licenses = cursor.fetchone()['total']
-            
-            # 卡密統計
+            # 卡密統計（可能沒有 licenses 表）
+            total_licenses = 0
+            unused_licenses = 0
             license_stats = {}
-            for level in ['silver', 'gold', 'diamond', 'star', 'king']:
-                cursor.execute('SELECT COUNT(*) as total FROM licenses WHERE level = ?', (level[0].upper(),))
-                total = cursor.fetchone()['total']
-                cursor.execute("SELECT COUNT(*) as unused FROM licenses WHERE level = ? AND status = 'unused'", (level[0].upper(),))
-                unused = cursor.fetchone()['unused']
-                license_stats[level] = {'total': total, 'unused': unused}
+            
+            try:
+                cursor.execute('SELECT COUNT(*) as total FROM licenses')
+                total_licenses = cursor.fetchone()['total']
+                
+                cursor.execute("SELECT COUNT(*) as total FROM licenses WHERE status = 'unused'")
+                unused_licenses = cursor.fetchone()['total']
+                
+                for level in ['silver', 'gold', 'diamond', 'star', 'king']:
+                    cursor.execute('SELECT COUNT(*) as total FROM licenses WHERE level = ?', (level[0].upper(),))
+                    total = cursor.fetchone()['total']
+                    cursor.execute("SELECT COUNT(*) as unused FROM licenses WHERE level = ? AND status = 'unused'", (level[0].upper(),))
+                    unused = cursor.fetchone()['unused']
+                    license_stats[level] = {'total': total, 'unused': unused}
+            except:
+                pass  # licenses 表可能不存在
+            
+            # 等級分布
+            level_distribution = {}
+            if 'subscription_tier' in columns:
+                cursor.execute('SELECT subscription_tier as level, COUNT(*) as count FROM users GROUP BY subscription_tier')
+            elif 'membership_level' in columns:
+                cursor.execute('SELECT membership_level as level, COUNT(*) as count FROM users GROUP BY membership_level')
+            else:
+                cursor.execute('SELECT "free" as level, COUNT(*) as count FROM users')
+            
+            for row in cursor.fetchall():
+                level_distribution[row['level'] or 'free'] = row['count']
             
             conn.close()
             
@@ -6252,15 +6282,17 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
                     },
                     'licenseStats': license_stats,
                     'revenueTrend': [],
-                    'levelDistribution': {}
+                    'levelDistribution': level_distribution
                 }
             })
         except Exception as e:
+            import traceback
             logger.error(f"Dashboard error: {e}")
+            logger.error(traceback.format_exc())
             return web.json_response({'success': False, 'message': str(e)})
     
     async def admin_panel_users(self, request: web.Request) -> web.Response:
-        """用戶列表"""
+        """用戶列表 - 支持兩種表結構"""
         admin = self._verify_admin_token(request)
         if not admin:
             return web.json_response({'success': False, 'message': '未授權'}, status=401)
@@ -6268,24 +6300,58 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
         try:
             conn = self._get_admin_db()
             cursor = conn.cursor()
-            cursor.execute('''
-                SELECT user_id, email, nickname, level, expires_at, created_at, is_banned, machine_id
-                FROM users ORDER BY created_at DESC LIMIT 500
-            ''')
-            users = [dict(row) for row in cursor.fetchall()]
+            
+            # 檢查表結構（auth/service.py vs database.py 兩種格式）
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            users = []
+            
+            if 'user_id' in columns:
+                # database.py 格式（卡密系統）
+                cursor.execute('''
+                    SELECT user_id, email, nickname, membership_level as level, expires_at, 
+                           created_at, is_banned, machine_id
+                    FROM users ORDER BY created_at DESC LIMIT 500
+                ''')
+                for row in cursor.fetchall():
+                    u = dict(row)
+                    users.append({
+                        'userId': u.get('user_id', ''),
+                        'email': u.get('email', ''),
+                        'nickname': u.get('nickname', ''),
+                        'level': u.get('level', 'bronze'),
+                        'expiresAt': u.get('expires_at', ''),
+                        'createdAt': u.get('created_at', ''),
+                        'isBanned': u.get('is_banned', 0),
+                        'machineId': u.get('machine_id', '')
+                    })
+            elif 'id' in columns and 'email' in columns:
+                # auth/service.py 格式（SaaS 認證）
+                cursor.execute('''
+                    SELECT id, email, username, display_name, subscription_tier, 
+                           subscription_expires, created_at, is_active, telegram_username
+                    FROM users ORDER BY created_at DESC LIMIT 500
+                ''')
+                for row in cursor.fetchall():
+                    u = dict(row)
+                    users.append({
+                        'userId': u.get('id', ''),
+                        'email': u.get('email', ''),
+                        'nickname': u.get('display_name') or u.get('username') or u.get('telegram_username') or '',
+                        'level': u.get('subscription_tier', 'free'),
+                        'expiresAt': u.get('subscription_expires', ''),
+                        'createdAt': u.get('created_at', ''),
+                        'isBanned': 0 if u.get('is_active', 1) else 1,
+                        'machineId': ''
+                    })
+            
             conn.close()
-            
-            # 轉換字段名
-            for u in users:
-                u['userId'] = u.pop('user_id', '')
-                u['machineId'] = u.pop('machine_id', '')
-                u['isBanned'] = u.pop('is_banned', 0)
-                u['expiresAt'] = u.pop('expires_at', '')
-                u['createdAt'] = u.pop('created_at', '')
-            
             return web.json_response({'success': True, 'data': users})
         except Exception as e:
+            import traceback
             logger.error(f"Users list error: {e}")
+            logger.error(traceback.format_exc())
             return web.json_response({'success': False, 'message': str(e)})
     
     async def admin_panel_user_detail(self, request: web.Request) -> web.Response:

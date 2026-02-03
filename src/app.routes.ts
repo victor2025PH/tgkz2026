@@ -114,6 +114,19 @@ export const routes: Routes = [
     title: '充值中心',
     canActivate: [authGuard]
   },
+  // 🆕 Phase 3: 錢包高級功能
+  {
+    path: 'wallet/orders',
+    loadComponent: () => import('./views/wallet-orders.component').then(m => m.WalletOrdersComponent),
+    title: '充值訂單',
+    canActivate: [authGuard]
+  },
+  {
+    path: 'wallet/analytics',
+    loadComponent: () => import('./views/wallet-analytics.component').then(m => m.WalletAnalyticsComponent),
+    title: '消費分析',
+    canActivate: [authGuard]
+  },
   // 營銷功能 - 需要會員權限
   {
     path: 'leads',
@@ -222,6 +235,8 @@ export const VIEW_ROUTE_MAP: Record<string, string> = {
   'wallet': '/wallet',
   'wallet-transactions': '/wallet/transactions',
   'wallet-recharge': '/wallet/recharge',
+  'wallet-orders': '/wallet/orders',
+  'wallet-analytics': '/wallet/analytics',
   
   // 🆕 營銷任務中心（核心入口）
   'marketing-hub': '/marketing-hub',

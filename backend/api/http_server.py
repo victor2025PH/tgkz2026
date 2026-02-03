@@ -38,10 +38,12 @@ except ImportError:
 # 🆕 Phase 0 (Wallet): 導入錢包模塊
 try:
     from wallet.handlers import setup_wallet_routes, wallet_handlers
+    from wallet.admin_handlers import setup_admin_wallet_routes, admin_wallet_handlers
     WALLET_MODULE_AVAILABLE = True
 except ImportError:
     WALLET_MODULE_AVAILABLE = False
     wallet_handlers = None
+    admin_wallet_handlers = None
 
 logger = logging.getLogger(__name__)
 
@@ -484,7 +486,18 @@ class HttpApiServer:
             self.app.router.add_get('/api/wallet/consume/limit', wallet_handlers.check_consume_limit)
             self.app.router.add_get('/api/wallet/consume/summary', wallet_handlers.get_consume_summary)
             self.app.router.add_post('/api/wallet/refund', wallet_handlers.refund_transaction)
-            logger.info("✅ Wallet module loaded with Phase 0, 1, 2 (Recharge + Consume) features")
+            # Phase 3: 管理員錢包 API
+            if admin_wallet_handlers:
+                self.app.router.add_get('/api/admin/wallets', admin_wallet_handlers.list_wallets)
+                self.app.router.add_get('/api/admin/wallets/{user_id}', admin_wallet_handlers.get_wallet_detail)
+                self.app.router.add_post('/api/admin/wallets/{user_id}/adjust', admin_wallet_handlers.adjust_balance)
+                self.app.router.add_post('/api/admin/wallets/{user_id}/freeze', admin_wallet_handlers.freeze_wallet)
+                self.app.router.add_post('/api/admin/wallets/{user_id}/unfreeze', admin_wallet_handlers.unfreeze_wallet)
+                self.app.router.add_get('/api/admin/orders', admin_wallet_handlers.list_orders)
+                self.app.router.add_post('/api/admin/orders/{order_no}/confirm', admin_wallet_handlers.confirm_order)
+                self.app.router.add_get('/api/admin/wallet/dashboard', admin_wallet_handlers.get_dashboard)
+                self.app.router.add_get('/api/admin/wallet/scheduler', admin_wallet_handlers.get_scheduler_status)
+            logger.info("✅ Wallet module loaded with Phase 0, 1, 2, 3 (Full Features)")
         
         # 保留舊的處理器作為後備（或未遷移的功能）
         self.app.router.add_post('/api/admin/logout', self.admin_panel_logout)

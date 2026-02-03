@@ -38,6 +38,12 @@ from .consume_service import (
     ConsumeService, get_consume_service,
     ConsumeRequest, ConsumeResult, ConsumeError
 )
+from .scheduler import (
+    WalletScheduler, get_scheduler, start_scheduler, stop_scheduler
+)
+from .admin_handlers import (
+    setup_admin_wallet_routes, admin_wallet_handlers
+)
 
 __all__ = [
     # 枚舉
@@ -53,4 +59,6 @@ __all__ = [
     'UsdtPaymentWatcher', 'get_usdt_watcher',
     'ConsumeService', 'get_consume_service',
     'ConsumeRequest', 'ConsumeResult', 'ConsumeError',
+    'WalletScheduler', 'get_scheduler', 'start_scheduler', 'stop_scheduler',
+    'setup_admin_wallet_routes', 'admin_wallet_handlers',
 ]

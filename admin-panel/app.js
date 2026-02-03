@@ -295,13 +295,6 @@ createApp({
         // 價格編輯狀態
         const editingPrices = ref(false);
         
-        // 密碼修改表單
-        const passwordForm = ref({
-            old_password: '',
-            new_password: '',
-            confirm_password: ''
-        });
-        
         // Telegram 配置
         const telegramConfig = ref({
             bot_token: '',
@@ -1395,31 +1388,6 @@ createApp({
             }
         };
         
-        const changePassword = async () => {
-            if (!passwordForm.value.old_password || !passwordForm.value.new_password) {
-                showToast('請輸入舊密碼和新密碼', 'error');
-                return;
-            }
-            if (passwordForm.value.new_password !== passwordForm.value.confirm_password) {
-                showToast('兩次輸入的密碼不一致', 'error');
-                return;
-            }
-            if (passwordForm.value.new_password.length < 6) {
-                showToast('密碼長度至少 6 位', 'error');
-                return;
-            }
-            
-            const result = await apiRequest('/admin/change-password', {
-                method: 'POST',
-                body: JSON.stringify(passwordForm.value)
-            });
-            
-            if (result.success) {
-                showToast('密碼修改成功', 'success');
-                passwordForm.value = { old_password: '', new_password: '', confirm_password: '' };
-            }
-        };
-        
         const saveTelegramConfig = async () => {
             const result = await apiRequest('/admin/telegram/config', {
                 method: 'POST',
@@ -1882,8 +1850,6 @@ createApp({
             // 設置操作
             saveSettings,
             savePrices,
-            passwordForm,
-            changePassword,
             telegramConfig,
             saveTelegramConfig,
             testTelegram,

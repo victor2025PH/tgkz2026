@@ -39,11 +39,15 @@ except ImportError:
 try:
     from wallet.handlers import setup_wallet_routes, wallet_handlers
     from wallet.admin_handlers import setup_admin_wallet_routes, admin_wallet_handlers
+    from wallet.purchase_handlers import setup_purchase_routes, purchase_handlers
+    from wallet.withdraw_handlers import setup_withdraw_routes, withdraw_handlers
     WALLET_MODULE_AVAILABLE = True
 except ImportError:
     WALLET_MODULE_AVAILABLE = False
     wallet_handlers = None
     admin_wallet_handlers = None
+    purchase_handlers = None
+    withdraw_handlers = None
 
 logger = logging.getLogger(__name__)
 
@@ -497,7 +501,24 @@ class HttpApiServer:
                 self.app.router.add_post('/api/admin/orders/{order_no}/confirm', admin_wallet_handlers.confirm_order)
                 self.app.router.add_get('/api/admin/wallet/dashboard', admin_wallet_handlers.get_dashboard)
                 self.app.router.add_get('/api/admin/wallet/scheduler', admin_wallet_handlers.get_scheduler_status)
-            logger.info("✅ Wallet module loaded with Phase 0, 1, 2, 3 (Full Features)")
+            # Phase 4: 購買整合
+            if purchase_handlers:
+                self.app.router.add_post('/api/purchase', purchase_handlers.unified_purchase)
+                self.app.router.add_post('/api/purchase/membership', purchase_handlers.purchase_membership)
+                self.app.router.add_post('/api/purchase/proxy', purchase_handlers.purchase_ip_proxy)
+                self.app.router.add_post('/api/purchase/quota', purchase_handlers.purchase_quota_pack)
+            # Phase 4: 提現功能
+            if withdraw_handlers:
+                self.app.router.add_get('/api/wallet/withdraw/config', withdraw_handlers.get_withdraw_config)
+                self.app.router.add_post('/api/wallet/withdraw/create', withdraw_handlers.create_withdraw)
+                self.app.router.add_get('/api/wallet/withdraw/orders', withdraw_handlers.get_withdraw_orders)
+                self.app.router.add_get('/api/wallet/withdraw/{order_no}', withdraw_handlers.get_withdraw_order)
+                self.app.router.add_post('/api/wallet/withdraw/{order_no}/cancel', withdraw_handlers.cancel_withdraw)
+                self.app.router.add_get('/api/admin/withdraws', withdraw_handlers.admin_list_withdraws)
+                self.app.router.add_post('/api/admin/withdraws/{order_no}/approve', withdraw_handlers.admin_approve_withdraw)
+                self.app.router.add_post('/api/admin/withdraws/{order_no}/reject', withdraw_handlers.admin_reject_withdraw)
+                self.app.router.add_post('/api/admin/withdraws/{order_no}/complete', withdraw_handlers.admin_complete_withdraw)
+            logger.info("✅ Wallet module loaded with Phase 0-4 (Full + Business Integration)")
         
         # 保留舊的處理器作為後備（或未遷移的功能）
         self.app.router.add_post('/api/admin/logout', self.admin_panel_logout)

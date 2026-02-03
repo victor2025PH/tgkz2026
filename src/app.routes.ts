@@ -127,6 +127,13 @@ export const routes: Routes = [
     title: '消費分析',
     canActivate: [authGuard]
   },
+  // 🆕 Phase 4: 提現功能
+  {
+    path: 'wallet/withdraw',
+    loadComponent: () => import('./views/wallet-withdraw.component').then(m => m.WalletWithdrawComponent),
+    title: '提現',
+    canActivate: [authGuard]
+  },
   // 營銷功能 - 需要會員權限
   {
     path: 'leads',
@@ -237,6 +244,7 @@ export const VIEW_ROUTE_MAP: Record<string, string> = {
   'wallet-recharge': '/wallet/recharge',
   'wallet-orders': '/wallet/orders',
   'wallet-analytics': '/wallet/analytics',
+  'wallet-withdraw': '/wallet/withdraw',
   
   // 🆕 營銷任務中心（核心入口）
   'marketing-hub': '/marketing-hub',

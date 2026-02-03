@@ -44,6 +44,23 @@ from .scheduler import (
 from .admin_handlers import (
     setup_admin_wallet_routes, admin_wallet_handlers
 )
+from .business_integration import (
+    BusinessIntegrationService, get_business_service,
+    PurchaseRequest, PurchaseResult
+)
+from .purchase_handlers import (
+    setup_purchase_routes, purchase_handlers
+)
+from .notification_service import (
+    WalletNotificationService, get_notification_service,
+    start_notification_service, stop_notification_service
+)
+from .withdraw_service import (
+    WithdrawService, get_withdraw_service
+)
+from .withdraw_handlers import (
+    setup_withdraw_routes, withdraw_handlers
+)
 
 __all__ = [
     # 枚舉
@@ -61,4 +78,11 @@ __all__ = [
     'ConsumeRequest', 'ConsumeResult', 'ConsumeError',
     'WalletScheduler', 'get_scheduler', 'start_scheduler', 'stop_scheduler',
     'setup_admin_wallet_routes', 'admin_wallet_handlers',
+    'BusinessIntegrationService', 'get_business_service',
+    'PurchaseRequest', 'PurchaseResult',
+    'setup_purchase_routes', 'purchase_handlers',
+    'WalletNotificationService', 'get_notification_service',
+    'start_notification_service', 'stop_notification_service',
+    'WithdrawService', 'get_withdraw_service',
+    'setup_withdraw_routes', 'withdraw_handlers',
 ]

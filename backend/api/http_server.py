@@ -470,7 +470,16 @@ class HttpApiServer:
             # 消費接口
             self.app.router.add_post('/api/wallet/consume', wallet_handlers.consume)
             self.app.router.add_post('/api/wallet/check-balance', wallet_handlers.check_balance)
-            logger.info("✅ Wallet module loaded with Phase 0 features")
+            # Phase 1: 充值訂單
+            self.app.router.add_post('/api/wallet/recharge/create', wallet_handlers.create_recharge_order)
+            self.app.router.add_get('/api/wallet/recharge/orders', wallet_handlers.get_recharge_orders)
+            self.app.router.add_get('/api/wallet/recharge/{order_no}', wallet_handlers.get_recharge_order)
+            self.app.router.add_post('/api/wallet/recharge/{order_no}/paid', wallet_handlers.mark_recharge_paid)
+            self.app.router.add_post('/api/wallet/recharge/{order_no}/cancel', wallet_handlers.cancel_recharge_order)
+            self.app.router.add_get('/api/wallet/recharge/{order_no}/status', wallet_handlers.check_recharge_status)
+            # 支付回調（公開）
+            self.app.router.add_post('/api/wallet/callback/{provider}', wallet_handlers.payment_callback)
+            logger.info("✅ Wallet module loaded with Phase 0 & Phase 1 (Recharge) features")
         
         # 保留舊的處理器作為後備（或未遷移的功能）
         self.app.router.add_post('/api/admin/logout', self.admin_panel_logout)

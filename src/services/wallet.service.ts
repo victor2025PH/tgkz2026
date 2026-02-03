@@ -115,6 +115,46 @@ export interface WalletStatistics {
   transaction_count: number;
 }
 
+export interface RechargeOrder {
+  id: string;
+  order_no: string;
+  user_id: string;
+  wallet_id: string;
+  amount: number;
+  bonus_amount: number;
+  fee: number;
+  actual_amount: number;
+  payment_method: string;
+  payment_channel: string;
+  status: 'pending' | 'paid' | 'confirmed' | 'failed' | 'expired' | 'refunded';
+  usdt_network?: string;
+  usdt_address?: string;
+  usdt_amount?: number;
+  usdt_rate?: number;
+  usdt_tx_hash?: string;
+  paid_at?: string;
+  confirmed_at?: string;
+  expired_at?: string;
+  created_at: string;
+}
+
+export interface PaymentInfo {
+  order_no: string;
+  amount: number;
+  amount_display: string;
+  bonus_amount: number;
+  bonus_display: string;
+  fee: number;
+  actual_amount: number;
+  actual_display: string;
+  payment_method: string;
+  expired_at: string;
+  usdt_network?: string;
+  usdt_address?: string;
+  usdt_amount?: number;
+  usdt_rate?: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -494,5 +534,206 @@ export class WalletService {
       this.loadStatistics(),
       this.loadRechargePackages()
     ]);
+  }
+
+  // ==================== Phase 1: 充值訂單 ====================
+
+  /**
+   * 創建充值訂單
+   */
+  async createRechargeOrder(options: {
+    amount: number;
+    paymentMethod: string;
+    paymentChannel?: string;
+  }): Promise<{ success: boolean; order?: RechargeOrder; paymentInfo?: PaymentInfo; error?: string }> {
+    try {
+      const response = await this.api.post<any>('/api/wallet/recharge/create', {
+        amount: options.amount,
+        payment_method: options.paymentMethod,
+        payment_channel: options.paymentChannel || 'direct'
+      });
+      
+      if (response?.success && response?.data) {
+        return {
+          success: true,
+          order: response.data.order,
+          paymentInfo: response.data.payment_info
+        };
+      }
+      
+      return { success: false, error: response?.error || '創建訂單失敗' };
+    } catch (error) {
+      console.error('Create recharge order error:', error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * 獲取充值訂單詳情
+   */
+  async getRechargeOrder(orderNo: string): Promise<{ order?: RechargeOrder; paymentInfo?: PaymentInfo } | null> {
+    try {
+      const response = await this.api.get<any>(`/api/wallet/recharge/${orderNo}`);
+      
+      if (response?.success && response?.data) {
+        return {
+          order: response.data.order,
+          paymentInfo: response.data.payment_info
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Get recharge order error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 獲取充值訂單列表
+   */
+  async getRechargeOrders(options?: {
+    page?: number;
+    pageSize?: number;
+    status?: string;
+  }): Promise<{ orders: RechargeOrder[]; pagination: any } | null> {
+    try {
+      const params = new URLSearchParams();
+      if (options?.page) params.set('page', String(options.page));
+      if (options?.pageSize) params.set('page_size', String(options.pageSize));
+      if (options?.status) params.set('status', options.status);
+      
+      const url = `/api/wallet/recharge/orders${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await this.api.get<any>(url);
+      
+      if (response?.success && response?.data) {
+        return {
+          orders: response.data.orders,
+          pagination: response.data.pagination
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Get recharge orders error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 標記訂單已支付
+   */
+  async markRechargeOrderPaid(orderNo: string, txHash?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await this.api.post<any>(`/api/wallet/recharge/${orderNo}/paid`, {
+        tx_hash: txHash
+      });
+      
+      if (response?.success) {
+        return { success: true };
+      }
+      
+      return { success: false, error: response?.error || '標記失敗' };
+    } catch (error) {
+      console.error('Mark recharge order paid error:', error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * 取消充值訂單
+   */
+  async cancelRechargeOrder(orderNo: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await this.api.post<any>(`/api/wallet/recharge/${orderNo}/cancel`, {});
+      
+      if (response?.success) {
+        return { success: true };
+      }
+      
+      return { success: false, error: response?.error || '取消失敗' };
+    } catch (error) {
+      console.error('Cancel recharge order error:', error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * 檢查充值訂單狀態
+   */
+  async checkRechargeOrderStatus(orderNo: string): Promise<{
+    status: string;
+    isConfirmed: boolean;
+    isPending: boolean;
+    isExpired: boolean;
+    confirmedAt?: string;
+  } | null> {
+    try {
+      const response = await this.api.get<any>(`/api/wallet/recharge/${orderNo}/status`);
+      
+      if (response?.success && response?.data) {
+        return {
+          status: response.data.status,
+          isConfirmed: response.data.is_confirmed,
+          isPending: response.data.is_pending,
+          isExpired: response.data.is_expired,
+          confirmedAt: response.data.confirmed_at
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Check recharge order status error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 輪詢充值訂單狀態
+   */
+  async pollRechargeOrderStatus(
+    orderNo: string,
+    intervalMs: number = 5000,
+    maxAttempts: number = 60
+  ): Promise<{ success: boolean; confirmed: boolean }> {
+    let attempts = 0;
+    
+    while (attempts < maxAttempts) {
+      const result = await this.checkRechargeOrderStatus(orderNo);
+      
+      if (!result) {
+        return { success: false, confirmed: false };
+      }
+      
+      if (result.isConfirmed) {
+        // 刷新錢包餘額
+        await this.loadWallet();
+        return { success: true, confirmed: true };
+      }
+      
+      if (result.isExpired) {
+        return { success: false, confirmed: false };
+      }
+      
+      attempts++;
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+    
+    return { success: false, confirmed: false };
+  }
+
+  /**
+   * 獲取充值訂單狀態標籤
+   */
+  getRechargeStatusLabel(status: string): { text: string; color: string } {
+    const labels: Record<string, { text: string; color: string }> = {
+      pending: { text: '待支付', color: '#f59e0b' },
+      paid: { text: '已支付', color: '#3b82f6' },
+      confirmed: { text: '已到賬', color: '#22c55e' },
+      failed: { text: '失敗', color: '#ef4444' },
+      expired: { text: '已過期', color: '#9ca3af' },
+      refunded: { text: '已退款', color: '#8b5cf6' }
+    };
+    return labels[status] || { text: status, color: '#666' };
   }
 }

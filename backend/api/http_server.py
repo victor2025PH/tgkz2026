@@ -6052,6 +6052,8 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
     def _get_admin_db(self):
         """獲取管理員數據庫連接"""
         import sqlite3
+        import hashlib
+        
         # 嘗試多個可能的數據庫路徑
         possible_paths = [
             os.environ.get('DATABASE_PATH', ''),
@@ -6068,11 +6070,44 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
                 break
         
         if not db_path:
-            db_path = possible_paths[1] if os.path.exists('/app') else possible_paths[2]
+            # 如果沒有找到數據庫，創建一個
+            db_path = '/app/data/tgmatrix.db' if os.path.exists('/app/data') else './data/tgmatrix.db'
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
         
         logger.info(f"Using database path: {db_path}")
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
+        
+        # 確保 admins 表存在
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS admins (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                name TEXT,
+                email TEXT,
+                role TEXT DEFAULT 'admin',
+                permissions TEXT,
+                is_active INTEGER DEFAULT 1,
+                last_login_at TIMESTAMP,
+                last_login_ip TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # 確保有默認管理員
+        cursor.execute('SELECT COUNT(*) FROM admins')
+        if cursor.fetchone()[0] == 0:
+            admin_password_hash = hashlib.sha256("admin888".encode()).hexdigest()
+            cursor.execute('''
+                INSERT INTO admins (username, password_hash, name, role, is_active)
+                VALUES (?, ?, ?, ?, ?)
+            ''', ('admin', admin_password_hash, '超級管理員', 'super_admin', 1))
+            conn.commit()
+            logger.info("Created default admin user: admin / admin888")
+        
         return conn
     
     def _verify_admin_token(self, request) -> Optional[dict]:

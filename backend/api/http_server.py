@@ -46,7 +46,24 @@ try:
     from wallet.coupon_handlers import setup_coupon_routes, coupon_handlers
     from wallet.finance_report_handlers import setup_finance_report_routes, finance_report_handlers
     WALLET_MODULE_AVAILABLE = True
-except ImportError:
+    print("✅ Wallet module imported successfully")
+except ImportError as e:
+    import traceback
+    print(f"⚠️ Wallet module import failed: {e}")
+    traceback.print_exc()
+    WALLET_MODULE_AVAILABLE = False
+    wallet_handlers = None
+    admin_wallet_handlers = None
+    purchase_handlers = None
+    withdraw_handlers = None
+    redeem_handlers = None
+    pay_password_handlers = None
+    coupon_handlers = None
+    finance_report_handlers = None
+except Exception as e:
+    import traceback
+    print(f"⚠️ Wallet module error: {e}")
+    traceback.print_exc()
     WALLET_MODULE_AVAILABLE = False
     wallet_handlers = None
     admin_wallet_handlers = None
@@ -670,7 +687,8 @@ class HttpApiServer:
             'service': 'TG-Matrix API',
             'version': '2.1.1',
             'timestamp': datetime.now().isoformat(),
-            'backend_ready': self.backend_service is not None
+            'backend_ready': self.backend_service is not None,
+            'wallet_module': WALLET_MODULE_AVAILABLE
         })
     
     async def handle_command(self, request):

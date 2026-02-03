@@ -85,16 +85,19 @@ jobs:
             docker-compose.yml nginx.conf \
             deploy-server:${{ env.DEPLOY_PATH }}/
       
-      - name: Restart services
+      - name: Rebuild and restart services
         run: |
-          ssh -o ConnectTimeout=30 deploy-server << 'ENDSSH'
+          ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 deploy-server << 'ENDSSH'
             cd /opt/tg-matrix
             
+            # 重建 API 容器（確保使用新代碼）
+            sudo docker compose build --no-cache api
+            
             # 重啟 API 容器
-            sudo docker compose restart api
+            sudo docker compose up -d --force-recreate api
             
             # 等待啟動
-            sleep 5
+            sleep 10
             
             # 重載 nginx 配置
             sudo docker compose exec -T web nginx -s reload || true

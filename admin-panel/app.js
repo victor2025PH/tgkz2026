@@ -147,6 +147,9 @@ createApp({
             { id: 'expiring', name: '即將到期', icon: '⏰', badge: null },
             { id: 'licenses', name: '卡密管理', icon: '🎟️' },
             { id: 'orders', name: '訂單管理', icon: '💰' },
+            { id: 'walletOps', name: '錢包運營', icon: '💳' },  // 🆕 Phase 3
+            { id: 'alerts', name: '告警監控', icon: '🚨', badge: null },  // 🆕 Phase 3
+            { id: 'campaigns', name: '營銷活動', icon: '🎯' },  // 🆕 Phase 3
             { id: 'revenue', name: '收入報表', icon: '💹' },
             { id: 'analytics', name: '用戶分析', icon: '📈' },
             { id: 'quotas', name: '配額監控', icon: '📉' },
@@ -218,6 +221,37 @@ createApp({
             country: ''
         });
         const logsStats = ref({});
+        
+        // 🆕 Phase 3: 錢包運營工具
+        const walletOperations = ref([]);
+        const walletAnalytics = ref({
+            overview: { total_wallets: 0, active_wallets: 0, frozen_wallets: 0, total_balance: 0 },
+            recharge_trend: [],
+            consume_trend: [],
+            category_distribution: []
+        });
+        const showBatchAdjustModal = ref(false);
+        const batchAdjustForm = reactive({
+            userIds: '',
+            amount: 0,
+            reason: '',
+            isBonus: false
+        });
+        
+        // 🆕 Phase 3: 告警監控
+        const alerts = ref([]);
+        const alertSummary = ref({ total: 0, unacknowledged: 0, recent_24h: 0, by_severity: {} });
+        const alertFilter = ref('');
+        
+        // 🆕 Phase 3: 營銷活動
+        const showCampaignModal = ref(false);
+        const campaignForm = reactive({
+            campaignId: '',
+            campaignName: '',
+            userIds: '',
+            rewardAmount: 100,
+            rewardType: 'bonus'
+        });
         
         // 即將到期用戶
         const expiringUsers = ref([]);
@@ -662,6 +696,218 @@ createApp({
                 'disabled': '已禁用'
             };
             return texts[status] || status;
+        };
+        
+        // ============ 🆕 Phase 3: 錢包運營工具 ============
+        
+        const loadWalletAnalytics = async () => {
+            const result = await apiRequest('/admin/wallet/analytics?days=30');
+            if (result.success) {
+                walletAnalytics.value = result.data || {
+                    overview: { total_wallets: 0, active_wallets: 0, frozen_wallets: 0, total_balance: 0 },
+                    recharge_trend: [],
+                    consume_trend: [],
+                    category_distribution: []
+                };
+            }
+        };
+        
+        const loadWalletOperations = async () => {
+            const result = await apiRequest('/admin/wallet/operations?limit=50');
+            if (result.success) {
+                walletOperations.value = result.data?.operations || [];
+            }
+        };
+        
+        const executeBatchAdjust = async () => {
+            if (!batchAdjustForm.userIds || !batchAdjustForm.amount) {
+                showToast('請填寫完整信息', 'error');
+                return;
+            }
+            
+            const userIds = batchAdjustForm.userIds.split(/[\n,;]/).map(id => id.trim()).filter(id => id);
+            
+            if (userIds.length === 0) {
+                showToast('用戶ID列表為空', 'error');
+                return;
+            }
+            
+            if (userIds.length > 1000) {
+                showToast('單次最多1000個用戶', 'error');
+                return;
+            }
+            
+            isLoading.value = true;
+            
+            const result = await apiRequest('/admin/wallet/batch/adjust', {
+                method: 'POST',
+                body: JSON.stringify({
+                    user_ids: userIds,
+                    amount: parseInt(batchAdjustForm.amount),
+                    reason: batchAdjustForm.reason || '批量調賬',
+                    is_bonus: batchAdjustForm.isBonus
+                })
+            });
+            
+            isLoading.value = false;
+            
+            if (result.success) {
+                const data = result.data || result;
+                showToast(`批量調賬完成: ${data.success}/${data.total} 成功`, 'success');
+                showBatchAdjustModal.value = false;
+                batchAdjustForm.userIds = '';
+                batchAdjustForm.amount = 0;
+                batchAdjustForm.reason = '';
+                await loadWalletOperations();
+            } else {
+                showToast('批量調賬失敗: ' + (result.message || result.error), 'error');
+            }
+        };
+        
+        const executeBatchFreeze = async () => {
+            const userIdsInput = prompt('請輸入要凍結的用戶ID（用逗號或換行分隔）:');
+            if (!userIdsInput) return;
+            
+            const reason = prompt('請輸入凍結原因:') || '管理員操作';
+            const userIds = userIdsInput.split(/[\n,;]/).map(id => id.trim()).filter(id => id);
+            
+            if (userIds.length === 0) return;
+            
+            isLoading.value = true;
+            
+            const result = await apiRequest('/admin/wallet/batch/freeze', {
+                method: 'POST',
+                body: JSON.stringify({ user_ids: userIds, reason })
+            });
+            
+            isLoading.value = false;
+            
+            if (result.success) {
+                const data = result.data || result;
+                showToast(`批量凍結完成: ${data.success}/${data.total} 成功`, 'success');
+                await loadWalletOperations();
+            }
+        };
+        
+        const executeBatchUnfreeze = async () => {
+            const userIdsInput = prompt('請輸入要解凍的用戶ID（用逗號或換行分隔）:');
+            if (!userIdsInput) return;
+            
+            const userIds = userIdsInput.split(/[\n,;]/).map(id => id.trim()).filter(id => id);
+            if (userIds.length === 0) return;
+            
+            isLoading.value = true;
+            
+            const result = await apiRequest('/admin/wallet/batch/unfreeze', {
+                method: 'POST',
+                body: JSON.stringify({ user_ids: userIds })
+            });
+            
+            isLoading.value = false;
+            
+            if (result.success) {
+                const data = result.data || result;
+                showToast(`批量解凍完成: ${data.success}/${data.total} 成功`, 'success');
+                await loadWalletOperations();
+            }
+        };
+        
+        // ============ 🆕 Phase 3: 告警監控 ============
+        
+        const loadAlerts = async () => {
+            const params = alertFilter.value ? `?severity=${alertFilter.value}` : '';
+            const result = await apiRequest(`/admin/wallet/alerts${params}&limit=100`);
+            if (result.success) {
+                alerts.value = result.data?.alerts || [];
+            }
+        };
+        
+        const loadAlertSummary = async () => {
+            const result = await apiRequest('/admin/wallet/alerts/summary');
+            if (result.success) {
+                alertSummary.value = result.data || { total: 0, unacknowledged: 0, recent_24h: 0, by_severity: {} };
+                // 更新菜單徽章
+                const menuItem = menuItems.value.find(m => m.id === 'alerts');
+                if (menuItem) {
+                    menuItem.badge = alertSummary.value.unacknowledged > 0 ? alertSummary.value.unacknowledged : null;
+                }
+            }
+        };
+        
+        const acknowledgeAlert = async (alertId) => {
+            const result = await apiRequest(`/admin/wallet/alerts/${alertId}/acknowledge`, {
+                method: 'POST'
+            });
+            
+            if (result.success) {
+                showToast('告警已確認', 'success');
+                await loadAlerts();
+                await loadAlertSummary();
+            }
+        };
+        
+        const triggerAnomalyScan = async () => {
+            isLoading.value = true;
+            const result = await apiRequest('/admin/wallet/alerts/scan', { method: 'POST' });
+            isLoading.value = false;
+            
+            if (result.success) {
+                showToast(`掃描完成，發現 ${result.data?.new_alerts || 0} 個異常`, 'success');
+                await loadAlerts();
+                await loadAlertSummary();
+            }
+        };
+        
+        const getAlertSeverityClass = (severity) => {
+            const classes = {
+                'info': 'text-blue-400',
+                'warning': 'text-yellow-400',
+                'critical': 'text-red-400'
+            };
+            return classes[severity] || 'text-gray-400';
+        };
+        
+        // ============ 🆕 Phase 3: 營銷活動 ============
+        
+        const executeCampaignReward = async () => {
+            if (!campaignForm.campaignId || !campaignForm.campaignName || !campaignForm.userIds) {
+                showToast('請填寫完整活動信息', 'error');
+                return;
+            }
+            
+            const userIds = campaignForm.userIds.split(/[\n,;]/).map(id => id.trim()).filter(id => id);
+            
+            if (userIds.length === 0) {
+                showToast('用戶ID列表為空', 'error');
+                return;
+            }
+            
+            isLoading.value = true;
+            
+            const result = await apiRequest('/admin/wallet/campaign/reward', {
+                method: 'POST',
+                body: JSON.stringify({
+                    campaign_id: campaignForm.campaignId,
+                    campaign_name: campaignForm.campaignName,
+                    user_ids: userIds,
+                    reward_amount: parseInt(campaignForm.rewardAmount),
+                    reward_type: campaignForm.rewardType
+                })
+            });
+            
+            isLoading.value = false;
+            
+            if (result.success) {
+                const data = result.data || result;
+                showToast(`活動獎勵發放完成: ${data.success}/${data.total} 成功`, 'success');
+                showCampaignModal.value = false;
+                campaignForm.campaignId = '';
+                campaignForm.campaignName = '';
+                campaignForm.userIds = '';
+                await loadWalletOperations();
+            } else {
+                showToast('發放失敗: ' + (result.message || result.error), 'error');
+            }
         };
         
         const getActionIcon = (category) => {
@@ -1953,6 +2199,9 @@ createApp({
             else if (newPage === 'expiring') await loadExpiringUsers();
             else if (newPage === 'licenses') await loadLicenses();
             else if (newPage === 'orders') await loadOrders();
+            else if (newPage === 'walletOps') { await loadWalletAnalytics(); await loadWalletOperations(); }  // 🆕
+            else if (newPage === 'alerts') { await loadAlerts(); await loadAlertSummary(); }  // 🆕
+            else if (newPage === 'campaigns') { await loadWalletOperations(); }  // 🆕
             else if (newPage === 'revenue') await loadRevenueReport();
             else if (newPage === 'analytics') await loadUserAnalytics();
             else if (newPage === 'quotas') await loadQuotaStats();
@@ -2026,6 +2275,29 @@ createApp({
             releaseProxy,
             getProxyStatusClass,
             getProxyStatusText,
+            // 🆕 Phase 3: 錢包運營
+            walletOperations,
+            walletAnalytics,
+            showBatchAdjustModal,
+            batchAdjustForm,
+            loadWalletAnalytics,
+            loadWalletOperations,
+            executeBatchAdjust,
+            executeBatchFreeze,
+            executeBatchUnfreeze,
+            // 🆕 Phase 3: 告警監控
+            alerts,
+            alertSummary,
+            alertFilter,
+            loadAlerts,
+            loadAlertSummary,
+            acknowledgeAlert,
+            triggerAnomalyScan,
+            getAlertSeverityClass,
+            // 🆕 Phase 3: 營銷活動
+            showCampaignModal,
+            campaignForm,
+            executeCampaignReward,
             admins,
             showAdminModal,
             editingAdmin,

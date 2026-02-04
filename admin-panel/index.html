@@ -928,6 +928,108 @@ host:port"></textarea>
                     </div>
                 </div>
                 
+                <!-- 🆕 批量調賬彈窗 -->
+                <div v-if="showBatchAdjustModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-lg">
+                        <h3 class="text-xl font-bold mb-4">💳 批量調賬</h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">用戶ID列表（每行一個或用逗號分隔）</label>
+                                <textarea v-model="batchAdjustForm.userIds" rows="4" 
+                                          class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                          placeholder="user_id_1&#10;user_id_2&#10;user_id_3"></textarea>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">金額（分，正數加款，負數扣款）</label>
+                                    <input v-model.number="batchAdjustForm.amount" type="number" 
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                           placeholder="如 100 = $1.00">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">類型</label>
+                                    <select v-model="batchAdjustForm.isBonus" 
+                                            class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
+                                        <option :value="false">主餘額</option>
+                                        <option :value="true">贈送餘額</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">原因（必填）</label>
+                                <input v-model="batchAdjustForm.reason" type="text" 
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                       placeholder="如：系統補償、活動獎勵">
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button @click="showBatchAdjustModal = false" 
+                                    class="px-6 py-2 rounded-lg bg-gray-700 hover:bg-gray-600">取消</button>
+                            <button @click="executeBatchAdjust" 
+                                    class="px-6 py-2 rounded-lg gradient-bg hover:opacity-90">確認調賬</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 🆕 營銷活動獎勵彈窗 -->
+                <div v-if="showCampaignModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-lg">
+                        <h3 class="text-xl font-bold mb-4">🎯 發放活動獎勵</h3>
+                        
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">活動ID</label>
+                                    <input v-model="campaignForm.campaignId" type="text" 
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                           placeholder="如：newyear2026">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">活動名稱</label>
+                                    <input v-model="campaignForm.campaignName" type="text" 
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                           placeholder="如：新年活動">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">獲獎用戶ID列表</label>
+                                <textarea v-model="campaignForm.userIds" rows="4" 
+                                          class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                          placeholder="每行一個用戶ID"></textarea>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">獎勵金額（分）</label>
+                                    <input v-model.number="campaignForm.rewardAmount" type="number" 
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                           placeholder="如 100 = $1.00">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">獎勵類型</label>
+                                    <select v-model="campaignForm.rewardType" 
+                                            class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
+                                        <option value="bonus">贈送餘額</option>
+                                        <option value="balance">主餘額</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button @click="showCampaignModal = false" 
+                                    class="px-6 py-2 rounded-lg bg-gray-700 hover:bg-gray-600">取消</button>
+                            <button @click="executeCampaignReward" 
+                                    class="px-6 py-2 rounded-lg gradient-bg hover:opacity-90">發放獎勵</button>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- ==================== 管理員管理 ==================== -->
                 <div v-if="currentPage === 'admins'">
                     <div class="flex justify-end mb-6">
@@ -1144,6 +1246,228 @@ host:port"></textarea>
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+                
+                <!-- ==================== 🆕 錢包運營 ==================== -->
+                <div v-if="currentPage === 'walletOps'">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold">💳 錢包運營工具</h2>
+                        <div class="flex gap-2">
+                            <button @click="showBatchAdjustModal = true" 
+                                    class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm">
+                                ➕ 批量調賬
+                            </button>
+                            <button @click="executeBatchFreeze"
+                                    class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg text-sm">
+                                🔒 批量凍結
+                            </button>
+                            <button @click="executeBatchUnfreeze"
+                                    class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm">
+                                🔓 批量解凍
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 錢包統計概覽 -->
+                    <div class="grid grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gray-800 rounded-xl p-4">
+                            <div class="text-gray-400 text-sm">總錢包數</div>
+                            <div class="text-2xl font-bold text-blue-400">{{ walletAnalytics.overview?.total_wallets || 0 }}</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-4">
+                            <div class="text-gray-400 text-sm">活躍錢包</div>
+                            <div class="text-2xl font-bold text-green-400">{{ walletAnalytics.overview?.active_wallets || 0 }}</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-4">
+                            <div class="text-gray-400 text-sm">凍結錢包</div>
+                            <div class="text-2xl font-bold text-red-400">{{ walletAnalytics.overview?.frozen_wallets || 0 }}</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-4">
+                            <div class="text-gray-400 text-sm">總餘額</div>
+                            <div class="text-2xl font-bold text-purple-400">{{ walletAnalytics.overview?.total_balance_display || '$0.00' }}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 操作記錄 -->
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-700 flex justify-between items-center">
+                            <h3 class="font-medium">批量操作記錄</h3>
+                            <button @click="loadWalletOperations" class="text-blue-400 text-sm hover:underline">刷新</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-gray-700/50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs text-gray-400">時間</th>
+                                        <th class="px-4 py-3 text-left text-xs text-gray-400">類型</th>
+                                        <th class="px-4 py-3 text-left text-xs text-gray-400">描述</th>
+                                        <th class="px-4 py-3 text-center text-xs text-gray-400">成功/總數</th>
+                                        <th class="px-4 py-3 text-center text-xs text-gray-400">狀態</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-700">
+                                    <tr v-for="op in walletOperations" :key="op.id" class="hover:bg-gray-700/30">
+                                        <td class="px-4 py-3 text-sm text-gray-400">{{ new Date(op.created_at).toLocaleString() }}</td>
+                                        <td class="px-4 py-3 text-sm">{{ op.type }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-300">{{ op.description }}</td>
+                                        <td class="px-4 py-3 text-center">
+                                            <span class="text-green-400">{{ op.success }}</span> / {{ op.total }}
+                                        </td>
+                                        <td class="px-4 py-3 text-center">
+                                            <span :class="op.status === 'completed' ? 'text-green-400' : 'text-yellow-400'">
+                                                {{ op.status === 'completed' ? '完成' : op.status }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="walletOperations.length === 0">
+                                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">暫無操作記錄</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ==================== 🆕 告警監控 ==================== -->
+                <div v-if="currentPage === 'alerts'">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold">🚨 告警監控</h2>
+                        <div class="flex gap-2">
+                            <select v-model="alertFilter" @change="loadAlerts" 
+                                    class="bg-gray-700 rounded-lg px-3 py-2 text-sm">
+                                <option value="">全部告警</option>
+                                <option value="critical">嚴重</option>
+                                <option value="warning">警告</option>
+                                <option value="info">信息</option>
+                            </select>
+                            <button @click="triggerAnomalyScan"
+                                    class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm">
+                                🔍 立即掃描
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 告警統計 -->
+                    <div class="grid grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gray-800 rounded-xl p-4">
+                            <div class="text-gray-400 text-sm">總告警</div>
+                            <div class="text-2xl font-bold">{{ alertSummary.total }}</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-4">
+                            <div class="text-gray-400 text-sm">未確認</div>
+                            <div class="text-2xl font-bold text-red-400">{{ alertSummary.unacknowledged }}</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-4">
+                            <div class="text-gray-400 text-sm">近24小時</div>
+                            <div class="text-2xl font-bold text-yellow-400">{{ alertSummary.recent_24h }}</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-4">
+                            <div class="text-gray-400 text-sm">嚴重告警</div>
+                            <div class="text-2xl font-bold text-red-500">{{ alertSummary.by_severity?.critical || 0 }}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 告警列表 -->
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-700/50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs text-gray-400">時間</th>
+                                    <th class="px-4 py-3 text-left text-xs text-gray-400">嚴重程度</th>
+                                    <th class="px-4 py-3 text-left text-xs text-gray-400">類型</th>
+                                    <th class="px-4 py-3 text-left text-xs text-gray-400">消息</th>
+                                    <th class="px-4 py-3 text-center text-xs text-gray-400">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-700">
+                                <tr v-for="alert in alerts" :key="alert.id" class="hover:bg-gray-700/30">
+                                    <td class="px-4 py-3 text-sm text-gray-400">{{ new Date(alert.created_at).toLocaleString() }}</td>
+                                    <td class="px-4 py-3">
+                                        <span :class="getAlertSeverityClass(alert.severity)" class="font-medium">
+                                            {{ alert.severity === 'critical' ? '🔴 嚴重' : alert.severity === 'warning' ? '🟡 警告' : '🔵 信息' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm">{{ alert.type }}</td>
+                                    <td class="px-4 py-3 text-sm text-gray-300">{{ alert.message }}</td>
+                                    <td class="px-4 py-3 text-center">
+                                        <button v-if="!alert.acknowledged" 
+                                                @click="acknowledgeAlert(alert.id)"
+                                                class="text-green-400 text-sm hover:underline">
+                                            確認
+                                        </button>
+                                        <span v-else class="text-gray-500 text-sm">已確認</span>
+                                    </td>
+                                </tr>
+                                <tr v-if="alerts.length === 0">
+                                    <td colspan="5" class="px-6 py-12 text-center text-gray-500">暫無告警</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- ==================== 🆕 營銷活動 ==================== -->
+                <div v-if="currentPage === 'campaigns'">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold">🎯 營銷活動</h2>
+                        <button @click="showCampaignModal = true" 
+                                class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm">
+                            🎁 發放活動獎勵
+                        </button>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-xl p-6 mb-6">
+                        <h3 class="font-medium mb-4">活動獎勵發放</h3>
+                        <p class="text-gray-400 text-sm mb-4">
+                            通過營銷活動為指定用戶批量發放獎勵，可選擇發放到主餘額或贈送餘額。
+                        </p>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-gray-700/50 rounded-lg p-4">
+                                <div class="text-3xl mb-2">💰</div>
+                                <h4 class="font-medium">批量獎勵</h4>
+                                <p class="text-gray-400 text-sm">一次性向多個用戶發放獎勵</p>
+                            </div>
+                            <div class="bg-gray-700/50 rounded-lg p-4">
+                                <div class="text-3xl mb-2">📊</div>
+                                <h4 class="font-medium">活動追蹤</h4>
+                                <p class="text-gray-400 text-sm">查看歷史發放記錄</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 活動獎勵記錄 -->
+                    <div class="bg-gray-800 rounded-xl overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-700">
+                            <h3 class="font-medium">活動獎勵發放記錄</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-gray-700/50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs text-gray-400">時間</th>
+                                        <th class="px-4 py-3 text-left text-xs text-gray-400">活動描述</th>
+                                        <th class="px-4 py-3 text-center text-xs text-gray-400">成功/總數</th>
+                                        <th class="px-4 py-3 text-center text-xs text-gray-400">狀態</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-700">
+                                    <tr v-for="op in walletOperations.filter(o => o.type === 'campaign_reward')" :key="op.id" class="hover:bg-gray-700/30">
+                                        <td class="px-4 py-3 text-sm text-gray-400">{{ new Date(op.created_at).toLocaleString() }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-300">{{ op.description }}</td>
+                                        <td class="px-4 py-3 text-center">
+                                            <span class="text-green-400">{{ op.success }}</span> / {{ op.total }}
+                                        </td>
+                                        <td class="px-4 py-3 text-center text-green-400">
+                                            {{ op.status === 'completed' ? '完成' : op.status }}
+                                        </td>
+                                    </tr>
+                                    <tr v-if="walletOperations.filter(o => o.type === 'campaign_reward').length === 0">
+                                        <td colspan="4" class="px-6 py-12 text-center text-gray-500">暫無活動記錄</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
                 

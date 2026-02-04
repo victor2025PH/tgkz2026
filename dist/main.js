@@ -27355,6 +27355,90 @@ var AuthService2 = class _AuthService {
     }
   }
   /**
+   * 🆕 修改郵箱
+   * 使用 PUT /api/v1/auth/me 接口更新用戶信息
+   */
+  async updateEmail(newEmail, password) {
+    try {
+      const token = this._token();
+      if (!token) {
+        return { success: false, message: "\u8ACB\u5148\u767B\u5165" };
+      }
+      const baseUrl = localStorage.getItem("api_base_url") || "https://tg.dairoot.cn";
+      const response = await fetch(`${baseUrl}/api/v1/auth/me`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          email: newEmail,
+          password
+          // 傳遞密碼用於驗證
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        const currentUser = this._user();
+        if (currentUser) {
+          this._user.set(__spreadProps(__spreadValues({}, currentUser), {
+            email: newEmail
+          }));
+          localStorage.setItem("user", JSON.stringify(this._user()));
+        }
+        return { success: true, message: "\u90F5\u7BB1\u66F4\u65B0\u6210\u529F" };
+      }
+      return { success: false, message: result.error || result.message || "\u90F5\u7BB1\u66F4\u65B0\u5931\u6557" };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message || "\u4FEE\u6539\u90F5\u7BB1\u5931\u6557"
+      };
+    }
+  }
+  /**
+   * 🆕 修改顯示名稱
+   */
+  async updateDisplayName(newDisplayName) {
+    try {
+      const token = this._token();
+      if (!token) {
+        return { success: false, message: "\u8ACB\u5148\u767B\u5165" };
+      }
+      const baseUrl = localStorage.getItem("api_base_url") || "https://tg.dairoot.cn";
+      const response = await fetch(`${baseUrl}/api/v1/auth/me`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          display_name: newDisplayName
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        const currentUser = this._user();
+        if (currentUser) {
+          this._user.set(__spreadProps(__spreadValues({}, currentUser), {
+            displayName: newDisplayName
+          }));
+          const storedUser = JSON.parse(localStorage.getItem("tgm_user") || "{}");
+          storedUser.display_name = newDisplayName;
+          storedUser.displayName = newDisplayName;
+          localStorage.setItem("tgm_user", JSON.stringify(storedUser));
+        }
+        return { success: true, message: "\u986F\u793A\u540D\u7A31\u66F4\u65B0\u6210\u529F" };
+      }
+      return { success: false, message: result.error || result.message || "\u986F\u793A\u540D\u7A31\u66F4\u65B0\u5931\u6557" };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message || "\u4FEE\u6539\u986F\u793A\u540D\u7A31\u5931\u6557"
+      };
+    }
+  }
+  /**
    * 續費/升級會員（使用卡密）
    * 調用後端 API 激活卡密，並同步更新所有相關狀態
    */
@@ -41747,53 +41831,220 @@ function ProfileComponent_Conditional_17_Template(rf, ctx) {
     \u0275\u0275text(0, " \u{1F6AA} \u9000\u51FA ");
   }
 }
-function ProfileComponent_Conditional_29_Conditional_35_Template(rf, ctx) {
+function ProfileComponent_Conditional_29_Conditional_44_Conditional_22_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "span", 48);
+    \u0275\u0275text(1, " \u4FDD\u5B58\u4E2D... ");
+  }
+}
+function ProfileComponent_Conditional_29_Conditional_44_Conditional_23_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275text(0, " \u78BA\u8A8D\u4FEE\u6539 ");
+  }
+}
+function ProfileComponent_Conditional_29_Conditional_44_Template(rf, ctx) {
   if (rf & 1) {
     const _r4 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 29)(1, "div", 30)(2, "label");
+    \u0275\u0275elementStart(0, "div", 36);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_div_click_0_listener() {
+      \u0275\u0275restoreView(_r4);
+      const ctx_r1 = \u0275\u0275nextContext(2);
+      return \u0275\u0275resetView(ctx_r1.closeEmailEditor());
+    });
+    \u0275\u0275elementStart(1, "div", 37);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_div_click_1_listener($event) {
+      \u0275\u0275restoreView(_r4);
+      return \u0275\u0275resetView($event.stopPropagation());
+    });
+    \u0275\u0275elementStart(2, "div", 38)(3, "h3");
+    \u0275\u0275text(4, "\u{1F4E7} \u4FEE\u6539\u90F5\u7BB1");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(5, "button", 39);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_button_click_5_listener() {
+      \u0275\u0275restoreView(_r4);
+      const ctx_r1 = \u0275\u0275nextContext(2);
+      return \u0275\u0275resetView(ctx_r1.closeEmailEditor());
+    });
+    \u0275\u0275text(6, "\xD7");
+    \u0275\u0275elementEnd()();
+    \u0275\u0275elementStart(7, "div", 40)(8, "div", 41)(9, "label");
+    \u0275\u0275text(10, "\u65B0\u90F5\u7BB1\u5730\u5740");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(11, "input", 42);
+    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_44_Template_input_ngModelChange_11_listener($event) {
+      \u0275\u0275restoreView(_r4);
+      const ctx_r1 = \u0275\u0275nextContext(2);
+      \u0275\u0275twoWayBindingSet(ctx_r1.emailForm.newEmail, $event) || (ctx_r1.emailForm.newEmail = $event);
+      return \u0275\u0275resetView($event);
+    });
+    \u0275\u0275elementEnd()();
+    \u0275\u0275elementStart(12, "div", 41)(13, "label");
+    \u0275\u0275text(14, "\u7576\u524D\u5BC6\u78BC\uFF08\u9A57\u8B49\u8EAB\u4EFD\uFF09");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(15, "input", 43);
+    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_44_Template_input_ngModelChange_15_listener($event) {
+      \u0275\u0275restoreView(_r4);
+      const ctx_r1 = \u0275\u0275nextContext(2);
+      \u0275\u0275twoWayBindingSet(ctx_r1.emailForm.password, $event) || (ctx_r1.emailForm.password = $event);
+      return \u0275\u0275resetView($event);
+    });
+    \u0275\u0275elementEnd()();
+    \u0275\u0275elementStart(16, "p", 44);
+    \u0275\u0275text(17, "\u26A0\uFE0F \u4FEE\u6539\u90F5\u7BB1\u9700\u8981\u9A57\u8B49\u7576\u524D\u5BC6\u78BC");
+    \u0275\u0275elementEnd()();
+    \u0275\u0275elementStart(18, "div", 45)(19, "button", 46);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_button_click_19_listener() {
+      \u0275\u0275restoreView(_r4);
+      const ctx_r1 = \u0275\u0275nextContext(2);
+      return \u0275\u0275resetView(ctx_r1.closeEmailEditor());
+    });
+    \u0275\u0275text(20, "\u53D6\u6D88");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(21, "button", 47);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_button_click_21_listener() {
+      \u0275\u0275restoreView(_r4);
+      const ctx_r1 = \u0275\u0275nextContext(2);
+      return \u0275\u0275resetView(ctx_r1.onSaveEmail());
+    });
+    \u0275\u0275conditionalCreate(22, ProfileComponent_Conditional_29_Conditional_44_Conditional_22_Template, 2, 0)(23, ProfileComponent_Conditional_29_Conditional_44_Conditional_23_Template, 1, 0);
+    \u0275\u0275elementEnd()()()();
+  }
+  if (rf & 2) {
+    const ctx_r1 = \u0275\u0275nextContext(2);
+    \u0275\u0275advance(11);
+    \u0275\u0275twoWayProperty("ngModel", ctx_r1.emailForm.newEmail);
+    \u0275\u0275advance(4);
+    \u0275\u0275twoWayProperty("ngModel", ctx_r1.emailForm.password);
+    \u0275\u0275advance(6);
+    \u0275\u0275property("disabled", ctx_r1.isSavingEmail());
+    \u0275\u0275advance();
+    \u0275\u0275conditional(ctx_r1.isSavingEmail() ? 22 : 23);
+  }
+}
+function ProfileComponent_Conditional_29_Conditional_45_Conditional_18_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "span", 48);
+    \u0275\u0275text(1, " \u4FDD\u5B58\u4E2D... ");
+  }
+}
+function ProfileComponent_Conditional_29_Conditional_45_Conditional_19_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275text(0, " \u78BA\u8A8D\u4FEE\u6539 ");
+  }
+}
+function ProfileComponent_Conditional_29_Conditional_45_Template(rf, ctx) {
+  if (rf & 1) {
+    const _r5 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "div", 36);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_45_Template_div_click_0_listener() {
+      \u0275\u0275restoreView(_r5);
+      const ctx_r1 = \u0275\u0275nextContext(2);
+      return \u0275\u0275resetView(ctx_r1.closeDisplayNameEditor());
+    });
+    \u0275\u0275elementStart(1, "div", 37);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_45_Template_div_click_1_listener($event) {
+      \u0275\u0275restoreView(_r5);
+      return \u0275\u0275resetView($event.stopPropagation());
+    });
+    \u0275\u0275elementStart(2, "div", 38)(3, "h3");
+    \u0275\u0275text(4, "\u270F\uFE0F \u4FEE\u6539\u986F\u793A\u540D\u7A31");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(5, "button", 39);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_45_Template_button_click_5_listener() {
+      \u0275\u0275restoreView(_r5);
+      const ctx_r1 = \u0275\u0275nextContext(2);
+      return \u0275\u0275resetView(ctx_r1.closeDisplayNameEditor());
+    });
+    \u0275\u0275text(6, "\xD7");
+    \u0275\u0275elementEnd()();
+    \u0275\u0275elementStart(7, "div", 40)(8, "div", 41)(9, "label");
+    \u0275\u0275text(10, "\u986F\u793A\u540D\u7A31");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(11, "input", 49);
+    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_45_Template_input_ngModelChange_11_listener($event) {
+      \u0275\u0275restoreView(_r5);
+      const ctx_r1 = \u0275\u0275nextContext(2);
+      \u0275\u0275twoWayBindingSet(ctx_r1.displayNameForm.newName, $event) || (ctx_r1.displayNameForm.newName = $event);
+      return \u0275\u0275resetView($event);
+    });
+    \u0275\u0275elementEnd()();
+    \u0275\u0275elementStart(12, "p", 44);
+    \u0275\u0275text(13, "\u{1F4A1} \u986F\u793A\u540D\u7A31\u6703\u5728\u83DC\u55AE\u6B04\u548C\u500B\u4EBA\u4E2D\u5FC3\u986F\u793A\uFF0C\u6700\u591A30\u500B\u5B57\u7B26");
+    \u0275\u0275elementEnd()();
+    \u0275\u0275elementStart(14, "div", 45)(15, "button", 46);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_45_Template_button_click_15_listener() {
+      \u0275\u0275restoreView(_r5);
+      const ctx_r1 = \u0275\u0275nextContext(2);
+      return \u0275\u0275resetView(ctx_r1.closeDisplayNameEditor());
+    });
+    \u0275\u0275text(16, "\u53D6\u6D88");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(17, "button", 47);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_45_Template_button_click_17_listener() {
+      \u0275\u0275restoreView(_r5);
+      const ctx_r1 = \u0275\u0275nextContext(2);
+      return \u0275\u0275resetView(ctx_r1.onSaveDisplayName());
+    });
+    \u0275\u0275conditionalCreate(18, ProfileComponent_Conditional_29_Conditional_45_Conditional_18_Template, 2, 0)(19, ProfileComponent_Conditional_29_Conditional_45_Conditional_19_Template, 1, 0);
+    \u0275\u0275elementEnd()()()();
+  }
+  if (rf & 2) {
+    const ctx_r1 = \u0275\u0275nextContext(2);
+    \u0275\u0275advance(11);
+    \u0275\u0275twoWayProperty("ngModel", ctx_r1.displayNameForm.newName);
+    \u0275\u0275advance(6);
+    \u0275\u0275property("disabled", ctx_r1.isSavingDisplayName());
+    \u0275\u0275advance();
+    \u0275\u0275conditional(ctx_r1.isSavingDisplayName() ? 18 : 19);
+  }
+}
+function ProfileComponent_Conditional_29_Conditional_54_Template(rf, ctx) {
+  if (rf & 1) {
+    const _r6 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "div", 35)(1, "div", 41)(2, "label");
     \u0275\u0275text(3, "\u7576\u524D\u5BC6\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "input", 31);
-    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_35_Template_input_ngModelChange_4_listener($event) {
-      \u0275\u0275restoreView(_r4);
+    \u0275\u0275elementStart(4, "input", 50);
+    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_54_Template_input_ngModelChange_4_listener($event) {
+      \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       \u0275\u0275twoWayBindingSet(ctx_r1.passwordForm.oldPassword, $event) || (ctx_r1.passwordForm.oldPassword = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(5, "div", 30)(6, "label");
+    \u0275\u0275elementStart(5, "div", 41)(6, "label");
     \u0275\u0275text(7, "\u65B0\u5BC6\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "input", 31);
-    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_35_Template_input_ngModelChange_8_listener($event) {
-      \u0275\u0275restoreView(_r4);
+    \u0275\u0275elementStart(8, "input", 50);
+    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_54_Template_input_ngModelChange_8_listener($event) {
+      \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       \u0275\u0275twoWayBindingSet(ctx_r1.passwordForm.newPassword, $event) || (ctx_r1.passwordForm.newPassword = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(9, "div", 30)(10, "label");
+    \u0275\u0275elementStart(9, "div", 41)(10, "label");
     \u0275\u0275text(11, "\u78BA\u8A8D\u65B0\u5BC6\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "input", 31);
-    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_35_Template_input_ngModelChange_12_listener($event) {
-      \u0275\u0275restoreView(_r4);
+    \u0275\u0275elementStart(12, "input", 50);
+    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_54_Template_input_ngModelChange_12_listener($event) {
+      \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       \u0275\u0275twoWayBindingSet(ctx_r1.passwordForm.confirmPassword, $event) || (ctx_r1.passwordForm.confirmPassword = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(13, "div", 32)(14, "button", 33);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_35_Template_button_click_14_listener() {
-      \u0275\u0275restoreView(_r4);
+    \u0275\u0275elementStart(13, "div", 51)(14, "button", 46);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_54_Template_button_click_14_listener() {
+      \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.showChangePassword.set(false));
     });
     \u0275\u0275text(15, "\u53D6\u6D88");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(16, "button", 34);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_35_Template_button_click_16_listener() {
-      \u0275\u0275restoreView(_r4);
+    \u0275\u0275elementStart(16, "button", 52);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_54_Template_button_click_16_listener() {
+      \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.onChangePassword());
     });
@@ -41817,47 +42068,85 @@ function ProfileComponent_Conditional_29_Template(rf, ctx) {
     \u0275\u0275text(3, "\u{1F4CB} \u57FA\u672C\u4FE1\u606F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(4, "div", 21)(5, "div", 22)(6, "span", 23);
-    \u0275\u0275text(7, "\u7528\u6236\u540D");
+    \u0275\u0275text(7, "\u7528\u6236ID");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "span", 24);
-    \u0275\u0275text(9);
+    \u0275\u0275elementStart(8, "span", 24)(9, "span", 25);
+    \u0275\u0275text(10);
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(11, "button", 26);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_11_listener() {
+      \u0275\u0275restoreView(_r3);
+      const ctx_r1 = \u0275\u0275nextContext();
+      return \u0275\u0275resetView(ctx_r1.copyUserId());
+    });
+    \u0275\u0275text(12, "\u{1F4CB}");
+    \u0275\u0275elementEnd()()();
+    \u0275\u0275elementStart(13, "div", 22)(14, "span", 23);
+    \u0275\u0275text(15, "\u986F\u793A\u540D\u7A31");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(16, "span", 27);
+    \u0275\u0275text(17);
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(18, "button", 28);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_18_listener() {
+      \u0275\u0275restoreView(_r3);
+      const ctx_r1 = \u0275\u0275nextContext();
+      return \u0275\u0275resetView(ctx_r1.openDisplayNameEditor());
+    });
+    \u0275\u0275text(19, "\u7DE8\u8F2F");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(10, "div", 22)(11, "span", 23);
-    \u0275\u0275text(12, "\u90F5\u7BB1");
+    \u0275\u0275elementStart(20, "div", 22)(21, "span", 23);
+    \u0275\u0275text(22, "\u7528\u6236\u540D");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(13, "span", 24);
-    \u0275\u0275text(14);
+    \u0275\u0275elementStart(23, "span", 29);
+    \u0275\u0275text(24);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(15, "button", 25);
-    \u0275\u0275text(16, "\u7DE8\u8F2F");
+    \u0275\u0275elementStart(25, "span", 30);
+    \u0275\u0275text(26, "\u767B\u5165\u7528\uFF0C\u4E0D\u53EF\u4FEE\u6539");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(17, "div", 22)(18, "span", 23);
-    \u0275\u0275text(19, "\u8A3B\u518A\u6642\u9593");
+    \u0275\u0275elementStart(27, "div", 22)(28, "span", 23);
+    \u0275\u0275text(29, "\u90F5\u7BB1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(20, "span", 24);
-    \u0275\u0275text(21);
+    \u0275\u0275elementStart(30, "span", 27);
+    \u0275\u0275text(31);
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(32, "button", 28);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_32_listener() {
+      \u0275\u0275restoreView(_r3);
+      const ctx_r1 = \u0275\u0275nextContext();
+      return \u0275\u0275resetView(ctx_r1.openEmailEditor());
+    });
+    \u0275\u0275text(33, "\u7DE8\u8F2F");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(22, "div", 22)(23, "span", 23);
-    \u0275\u0275text(24, "\u6700\u5F8C\u767B\u5165");
+    \u0275\u0275elementStart(34, "div", 22)(35, "span", 23);
+    \u0275\u0275text(36, "\u8A3B\u518A\u6642\u9593");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(25, "span", 24);
-    \u0275\u0275text(26);
+    \u0275\u0275elementStart(37, "span", 27);
+    \u0275\u0275text(38);
+    \u0275\u0275elementEnd()();
+    \u0275\u0275elementStart(39, "div", 22)(40, "span", 23);
+    \u0275\u0275text(41, "\u6700\u5F8C\u767B\u5165");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(42, "span", 27);
+    \u0275\u0275text(43);
     \u0275\u0275elementEnd()()()();
-    \u0275\u0275elementStart(27, "div", 19)(28, "h3", 20);
-    \u0275\u0275text(29, "\u{1F510} \u5B89\u5168\u8A2D\u7F6E");
+    \u0275\u0275conditionalCreate(44, ProfileComponent_Conditional_29_Conditional_44_Template, 24, 4, "div", 31);
+    \u0275\u0275conditionalCreate(45, ProfileComponent_Conditional_29_Conditional_45_Template, 20, 3, "div", 31);
+    \u0275\u0275elementStart(46, "div", 19)(47, "h3", 20);
+    \u0275\u0275text(48, "\u{1F510} \u5B89\u5168\u8A2D\u7F6E");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(30, "div", 26)(31, "button", 27);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_31_listener() {
+    \u0275\u0275elementStart(49, "div", 32)(50, "button", 33);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_50_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.showChangePassword.set(true));
     });
-    \u0275\u0275text(32, " \u{1F511} \u4FEE\u6539\u5BC6\u78BC ");
+    \u0275\u0275text(51, " \u{1F511} \u4FEE\u6539\u5BC6\u78BC ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(33, "button", 28);
-    \u0275\u0275text(34, " \u{1F4F1} \u5169\u6B65\u9A57\u8B49 ");
+    \u0275\u0275elementStart(52, "button", 34);
+    \u0275\u0275text(53, " \u{1F4F1} \u5169\u6B65\u9A57\u8B49 ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(35, ProfileComponent_Conditional_29_Conditional_35_Template, 18, 3, "div", 29);
+    \u0275\u0275conditionalCreate(54, ProfileComponent_Conditional_29_Conditional_54_Template, 18, 3, "div", 35);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -41865,66 +42154,76 @@ function ProfileComponent_Conditional_29_Template(rf, ctx) {
     let tmp_2_0;
     let tmp_3_0;
     let tmp_4_0;
+    let tmp_5_0;
+    let tmp_6_0;
     const ctx_r1 = \u0275\u0275nextContext();
-    \u0275\u0275advance(9);
-    \u0275\u0275textInterpolate((tmp_1_0 = ctx_r1.user()) == null ? null : tmp_1_0.username);
-    \u0275\u0275advance(5);
-    \u0275\u0275textInterpolate(((tmp_2_0 = ctx_r1.user()) == null ? null : tmp_2_0.email) || "\u672A\u8A2D\u7F6E");
+    \u0275\u0275advance(10);
+    \u0275\u0275textInterpolate(((tmp_1_0 = ctx_r1.user()) == null ? null : tmp_1_0.id) || "-");
     \u0275\u0275advance(7);
-    \u0275\u0275textInterpolate(ctx_r1.formatDate((tmp_3_0 = ctx_r1.user()) == null ? null : tmp_3_0.createdAt));
+    \u0275\u0275textInterpolate(((tmp_2_0 = ctx_r1.user()) == null ? null : tmp_2_0.displayName) || ((tmp_2_0 = ctx_r1.user()) == null ? null : tmp_2_0.username) || "\u672A\u8A2D\u7F6E");
+    \u0275\u0275advance(7);
+    \u0275\u0275textInterpolate((tmp_3_0 = ctx_r1.user()) == null ? null : tmp_3_0.username);
+    \u0275\u0275advance(7);
+    \u0275\u0275textInterpolate(((tmp_4_0 = ctx_r1.user()) == null ? null : tmp_4_0.email) || "\u672A\u8A2D\u7F6E");
+    \u0275\u0275advance(7);
+    \u0275\u0275textInterpolate(ctx_r1.formatDate((tmp_5_0 = ctx_r1.user()) == null ? null : tmp_5_0.createdAt));
     \u0275\u0275advance(5);
-    \u0275\u0275textInterpolate(ctx_r1.formatDate((tmp_4_0 = ctx_r1.user()) == null ? null : tmp_4_0.lastLogin));
+    \u0275\u0275textInterpolate(ctx_r1.formatDate((tmp_6_0 = ctx_r1.user()) == null ? null : tmp_6_0.lastLogin));
+    \u0275\u0275advance();
+    \u0275\u0275conditional(ctx_r1.showEditEmail() ? 44 : -1);
+    \u0275\u0275advance();
+    \u0275\u0275conditional(ctx_r1.showEditDisplayName() ? 45 : -1);
     \u0275\u0275advance(9);
-    \u0275\u0275conditional(ctx_r1.showChangePassword() ? 35 : -1);
+    \u0275\u0275conditional(ctx_r1.showChangePassword() ? 54 : -1);
   }
 }
 function ProfileComponent_Conditional_30_Conditional_14_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 40);
+    \u0275\u0275elementStart(0, "div", 57);
     \u0275\u0275text(1, "\u8F09\u5165\u4E2D...");
     \u0275\u0275elementEnd();
   }
 }
 function ProfileComponent_Conditional_30_Conditional_15_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 41);
+    \u0275\u0275elementStart(0, "div", 58);
     \u0275\u0275text(1, "\u66AB\u7121\u6FC0\u6D3B\u8A18\u9304");
     \u0275\u0275elementEnd();
   }
 }
 function ProfileComponent_Conditional_30_Conditional_16_For_1_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 53)(1, "div", 54)(2, "span", 55);
+    \u0275\u0275elementStart(0, "div", 70)(1, "div", 71)(2, "span", 72);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "span", 56);
+    \u0275\u0275elementStart(4, "span", 73);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(6, "div", 57)(7, "span");
+    \u0275\u0275elementStart(6, "div", 74)(7, "span");
     \u0275\u0275text(8);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "span", 58);
+    \u0275\u0275elementStart(9, "span", 75);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
-    const record_r6 = ctx.$implicit;
+    const record_r8 = ctx.$implicit;
     const ctx_r1 = \u0275\u0275nextContext(3);
     \u0275\u0275advance(3);
-    \u0275\u0275textInterpolate(ctx_r1.formatLicenseKey(record_r6.license_key));
+    \u0275\u0275textInterpolate(ctx_r1.formatLicenseKey(record_r8.license_key));
     \u0275\u0275advance(2);
-    \u0275\u0275textInterpolate3("", record_r6.level_icon, " ", record_r6.level_name, " ", record_r6.duration_name);
+    \u0275\u0275textInterpolate3("", record_r8.level_icon, " ", record_r8.level_name, " ", record_r8.duration_name);
     \u0275\u0275advance(3);
-    \u0275\u0275textInterpolate1("", ctx_r1.formatActivationDate(record_r6.activated_at), " \u6FC0\u6D3B");
+    \u0275\u0275textInterpolate1("", ctx_r1.formatActivationDate(record_r8.activated_at), " \u6FC0\u6D3B");
     \u0275\u0275advance();
-    \u0275\u0275classProp("active", record_r6.is_active)("used", !record_r6.is_active);
+    \u0275\u0275classProp("active", record_r8.is_active)("used", !record_r8.is_active);
     \u0275\u0275advance();
-    \u0275\u0275textInterpolate1(" ", record_r6.is_active ? "\u6709\u6548" : "\u5DF2\u904E\u671F", " ");
+    \u0275\u0275textInterpolate1(" ", record_r8.is_active ? "\u6709\u6548" : "\u5DF2\u904E\u671F", " ");
   }
 }
 function ProfileComponent_Conditional_30_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275repeaterCreate(0, ProfileComponent_Conditional_30_Conditional_16_For_1_Template, 11, 10, "div", 53, _forTrack015);
+    \u0275\u0275repeaterCreate(0, ProfileComponent_Conditional_30_Conditional_16_For_1_Template, 11, 10, "div", 70, _forTrack015);
   }
   if (rf & 2) {
     const ctx_r1 = \u0275\u0275nextContext(2);
@@ -41933,45 +42232,45 @@ function ProfileComponent_Conditional_30_Conditional_16_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_30_Template(rf, ctx) {
   if (rf & 1) {
-    const _r5 = \u0275\u0275getCurrentView();
+    const _r7 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 14)(1, "div", 19)(2, "h3", 20);
     \u0275\u0275text(3, "\u{1F3AB} \u6FC0\u6D3B\u65B0\u5361\u5BC6");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "div", 35)(5, "input", 36);
+    \u0275\u0275elementStart(4, "div", 53)(5, "input", 54);
     \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_30_Template_input_ngModelChange_5_listener($event) {
-      \u0275\u0275restoreView(_r5);
+      \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext();
       \u0275\u0275twoWayBindingSet(ctx_r1.newLicenseKey, $event) || (ctx_r1.newLicenseKey = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "button", 37);
+    \u0275\u0275elementStart(6, "button", 55);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_30_Template_button_click_6_listener() {
-      \u0275\u0275restoreView(_r5);
+      \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.onActivateLicense());
     });
     \u0275\u0275text(7, " \u6FC0\u6D3B ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(8, "p", 38);
+    \u0275\u0275elementStart(8, "p", 44);
     \u0275\u0275text(9, "\u8F38\u5165\u8CFC\u8CB7\u7684\u5361\u5BC6\u4EE5\u7E8C\u8CBB\u6216\u5347\u7D1A\u6703\u54E1");
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(10, "div", 19)(11, "h3", 20);
     \u0275\u0275text(12, "\u{1F4DC} \u6FC0\u6D3B\u8A18\u9304");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(13, "div", 39);
-    \u0275\u0275conditionalCreate(14, ProfileComponent_Conditional_30_Conditional_14_Template, 2, 0, "div", 40)(15, ProfileComponent_Conditional_30_Conditional_15_Template, 2, 0, "div", 41)(16, ProfileComponent_Conditional_30_Conditional_16_Template, 2, 0);
+    \u0275\u0275elementStart(13, "div", 56);
+    \u0275\u0275conditionalCreate(14, ProfileComponent_Conditional_30_Conditional_14_Template, 2, 0, "div", 57)(15, ProfileComponent_Conditional_30_Conditional_15_Template, 2, 0, "div", 58)(16, ProfileComponent_Conditional_30_Conditional_16_Template, 2, 0);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(17, "div", 19)(18, "h3", 20);
     \u0275\u0275text(19, "\u{1F6D2} \u8CFC\u8CB7\u5361\u5BC6\uFF08\u738B\u8005\u69AE\u8000\u7B49\u7D1A\uFF09");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(20, "div", 42)(21, "div", 43)(22, "div", 44);
+    \u0275\u0275elementStart(20, "div", 59)(21, "div", 60)(22, "div", 61);
     \u0275\u0275text(23, "\u{1F948} \u767D\u9280\u7CBE\u82F1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(24, "div", 45);
+    \u0275\u0275elementStart(24, "div", 62);
     \u0275\u0275text(25, "4.99 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(26, "ul", 46)(27, "li");
+    \u0275\u0275elementStart(26, "ul", 63)(27, "li");
     \u0275\u0275text(28, "5 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(29, "li");
@@ -41983,19 +42282,19 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(33, "li");
     \u0275\u0275text(34, "10 \u500B\u7FA4\u7D44");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(35, "button", 47);
+    \u0275\u0275elementStart(35, "button", 64);
     \u0275\u0275text(36, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(37, "div", 48)(38, "div", 44);
+    \u0275\u0275elementStart(37, "div", 65)(38, "div", 61);
     \u0275\u0275text(39, "\u{1F947} \u9EC3\u91D1\u5927\u5E2B");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(40, "div", 45);
+    \u0275\u0275elementStart(40, "div", 62);
     \u0275\u0275text(41, "19.9 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(42, "div", 49);
+    \u0275\u0275elementStart(42, "div", 66);
     \u0275\u0275text(43, "\u63A8\u85A6");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(44, "ul", 46)(45, "li");
+    \u0275\u0275elementStart(44, "ul", 63)(45, "li");
     \u0275\u0275text(46, "15 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(47, "li");
@@ -42007,16 +42306,16 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(51, "li");
     \u0275\u0275text(52, "\u6279\u91CF\u64CD\u4F5C");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(53, "button", 47);
+    \u0275\u0275elementStart(53, "button", 64);
     \u0275\u0275text(54, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(55, "div", 50)(56, "div", 44);
+    \u0275\u0275elementStart(55, "div", 67)(56, "div", 61);
     \u0275\u0275text(57, "\u{1F48E} \u947D\u77F3\u738B\u724C");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(58, "div", 45);
+    \u0275\u0275elementStart(58, "div", 62);
     \u0275\u0275text(59, "59.9 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(60, "ul", 46)(61, "li");
+    \u0275\u0275elementStart(60, "ul", 63)(61, "li");
     \u0275\u0275text(62, "50 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(63, "li");
@@ -42028,16 +42327,16 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(67, "li");
     \u0275\u0275text(68, "AI \u92B7\u552E\u6F0F\u6597");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(69, "button", 47);
+    \u0275\u0275elementStart(69, "button", 64);
     \u0275\u0275text(70, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(71, "div", 51)(72, "div", 44);
+    \u0275\u0275elementStart(71, "div", 68)(72, "div", 61);
     \u0275\u0275text(73, "\u{1F31F} \u661F\u8000\u50B3\u8AAA");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(74, "div", 45);
+    \u0275\u0275elementStart(74, "div", 62);
     \u0275\u0275text(75, "199 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(76, "ul", 46)(77, "li");
+    \u0275\u0275elementStart(76, "ul", 63)(77, "li");
     \u0275\u0275text(78, "100 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(79, "li");
@@ -42049,16 +42348,16 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(83, "li");
     \u0275\u0275text(84, "\u667A\u80FD\u9632\u5C01");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(85, "button", 47);
+    \u0275\u0275elementStart(85, "button", 64);
     \u0275\u0275text(86, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(87, "div", 52)(88, "div", 44);
+    \u0275\u0275elementStart(87, "div", 69)(88, "div", 61);
     \u0275\u0275text(89, "\u{1F451} \u69AE\u8000\u738B\u8005");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(90, "div", 45);
+    \u0275\u0275elementStart(90, "div", 62);
     \u0275\u0275text(91, "599 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(92, "ul", 46)(93, "li");
+    \u0275\u0275elementStart(92, "ul", 63)(93, "li");
     \u0275\u0275text(94, "\u7121\u9650\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(95, "li");
@@ -42070,7 +42369,7 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(99, "li");
     \u0275\u0275text(100, "\u5C08\u5C6C\u9867\u554F");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(101, "button", 47);
+    \u0275\u0275elementStart(101, "button", 64);
     \u0275\u0275text(102, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()()()()();
   }
@@ -42086,20 +42385,20 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_31_For_8_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 72);
+    \u0275\u0275elementStart(0, "span", 89);
     \u0275\u0275text(1, "\u672C\u6A5F");
     \u0275\u0275elementEnd();
   }
 }
 function ProfileComponent_Conditional_31_For_8_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
-    const _r8 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 76);
+    const _r10 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "button", 93);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_31_For_8_Conditional_11_Template_button_click_0_listener() {
-      \u0275\u0275restoreView(_r8);
-      const device_r9 = \u0275\u0275nextContext().$implicit;
+      \u0275\u0275restoreView(_r10);
+      const device_r11 = \u0275\u0275nextContext().$implicit;
       const ctx_r1 = \u0275\u0275nextContext(2);
-      return \u0275\u0275resetView(ctx_r1.onUnbindDevice(device_r9.id));
+      return \u0275\u0275resetView(ctx_r1.onUnbindDevice(device_r11.id));
     });
     \u0275\u0275text(1, " \u89E3\u7D81 ");
     \u0275\u0275elementEnd();
@@ -42111,80 +42410,80 @@ function ProfileComponent_Conditional_31_For_8_Conditional_11_Template(rf, ctx) 
 }
 function ProfileComponent_Conditional_31_For_8_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 68)(1, "div", 69);
+    \u0275\u0275elementStart(0, "div", 85)(1, "div", 86);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "div", 70)(4, "div", 71);
+    \u0275\u0275elementStart(3, "div", 87)(4, "div", 88);
     \u0275\u0275text(5);
-    \u0275\u0275conditionalCreate(6, ProfileComponent_Conditional_31_For_8_Conditional_6_Template, 2, 0, "span", 72);
+    \u0275\u0275conditionalCreate(6, ProfileComponent_Conditional_31_For_8_Conditional_6_Template, 2, 0, "span", 89);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "div", 73);
+    \u0275\u0275elementStart(7, "div", 90);
     \u0275\u0275text(8);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "div", 74);
+    \u0275\u0275elementStart(9, "div", 91);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(11, ProfileComponent_Conditional_31_For_8_Conditional_11_Template, 2, 1, "button", 75);
+    \u0275\u0275conditionalCreate(11, ProfileComponent_Conditional_31_For_8_Conditional_11_Template, 2, 1, "button", 92);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
-    const device_r9 = ctx.$implicit;
+    const device_r11 = ctx.$implicit;
     const ctx_r1 = \u0275\u0275nextContext(2);
-    \u0275\u0275classProp("current", device_r9.isCurrent);
+    \u0275\u0275classProp("current", device_r11.isCurrent);
     \u0275\u0275advance(2);
-    \u0275\u0275textInterpolate1(" ", ctx_r1.getDeviceIcon(device_r9), " ");
+    \u0275\u0275textInterpolate1(" ", ctx_r1.getDeviceIcon(device_r11), " ");
     \u0275\u0275advance(3);
-    \u0275\u0275textInterpolate1(" ", device_r9.deviceName, " ");
+    \u0275\u0275textInterpolate1(" ", device_r11.deviceName, " ");
     \u0275\u0275advance();
-    \u0275\u0275conditional(device_r9.isCurrent ? 6 : -1);
+    \u0275\u0275conditional(device_r11.isCurrent ? 6 : -1);
     \u0275\u0275advance(2);
-    \u0275\u0275textInterpolate(device_r9.deviceCode);
+    \u0275\u0275textInterpolate(device_r11.deviceCode);
     \u0275\u0275advance(2);
-    \u0275\u0275textInterpolate2(" \u7D81\u5B9A\u65BC ", ctx_r1.formatDate(device_r9.boundAt), " \xB7 \u6700\u5F8C\u6D3B\u52D5 ", ctx_r1.formatDate(device_r9.lastSeen), " ");
+    \u0275\u0275textInterpolate2(" \u7D81\u5B9A\u65BC ", ctx_r1.formatDate(device_r11.boundAt), " \xB7 \u6700\u5F8C\u6D3B\u52D5 ", ctx_r1.formatDate(device_r11.lastSeen), " ");
     \u0275\u0275advance();
-    \u0275\u0275conditional(!device_r9.isCurrent ? 11 : -1);
+    \u0275\u0275conditional(!device_r11.isCurrent ? 11 : -1);
   }
 }
 function ProfileComponent_Conditional_31_ForEmpty_9_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 41);
+    \u0275\u0275elementStart(0, "div", 58);
     \u0275\u0275text(1, " \u66AB\u7121\u7D81\u5B9A\u8A2D\u5099\u8A18\u9304 ");
     \u0275\u0275elementEnd();
   }
 }
 function ProfileComponent_Conditional_31_Template(rf, ctx) {
   if (rf & 1) {
-    const _r7 = \u0275\u0275getCurrentView();
+    const _r9 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 14)(1, "div", 19)(2, "h3", 20);
     \u0275\u0275text(3, "\u{1F4BB} \u5DF2\u7D81\u5B9A\u8A2D\u5099");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "p", 59);
+    \u0275\u0275elementStart(4, "p", 76);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "div", 60);
-    \u0275\u0275repeaterCreate(7, ProfileComponent_Conditional_31_For_8_Template, 12, 9, "div", 61, _forTrack015, false, ProfileComponent_Conditional_31_ForEmpty_9_Template, 2, 0, "div", 41);
+    \u0275\u0275elementStart(6, "div", 77);
+    \u0275\u0275repeaterCreate(7, ProfileComponent_Conditional_31_For_8_Template, 12, 9, "div", 78, _forTrack015, false, ProfileComponent_Conditional_31_ForEmpty_9_Template, 2, 0, "div", 58);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(10, "div", 19)(11, "h3", 20);
     \u0275\u0275text(12, "\u{1F4F1} \u7576\u524D\u8A2D\u5099");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(13, "div", 62)(14, "div", 63)(15, "span", 64);
+    \u0275\u0275elementStart(13, "div", 79)(14, "div", 80)(15, "span", 81);
     \u0275\u0275text(16, "\u8A2D\u5099\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "span", 65);
+    \u0275\u0275elementStart(17, "span", 82);
     \u0275\u0275text(18);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(19, "button", 66);
+    \u0275\u0275elementStart(19, "button", 83);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_31_Template_button_click_19_listener() {
-      \u0275\u0275restoreView(_r7);
+      \u0275\u0275restoreView(_r9);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.copyDeviceCode());
     });
     \u0275\u0275text(20, "\u{1F4CB}");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(21, "div", 63)(22, "span", 64);
+    \u0275\u0275elementStart(21, "div", 80)(22, "span", 81);
     \u0275\u0275text(23, "\u8A2D\u5099\u540D\u7A31");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(24, "span", 67);
+    \u0275\u0275elementStart(24, "span", 84);
     \u0275\u0275text(25);
     \u0275\u0275elementEnd()()()()();
   }
@@ -42202,52 +42501,52 @@ function ProfileComponent_Conditional_31_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_32_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 77)(1, "div", 78)(2, "div", 79);
+    \u0275\u0275elementStart(0, "div", 94)(1, "div", 95)(2, "div", 96);
     \u0275\u0275text(3, "\u{1F916}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "div", 80)(5, "div", 81);
+    \u0275\u0275elementStart(4, "div", 97)(5, "div", 98);
     \u0275\u0275text(6, "AI \u8ABF\u7528");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "div", 82);
-    \u0275\u0275element(8, "div", 83);
+    \u0275\u0275elementStart(7, "div", 99);
+    \u0275\u0275element(8, "div", 100);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "div", 84);
+    \u0275\u0275elementStart(9, "div", 101);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(11, "div", 78)(12, "div", 79);
+    \u0275\u0275elementStart(11, "div", 95)(12, "div", 96);
     \u0275\u0275text(13, "\u{1F4E8}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "div", 80)(15, "div", 81);
+    \u0275\u0275elementStart(14, "div", 97)(15, "div", 98);
     \u0275\u0275text(16, "\u6D88\u606F\u767C\u9001");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "div", 82);
-    \u0275\u0275element(18, "div", 83);
+    \u0275\u0275elementStart(17, "div", 99);
+    \u0275\u0275element(18, "div", 100);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(19, "div", 84);
+    \u0275\u0275elementStart(19, "div", 101);
     \u0275\u0275text(20);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(21, "div", 78)(22, "div", 79);
+    \u0275\u0275elementStart(21, "div", 95)(22, "div", 96);
     \u0275\u0275text(23, "\u{1F465}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(24, "div", 80)(25, "div", 81);
+    \u0275\u0275elementStart(24, "div", 97)(25, "div", 98);
     \u0275\u0275text(26, "\u5E33\u865F\u6578\u91CF");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(27, "div", 82);
-    \u0275\u0275element(28, "div", 83);
+    \u0275\u0275elementStart(27, "div", 99);
+    \u0275\u0275element(28, "div", 100);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(29, "div", 84);
+    \u0275\u0275elementStart(29, "div", 101);
     \u0275\u0275text(30);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(31, "div", 78)(32, "div", 79);
+    \u0275\u0275elementStart(31, "div", 95)(32, "div", 96);
     \u0275\u0275text(33, "\u{1F4BE}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(34, "div", 80)(35, "div", 81);
+    \u0275\u0275elementStart(34, "div", 97)(35, "div", 98);
     \u0275\u0275text(36, "\u5B58\u5132\u7A7A\u9593");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(37, "div", 82);
-    \u0275\u0275element(38, "div", 83);
+    \u0275\u0275elementStart(37, "div", 99);
+    \u0275\u0275element(38, "div", 100);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(39, "div", 84);
+    \u0275\u0275elementStart(39, "div", 101);
     \u0275\u0275text(40);
     \u0275\u0275elementEnd()()()();
   }
@@ -42273,7 +42572,7 @@ function ProfileComponent_Conditional_32_Conditional_4_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_32_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 40);
+    \u0275\u0275elementStart(0, "div", 57);
     \u0275\u0275text(1, "\u8F09\u5165\u4E2D...");
     \u0275\u0275elementEnd();
   }
@@ -42283,12 +42582,12 @@ function ProfileComponent_Conditional_32_Template(rf, ctx) {
     \u0275\u0275elementStart(0, "div", 14)(1, "div", 19)(2, "h3", 20);
     \u0275\u0275text(3, "\u{1F4CA} \u672C\u6708\u4F7F\u7528\u60C5\u6CC1");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(4, ProfileComponent_Conditional_32_Conditional_4_Template, 41, 16, "div", 77)(5, ProfileComponent_Conditional_32_Conditional_5_Template, 2, 0, "div", 40);
+    \u0275\u0275conditionalCreate(4, ProfileComponent_Conditional_32_Conditional_4_Template, 41, 16, "div", 94)(5, ProfileComponent_Conditional_32_Conditional_5_Template, 2, 0, "div", 57);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(6, "div", 19)(7, "h3", 20);
     \u0275\u0275text(8, "\u{1F4C8} \u6B77\u53F2\u8DA8\u52E2");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "p", 59);
+    \u0275\u0275elementStart(9, "p", 76);
     \u0275\u0275text(10, "\u656C\u8ACB\u671F\u5F85...");
     \u0275\u0275elementEnd()()();
   }
@@ -42300,38 +42599,38 @@ function ProfileComponent_Conditional_32_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_33_Template(rf, ctx) {
   if (rf & 1) {
-    const _r10 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 14)(1, "div", 85)(2, "h3", 20);
+    const _r12 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "div", 14)(1, "div", 102)(2, "h3", 20);
     \u0275\u0275text(3, "\u{1F381} \u9080\u8ACB\u597D\u53CB\u5F97\u734E\u52F5");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "p", 59);
+    \u0275\u0275elementStart(4, "p", 76);
     \u0275\u0275text(5, " \u6BCF\u9080\u8ACB 1 \u4F4D\u597D\u53CB\u8A3B\u518A\u4E26\u6FC0\u6D3B\uFF0C\u60A8\u5C07\u7372\u5F97 ");
     \u0275\u0275elementStart(6, "strong");
     \u0275\u0275text(7, "3 \u5929\u767D\u9280\u7CBE\u82F1");
     \u0275\u0275elementEnd();
     \u0275\u0275text(8, " \u734E\u52F5\uFF01 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "div", 86)(10, "span", 87);
+    \u0275\u0275elementStart(9, "div", 103)(10, "span", 104);
     \u0275\u0275text(11, "\u6211\u7684\u9080\u8ACB\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "div", 88);
+    \u0275\u0275elementStart(12, "div", 105);
     \u0275\u0275text(13);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "button", 66);
+    \u0275\u0275elementStart(14, "button", 83);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_33_Template_button_click_14_listener() {
-      \u0275\u0275restoreView(_r10);
+      \u0275\u0275restoreView(_r12);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.copyInviteCode());
     });
     \u0275\u0275text(15, " \u{1F4CB} \u8907\u88FD ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(16, "div", 89)(17, "span", 87);
+    \u0275\u0275elementStart(16, "div", 106)(17, "span", 104);
     \u0275\u0275text(18, "\u9080\u8ACB\u93C8\u63A5");
     \u0275\u0275elementEnd();
-    \u0275\u0275element(19, "input", 90);
-    \u0275\u0275elementStart(20, "button", 66);
+    \u0275\u0275element(19, "input", 107);
+    \u0275\u0275elementStart(20, "button", 83);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_33_Template_button_click_20_listener() {
-      \u0275\u0275restoreView(_r10);
+      \u0275\u0275restoreView(_r12);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.copyInviteLink());
     });
@@ -42340,16 +42639,16 @@ function ProfileComponent_Conditional_33_Template(rf, ctx) {
     \u0275\u0275elementStart(22, "div", 19)(23, "h3", 20);
     \u0275\u0275text(24, "\u{1F4CA} \u9080\u8ACB\u7D71\u8A08");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(25, "div", 91)(26, "div", 92)(27, "div", 93);
+    \u0275\u0275elementStart(25, "div", 108)(26, "div", 109)(27, "div", 110);
     \u0275\u0275text(28);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(29, "div", 94);
+    \u0275\u0275elementStart(29, "div", 111);
     \u0275\u0275text(30, "\u5DF2\u9080\u8ACB\u4EBA\u6578");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(31, "div", 92)(32, "div", 93);
+    \u0275\u0275elementStart(31, "div", 109)(32, "div", 110);
     \u0275\u0275text(33);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(34, "div", 94);
+    \u0275\u0275elementStart(34, "div", 111);
     \u0275\u0275text(35, "\u7372\u5F97\u734E\u52F5\u5929\u6578");
     \u0275\u0275elementEnd()()()()();
   }
@@ -42377,9 +42676,15 @@ var ProfileComponent = class _ProfileComponent {
     this.membershipUpdateHandler = null;
     this.activeTab = signal("account", ...ngDevMode ? [{ debugName: "activeTab" }] : []);
     this.showChangePassword = signal(false, ...ngDevMode ? [{ debugName: "showChangePassword" }] : []);
+    this.showEditEmail = signal(false, ...ngDevMode ? [{ debugName: "showEditEmail" }] : []);
+    this.showEditDisplayName = signal(false, ...ngDevMode ? [{ debugName: "showEditDisplayName" }] : []);
     this.isUnbinding = signal(false, ...ngDevMode ? [{ debugName: "isUnbinding" }] : []);
     this.isLoggingOut = signal(false, ...ngDevMode ? [{ debugName: "isLoggingOut" }] : []);
+    this.isSavingEmail = signal(false, ...ngDevMode ? [{ debugName: "isSavingEmail" }] : []);
+    this.isSavingDisplayName = signal(false, ...ngDevMode ? [{ debugName: "isSavingDisplayName" }] : []);
     this.passwordForm = { oldPassword: "", newPassword: "", confirmPassword: "" };
+    this.emailForm = { newEmail: "", password: "" };
+    this.displayNameForm = { newName: "" };
     this.newLicenseKey = "";
     this.user = computed(() => this.authService.user(), ...ngDevMode ? [{ debugName: "user" }] : []);
     this.membershipLevel = computed(() => this.authService.membershipLevel(), ...ngDevMode ? [{ debugName: "membershipLevel" }] : []);
@@ -42572,13 +42877,103 @@ var ProfileComponent = class _ProfileComponent {
     navigator.clipboard.writeText(this.inviteLink());
     this.toast.success("\u9080\u8ACB\u93C8\u63A5\u5DF2\u8907\u88FD");
   }
+  // 🆕 複製用戶ID
+  copyUserId() {
+    const userId = this.user()?.id;
+    if (userId) {
+      navigator.clipboard.writeText(String(userId));
+      this.toast.success("\u7528\u6236ID\u5DF2\u8907\u88FD");
+    }
+  }
+  // 🆕 打開郵箱編輯彈窗
+  openEmailEditor() {
+    this.emailForm = { newEmail: this.user()?.email || "", password: "" };
+    this.showEditEmail.set(true);
+  }
+  // 🆕 關閉郵箱編輯彈窗
+  closeEmailEditor() {
+    this.showEditEmail.set(false);
+    this.emailForm = { newEmail: "", password: "" };
+  }
+  // 🆕 保存郵箱
+  async onSaveEmail() {
+    const newEmail = this.emailForm.newEmail.trim();
+    const password = this.emailForm.password;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!newEmail) {
+      this.toast.error("\u8ACB\u8F38\u5165\u90F5\u7BB1\u5730\u5740");
+      return;
+    }
+    if (!emailRegex.test(newEmail)) {
+      this.toast.error("\u90F5\u7BB1\u683C\u5F0F\u4E0D\u6B63\u78BA");
+      return;
+    }
+    if (!password) {
+      this.toast.error("\u8ACB\u8F38\u5165\u7576\u524D\u5BC6\u78BC\u4EE5\u9A57\u8B49\u8EAB\u4EFD");
+      return;
+    }
+    this.isSavingEmail.set(true);
+    try {
+      const result = await this.authService.updateEmail(newEmail, password);
+      if (result.success) {
+        this.toast.success(result.message || "\u90F5\u7BB1\u66F4\u65B0\u6210\u529F");
+        this.closeEmailEditor();
+        await this.authService.fetchCurrentUser();
+        this.cdr.detectChanges();
+      } else {
+        this.toast.error(result.message || "\u90F5\u7BB1\u66F4\u65B0\u5931\u6557");
+      }
+    } catch (error) {
+      this.toast.error(error.message || "\u90F5\u7BB1\u66F4\u65B0\u5931\u6557");
+    } finally {
+      this.isSavingEmail.set(false);
+    }
+  }
+  // 🆕 打開顯示名稱編輯彈窗
+  openDisplayNameEditor() {
+    this.displayNameForm = { newName: this.user()?.displayName || "" };
+    this.showEditDisplayName.set(true);
+  }
+  // 🆕 關閉顯示名稱編輯彈窗
+  closeDisplayNameEditor() {
+    this.showEditDisplayName.set(false);
+    this.displayNameForm = { newName: "" };
+  }
+  // 🆕 保存顯示名稱
+  async onSaveDisplayName() {
+    const newName = this.displayNameForm.newName.trim();
+    if (!newName) {
+      this.toast.error("\u8ACB\u8F38\u5165\u986F\u793A\u540D\u7A31");
+      return;
+    }
+    if (newName.length > 30) {
+      this.toast.error("\u986F\u793A\u540D\u7A31\u6700\u591A30\u500B\u5B57\u7B26");
+      return;
+    }
+    this.isSavingDisplayName.set(true);
+    try {
+      const result = await this.authService.updateDisplayName(newName);
+      if (result.success) {
+        this.toast.success(result.message || "\u986F\u793A\u540D\u7A31\u66F4\u65B0\u6210\u529F");
+        this.closeDisplayNameEditor();
+        await this.authService.fetchCurrentUser();
+        this.cdr.detectChanges();
+      } else {
+        this.toast.error(result.message || "\u986F\u793A\u540D\u7A31\u66F4\u65B0\u5931\u6557");
+      }
+    } catch (error) {
+      this.toast.error(error.message || "\u986F\u793A\u540D\u7A31\u66F4\u65B0\u5931\u6557");
+    } finally {
+      this.isSavingDisplayName.set(false);
+    }
+  }
   static {
     this.\u0275fac = function ProfileComponent_Factory(__ngFactoryType__) {
       return new (__ngFactoryType__ || _ProfileComponent)();
     };
   }
   static {
-    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _ProfileComponent, selectors: [["app-profile"]], decls: 34, vars: 27, consts: [[1, "profile-container"], [1, "loading-overlay"], [1, "error-alert"], [1, "profile-header"], [1, "avatar-section"], [1, "avatar"], [1, "user-info"], [1, "username"], [1, "email"], [1, "membership-badge"], [1, "expires"], [1, "logout-btn", 3, "click", "disabled"], [1, "tabs"], [1, "tab-btn", 3, "click"], [1, "tab-content"], [1, "loading-spinner"], [1, "error-icon"], [1, "retry-btn", 3, "click"], [1, "logout-spinner"], [1, "section-card"], [1, "section-title"], [1, "info-grid"], [1, "info-item"], [1, "info-label"], [1, "info-value"], [1, "edit-btn"], [1, "security-actions"], [1, "action-btn", 3, "click"], [1, "action-btn"], [1, "change-password-form"], [1, "form-group"], ["type", "password", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "form-actions"], [1, "cancel-btn", 3, "click"], [1, "submit-btn", 3, "click"], [1, "license-input-group"], ["type", "text", "placeholder", "XXXX-XXXX-XXXX-XXXX", 1, "form-input", "font-mono", 3, "ngModelChange", "ngModel"], [1, "activate-btn", 3, "click", "disabled"], [1, "hint-text"], [1, "license-history"], [1, "loading-state"], [1, "empty-state"], [1, "purchase-options"], [1, "purchase-card", "silver"], [1, "plan-name"], [1, "plan-price"], [1, "plan-features"], [1, "buy-btn"], [1, "purchase-card", "gold"], [1, "recommended"], [1, "purchase-card", "diamond"], [1, "purchase-card", "star"], [1, "purchase-card", "king"], [1, "history-item"], [1, "history-info"], [1, "license-code"], [1, "license-type"], [1, "history-meta"], [1, "status"], [1, "section-desc"], [1, "device-list"], [1, "device-item", 3, "current"], [1, "current-device-info"], [1, "info-row"], [1, "label"], [1, "value", "font-mono"], [1, "copy-btn", 3, "click"], [1, "value"], [1, "device-item"], [1, "device-icon"], [1, "device-info"], [1, "device-name"], [1, "current-badge"], [1, "device-code"], [1, "device-meta"], [1, "unbind-btn", 3, "disabled"], [1, "unbind-btn", 3, "click", "disabled"], [1, "usage-grid"], [1, "usage-item"], [1, "usage-icon"], [1, "usage-info"], [1, "usage-label"], [1, "usage-bar"], [1, "usage-fill"], [1, "usage-text"], [1, "section-card", "highlight"], [1, "invite-code-box"], [1, "invite-label"], [1, "invite-code"], [1, "invite-link-box"], ["type", "text", "readonly", "", 1, "invite-link-input", 3, "value"], [1, "invite-stats"], [1, "stat-item"], [1, "stat-value"], [1, "stat-label"]], template: function ProfileComponent_Template(rf, ctx) {
+    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _ProfileComponent, selectors: [["app-profile"]], decls: 34, vars: 27, consts: [[1, "profile-container"], [1, "loading-overlay"], [1, "error-alert"], [1, "profile-header"], [1, "avatar-section"], [1, "avatar"], [1, "user-info"], [1, "username"], [1, "email"], [1, "membership-badge"], [1, "expires"], [1, "logout-btn", 3, "click", "disabled"], [1, "tabs"], [1, "tab-btn", 3, "click"], [1, "tab-content"], [1, "loading-spinner"], [1, "error-icon"], [1, "retry-btn", 3, "click"], [1, "logout-spinner"], [1, "section-card"], [1, "section-title"], [1, "info-grid"], [1, "info-item"], [1, "info-label"], [1, "info-value", "user-id"], [1, "id-text"], ["title", "\u8907\u88FDID", 1, "copy-id-btn", 3, "click"], [1, "info-value"], [1, "edit-btn", 3, "click"], [1, "info-value", "username-value"], [1, "info-hint"], [1, "modal-overlay"], [1, "security-actions"], [1, "action-btn", 3, "click"], [1, "action-btn"], [1, "change-password-form"], [1, "modal-overlay", 3, "click"], [1, "modal-content", 3, "click"], [1, "modal-header"], [1, "close-btn", 3, "click"], [1, "modal-body"], [1, "form-group"], ["type", "email", "placeholder", "\u8ACB\u8F38\u5165\u65B0\u90F5\u7BB1", 1, "form-input", 3, "ngModelChange", "ngModel"], ["type", "password", "placeholder", "\u8ACB\u8F38\u5165\u7576\u524D\u5BC6\u78BC", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "hint-text"], [1, "modal-footer"], [1, "cancel-btn", 3, "click"], [1, "save-btn", 3, "click", "disabled"], [1, "btn-spinner"], ["type", "text", "placeholder", "\u8ACB\u8F38\u5165\u986F\u793A\u540D\u7A31", "maxlength", "30", 1, "form-input", 3, "ngModelChange", "ngModel"], ["type", "password", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "form-actions"], [1, "submit-btn", 3, "click"], [1, "license-input-group"], ["type", "text", "placeholder", "XXXX-XXXX-XXXX-XXXX", 1, "form-input", "font-mono", 3, "ngModelChange", "ngModel"], [1, "activate-btn", 3, "click", "disabled"], [1, "license-history"], [1, "loading-state"], [1, "empty-state"], [1, "purchase-options"], [1, "purchase-card", "silver"], [1, "plan-name"], [1, "plan-price"], [1, "plan-features"], [1, "buy-btn"], [1, "purchase-card", "gold"], [1, "recommended"], [1, "purchase-card", "diamond"], [1, "purchase-card", "star"], [1, "purchase-card", "king"], [1, "history-item"], [1, "history-info"], [1, "license-code"], [1, "license-type"], [1, "history-meta"], [1, "status"], [1, "section-desc"], [1, "device-list"], [1, "device-item", 3, "current"], [1, "current-device-info"], [1, "info-row"], [1, "label"], [1, "value", "font-mono"], [1, "copy-btn", 3, "click"], [1, "value"], [1, "device-item"], [1, "device-icon"], [1, "device-info"], [1, "device-name"], [1, "current-badge"], [1, "device-code"], [1, "device-meta"], [1, "unbind-btn", 3, "disabled"], [1, "unbind-btn", 3, "click", "disabled"], [1, "usage-grid"], [1, "usage-item"], [1, "usage-icon"], [1, "usage-info"], [1, "usage-label"], [1, "usage-bar"], [1, "usage-fill"], [1, "usage-text"], [1, "section-card", "highlight"], [1, "invite-code-box"], [1, "invite-label"], [1, "invite-code"], [1, "invite-link-box"], ["type", "text", "readonly", "", 1, "invite-link-input", 3, "value"], [1, "invite-stats"], [1, "stat-item"], [1, "stat-value"], [1, "stat-label"]], template: function ProfileComponent_Template(rf, ctx) {
       if (rf & 1) {
         \u0275\u0275elementStart(0, "div", 0);
         \u0275\u0275conditionalCreate(1, ProfileComponent_Conditional_1_Template, 4, 0, "div", 1);
@@ -42632,7 +43027,7 @@ var ProfileComponent = class _ProfileComponent {
         });
         \u0275\u0275text(28, " \u{1F381} \u9080\u8ACB\u734E\u52F5 ");
         \u0275\u0275elementEnd()();
-        \u0275\u0275conditionalCreate(29, ProfileComponent_Conditional_29_Template, 36, 5, "div", 14);
+        \u0275\u0275conditionalCreate(29, ProfileComponent_Conditional_29_Template, 55, 9, "div", 14);
         \u0275\u0275conditionalCreate(30, ProfileComponent_Conditional_30_Template, 103, 3, "div", 14);
         \u0275\u0275conditionalCreate(31, ProfileComponent_Conditional_31_Template, 26, 5, "div", 14);
         \u0275\u0275conditionalCreate(32, ProfileComponent_Conditional_32_Template, 11, 1, "div", 14);
@@ -42685,7 +43080,7 @@ var ProfileComponent = class _ProfileComponent {
         \u0275\u0275advance();
         \u0275\u0275conditional(ctx.activeTab() === "invite" ? 33 : -1);
       }
-    }, dependencies: [CommonModule, FormsModule, DefaultValueAccessor, NgControlStatus, NgModel], styles: ["\n\n.profile-container[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n  max-width: 900px;\n  margin: 0 auto;\n}\n.profile-header[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border: 1px solid rgba(6, 182, 212, 0.2);\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n}\n.avatar-section[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.avatar[_ngcontent-%COMP%] {\n  width: 64px;\n  height: 64px;\n  border-radius: 50%;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: white;\n}\n.username[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0;\n}\n.email[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin: 0.25rem 0;\n}\n.membership-badge[_ngcontent-%COMP%] {\n  display: inline-flex;\n  align-items: center;\n  gap: 0.25rem;\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n  font-size: 0.75rem;\n  font-weight: 500;\n}\n.membership-badge.level-bronze[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #CD7F32,\n      #8B4513);\n  color: white;\n}\n.membership-badge.level-silver[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #C0C0C0,\n      #A8A8A8);\n  color: #1e293b;\n}\n.membership-badge.level-gold[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #FFD700,\n      #FFA500);\n  color: #1e293b;\n}\n.membership-badge.level-diamond[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #B9F2FF,\n      #06b6d4);\n  color: #1e293b;\n}\n.membership-badge.level-star[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #9B59B6,\n      #8E44AD);\n  color: white;\n}\n.membership-badge.level-king[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #FF6B6B,\n      #ee5a5a);\n  color: white;\n}\n.expires[_ngcontent-%COMP%] {\n  opacity: 0.8;\n}\n.logout-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.5rem;\n  color: #fca5a5;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.logout-btn[_ngcontent-%COMP%]:hover:not(:disabled) {\n  background: rgba(239, 68, 68, 0.2);\n}\n.logout-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.7;\n  cursor: not-allowed;\n}\n.logout-spinner[_ngcontent-%COMP%] {\n  display: inline-block;\n  width: 14px;\n  height: 14px;\n  border: 2px solid rgba(239, 68, 68, 0.3);\n  border-top-color: #ef4444;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 0.8s linear infinite;\n}\n@keyframes _ngcontent-%COMP%_spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n.tabs[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1.5rem;\n  flex-wrap: wrap;\n}\n.tab-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n  font-size: 0.875rem;\n}\n.tab-btn[_ngcontent-%COMP%]:hover {\n  border-color: var(--primary, #06b6d4);\n  color: var(--text-primary, white);\n}\n.tab-btn.active[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border-color: transparent;\n  color: white;\n}\n.section-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.section-card.highlight[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border-color: rgba(6, 182, 212, 0.3);\n}\n.section-title[_ngcontent-%COMP%] {\n  font-size: 1rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 1rem 0;\n}\n.section-desc[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin-bottom: 1rem;\n}\n.info-grid[_ngcontent-%COMP%] {\n  display: grid;\n  gap: 1rem;\n}\n.info-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n}\n.info-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  min-width: 80px;\n}\n.info-value[_ngcontent-%COMP%] {\n  color: var(--text-primary, white);\n  flex: 1;\n}\n.edit-btn[_ngcontent-%COMP%], \n.copy-btn[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  background: transparent;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.25rem;\n  color: var(--text-muted, #94a3b8);\n  cursor: pointer;\n  font-size: 0.75rem;\n}\n.edit-btn[_ngcontent-%COMP%]:hover, \n.copy-btn[_ngcontent-%COMP%]:hover {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n}\n.form-group[_ngcontent-%COMP%] {\n  margin-bottom: 1rem;\n}\n.form-group[_ngcontent-%COMP%]   label[_ngcontent-%COMP%] {\n  display: block;\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n}\n.form-input[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-size: 0.875rem;\n}\n.form-input[_ngcontent-%COMP%]:focus {\n  outline: none;\n  border-color: var(--primary, #06b6d4);\n}\n.device-list[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.75rem;\n}\n.device-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.75rem;\n}\n.device-item.current[_ngcontent-%COMP%] {\n  border-color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.1);\n}\n.device-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.device-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.device-name[_ngcontent-%COMP%] {\n  font-weight: 500;\n  color: var(--text-primary, white);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.current-badge[_ngcontent-%COMP%] {\n  font-size: 0.625rem;\n  padding: 0.125rem 0.375rem;\n  background: var(--primary, #06b6d4);\n  border-radius: 0.25rem;\n  color: white;\n}\n.device-code[_ngcontent-%COMP%] {\n  font-family: monospace;\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.device-meta[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n  margin-top: 0.25rem;\n}\n.unbind-btn[_ngcontent-%COMP%] {\n  padding: 0.375rem 0.75rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.375rem;\n  color: #fca5a5;\n  cursor: pointer;\n  font-size: 0.75rem;\n}\n.usage-grid[_ngcontent-%COMP%] {\n  display: grid;\n  gap: 1rem;\n}\n.usage-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n}\n.usage-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.usage-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.usage-label[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n}\n.usage-bar[_ngcontent-%COMP%] {\n  height: 8px;\n  background: var(--bg-primary, #0f172a);\n  border-radius: 4px;\n  overflow: hidden;\n}\n.usage-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 4px;\n  transition: width 0.3s;\n}\n.usage-text[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n  margin-top: 0.25rem;\n}\n.invite-code-box[_ngcontent-%COMP%], \n.invite-link-box[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.invite-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  min-width: 80px;\n}\n.invite-code[_ngcontent-%COMP%] {\n  font-family: monospace;\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n  flex: 1;\n}\n.invite-link-input[_ngcontent-%COMP%] {\n  flex: 1;\n  padding: 0.5rem;\n  background: transparent;\n  border: none;\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n}\n.invite-stats[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 2rem;\n  justify-content: center;\n  padding: 1rem;\n}\n.stat-item[_ngcontent-%COMP%] {\n  text-align: center;\n}\n.stat-value[_ngcontent-%COMP%] {\n  font-size: 2rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.stat-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.purchase-options[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 1rem;\n}\n.purchase-card[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n  border-radius: 1rem;\n  text-align: center;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.purchase-card.silver[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(192, 192, 192, 0.1),\n      rgba(168, 168, 168, 0.1));\n  border-color: rgba(192, 192, 192, 0.3);\n}\n.purchase-card.gold[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(255, 215, 0, 0.1),\n      rgba(255, 165, 0, 0.1));\n  border-color: rgba(255, 215, 0, 0.3);\n}\n.purchase-card.diamond[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.15),\n      rgba(185, 242, 255, 0.1));\n  border-color: rgba(6, 182, 212, 0.4);\n}\n.purchase-card.star[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(155, 89, 182, 0.1),\n      rgba(142, 68, 173, 0.1));\n  border-color: rgba(155, 89, 182, 0.3);\n}\n.purchase-card.king[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(255, 107, 107, 0.15),\n      rgba(238, 90, 90, 0.1));\n  border-color: rgba(255, 107, 107, 0.4);\n}\n.recommended[_ngcontent-%COMP%] {\n  position: absolute;\n  top: -8px;\n  right: -8px;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  color: white;\n  font-size: 0.625rem;\n  padding: 0.125rem 0.5rem;\n  border-radius: 0.25rem;\n  font-weight: 600;\n}\n.purchase-card[_ngcontent-%COMP%] {\n  position: relative;\n}\n.plan-name[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin-bottom: 0.5rem;\n}\n.plan-price[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n  margin-bottom: 1rem;\n}\n.plan-features[_ngcontent-%COMP%] {\n  list-style: none;\n  padding: 0;\n  margin: 0 0 1rem 0;\n  font-size: 0.875rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.plan-features[_ngcontent-%COMP%]   li[_ngcontent-%COMP%] {\n  padding: 0.25rem 0;\n}\n.buy-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  cursor: pointer;\n  font-weight: 500;\n}\n.license-input-group[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 0.5rem;\n}\n.license-input-group[_ngcontent-%COMP%]   .form-input[_ngcontent-%COMP%] {\n  flex: 1;\n  font-family: monospace;\n}\n.activate-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.2s;\n  white-space: nowrap;\n}\n.activate-btn[_ngcontent-%COMP%]:hover:not(:disabled) {\n  transform: translateY(-1px);\n  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);\n}\n.activate-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.hint-text[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin-top: 0.5rem;\n}\n.empty-state[_ngcontent-%COMP%], \n.loading-state[_ngcontent-%COMP%] {\n  text-align: center;\n  padding: 2rem;\n  color: var(--text-muted, #94a3b8);\n}\n.loading-overlay[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.75rem;\n  padding: 1.5rem;\n  background: rgba(6, 182, 212, 0.1);\n  border: 1px solid rgba(6, 182, 212, 0.2);\n  border-radius: 1rem;\n  margin-bottom: 1rem;\n  color: var(--primary, #06b6d4);\n}\n.loading-overlay[_ngcontent-%COMP%]   .loading-spinner[_ngcontent-%COMP%] {\n  width: 24px;\n  height: 24px;\n  border: 3px solid rgba(6, 182, 212, 0.3);\n  border-top-color: #06b6d4;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 0.8s linear infinite;\n}\n.error-alert[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.75rem;\n  padding: 1rem 1.25rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.5rem;\n  color: #fca5a5;\n  margin-bottom: 1rem;\n}\n.error-icon[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n}\n.retry-btn[_ngcontent-%COMP%] {\n  margin-left: auto;\n  padding: 0.375rem 0.75rem;\n  background: rgba(239, 68, 68, 0.2);\n  border: 1px solid rgba(239, 68, 68, 0.4);\n  border-radius: 0.375rem;\n  color: #fca5a5;\n  font-size: 0.75rem;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.retry-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(239, 68, 68, 0.3);\n}\n/*# sourceMappingURL=profile.component.css.map */"] });
+    }, dependencies: [CommonModule, FormsModule, DefaultValueAccessor, NgControlStatus, MaxLengthValidator, NgModel], styles: ["\n\n.profile-container[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n  max-width: 900px;\n  margin: 0 auto;\n}\n.profile-header[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border: 1px solid rgba(6, 182, 212, 0.2);\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n}\n.avatar-section[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.avatar[_ngcontent-%COMP%] {\n  width: 64px;\n  height: 64px;\n  border-radius: 50%;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: white;\n}\n.username[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0;\n}\n.email[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin: 0.25rem 0;\n}\n.membership-badge[_ngcontent-%COMP%] {\n  display: inline-flex;\n  align-items: center;\n  gap: 0.25rem;\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n  font-size: 0.75rem;\n  font-weight: 500;\n}\n.membership-badge.level-bronze[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #CD7F32,\n      #8B4513);\n  color: white;\n}\n.membership-badge.level-silver[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #C0C0C0,\n      #A8A8A8);\n  color: #1e293b;\n}\n.membership-badge.level-gold[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #FFD700,\n      #FFA500);\n  color: #1e293b;\n}\n.membership-badge.level-diamond[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #B9F2FF,\n      #06b6d4);\n  color: #1e293b;\n}\n.membership-badge.level-star[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #9B59B6,\n      #8E44AD);\n  color: white;\n}\n.membership-badge.level-king[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #FF6B6B,\n      #ee5a5a);\n  color: white;\n}\n.expires[_ngcontent-%COMP%] {\n  opacity: 0.8;\n}\n.logout-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.5rem;\n  color: #fca5a5;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.logout-btn[_ngcontent-%COMP%]:hover:not(:disabled) {\n  background: rgba(239, 68, 68, 0.2);\n}\n.logout-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.7;\n  cursor: not-allowed;\n}\n.logout-spinner[_ngcontent-%COMP%] {\n  display: inline-block;\n  width: 14px;\n  height: 14px;\n  border: 2px solid rgba(239, 68, 68, 0.3);\n  border-top-color: #ef4444;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 0.8s linear infinite;\n}\n@keyframes _ngcontent-%COMP%_spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n.tabs[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1.5rem;\n  flex-wrap: wrap;\n}\n.tab-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n  font-size: 0.875rem;\n}\n.tab-btn[_ngcontent-%COMP%]:hover {\n  border-color: var(--primary, #06b6d4);\n  color: var(--text-primary, white);\n}\n.tab-btn.active[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border-color: transparent;\n  color: white;\n}\n.section-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.section-card.highlight[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border-color: rgba(6, 182, 212, 0.3);\n}\n.section-title[_ngcontent-%COMP%] {\n  font-size: 1rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 1rem 0;\n}\n.section-desc[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin-bottom: 1rem;\n}\n.info-grid[_ngcontent-%COMP%] {\n  display: grid;\n  gap: 1rem;\n}\n.info-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n}\n.info-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  min-width: 80px;\n}\n.info-value[_ngcontent-%COMP%] {\n  color: var(--text-primary, white);\n  flex: 1;\n}\n.edit-btn[_ngcontent-%COMP%], \n.copy-btn[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  background: transparent;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.25rem;\n  color: var(--text-muted, #94a3b8);\n  cursor: pointer;\n  font-size: 0.75rem;\n}\n.edit-btn[_ngcontent-%COMP%]:hover, \n.copy-btn[_ngcontent-%COMP%]:hover {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n}\n.form-group[_ngcontent-%COMP%] {\n  margin-bottom: 1rem;\n}\n.form-group[_ngcontent-%COMP%]   label[_ngcontent-%COMP%] {\n  display: block;\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n}\n.form-input[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-size: 0.875rem;\n}\n.form-input[_ngcontent-%COMP%]:focus {\n  outline: none;\n  border-color: var(--primary, #06b6d4);\n}\n.device-list[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.75rem;\n}\n.device-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.75rem;\n}\n.device-item.current[_ngcontent-%COMP%] {\n  border-color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.1);\n}\n.device-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.device-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.device-name[_ngcontent-%COMP%] {\n  font-weight: 500;\n  color: var(--text-primary, white);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.current-badge[_ngcontent-%COMP%] {\n  font-size: 0.625rem;\n  padding: 0.125rem 0.375rem;\n  background: var(--primary, #06b6d4);\n  border-radius: 0.25rem;\n  color: white;\n}\n.device-code[_ngcontent-%COMP%] {\n  font-family: monospace;\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.device-meta[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n  margin-top: 0.25rem;\n}\n.unbind-btn[_ngcontent-%COMP%] {\n  padding: 0.375rem 0.75rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.375rem;\n  color: #fca5a5;\n  cursor: pointer;\n  font-size: 0.75rem;\n}\n.usage-grid[_ngcontent-%COMP%] {\n  display: grid;\n  gap: 1rem;\n}\n.usage-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n}\n.usage-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.usage-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.usage-label[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n}\n.usage-bar[_ngcontent-%COMP%] {\n  height: 8px;\n  background: var(--bg-primary, #0f172a);\n  border-radius: 4px;\n  overflow: hidden;\n}\n.usage-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 4px;\n  transition: width 0.3s;\n}\n.usage-text[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n  margin-top: 0.25rem;\n}\n.invite-code-box[_ngcontent-%COMP%], \n.invite-link-box[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.invite-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  min-width: 80px;\n}\n.invite-code[_ngcontent-%COMP%] {\n  font-family: monospace;\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n  flex: 1;\n}\n.invite-link-input[_ngcontent-%COMP%] {\n  flex: 1;\n  padding: 0.5rem;\n  background: transparent;\n  border: none;\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n}\n.invite-stats[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 2rem;\n  justify-content: center;\n  padding: 1rem;\n}\n.stat-item[_ngcontent-%COMP%] {\n  text-align: center;\n}\n.stat-value[_ngcontent-%COMP%] {\n  font-size: 2rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.stat-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.purchase-options[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 1rem;\n}\n.purchase-card[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n  border-radius: 1rem;\n  text-align: center;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.purchase-card.silver[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(192, 192, 192, 0.1),\n      rgba(168, 168, 168, 0.1));\n  border-color: rgba(192, 192, 192, 0.3);\n}\n.purchase-card.gold[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(255, 215, 0, 0.1),\n      rgba(255, 165, 0, 0.1));\n  border-color: rgba(255, 215, 0, 0.3);\n}\n.purchase-card.diamond[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.15),\n      rgba(185, 242, 255, 0.1));\n  border-color: rgba(6, 182, 212, 0.4);\n}\n.purchase-card.star[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(155, 89, 182, 0.1),\n      rgba(142, 68, 173, 0.1));\n  border-color: rgba(155, 89, 182, 0.3);\n}\n.purchase-card.king[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(255, 107, 107, 0.15),\n      rgba(238, 90, 90, 0.1));\n  border-color: rgba(255, 107, 107, 0.4);\n}\n.recommended[_ngcontent-%COMP%] {\n  position: absolute;\n  top: -8px;\n  right: -8px;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  color: white;\n  font-size: 0.625rem;\n  padding: 0.125rem 0.5rem;\n  border-radius: 0.25rem;\n  font-weight: 600;\n}\n.purchase-card[_ngcontent-%COMP%] {\n  position: relative;\n}\n.plan-name[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin-bottom: 0.5rem;\n}\n.plan-price[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n  margin-bottom: 1rem;\n}\n.plan-features[_ngcontent-%COMP%] {\n  list-style: none;\n  padding: 0;\n  margin: 0 0 1rem 0;\n  font-size: 0.875rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.plan-features[_ngcontent-%COMP%]   li[_ngcontent-%COMP%] {\n  padding: 0.25rem 0;\n}\n.buy-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  cursor: pointer;\n  font-weight: 500;\n}\n.license-input-group[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 0.5rem;\n}\n.license-input-group[_ngcontent-%COMP%]   .form-input[_ngcontent-%COMP%] {\n  flex: 1;\n  font-family: monospace;\n}\n.activate-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.2s;\n  white-space: nowrap;\n}\n.activate-btn[_ngcontent-%COMP%]:hover:not(:disabled) {\n  transform: translateY(-1px);\n  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);\n}\n.activate-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.hint-text[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin-top: 0.5rem;\n}\n.empty-state[_ngcontent-%COMP%], \n.loading-state[_ngcontent-%COMP%] {\n  text-align: center;\n  padding: 2rem;\n  color: var(--text-muted, #94a3b8);\n}\n.loading-overlay[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.75rem;\n  padding: 1.5rem;\n  background: rgba(6, 182, 212, 0.1);\n  border: 1px solid rgba(6, 182, 212, 0.2);\n  border-radius: 1rem;\n  margin-bottom: 1rem;\n  color: var(--primary, #06b6d4);\n}\n.loading-overlay[_ngcontent-%COMP%]   .loading-spinner[_ngcontent-%COMP%] {\n  width: 24px;\n  height: 24px;\n  border: 3px solid rgba(6, 182, 212, 0.3);\n  border-top-color: #06b6d4;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 0.8s linear infinite;\n}\n.error-alert[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.75rem;\n  padding: 1rem 1.25rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.5rem;\n  color: #fca5a5;\n  margin-bottom: 1rem;\n}\n.error-icon[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n}\n.retry-btn[_ngcontent-%COMP%] {\n  margin-left: auto;\n  padding: 0.375rem 0.75rem;\n  background: rgba(239, 68, 68, 0.2);\n  border: 1px solid rgba(239, 68, 68, 0.4);\n  border-radius: 0.375rem;\n  color: #fca5a5;\n  font-size: 0.75rem;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.retry-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(239, 68, 68, 0.3);\n}\n.user-id[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.id-text[_ngcontent-%COMP%] {\n  font-family: monospace;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.copy-id-btn[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  background: rgba(6, 182, 212, 0.1);\n  border: 1px solid rgba(6, 182, 212, 0.3);\n  border-radius: 0.375rem;\n  cursor: pointer;\n  transition: all 0.2s;\n  font-size: 0.875rem;\n}\n.copy-id-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(6, 182, 212, 0.2);\n  border-color: rgba(6, 182, 212, 0.5);\n}\n.username-value[_ngcontent-%COMP%] {\n  font-family: monospace;\n  color: var(--text-secondary, #94a3b8);\n}\n.info-hint[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n  margin-left: 0.5rem;\n}\n.modal-overlay[_ngcontent-%COMP%] {\n  position: fixed;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  background: rgba(0, 0, 0, 0.7);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  z-index: 1000;\n  -webkit-backdrop-filter: blur(4px);\n  backdrop-filter: blur(4px);\n}\n.modal-content[_ngcontent-%COMP%] {\n  background: var(--bg-card, #1e293b);\n  border-radius: 1rem;\n  width: 100%;\n  max-width: 420px;\n  border: 1px solid rgba(255, 255, 255, 0.1);\n  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);\n}\n.modal-header[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  padding: 1.25rem 1.5rem;\n  border-bottom: 1px solid rgba(255, 255, 255, 0.1);\n}\n.modal-header[_ngcontent-%COMP%]   h3[_ngcontent-%COMP%] {\n  margin: 0;\n  font-size: 1.125rem;\n  color: var(--text-primary, white);\n}\n.close-btn[_ngcontent-%COMP%] {\n  width: 32px;\n  height: 32px;\n  border-radius: 50%;\n  border: none;\n  background: rgba(255, 255, 255, 0.1);\n  color: var(--text-muted, #94a3b8);\n  font-size: 1.25rem;\n  cursor: pointer;\n  transition: all 0.2s;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n.close-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(239, 68, 68, 0.2);\n  color: #f87171;\n}\n.modal-body[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n}\n.modal-footer[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.75rem;\n  padding: 1rem 1.5rem;\n  border-top: 1px solid rgba(255, 255, 255, 0.1);\n  justify-content: flex-end;\n}\n.cancel-btn[_ngcontent-%COMP%] {\n  padding: 0.625rem 1.25rem;\n  background: rgba(255, 255, 255, 0.1);\n  border: 1px solid rgba(255, 255, 255, 0.2);\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.cancel-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(255, 255, 255, 0.15);\n}\n.save-btn[_ngcontent-%COMP%] {\n  padding: 0.625rem 1.25rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #0891b2);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.save-btn[_ngcontent-%COMP%]:hover:not(:disabled) {\n  transform: translateY(-1px);\n  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);\n}\n.save-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.6;\n  cursor: not-allowed;\n}\n.btn-spinner[_ngcontent-%COMP%] {\n  width: 16px;\n  height: 16px;\n  border: 2px solid rgba(255, 255, 255, 0.3);\n  border-top-color: white;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 0.8s linear infinite;\n}\n@keyframes _ngcontent-%COMP%_spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n/*# sourceMappingURL=profile.component.css.map */"] });
   }
 };
 (() => {
@@ -42778,13 +43173,26 @@ var ProfileComponent = class _ProfileComponent {
             
             <div class="info-grid">
               <div class="info-item">
+                <span class="info-label">\u7528\u6236ID</span>
+                <span class="info-value user-id">
+                  <span class="id-text">{{ user()?.id || '-' }}</span>
+                  <button class="copy-id-btn" (click)="copyUserId()" title="\u8907\u88FDID">\u{1F4CB}</button>
+                </span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">\u986F\u793A\u540D\u7A31</span>
+                <span class="info-value">{{ user()?.displayName || user()?.username || '\u672A\u8A2D\u7F6E' }}</span>
+                <button class="edit-btn" (click)="openDisplayNameEditor()">\u7DE8\u8F2F</button>
+              </div>
+              <div class="info-item">
                 <span class="info-label">\u7528\u6236\u540D</span>
-                <span class="info-value">{{ user()?.username }}</span>
+                <span class="info-value username-value">{{ user()?.username }}</span>
+                <span class="info-hint">\u767B\u5165\u7528\uFF0C\u4E0D\u53EF\u4FEE\u6539</span>
               </div>
               <div class="info-item">
                 <span class="info-label">\u90F5\u7BB1</span>
                 <span class="info-value">{{ user()?.email || '\u672A\u8A2D\u7F6E' }}</span>
-                <button class="edit-btn">\u7DE8\u8F2F</button>
+                <button class="edit-btn" (click)="openEmailEditor()">\u7DE8\u8F2F</button>
               </div>
               <div class="info-item">
                 <span class="info-label">\u8A3B\u518A\u6642\u9593</span>
@@ -42796,6 +43204,68 @@ var ProfileComponent = class _ProfileComponent {
               </div>
             </div>
           </div>
+          
+          <!-- \u{1F195} \u90F5\u7BB1\u7DE8\u8F2F\u5F48\u7A97 -->
+          @if (showEditEmail()) {
+            <div class="modal-overlay" (click)="closeEmailEditor()">
+              <div class="modal-content" (click)="$event.stopPropagation()">
+                <div class="modal-header">
+                  <h3>\u{1F4E7} \u4FEE\u6539\u90F5\u7BB1</h3>
+                  <button class="close-btn" (click)="closeEmailEditor()">\xD7</button>
+                </div>
+                <div class="modal-body">
+                  <div class="form-group">
+                    <label>\u65B0\u90F5\u7BB1\u5730\u5740</label>
+                    <input type="email" [(ngModel)]="emailForm.newEmail" class="form-input" placeholder="\u8ACB\u8F38\u5165\u65B0\u90F5\u7BB1">
+                  </div>
+                  <div class="form-group">
+                    <label>\u7576\u524D\u5BC6\u78BC\uFF08\u9A57\u8B49\u8EAB\u4EFD\uFF09</label>
+                    <input type="password" [(ngModel)]="emailForm.password" class="form-input" placeholder="\u8ACB\u8F38\u5165\u7576\u524D\u5BC6\u78BC">
+                  </div>
+                  <p class="hint-text">\u26A0\uFE0F \u4FEE\u6539\u90F5\u7BB1\u9700\u8981\u9A57\u8B49\u7576\u524D\u5BC6\u78BC</p>
+                </div>
+                <div class="modal-footer">
+                  <button class="cancel-btn" (click)="closeEmailEditor()">\u53D6\u6D88</button>
+                  <button class="save-btn" (click)="onSaveEmail()" [disabled]="isSavingEmail()">
+                    @if (isSavingEmail()) {
+                      <span class="btn-spinner"></span> \u4FDD\u5B58\u4E2D...
+                    } @else {
+                      \u78BA\u8A8D\u4FEE\u6539
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+          }
+          
+          <!-- \u{1F195} \u986F\u793A\u540D\u7A31\u7DE8\u8F2F\u5F48\u7A97 -->
+          @if (showEditDisplayName()) {
+            <div class="modal-overlay" (click)="closeDisplayNameEditor()">
+              <div class="modal-content" (click)="$event.stopPropagation()">
+                <div class="modal-header">
+                  <h3>\u270F\uFE0F \u4FEE\u6539\u986F\u793A\u540D\u7A31</h3>
+                  <button class="close-btn" (click)="closeDisplayNameEditor()">\xD7</button>
+                </div>
+                <div class="modal-body">
+                  <div class="form-group">
+                    <label>\u986F\u793A\u540D\u7A31</label>
+                    <input type="text" [(ngModel)]="displayNameForm.newName" class="form-input" placeholder="\u8ACB\u8F38\u5165\u986F\u793A\u540D\u7A31" maxlength="30">
+                  </div>
+                  <p class="hint-text">\u{1F4A1} \u986F\u793A\u540D\u7A31\u6703\u5728\u83DC\u55AE\u6B04\u548C\u500B\u4EBA\u4E2D\u5FC3\u986F\u793A\uFF0C\u6700\u591A30\u500B\u5B57\u7B26</p>
+                </div>
+                <div class="modal-footer">
+                  <button class="cancel-btn" (click)="closeDisplayNameEditor()">\u53D6\u6D88</button>
+                  <button class="save-btn" (click)="onSaveDisplayName()" [disabled]="isSavingDisplayName()">
+                    @if (isSavingDisplayName()) {
+                      <span class="btn-spinner"></span> \u4FDD\u5B58\u4E2D...
+                    } @else {
+                      \u78BA\u8A8D\u4FEE\u6539
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+          }
           
           <div class="section-card">
             <h3 class="section-title">\u{1F510} \u5B89\u5168\u8A2D\u7F6E</h3>
@@ -43138,11 +43608,11 @@ var ProfileComponent = class _ProfileComponent {
         </div>
       }
     </div>
-  `, styles: ["/* angular:styles/component:css;292e3c2b0ebd9c5a673e446e4e9ea2592f5852b6be40c4e5935f21a0a574d786;D:/tgkz2026/src/profile.component.ts */\n.profile-container {\n  padding: 1.5rem;\n  max-width: 900px;\n  margin: 0 auto;\n}\n.profile-header {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border: 1px solid rgba(6, 182, 212, 0.2);\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n}\n.avatar-section {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.avatar {\n  width: 64px;\n  height: 64px;\n  border-radius: 50%;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: white;\n}\n.username {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0;\n}\n.email {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin: 0.25rem 0;\n}\n.membership-badge {\n  display: inline-flex;\n  align-items: center;\n  gap: 0.25rem;\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n  font-size: 0.75rem;\n  font-weight: 500;\n}\n.membership-badge.level-bronze {\n  background:\n    linear-gradient(\n      135deg,\n      #CD7F32,\n      #8B4513);\n  color: white;\n}\n.membership-badge.level-silver {\n  background:\n    linear-gradient(\n      135deg,\n      #C0C0C0,\n      #A8A8A8);\n  color: #1e293b;\n}\n.membership-badge.level-gold {\n  background:\n    linear-gradient(\n      135deg,\n      #FFD700,\n      #FFA500);\n  color: #1e293b;\n}\n.membership-badge.level-diamond {\n  background:\n    linear-gradient(\n      135deg,\n      #B9F2FF,\n      #06b6d4);\n  color: #1e293b;\n}\n.membership-badge.level-star {\n  background:\n    linear-gradient(\n      135deg,\n      #9B59B6,\n      #8E44AD);\n  color: white;\n}\n.membership-badge.level-king {\n  background:\n    linear-gradient(\n      135deg,\n      #FF6B6B,\n      #ee5a5a);\n  color: white;\n}\n.expires {\n  opacity: 0.8;\n}\n.logout-btn {\n  padding: 0.5rem 1rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.5rem;\n  color: #fca5a5;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.logout-btn:hover:not(:disabled) {\n  background: rgba(239, 68, 68, 0.2);\n}\n.logout-btn:disabled {\n  opacity: 0.7;\n  cursor: not-allowed;\n}\n.logout-spinner {\n  display: inline-block;\n  width: 14px;\n  height: 14px;\n  border: 2px solid rgba(239, 68, 68, 0.3);\n  border-top-color: #ef4444;\n  border-radius: 50%;\n  animation: spin 0.8s linear infinite;\n}\n@keyframes spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n.tabs {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1.5rem;\n  flex-wrap: wrap;\n}\n.tab-btn {\n  padding: 0.5rem 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n  font-size: 0.875rem;\n}\n.tab-btn:hover {\n  border-color: var(--primary, #06b6d4);\n  color: var(--text-primary, white);\n}\n.tab-btn.active {\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border-color: transparent;\n  color: white;\n}\n.section-card {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.section-card.highlight {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border-color: rgba(6, 182, 212, 0.3);\n}\n.section-title {\n  font-size: 1rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 1rem 0;\n}\n.section-desc {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin-bottom: 1rem;\n}\n.info-grid {\n  display: grid;\n  gap: 1rem;\n}\n.info-item {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n}\n.info-label {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  min-width: 80px;\n}\n.info-value {\n  color: var(--text-primary, white);\n  flex: 1;\n}\n.edit-btn,\n.copy-btn {\n  padding: 0.25rem 0.5rem;\n  background: transparent;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.25rem;\n  color: var(--text-muted, #94a3b8);\n  cursor: pointer;\n  font-size: 0.75rem;\n}\n.edit-btn:hover,\n.copy-btn:hover {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n}\n.form-group {\n  margin-bottom: 1rem;\n}\n.form-group label {\n  display: block;\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n}\n.form-input {\n  width: 100%;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-size: 0.875rem;\n}\n.form-input:focus {\n  outline: none;\n  border-color: var(--primary, #06b6d4);\n}\n.device-list {\n  display: flex;\n  flex-direction: column;\n  gap: 0.75rem;\n}\n.device-item {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.75rem;\n}\n.device-item.current {\n  border-color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.1);\n}\n.device-icon {\n  font-size: 1.5rem;\n}\n.device-info {\n  flex: 1;\n}\n.device-name {\n  font-weight: 500;\n  color: var(--text-primary, white);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.current-badge {\n  font-size: 0.625rem;\n  padding: 0.125rem 0.375rem;\n  background: var(--primary, #06b6d4);\n  border-radius: 0.25rem;\n  color: white;\n}\n.device-code {\n  font-family: monospace;\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.device-meta {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n  margin-top: 0.25rem;\n}\n.unbind-btn {\n  padding: 0.375rem 0.75rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.375rem;\n  color: #fca5a5;\n  cursor: pointer;\n  font-size: 0.75rem;\n}\n.usage-grid {\n  display: grid;\n  gap: 1rem;\n}\n.usage-item {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n}\n.usage-icon {\n  font-size: 1.5rem;\n}\n.usage-info {\n  flex: 1;\n}\n.usage-label {\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n}\n.usage-bar {\n  height: 8px;\n  background: var(--bg-primary, #0f172a);\n  border-radius: 4px;\n  overflow: hidden;\n}\n.usage-fill {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 4px;\n  transition: width 0.3s;\n}\n.usage-text {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n  margin-top: 0.25rem;\n}\n.invite-code-box,\n.invite-link-box {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.invite-label {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  min-width: 80px;\n}\n.invite-code {\n  font-family: monospace;\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n  flex: 1;\n}\n.invite-link-input {\n  flex: 1;\n  padding: 0.5rem;\n  background: transparent;\n  border: none;\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n}\n.invite-stats {\n  display: flex;\n  gap: 2rem;\n  justify-content: center;\n  padding: 1rem;\n}\n.stat-item {\n  text-align: center;\n}\n.stat-value {\n  font-size: 2rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.stat-label {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.purchase-options {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 1rem;\n}\n.purchase-card {\n  padding: 1.5rem;\n  border-radius: 1rem;\n  text-align: center;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.purchase-card.silver {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(192, 192, 192, 0.1),\n      rgba(168, 168, 168, 0.1));\n  border-color: rgba(192, 192, 192, 0.3);\n}\n.purchase-card.gold {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(255, 215, 0, 0.1),\n      rgba(255, 165, 0, 0.1));\n  border-color: rgba(255, 215, 0, 0.3);\n}\n.purchase-card.diamond {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.15),\n      rgba(185, 242, 255, 0.1));\n  border-color: rgba(6, 182, 212, 0.4);\n}\n.purchase-card.star {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(155, 89, 182, 0.1),\n      rgba(142, 68, 173, 0.1));\n  border-color: rgba(155, 89, 182, 0.3);\n}\n.purchase-card.king {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(255, 107, 107, 0.15),\n      rgba(238, 90, 90, 0.1));\n  border-color: rgba(255, 107, 107, 0.4);\n}\n.recommended {\n  position: absolute;\n  top: -8px;\n  right: -8px;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  color: white;\n  font-size: 0.625rem;\n  padding: 0.125rem 0.5rem;\n  border-radius: 0.25rem;\n  font-weight: 600;\n}\n.purchase-card {\n  position: relative;\n}\n.plan-name {\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin-bottom: 0.5rem;\n}\n.plan-price {\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n  margin-bottom: 1rem;\n}\n.plan-features {\n  list-style: none;\n  padding: 0;\n  margin: 0 0 1rem 0;\n  font-size: 0.875rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.plan-features li {\n  padding: 0.25rem 0;\n}\n.buy-btn {\n  padding: 0.5rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  cursor: pointer;\n  font-weight: 500;\n}\n.license-input-group {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 0.5rem;\n}\n.license-input-group .form-input {\n  flex: 1;\n  font-family: monospace;\n}\n.activate-btn {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.2s;\n  white-space: nowrap;\n}\n.activate-btn:hover:not(:disabled) {\n  transform: translateY(-1px);\n  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);\n}\n.activate-btn:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.hint-text {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin-top: 0.5rem;\n}\n.empty-state,\n.loading-state {\n  text-align: center;\n  padding: 2rem;\n  color: var(--text-muted, #94a3b8);\n}\n.loading-overlay {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.75rem;\n  padding: 1.5rem;\n  background: rgba(6, 182, 212, 0.1);\n  border: 1px solid rgba(6, 182, 212, 0.2);\n  border-radius: 1rem;\n  margin-bottom: 1rem;\n  color: var(--primary, #06b6d4);\n}\n.loading-overlay .loading-spinner {\n  width: 24px;\n  height: 24px;\n  border: 3px solid rgba(6, 182, 212, 0.3);\n  border-top-color: #06b6d4;\n  border-radius: 50%;\n  animation: spin 0.8s linear infinite;\n}\n.error-alert {\n  display: flex;\n  align-items: center;\n  gap: 0.75rem;\n  padding: 1rem 1.25rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.5rem;\n  color: #fca5a5;\n  margin-bottom: 1rem;\n}\n.error-icon {\n  font-size: 1.25rem;\n}\n.retry-btn {\n  margin-left: auto;\n  padding: 0.375rem 0.75rem;\n  background: rgba(239, 68, 68, 0.2);\n  border: 1px solid rgba(239, 68, 68, 0.4);\n  border-radius: 0.375rem;\n  color: #fca5a5;\n  font-size: 0.75rem;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.retry-btn:hover {\n  background: rgba(239, 68, 68, 0.3);\n}\n/*# sourceMappingURL=profile.component.css.map */\n"] }]
+  `, styles: ["/* angular:styles/component:css;dc58610479775123a7ae355ce27cc09c667ac578a0c0294810f80384aa409291;D:/tgkz2026/src/profile.component.ts */\n.profile-container {\n  padding: 1.5rem;\n  max-width: 900px;\n  margin: 0 auto;\n}\n.profile-header {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border: 1px solid rgba(6, 182, 212, 0.2);\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n}\n.avatar-section {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.avatar {\n  width: 64px;\n  height: 64px;\n  border-radius: 50%;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: white;\n}\n.username {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0;\n}\n.email {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin: 0.25rem 0;\n}\n.membership-badge {\n  display: inline-flex;\n  align-items: center;\n  gap: 0.25rem;\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n  font-size: 0.75rem;\n  font-weight: 500;\n}\n.membership-badge.level-bronze {\n  background:\n    linear-gradient(\n      135deg,\n      #CD7F32,\n      #8B4513);\n  color: white;\n}\n.membership-badge.level-silver {\n  background:\n    linear-gradient(\n      135deg,\n      #C0C0C0,\n      #A8A8A8);\n  color: #1e293b;\n}\n.membership-badge.level-gold {\n  background:\n    linear-gradient(\n      135deg,\n      #FFD700,\n      #FFA500);\n  color: #1e293b;\n}\n.membership-badge.level-diamond {\n  background:\n    linear-gradient(\n      135deg,\n      #B9F2FF,\n      #06b6d4);\n  color: #1e293b;\n}\n.membership-badge.level-star {\n  background:\n    linear-gradient(\n      135deg,\n      #9B59B6,\n      #8E44AD);\n  color: white;\n}\n.membership-badge.level-king {\n  background:\n    linear-gradient(\n      135deg,\n      #FF6B6B,\n      #ee5a5a);\n  color: white;\n}\n.expires {\n  opacity: 0.8;\n}\n.logout-btn {\n  padding: 0.5rem 1rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.5rem;\n  color: #fca5a5;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.logout-btn:hover:not(:disabled) {\n  background: rgba(239, 68, 68, 0.2);\n}\n.logout-btn:disabled {\n  opacity: 0.7;\n  cursor: not-allowed;\n}\n.logout-spinner {\n  display: inline-block;\n  width: 14px;\n  height: 14px;\n  border: 2px solid rgba(239, 68, 68, 0.3);\n  border-top-color: #ef4444;\n  border-radius: 50%;\n  animation: spin 0.8s linear infinite;\n}\n@keyframes spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n.tabs {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1.5rem;\n  flex-wrap: wrap;\n}\n.tab-btn {\n  padding: 0.5rem 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n  font-size: 0.875rem;\n}\n.tab-btn:hover {\n  border-color: var(--primary, #06b6d4);\n  color: var(--text-primary, white);\n}\n.tab-btn.active {\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border-color: transparent;\n  color: white;\n}\n.section-card {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.section-card.highlight {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border-color: rgba(6, 182, 212, 0.3);\n}\n.section-title {\n  font-size: 1rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 1rem 0;\n}\n.section-desc {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin-bottom: 1rem;\n}\n.info-grid {\n  display: grid;\n  gap: 1rem;\n}\n.info-item {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n}\n.info-label {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  min-width: 80px;\n}\n.info-value {\n  color: var(--text-primary, white);\n  flex: 1;\n}\n.edit-btn,\n.copy-btn {\n  padding: 0.25rem 0.5rem;\n  background: transparent;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.25rem;\n  color: var(--text-muted, #94a3b8);\n  cursor: pointer;\n  font-size: 0.75rem;\n}\n.edit-btn:hover,\n.copy-btn:hover {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n}\n.form-group {\n  margin-bottom: 1rem;\n}\n.form-group label {\n  display: block;\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n}\n.form-input {\n  width: 100%;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-size: 0.875rem;\n}\n.form-input:focus {\n  outline: none;\n  border-color: var(--primary, #06b6d4);\n}\n.device-list {\n  display: flex;\n  flex-direction: column;\n  gap: 0.75rem;\n}\n.device-item {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.75rem;\n}\n.device-item.current {\n  border-color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.1);\n}\n.device-icon {\n  font-size: 1.5rem;\n}\n.device-info {\n  flex: 1;\n}\n.device-name {\n  font-weight: 500;\n  color: var(--text-primary, white);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.current-badge {\n  font-size: 0.625rem;\n  padding: 0.125rem 0.375rem;\n  background: var(--primary, #06b6d4);\n  border-radius: 0.25rem;\n  color: white;\n}\n.device-code {\n  font-family: monospace;\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.device-meta {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n  margin-top: 0.25rem;\n}\n.unbind-btn {\n  padding: 0.375rem 0.75rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.375rem;\n  color: #fca5a5;\n  cursor: pointer;\n  font-size: 0.75rem;\n}\n.usage-grid {\n  display: grid;\n  gap: 1rem;\n}\n.usage-item {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n}\n.usage-icon {\n  font-size: 1.5rem;\n}\n.usage-info {\n  flex: 1;\n}\n.usage-label {\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n}\n.usage-bar {\n  height: 8px;\n  background: var(--bg-primary, #0f172a);\n  border-radius: 4px;\n  overflow: hidden;\n}\n.usage-fill {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 4px;\n  transition: width 0.3s;\n}\n.usage-text {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n  margin-top: 0.25rem;\n}\n.invite-code-box,\n.invite-link-box {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.invite-label {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  min-width: 80px;\n}\n.invite-code {\n  font-family: monospace;\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n  flex: 1;\n}\n.invite-link-input {\n  flex: 1;\n  padding: 0.5rem;\n  background: transparent;\n  border: none;\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n}\n.invite-stats {\n  display: flex;\n  gap: 2rem;\n  justify-content: center;\n  padding: 1rem;\n}\n.stat-item {\n  text-align: center;\n}\n.stat-value {\n  font-size: 2rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.stat-label {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.purchase-options {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 1rem;\n}\n.purchase-card {\n  padding: 1.5rem;\n  border-radius: 1rem;\n  text-align: center;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.purchase-card.silver {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(192, 192, 192, 0.1),\n      rgba(168, 168, 168, 0.1));\n  border-color: rgba(192, 192, 192, 0.3);\n}\n.purchase-card.gold {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(255, 215, 0, 0.1),\n      rgba(255, 165, 0, 0.1));\n  border-color: rgba(255, 215, 0, 0.3);\n}\n.purchase-card.diamond {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.15),\n      rgba(185, 242, 255, 0.1));\n  border-color: rgba(6, 182, 212, 0.4);\n}\n.purchase-card.star {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(155, 89, 182, 0.1),\n      rgba(142, 68, 173, 0.1));\n  border-color: rgba(155, 89, 182, 0.3);\n}\n.purchase-card.king {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(255, 107, 107, 0.15),\n      rgba(238, 90, 90, 0.1));\n  border-color: rgba(255, 107, 107, 0.4);\n}\n.recommended {\n  position: absolute;\n  top: -8px;\n  right: -8px;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  color: white;\n  font-size: 0.625rem;\n  padding: 0.125rem 0.5rem;\n  border-radius: 0.25rem;\n  font-weight: 600;\n}\n.purchase-card {\n  position: relative;\n}\n.plan-name {\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin-bottom: 0.5rem;\n}\n.plan-price {\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n  margin-bottom: 1rem;\n}\n.plan-features {\n  list-style: none;\n  padding: 0;\n  margin: 0 0 1rem 0;\n  font-size: 0.875rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.plan-features li {\n  padding: 0.25rem 0;\n}\n.buy-btn {\n  padding: 0.5rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  cursor: pointer;\n  font-weight: 500;\n}\n.license-input-group {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 0.5rem;\n}\n.license-input-group .form-input {\n  flex: 1;\n  font-family: monospace;\n}\n.activate-btn {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.2s;\n  white-space: nowrap;\n}\n.activate-btn:hover:not(:disabled) {\n  transform: translateY(-1px);\n  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);\n}\n.activate-btn:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.hint-text {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin-top: 0.5rem;\n}\n.empty-state,\n.loading-state {\n  text-align: center;\n  padding: 2rem;\n  color: var(--text-muted, #94a3b8);\n}\n.loading-overlay {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.75rem;\n  padding: 1.5rem;\n  background: rgba(6, 182, 212, 0.1);\n  border: 1px solid rgba(6, 182, 212, 0.2);\n  border-radius: 1rem;\n  margin-bottom: 1rem;\n  color: var(--primary, #06b6d4);\n}\n.loading-overlay .loading-spinner {\n  width: 24px;\n  height: 24px;\n  border: 3px solid rgba(6, 182, 212, 0.3);\n  border-top-color: #06b6d4;\n  border-radius: 50%;\n  animation: spin 0.8s linear infinite;\n}\n.error-alert {\n  display: flex;\n  align-items: center;\n  gap: 0.75rem;\n  padding: 1rem 1.25rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.5rem;\n  color: #fca5a5;\n  margin-bottom: 1rem;\n}\n.error-icon {\n  font-size: 1.25rem;\n}\n.retry-btn {\n  margin-left: auto;\n  padding: 0.375rem 0.75rem;\n  background: rgba(239, 68, 68, 0.2);\n  border: 1px solid rgba(239, 68, 68, 0.4);\n  border-radius: 0.375rem;\n  color: #fca5a5;\n  font-size: 0.75rem;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.retry-btn:hover {\n  background: rgba(239, 68, 68, 0.3);\n}\n.user-id {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.id-text {\n  font-family: monospace;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.copy-id-btn {\n  padding: 0.25rem 0.5rem;\n  background: rgba(6, 182, 212, 0.1);\n  border: 1px solid rgba(6, 182, 212, 0.3);\n  border-radius: 0.375rem;\n  cursor: pointer;\n  transition: all 0.2s;\n  font-size: 0.875rem;\n}\n.copy-id-btn:hover {\n  background: rgba(6, 182, 212, 0.2);\n  border-color: rgba(6, 182, 212, 0.5);\n}\n.username-value {\n  font-family: monospace;\n  color: var(--text-secondary, #94a3b8);\n}\n.info-hint {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n  margin-left: 0.5rem;\n}\n.modal-overlay {\n  position: fixed;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  background: rgba(0, 0, 0, 0.7);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  z-index: 1000;\n  -webkit-backdrop-filter: blur(4px);\n  backdrop-filter: blur(4px);\n}\n.modal-content {\n  background: var(--bg-card, #1e293b);\n  border-radius: 1rem;\n  width: 100%;\n  max-width: 420px;\n  border: 1px solid rgba(255, 255, 255, 0.1);\n  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);\n}\n.modal-header {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  padding: 1.25rem 1.5rem;\n  border-bottom: 1px solid rgba(255, 255, 255, 0.1);\n}\n.modal-header h3 {\n  margin: 0;\n  font-size: 1.125rem;\n  color: var(--text-primary, white);\n}\n.close-btn {\n  width: 32px;\n  height: 32px;\n  border-radius: 50%;\n  border: none;\n  background: rgba(255, 255, 255, 0.1);\n  color: var(--text-muted, #94a3b8);\n  font-size: 1.25rem;\n  cursor: pointer;\n  transition: all 0.2s;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n.close-btn:hover {\n  background: rgba(239, 68, 68, 0.2);\n  color: #f87171;\n}\n.modal-body {\n  padding: 1.5rem;\n}\n.modal-footer {\n  display: flex;\n  gap: 0.75rem;\n  padding: 1rem 1.5rem;\n  border-top: 1px solid rgba(255, 255, 255, 0.1);\n  justify-content: flex-end;\n}\n.cancel-btn {\n  padding: 0.625rem 1.25rem;\n  background: rgba(255, 255, 255, 0.1);\n  border: 1px solid rgba(255, 255, 255, 0.2);\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.cancel-btn:hover {\n  background: rgba(255, 255, 255, 0.15);\n}\n.save-btn {\n  padding: 0.625rem 1.25rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #0891b2);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.save-btn:hover:not(:disabled) {\n  transform: translateY(-1px);\n  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);\n}\n.save-btn:disabled {\n  opacity: 0.6;\n  cursor: not-allowed;\n}\n.btn-spinner {\n  width: 16px;\n  height: 16px;\n  border: 2px solid rgba(255, 255, 255, 0.3);\n  border-top-color: white;\n  border-radius: 50%;\n  animation: spin 0.8s linear infinite;\n}\n@keyframes spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n/*# sourceMappingURL=profile.component.css.map */\n"] }]
   }], null, null);
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(ProfileComponent, { className: "ProfileComponent", filePath: "src/profile.component.ts", lineNumber: 1037 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(ProfileComponent, { className: "ProfileComponent", filePath: "src/profile.component.ts", lineNumber: 1273 });
 })();
 
 // src/manual-mode/resource-center.component.ts
@@ -64340,6 +64810,13 @@ ${details.suggestion || "\u8ACB\u5237\u65B0\u8CC7\u6E90\u5217\u8868"}`);
     }));
     console.log("[App] Current URL:", window.location.href);
     this.ipcService.send("get-initial-state");
+    if (this.isAuthenticated()) {
+      this.authService.fetchCurrentUser().then((user) => {
+        if (user) {
+          console.log("[App] User data refreshed, membership:", this.authService.membershipLevel());
+        }
+      }).catch((err) => console.warn("[App] Failed to refresh user data:", err));
+    }
     this.queueRefreshInterval = setInterval(() => {
       this.refreshQueueStatusThrottled();
     }, 6e4);

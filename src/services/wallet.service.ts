@@ -175,24 +175,85 @@ export class WalletService {
   private _loading = signal(false);
   readonly loading = this._loading.asReadonly();
   
+  // P2: 數據一致性 - 最後更新時間
+  private _lastUpdated = signal<Date | null>(null);
+  readonly lastUpdated = this._lastUpdated.asReadonly();
+  
+  // P2: 數據過期時間（毫秒）
+  private readonly STALE_TIME = 30000; // 30秒後視為過期
+  private readonly AUTO_REFRESH_INTERVAL = 60000; // 1分鐘自動刷新
+  private autoRefreshTimer: any = null;
+  
   // 計算屬性
   readonly balance = computed(() => this._wallet()?.available_balance ?? 0);
   readonly balanceDisplay = computed(() => this._wallet()?.total_display ?? '$0.00');
   readonly hasBalance = computed(() => this.balance() > 0);
   
-  constructor(private api: ApiService) {}
+  // P2: 數據是否過期
+  readonly isStale = computed(() => {
+    const lastUpdate = this._lastUpdated();
+    if (!lastUpdate) return true;
+    return Date.now() - lastUpdate.getTime() > this.STALE_TIME;
+  });
+  
+  // P2: 錢包是否凍結
+  readonly isFrozen = computed(() => this._wallet()?.status === 'frozen');
+  
+  constructor(private api: ApiService) {
+    // P2: 監聽頁面可見性變化，恢復時自動刷新
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && this.isStale()) {
+          this.loadWallet();
+        }
+      });
+    }
+  }
+  
+  // P2: 啟動自動刷新
+  startAutoRefresh() {
+    if (this.autoRefreshTimer) return;
+    this.autoRefreshTimer = setInterval(() => {
+      if (!document.hidden) {
+        this.loadWallet();
+      }
+    }, this.AUTO_REFRESH_INTERVAL);
+  }
+  
+  // P2: 停止自動刷新
+  stopAutoRefresh() {
+    if (this.autoRefreshTimer) {
+      clearInterval(this.autoRefreshTimer);
+      this.autoRefreshTimer = null;
+    }
+  }
+  
+  // P2: 強制刷新
+  async forceRefresh(): Promise<Wallet | null> {
+    return this.loadWallet(true);
+  }
 
   /**
    * 獲取錢包信息
+   * @param forceRefresh 強制刷新，忽略緩存
    */
-  async loadWallet(): Promise<Wallet | null> {
+  async loadWallet(forceRefresh = false): Promise<Wallet | null> {
+    // P2: 如果數據未過期且不強制刷新，返回緩存
+    if (!forceRefresh && !this.isStale() && this._wallet()) {
+      return this._wallet();
+    }
+    
     this._loading.set(true);
     
     try {
-      const response = await this.api.get<any>('/api/wallet');
+      const response = await this.api.get<any>('/api/wallet', { 
+        cache: false // 確保獲取最新數據
+      });
       
       if (response?.success && response?.data) {
         this._wallet.set(response.data);
+        // P2: 更新時間戳
+        this._lastUpdated.set(new Date());
         return response.data;
       }
       
@@ -203,6 +264,38 @@ export class WalletService {
     } finally {
       this._loading.set(false);
     }
+  }
+  
+  /**
+   * P2: 樂觀更新餘額（用於兌換碼等操作後的即時反饋）
+   * @param amountChange 餘額變化量（分）
+   * @param bonusChange 贈送餘額變化量（分）
+   */
+  optimisticUpdateBalance(amountChange: number, bonusChange: number = 0) {
+    const current = this._wallet();
+    if (!current) return;
+    
+    // 創建新的錢包對象（不可變更新）
+    const updated: Wallet = {
+      ...current,
+      balance: current.balance + amountChange,
+      bonus_balance: current.bonus_balance + bonusChange,
+      available_balance: current.available_balance + amountChange + bonusChange,
+      balance_display: `$${((current.balance + amountChange) / 100).toFixed(2)}`,
+      bonus_display: `$${((current.bonus_balance + bonusChange) / 100).toFixed(2)}`,
+      total_display: `$${((current.available_balance + amountChange + bonusChange) / 100).toFixed(2)}`,
+      total_recharged: current.total_recharged + (amountChange > 0 ? amountChange : 0)
+    };
+    
+    this._wallet.set(updated);
+    this._lastUpdated.set(new Date());
+  }
+  
+  /**
+   * P2: 標記數據為過期，下次訪問時強制刷新
+   */
+  invalidateCache() {
+    this._lastUpdated.set(null);
   }
 
   /**

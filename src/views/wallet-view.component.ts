@@ -9,7 +9,7 @@
  * - 充值入口
  */
 
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -68,19 +68,63 @@ import { ApiService } from '../core/api.service';
               <span class="value">{{ wallet()?.bonus_display || '$0.00' }}</span>
             </div>
           </div>
+          <!-- P2: 凍結狀態警告 -->
+          @if (isFrozen()) {
+            <div class="frozen-warning">
+              🔒 錢包已被凍結，請聯繫客服解凍後操作
+            </div>
+          }
+          
           <div class="balance-actions">
-            <button class="recharge-btn" (click)="goToRecharge()">
-              💳 充值
+            <button 
+              class="recharge-btn" 
+              (click)="goToRecharge()"
+              [disabled]="!canOperate() || isNavigating()"
+              [class.loading]="isNavigating()"
+            >
+              @if (isNavigating()) {
+                <span class="btn-spinner"></span>
+              } @else {
+                💳
+              }
+              充值
             </button>
-            <button class="withdraw-btn" (click)="goToWithdraw()">
+            <button 
+              class="withdraw-btn" 
+              (click)="goToWithdraw()"
+              [disabled]="!canOperate() || isNavigating()"
+              [class.loading]="isNavigating()"
+            >
               📤 提現
             </button>
-            <button class="redeem-btn" (click)="showRedeemCode()">
+            <button 
+              class="redeem-btn" 
+              (click)="showRedeemCode()"
+              [disabled]="!canOperate()"
+            >
               🎁 兌換碼
             </button>
           </div>
         </div>
       </div>
+      
+      <!-- P2: 離線提示條 -->
+      @if (!isOnline()) {
+        <div class="offline-banner">
+          <span class="offline-icon">📡</span>
+          <span class="offline-text">您目前處於離線狀態</span>
+          <button class="retry-btn" (click)="retryConnection()">重試連接</button>
+        </div>
+      }
+      
+      <!-- P2: 全局錯誤提示 -->
+      @if (globalError()) {
+        <div class="global-error-toast" (click)="dismissError()">
+          <span class="error-icon">⚠️</span>
+          <span class="error-text">{{ globalError() }}</span>
+          <button class="dismiss-btn">×</button>
+        </div>
+      }
 
       <!-- 本月消費概覽 -->
       <div class="section consume-overview" *ngIf="analysis()">
@@ -428,6 +472,121 @@ import { ApiService } from '../core/api.service';
       opacity: 0.6;
       cursor: not-allowed;
       transform: none !important;
+    }
+
+    .balance-actions button.loading {
+      position: relative;
+    }
+
+    /* P2: 凍結警告 */
+    .frozen-warning {
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(185, 28, 28, 0.2) 100%);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: 12px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      color: #fca5a5;
+      text-align: center;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    /* P2: 離線提示條 */
+    .offline-banner {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      animation: slideDown 0.3s ease;
+    }
+
+    @keyframes slideDown {
+      from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+      to { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+
+    .offline-icon {
+      font-size: 20px;
+    }
+
+    .offline-text {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .retry-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .retry-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* P2: 全局錯誤提示 */
+    .global-error-toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      cursor: pointer;
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateX(-50%) translateY(100%); opacity: 0; }
+      to { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+
+    .error-icon {
+      font-size: 18px;
+    }
+
+    .error-text {
+      font-size: 14px;
+      max-width: 280px;
+    }
+
+    .dismiss-btn {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+
+    .dismiss-btn:hover {
+      color: #fff;
     }
 
     /* 區塊通用樣式 */
@@ -858,7 +1017,7 @@ import { ApiService } from '../core/api.service';
     }
   `]
 })
-export class WalletViewComponent implements OnInit {
+export class WalletViewComponent implements OnInit, OnDestroy {
   wallet = signal<Wallet | null>(null);
   recentTransactions = signal<Transaction[]>([]);
   analysis = signal<ConsumeAnalysis | null>(null);
@@ -872,24 +1031,69 @@ export class WalletViewComponent implements OnInit {
   redeemError = signal('');
   redeemSuccess = signal('');
   
+  // P2: 網絡狀態和錯誤提示
+  isOnline = signal(true);
+  globalError = signal('');
+  isNavigating = signal(false);
+  
+  // 計算屬性
   balanceDisplay = computed(() => {
     const w = this.wallet();
     if (!w) return '0.00';
     return (w.available_balance / 100).toFixed(2);
   });
   
+  // P2: 錢包凍結狀態
+  isFrozen = computed(() => {
+    const w = this.wallet();
+    return w?.status === 'frozen';
+  });
+  
+  // P2: 操作是否可用
+  canOperate = computed(() => {
+    return this.isOnline() && !this.isFrozen() && !this.loading() && !this.isNavigating();
+  });
+  
   constructor(
     private walletService: WalletService,
     private router: Router,
     private apiService: ApiService
-  ) {}
+  ) {
+    // P2: 監聽網絡狀態
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        this.isOnline.set(true);
+        this.globalError.set('');
+        // 網絡恢復時自動刷新數據
+        this.loadData();
+      });
+      window.addEventListener('offline', () => {
+        this.isOnline.set(false);
+        this.globalError.set('網絡連接已斷開，請檢查網絡設置');
+      });
+      this.isOnline.set(navigator.onLine);
+    }
+  }
   
   ngOnInit() {
     this.loadData();
+    // P2: 啟動自動刷新
+    this.walletService.startAutoRefresh();
+  }
+  
+  ngOnDestroy() {
+    // P2: 清理自動刷新
+    this.walletService.stopAutoRefresh();
   }
   
   async loadData() {
+    // P2: 離線時跳過加載
+    if (!this.isOnline()) {
+      return;
+    }
+    
     this.loading.set(true);
+    this.globalError.set('');
     
     try {
       const [wallet, transactions, analysis, monthly] = await Promise.all([
@@ -899,13 +1103,28 @@ export class WalletViewComponent implements OnInit {
         this.walletService.getMonthlySummary(6)
       ]);
       
-      if (wallet) this.wallet.set(wallet);
+      if (wallet) {
+        this.wallet.set(wallet);
+        // P2: 檢測到凍結狀態時顯示提示
+        if (wallet.status === 'frozen') {
+          this.globalError.set('您的錢包已被凍結，請聯繫客服');
+        }
+      }
       this.recentTransactions.set(transactions);
       if (analysis) this.analysis.set(analysis);
       this.monthlySummary.set(monthly);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Load wallet data error:', error);
+      // P2: 區分不同錯誤類型
+      if (error.message?.includes('Network') || error.name === 'TypeError') {
+        this.globalError.set('網絡請求失敗，請檢查網絡連接');
+      } else if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+        this.globalError.set('登錄已過期，請重新登錄');
+        setTimeout(() => this.router.navigate(['/login']), 2000);
+      } else {
+        this.globalError.set('載入數據失敗，請稍後重試');
+      }
     } finally {
       this.loading.set(false);
     }
@@ -916,14 +1135,62 @@ export class WalletViewComponent implements OnInit {
   }
   
   goToRecharge() {
-    this.router.navigate(['/wallet/recharge']);
+    if (!this.canOperate()) {
+      if (this.isFrozen()) {
+        this.globalError.set('錢包已凍結，無法進行充值操作');
+      } else if (!this.isOnline()) {
+        this.globalError.set('網絡連接異常，請檢查網絡後重試');
+      }
+      return;
+    }
+    this.isNavigating.set(true);
+    this.router.navigate(['/wallet/recharge']).finally(() => {
+      this.isNavigating.set(false);
+    });
   }
   
   goToWithdraw() {
-    this.router.navigate(['/wallet/withdraw']);
+    if (!this.canOperate()) {
+      if (this.isFrozen()) {
+        this.globalError.set('錢包已凍結，無法進行提現操作');
+      } else if (!this.isOnline()) {
+        this.globalError.set('網絡連接異常，請檢查網絡後重試');
+      }
+      return;
+    }
+    this.isNavigating.set(true);
+    this.router.navigate(['/wallet/withdraw']).finally(() => {
+      this.isNavigating.set(false);
+    });
+  }
+  
+  // P2: 重試連接
+  retryConnection() {
+    if (navigator.onLine) {
+      this.isOnline.set(true);
+      this.globalError.set('');
+      this.loadData();
+    } else {
+      this.globalError.set('網絡仍未連接，請檢查網絡設置');
+    }
+  }
+  
+  // P2: 關閉錯誤提示
+  dismissError() {
+    this.globalError.set('');
   }
   
   showRedeemCode() {
+    // P2: 檢查操作權限
+    if (!this.canOperate()) {
+      if (this.isFrozen()) {
+        this.globalError.set('錢包已凍結，無法使用兌換碼');
+      } else if (!this.isOnline()) {
+        this.globalError.set('網絡連接異常，請檢查網絡後重試');
+      }
+      return;
+    }
+    
     this.redeemCode = '';
     this.redeemError.set('');
     this.redeemSuccess.set('');
@@ -962,8 +1229,17 @@ export class WalletViewComponent implements OnInit {
           (bonusAmount > 0 ? ` (含贈送 $${(bonusAmount / 100).toFixed(2)})` : '')
         );
         
-        // 重新載入錢包數據
-        await this.loadData();
+        // P2: 樂觀更新餘額（立即反饋）
+        this.walletService.optimisticUpdateBalance(amount, bonusAmount);
+        
+        // P2: 同步更新本地狀態
+        const updatedWallet = this.walletService.wallet();
+        if (updatedWallet) {
+          this.wallet.set(updatedWallet);
+        }
+        
+        // 後台重新載入完整數據（確保數據一致性）
+        this.loadData();
         
         // 2秒後自動關閉彈窗
         setTimeout(() => {

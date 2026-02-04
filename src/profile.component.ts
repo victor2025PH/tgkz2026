@@ -13,13 +13,14 @@ import { DeviceService } from './device.service';
 import { I18nService } from './i18n.service';
 import { ToastService } from './toast.service';
 import { LicenseClientService } from './license-client.service';
+import { UserLevelBadgeComponent } from './components/user-level-badge.component';
 
 type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, UserLevelBadgeComponent],
   template: `
     <div class="profile-container">
       <!-- 🔧 加載中狀態 -->
@@ -48,10 +49,11 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
           <div class="user-info">
             <h2 class="username">{{ user()?.displayName || user()?.username || (isLoadingUser() ? '載入中...' : '未登入') }}</h2>
             <p class="email">{{ user()?.email || '未設置郵箱' }}</p>
-            <div class="membership-badge" [class]="'level-' + membershipLevel()">
-              {{ getMembershipIcon() }} {{ getMembershipName() }}
+            <div class="membership-badge-wrapper flex items-center gap-2">
+              <!-- 🔧 P1-2: 使用統一的會員等級徽章組件 -->
+              <user-level-badge [level]="membershipLevel()" size="md" />
               @if (membershipDaysLeft() > 0) {
-                <span class="expires">· 剩餘 {{ membershipDaysLeft() }} 天</span>
+                <span class="expires text-xs opacity-70">· 剩餘 {{ membershipDaysLeft() }} 天</span>
               }
             </div>
           </div>

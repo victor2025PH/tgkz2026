@@ -121,6 +121,15 @@ export class AuthService implements OnDestroy {
   private _devices = signal<DeviceInfo[]>([]);
   private _usageStats = signal<UsageStats | null>(null);
   
+  // 🔧 P1: Cache-then-Network 策略相關
+  // TTL 配置（毫秒）
+  private readonly USER_DATA_TTL = 5 * 60 * 1000;  // 用戶數據 TTL: 5 分鐘
+  private readonly REFRESH_DEBOUNCE = 3 * 1000;    // 刷新防抖: 3 秒
+  
+  // 最後刷新時間戳
+  private _lastUserFetchTime = 0;
+  private _isRefreshing = false;
+  
   // 公開的計算屬性
   isAuthenticated = computed(() => this._isAuthenticated());
   user = computed(() => this._user());
@@ -241,11 +250,39 @@ export class AuthService implements OnDestroy {
           this._user.set(user);
           this._isAuthenticated.set(true);
           
-          console.log('[AuthService] 已從本地存儲恢復用戶:', user.username);
+          // 🔧 P1: 讀取緩存時間戳
+          const cachedAt = rawUser._cachedAt || 0;
+          const cacheAge = Date.now() - cachedAt;
+          const isStale = cacheAge > this.USER_DATA_TTL;
+          
+          console.log('[AuthService] 已從本地存儲恢復用戶:', user.username, '等級:', user.membershipLevel, 
+            `緩存年齡: ${Math.round(cacheAge / 1000)}s`, isStale ? '(已過期)' : '(有效)');
+          
+          // 記錄緩存時間（如果有）
+          if (cachedAt > 0) {
+            this._lastUserFetchTime = cachedAt;
+          }
           
           // 載入設備列表和使用統計（異步，不阻塞）
           this.loadDevices().catch(err => console.error('載入設備列表失敗:', err));
           this.loadUsageStats().catch(err => console.error('載入使用統計失敗:', err));
+          
+          // 🔧 P0/P1 修復：Cache-then-Network 策略
+          // 先顯示本地緩存數據，同時從服務端刷新最新用戶信息
+          // 如果緩存已過期或無時間戳，強制刷新；否則使用智能刷新
+          if (isStale || cachedAt === 0) {
+            console.log('[AuthService] 緩存已過期，強制刷新用戶數據');
+            this.refreshUserFromServer().catch(err => {
+              console.warn('[AuthService] 服務端用戶數據刷新失敗，保持使用本地緩存:', err);
+            });
+          } else {
+            // 緩存有效，但仍在後台刷新以確保最新
+            setTimeout(() => {
+              this.refreshUserFromServer().catch(err => {
+                console.warn('[AuthService] 後台刷新用戶數據失敗:', err);
+              });
+            }, 1000);  // 延遲 1 秒，避免阻塞首次渲染
+          }
         } catch (parseError) {
           console.error('解析用戶數據失敗:', parseError);
           this.clearLocalAuth();
@@ -311,10 +348,16 @@ export class AuthService implements OnDestroy {
           status: rawUser.status || (rawUser.is_active ? 'active' : 'suspended')
         };
         
-        console.log('[AuthService] fetchCurrentUser: Success', user.username);
+        console.log('[AuthService] fetchCurrentUser: Success', user.username, '等級:', user.membershipLevel);
         this._user.set(user);
-        // 更新 localStorage
-        localStorage.setItem('tgm_user', JSON.stringify(result.data));
+        // 🔧 P1: 記錄刷新時間戳
+        this._lastUserFetchTime = Date.now();
+        // 更新 localStorage（帶時間戳）
+        const dataToStore = {
+          ...result.data,
+          _cachedAt: this._lastUserFetchTime
+        };
+        localStorage.setItem('tgm_user', JSON.stringify(dataToStore));
         return user;
       }
       
@@ -324,6 +367,183 @@ export class AuthService implements OnDestroy {
       console.error('[AuthService] fetchCurrentUser error:', e);
       return null;
     }
+  }
+  
+  /**
+   * 🔧 P0 修復：從服務端刷新用戶數據（Cache-then-Network 策略的 Network 部分）
+   * 
+   * 功能：
+   * 1. 異步從服務端獲取最新用戶數據
+   * 2. 比對關鍵字段（membershipLevel, displayName 等）
+   * 3. 如果不一致，更新本地數據並記錄日誌
+   * 4. 為後續數據一致性監控提供基礎
+   */
+  private async refreshUserFromServer(): Promise<void> {
+    const localUser = this._user();
+    if (!localUser) {
+      console.log('[AuthService] refreshUserFromServer: 無本地用戶，跳過刷新');
+      return;
+    }
+    
+    const localLevel = localUser.membershipLevel;
+    const localDisplayName = localUser.displayName;
+    
+    console.log('[AuthService] refreshUserFromServer: 開始刷新，當前本地等級:', localLevel);
+    
+    try {
+      const serverUser = await this.fetchCurrentUser();
+      
+      if (serverUser) {
+        // 🔧 數據一致性檢測
+        const inconsistencies: string[] = [];
+        
+        if (serverUser.membershipLevel !== localLevel) {
+          inconsistencies.push(`membershipLevel: ${localLevel} → ${serverUser.membershipLevel}`);
+        }
+        if (serverUser.displayName !== localDisplayName) {
+          inconsistencies.push(`displayName: ${localDisplayName} → ${serverUser.displayName}`);
+        }
+        
+        if (inconsistencies.length > 0) {
+          console.warn('[AuthService] 🔄 數據不一致已修正:', inconsistencies.join(', '));
+          
+          // 🔧 P2: 數據不一致監控記錄
+          this.recordDataInconsistency({
+            userId: localUser.id,
+            timestamp: new Date().toISOString(),
+            fields: inconsistencies,
+            localData: { membershipLevel: localLevel, displayName: localDisplayName },
+            serverData: { membershipLevel: serverUser.membershipLevel, displayName: serverUser.displayName }
+          });
+        } else {
+          console.log('[AuthService] ✓ 本地數據與服務端一致');
+        }
+      }
+    } catch (error) {
+      // 網絡錯誤時保持使用本地數據，不影響用戶體驗
+      console.warn('[AuthService] refreshUserFromServer: 網絡錯誤，保持本地數據', error);
+    }
+  }
+  
+  /**
+   * 🆕 公開方法：強制刷新用戶數據
+   * 供組件在關鍵時機（如頁面可見、會員頁面進入）調用
+   * 
+   * 🔧 P1 增強：智能刷新策略
+   * - 支持 TTL 檢查，避免頻繁刷新
+   * - 支持強制刷新模式（忽略 TTL）
+   * - 防抖機制，避免並發刷新
+   */
+  async forceRefreshUser(options: { force?: boolean } = {}): Promise<User | null> {
+    const now = Date.now();
+    const timeSinceLastFetch = now - this._lastUserFetchTime;
+    
+    // 防抖：如果正在刷新中，跳過
+    if (this._isRefreshing) {
+      console.log('[AuthService] forceRefreshUser: 正在刷新中，跳過');
+      return this._user();
+    }
+    
+    // TTL 檢查：如果不是強制刷新且未過期，跳過
+    if (!options.force && timeSinceLastFetch < this.USER_DATA_TTL) {
+      console.log(`[AuthService] forceRefreshUser: 數據未過期 (${Math.round(timeSinceLastFetch / 1000)}s < ${this.USER_DATA_TTL / 1000}s)，跳過刷新`);
+      return this._user();
+    }
+    
+    // 防抖：如果距離上次刷新太近，跳過（除非強制）
+    if (!options.force && timeSinceLastFetch < this.REFRESH_DEBOUNCE) {
+      console.log('[AuthService] forceRefreshUser: 防抖保護，跳過');
+      return this._user();
+    }
+    
+    console.log('[AuthService] forceRefreshUser: 開始刷新用戶數據', options.force ? '(強制)' : '');
+    this._isRefreshing = true;
+    
+    try {
+      const user = await this.fetchCurrentUser();
+      this._lastUserFetchTime = Date.now();
+      return user;
+    } finally {
+      this._isRefreshing = false;
+    }
+  }
+  
+  /**
+   * 🆕 P1: 檢查用戶數據是否過期
+   */
+  isUserDataStale(): boolean {
+    return Date.now() - this._lastUserFetchTime > this.USER_DATA_TTL;
+  }
+  
+  // ============ 🔧 P2: 數據不一致監控 ============
+  
+  private readonly INCONSISTENCY_LOG_KEY = 'tgm_data_inconsistency_log';
+  private readonly MAX_LOG_ENTRIES = 50;  // 最多保留 50 條記錄
+  
+  /**
+   * 🔧 P2: 記錄數據不一致事件
+   * 
+   * 記錄到 localStorage 供後續分析：
+   * - 可用於調試數據同步問題
+   * - 可用於監控數據一致性趨勢
+   * - 可在未來接入正式監控系統
+   */
+  private recordDataInconsistency(event: {
+    userId: number;
+    timestamp: string;
+    fields: string[];
+    localData: Record<string, any>;
+    serverData: Record<string, any>;
+  }): void {
+    try {
+      // 讀取現有日誌
+      const storedLog = localStorage.getItem(this.INCONSISTENCY_LOG_KEY);
+      const log: typeof event[] = storedLog ? JSON.parse(storedLog) : [];
+      
+      // 添加新記錄
+      log.push(event);
+      
+      // 保持日誌大小在限制內
+      while (log.length > this.MAX_LOG_ENTRIES) {
+        log.shift();
+      }
+      
+      // 保存更新後的日誌
+      localStorage.setItem(this.INCONSISTENCY_LOG_KEY, JSON.stringify(log));
+      
+      console.log(`[AuthService] 📊 數據不一致已記錄 (共 ${log.length} 條)`);
+      
+      // 🔧 未來可以在這裡添加遠程上報邏輯
+      // this.reportToAnalytics(event);
+    } catch (error) {
+      console.warn('[AuthService] 記錄數據不一致失敗:', error);
+    }
+  }
+  
+  /**
+   * 🔧 P2: 獲取數據不一致日誌（供調試使用）
+   */
+  getInconsistencyLog(): Array<{
+    userId: number;
+    timestamp: string;
+    fields: string[];
+    localData: Record<string, any>;
+    serverData: Record<string, any>;
+  }> {
+    try {
+      const storedLog = localStorage.getItem(this.INCONSISTENCY_LOG_KEY);
+      return storedLog ? JSON.parse(storedLog) : [];
+    } catch {
+      return [];
+    }
+  }
+  
+  /**
+   * 🔧 P2: 清除數據不一致日誌
+   */
+  clearInconsistencyLog(): void {
+    localStorage.removeItem(this.INCONSISTENCY_LOG_KEY);
+    console.log('[AuthService] 數據不一致日誌已清除');
   }
   
   /**

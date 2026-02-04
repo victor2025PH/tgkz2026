@@ -51,6 +51,7 @@ import { BatchInviteDialogComponent, BatchInviteTarget } from './dialogs/batch-i
 import { MemberExtractionDialogComponent, MemberExtractionConfig, ExtractionGroupInfo } from './dialogs/member-extraction-dialog.component';
 import { AIStrategyResult } from './ai-assistant/ai-marketing-assistant.component';
 import { CommandPaletteComponent } from './components/command-palette.component';
+import { UserLevelBadgeComponent } from './components/user-level-badge.component';
 import { NetworkStatusComponent } from './core/network-status.component';
 import { AuthTransitionComponent } from './core/auth-transition.component';
 // EmptyStateComponent 暫時未使用
@@ -171,6 +172,8 @@ interface SuccessOverlayConfig {
     MarketingReportComponent,
     // 通用組件（模板中使用）
     ToastComponent, GlobalConfirmDialogComponent, GlobalInputDialogComponent, ProgressDialogComponent,
+    // 🔧 P1-2: 統一會員等級徽章組件
+    UserLevelBadgeComponent,
     // 會員相關（模板中使用）
     MembershipDialogComponent, UpgradePromptComponent, PaymentComponent,
     // 導航和佈局（模板中使用）
@@ -6177,6 +6180,15 @@ export class AppComponent implements OnDestroy, OnInit {
               telegramId: (user as any).telegramId || (user as any).telegram_id,
               membership: this.authService.membershipLevel()
             });
+            
+            // 🔧 P2: 同步到 MembershipService（確保數據一致性）
+            if (this.membershipService.isSaaSMode()) {
+              this.membershipService.syncFromAuthService(
+                this.authService.membershipLevel(),
+                this.authService.user()?.membershipExpires
+              );
+            }
+            
             // 強制變更檢測
             this.cdr.detectChanges();
           }
@@ -6397,6 +6409,22 @@ export class AppComponent implements OnDestroy, OnInit {
       this.queueRefreshInterval = setInterval(() => {
         this.refreshQueueStatusThrottled();
       }, 60000);
+    }
+    
+    // 🔧 P0 增強：頁面可見時刷新用戶數據
+    // 確保會員等級、顯示名稱等關鍵信息與服務端保持一致
+    if (this.isAuthenticated()) {
+      this.authService.forceRefreshUser().then(user => {
+        if (user) {
+          console.log('[App] 頁面可見，用戶數據已刷新:', {
+            displayName: user.displayName,
+            membershipLevel: user.membershipLevel
+          });
+          this.cdr.detectChanges();
+        }
+      }).catch(err => {
+        console.warn('[App] 頁面可見時刷新用戶數據失敗:', err);
+      });
     }
   }
   

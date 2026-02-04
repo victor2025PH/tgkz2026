@@ -106,13 +106,22 @@ export class AuthService implements OnDestroy {
   readonly isPro = computed(() => ['pro', 'enterprise'].includes(this.subscriptionTier()));
   
   // 會員等級（兼容舊接口）
+  // 🔧 P0 修復：完整的等級映射，支持 subscription_tier 和直接的等級名稱
   readonly membershipLevel = computed(() => {
     const tier = this.subscriptionTier();
     const tierMap: Record<string, string> = {
+      // 從 subscription_tier 轉換
       'free': 'bronze',
       'basic': 'silver',
       'pro': 'gold',
-      'enterprise': 'diamond'
+      'enterprise': 'diamond',
+      // 🔧 直接映射（數據庫可能直接存儲等級名稱）
+      'bronze': 'bronze',
+      'silver': 'silver',
+      'gold': 'gold',
+      'diamond': 'diamond',
+      'star': 'star',
+      'king': 'king'
     };
     return tierMap[tier] || 'bronze';
   });

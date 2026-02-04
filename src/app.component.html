@@ -463,7 +463,7 @@
            [style.background-color]="view === 'membership-center' ? 'var(--sidebar-item-active)' : 'transparent'"
            [style.color]="view === 'membership-center' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
            <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-           <span>會員中心</span>
+           <span>{{ t('menu.membershipCenter') }}</span>
         </a>
         
         <!-- 我的錢包 -->
@@ -473,7 +473,7 @@
            [style.background-color]="view === 'wallet' ? 'var(--sidebar-item-active)' : 'transparent'"
            [style.color]="view === 'wallet' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
            <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-           <span>我的錢包</span>
+           <span>{{ t('menu.myWallet') }}</span>
         </a>
         
         <!-- 儀表盤 -->
@@ -491,7 +491,7 @@
           <button (click)="toggleSidebarGroup('manual')" 
                   class="w-full flex items-center justify-between px-3 py-2 mt-2 rounded-md hover:bg-white/5 transition-colors cursor-pointer group">
             <span class="sidebar-group-title text-xs uppercase tracking-wider flex items-center gap-1" style="color: var(--sidebar-group-title);">
-              🔧 手動操作
+              🔧 {{ t('menu.manualOperations') }}
             </span>
             <svg class="w-3.5 h-3.5 transition-transform duration-200" 
                  [class.rotate-180]="!isSidebarGroupExpanded('manual')"
@@ -522,7 +522,7 @@
                  [style.background-color]="view === 'search-discovery' ? 'rgba(6, 182, 212, 0.2)' : 'transparent'"
                  [style.color]="view === 'search-discovery' ? '#22d3ee' : 'var(--sidebar-text)'">
                  <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-                 <span>搜索發現</span>
+                 <span>{{ t('menu.searchDiscovery') }}</span>
                  <span class="absolute right-2 px-1.5 py-0.5 text-[10px] bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-full font-bold">NEW</span>
               </a>
               
@@ -533,7 +533,7 @@
                  [style.background-color]="(view === 'resource-center' || view === 'resources') ? 'rgba(6, 182, 212, 0.2)' : 'transparent'"
                  [style.color]="(view === 'resource-center' || view === 'resources') ? '#22d3ee' : 'var(--sidebar-text)'">
                  <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-                 <span>資源中心</span>
+                 <span>{{ t('menu.resourceCenter') }}</span>
               </a>
               
               <!-- 📤 發送控制台 -->
@@ -543,7 +543,7 @@
                  [style.background-color]="view === 'leads' ? 'var(--sidebar-item-active)' : 'transparent'"
                  [style.color]="view === 'leads' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
                  <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
-                 <span>發送控制台</span>
+                 <span>{{ t('menu.sendConsole') }}</span>
               </a>
             </div>
           }
@@ -555,7 +555,7 @@
                   class="w-full flex items-center justify-between px-3 py-2 mt-2 rounded-md hover:bg-white/5 transition-colors cursor-pointer group">
             <span class="sidebar-group-title text-xs uppercase tracking-wider font-semibold flex items-center gap-1" style="color: var(--sidebar-group-title);">
               <span class="inline-block w-5 h-5 rounded bg-gradient-to-br from-cyan-500 to-blue-500 text-center leading-5 text-[10px]">📡</span>
-              監控中心
+              {{ t('menu.monitoringCenter') }}
             </span>
             <svg class="w-3.5 h-3.5 transition-transform duration-200" 
                  [class.rotate-180]="!isSidebarGroupExpanded('monitoring')"
@@ -582,8 +582,8 @@
                      <span class="text-lg">📊</span>
                   </div>
                   <div class="flex flex-col">
-                     <span class="font-medium">自動化總覽</span>
-                     <span class="text-[10px] opacity-60">配置與監控狀態</span>
+                     <span class="font-medium">{{ t('menu.automationOverview') }}</span>
+                     <span class="text-[10px] opacity-60">{{ t('menu.configAndStatus') }}</span>
                   </div>
               </a>
               
@@ -594,7 +594,7 @@
                  [style.background-color]="view === 'monitoring-accounts' ? 'rgba(6, 182, 212, 0.1)' : 'transparent'"
                  [style.color]="view === 'monitoring-accounts' ? '#22d3ee' : 'var(--sidebar-text)'">
                  <span class="text-lg ml-1">📱</span>
-                 <span>監控帳號</span>
+                 <span>{{ t('menu.monitorAccounts') }}</span>
               </a>
               
               <!-- 💬 監控群組 -->
@@ -604,7 +604,7 @@
                  [style.background-color]="view === 'monitoring-groups' ? 'rgba(16, 185, 129, 0.1)' : 'transparent'"
                  [style.color]="view === 'monitoring-groups' ? '#34d399' : 'var(--sidebar-text)'">
                  <span class="text-lg ml-1">💬</span>
-                 <span>監控群組</span>
+                 <span>{{ t('menu.monitorGroups') }}</span>
               </a>
               
               <!-- 🔑 關鍵詞集 -->
@@ -614,7 +614,7 @@
                  [style.background-color]="view === 'keyword-sets' ? 'rgba(139, 92, 246, 0.1)' : 'transparent'"
                  [style.color]="view === 'keyword-sets' ? '#a78bfa' : 'var(--sidebar-text)'">
                  <span class="text-lg ml-1">🔑</span>
-                 <span>關鍵詞集</span>
+                 <span>{{ t('menu.keywordSets') }}</span>
               </a>
               
               <!-- 📝 聊天模板 -->
@@ -624,7 +624,7 @@
                  [style.background-color]="view === 'chat-templates' ? 'rgba(236, 72, 153, 0.1)' : 'transparent'"
                  [style.color]="view === 'chat-templates' ? '#f472b6' : 'var(--sidebar-text)'">
                  <span class="text-lg ml-1">📝</span>
-                 <span>聊天模板</span>
+                 <span>{{ t('menu.chatTemplates') }}</span>
               </a>
               
               <!-- ⚡ 觸發規則 -->
@@ -634,7 +634,7 @@
                  [style.background-color]="view === 'trigger-rules' ? 'rgba(251, 146, 60, 0.1)' : 'transparent'"
                  [style.color]="view === 'trigger-rules' ? '#fb923c' : 'var(--sidebar-text)'">
                  <span class="text-lg ml-1">⚡</span>
-                 <span>觸發規則</span>
+                 <span>{{ t('menu.triggerRules') }}</span>
               </a>
               
               <!-- 👥 收集用戶（廣告識別） -->
@@ -644,7 +644,7 @@
                  [style.background-color]="view === 'collected-users' ? 'rgba(139, 92, 246, 0.1)' : 'transparent'"
                  [style.color]="view === 'collected-users' ? '#a78bfa' : 'var(--sidebar-text)'">
                  <span class="text-lg ml-1">👥</span>
-                 <span>收集用戶</span>
+                 <span>{{ t('menu.collectedUsers') }}</span>
                  <span class="ml-auto text-xs px-1.5 py-0.5 bg-violet-500/20 text-violet-400 rounded">NEW</span>
               </a>
             </div>
@@ -657,7 +657,7 @@
                   class="w-full flex items-center justify-between px-3 py-2 mt-2 rounded-md hover:bg-white/5 transition-colors cursor-pointer group">
             <span class="sidebar-group-title text-xs uppercase tracking-wider font-semibold flex items-center gap-1" style="color: var(--sidebar-group-title);">
               <span class="inline-block w-5 h-5 rounded bg-gradient-to-br from-violet-500 to-fuchsia-500 text-center leading-5 text-[10px]">AI</span>
-              智能營銷
+              {{ t('menu.aiMarketing') }}
             </span>
             <svg class="w-3.5 h-3.5 transition-transform duration-200" 
                  [class.rotate-180]="!isSidebarGroupExpanded('marketing')"
@@ -838,7 +838,7 @@
              [style.background-color]="isKnowledgeView() ? 'rgba(236, 72, 153, 0.15)' : 'transparent'"
              [style.color]="isKnowledgeView() ? '#f472b6' : 'var(--sidebar-text)'">
              <span class="text-lg">🧠</span>
-             <span class="flex-1">知識大腦</span>
+             <span class="flex-1">{{ t('menu.knowledgeBrain') }}</span>
              <span class="text-xs transition-transform duration-200" [class.rotate-180]="knowledgeMenuExpanded()">▼</span>
           </a>
           
@@ -851,7 +851,7 @@
                  [style.background-color]="view === 'knowledge-brain' ? 'rgba(236, 72, 153, 0.1)' : 'transparent'"
                  [style.color]="view === 'knowledge-brain' ? '#f472b6' : 'var(--sidebar-text-muted)'">
                  <span>📊</span>
-                 <span>總覽</span>
+                 <span>{{ t('menu.overview') }}</span>
               </a>
               <a (click)="changeView('knowledge-manage')" 
                  class="sidebar-item flex items-center gap-2 px-3 py-2 rounded-md transition-all duration-200 cursor-pointer text-sm"
@@ -859,7 +859,7 @@
                  [style.background-color]="view === 'knowledge-manage' ? 'rgba(236, 72, 153, 0.1)' : 'transparent'"
                  [style.color]="view === 'knowledge-manage' ? '#f472b6' : 'var(--sidebar-text-muted)'">
                  <span>📝</span>
-                 <span>知識管理</span>
+                 <span>{{ t('menu.knowledgeManagement') }}</span>
               </a>
               <a (click)="changeView('knowledge-gaps')" 
                  class="sidebar-item flex items-center gap-2 px-3 py-2 rounded-md transition-all duration-200 cursor-pointer text-sm relative"
@@ -867,7 +867,7 @@
                  [style.background-color]="view === 'knowledge-gaps' ? 'rgba(236, 72, 153, 0.1)' : 'transparent'"
                  [style.color]="view === 'knowledge-gaps' ? '#f472b6' : 'var(--sidebar-text-muted)'">
                  <span>❓</span>
-                 <span>知識缺口</span>
+                 <span>{{ t('menu.knowledgeGaps') }}</span>
                  @if (ragBrainService.gapsCount() > 0) {
                    <span class="ml-auto text-xs font-bold rounded-full px-1.5 py-0.5" style="background-color: rgba(239, 68, 68, 0.2); color: #f87171;">{{ ragBrainService.gapsCount() }}</span>
                  }
@@ -926,7 +926,7 @@
         <button (click)="openOnboarding()"
                 class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 border border-cyan-500/30 hover:border-cyan-500/50 text-cyan-400 rounded-xl transition-all text-sm font-medium group">
           <span class="text-lg group-hover:animate-bounce">❓</span>
-          <span>使用帮助</span>
+          <span>{{ t('menu.help') }}</span>
         </button>
         
         <div>

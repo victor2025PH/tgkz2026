@@ -73303,13 +73303,17 @@ var routes = [
     title: "\u652F\u4ED8\u4E2D\u5FC3",
     canActivate: [authGuard]
   },
-  // 🆕 Phase 0: 錢包系統
+  // 🆕 Phase 0: 錢包系統 - 具體路由必須在通用路由之前
   {
-    path: "wallet",
-    pathMatch: "full",
-    // 確保只匹配精確的 /wallet 路徑
-    loadComponent: () => import("./chunk-YFQK2ZWN.js").then((m) => m.WalletViewComponent),
-    title: "\u6211\u7684\u9322\u5305",
+    path: "wallet/recharge",
+    loadComponent: () => import("./chunk-XHVPHUVH.js").then((m) => m.WalletRechargeComponent),
+    title: "\u5145\u503C\u4E2D\u5FC3",
+    canActivate: [authGuard]
+  },
+  {
+    path: "wallet/withdraw",
+    loadComponent: () => import("./chunk-C5XUP5QL.js").then((m) => m.WalletWithdrawComponent),
+    title: "\u63D0\u73FE",
     canActivate: [authGuard]
   },
   {
@@ -73318,13 +73322,6 @@ var routes = [
     title: "\u4EA4\u6613\u8A18\u9304",
     canActivate: [authGuard]
   },
-  {
-    path: "wallet/recharge",
-    loadComponent: () => import("./chunk-XHVPHUVH.js").then((m) => m.WalletRechargeComponent),
-    title: "\u5145\u503C\u4E2D\u5FC3",
-    canActivate: [authGuard]
-  },
-  // 🆕 Phase 3: 錢包高級功能
   {
     path: "wallet/orders",
     loadComponent: () => import("./chunk-UIUXT5GK.js").then((m) => m.WalletOrdersComponent),
@@ -73337,11 +73334,12 @@ var routes = [
     title: "\u6D88\u8CBB\u5206\u6790",
     canActivate: [authGuard]
   },
-  // 🆕 Phase 4: 提現功能
+  // 錢包主頁放在所有 wallet/* 路由之後
   {
-    path: "wallet/withdraw",
-    loadComponent: () => import("./chunk-C5XUP5QL.js").then((m) => m.WalletWithdrawComponent),
-    title: "\u63D0\u73FE",
+    path: "wallet",
+    pathMatch: "full",
+    loadComponent: () => import("./chunk-YFQK2ZWN.js").then((m) => m.WalletViewComponent),
+    title: "\u6211\u7684\u9322\u5305",
     canActivate: [authGuard]
   },
   // 營銷功能 - 需要會員權限

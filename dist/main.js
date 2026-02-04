@@ -1,6 +1,6 @@
 import {
   authGuard
-} from "./chunk-UE6ET2M5.js";
+} from "./chunk-4NW3NYHP.js";
 import {
   WalletOrdersComponent
 } from "./chunk-MEWYCPNB.js";
@@ -10,25 +10,25 @@ import {
 import {
   AuthEventsService,
   AuthService
-} from "./chunk-EY2QFFJA.js";
+} from "./chunk-2G2ZNYYZ.js";
 import {
   AiCenterViewComponent
-} from "./chunk-AIZRAQX3.js";
+} from "./chunk-GLMKOHSV.js";
 import {
   AutoGroupService,
   MultiRoleViewComponent
-} from "./chunk-STMAXXHJ.js";
+} from "./chunk-ICLVZQMQ.js";
 import {
   AIProviderService,
   DynamicScriptEngineService
-} from "./chunk-UU2EWNBQ.js";
+} from "./chunk-6MV7RIEN.js";
 import {
   AnalyticsViewComponent
-} from "./chunk-5F6KNM7V.js";
+} from "./chunk-SE77KBXW.js";
 import {
   ConfirmDialogService,
   MonitoringViewComponent
-} from "./chunk-BKUHQXQW.js";
+} from "./chunk-JQDGLS5B.js";
 import {
   WalletViewComponent
 } from "./chunk-2CNBI7M4.js";
@@ -47,30 +47,30 @@ import {
 import "./chunk-LRT2RG6V.js";
 import {
   LicenseClientService
-} from "./chunk-SDTPNQBR.js";
+} from "./chunk-A2YLVIZU.js";
 import {
   DashboardViewComponent
-} from "./chunk-SGK3XT22.js";
+} from "./chunk-66E6NV6B.js";
 import {
   MarketingAnalyticsService
-} from "./chunk-UNP75L76.js";
+} from "./chunk-6NMZIGVF.js";
 import {
   AccountsViewComponent
-} from "./chunk-MVMHNEHY.js";
+} from "./chunk-TUZCLVJD.js";
 import {
   SettingsViewComponent
-} from "./chunk-NHFFOREU.js";
+} from "./chunk-BL56X2KT.js";
 import {
   LeadsViewComponent
-} from "./chunk-VI3GGFK2.js";
+} from "./chunk-MGBRSD7Q.js";
 import {
   AutomationViewComponent
-} from "./chunk-32DEPZ5T.js";
+} from "./chunk-MSP4NM5P.js";
 import "./chunk-XBRFXE36.js";
 import {
   ResourceDiscoveryViewComponent,
   SearchDiscoveryComponent
-} from "./chunk-5UEKEXAW.js";
+} from "./chunk-5N472RHM.js";
 import {
   AUTO_STYLE,
   AiChatService,
@@ -96,10 +96,10 @@ import {
   sequence,
   style,
   ɵPRE_STYLE
-} from "./chunk-P5NRPJO6.js";
+} from "./chunk-XT45YJ5X.js";
 import {
   AICenterService
-} from "./chunk-RUWU7PL6.js";
+} from "./chunk-FN2YHCU4.js";
 import {
   BrowserModule,
   DomRendererFactory2,
@@ -113,11 +113,11 @@ import {
   DEFAULT_TAGS,
   STATUS_OPTIONS,
   UnifiedContactsService
-} from "./chunk-UTR72ISQ.js";
-import "./chunk-5TVIREIP.js";
+} from "./chunk-GRS575IO.js";
+import "./chunk-WJVAD2FT.js";
 import {
   MonitoringManagementService
-} from "./chunk-AWDF3A3Y.js";
+} from "./chunk-JYDDS6LH.js";
 import {
   NavBridgeService,
   NavShortcutsService,
@@ -160,7 +160,7 @@ import {
 import {
   MembershipService,
   ToastService
-} from "./chunk-ORLIRJMO.js";
+} from "./chunk-Z2LRLAVM.js";
 import {
   ANIMATION_MODULE_TYPE,
   ChangeDetectionStrategy,
@@ -27052,6 +27052,10 @@ var AuthService2 = class _AuthService {
     this._isLoading = signal(false, ...ngDevMode ? [{ debugName: "_isLoading" }] : []);
     this._devices = signal([], ...ngDevMode ? [{ debugName: "_devices" }] : []);
     this._usageStats = signal(null, ...ngDevMode ? [{ debugName: "_usageStats" }] : []);
+    this.USER_DATA_TTL = 5 * 60 * 1e3;
+    this.REFRESH_DEBOUNCE = 3 * 1e3;
+    this._lastUserFetchTime = 0;
+    this._isRefreshing = false;
     this.isAuthenticated = computed(() => this._isAuthenticated(), ...ngDevMode ? [{ debugName: "isAuthenticated" }] : []);
     this.user = computed(() => this._user(), ...ngDevMode ? [{ debugName: "user" }] : []);
     this.isLoading = computed(() => this._isLoading(), ...ngDevMode ? [{ debugName: "isLoading" }] : []);
@@ -27075,6 +27079,8 @@ var AuthService2 = class _AuthService {
         return 0;
       return Math.max(0, Math.floor((new Date(expires).getTime() - Date.now()) / (1e3 * 60 * 60 * 24)));
     }, ...ngDevMode ? [{ debugName: "membershipDaysLeft" }] : []);
+    this.INCONSISTENCY_LOG_KEY = "tgm_data_inconsistency_log";
+    this.MAX_LOG_ENTRIES = 50;
     if (this.SKIP_LOGIN) {
       console.log("[AuthService] \u514D\u767B\u9304\u6A21\u5F0F\u5DF2\u555F\u7528\uFF0C\u9ED8\u8A8D\u70BA\u738B\u8005\u6703\u54E1");
       return;
@@ -27144,9 +27150,27 @@ var AuthService2 = class _AuthService {
           this._token.set(storedToken);
           this._user.set(user);
           this._isAuthenticated.set(true);
-          console.log("[AuthService] \u5DF2\u5F9E\u672C\u5730\u5B58\u5132\u6062\u5FA9\u7528\u6236:", user.username);
+          const cachedAt = rawUser._cachedAt || 0;
+          const cacheAge = Date.now() - cachedAt;
+          const isStale = cacheAge > this.USER_DATA_TTL;
+          console.log("[AuthService] \u5DF2\u5F9E\u672C\u5730\u5B58\u5132\u6062\u5FA9\u7528\u6236:", user.username, "\u7B49\u7D1A:", user.membershipLevel, `\u7DE9\u5B58\u5E74\u9F61: ${Math.round(cacheAge / 1e3)}s`, isStale ? "(\u5DF2\u904E\u671F)" : "(\u6709\u6548)");
+          if (cachedAt > 0) {
+            this._lastUserFetchTime = cachedAt;
+          }
           this.loadDevices().catch((err) => console.error("\u8F09\u5165\u8A2D\u5099\u5217\u8868\u5931\u6557:", err));
           this.loadUsageStats().catch((err) => console.error("\u8F09\u5165\u4F7F\u7528\u7D71\u8A08\u5931\u6557:", err));
+          if (isStale || cachedAt === 0) {
+            console.log("[AuthService] \u7DE9\u5B58\u5DF2\u904E\u671F\uFF0C\u5F37\u5236\u5237\u65B0\u7528\u6236\u6578\u64DA");
+            this.refreshUserFromServer().catch((err) => {
+              console.warn("[AuthService] \u670D\u52D9\u7AEF\u7528\u6236\u6578\u64DA\u5237\u65B0\u5931\u6557\uFF0C\u4FDD\u6301\u4F7F\u7528\u672C\u5730\u7DE9\u5B58:", err);
+            });
+          } else {
+            setTimeout(() => {
+              this.refreshUserFromServer().catch((err) => {
+                console.warn("[AuthService] \u5F8C\u53F0\u5237\u65B0\u7528\u6236\u6578\u64DA\u5931\u6557:", err);
+              });
+            }, 1e3);
+          }
         } catch (parseError) {
           console.error("\u89E3\u6790\u7528\u6236\u6578\u64DA\u5931\u6557:", parseError);
           this.clearLocalAuth();
@@ -27203,9 +27227,13 @@ var AuthService2 = class _AuthService {
           lastLogin: rawUser.lastLogin || rawUser.last_login_at || (/* @__PURE__ */ new Date()).toISOString(),
           status: rawUser.status || (rawUser.is_active ? "active" : "suspended")
         };
-        console.log("[AuthService] fetchCurrentUser: Success", user.username);
+        console.log("[AuthService] fetchCurrentUser: Success", user.username, "\u7B49\u7D1A:", user.membershipLevel);
         this._user.set(user);
-        localStorage.setItem("tgm_user", JSON.stringify(result.data));
+        this._lastUserFetchTime = Date.now();
+        const dataToStore = __spreadProps(__spreadValues({}, result.data), {
+          _cachedAt: this._lastUserFetchTime
+        });
+        localStorage.setItem("tgm_user", JSON.stringify(dataToStore));
         return user;
       }
       console.warn("[AuthService] fetchCurrentUser: API returned", result);
@@ -27214,6 +27242,131 @@ var AuthService2 = class _AuthService {
       console.error("[AuthService] fetchCurrentUser error:", e);
       return null;
     }
+  }
+  /**
+   * 🔧 P0 修復：從服務端刷新用戶數據（Cache-then-Network 策略的 Network 部分）
+   *
+   * 功能：
+   * 1. 異步從服務端獲取最新用戶數據
+   * 2. 比對關鍵字段（membershipLevel, displayName 等）
+   * 3. 如果不一致，更新本地數據並記錄日誌
+   * 4. 為後續數據一致性監控提供基礎
+   */
+  async refreshUserFromServer() {
+    const localUser = this._user();
+    if (!localUser) {
+      console.log("[AuthService] refreshUserFromServer: \u7121\u672C\u5730\u7528\u6236\uFF0C\u8DF3\u904E\u5237\u65B0");
+      return;
+    }
+    const localLevel = localUser.membershipLevel;
+    const localDisplayName = localUser.displayName;
+    console.log("[AuthService] refreshUserFromServer: \u958B\u59CB\u5237\u65B0\uFF0C\u7576\u524D\u672C\u5730\u7B49\u7D1A:", localLevel);
+    try {
+      const serverUser = await this.fetchCurrentUser();
+      if (serverUser) {
+        const inconsistencies = [];
+        if (serverUser.membershipLevel !== localLevel) {
+          inconsistencies.push(`membershipLevel: ${localLevel} \u2192 ${serverUser.membershipLevel}`);
+        }
+        if (serverUser.displayName !== localDisplayName) {
+          inconsistencies.push(`displayName: ${localDisplayName} \u2192 ${serverUser.displayName}`);
+        }
+        if (inconsistencies.length > 0) {
+          console.warn("[AuthService] \u{1F504} \u6578\u64DA\u4E0D\u4E00\u81F4\u5DF2\u4FEE\u6B63:", inconsistencies.join(", "));
+          this.recordDataInconsistency({
+            userId: localUser.id,
+            timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+            fields: inconsistencies,
+            localData: { membershipLevel: localLevel, displayName: localDisplayName },
+            serverData: { membershipLevel: serverUser.membershipLevel, displayName: serverUser.displayName }
+          });
+        } else {
+          console.log("[AuthService] \u2713 \u672C\u5730\u6578\u64DA\u8207\u670D\u52D9\u7AEF\u4E00\u81F4");
+        }
+      }
+    } catch (error) {
+      console.warn("[AuthService] refreshUserFromServer: \u7DB2\u7D61\u932F\u8AA4\uFF0C\u4FDD\u6301\u672C\u5730\u6578\u64DA", error);
+    }
+  }
+  /**
+   * 🆕 公開方法：強制刷新用戶數據
+   * 供組件在關鍵時機（如頁面可見、會員頁面進入）調用
+   *
+   * 🔧 P1 增強：智能刷新策略
+   * - 支持 TTL 檢查，避免頻繁刷新
+   * - 支持強制刷新模式（忽略 TTL）
+   * - 防抖機制，避免並發刷新
+   */
+  async forceRefreshUser(options = {}) {
+    const now = Date.now();
+    const timeSinceLastFetch = now - this._lastUserFetchTime;
+    if (this._isRefreshing) {
+      console.log("[AuthService] forceRefreshUser: \u6B63\u5728\u5237\u65B0\u4E2D\uFF0C\u8DF3\u904E");
+      return this._user();
+    }
+    if (!options.force && timeSinceLastFetch < this.USER_DATA_TTL) {
+      console.log(`[AuthService] forceRefreshUser: \u6578\u64DA\u672A\u904E\u671F (${Math.round(timeSinceLastFetch / 1e3)}s < ${this.USER_DATA_TTL / 1e3}s)\uFF0C\u8DF3\u904E\u5237\u65B0`);
+      return this._user();
+    }
+    if (!options.force && timeSinceLastFetch < this.REFRESH_DEBOUNCE) {
+      console.log("[AuthService] forceRefreshUser: \u9632\u6296\u4FDD\u8B77\uFF0C\u8DF3\u904E");
+      return this._user();
+    }
+    console.log("[AuthService] forceRefreshUser: \u958B\u59CB\u5237\u65B0\u7528\u6236\u6578\u64DA", options.force ? "(\u5F37\u5236)" : "");
+    this._isRefreshing = true;
+    try {
+      const user = await this.fetchCurrentUser();
+      this._lastUserFetchTime = Date.now();
+      return user;
+    } finally {
+      this._isRefreshing = false;
+    }
+  }
+  /**
+   * 🆕 P1: 檢查用戶數據是否過期
+   */
+  isUserDataStale() {
+    return Date.now() - this._lastUserFetchTime > this.USER_DATA_TTL;
+  }
+  /**
+   * 🔧 P2: 記錄數據不一致事件
+   *
+   * 記錄到 localStorage 供後續分析：
+   * - 可用於調試數據同步問題
+   * - 可用於監控數據一致性趨勢
+   * - 可在未來接入正式監控系統
+   */
+  recordDataInconsistency(event) {
+    try {
+      const storedLog = localStorage.getItem(this.INCONSISTENCY_LOG_KEY);
+      const log = storedLog ? JSON.parse(storedLog) : [];
+      log.push(event);
+      while (log.length > this.MAX_LOG_ENTRIES) {
+        log.shift();
+      }
+      localStorage.setItem(this.INCONSISTENCY_LOG_KEY, JSON.stringify(log));
+      console.log(`[AuthService] \u{1F4CA} \u6578\u64DA\u4E0D\u4E00\u81F4\u5DF2\u8A18\u9304 (\u5171 ${log.length} \u689D)`);
+    } catch (error) {
+      console.warn("[AuthService] \u8A18\u9304\u6578\u64DA\u4E0D\u4E00\u81F4\u5931\u6557:", error);
+    }
+  }
+  /**
+   * 🔧 P2: 獲取數據不一致日誌（供調試使用）
+   */
+  getInconsistencyLog() {
+    try {
+      const storedLog = localStorage.getItem(this.INCONSISTENCY_LOG_KEY);
+      return storedLog ? JSON.parse(storedLog) : [];
+    } catch {
+      return [];
+    }
+  }
+  /**
+   * 🔧 P2: 清除數據不一致日誌
+   */
+  clearInconsistencyLog() {
+    localStorage.removeItem(this.INCONSISTENCY_LOG_KEY);
+    console.log("[AuthService] \u6578\u64DA\u4E0D\u4E00\u81F4\u65E5\u8A8C\u5DF2\u6E05\u9664");
   }
   /**
    * 獲取 API 基礎 URL
@@ -27620,7 +27773,7 @@ var AuthService2 = class _AuthService {
   async loadUsageStats() {
     try {
       try {
-        const { LicenseClientService: LicenseClientService2 } = await import("./chunk-SKFX5KMD.js");
+        const { LicenseClientService: LicenseClientService2 } = await import("./chunk-VDINMIPG.js");
         const licenseClient = this.injector.get(LicenseClientService2);
         const result = await licenseClient.getUsageStats();
         if (result.success && result.stats) {
@@ -38928,6 +39081,125 @@ var CommandPaletteComponent = class _CommandPaletteComponent {
   (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(CommandPaletteComponent, { className: "CommandPaletteComponent", filePath: "src/components/command-palette.component.ts", lineNumber: 207 });
 })();
 
+// src/components/user-level-badge.component.ts
+function UserLevelBadgeComponent_Conditional_1_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275domElementStart(0, "span", 3);
+    \u0275\u0275text(1);
+    \u0275\u0275domElementEnd();
+  }
+  if (rf & 2) {
+    const ctx_r0 = \u0275\u0275nextContext();
+    \u0275\u0275classProp("animate-bounce", ctx_r0.level === "king")("animate-pulse", ctx_r0.level !== "king" && ctx_r0.level !== "bronze");
+    \u0275\u0275advance();
+    \u0275\u0275textInterpolate1(" ", ctx_r0.levelIcon(), " ");
+  }
+}
+function UserLevelBadgeComponent_Conditional_2_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275domElementStart(0, "span", 2);
+    \u0275\u0275text(1);
+    \u0275\u0275domElementEnd();
+  }
+  if (rf & 2) {
+    const ctx_r0 = \u0275\u0275nextContext();
+    \u0275\u0275advance();
+    \u0275\u0275textInterpolate(ctx_r0.levelText());
+  }
+}
+var UserLevelBadgeComponent = class _UserLevelBadgeComponent {
+  constructor() {
+    this.i18n = inject(I18nService);
+    this.level = "bronze";
+    this.size = "sm";
+    this.showIcon = true;
+    this.showText = true;
+    this.LEVEL_ICONS = {
+      bronze: "\u2694\uFE0F",
+      silver: "\u{1F948}",
+      gold: "\u{1F947}",
+      diamond: "\u{1F48E}",
+      star: "\u{1F31F}",
+      king: "\u{1F451}"
+    };
+    this.LEVEL_NAMES = {
+      bronze: "membershipLevels.bronze",
+      silver: "membershipLevels.silver",
+      gold: "membershipLevels.gold",
+      diamond: "membershipLevels.diamond",
+      star: "membershipLevels.star",
+      king: "membershipLevels.king"
+    };
+    this.badgeClasses = computed(() => {
+      return `badge-${this.size} badge-${this.level}`;
+    }, ...ngDevMode ? [{ debugName: "badgeClasses" }] : []);
+    this.levelIcon = computed(() => {
+      return this.LEVEL_ICONS[this.level] || "\u2694\uFE0F";
+    }, ...ngDevMode ? [{ debugName: "levelIcon" }] : []);
+    this.levelText = computed(() => {
+      const key = this.LEVEL_NAMES[this.level];
+      return this.i18n.t(key);
+    }, ...ngDevMode ? [{ debugName: "levelText" }] : []);
+    this.tooltip = computed(() => {
+      return this.levelText();
+    }, ...ngDevMode ? [{ debugName: "tooltip" }] : []);
+  }
+  static {
+    this.\u0275fac = function UserLevelBadgeComponent_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _UserLevelBadgeComponent)();
+    };
+  }
+  static {
+    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _UserLevelBadgeComponent, selectors: [["user-level-badge"]], inputs: { level: "level", size: "size", showIcon: "showIcon", showText: "showText" }, decls: 3, vars: 5, consts: [[1, "user-level-badge", 3, "title"], [1, "badge-icon", 3, "animate-bounce", "animate-pulse"], [1, "badge-text"], [1, "badge-icon"]], template: function UserLevelBadgeComponent_Template(rf, ctx) {
+      if (rf & 1) {
+        \u0275\u0275domElementStart(0, "span", 0);
+        \u0275\u0275conditionalCreate(1, UserLevelBadgeComponent_Conditional_1_Template, 2, 5, "span", 1);
+        \u0275\u0275conditionalCreate(2, UserLevelBadgeComponent_Conditional_2_Template, 2, 1, "span", 2);
+        \u0275\u0275domElementEnd();
+      }
+      if (rf & 2) {
+        \u0275\u0275classMap(ctx.badgeClasses());
+        \u0275\u0275domProperty("title", ctx.tooltip());
+        \u0275\u0275advance();
+        \u0275\u0275conditional(ctx.showIcon ? 1 : -1);
+        \u0275\u0275advance();
+        \u0275\u0275conditional(ctx.showText ? 2 : -1);
+      }
+    }, dependencies: [CommonModule], styles: ["\n\n.user-level-badge[_ngcontent-%COMP%] {\n  display: inline-flex;\n  align-items: center;\n  gap: 4px;\n  padding: 2px 8px;\n  border-radius: 9999px;\n  font-weight: 600;\n  white-space: nowrap;\n  transition: all 0.2s ease;\n}\n.badge-xs[_ngcontent-%COMP%] {\n  font-size: 10px;\n  padding: 1px 4px;\n  gap: 2px;\n}\n.badge-sm[_ngcontent-%COMP%] {\n  font-size: 11px;\n  padding: 2px 6px;\n  gap: 3px;\n}\n.badge-md[_ngcontent-%COMP%] {\n  font-size: 12px;\n  padding: 3px 10px;\n  gap: 4px;\n}\n.badge-lg[_ngcontent-%COMP%] {\n  font-size: 14px;\n  padding: 4px 12px;\n  gap: 5px;\n}\n.badge-bronze[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #8B6914 0%,\n      #CD853F 100%);\n  color: #FFF8DC;\n  border: 1px solid rgba(205, 133, 63, 0.5);\n}\n.badge-silver[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #708090 0%,\n      #C0C0C0 50%,\n      #A8A8A8 100%);\n  color: #1a1a2e;\n  border: 1px solid rgba(192, 192, 192, 0.5);\n  box-shadow: 0 0 8px rgba(192, 192, 192, 0.3);\n}\n.badge-gold[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #B8860B 0%,\n      #FFD700 50%,\n      #FFA500 100%);\n  color: #1a1a2e;\n  border: 1px solid rgba(255, 215, 0, 0.5);\n  box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);\n}\n.badge-diamond[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #00CED1 0%,\n      #87CEEB 50%,\n      #B9F2FF 100%);\n  color: #1a1a2e;\n  border: 1px solid rgba(135, 206, 235, 0.5);\n  box-shadow: 0 0 12px rgba(0, 206, 209, 0.5);\n}\n.badge-star[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #9932CC 0%,\n      #DA70D6 50%,\n      #FF69B4 100%);\n  color: #FFFFFF;\n  border: 1px solid rgba(218, 112, 214, 0.5);\n  box-shadow: 0 0 15px rgba(153, 50, 204, 0.5);\n}\n.badge-king[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #FF4500 0%,\n      #FF6347 30%,\n      #FFD700 70%,\n      #FFA500 100%);\n  color: #FFFFFF;\n  border: 1px solid rgba(255, 215, 0, 0.6);\n  box-shadow: 0 0 20px rgba(255, 69, 0, 0.6), 0 0 40px rgba(255, 215, 0, 0.3);\n  animation: _ngcontent-%COMP%_king-glow 2s ease-in-out infinite alternate;\n}\n@keyframes _ngcontent-%COMP%_king-glow {\n  from {\n    box-shadow: 0 0 20px rgba(255, 69, 0, 0.6), 0 0 40px rgba(255, 215, 0, 0.3);\n  }\n  to {\n    box-shadow: 0 0 25px rgba(255, 69, 0, 0.8), 0 0 50px rgba(255, 215, 0, 0.5);\n  }\n}\n.badge-icon[_ngcontent-%COMP%] {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n}\n.badge-text[_ngcontent-%COMP%] {\n  line-height: 1;\n}\n.animate-pulse[_ngcontent-%COMP%] {\n  animation: _ngcontent-%COMP%_pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;\n}\n.animate-bounce[_ngcontent-%COMP%] {\n  animation: _ngcontent-%COMP%_bounce 1s infinite;\n}\n@keyframes _ngcontent-%COMP%_pulse {\n  0%, 100% {\n    opacity: 1;\n  }\n  50% {\n    opacity: 0.7;\n  }\n}\n@keyframes _ngcontent-%COMP%_bounce {\n  0%, 100% {\n    transform: translateY(-10%);\n    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);\n  }\n  50% {\n    transform: translateY(0);\n    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);\n  }\n}\n/*# sourceMappingURL=user-level-badge.component.css.map */"] });
+  }
+};
+(() => {
+  (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(UserLevelBadgeComponent, [{
+    type: Component,
+    args: [{ selector: "user-level-badge", standalone: true, imports: [CommonModule], template: `
+    <span 
+      class="user-level-badge"
+      [class]="badgeClasses()"
+      [title]="tooltip()">
+      @if (showIcon) {
+        <span class="badge-icon" [class.animate-bounce]="level === 'king'" [class.animate-pulse]="level !== 'king' && level !== 'bronze'">
+          {{ levelIcon() }}
+        </span>
+      }
+      @if (showText) {
+        <span class="badge-text">{{ levelText() }}</span>
+      }
+    </span>
+  `, styles: ["/* angular:styles/component:css;9ed5a192d45445c3f1f57980f315cace196a2736bedf083f7be2221beb6f014c;D:/tgkz2026/src/components/user-level-badge.component.ts */\n.user-level-badge {\n  display: inline-flex;\n  align-items: center;\n  gap: 4px;\n  padding: 2px 8px;\n  border-radius: 9999px;\n  font-weight: 600;\n  white-space: nowrap;\n  transition: all 0.2s ease;\n}\n.badge-xs {\n  font-size: 10px;\n  padding: 1px 4px;\n  gap: 2px;\n}\n.badge-sm {\n  font-size: 11px;\n  padding: 2px 6px;\n  gap: 3px;\n}\n.badge-md {\n  font-size: 12px;\n  padding: 3px 10px;\n  gap: 4px;\n}\n.badge-lg {\n  font-size: 14px;\n  padding: 4px 12px;\n  gap: 5px;\n}\n.badge-bronze {\n  background:\n    linear-gradient(\n      135deg,\n      #8B6914 0%,\n      #CD853F 100%);\n  color: #FFF8DC;\n  border: 1px solid rgba(205, 133, 63, 0.5);\n}\n.badge-silver {\n  background:\n    linear-gradient(\n      135deg,\n      #708090 0%,\n      #C0C0C0 50%,\n      #A8A8A8 100%);\n  color: #1a1a2e;\n  border: 1px solid rgba(192, 192, 192, 0.5);\n  box-shadow: 0 0 8px rgba(192, 192, 192, 0.3);\n}\n.badge-gold {\n  background:\n    linear-gradient(\n      135deg,\n      #B8860B 0%,\n      #FFD700 50%,\n      #FFA500 100%);\n  color: #1a1a2e;\n  border: 1px solid rgba(255, 215, 0, 0.5);\n  box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);\n}\n.badge-diamond {\n  background:\n    linear-gradient(\n      135deg,\n      #00CED1 0%,\n      #87CEEB 50%,\n      #B9F2FF 100%);\n  color: #1a1a2e;\n  border: 1px solid rgba(135, 206, 235, 0.5);\n  box-shadow: 0 0 12px rgba(0, 206, 209, 0.5);\n}\n.badge-star {\n  background:\n    linear-gradient(\n      135deg,\n      #9932CC 0%,\n      #DA70D6 50%,\n      #FF69B4 100%);\n  color: #FFFFFF;\n  border: 1px solid rgba(218, 112, 214, 0.5);\n  box-shadow: 0 0 15px rgba(153, 50, 204, 0.5);\n}\n.badge-king {\n  background:\n    linear-gradient(\n      135deg,\n      #FF4500 0%,\n      #FF6347 30%,\n      #FFD700 70%,\n      #FFA500 100%);\n  color: #FFFFFF;\n  border: 1px solid rgba(255, 215, 0, 0.6);\n  box-shadow: 0 0 20px rgba(255, 69, 0, 0.6), 0 0 40px rgba(255, 215, 0, 0.3);\n  animation: king-glow 2s ease-in-out infinite alternate;\n}\n@keyframes king-glow {\n  from {\n    box-shadow: 0 0 20px rgba(255, 69, 0, 0.6), 0 0 40px rgba(255, 215, 0, 0.3);\n  }\n  to {\n    box-shadow: 0 0 25px rgba(255, 69, 0, 0.8), 0 0 50px rgba(255, 215, 0, 0.5);\n  }\n}\n.badge-icon {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n}\n.badge-text {\n  line-height: 1;\n}\n.animate-pulse {\n  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;\n}\n.animate-bounce {\n  animation: bounce 1s infinite;\n}\n@keyframes pulse {\n  0%, 100% {\n    opacity: 1;\n  }\n  50% {\n    opacity: 0.7;\n  }\n}\n@keyframes bounce {\n  0%, 100% {\n    transform: translateY(-10%);\n    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);\n  }\n  50% {\n    transform: translateY(0);\n    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);\n  }\n}\n/*# sourceMappingURL=user-level-badge.component.css.map */\n"] }]
+  }], null, { level: [{
+    type: Input
+  }], size: [{
+    type: Input
+  }], showIcon: [{
+    type: Input
+  }], showText: [{
+    type: Input
+  }] });
+})();
+(() => {
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(UserLevelBadgeComponent, { className: "UserLevelBadgeComponent", filePath: "src/components/user-level-badge.component.ts", lineNumber: 166 });
+})();
+
 // src/core/network.service.ts
 var NetworkService = class _NetworkService {
   constructor() {
@@ -40001,7 +40273,7 @@ var ApiCredentialsViewComponent = class _ApiCredentialsViewComponent {
 var _c03 = () => ["bronze", "silver"];
 var _c1 = () => ["bronze", "silver", "gold"];
 var _forTrack014 = ($index, $item) => $item.id;
-function MembershipCenterComponent_Conditional_15_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_14_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "p", 10);
     \u0275\u0275text(1);
@@ -40017,18 +40289,18 @@ function MembershipCenterComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275textInterpolate1("(\u5269\u9918 ", ctx_r0.membershipDaysLeft(), " \u5929)");
   }
 }
-function MembershipCenterComponent_Conditional_16_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_15_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "p", 10);
     \u0275\u0275text(1, "\u6C38\u4E45\u514D\u8CBB\u7248");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_18_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_17_Template(rf, ctx) {
   if (rf & 1) {
     const _r2 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 26);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_18_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_17_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r2);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.activeTab.set("upgrade"));
@@ -40037,7 +40309,7 @@ function MembershipCenterComponent_Conditional_18_Template(rf, ctx) {
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_69_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_68_Template(rf, ctx) {
   if (rf & 1) {
     const _r3 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 24)(1, "div", 27)(2, "h3", 28);
@@ -40096,7 +40368,7 @@ function MembershipCenterComponent_Conditional_69_Template(rf, ctx) {
     \u0275\u0275text(49);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(50, "button", 41);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_69_Template_button_click_50_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_68_Template_button_click_50_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.copyInviteCode());
@@ -40146,7 +40418,7 @@ function MembershipCenterComponent_Conditional_69_Template(rf, ctx) {
     \u0275\u0275textInterpolate(ctx_r0.rewardDays());
   }
 }
-function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_69_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 24)(1, "div", 45)(2, "table", 46)(3, "thead")(4, "tr")(5, "th", 47);
     \u0275\u0275text(6, "\u529F\u80FD");
@@ -40402,18 +40674,18 @@ function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
     \u0275\u0275elementEnd()()()()()();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_3_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 59);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_24_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_24_Template(rf, ctx) {
   if (rf & 1) {
     const _r5 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 80);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_24_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_70_Conditional_24_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("silver", "month"));
@@ -40427,11 +40699,11 @@ function MembershipCenterComponent_Conditional_71_Conditional_24_Template(rf, ct
     \u0275\u0275textInterpolate1(" ", ctx_r0.membershipLevel() === "bronze" ? "\u7ACB\u5373\u958B\u901A" : "\u5207\u63DB\u65B9\u6848", " ");
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_25_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_25_Template(rf, ctx) {
   if (rf & 1) {
     const _r6 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 81);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_25_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_70_Conditional_25_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r6);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("silver", "month"));
@@ -40440,18 +40712,18 @@ function MembershipCenterComponent_Conditional_71_Conditional_25_Template(rf, ct
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_27_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_27_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 59);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_50_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_50_Template(rf, ctx) {
   if (rf & 1) {
     const _r7 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 80);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_50_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_70_Conditional_50_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("gold", "month"));
@@ -40465,11 +40737,11 @@ function MembershipCenterComponent_Conditional_71_Conditional_50_Template(rf, ct
     \u0275\u0275textInterpolate1(" ", \u0275\u0275pureFunction0(1, _c03).includes(ctx_r0.membershipLevel()) ? "\u7ACB\u5373\u5347\u7D1A" : "\u5207\u63DB\u65B9\u6848", " ");
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_51_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_51_Template(rf, ctx) {
   if (rf & 1) {
     const _r8 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 81);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_51_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_70_Conditional_51_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r8);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("gold", "month"));
@@ -40478,18 +40750,18 @@ function MembershipCenterComponent_Conditional_71_Conditional_51_Template(rf, ct
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_55_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_55_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 59);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_78_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_78_Template(rf, ctx) {
   if (rf & 1) {
     const _r9 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 80);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_78_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_70_Conditional_78_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r9);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("diamond", "month"));
@@ -40503,11 +40775,11 @@ function MembershipCenterComponent_Conditional_71_Conditional_78_Template(rf, ct
     \u0275\u0275textInterpolate1(" ", \u0275\u0275pureFunction0(1, _c1).includes(ctx_r0.membershipLevel()) ? "\u7ACB\u5373\u5347\u7D1A" : "\u5207\u63DB\u65B9\u6848", " ");
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_79_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_79_Template(rf, ctx) {
   if (rf & 1) {
     const _r10 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 81);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_79_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_70_Conditional_79_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r10);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("diamond", "month"));
@@ -40516,18 +40788,18 @@ function MembershipCenterComponent_Conditional_71_Conditional_79_Template(rf, ct
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_81_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_81_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 59);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_104_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_104_Template(rf, ctx) {
   if (rf & 1) {
     const _r11 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 80);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_104_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_70_Conditional_104_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r11);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("star", "month"));
@@ -40541,11 +40813,11 @@ function MembershipCenterComponent_Conditional_71_Conditional_104_Template(rf, c
     \u0275\u0275textInterpolate1(" ", ctx_r0.membershipLevel() !== "king" ? "\u7ACB\u5373\u5347\u7D1A" : "\u5207\u63DB\u65B9\u6848", " ");
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_105_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_105_Template(rf, ctx) {
   if (rf & 1) {
     const _r12 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 81);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_105_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_70_Conditional_105_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r12);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("star", "month"));
@@ -40554,18 +40826,18 @@ function MembershipCenterComponent_Conditional_71_Conditional_105_Template(rf, c
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_107_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_107_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 59);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_132_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_132_Template(rf, ctx) {
   if (rf & 1) {
     const _r13 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 80);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_132_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_70_Conditional_132_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("king", "month"));
@@ -40574,11 +40846,11 @@ function MembershipCenterComponent_Conditional_71_Conditional_132_Template(rf, c
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_133_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Conditional_133_Template(rf, ctx) {
   if (rf & 1) {
     const _r14 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 81);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_133_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_70_Conditional_133_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r14);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("king", "month"));
@@ -40587,11 +40859,11 @@ function MembershipCenterComponent_Conditional_71_Conditional_133_Template(rf, c
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
   if (rf & 1) {
     const _r4 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 24)(1, "div", 57)(2, "div", 58);
-    \u0275\u0275conditionalCreate(3, MembershipCenterComponent_Conditional_71_Conditional_3_Template, 2, 0, "div", 59);
+    \u0275\u0275conditionalCreate(3, MembershipCenterComponent_Conditional_70_Conditional_3_Template, 2, 0, "div", 59);
     \u0275\u0275elementStart(4, "div", 60);
     \u0275\u0275text(5, "\u{1F948}");
     \u0275\u0275elementEnd();
@@ -40619,10 +40891,10 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275elementStart(22, "li");
     \u0275\u0275text(23, "\u2705 \u5EE3\u544A\u767C\u9001");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(24, MembershipCenterComponent_Conditional_71_Conditional_24_Template, 2, 1, "button", 66)(25, MembershipCenterComponent_Conditional_71_Conditional_25_Template, 2, 0, "button", 67);
+    \u0275\u0275conditionalCreate(24, MembershipCenterComponent_Conditional_70_Conditional_24_Template, 2, 1, "button", 66)(25, MembershipCenterComponent_Conditional_70_Conditional_25_Template, 2, 0, "button", 67);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(26, "div", 68);
-    \u0275\u0275conditionalCreate(27, MembershipCenterComponent_Conditional_71_Conditional_27_Template, 2, 0, "div", 59);
+    \u0275\u0275conditionalCreate(27, MembershipCenterComponent_Conditional_70_Conditional_27_Template, 2, 0, "div", 59);
     \u0275\u0275elementStart(28, "div", 60);
     \u0275\u0275text(29, "\u{1F947}");
     \u0275\u0275elementEnd();
@@ -40653,12 +40925,12 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275elementStart(48, "li");
     \u0275\u0275text(49, "\u2705 \u6578\u64DA\u5C0E\u51FA");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(50, MembershipCenterComponent_Conditional_71_Conditional_50_Template, 2, 2, "button", 66)(51, MembershipCenterComponent_Conditional_71_Conditional_51_Template, 2, 0, "button", 67);
+    \u0275\u0275conditionalCreate(50, MembershipCenterComponent_Conditional_70_Conditional_50_Template, 2, 2, "button", 66)(51, MembershipCenterComponent_Conditional_70_Conditional_51_Template, 2, 0, "button", 67);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(52, "div", 69)(53, "div", 70);
     \u0275\u0275text(54, "\u63A8\u85A6");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(55, MembershipCenterComponent_Conditional_71_Conditional_55_Template, 2, 0, "div", 59);
+    \u0275\u0275conditionalCreate(55, MembershipCenterComponent_Conditional_70_Conditional_55_Template, 2, 0, "div", 59);
     \u0275\u0275elementStart(56, "div", 60);
     \u0275\u0275text(57, "\u{1F48E}");
     \u0275\u0275elementEnd();
@@ -40689,10 +40961,10 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275elementStart(76, "li");
     \u0275\u0275text(77, "\u2705 \u9AD8\u7D1A\u5206\u6790");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(78, MembershipCenterComponent_Conditional_71_Conditional_78_Template, 2, 2, "button", 66)(79, MembershipCenterComponent_Conditional_71_Conditional_79_Template, 2, 0, "button", 67);
+    \u0275\u0275conditionalCreate(78, MembershipCenterComponent_Conditional_70_Conditional_78_Template, 2, 2, "button", 66)(79, MembershipCenterComponent_Conditional_70_Conditional_79_Template, 2, 0, "button", 67);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(80, "div", 71);
-    \u0275\u0275conditionalCreate(81, MembershipCenterComponent_Conditional_71_Conditional_81_Template, 2, 0, "div", 59);
+    \u0275\u0275conditionalCreate(81, MembershipCenterComponent_Conditional_70_Conditional_81_Template, 2, 0, "div", 59);
     \u0275\u0275elementStart(82, "div", 60);
     \u0275\u0275text(83, "\u{1F31F}");
     \u0275\u0275elementEnd();
@@ -40723,10 +40995,10 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275elementStart(102, "li");
     \u0275\u0275text(103, "\u2705 \u5718\u968A\u7BA1\u7406");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(104, MembershipCenterComponent_Conditional_71_Conditional_104_Template, 2, 1, "button", 66)(105, MembershipCenterComponent_Conditional_71_Conditional_105_Template, 2, 0, "button", 67);
+    \u0275\u0275conditionalCreate(104, MembershipCenterComponent_Conditional_70_Conditional_104_Template, 2, 1, "button", 66)(105, MembershipCenterComponent_Conditional_70_Conditional_105_Template, 2, 0, "button", 67);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(106, "div", 72);
-    \u0275\u0275conditionalCreate(107, MembershipCenterComponent_Conditional_71_Conditional_107_Template, 2, 0, "div", 59);
+    \u0275\u0275conditionalCreate(107, MembershipCenterComponent_Conditional_70_Conditional_107_Template, 2, 0, "div", 59);
     \u0275\u0275elementStart(108, "div", 60);
     \u0275\u0275text(109, "\u{1F451}");
     \u0275\u0275elementEnd();
@@ -40760,13 +41032,13 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275elementStart(130, "li");
     \u0275\u0275text(131, "\u2705 \u65B0\u529F\u80FD\u5167\u6E2C");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(132, MembershipCenterComponent_Conditional_71_Conditional_132_Template, 2, 0, "button", 66)(133, MembershipCenterComponent_Conditional_71_Conditional_133_Template, 2, 0, "button", 67);
+    \u0275\u0275conditionalCreate(132, MembershipCenterComponent_Conditional_70_Conditional_132_Template, 2, 0, "button", 66)(133, MembershipCenterComponent_Conditional_70_Conditional_133_Template, 2, 0, "button", 67);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(134, "div", 27)(135, "h3", 28);
     \u0275\u0275text(136, "\u{1F3AB} \u4F7F\u7528\u5361\u5BC6\u6FC0\u6D3B");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(137, "div", 74)(138, "input", 75);
-    \u0275\u0275twoWayListener("ngModelChange", function MembershipCenterComponent_Conditional_71_Template_input_ngModelChange_138_listener($event) {
+    \u0275\u0275twoWayListener("ngModelChange", function MembershipCenterComponent_Conditional_70_Template_input_ngModelChange_138_listener($event) {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       \u0275\u0275twoWayBindingSet(ctx_r0.licenseKey, $event) || (ctx_r0.licenseKey = $event);
@@ -40774,7 +41046,7 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     });
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(139, "button", 76);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Template_button_click_139_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_70_Template_button_click_139_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.onActivateLicense());
@@ -40785,7 +41057,7 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275text(143, "\u{1F4B3} \u652F\u4ED8\u65B9\u5F0F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(144, "div", 77)(145, "button", 78);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Template_button_click_145_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_70_Template_button_click_145_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.selectedPayment.set("alipay"));
@@ -40796,7 +41068,7 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275text(148, " \u652F\u4ED8\u5BF6 ");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(149, "button", 78);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Template_button_click_149_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_70_Template_button_click_149_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.selectedPayment.set("wechat"));
@@ -40807,7 +41079,7 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275text(152, " \u5FAE\u4FE1\u652F\u4ED8 ");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(153, "button", 78);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Template_button_click_153_listener() {
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_70_Template_button_click_153_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.selectedPayment.set("usdt"));
@@ -40862,21 +41134,21 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275classProp("active", ctx_r0.selectedPayment() === "usdt");
   }
 }
-function MembershipCenterComponent_Conditional_72_Conditional_5_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 83);
     \u0275\u0275text(1, "\u8F09\u5165\u4E2D...");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_72_Conditional_6_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 84);
     \u0275\u0275text(1, "\u66AB\u7121\u8A02\u95B1\u8A18\u9304");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_72_Conditional_7_For_1_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_7_For_1_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 85)(1, "div", 86);
     \u0275\u0275text(2);
@@ -40906,22 +41178,22 @@ function MembershipCenterComponent_Conditional_72_Conditional_7_For_1_Template(r
     \u0275\u0275textInterpolate1(" ", record_r15.is_active ? "\u751F\u6548\u4E2D" : "\u5DF2\u904E\u671F", " ");
   }
 }
-function MembershipCenterComponent_Conditional_72_Conditional_7_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275repeaterCreate(0, MembershipCenterComponent_Conditional_72_Conditional_7_For_1_Template, 10, 9, "div", 85, _forTrack014);
+    \u0275\u0275repeaterCreate(0, MembershipCenterComponent_Conditional_71_Conditional_7_For_1_Template, 10, 9, "div", 85, _forTrack014);
   }
   if (rf & 2) {
     const ctx_r0 = \u0275\u0275nextContext(2);
     \u0275\u0275repeater(ctx_r0.subscriptionHistory());
   }
 }
-function MembershipCenterComponent_Conditional_72_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 24)(1, "div", 27)(2, "h3", 28);
     \u0275\u0275text(3, "\u{1F4DC} \u8A02\u95B1\u6B77\u53F2");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(4, "div", 82);
-    \u0275\u0275conditionalCreate(5, MembershipCenterComponent_Conditional_72_Conditional_5_Template, 2, 0, "div", 83)(6, MembershipCenterComponent_Conditional_72_Conditional_6_Template, 2, 0, "div", 84)(7, MembershipCenterComponent_Conditional_72_Conditional_7_Template, 2, 0);
+    \u0275\u0275conditionalCreate(5, MembershipCenterComponent_Conditional_71_Conditional_5_Template, 2, 0, "div", 83)(6, MembershipCenterComponent_Conditional_71_Conditional_6_Template, 2, 0, "div", 84)(7, MembershipCenterComponent_Conditional_71_Conditional_7_Template, 2, 0);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -41090,7 +41362,7 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
     };
   }
   static {
-    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _MembershipCenterComponent, selectors: [["app-membership-center"]], decls: 73, vars: 32, consts: [[1, "membership-container"], [1, "page-header"], [1, "page-title"], [1, "title-icon"], [1, "page-desc"], [1, "membership-status-card"], [1, "status-left"], [1, "level-badge"], [1, "level-info"], [1, "level-name"], [1, "expires-info"], [1, "status-right"], [1, "upgrade-btn"], [1, "quick-stats"], [1, "stat-card"], [1, "stat-icon"], [1, "stat-content"], [1, "stat-label"], [1, "stat-value"], [1, "stat-bar"], [1, "stat-fill"], [1, "stat-hint"], [1, "tabs"], [1, "tab-btn", 3, "click"], [1, "tab-content"], [1, "days-left"], [1, "upgrade-btn", 3, "click"], [1, "section-card"], [1, "section-title"], [1, "usage-details"], [1, "usage-row"], [1, "usage-name"], [1, "usage-bar-container"], [1, "usage-bar"], [1, "usage-fill"], [1, "usage-count"], [1, "section-card", "invite-card"], [1, "invite-desc"], [1, "invite-code-display"], [1, "label"], [1, "code"], [1, "copy-btn", 3, "click"], [1, "invite-stats-row"], [1, "invite-stat"], [1, "value"], [1, "benefits-table-container"], [1, "benefits-table"], [1, "feature-col"], [1, "level-col", "bronze"], [1, "level-col", "silver"], [1, "level-col", "gold"], [1, "level-col", "diamond"], [1, "level-col", "star"], [1, "level-col", "king"], [1, "feature-name"], [1, "price-row"], [1, "price"], [1, "pricing-cards"], [1, "pricing-card", "silver"], [1, "current-badge"], [1, "plan-icon"], [1, "plan-name"], [1, "plan-price"], [1, "amount"], [1, "period"], [1, "plan-features"], [1, "buy-btn"], [1, "buy-btn", "renew"], [1, "pricing-card", "gold"], [1, "pricing-card", "diamond", "popular"], [1, "popular-badge"], [1, "pricing-card", "star"], [1, "pricing-card", "king"], [1, "savings"], [1, "license-input-row"], ["type", "text", "placeholder", "\u8F38\u5165\u5361\u5BC6\uFF1AXXXX-XXXX-XXXX-XXXX", 1, "license-input", 3, "ngModelChange", "ngModel"], [1, "activate-btn", 3, "click", "disabled"], [1, "payment-methods"], [1, "payment-btn", 3, "click"], [1, "payment-icon"], [1, "buy-btn", 3, "click"], [1, "buy-btn", "renew", 3, "click"], [1, "history-list"], [1, "loading-state"], [1, "empty-state"], [1, "history-item"], [1, "history-icon"], [1, "history-info"], [1, "history-title"], [1, "history-meta"], [1, "history-status"]], template: function MembershipCenterComponent_Template(rf, ctx) {
+    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _MembershipCenterComponent, selectors: [["app-membership-center"]], decls: 72, vars: 32, consts: [[1, "membership-container"], [1, "page-header"], [1, "page-title"], [1, "title-icon"], [1, "page-desc"], [1, "membership-status-card"], [1, "status-left"], [1, "level-badge"], [1, "level-info"], ["size", "lg", 3, "level"], [1, "expires-info"], [1, "status-right"], [1, "upgrade-btn"], [1, "quick-stats"], [1, "stat-card"], [1, "stat-icon"], [1, "stat-content"], [1, "stat-label"], [1, "stat-value"], [1, "stat-bar"], [1, "stat-fill"], [1, "stat-hint"], [1, "tabs"], [1, "tab-btn", 3, "click"], [1, "tab-content"], [1, "days-left"], [1, "upgrade-btn", 3, "click"], [1, "section-card"], [1, "section-title"], [1, "usage-details"], [1, "usage-row"], [1, "usage-name"], [1, "usage-bar-container"], [1, "usage-bar"], [1, "usage-fill"], [1, "usage-count"], [1, "section-card", "invite-card"], [1, "invite-desc"], [1, "invite-code-display"], [1, "label"], [1, "code"], [1, "copy-btn", 3, "click"], [1, "invite-stats-row"], [1, "invite-stat"], [1, "value"], [1, "benefits-table-container"], [1, "benefits-table"], [1, "feature-col"], [1, "level-col", "bronze"], [1, "level-col", "silver"], [1, "level-col", "gold"], [1, "level-col", "diamond"], [1, "level-col", "star"], [1, "level-col", "king"], [1, "feature-name"], [1, "price-row"], [1, "price"], [1, "pricing-cards"], [1, "pricing-card", "silver"], [1, "current-badge"], [1, "plan-icon"], [1, "plan-name"], [1, "plan-price"], [1, "amount"], [1, "period"], [1, "plan-features"], [1, "buy-btn"], [1, "buy-btn", "renew"], [1, "pricing-card", "gold"], [1, "pricing-card", "diamond", "popular"], [1, "popular-badge"], [1, "pricing-card", "star"], [1, "pricing-card", "king"], [1, "savings"], [1, "license-input-row"], ["type", "text", "placeholder", "\u8F38\u5165\u5361\u5BC6\uFF1AXXXX-XXXX-XXXX-XXXX", 1, "license-input", 3, "ngModelChange", "ngModel"], [1, "activate-btn", 3, "click", "disabled"], [1, "payment-methods"], [1, "payment-btn", 3, "click"], [1, "payment-icon"], [1, "buy-btn", 3, "click"], [1, "buy-btn", "renew", 3, "click"], [1, "history-list"], [1, "loading-state"], [1, "empty-state"], [1, "history-item"], [1, "history-icon"], [1, "history-info"], [1, "history-title"], [1, "history-meta"], [1, "history-status"]], template: function MembershipCenterComponent_Template(rf, ctx) {
       if (rf & 1) {
         \u0275\u0275elementStart(0, "div", 0)(1, "div", 1)(2, "h1", 2)(3, "span", 3);
         \u0275\u0275text(4, "\u2B50");
@@ -41103,90 +41375,89 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
         \u0275\u0275elementStart(8, "div", 5)(9, "div", 6)(10, "div", 7);
         \u0275\u0275text(11);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(12, "div", 8)(13, "h2", 9);
-        \u0275\u0275text(14);
-        \u0275\u0275elementEnd();
-        \u0275\u0275conditionalCreate(15, MembershipCenterComponent_Conditional_15_Template, 4, 2, "p", 10)(16, MembershipCenterComponent_Conditional_16_Template, 2, 0, "p", 10);
+        \u0275\u0275elementStart(12, "div", 8);
+        \u0275\u0275element(13, "user-level-badge", 9);
+        \u0275\u0275conditionalCreate(14, MembershipCenterComponent_Conditional_14_Template, 4, 2, "p", 10)(15, MembershipCenterComponent_Conditional_15_Template, 2, 0, "p", 10);
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(17, "div", 11);
-        \u0275\u0275conditionalCreate(18, MembershipCenterComponent_Conditional_18_Template, 2, 0, "button", 12);
+        \u0275\u0275elementStart(16, "div", 11);
+        \u0275\u0275conditionalCreate(17, MembershipCenterComponent_Conditional_17_Template, 2, 0, "button", 12);
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(19, "div", 13)(20, "div", 14)(21, "div", 15);
-        \u0275\u0275text(22, "\u{1F916}");
+        \u0275\u0275elementStart(18, "div", 13)(19, "div", 14)(20, "div", 15);
+        \u0275\u0275text(21, "\u{1F916}");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(23, "div", 16)(24, "div", 17);
-        \u0275\u0275text(25, "AI \u8ABF\u7528");
+        \u0275\u0275elementStart(22, "div", 16)(23, "div", 17);
+        \u0275\u0275text(24, "AI \u8ABF\u7528");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(26, "div", 18);
-        \u0275\u0275text(27);
+        \u0275\u0275elementStart(25, "div", 18);
+        \u0275\u0275text(26);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(28, "div", 19);
-        \u0275\u0275element(29, "div", 20);
+        \u0275\u0275elementStart(27, "div", 19);
+        \u0275\u0275element(28, "div", 20);
         \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(30, "div", 14)(31, "div", 15);
-        \u0275\u0275text(32, "\u{1F4E8}");
+        \u0275\u0275elementStart(29, "div", 14)(30, "div", 15);
+        \u0275\u0275text(31, "\u{1F4E8}");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(33, "div", 16)(34, "div", 17);
-        \u0275\u0275text(35, "\u6D88\u606F\u767C\u9001");
+        \u0275\u0275elementStart(32, "div", 16)(33, "div", 17);
+        \u0275\u0275text(34, "\u6D88\u606F\u767C\u9001");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(36, "div", 18);
-        \u0275\u0275text(37);
+        \u0275\u0275elementStart(35, "div", 18);
+        \u0275\u0275text(36);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(38, "div", 19);
-        \u0275\u0275element(39, "div", 20);
+        \u0275\u0275elementStart(37, "div", 19);
+        \u0275\u0275element(38, "div", 20);
         \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(40, "div", 14)(41, "div", 15);
-        \u0275\u0275text(42, "\u{1F465}");
+        \u0275\u0275elementStart(39, "div", 14)(40, "div", 15);
+        \u0275\u0275text(41, "\u{1F465}");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(43, "div", 16)(44, "div", 17);
-        \u0275\u0275text(45, "\u5E33\u865F\u6578\u91CF");
+        \u0275\u0275elementStart(42, "div", 16)(43, "div", 17);
+        \u0275\u0275text(44, "\u5E33\u865F\u6578\u91CF");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(46, "div", 18);
-        \u0275\u0275text(47);
+        \u0275\u0275elementStart(45, "div", 18);
+        \u0275\u0275text(46);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(48, "div", 19);
-        \u0275\u0275element(49, "div", 20);
+        \u0275\u0275elementStart(47, "div", 19);
+        \u0275\u0275element(48, "div", 20);
         \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(50, "div", 14)(51, "div", 15);
-        \u0275\u0275text(52, "\u{1F381}");
+        \u0275\u0275elementStart(49, "div", 14)(50, "div", 15);
+        \u0275\u0275text(51, "\u{1F381}");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(53, "div", 16)(54, "div", 17);
-        \u0275\u0275text(55, "\u9080\u8ACB\u734E\u52F5");
+        \u0275\u0275elementStart(52, "div", 16)(53, "div", 17);
+        \u0275\u0275text(54, "\u9080\u8ACB\u734E\u52F5");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(56, "div", 18);
-        \u0275\u0275text(57);
+        \u0275\u0275elementStart(55, "div", 18);
+        \u0275\u0275text(56);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(58, "div", 21);
-        \u0275\u0275text(59);
+        \u0275\u0275elementStart(57, "div", 21);
+        \u0275\u0275text(58);
         \u0275\u0275elementEnd()()()();
-        \u0275\u0275elementStart(60, "div", 22)(61, "button", 23);
-        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_61_listener() {
+        \u0275\u0275elementStart(59, "div", 22)(60, "button", 23);
+        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_60_listener() {
           return ctx.activeTab.set("overview");
         });
-        \u0275\u0275text(62, " \u{1F4CA} \u7E3D\u89BD ");
+        \u0275\u0275text(61, " \u{1F4CA} \u7E3D\u89BD ");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(63, "button", 23);
-        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_63_listener() {
+        \u0275\u0275elementStart(62, "button", 23);
+        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_62_listener() {
           return ctx.activeTab.set("benefits");
         });
-        \u0275\u0275text(64, " \u{1F3AF} \u6B0A\u76CA\u5C0D\u6BD4 ");
+        \u0275\u0275text(63, " \u{1F3AF} \u6B0A\u76CA\u5C0D\u6BD4 ");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(65, "button", 23);
-        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_65_listener() {
+        \u0275\u0275elementStart(64, "button", 23);
+        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_64_listener() {
           return ctx.activeTab.set("upgrade");
         });
-        \u0275\u0275text(66, " \u{1F680} \u5347\u7D1A\u8CFC\u8CB7 ");
+        \u0275\u0275text(65, " \u{1F680} \u5347\u7D1A\u8CFC\u8CB7 ");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(67, "button", 23);
-        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_67_listener() {
+        \u0275\u0275elementStart(66, "button", 23);
+        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_66_listener() {
           return ctx.activeTab.set("history");
         });
-        \u0275\u0275text(68, " \u{1F4DC} \u8A02\u95B1\u8A18\u9304 ");
+        \u0275\u0275text(67, " \u{1F4DC} \u8A02\u95B1\u8A18\u9304 ");
         \u0275\u0275elementEnd()();
-        \u0275\u0275conditionalCreate(69, MembershipCenterComponent_Conditional_69_Template, 63, 19, "div", 24);
-        \u0275\u0275conditionalCreate(70, MembershipCenterComponent_Conditional_70_Template, 185, 0, "div", 24);
-        \u0275\u0275conditionalCreate(71, MembershipCenterComponent_Conditional_71_Template, 157, 28, "div", 24);
-        \u0275\u0275conditionalCreate(72, MembershipCenterComponent_Conditional_72_Template, 8, 1, "div", 24);
+        \u0275\u0275conditionalCreate(68, MembershipCenterComponent_Conditional_68_Template, 63, 19, "div", 24);
+        \u0275\u0275conditionalCreate(69, MembershipCenterComponent_Conditional_69_Template, 185, 0, "div", 24);
+        \u0275\u0275conditionalCreate(70, MembershipCenterComponent_Conditional_70_Template, 157, 28, "div", 24);
+        \u0275\u0275conditionalCreate(71, MembershipCenterComponent_Conditional_71_Template, 8, 1, "div", 24);
         \u0275\u0275elementEnd();
       }
       if (rf & 2) {
@@ -41197,12 +41468,12 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
         \u0275\u0275classMap("level-" + ctx.membershipLevel());
         \u0275\u0275advance(3);
         \u0275\u0275textInterpolate1(" ", ctx.getMembershipIcon(), " ");
-        \u0275\u0275advance(3);
-        \u0275\u0275textInterpolate(ctx.getMembershipName());
+        \u0275\u0275advance(2);
+        \u0275\u0275property("level", ctx.membershipLevel());
         \u0275\u0275advance();
-        \u0275\u0275conditional(ctx.membershipExpires() ? 15 : 16);
+        \u0275\u0275conditional(ctx.membershipExpires() ? 14 : 15);
         \u0275\u0275advance(3);
-        \u0275\u0275conditional(ctx.membershipLevel() !== "king" ? 18 : -1);
+        \u0275\u0275conditional(ctx.membershipLevel() !== "king" ? 17 : -1);
         \u0275\u0275advance(9);
         \u0275\u0275textInterpolate2(" ", ((tmp_5_0 = ctx.usageStats()) == null ? null : tmp_5_0.aiCalls == null ? null : tmp_5_0.aiCalls.used) || 0, " / ", ((tmp_5_0 = ctx.usageStats()) == null ? null : tmp_5_0.aiCalls == null ? null : tmp_5_0.aiCalls.limit) || 50, " ");
         \u0275\u0275advance(2);
@@ -41228,21 +41499,21 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
         \u0275\u0275advance(2);
         \u0275\u0275classProp("active", ctx.activeTab() === "history");
         \u0275\u0275advance(2);
-        \u0275\u0275conditional(ctx.activeTab() === "overview" ? 69 : -1);
+        \u0275\u0275conditional(ctx.activeTab() === "overview" ? 68 : -1);
         \u0275\u0275advance();
-        \u0275\u0275conditional(ctx.activeTab() === "benefits" ? 70 : -1);
+        \u0275\u0275conditional(ctx.activeTab() === "benefits" ? 69 : -1);
         \u0275\u0275advance();
-        \u0275\u0275conditional(ctx.activeTab() === "upgrade" ? 71 : -1);
+        \u0275\u0275conditional(ctx.activeTab() === "upgrade" ? 70 : -1);
         \u0275\u0275advance();
-        \u0275\u0275conditional(ctx.activeTab() === "history" ? 72 : -1);
+        \u0275\u0275conditional(ctx.activeTab() === "history" ? 71 : -1);
       }
-    }, dependencies: [CommonModule, FormsModule, DefaultValueAccessor, NgControlStatus, NgModel], styles: ["\n\n.membership-container[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n  max-width: 1200px;\n  margin: 0 auto;\n}\n.page-header[_ngcontent-%COMP%] {\n  margin-bottom: 1.5rem;\n}\n.page-title[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  margin: 0;\n}\n.title-icon[_ngcontent-%COMP%] {\n  font-size: 1.75rem;\n}\n.page-desc[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  margin: 0.5rem 0 0 0;\n}\n.membership-status-card[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1.5rem;\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n  border: 1px solid;\n}\n.membership-status-card.level-free[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(71, 85, 105, 0.3),\n      rgba(51, 65, 85, 0.3));\n  border-color: rgba(71, 85, 105, 0.5);\n}\n.membership-status-card.level-vip[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(245, 158, 11, 0.2),\n      rgba(217, 119, 6, 0.2));\n  border-color: rgba(245, 158, 11, 0.5);\n}\n.membership-status-card.level-svip[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(139, 92, 246, 0.2),\n      rgba(124, 58, 237, 0.2));\n  border-color: rgba(139, 92, 246, 0.5);\n}\n.membership-status-card.level-mvp[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(236, 72, 153, 0.2),\n      rgba(219, 39, 119, 0.2));\n  border-color: rgba(236, 72, 153, 0.5);\n}\n.wallet-card[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1rem 1.5rem;\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(102, 126, 234, 0.2),\n      rgba(118, 75, 162, 0.2));\n  border: 1px solid rgba(102, 126, 234, 0.5);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.wallet-card[_ngcontent-%COMP%]:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);\n}\n.wallet-left[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.wallet-icon[_ngcontent-%COMP%] {\n  font-size: 2rem;\n}\n.wallet-label[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: var(--text-muted, #94a3b8);\n}\n.wallet-amount[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: 700;\n  color: #22c55e;\n}\n.wallet-right[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.wallet-bonus[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: #f59e0b;\n  background: rgba(245, 158, 11, 0.1);\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n}\n.wallet-recharge-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  border-radius: 0.5rem;\n  border: none;\n  background:\n    linear-gradient(\n      135deg,\n      #667eea,\n      #764ba2);\n  color: white;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.wallet-recharge-btn[_ngcontent-%COMP%]:hover {\n  transform: scale(1.05);\n}\n.status-left[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.level-badge[_ngcontent-%COMP%] {\n  width: 64px;\n  height: 64px;\n  border-radius: 50%;\n  background: rgba(255, 255, 255, 0.1);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 2rem;\n}\n.level-name[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0;\n}\n.expires-info[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  margin: 0.25rem 0 0 0;\n}\n.days-left[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.upgrade-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.75rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.upgrade-btn[_ngcontent-%COMP%]:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 10px 20px -10px rgba(6, 182, 212, 0.5);\n}\n.quick-stats[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 1rem;\n  margin-bottom: 1.5rem;\n}\n.stat-card[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.75rem;\n}\n.stat-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.stat-content[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.stat-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.75rem;\n}\n.stat-value[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.stat-bar[_ngcontent-%COMP%] {\n  height: 4px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 2px;\n  margin-top: 0.5rem;\n  overflow: hidden;\n}\n.stat-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 2px;\n}\n.stat-hint[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n}\n.tabs[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1.5rem;\n  flex-wrap: wrap;\n}\n.tab-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.tab-btn[_ngcontent-%COMP%]:hover {\n  border-color: var(--primary, #06b6d4);\n}\n.tab-btn.active[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border-color: transparent;\n  color: white;\n}\n.section-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.section-title[_ngcontent-%COMP%] {\n  font-size: 1rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 1rem 0;\n}\n.usage-details[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 1rem;\n}\n.usage-row[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.usage-name[_ngcontent-%COMP%] {\n  width: 150px;\n  color: var(--text-secondary, #cbd5e1);\n}\n.usage-bar-container[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.usage-bar[_ngcontent-%COMP%] {\n  height: 8px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 4px;\n  overflow: hidden;\n}\n.usage-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 4px;\n}\n.usage-count[_ngcontent-%COMP%] {\n  width: 100px;\n  text-align: right;\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.invite-card[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border-color: rgba(6, 182, 212, 0.3);\n}\n.invite-desc[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  margin-bottom: 1rem;\n}\n.invite-code-display[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.invite-code-display[_ngcontent-%COMP%]   .label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.invite-code-display[_ngcontent-%COMP%]   .code[_ngcontent-%COMP%] {\n  flex: 1;\n  font-family: monospace;\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.copy-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--primary-bg, rgba(6, 182, 212, 0.1));\n  border: 1px solid var(--primary, #06b6d4);\n  border-radius: 0.5rem;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n}\n.invite-stats-row[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 2rem;\n}\n.invite-stat[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n}\n.invite-stat[_ngcontent-%COMP%]   .value[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.invite-stat[_ngcontent-%COMP%]   .label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.benefits-table-container[_ngcontent-%COMP%] {\n  overflow-x: auto;\n}\n.benefits-table[_ngcontent-%COMP%] {\n  width: 100%;\n  border-collapse: collapse;\n  font-size: 0.875rem;\n}\n.benefits-table[_ngcontent-%COMP%]   th[_ngcontent-%COMP%], \n.benefits-table[_ngcontent-%COMP%]   td[_ngcontent-%COMP%] {\n  padding: 0.75rem 1rem;\n  text-align: center;\n  border-bottom: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.benefits-table[_ngcontent-%COMP%]   th[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  color: var(--text-primary, white);\n  font-weight: 600;\n}\n.benefits-table[_ngcontent-%COMP%]   .feature-col[_ngcontent-%COMP%] {\n  text-align: left;\n  min-width: 150px;\n}\n.benefits-table[_ngcontent-%COMP%]   .feature-name[_ngcontent-%COMP%] {\n  text-align: left;\n  color: var(--text-secondary, #cbd5e1);\n}\n.benefits-table[_ngcontent-%COMP%]   td[_ngcontent-%COMP%] {\n  color: var(--text-primary, white);\n}\n.benefits-table[_ngcontent-%COMP%]   .price[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.pricing-cards[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));\n  gap: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.pricing-card[_ngcontent-%COMP%] {\n  position: relative;\n  padding: 2rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 2px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  text-align: center;\n}\n.pricing-card.vip[_ngcontent-%COMP%] {\n  border-color: rgba(245, 158, 11, 0.3);\n}\n.pricing-card.svip[_ngcontent-%COMP%] {\n  border-color: rgba(139, 92, 246, 0.3);\n}\n.pricing-card.mvp[_ngcontent-%COMP%] {\n  border-color: rgba(236, 72, 153, 0.3);\n}\n.pricing-card.popular[_ngcontent-%COMP%] {\n  transform: scale(1.02);\n  box-shadow: 0 20px 40px -20px rgba(139, 92, 246, 0.3);\n}\n.pricing-card.current[_ngcontent-%COMP%] {\n  border-width: 3px;\n}\n.popular-badge[_ngcontent-%COMP%] {\n  position: absolute;\n  top: -12px;\n  left: 50%;\n  transform: translateX(-50%);\n  padding: 0.25rem 1rem;\n  background:\n    linear-gradient(\n      135deg,\n      #8b5cf6,\n      #7c3aed);\n  border-radius: 1rem;\n  color: white;\n  font-size: 0.75rem;\n  font-weight: 600;\n}\n.current-badge[_ngcontent-%COMP%] {\n  position: absolute;\n  top: 1rem;\n  right: 1rem;\n  padding: 0.25rem 0.5rem;\n  background: var(--success, #22c55e);\n  border-radius: 0.25rem;\n  color: white;\n  font-size: 0.625rem;\n  font-weight: 600;\n}\n.plan-icon[_ngcontent-%COMP%] {\n  font-size: 3rem;\n  margin-bottom: 1rem;\n}\n.plan-name[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 0.5rem 0;\n}\n.plan-price[_ngcontent-%COMP%] {\n  margin-bottom: 0.5rem;\n}\n.plan-price[_ngcontent-%COMP%]   .amount[_ngcontent-%COMP%] {\n  font-size: 2rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.plan-price[_ngcontent-%COMP%]   .period[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.savings[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--success, #22c55e);\n  margin-bottom: 1rem;\n}\n.plan-features[_ngcontent-%COMP%] {\n  list-style: none;\n  padding: 0;\n  margin: 1rem 0;\n  text-align: left;\n}\n.plan-features[_ngcontent-%COMP%]   li[_ngcontent-%COMP%] {\n  padding: 0.5rem 0;\n  color: var(--text-secondary, #cbd5e1);\n}\n.buy-btn[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 0.75rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.buy-btn.renew[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n}\n.license-input-row[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n}\n.license-input[_ngcontent-%COMP%] {\n  flex: 1;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-family: monospace;\n}\n.activate-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.activate-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.payment-methods[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 1rem;\n  flex-wrap: wrap;\n}\n.payment-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.payment-btn.active[_ngcontent-%COMP%] {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.1);\n}\n.history-list[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.75rem;\n}\n.history-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n}\n.history-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.history-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.history-title[_ngcontent-%COMP%] {\n  font-weight: 500;\n  color: var(--text-primary, white);\n}\n.history-meta[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.history-status[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  border-radius: 0.25rem;\n  font-size: 0.75rem;\n}\n.history-status.active[_ngcontent-%COMP%] {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.history-status.used[_ngcontent-%COMP%] {\n  background: rgba(148, 163, 184, 0.2);\n  color: #94a3b8;\n}\n/*# sourceMappingURL=membership-center.component.css.map */"] });
+    }, dependencies: [CommonModule, FormsModule, DefaultValueAccessor, NgControlStatus, NgModel, UserLevelBadgeComponent], styles: ["\n\n.membership-container[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n  max-width: 1200px;\n  margin: 0 auto;\n}\n.page-header[_ngcontent-%COMP%] {\n  margin-bottom: 1.5rem;\n}\n.page-title[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  margin: 0;\n}\n.title-icon[_ngcontent-%COMP%] {\n  font-size: 1.75rem;\n}\n.page-desc[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  margin: 0.5rem 0 0 0;\n}\n.membership-status-card[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1.5rem;\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n  border: 1px solid;\n}\n.membership-status-card.level-free[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(71, 85, 105, 0.3),\n      rgba(51, 65, 85, 0.3));\n  border-color: rgba(71, 85, 105, 0.5);\n}\n.membership-status-card.level-vip[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(245, 158, 11, 0.2),\n      rgba(217, 119, 6, 0.2));\n  border-color: rgba(245, 158, 11, 0.5);\n}\n.membership-status-card.level-svip[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(139, 92, 246, 0.2),\n      rgba(124, 58, 237, 0.2));\n  border-color: rgba(139, 92, 246, 0.5);\n}\n.membership-status-card.level-mvp[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(236, 72, 153, 0.2),\n      rgba(219, 39, 119, 0.2));\n  border-color: rgba(236, 72, 153, 0.5);\n}\n.wallet-card[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1rem 1.5rem;\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(102, 126, 234, 0.2),\n      rgba(118, 75, 162, 0.2));\n  border: 1px solid rgba(102, 126, 234, 0.5);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.wallet-card[_ngcontent-%COMP%]:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);\n}\n.wallet-left[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.wallet-icon[_ngcontent-%COMP%] {\n  font-size: 2rem;\n}\n.wallet-label[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: var(--text-muted, #94a3b8);\n}\n.wallet-amount[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: 700;\n  color: #22c55e;\n}\n.wallet-right[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.wallet-bonus[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: #f59e0b;\n  background: rgba(245, 158, 11, 0.1);\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n}\n.wallet-recharge-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  border-radius: 0.5rem;\n  border: none;\n  background:\n    linear-gradient(\n      135deg,\n      #667eea,\n      #764ba2);\n  color: white;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.wallet-recharge-btn[_ngcontent-%COMP%]:hover {\n  transform: scale(1.05);\n}\n.status-left[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.level-badge[_ngcontent-%COMP%] {\n  width: 64px;\n  height: 64px;\n  border-radius: 50%;\n  background: rgba(255, 255, 255, 0.1);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 2rem;\n}\n.level-name[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0;\n}\n.expires-info[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  margin: 0.25rem 0 0 0;\n}\n.days-left[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.upgrade-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.75rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.upgrade-btn[_ngcontent-%COMP%]:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 10px 20px -10px rgba(6, 182, 212, 0.5);\n}\n.quick-stats[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 1rem;\n  margin-bottom: 1.5rem;\n}\n.stat-card[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.75rem;\n}\n.stat-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.stat-content[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.stat-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.75rem;\n}\n.stat-value[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.stat-bar[_ngcontent-%COMP%] {\n  height: 4px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 2px;\n  margin-top: 0.5rem;\n  overflow: hidden;\n}\n.stat-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 2px;\n}\n.stat-hint[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n}\n.tabs[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1.5rem;\n  flex-wrap: wrap;\n}\n.tab-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.tab-btn[_ngcontent-%COMP%]:hover {\n  border-color: var(--primary, #06b6d4);\n}\n.tab-btn.active[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border-color: transparent;\n  color: white;\n}\n.section-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.section-title[_ngcontent-%COMP%] {\n  font-size: 1rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 1rem 0;\n}\n.usage-details[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 1rem;\n}\n.usage-row[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.usage-name[_ngcontent-%COMP%] {\n  width: 150px;\n  color: var(--text-secondary, #cbd5e1);\n}\n.usage-bar-container[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.usage-bar[_ngcontent-%COMP%] {\n  height: 8px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 4px;\n  overflow: hidden;\n}\n.usage-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 4px;\n}\n.usage-count[_ngcontent-%COMP%] {\n  width: 100px;\n  text-align: right;\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.invite-card[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border-color: rgba(6, 182, 212, 0.3);\n}\n.invite-desc[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  margin-bottom: 1rem;\n}\n.invite-code-display[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.invite-code-display[_ngcontent-%COMP%]   .label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.invite-code-display[_ngcontent-%COMP%]   .code[_ngcontent-%COMP%] {\n  flex: 1;\n  font-family: monospace;\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.copy-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--primary-bg, rgba(6, 182, 212, 0.1));\n  border: 1px solid var(--primary, #06b6d4);\n  border-radius: 0.5rem;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n}\n.invite-stats-row[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 2rem;\n}\n.invite-stat[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n}\n.invite-stat[_ngcontent-%COMP%]   .value[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.invite-stat[_ngcontent-%COMP%]   .label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.benefits-table-container[_ngcontent-%COMP%] {\n  overflow-x: auto;\n}\n.benefits-table[_ngcontent-%COMP%] {\n  width: 100%;\n  border-collapse: collapse;\n  font-size: 0.875rem;\n}\n.benefits-table[_ngcontent-%COMP%]   th[_ngcontent-%COMP%], \n.benefits-table[_ngcontent-%COMP%]   td[_ngcontent-%COMP%] {\n  padding: 0.75rem 1rem;\n  text-align: center;\n  border-bottom: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.benefits-table[_ngcontent-%COMP%]   th[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  color: var(--text-primary, white);\n  font-weight: 600;\n}\n.benefits-table[_ngcontent-%COMP%]   .feature-col[_ngcontent-%COMP%] {\n  text-align: left;\n  min-width: 150px;\n}\n.benefits-table[_ngcontent-%COMP%]   .feature-name[_ngcontent-%COMP%] {\n  text-align: left;\n  color: var(--text-secondary, #cbd5e1);\n}\n.benefits-table[_ngcontent-%COMP%]   td[_ngcontent-%COMP%] {\n  color: var(--text-primary, white);\n}\n.benefits-table[_ngcontent-%COMP%]   .price[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.pricing-cards[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));\n  gap: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.pricing-card[_ngcontent-%COMP%] {\n  position: relative;\n  padding: 2rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 2px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  text-align: center;\n}\n.pricing-card.vip[_ngcontent-%COMP%] {\n  border-color: rgba(245, 158, 11, 0.3);\n}\n.pricing-card.svip[_ngcontent-%COMP%] {\n  border-color: rgba(139, 92, 246, 0.3);\n}\n.pricing-card.mvp[_ngcontent-%COMP%] {\n  border-color: rgba(236, 72, 153, 0.3);\n}\n.pricing-card.popular[_ngcontent-%COMP%] {\n  transform: scale(1.02);\n  box-shadow: 0 20px 40px -20px rgba(139, 92, 246, 0.3);\n}\n.pricing-card.current[_ngcontent-%COMP%] {\n  border-width: 3px;\n}\n.popular-badge[_ngcontent-%COMP%] {\n  position: absolute;\n  top: -12px;\n  left: 50%;\n  transform: translateX(-50%);\n  padding: 0.25rem 1rem;\n  background:\n    linear-gradient(\n      135deg,\n      #8b5cf6,\n      #7c3aed);\n  border-radius: 1rem;\n  color: white;\n  font-size: 0.75rem;\n  font-weight: 600;\n}\n.current-badge[_ngcontent-%COMP%] {\n  position: absolute;\n  top: 1rem;\n  right: 1rem;\n  padding: 0.25rem 0.5rem;\n  background: var(--success, #22c55e);\n  border-radius: 0.25rem;\n  color: white;\n  font-size: 0.625rem;\n  font-weight: 600;\n}\n.plan-icon[_ngcontent-%COMP%] {\n  font-size: 3rem;\n  margin-bottom: 1rem;\n}\n.plan-name[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 0.5rem 0;\n}\n.plan-price[_ngcontent-%COMP%] {\n  margin-bottom: 0.5rem;\n}\n.plan-price[_ngcontent-%COMP%]   .amount[_ngcontent-%COMP%] {\n  font-size: 2rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.plan-price[_ngcontent-%COMP%]   .period[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.savings[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--success, #22c55e);\n  margin-bottom: 1rem;\n}\n.plan-features[_ngcontent-%COMP%] {\n  list-style: none;\n  padding: 0;\n  margin: 1rem 0;\n  text-align: left;\n}\n.plan-features[_ngcontent-%COMP%]   li[_ngcontent-%COMP%] {\n  padding: 0.5rem 0;\n  color: var(--text-secondary, #cbd5e1);\n}\n.buy-btn[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 0.75rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.buy-btn.renew[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n}\n.license-input-row[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n}\n.license-input[_ngcontent-%COMP%] {\n  flex: 1;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-family: monospace;\n}\n.activate-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.activate-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.payment-methods[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 1rem;\n  flex-wrap: wrap;\n}\n.payment-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.payment-btn.active[_ngcontent-%COMP%] {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.1);\n}\n.history-list[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.75rem;\n}\n.history-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n}\n.history-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.history-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.history-title[_ngcontent-%COMP%] {\n  font-weight: 500;\n  color: var(--text-primary, white);\n}\n.history-meta[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.history-status[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  border-radius: 0.25rem;\n  font-size: 0.75rem;\n}\n.history-status.active[_ngcontent-%COMP%] {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.history-status.used[_ngcontent-%COMP%] {\n  background: rgba(148, 163, 184, 0.2);\n  color: #94a3b8;\n}\n/*# sourceMappingURL=membership-center.component.css.map */"] });
   }
 };
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(MembershipCenterComponent, [{
     type: Component,
-    args: [{ selector: "app-membership-center", standalone: true, imports: [CommonModule, FormsModule], template: `
+    args: [{ selector: "app-membership-center", standalone: true, imports: [CommonModule, FormsModule, UserLevelBadgeComponent], template: `
     <div class="membership-container">
       <!-- \u9801\u9762\u6A19\u984C -->
       <div class="page-header">
@@ -41260,7 +41531,8 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
             {{ getMembershipIcon() }}
           </div>
           <div class="level-info">
-            <h2 class="level-name">{{ getMembershipName() }}</h2>
+            <!-- \u{1F527} P1-2: \u4F7F\u7528\u7D71\u4E00\u7684\u6703\u54E1\u7B49\u7D1A\u5FBD\u7AE0\u7D44\u4EF6 -->
+            <user-level-badge [level]="membershipLevel()" size="lg" />
             @if (membershipExpires()) {
               <p class="expires-info">
                 \u6709\u6548\u671F\u81F3 {{ formatDate(membershipExpires()) }}
@@ -41782,7 +42054,7 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
   }], null, null);
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(MembershipCenterComponent, { className: "MembershipCenterComponent", filePath: "src/membership-center.component.ts", lineNumber: 1198 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(MembershipCenterComponent, { className: "MembershipCenterComponent", filePath: "src/membership-center.component.ts", lineNumber: 1200 });
 })();
 
 // src/profile.component.ts
@@ -41790,7 +42062,7 @@ var _forTrack015 = ($index, $item) => $item.id;
 function ProfileComponent_Conditional_1_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 1);
-    \u0275\u0275element(1, "div", 15);
+    \u0275\u0275element(1, "div", 16);
     \u0275\u0275elementStart(2, "span");
     \u0275\u0275text(3, "\u6B63\u5728\u52A0\u8F09\u7528\u6236\u4FE1\u606F...");
     \u0275\u0275elementEnd()();
@@ -41799,13 +42071,13 @@ function ProfileComponent_Conditional_1_Template(rf, ctx) {
 function ProfileComponent_Conditional_2_Template(rf, ctx) {
   if (rf & 1) {
     const _r1 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 2)(1, "span", 16);
+    \u0275\u0275elementStart(0, "div", 2)(1, "span", 17);
     \u0275\u0275text(2, "\u26A0\uFE0F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(3, "span");
     \u0275\u0275text(4);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "button", 17);
+    \u0275\u0275elementStart(5, "button", 18);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_2_Template_button_click_5_listener() {
       \u0275\u0275restoreView(_r1);
       const ctx_r1 = \u0275\u0275nextContext();
@@ -41822,7 +42094,7 @@ function ProfileComponent_Conditional_2_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_14_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 10);
+    \u0275\u0275elementStart(0, "span", 11);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -41834,7 +42106,7 @@ function ProfileComponent_Conditional_14_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "span", 18);
+    \u0275\u0275element(0, "span", 19);
     \u0275\u0275text(1, " \u9000\u51FA\u4E2D... ");
   }
 }
@@ -41846,7 +42118,7 @@ function ProfileComponent_Conditional_17_Template(rf, ctx) {
 function ProfileComponent_Conditional_29_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
     const _r4 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 36);
+    \u0275\u0275elementStart(0, "button", 37);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_11_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -41858,7 +42130,7 @@ function ProfileComponent_Conditional_29_Conditional_11_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_29_Conditional_43_Conditional_22_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "span", 49);
+    \u0275\u0275element(0, "span", 50);
     \u0275\u0275text(1, " \u4FDD\u5B58\u4E2D... ");
   }
 }
@@ -41870,21 +42142,21 @@ function ProfileComponent_Conditional_29_Conditional_43_Conditional_23_Template(
 function ProfileComponent_Conditional_29_Conditional_43_Template(rf, ctx) {
   if (rf & 1) {
     const _r5 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 37);
+    \u0275\u0275elementStart(0, "div", 38);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_43_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.closeEmailEditor());
     });
-    \u0275\u0275elementStart(1, "div", 38);
+    \u0275\u0275elementStart(1, "div", 39);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_43_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r5);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 39)(3, "h3");
+    \u0275\u0275elementStart(2, "div", 40)(3, "h3");
     \u0275\u0275text(4, "\u{1F4E7} \u4FEE\u6539\u90F5\u7BB1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "button", 40);
+    \u0275\u0275elementStart(5, "button", 41);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_43_Template_button_click_5_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -41892,10 +42164,10 @@ function ProfileComponent_Conditional_29_Conditional_43_Template(rf, ctx) {
     });
     \u0275\u0275text(6, "\xD7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "div", 41)(8, "div", 42)(9, "label");
+    \u0275\u0275elementStart(7, "div", 42)(8, "div", 43)(9, "label");
     \u0275\u0275text(10, "\u65B0\u90F5\u7BB1\u5730\u5740");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "input", 43);
+    \u0275\u0275elementStart(11, "input", 44);
     \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_43_Template_input_ngModelChange_11_listener($event) {
       \u0275\u0275restoreView(_r5);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -41903,10 +42175,10 @@ function ProfileComponent_Conditional_29_Conditional_43_Template(rf, ctx) {
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(12, "div", 42)(13, "label");
+    \u0275\u0275elementStart(12, "div", 43)(13, "label");
     \u0275\u0275text(14, "\u7576\u524D\u5BC6\u78BC\uFF08\u9A57\u8B49\u8EAB\u4EFD\uFF09");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(15, "input", 44);
+    \u0275\u0275elementStart(15, "input", 45);
     \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_43_Template_input_ngModelChange_15_listener($event) {
       \u0275\u0275restoreView(_r5);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -41914,10 +42186,10 @@ function ProfileComponent_Conditional_29_Conditional_43_Template(rf, ctx) {
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(16, "p", 45);
+    \u0275\u0275elementStart(16, "p", 46);
     \u0275\u0275text(17, "\u26A0\uFE0F \u4FEE\u6539\u90F5\u7BB1\u9700\u8981\u9A57\u8B49\u7576\u524D\u5BC6\u78BC");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(18, "div", 46)(19, "button", 47);
+    \u0275\u0275elementStart(18, "div", 47)(19, "button", 48);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_43_Template_button_click_19_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -41925,7 +42197,7 @@ function ProfileComponent_Conditional_29_Conditional_43_Template(rf, ctx) {
     });
     \u0275\u0275text(20, "\u53D6\u6D88");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(21, "button", 48);
+    \u0275\u0275elementStart(21, "button", 49);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_43_Template_button_click_21_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -41948,7 +42220,7 @@ function ProfileComponent_Conditional_29_Conditional_43_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_29_Conditional_44_Conditional_18_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "span", 49);
+    \u0275\u0275element(0, "span", 50);
     \u0275\u0275text(1, " \u4FDD\u5B58\u4E2D... ");
   }
 }
@@ -41960,21 +42232,21 @@ function ProfileComponent_Conditional_29_Conditional_44_Conditional_19_Template(
 function ProfileComponent_Conditional_29_Conditional_44_Template(rf, ctx) {
   if (rf & 1) {
     const _r6 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 37);
+    \u0275\u0275elementStart(0, "div", 38);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.closeDisplayNameEditor());
     });
-    \u0275\u0275elementStart(1, "div", 38);
+    \u0275\u0275elementStart(1, "div", 39);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r6);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 39)(3, "h3");
+    \u0275\u0275elementStart(2, "div", 40)(3, "h3");
     \u0275\u0275text(4, "\u270F\uFE0F \u4FEE\u6539\u986F\u793A\u540D\u7A31");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "button", 40);
+    \u0275\u0275elementStart(5, "button", 41);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_button_click_5_listener() {
       \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -41982,10 +42254,10 @@ function ProfileComponent_Conditional_29_Conditional_44_Template(rf, ctx) {
     });
     \u0275\u0275text(6, "\xD7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "div", 41)(8, "div", 42)(9, "label");
+    \u0275\u0275elementStart(7, "div", 42)(8, "div", 43)(9, "label");
     \u0275\u0275text(10, "\u986F\u793A\u540D\u7A31");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "input", 50);
+    \u0275\u0275elementStart(11, "input", 51);
     \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_44_Template_input_ngModelChange_11_listener($event) {
       \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -41993,10 +42265,10 @@ function ProfileComponent_Conditional_29_Conditional_44_Template(rf, ctx) {
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(12, "p", 45);
+    \u0275\u0275elementStart(12, "p", 46);
     \u0275\u0275text(13, "\u{1F4A1} \u986F\u793A\u540D\u7A31\u6703\u5728\u83DC\u55AE\u6B04\u548C\u500B\u4EBA\u4E2D\u5FC3\u986F\u793A\uFF0C\u6700\u591A30\u500B\u5B57\u7B26");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(14, "div", 46)(15, "button", 47);
+    \u0275\u0275elementStart(14, "div", 47)(15, "button", 48);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_button_click_15_listener() {
       \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -42004,7 +42276,7 @@ function ProfileComponent_Conditional_29_Conditional_44_Template(rf, ctx) {
     });
     \u0275\u0275text(16, "\u53D6\u6D88");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "button", 48);
+    \u0275\u0275elementStart(17, "button", 49);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_button_click_17_listener() {
       \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -42026,10 +42298,10 @@ function ProfileComponent_Conditional_29_Conditional_44_Template(rf, ctx) {
 function ProfileComponent_Conditional_29_Conditional_53_Template(rf, ctx) {
   if (rf & 1) {
     const _r7 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 35)(1, "div", 42)(2, "label");
+    \u0275\u0275elementStart(0, "div", 36)(1, "div", 43)(2, "label");
     \u0275\u0275text(3, "\u7576\u524D\u5BC6\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "input", 51);
+    \u0275\u0275elementStart(4, "input", 52);
     \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_53_Template_input_ngModelChange_4_listener($event) {
       \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -42037,10 +42309,10 @@ function ProfileComponent_Conditional_29_Conditional_53_Template(rf, ctx) {
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(5, "div", 42)(6, "label");
+    \u0275\u0275elementStart(5, "div", 43)(6, "label");
     \u0275\u0275text(7, "\u65B0\u5BC6\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "input", 51);
+    \u0275\u0275elementStart(8, "input", 52);
     \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_53_Template_input_ngModelChange_8_listener($event) {
       \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -42048,10 +42320,10 @@ function ProfileComponent_Conditional_29_Conditional_53_Template(rf, ctx) {
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(9, "div", 42)(10, "label");
+    \u0275\u0275elementStart(9, "div", 43)(10, "label");
     \u0275\u0275text(11, "\u78BA\u8A8D\u65B0\u5BC6\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "input", 51);
+    \u0275\u0275elementStart(12, "input", 52);
     \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_53_Template_input_ngModelChange_12_listener($event) {
       \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -42059,7 +42331,7 @@ function ProfileComponent_Conditional_29_Conditional_53_Template(rf, ctx) {
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(13, "div", 52)(14, "button", 47);
+    \u0275\u0275elementStart(13, "div", 53)(14, "button", 48);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_53_Template_button_click_14_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -42067,7 +42339,7 @@ function ProfileComponent_Conditional_29_Conditional_53_Template(rf, ctx) {
     });
     \u0275\u0275text(15, "\u53D6\u6D88");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(16, "button", 53);
+    \u0275\u0275elementStart(16, "button", 54);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_53_Template_button_click_16_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext(2);
@@ -42089,24 +42361,24 @@ function ProfileComponent_Conditional_29_Conditional_53_Template(rf, ctx) {
 function ProfileComponent_Conditional_29_Template(rf, ctx) {
   if (rf & 1) {
     const _r3 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 14)(1, "div", 19)(2, "h3", 20);
+    \u0275\u0275elementStart(0, "div", 15)(1, "div", 20)(2, "h3", 21);
     \u0275\u0275text(3, "\u{1F4CB} \u57FA\u672C\u4FE1\u606F");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "div", 21)(5, "div", 22)(6, "span", 23);
+    \u0275\u0275elementStart(4, "div", 22)(5, "div", 23)(6, "span", 24);
     \u0275\u0275text(7, "Telegram ID");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "span", 24)(9, "span", 25);
+    \u0275\u0275elementStart(8, "span", 25)(9, "span", 26);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(11, ProfileComponent_Conditional_29_Conditional_11_Template, 2, 0, "button", 26);
+    \u0275\u0275conditionalCreate(11, ProfileComponent_Conditional_29_Conditional_11_Template, 2, 0, "button", 27);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(12, "div", 22)(13, "span", 23);
+    \u0275\u0275elementStart(12, "div", 23)(13, "span", 24);
     \u0275\u0275text(14, "\u986F\u793A\u540D\u7A31");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(15, "span", 27);
+    \u0275\u0275elementStart(15, "span", 28);
     \u0275\u0275text(16);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "button", 28);
+    \u0275\u0275elementStart(17, "button", 29);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_17_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
@@ -42114,22 +42386,22 @@ function ProfileComponent_Conditional_29_Template(rf, ctx) {
     });
     \u0275\u0275text(18, "\u7DE8\u8F2F");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(19, "div", 22)(20, "span", 23);
+    \u0275\u0275elementStart(19, "div", 23)(20, "span", 24);
     \u0275\u0275text(21, "\u7528\u6236\u540D");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(22, "span", 29);
+    \u0275\u0275elementStart(22, "span", 30);
     \u0275\u0275text(23);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(24, "span", 30);
+    \u0275\u0275elementStart(24, "span", 31);
     \u0275\u0275text(25, "\u767B\u5165\u7528\uFF0C\u4E0D\u53EF\u4FEE\u6539");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(26, "div", 22)(27, "span", 23);
+    \u0275\u0275elementStart(26, "div", 23)(27, "span", 24);
     \u0275\u0275text(28, "\u90F5\u7BB1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(29, "span", 27);
+    \u0275\u0275elementStart(29, "span", 28);
     \u0275\u0275text(30);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(31, "button", 28);
+    \u0275\u0275elementStart(31, "button", 29);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_31_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
@@ -42137,24 +42409,24 @@ function ProfileComponent_Conditional_29_Template(rf, ctx) {
     });
     \u0275\u0275text(32, "\u7DE8\u8F2F");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(33, "div", 22)(34, "span", 23);
+    \u0275\u0275elementStart(33, "div", 23)(34, "span", 24);
     \u0275\u0275text(35, "\u8A3B\u518A\u6642\u9593");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(36, "span", 27);
+    \u0275\u0275elementStart(36, "span", 28);
     \u0275\u0275text(37);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(38, "div", 22)(39, "span", 23);
+    \u0275\u0275elementStart(38, "div", 23)(39, "span", 24);
     \u0275\u0275text(40, "\u6700\u5F8C\u767B\u5165");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(41, "span", 27);
+    \u0275\u0275elementStart(41, "span", 28);
     \u0275\u0275text(42);
     \u0275\u0275elementEnd()()()();
-    \u0275\u0275conditionalCreate(43, ProfileComponent_Conditional_29_Conditional_43_Template, 24, 4, "div", 31);
-    \u0275\u0275conditionalCreate(44, ProfileComponent_Conditional_29_Conditional_44_Template, 20, 3, "div", 31);
-    \u0275\u0275elementStart(45, "div", 19)(46, "h3", 20);
+    \u0275\u0275conditionalCreate(43, ProfileComponent_Conditional_29_Conditional_43_Template, 24, 4, "div", 32);
+    \u0275\u0275conditionalCreate(44, ProfileComponent_Conditional_29_Conditional_44_Template, 20, 3, "div", 32);
+    \u0275\u0275elementStart(45, "div", 20)(46, "h3", 21);
     \u0275\u0275text(47, "\u{1F510} \u5B89\u5168\u8A2D\u7F6E");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(48, "div", 32)(49, "button", 33);
+    \u0275\u0275elementStart(48, "div", 33)(49, "button", 34);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_49_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
@@ -42162,10 +42434,10 @@ function ProfileComponent_Conditional_29_Template(rf, ctx) {
     });
     \u0275\u0275text(50, " \u{1F511} \u4FEE\u6539\u5BC6\u78BC ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(51, "button", 34);
+    \u0275\u0275elementStart(51, "button", 35);
     \u0275\u0275text(52, " \u{1F4F1} \u5169\u6B65\u9A57\u8B49 ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(53, ProfileComponent_Conditional_29_Conditional_53_Template, 18, 3, "div", 35);
+    \u0275\u0275conditionalCreate(53, ProfileComponent_Conditional_29_Conditional_53_Template, 18, 3, "div", 36);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -42201,30 +42473,30 @@ function ProfileComponent_Conditional_29_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_30_Conditional_14_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 58);
+    \u0275\u0275elementStart(0, "div", 59);
     \u0275\u0275text(1, "\u8F09\u5165\u4E2D...");
     \u0275\u0275elementEnd();
   }
 }
 function ProfileComponent_Conditional_30_Conditional_15_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 59);
+    \u0275\u0275elementStart(0, "div", 60);
     \u0275\u0275text(1, "\u66AB\u7121\u6FC0\u6D3B\u8A18\u9304");
     \u0275\u0275elementEnd();
   }
 }
 function ProfileComponent_Conditional_30_Conditional_16_For_1_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 71)(1, "div", 72)(2, "span", 73);
+    \u0275\u0275elementStart(0, "div", 72)(1, "div", 73)(2, "span", 74);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "span", 74);
+    \u0275\u0275elementStart(4, "span", 75);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(6, "div", 75)(7, "span");
+    \u0275\u0275elementStart(6, "div", 76)(7, "span");
     \u0275\u0275text(8);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "span", 76);
+    \u0275\u0275elementStart(9, "span", 77);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd()()();
   }
@@ -42245,7 +42517,7 @@ function ProfileComponent_Conditional_30_Conditional_16_For_1_Template(rf, ctx) 
 }
 function ProfileComponent_Conditional_30_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275repeaterCreate(0, ProfileComponent_Conditional_30_Conditional_16_For_1_Template, 11, 10, "div", 71, _forTrack015);
+    \u0275\u0275repeaterCreate(0, ProfileComponent_Conditional_30_Conditional_16_For_1_Template, 11, 10, "div", 72, _forTrack015);
   }
   if (rf & 2) {
     const ctx_r1 = \u0275\u0275nextContext(2);
@@ -42255,10 +42527,10 @@ function ProfileComponent_Conditional_30_Conditional_16_Template(rf, ctx) {
 function ProfileComponent_Conditional_30_Template(rf, ctx) {
   if (rf & 1) {
     const _r8 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 14)(1, "div", 19)(2, "h3", 20);
+    \u0275\u0275elementStart(0, "div", 15)(1, "div", 20)(2, "h3", 21);
     \u0275\u0275text(3, "\u{1F3AB} \u6FC0\u6D3B\u65B0\u5361\u5BC6");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "div", 54)(5, "input", 55);
+    \u0275\u0275elementStart(4, "div", 55)(5, "input", 56);
     \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_30_Template_input_ngModelChange_5_listener($event) {
       \u0275\u0275restoreView(_r8);
       const ctx_r1 = \u0275\u0275nextContext();
@@ -42266,7 +42538,7 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "button", 56);
+    \u0275\u0275elementStart(6, "button", 57);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_30_Template_button_click_6_listener() {
       \u0275\u0275restoreView(_r8);
       const ctx_r1 = \u0275\u0275nextContext();
@@ -42274,25 +42546,25 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     });
     \u0275\u0275text(7, " \u6FC0\u6D3B ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(8, "p", 45);
+    \u0275\u0275elementStart(8, "p", 46);
     \u0275\u0275text(9, "\u8F38\u5165\u8CFC\u8CB7\u7684\u5361\u5BC6\u4EE5\u7E8C\u8CBB\u6216\u5347\u7D1A\u6703\u54E1");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(10, "div", 19)(11, "h3", 20);
+    \u0275\u0275elementStart(10, "div", 20)(11, "h3", 21);
     \u0275\u0275text(12, "\u{1F4DC} \u6FC0\u6D3B\u8A18\u9304");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(13, "div", 57);
-    \u0275\u0275conditionalCreate(14, ProfileComponent_Conditional_30_Conditional_14_Template, 2, 0, "div", 58)(15, ProfileComponent_Conditional_30_Conditional_15_Template, 2, 0, "div", 59)(16, ProfileComponent_Conditional_30_Conditional_16_Template, 2, 0);
+    \u0275\u0275elementStart(13, "div", 58);
+    \u0275\u0275conditionalCreate(14, ProfileComponent_Conditional_30_Conditional_14_Template, 2, 0, "div", 59)(15, ProfileComponent_Conditional_30_Conditional_15_Template, 2, 0, "div", 60)(16, ProfileComponent_Conditional_30_Conditional_16_Template, 2, 0);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(17, "div", 19)(18, "h3", 20);
+    \u0275\u0275elementStart(17, "div", 20)(18, "h3", 21);
     \u0275\u0275text(19, "\u{1F6D2} \u8CFC\u8CB7\u5361\u5BC6\uFF08\u738B\u8005\u69AE\u8000\u7B49\u7D1A\uFF09");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(20, "div", 60)(21, "div", 61)(22, "div", 62);
+    \u0275\u0275elementStart(20, "div", 61)(21, "div", 62)(22, "div", 63);
     \u0275\u0275text(23, "\u{1F948} \u767D\u9280\u7CBE\u82F1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(24, "div", 63);
+    \u0275\u0275elementStart(24, "div", 64);
     \u0275\u0275text(25, "4.99 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(26, "ul", 64)(27, "li");
+    \u0275\u0275elementStart(26, "ul", 65)(27, "li");
     \u0275\u0275text(28, "5 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(29, "li");
@@ -42304,19 +42576,19 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(33, "li");
     \u0275\u0275text(34, "10 \u500B\u7FA4\u7D44");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(35, "button", 65);
+    \u0275\u0275elementStart(35, "button", 66);
     \u0275\u0275text(36, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(37, "div", 66)(38, "div", 62);
+    \u0275\u0275elementStart(37, "div", 67)(38, "div", 63);
     \u0275\u0275text(39, "\u{1F947} \u9EC3\u91D1\u5927\u5E2B");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(40, "div", 63);
+    \u0275\u0275elementStart(40, "div", 64);
     \u0275\u0275text(41, "19.9 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(42, "div", 67);
+    \u0275\u0275elementStart(42, "div", 68);
     \u0275\u0275text(43, "\u63A8\u85A6");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(44, "ul", 64)(45, "li");
+    \u0275\u0275elementStart(44, "ul", 65)(45, "li");
     \u0275\u0275text(46, "15 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(47, "li");
@@ -42328,16 +42600,16 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(51, "li");
     \u0275\u0275text(52, "\u6279\u91CF\u64CD\u4F5C");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(53, "button", 65);
+    \u0275\u0275elementStart(53, "button", 66);
     \u0275\u0275text(54, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(55, "div", 68)(56, "div", 62);
+    \u0275\u0275elementStart(55, "div", 69)(56, "div", 63);
     \u0275\u0275text(57, "\u{1F48E} \u947D\u77F3\u738B\u724C");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(58, "div", 63);
+    \u0275\u0275elementStart(58, "div", 64);
     \u0275\u0275text(59, "59.9 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(60, "ul", 64)(61, "li");
+    \u0275\u0275elementStart(60, "ul", 65)(61, "li");
     \u0275\u0275text(62, "50 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(63, "li");
@@ -42349,16 +42621,16 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(67, "li");
     \u0275\u0275text(68, "AI \u92B7\u552E\u6F0F\u6597");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(69, "button", 65);
+    \u0275\u0275elementStart(69, "button", 66);
     \u0275\u0275text(70, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(71, "div", 69)(72, "div", 62);
+    \u0275\u0275elementStart(71, "div", 70)(72, "div", 63);
     \u0275\u0275text(73, "\u{1F31F} \u661F\u8000\u50B3\u8AAA");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(74, "div", 63);
+    \u0275\u0275elementStart(74, "div", 64);
     \u0275\u0275text(75, "199 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(76, "ul", 64)(77, "li");
+    \u0275\u0275elementStart(76, "ul", 65)(77, "li");
     \u0275\u0275text(78, "100 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(79, "li");
@@ -42370,16 +42642,16 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(83, "li");
     \u0275\u0275text(84, "\u667A\u80FD\u9632\u5C01");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(85, "button", 65);
+    \u0275\u0275elementStart(85, "button", 66);
     \u0275\u0275text(86, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(87, "div", 70)(88, "div", 62);
+    \u0275\u0275elementStart(87, "div", 71)(88, "div", 63);
     \u0275\u0275text(89, "\u{1F451} \u69AE\u8000\u738B\u8005");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(90, "div", 63);
+    \u0275\u0275elementStart(90, "div", 64);
     \u0275\u0275text(91, "599 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(92, "ul", 64)(93, "li");
+    \u0275\u0275elementStart(92, "ul", 65)(93, "li");
     \u0275\u0275text(94, "\u7121\u9650\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(95, "li");
@@ -42391,7 +42663,7 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(99, "li");
     \u0275\u0275text(100, "\u5C08\u5C6C\u9867\u554F");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(101, "button", 65);
+    \u0275\u0275elementStart(101, "button", 66);
     \u0275\u0275text(102, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()()()()();
   }
@@ -42407,7 +42679,7 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_31_For_8_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 90);
+    \u0275\u0275elementStart(0, "span", 91);
     \u0275\u0275text(1, "\u672C\u6A5F");
     \u0275\u0275elementEnd();
   }
@@ -42415,7 +42687,7 @@ function ProfileComponent_Conditional_31_For_8_Conditional_6_Template(rf, ctx) {
 function ProfileComponent_Conditional_31_For_8_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
     const _r11 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 94);
+    \u0275\u0275elementStart(0, "button", 95);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_31_For_8_Conditional_11_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r11);
       const device_r12 = \u0275\u0275nextContext().$implicit;
@@ -42432,20 +42704,20 @@ function ProfileComponent_Conditional_31_For_8_Conditional_11_Template(rf, ctx) 
 }
 function ProfileComponent_Conditional_31_For_8_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 86)(1, "div", 87);
+    \u0275\u0275elementStart(0, "div", 87)(1, "div", 88);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "div", 88)(4, "div", 89);
+    \u0275\u0275elementStart(3, "div", 89)(4, "div", 90);
     \u0275\u0275text(5);
-    \u0275\u0275conditionalCreate(6, ProfileComponent_Conditional_31_For_8_Conditional_6_Template, 2, 0, "span", 90);
+    \u0275\u0275conditionalCreate(6, ProfileComponent_Conditional_31_For_8_Conditional_6_Template, 2, 0, "span", 91);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "div", 91);
+    \u0275\u0275elementStart(7, "div", 92);
     \u0275\u0275text(8);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "div", 92);
+    \u0275\u0275elementStart(9, "div", 93);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(11, ProfileComponent_Conditional_31_For_8_Conditional_11_Template, 2, 1, "button", 93);
+    \u0275\u0275conditionalCreate(11, ProfileComponent_Conditional_31_For_8_Conditional_11_Template, 2, 1, "button", 94);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -42468,7 +42740,7 @@ function ProfileComponent_Conditional_31_For_8_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_31_ForEmpty_9_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 59);
+    \u0275\u0275elementStart(0, "div", 60);
     \u0275\u0275text(1, " \u66AB\u7121\u7D81\u5B9A\u8A2D\u5099\u8A18\u9304 ");
     \u0275\u0275elementEnd();
   }
@@ -42476,25 +42748,25 @@ function ProfileComponent_Conditional_31_ForEmpty_9_Template(rf, ctx) {
 function ProfileComponent_Conditional_31_Template(rf, ctx) {
   if (rf & 1) {
     const _r10 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 14)(1, "div", 19)(2, "h3", 20);
+    \u0275\u0275elementStart(0, "div", 15)(1, "div", 20)(2, "h3", 21);
     \u0275\u0275text(3, "\u{1F4BB} \u5DF2\u7D81\u5B9A\u8A2D\u5099");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "p", 77);
+    \u0275\u0275elementStart(4, "p", 78);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "div", 78);
-    \u0275\u0275repeaterCreate(7, ProfileComponent_Conditional_31_For_8_Template, 12, 9, "div", 79, _forTrack015, false, ProfileComponent_Conditional_31_ForEmpty_9_Template, 2, 0, "div", 59);
+    \u0275\u0275elementStart(6, "div", 79);
+    \u0275\u0275repeaterCreate(7, ProfileComponent_Conditional_31_For_8_Template, 12, 9, "div", 80, _forTrack015, false, ProfileComponent_Conditional_31_ForEmpty_9_Template, 2, 0, "div", 60);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(10, "div", 19)(11, "h3", 20);
+    \u0275\u0275elementStart(10, "div", 20)(11, "h3", 21);
     \u0275\u0275text(12, "\u{1F4F1} \u7576\u524D\u8A2D\u5099");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(13, "div", 80)(14, "div", 81)(15, "span", 82);
+    \u0275\u0275elementStart(13, "div", 81)(14, "div", 82)(15, "span", 83);
     \u0275\u0275text(16, "\u8A2D\u5099\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "span", 83);
+    \u0275\u0275elementStart(17, "span", 84);
     \u0275\u0275text(18);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(19, "button", 84);
+    \u0275\u0275elementStart(19, "button", 85);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_31_Template_button_click_19_listener() {
       \u0275\u0275restoreView(_r10);
       const ctx_r1 = \u0275\u0275nextContext();
@@ -42502,10 +42774,10 @@ function ProfileComponent_Conditional_31_Template(rf, ctx) {
     });
     \u0275\u0275text(20, "\u{1F4CB}");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(21, "div", 81)(22, "span", 82);
+    \u0275\u0275elementStart(21, "div", 82)(22, "span", 83);
     \u0275\u0275text(23, "\u8A2D\u5099\u540D\u7A31");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(24, "span", 85);
+    \u0275\u0275elementStart(24, "span", 86);
     \u0275\u0275text(25);
     \u0275\u0275elementEnd()()()()();
   }
@@ -42523,52 +42795,52 @@ function ProfileComponent_Conditional_31_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_32_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 95)(1, "div", 96)(2, "div", 97);
+    \u0275\u0275elementStart(0, "div", 96)(1, "div", 97)(2, "div", 98);
     \u0275\u0275text(3, "\u{1F916}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "div", 98)(5, "div", 99);
+    \u0275\u0275elementStart(4, "div", 99)(5, "div", 100);
     \u0275\u0275text(6, "AI \u8ABF\u7528");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "div", 100);
-    \u0275\u0275element(8, "div", 101);
+    \u0275\u0275elementStart(7, "div", 101);
+    \u0275\u0275element(8, "div", 102);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "div", 102);
+    \u0275\u0275elementStart(9, "div", 103);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(11, "div", 96)(12, "div", 97);
+    \u0275\u0275elementStart(11, "div", 97)(12, "div", 98);
     \u0275\u0275text(13, "\u{1F4E8}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "div", 98)(15, "div", 99);
+    \u0275\u0275elementStart(14, "div", 99)(15, "div", 100);
     \u0275\u0275text(16, "\u6D88\u606F\u767C\u9001");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "div", 100);
-    \u0275\u0275element(18, "div", 101);
+    \u0275\u0275elementStart(17, "div", 101);
+    \u0275\u0275element(18, "div", 102);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(19, "div", 102);
+    \u0275\u0275elementStart(19, "div", 103);
     \u0275\u0275text(20);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(21, "div", 96)(22, "div", 97);
+    \u0275\u0275elementStart(21, "div", 97)(22, "div", 98);
     \u0275\u0275text(23, "\u{1F465}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(24, "div", 98)(25, "div", 99);
+    \u0275\u0275elementStart(24, "div", 99)(25, "div", 100);
     \u0275\u0275text(26, "\u5E33\u865F\u6578\u91CF");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(27, "div", 100);
-    \u0275\u0275element(28, "div", 101);
+    \u0275\u0275elementStart(27, "div", 101);
+    \u0275\u0275element(28, "div", 102);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(29, "div", 102);
+    \u0275\u0275elementStart(29, "div", 103);
     \u0275\u0275text(30);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(31, "div", 96)(32, "div", 97);
+    \u0275\u0275elementStart(31, "div", 97)(32, "div", 98);
     \u0275\u0275text(33, "\u{1F4BE}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(34, "div", 98)(35, "div", 99);
+    \u0275\u0275elementStart(34, "div", 99)(35, "div", 100);
     \u0275\u0275text(36, "\u5B58\u5132\u7A7A\u9593");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(37, "div", 100);
-    \u0275\u0275element(38, "div", 101);
+    \u0275\u0275elementStart(37, "div", 101);
+    \u0275\u0275element(38, "div", 102);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(39, "div", 102);
+    \u0275\u0275elementStart(39, "div", 103);
     \u0275\u0275text(40);
     \u0275\u0275elementEnd()()()();
   }
@@ -42594,22 +42866,22 @@ function ProfileComponent_Conditional_32_Conditional_4_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_32_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 58);
+    \u0275\u0275elementStart(0, "div", 59);
     \u0275\u0275text(1, "\u8F09\u5165\u4E2D...");
     \u0275\u0275elementEnd();
   }
 }
 function ProfileComponent_Conditional_32_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 14)(1, "div", 19)(2, "h3", 20);
+    \u0275\u0275elementStart(0, "div", 15)(1, "div", 20)(2, "h3", 21);
     \u0275\u0275text(3, "\u{1F4CA} \u672C\u6708\u4F7F\u7528\u60C5\u6CC1");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(4, ProfileComponent_Conditional_32_Conditional_4_Template, 41, 16, "div", 95)(5, ProfileComponent_Conditional_32_Conditional_5_Template, 2, 0, "div", 58);
+    \u0275\u0275conditionalCreate(4, ProfileComponent_Conditional_32_Conditional_4_Template, 41, 16, "div", 96)(5, ProfileComponent_Conditional_32_Conditional_5_Template, 2, 0, "div", 59);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "div", 19)(7, "h3", 20);
+    \u0275\u0275elementStart(6, "div", 20)(7, "h3", 21);
     \u0275\u0275text(8, "\u{1F4C8} \u6B77\u53F2\u8DA8\u52E2");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "p", 77);
+    \u0275\u0275elementStart(9, "p", 78);
     \u0275\u0275text(10, "\u656C\u8ACB\u671F\u5F85...");
     \u0275\u0275elementEnd()()();
   }
@@ -42622,23 +42894,23 @@ function ProfileComponent_Conditional_32_Template(rf, ctx) {
 function ProfileComponent_Conditional_33_Template(rf, ctx) {
   if (rf & 1) {
     const _r13 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 14)(1, "div", 103)(2, "h3", 20);
+    \u0275\u0275elementStart(0, "div", 15)(1, "div", 104)(2, "h3", 21);
     \u0275\u0275text(3, "\u{1F381} \u9080\u8ACB\u597D\u53CB\u5F97\u734E\u52F5");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "p", 77);
+    \u0275\u0275elementStart(4, "p", 78);
     \u0275\u0275text(5, " \u6BCF\u9080\u8ACB 1 \u4F4D\u597D\u53CB\u8A3B\u518A\u4E26\u6FC0\u6D3B\uFF0C\u60A8\u5C07\u7372\u5F97 ");
     \u0275\u0275elementStart(6, "strong");
     \u0275\u0275text(7, "3 \u5929\u767D\u9280\u7CBE\u82F1");
     \u0275\u0275elementEnd();
     \u0275\u0275text(8, " \u734E\u52F5\uFF01 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "div", 104)(10, "span", 105);
+    \u0275\u0275elementStart(9, "div", 105)(10, "span", 106);
     \u0275\u0275text(11, "\u6211\u7684\u9080\u8ACB\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "div", 106);
+    \u0275\u0275elementStart(12, "div", 107);
     \u0275\u0275text(13);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "button", 84);
+    \u0275\u0275elementStart(14, "button", 85);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_33_Template_button_click_14_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r1 = \u0275\u0275nextContext();
@@ -42646,11 +42918,11 @@ function ProfileComponent_Conditional_33_Template(rf, ctx) {
     });
     \u0275\u0275text(15, " \u{1F4CB} \u8907\u88FD ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(16, "div", 107)(17, "span", 105);
+    \u0275\u0275elementStart(16, "div", 108)(17, "span", 106);
     \u0275\u0275text(18, "\u9080\u8ACB\u93C8\u63A5");
     \u0275\u0275elementEnd();
-    \u0275\u0275element(19, "input", 108);
-    \u0275\u0275elementStart(20, "button", 84);
+    \u0275\u0275element(19, "input", 109);
+    \u0275\u0275elementStart(20, "button", 85);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_33_Template_button_click_20_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r1 = \u0275\u0275nextContext();
@@ -42658,19 +42930,19 @@ function ProfileComponent_Conditional_33_Template(rf, ctx) {
     });
     \u0275\u0275text(21, " \u{1F4CB} \u8907\u88FD ");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(22, "div", 19)(23, "h3", 20);
+    \u0275\u0275elementStart(22, "div", 20)(23, "h3", 21);
     \u0275\u0275text(24, "\u{1F4CA} \u9080\u8ACB\u7D71\u8A08");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(25, "div", 109)(26, "div", 110)(27, "div", 111);
+    \u0275\u0275elementStart(25, "div", 110)(26, "div", 111)(27, "div", 112);
     \u0275\u0275text(28);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(29, "div", 112);
+    \u0275\u0275elementStart(29, "div", 113);
     \u0275\u0275text(30, "\u5DF2\u9080\u8ACB\u4EBA\u6578");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(31, "div", 110)(32, "div", 111);
+    \u0275\u0275elementStart(31, "div", 111)(32, "div", 112);
     \u0275\u0275text(33);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(34, "div", 112);
+    \u0275\u0275elementStart(34, "div", 113);
     \u0275\u0275text(35, "\u7372\u5F97\u734E\u52F5\u5929\u6578");
     \u0275\u0275elementEnd()()()()();
   }
@@ -42998,7 +43270,7 @@ var ProfileComponent = class _ProfileComponent {
     };
   }
   static {
-    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _ProfileComponent, selectors: [["app-profile"]], decls: 34, vars: 27, consts: [[1, "profile-container"], [1, "loading-overlay"], [1, "error-alert"], [1, "profile-header"], [1, "avatar-section"], [1, "avatar"], [1, "user-info"], [1, "username"], [1, "email"], [1, "membership-badge"], [1, "expires"], [1, "logout-btn", 3, "click", "disabled"], [1, "tabs"], [1, "tab-btn", 3, "click"], [1, "tab-content"], [1, "loading-spinner"], [1, "error-icon"], [1, "retry-btn", 3, "click"], [1, "logout-spinner"], [1, "section-card"], [1, "section-title"], [1, "info-grid"], [1, "info-item"], [1, "info-label"], [1, "info-value", "user-id"], [1, "id-text"], ["title", "\u8907\u88FD Telegram ID", 1, "copy-id-btn"], [1, "info-value"], [1, "edit-btn", 3, "click"], [1, "info-value", "username-value"], [1, "info-hint"], [1, "modal-overlay"], [1, "security-actions"], [1, "action-btn", 3, "click"], [1, "action-btn"], [1, "change-password-form"], ["title", "\u8907\u88FD Telegram ID", 1, "copy-id-btn", 3, "click"], [1, "modal-overlay", 3, "click"], [1, "modal-content", 3, "click"], [1, "modal-header"], [1, "close-btn", 3, "click"], [1, "modal-body"], [1, "form-group"], ["type", "email", "placeholder", "\u8ACB\u8F38\u5165\u65B0\u90F5\u7BB1", 1, "form-input", 3, "ngModelChange", "ngModel"], ["type", "password", "placeholder", "\u8ACB\u8F38\u5165\u7576\u524D\u5BC6\u78BC", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "hint-text"], [1, "modal-footer"], [1, "cancel-btn", 3, "click"], [1, "save-btn", 3, "click", "disabled"], [1, "btn-spinner"], ["type", "text", "placeholder", "\u8ACB\u8F38\u5165\u986F\u793A\u540D\u7A31", "maxlength", "30", 1, "form-input", 3, "ngModelChange", "ngModel"], ["type", "password", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "form-actions"], [1, "submit-btn", 3, "click"], [1, "license-input-group"], ["type", "text", "placeholder", "XXXX-XXXX-XXXX-XXXX", 1, "form-input", "font-mono", 3, "ngModelChange", "ngModel"], [1, "activate-btn", 3, "click", "disabled"], [1, "license-history"], [1, "loading-state"], [1, "empty-state"], [1, "purchase-options"], [1, "purchase-card", "silver"], [1, "plan-name"], [1, "plan-price"], [1, "plan-features"], [1, "buy-btn"], [1, "purchase-card", "gold"], [1, "recommended"], [1, "purchase-card", "diamond"], [1, "purchase-card", "star"], [1, "purchase-card", "king"], [1, "history-item"], [1, "history-info"], [1, "license-code"], [1, "license-type"], [1, "history-meta"], [1, "status"], [1, "section-desc"], [1, "device-list"], [1, "device-item", 3, "current"], [1, "current-device-info"], [1, "info-row"], [1, "label"], [1, "value", "font-mono"], [1, "copy-btn", 3, "click"], [1, "value"], [1, "device-item"], [1, "device-icon"], [1, "device-info"], [1, "device-name"], [1, "current-badge"], [1, "device-code"], [1, "device-meta"], [1, "unbind-btn", 3, "disabled"], [1, "unbind-btn", 3, "click", "disabled"], [1, "usage-grid"], [1, "usage-item"], [1, "usage-icon"], [1, "usage-info"], [1, "usage-label"], [1, "usage-bar"], [1, "usage-fill"], [1, "usage-text"], [1, "section-card", "highlight"], [1, "invite-code-box"], [1, "invite-label"], [1, "invite-code"], [1, "invite-link-box"], ["type", "text", "readonly", "", 1, "invite-link-input", 3, "value"], [1, "invite-stats"], [1, "stat-item"], [1, "stat-value"], [1, "stat-label"]], template: function ProfileComponent_Template(rf, ctx) {
+    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _ProfileComponent, selectors: [["app-profile"]], decls: 34, vars: 24, consts: [[1, "profile-container"], [1, "loading-overlay"], [1, "error-alert"], [1, "profile-header"], [1, "avatar-section"], [1, "avatar"], [1, "user-info"], [1, "username"], [1, "email"], [1, "membership-badge-wrapper", "flex", "items-center", "gap-2"], ["size", "md", 3, "level"], [1, "expires", "text-xs", "opacity-70"], [1, "logout-btn", 3, "click", "disabled"], [1, "tabs"], [1, "tab-btn", 3, "click"], [1, "tab-content"], [1, "loading-spinner"], [1, "error-icon"], [1, "retry-btn", 3, "click"], [1, "logout-spinner"], [1, "section-card"], [1, "section-title"], [1, "info-grid"], [1, "info-item"], [1, "info-label"], [1, "info-value", "user-id"], [1, "id-text"], ["title", "\u8907\u88FD Telegram ID", 1, "copy-id-btn"], [1, "info-value"], [1, "edit-btn", 3, "click"], [1, "info-value", "username-value"], [1, "info-hint"], [1, "modal-overlay"], [1, "security-actions"], [1, "action-btn", 3, "click"], [1, "action-btn"], [1, "change-password-form"], ["title", "\u8907\u88FD Telegram ID", 1, "copy-id-btn", 3, "click"], [1, "modal-overlay", 3, "click"], [1, "modal-content", 3, "click"], [1, "modal-header"], [1, "close-btn", 3, "click"], [1, "modal-body"], [1, "form-group"], ["type", "email", "placeholder", "\u8ACB\u8F38\u5165\u65B0\u90F5\u7BB1", 1, "form-input", 3, "ngModelChange", "ngModel"], ["type", "password", "placeholder", "\u8ACB\u8F38\u5165\u7576\u524D\u5BC6\u78BC", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "hint-text"], [1, "modal-footer"], [1, "cancel-btn", 3, "click"], [1, "save-btn", 3, "click", "disabled"], [1, "btn-spinner"], ["type", "text", "placeholder", "\u8ACB\u8F38\u5165\u986F\u793A\u540D\u7A31", "maxlength", "30", 1, "form-input", 3, "ngModelChange", "ngModel"], ["type", "password", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "form-actions"], [1, "submit-btn", 3, "click"], [1, "license-input-group"], ["type", "text", "placeholder", "XXXX-XXXX-XXXX-XXXX", 1, "form-input", "font-mono", 3, "ngModelChange", "ngModel"], [1, "activate-btn", 3, "click", "disabled"], [1, "license-history"], [1, "loading-state"], [1, "empty-state"], [1, "purchase-options"], [1, "purchase-card", "silver"], [1, "plan-name"], [1, "plan-price"], [1, "plan-features"], [1, "buy-btn"], [1, "purchase-card", "gold"], [1, "recommended"], [1, "purchase-card", "diamond"], [1, "purchase-card", "star"], [1, "purchase-card", "king"], [1, "history-item"], [1, "history-info"], [1, "license-code"], [1, "license-type"], [1, "history-meta"], [1, "status"], [1, "section-desc"], [1, "device-list"], [1, "device-item", 3, "current"], [1, "current-device-info"], [1, "info-row"], [1, "label"], [1, "value", "font-mono"], [1, "copy-btn", 3, "click"], [1, "value"], [1, "device-item"], [1, "device-icon"], [1, "device-info"], [1, "device-name"], [1, "current-badge"], [1, "device-code"], [1, "device-meta"], [1, "unbind-btn", 3, "disabled"], [1, "unbind-btn", 3, "click", "disabled"], [1, "usage-grid"], [1, "usage-item"], [1, "usage-icon"], [1, "usage-info"], [1, "usage-label"], [1, "usage-bar"], [1, "usage-fill"], [1, "usage-text"], [1, "section-card", "highlight"], [1, "invite-code-box"], [1, "invite-label"], [1, "invite-code"], [1, "invite-link-box"], ["type", "text", "readonly", "", 1, "invite-link-input", 3, "value"], [1, "invite-stats"], [1, "stat-item"], [1, "stat-value"], [1, "stat-label"]], template: function ProfileComponent_Template(rf, ctx) {
       if (rf & 1) {
         \u0275\u0275elementStart(0, "div", 0);
         \u0275\u0275conditionalCreate(1, ProfileComponent_Conditional_1_Template, 4, 0, "div", 1);
@@ -43013,50 +43285,50 @@ var ProfileComponent = class _ProfileComponent {
         \u0275\u0275text(11);
         \u0275\u0275elementEnd();
         \u0275\u0275elementStart(12, "div", 9);
-        \u0275\u0275text(13);
-        \u0275\u0275conditionalCreate(14, ProfileComponent_Conditional_14_Template, 2, 1, "span", 10);
+        \u0275\u0275element(13, "user-level-badge", 10);
+        \u0275\u0275conditionalCreate(14, ProfileComponent_Conditional_14_Template, 2, 1, "span", 11);
         \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(15, "button", 11);
+        \u0275\u0275elementStart(15, "button", 12);
         \u0275\u0275listener("click", function ProfileComponent_Template_button_click_15_listener() {
           return ctx.onLogout();
         });
         \u0275\u0275conditionalCreate(16, ProfileComponent_Conditional_16_Template, 2, 0)(17, ProfileComponent_Conditional_17_Template, 1, 0);
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(18, "div", 12)(19, "button", 13);
+        \u0275\u0275elementStart(18, "div", 13)(19, "button", 14);
         \u0275\u0275listener("click", function ProfileComponent_Template_button_click_19_listener() {
           return ctx.activeTab.set("account");
         });
         \u0275\u0275text(20, " \u{1F464} \u5E33\u865F\u4FE1\u606F ");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(21, "button", 13);
+        \u0275\u0275elementStart(21, "button", 14);
         \u0275\u0275listener("click", function ProfileComponent_Template_button_click_21_listener() {
           return ctx.activeTab.set("license");
         });
         \u0275\u0275text(22, " \u{1F511} \u5361\u5BC6\u7BA1\u7406 ");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(23, "button", 13);
+        \u0275\u0275elementStart(23, "button", 14);
         \u0275\u0275listener("click", function ProfileComponent_Template_button_click_23_listener() {
           return ctx.activeTab.set("devices");
         });
         \u0275\u0275text(24, " \u{1F4BB} \u8A2D\u5099\u7BA1\u7406 ");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(25, "button", 13);
+        \u0275\u0275elementStart(25, "button", 14);
         \u0275\u0275listener("click", function ProfileComponent_Template_button_click_25_listener() {
           return ctx.activeTab.set("usage");
         });
         \u0275\u0275text(26, " \u{1F4CA} \u4F7F\u7528\u7D71\u8A08 ");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(27, "button", 13);
+        \u0275\u0275elementStart(27, "button", 14);
         \u0275\u0275listener("click", function ProfileComponent_Template_button_click_27_listener() {
           return ctx.activeTab.set("invite");
         });
         \u0275\u0275text(28, " \u{1F381} \u9080\u8ACB\u734E\u52F5 ");
         \u0275\u0275elementEnd()();
-        \u0275\u0275conditionalCreate(29, ProfileComponent_Conditional_29_Template, 54, 10, "div", 14);
-        \u0275\u0275conditionalCreate(30, ProfileComponent_Conditional_30_Template, 103, 3, "div", 14);
-        \u0275\u0275conditionalCreate(31, ProfileComponent_Conditional_31_Template, 26, 5, "div", 14);
-        \u0275\u0275conditionalCreate(32, ProfileComponent_Conditional_32_Template, 11, 1, "div", 14);
-        \u0275\u0275conditionalCreate(33, ProfileComponent_Conditional_33_Template, 36, 4, "div", 14);
+        \u0275\u0275conditionalCreate(29, ProfileComponent_Conditional_29_Template, 54, 10, "div", 15);
+        \u0275\u0275conditionalCreate(30, ProfileComponent_Conditional_30_Template, 103, 3, "div", 15);
+        \u0275\u0275conditionalCreate(31, ProfileComponent_Conditional_31_Template, 26, 5, "div", 15);
+        \u0275\u0275conditionalCreate(32, ProfileComponent_Conditional_32_Template, 11, 1, "div", 15);
+        \u0275\u0275conditionalCreate(33, ProfileComponent_Conditional_33_Template, 36, 4, "div", 15);
         \u0275\u0275elementEnd();
       }
       if (rf & 2) {
@@ -43074,10 +43346,8 @@ var ProfileComponent = class _ProfileComponent {
         \u0275\u0275textInterpolate(((tmp_3_0 = ctx.user()) == null ? null : tmp_3_0.displayName) || ((tmp_3_0 = ctx.user()) == null ? null : tmp_3_0.username) || (ctx.isLoadingUser() ? "\u8F09\u5165\u4E2D..." : "\u672A\u767B\u5165"));
         \u0275\u0275advance(2);
         \u0275\u0275textInterpolate(((tmp_4_0 = ctx.user()) == null ? null : tmp_4_0.email) || "\u672A\u8A2D\u7F6E\u90F5\u7BB1");
-        \u0275\u0275advance();
-        \u0275\u0275classMap("level-" + ctx.membershipLevel());
-        \u0275\u0275advance();
-        \u0275\u0275textInterpolate2(" ", ctx.getMembershipIcon(), " ", ctx.getMembershipName(), " ");
+        \u0275\u0275advance(2);
+        \u0275\u0275property("level", ctx.membershipLevel());
         \u0275\u0275advance();
         \u0275\u0275conditional(ctx.membershipDaysLeft() > 0 ? 14 : -1);
         \u0275\u0275advance();
@@ -43105,13 +43375,13 @@ var ProfileComponent = class _ProfileComponent {
         \u0275\u0275advance();
         \u0275\u0275conditional(ctx.activeTab() === "invite" ? 33 : -1);
       }
-    }, dependencies: [CommonModule, FormsModule, DefaultValueAccessor, NgControlStatus, MaxLengthValidator, NgModel], styles: ["\n\n.profile-container[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n  max-width: 900px;\n  margin: 0 auto;\n}\n.profile-header[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border: 1px solid rgba(6, 182, 212, 0.2);\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n}\n.avatar-section[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.avatar[_ngcontent-%COMP%] {\n  width: 64px;\n  height: 64px;\n  border-radius: 50%;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: white;\n}\n.username[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0;\n}\n.email[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin: 0.25rem 0;\n}\n.membership-badge[_ngcontent-%COMP%] {\n  display: inline-flex;\n  align-items: center;\n  gap: 0.25rem;\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n  font-size: 0.75rem;\n  font-weight: 500;\n}\n.membership-badge.level-bronze[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #CD7F32,\n      #8B4513);\n  color: white;\n}\n.membership-badge.level-silver[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #C0C0C0,\n      #A8A8A8);\n  color: #1e293b;\n}\n.membership-badge.level-gold[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #FFD700,\n      #FFA500);\n  color: #1e293b;\n}\n.membership-badge.level-diamond[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #B9F2FF,\n      #06b6d4);\n  color: #1e293b;\n}\n.membership-badge.level-star[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #9B59B6,\n      #8E44AD);\n  color: white;\n}\n.membership-badge.level-king[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #FF6B6B,\n      #ee5a5a);\n  color: white;\n}\n.expires[_ngcontent-%COMP%] {\n  opacity: 0.8;\n}\n.logout-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.5rem;\n  color: #fca5a5;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.logout-btn[_ngcontent-%COMP%]:hover:not(:disabled) {\n  background: rgba(239, 68, 68, 0.2);\n}\n.logout-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.7;\n  cursor: not-allowed;\n}\n.logout-spinner[_ngcontent-%COMP%] {\n  display: inline-block;\n  width: 14px;\n  height: 14px;\n  border: 2px solid rgba(239, 68, 68, 0.3);\n  border-top-color: #ef4444;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 0.8s linear infinite;\n}\n@keyframes _ngcontent-%COMP%_spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n.tabs[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1.5rem;\n  flex-wrap: wrap;\n}\n.tab-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n  font-size: 0.875rem;\n}\n.tab-btn[_ngcontent-%COMP%]:hover {\n  border-color: var(--primary, #06b6d4);\n  color: var(--text-primary, white);\n}\n.tab-btn.active[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border-color: transparent;\n  color: white;\n}\n.section-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.section-card.highlight[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border-color: rgba(6, 182, 212, 0.3);\n}\n.section-title[_ngcontent-%COMP%] {\n  font-size: 1rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 1rem 0;\n}\n.section-desc[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin-bottom: 1rem;\n}\n.info-grid[_ngcontent-%COMP%] {\n  display: grid;\n  gap: 1rem;\n}\n.info-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n}\n.info-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  min-width: 80px;\n}\n.info-value[_ngcontent-%COMP%] {\n  color: var(--text-primary, white);\n  flex: 1;\n}\n.edit-btn[_ngcontent-%COMP%], \n.copy-btn[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  background: transparent;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.25rem;\n  color: var(--text-muted, #94a3b8);\n  cursor: pointer;\n  font-size: 0.75rem;\n}\n.edit-btn[_ngcontent-%COMP%]:hover, \n.copy-btn[_ngcontent-%COMP%]:hover {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n}\n.form-group[_ngcontent-%COMP%] {\n  margin-bottom: 1rem;\n}\n.form-group[_ngcontent-%COMP%]   label[_ngcontent-%COMP%] {\n  display: block;\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n}\n.form-input[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-size: 0.875rem;\n}\n.form-input[_ngcontent-%COMP%]:focus {\n  outline: none;\n  border-color: var(--primary, #06b6d4);\n}\n.device-list[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.75rem;\n}\n.device-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.75rem;\n}\n.device-item.current[_ngcontent-%COMP%] {\n  border-color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.1);\n}\n.device-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.device-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.device-name[_ngcontent-%COMP%] {\n  font-weight: 500;\n  color: var(--text-primary, white);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.current-badge[_ngcontent-%COMP%] {\n  font-size: 0.625rem;\n  padding: 0.125rem 0.375rem;\n  background: var(--primary, #06b6d4);\n  border-radius: 0.25rem;\n  color: white;\n}\n.device-code[_ngcontent-%COMP%] {\n  font-family: monospace;\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.device-meta[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n  margin-top: 0.25rem;\n}\n.unbind-btn[_ngcontent-%COMP%] {\n  padding: 0.375rem 0.75rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.375rem;\n  color: #fca5a5;\n  cursor: pointer;\n  font-size: 0.75rem;\n}\n.usage-grid[_ngcontent-%COMP%] {\n  display: grid;\n  gap: 1rem;\n}\n.usage-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n}\n.usage-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.usage-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.usage-label[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n}\n.usage-bar[_ngcontent-%COMP%] {\n  height: 8px;\n  background: var(--bg-primary, #0f172a);\n  border-radius: 4px;\n  overflow: hidden;\n}\n.usage-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 4px;\n  transition: width 0.3s;\n}\n.usage-text[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n  margin-top: 0.25rem;\n}\n.invite-code-box[_ngcontent-%COMP%], \n.invite-link-box[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.invite-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  min-width: 80px;\n}\n.invite-code[_ngcontent-%COMP%] {\n  font-family: monospace;\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n  flex: 1;\n}\n.invite-link-input[_ngcontent-%COMP%] {\n  flex: 1;\n  padding: 0.5rem;\n  background: transparent;\n  border: none;\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n}\n.invite-stats[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 2rem;\n  justify-content: center;\n  padding: 1rem;\n}\n.stat-item[_ngcontent-%COMP%] {\n  text-align: center;\n}\n.stat-value[_ngcontent-%COMP%] {\n  font-size: 2rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.stat-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.purchase-options[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 1rem;\n}\n.purchase-card[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n  border-radius: 1rem;\n  text-align: center;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.purchase-card.silver[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(192, 192, 192, 0.1),\n      rgba(168, 168, 168, 0.1));\n  border-color: rgba(192, 192, 192, 0.3);\n}\n.purchase-card.gold[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(255, 215, 0, 0.1),\n      rgba(255, 165, 0, 0.1));\n  border-color: rgba(255, 215, 0, 0.3);\n}\n.purchase-card.diamond[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.15),\n      rgba(185, 242, 255, 0.1));\n  border-color: rgba(6, 182, 212, 0.4);\n}\n.purchase-card.star[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(155, 89, 182, 0.1),\n      rgba(142, 68, 173, 0.1));\n  border-color: rgba(155, 89, 182, 0.3);\n}\n.purchase-card.king[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(255, 107, 107, 0.15),\n      rgba(238, 90, 90, 0.1));\n  border-color: rgba(255, 107, 107, 0.4);\n}\n.recommended[_ngcontent-%COMP%] {\n  position: absolute;\n  top: -8px;\n  right: -8px;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  color: white;\n  font-size: 0.625rem;\n  padding: 0.125rem 0.5rem;\n  border-radius: 0.25rem;\n  font-weight: 600;\n}\n.purchase-card[_ngcontent-%COMP%] {\n  position: relative;\n}\n.plan-name[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin-bottom: 0.5rem;\n}\n.plan-price[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n  margin-bottom: 1rem;\n}\n.plan-features[_ngcontent-%COMP%] {\n  list-style: none;\n  padding: 0;\n  margin: 0 0 1rem 0;\n  font-size: 0.875rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.plan-features[_ngcontent-%COMP%]   li[_ngcontent-%COMP%] {\n  padding: 0.25rem 0;\n}\n.buy-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  cursor: pointer;\n  font-weight: 500;\n}\n.license-input-group[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 0.5rem;\n}\n.license-input-group[_ngcontent-%COMP%]   .form-input[_ngcontent-%COMP%] {\n  flex: 1;\n  font-family: monospace;\n}\n.activate-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.2s;\n  white-space: nowrap;\n}\n.activate-btn[_ngcontent-%COMP%]:hover:not(:disabled) {\n  transform: translateY(-1px);\n  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);\n}\n.activate-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.hint-text[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin-top: 0.5rem;\n}\n.empty-state[_ngcontent-%COMP%], \n.loading-state[_ngcontent-%COMP%] {\n  text-align: center;\n  padding: 2rem;\n  color: var(--text-muted, #94a3b8);\n}\n.loading-overlay[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.75rem;\n  padding: 1.5rem;\n  background: rgba(6, 182, 212, 0.1);\n  border: 1px solid rgba(6, 182, 212, 0.2);\n  border-radius: 1rem;\n  margin-bottom: 1rem;\n  color: var(--primary, #06b6d4);\n}\n.loading-overlay[_ngcontent-%COMP%]   .loading-spinner[_ngcontent-%COMP%] {\n  width: 24px;\n  height: 24px;\n  border: 3px solid rgba(6, 182, 212, 0.3);\n  border-top-color: #06b6d4;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 0.8s linear infinite;\n}\n.error-alert[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.75rem;\n  padding: 1rem 1.25rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.5rem;\n  color: #fca5a5;\n  margin-bottom: 1rem;\n}\n.error-icon[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n}\n.retry-btn[_ngcontent-%COMP%] {\n  margin-left: auto;\n  padding: 0.375rem 0.75rem;\n  background: rgba(239, 68, 68, 0.2);\n  border: 1px solid rgba(239, 68, 68, 0.4);\n  border-radius: 0.375rem;\n  color: #fca5a5;\n  font-size: 0.75rem;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.retry-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(239, 68, 68, 0.3);\n}\n.user-id[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.id-text[_ngcontent-%COMP%] {\n  font-family: monospace;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.copy-id-btn[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  background: rgba(6, 182, 212, 0.1);\n  border: 1px solid rgba(6, 182, 212, 0.3);\n  border-radius: 0.375rem;\n  cursor: pointer;\n  transition: all 0.2s;\n  font-size: 0.875rem;\n}\n.copy-id-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(6, 182, 212, 0.2);\n  border-color: rgba(6, 182, 212, 0.5);\n}\n.username-value[_ngcontent-%COMP%] {\n  font-family: monospace;\n  color: var(--text-secondary, #94a3b8);\n}\n.info-hint[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n  margin-left: 0.5rem;\n}\n.modal-overlay[_ngcontent-%COMP%] {\n  position: fixed;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  background: rgba(0, 0, 0, 0.7);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  z-index: 1000;\n  -webkit-backdrop-filter: blur(4px);\n  backdrop-filter: blur(4px);\n}\n.modal-content[_ngcontent-%COMP%] {\n  background: var(--bg-card, #1e293b);\n  border-radius: 1rem;\n  width: 100%;\n  max-width: 420px;\n  border: 1px solid rgba(255, 255, 255, 0.1);\n  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);\n}\n.modal-header[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  padding: 1.25rem 1.5rem;\n  border-bottom: 1px solid rgba(255, 255, 255, 0.1);\n}\n.modal-header[_ngcontent-%COMP%]   h3[_ngcontent-%COMP%] {\n  margin: 0;\n  font-size: 1.125rem;\n  color: var(--text-primary, white);\n}\n.close-btn[_ngcontent-%COMP%] {\n  width: 32px;\n  height: 32px;\n  border-radius: 50%;\n  border: none;\n  background: rgba(255, 255, 255, 0.1);\n  color: var(--text-muted, #94a3b8);\n  font-size: 1.25rem;\n  cursor: pointer;\n  transition: all 0.2s;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n.close-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(239, 68, 68, 0.2);\n  color: #f87171;\n}\n.modal-body[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n}\n.modal-footer[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.75rem;\n  padding: 1rem 1.5rem;\n  border-top: 1px solid rgba(255, 255, 255, 0.1);\n  justify-content: flex-end;\n}\n.cancel-btn[_ngcontent-%COMP%] {\n  padding: 0.625rem 1.25rem;\n  background: rgba(255, 255, 255, 0.1);\n  border: 1px solid rgba(255, 255, 255, 0.2);\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.cancel-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(255, 255, 255, 0.15);\n}\n.save-btn[_ngcontent-%COMP%] {\n  padding: 0.625rem 1.25rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #0891b2);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.save-btn[_ngcontent-%COMP%]:hover:not(:disabled) {\n  transform: translateY(-1px);\n  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);\n}\n.save-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.6;\n  cursor: not-allowed;\n}\n.btn-spinner[_ngcontent-%COMP%] {\n  width: 16px;\n  height: 16px;\n  border: 2px solid rgba(255, 255, 255, 0.3);\n  border-top-color: white;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 0.8s linear infinite;\n}\n@keyframes _ngcontent-%COMP%_spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n/*# sourceMappingURL=profile.component.css.map */"] });
+    }, dependencies: [CommonModule, FormsModule, DefaultValueAccessor, NgControlStatus, MaxLengthValidator, NgModel, UserLevelBadgeComponent], styles: ["\n\n.profile-container[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n  max-width: 900px;\n  margin: 0 auto;\n}\n.profile-header[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border: 1px solid rgba(6, 182, 212, 0.2);\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n}\n.avatar-section[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.avatar[_ngcontent-%COMP%] {\n  width: 64px;\n  height: 64px;\n  border-radius: 50%;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: white;\n}\n.username[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0;\n}\n.email[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin: 0.25rem 0;\n}\n.membership-badge[_ngcontent-%COMP%] {\n  display: inline-flex;\n  align-items: center;\n  gap: 0.25rem;\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n  font-size: 0.75rem;\n  font-weight: 500;\n}\n.membership-badge.level-bronze[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #CD7F32,\n      #8B4513);\n  color: white;\n}\n.membership-badge.level-silver[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #C0C0C0,\n      #A8A8A8);\n  color: #1e293b;\n}\n.membership-badge.level-gold[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #FFD700,\n      #FFA500);\n  color: #1e293b;\n}\n.membership-badge.level-diamond[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #B9F2FF,\n      #06b6d4);\n  color: #1e293b;\n}\n.membership-badge.level-star[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #9B59B6,\n      #8E44AD);\n  color: white;\n}\n.membership-badge.level-king[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #FF6B6B,\n      #ee5a5a);\n  color: white;\n}\n.expires[_ngcontent-%COMP%] {\n  opacity: 0.8;\n}\n.logout-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.5rem;\n  color: #fca5a5;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.logout-btn[_ngcontent-%COMP%]:hover:not(:disabled) {\n  background: rgba(239, 68, 68, 0.2);\n}\n.logout-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.7;\n  cursor: not-allowed;\n}\n.logout-spinner[_ngcontent-%COMP%] {\n  display: inline-block;\n  width: 14px;\n  height: 14px;\n  border: 2px solid rgba(239, 68, 68, 0.3);\n  border-top-color: #ef4444;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 0.8s linear infinite;\n}\n@keyframes _ngcontent-%COMP%_spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n.tabs[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1.5rem;\n  flex-wrap: wrap;\n}\n.tab-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n  font-size: 0.875rem;\n}\n.tab-btn[_ngcontent-%COMP%]:hover {\n  border-color: var(--primary, #06b6d4);\n  color: var(--text-primary, white);\n}\n.tab-btn.active[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border-color: transparent;\n  color: white;\n}\n.section-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.section-card.highlight[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border-color: rgba(6, 182, 212, 0.3);\n}\n.section-title[_ngcontent-%COMP%] {\n  font-size: 1rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 1rem 0;\n}\n.section-desc[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin-bottom: 1rem;\n}\n.info-grid[_ngcontent-%COMP%] {\n  display: grid;\n  gap: 1rem;\n}\n.info-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n}\n.info-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  min-width: 80px;\n}\n.info-value[_ngcontent-%COMP%] {\n  color: var(--text-primary, white);\n  flex: 1;\n}\n.edit-btn[_ngcontent-%COMP%], \n.copy-btn[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  background: transparent;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.25rem;\n  color: var(--text-muted, #94a3b8);\n  cursor: pointer;\n  font-size: 0.75rem;\n}\n.edit-btn[_ngcontent-%COMP%]:hover, \n.copy-btn[_ngcontent-%COMP%]:hover {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n}\n.form-group[_ngcontent-%COMP%] {\n  margin-bottom: 1rem;\n}\n.form-group[_ngcontent-%COMP%]   label[_ngcontent-%COMP%] {\n  display: block;\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n}\n.form-input[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-size: 0.875rem;\n}\n.form-input[_ngcontent-%COMP%]:focus {\n  outline: none;\n  border-color: var(--primary, #06b6d4);\n}\n.device-list[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.75rem;\n}\n.device-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.75rem;\n}\n.device-item.current[_ngcontent-%COMP%] {\n  border-color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.1);\n}\n.device-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.device-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.device-name[_ngcontent-%COMP%] {\n  font-weight: 500;\n  color: var(--text-primary, white);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.current-badge[_ngcontent-%COMP%] {\n  font-size: 0.625rem;\n  padding: 0.125rem 0.375rem;\n  background: var(--primary, #06b6d4);\n  border-radius: 0.25rem;\n  color: white;\n}\n.device-code[_ngcontent-%COMP%] {\n  font-family: monospace;\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.device-meta[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n  margin-top: 0.25rem;\n}\n.unbind-btn[_ngcontent-%COMP%] {\n  padding: 0.375rem 0.75rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.375rem;\n  color: #fca5a5;\n  cursor: pointer;\n  font-size: 0.75rem;\n}\n.usage-grid[_ngcontent-%COMP%] {\n  display: grid;\n  gap: 1rem;\n}\n.usage-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n}\n.usage-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.usage-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.usage-label[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n}\n.usage-bar[_ngcontent-%COMP%] {\n  height: 8px;\n  background: var(--bg-primary, #0f172a);\n  border-radius: 4px;\n  overflow: hidden;\n}\n.usage-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 4px;\n  transition: width 0.3s;\n}\n.usage-text[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n  margin-top: 0.25rem;\n}\n.invite-code-box[_ngcontent-%COMP%], \n.invite-link-box[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.invite-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  min-width: 80px;\n}\n.invite-code[_ngcontent-%COMP%] {\n  font-family: monospace;\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n  flex: 1;\n}\n.invite-link-input[_ngcontent-%COMP%] {\n  flex: 1;\n  padding: 0.5rem;\n  background: transparent;\n  border: none;\n  color: var(--text-secondary, #cbd5e1);\n  font-size: 0.875rem;\n}\n.invite-stats[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 2rem;\n  justify-content: center;\n  padding: 1rem;\n}\n.stat-item[_ngcontent-%COMP%] {\n  text-align: center;\n}\n.stat-value[_ngcontent-%COMP%] {\n  font-size: 2rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.stat-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.purchase-options[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 1rem;\n}\n.purchase-card[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n  border-radius: 1rem;\n  text-align: center;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.purchase-card.silver[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(192, 192, 192, 0.1),\n      rgba(168, 168, 168, 0.1));\n  border-color: rgba(192, 192, 192, 0.3);\n}\n.purchase-card.gold[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(255, 215, 0, 0.1),\n      rgba(255, 165, 0, 0.1));\n  border-color: rgba(255, 215, 0, 0.3);\n}\n.purchase-card.diamond[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.15),\n      rgba(185, 242, 255, 0.1));\n  border-color: rgba(6, 182, 212, 0.4);\n}\n.purchase-card.star[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(155, 89, 182, 0.1),\n      rgba(142, 68, 173, 0.1));\n  border-color: rgba(155, 89, 182, 0.3);\n}\n.purchase-card.king[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(255, 107, 107, 0.15),\n      rgba(238, 90, 90, 0.1));\n  border-color: rgba(255, 107, 107, 0.4);\n}\n.recommended[_ngcontent-%COMP%] {\n  position: absolute;\n  top: -8px;\n  right: -8px;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  color: white;\n  font-size: 0.625rem;\n  padding: 0.125rem 0.5rem;\n  border-radius: 0.25rem;\n  font-weight: 600;\n}\n.purchase-card[_ngcontent-%COMP%] {\n  position: relative;\n}\n.plan-name[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin-bottom: 0.5rem;\n}\n.plan-price[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n  margin-bottom: 1rem;\n}\n.plan-features[_ngcontent-%COMP%] {\n  list-style: none;\n  padding: 0;\n  margin: 0 0 1rem 0;\n  font-size: 0.875rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.plan-features[_ngcontent-%COMP%]   li[_ngcontent-%COMP%] {\n  padding: 0.25rem 0;\n}\n.buy-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  cursor: pointer;\n  font-weight: 500;\n}\n.license-input-group[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 0.5rem;\n}\n.license-input-group[_ngcontent-%COMP%]   .form-input[_ngcontent-%COMP%] {\n  flex: 1;\n  font-family: monospace;\n}\n.activate-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.2s;\n  white-space: nowrap;\n}\n.activate-btn[_ngcontent-%COMP%]:hover:not(:disabled) {\n  transform: translateY(-1px);\n  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);\n}\n.activate-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.hint-text[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n  margin-top: 0.5rem;\n}\n.empty-state[_ngcontent-%COMP%], \n.loading-state[_ngcontent-%COMP%] {\n  text-align: center;\n  padding: 2rem;\n  color: var(--text-muted, #94a3b8);\n}\n.loading-overlay[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.75rem;\n  padding: 1.5rem;\n  background: rgba(6, 182, 212, 0.1);\n  border: 1px solid rgba(6, 182, 212, 0.2);\n  border-radius: 1rem;\n  margin-bottom: 1rem;\n  color: var(--primary, #06b6d4);\n}\n.loading-overlay[_ngcontent-%COMP%]   .loading-spinner[_ngcontent-%COMP%] {\n  width: 24px;\n  height: 24px;\n  border: 3px solid rgba(6, 182, 212, 0.3);\n  border-top-color: #06b6d4;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 0.8s linear infinite;\n}\n.error-alert[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.75rem;\n  padding: 1rem 1.25rem;\n  background: rgba(239, 68, 68, 0.1);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 0.5rem;\n  color: #fca5a5;\n  margin-bottom: 1rem;\n}\n.error-icon[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n}\n.retry-btn[_ngcontent-%COMP%] {\n  margin-left: auto;\n  padding: 0.375rem 0.75rem;\n  background: rgba(239, 68, 68, 0.2);\n  border: 1px solid rgba(239, 68, 68, 0.4);\n  border-radius: 0.375rem;\n  color: #fca5a5;\n  font-size: 0.75rem;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.retry-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(239, 68, 68, 0.3);\n}\n.user-id[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.id-text[_ngcontent-%COMP%] {\n  font-family: monospace;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.copy-id-btn[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  background: rgba(6, 182, 212, 0.1);\n  border: 1px solid rgba(6, 182, 212, 0.3);\n  border-radius: 0.375rem;\n  cursor: pointer;\n  transition: all 0.2s;\n  font-size: 0.875rem;\n}\n.copy-id-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(6, 182, 212, 0.2);\n  border-color: rgba(6, 182, 212, 0.5);\n}\n.username-value[_ngcontent-%COMP%] {\n  font-family: monospace;\n  color: var(--text-secondary, #94a3b8);\n}\n.info-hint[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n  margin-left: 0.5rem;\n}\n.modal-overlay[_ngcontent-%COMP%] {\n  position: fixed;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  background: rgba(0, 0, 0, 0.7);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  z-index: 1000;\n  -webkit-backdrop-filter: blur(4px);\n  backdrop-filter: blur(4px);\n}\n.modal-content[_ngcontent-%COMP%] {\n  background: var(--bg-card, #1e293b);\n  border-radius: 1rem;\n  width: 100%;\n  max-width: 420px;\n  border: 1px solid rgba(255, 255, 255, 0.1);\n  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);\n}\n.modal-header[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  padding: 1.25rem 1.5rem;\n  border-bottom: 1px solid rgba(255, 255, 255, 0.1);\n}\n.modal-header[_ngcontent-%COMP%]   h3[_ngcontent-%COMP%] {\n  margin: 0;\n  font-size: 1.125rem;\n  color: var(--text-primary, white);\n}\n.close-btn[_ngcontent-%COMP%] {\n  width: 32px;\n  height: 32px;\n  border-radius: 50%;\n  border: none;\n  background: rgba(255, 255, 255, 0.1);\n  color: var(--text-muted, #94a3b8);\n  font-size: 1.25rem;\n  cursor: pointer;\n  transition: all 0.2s;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n.close-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(239, 68, 68, 0.2);\n  color: #f87171;\n}\n.modal-body[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n}\n.modal-footer[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.75rem;\n  padding: 1rem 1.5rem;\n  border-top: 1px solid rgba(255, 255, 255, 0.1);\n  justify-content: flex-end;\n}\n.cancel-btn[_ngcontent-%COMP%] {\n  padding: 0.625rem 1.25rem;\n  background: rgba(255, 255, 255, 0.1);\n  border: 1px solid rgba(255, 255, 255, 0.2);\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.cancel-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(255, 255, 255, 0.15);\n}\n.save-btn[_ngcontent-%COMP%] {\n  padding: 0.625rem 1.25rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #0891b2);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.save-btn[_ngcontent-%COMP%]:hover:not(:disabled) {\n  transform: translateY(-1px);\n  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);\n}\n.save-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.6;\n  cursor: not-allowed;\n}\n.btn-spinner[_ngcontent-%COMP%] {\n  width: 16px;\n  height: 16px;\n  border: 2px solid rgba(255, 255, 255, 0.3);\n  border-top-color: white;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 0.8s linear infinite;\n}\n@keyframes _ngcontent-%COMP%_spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n/*# sourceMappingURL=profile.component.css.map */"] });
   }
 };
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(ProfileComponent, [{
     type: Component,
-    args: [{ selector: "app-profile", standalone: true, imports: [CommonModule, FormsModule], template: `
+    args: [{ selector: "app-profile", standalone: true, imports: [CommonModule, FormsModule, UserLevelBadgeComponent], template: `
     <div class="profile-container">
       <!-- \u{1F527} \u52A0\u8F09\u4E2D\u72C0\u614B -->
       @if (isLoadingUser()) {
@@ -43139,10 +43409,11 @@ var ProfileComponent = class _ProfileComponent {
           <div class="user-info">
             <h2 class="username">{{ user()?.displayName || user()?.username || (isLoadingUser() ? '\u8F09\u5165\u4E2D...' : '\u672A\u767B\u5165') }}</h2>
             <p class="email">{{ user()?.email || '\u672A\u8A2D\u7F6E\u90F5\u7BB1' }}</p>
-            <div class="membership-badge" [class]="'level-' + membershipLevel()">
-              {{ getMembershipIcon() }} {{ getMembershipName() }}
+            <div class="membership-badge-wrapper flex items-center gap-2">
+              <!-- \u{1F527} P1-2: \u4F7F\u7528\u7D71\u4E00\u7684\u6703\u54E1\u7B49\u7D1A\u5FBD\u7AE0\u7D44\u4EF6 -->
+              <user-level-badge [level]="membershipLevel()" size="md" />
               @if (membershipDaysLeft() > 0) {
-                <span class="expires">\xB7 \u5269\u9918 {{ membershipDaysLeft() }} \u5929</span>
+                <span class="expires text-xs opacity-70">\xB7 \u5269\u9918 {{ membershipDaysLeft() }} \u5929</span>
               }
             </div>
           </div>
@@ -43639,7 +43910,7 @@ var ProfileComponent = class _ProfileComponent {
   }], null, null);
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(ProfileComponent, { className: "ProfileComponent", filePath: "src/profile.component.ts", lineNumber: 1276 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(ProfileComponent, { className: "ProfileComponent", filePath: "src/profile.component.ts", lineNumber: 1278 });
 })();
 
 // src/manual-mode/resource-center.component.ts
@@ -56856,9 +57127,9 @@ function AppComponent_Conditional_14_Template(rf, ctx) {
 }
 function AppComponent_Conditional_15_Conditional_4_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "p", 128);
+    \u0275\u0275elementStart(0, "p", 123);
     \u0275\u0275text(1, " \u78BA\u5B9A\u8981\u522A\u9664\u5BA2\u6236 ");
-    \u0275\u0275elementStart(2, "span", 134);
+    \u0275\u0275elementStart(2, "span", 129);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd();
     \u0275\u0275text(4, " \u55CE\uFF1F ");
@@ -56873,9 +57144,9 @@ function AppComponent_Conditional_15_Conditional_4_Conditional_11_Template(rf, c
 }
 function AppComponent_Conditional_15_Conditional_4_Conditional_12_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "p", 128);
+    \u0275\u0275elementStart(0, "p", 123);
     \u0275\u0275text(1, " \u78BA\u5B9A\u8981\u522A\u9664 ");
-    \u0275\u0275elementStart(2, "span", 135);
+    \u0275\u0275elementStart(2, "span", 130);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd();
     \u0275\u0275text(4, " \u500B\u9078\u4E2D\u7684\u5BA2\u6236\u55CE\uFF1F ");
@@ -56890,32 +57161,32 @@ function AppComponent_Conditional_15_Conditional_4_Conditional_12_Template(rf, c
 function AppComponent_Conditional_15_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     const _r6 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 118);
+    \u0275\u0275elementStart(0, "div", 113);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_4_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r6);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.cancelDeleteLeads());
     });
-    \u0275\u0275elementStart(1, "div", 119);
+    \u0275\u0275elementStart(1, "div", 114);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_4_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r6);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 120)(3, "div", 121);
+    \u0275\u0275elementStart(2, "div", 115)(3, "div", 116);
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(4, "svg", 122);
-    \u0275\u0275element(5, "path", 123)(6, "line", 124)(7, "line", 125);
+    \u0275\u0275elementStart(4, "svg", 117);
+    \u0275\u0275element(5, "path", 118)(6, "line", 119)(7, "line", 120);
     \u0275\u0275elementEnd()();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(8, "h3", 126);
+    \u0275\u0275elementStart(8, "h3", 121);
     \u0275\u0275text(9, "\u78BA\u8A8D\u522A\u9664");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(10, "div", 127);
-    \u0275\u0275conditionalCreate(11, AppComponent_Conditional_15_Conditional_4_Conditional_11_Template, 5, 1, "p", 128)(12, AppComponent_Conditional_15_Conditional_4_Conditional_12_Template, 5, 1, "p", 128);
-    \u0275\u0275elementStart(13, "div", 129);
+    \u0275\u0275elementStart(10, "div", 122);
+    \u0275\u0275conditionalCreate(11, AppComponent_Conditional_15_Conditional_4_Conditional_11_Template, 5, 1, "p", 123)(12, AppComponent_Conditional_15_Conditional_4_Conditional_12_Template, 5, 1, "p", 123);
+    \u0275\u0275elementStart(13, "div", 124);
     \u0275\u0275text(14, " \u26A0\uFE0F \u6B64\u64CD\u4F5C\u7121\u6CD5\u64A4\u92B7\uFF0C\u6240\u6709\u76F8\u95DC\u8A18\u9304\u5C07\u88AB\u6C38\u4E45\u522A\u9664\u3002 ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(15, "div", 130)(16, "button", 131);
+    \u0275\u0275elementStart(15, "div", 125)(16, "button", 126);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_4_Template_button_click_16_listener() {
       \u0275\u0275restoreView(_r6);
       const ctx_r0 = \u0275\u0275nextContext(2);
@@ -56923,15 +57194,15 @@ function AppComponent_Conditional_15_Conditional_4_Template(rf, ctx) {
     });
     \u0275\u0275text(17, " \u53D6\u6D88 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(18, "button", 132);
+    \u0275\u0275elementStart(18, "button", 127);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_4_Template_button_click_18_listener() {
       \u0275\u0275restoreView(_r6);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.executeDeleteLeads());
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(19, "svg", 133);
-    \u0275\u0275element(20, "path", 123);
+    \u0275\u0275elementStart(19, "svg", 128);
+    \u0275\u0275element(20, "path", 118);
     \u0275\u0275elementEnd();
     \u0275\u0275text(21, " \u78BA\u8A8D\u522A\u9664 ");
     \u0275\u0275elementEnd()()()();
@@ -56945,10 +57216,10 @@ function AppComponent_Conditional_15_Conditional_4_Template(rf, ctx) {
 function AppComponent_Conditional_15_Conditional_5_Conditional_12_Template(rf, ctx) {
   if (rf & 1) {
     const _r8 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 139)(1, "p", 143);
+    \u0275\u0275elementStart(0, "div", 134)(1, "p", 138);
     \u0275\u0275text(2, "\u66AB\u7121\u5354\u4F5C\u7FA4\u7D44");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "button", 144);
+    \u0275\u0275elementStart(3, "button", 139);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_5_Conditional_12_Template_button_click_3_listener() {
       \u0275\u0275restoreView(_r8);
       const ctx_r0 = \u0275\u0275nextContext(3);
@@ -56962,19 +57233,19 @@ function AppComponent_Conditional_15_Conditional_5_Conditional_12_Template(rf, c
 function AppComponent_Conditional_15_Conditional_5_Conditional_13_For_2_Template(rf, ctx) {
   if (rf & 1) {
     const _r9 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 146);
+    \u0275\u0275elementStart(0, "button", 141);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_5_Conditional_13_For_2_Template_button_click_0_listener() {
       const group_r10 = \u0275\u0275restoreView(_r9).$implicit;
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.executeInviteToGroup(group_r10.id));
     });
-    \u0275\u0275elementStart(1, "div", 147)(2, "div")(3, "p", 148);
+    \u0275\u0275elementStart(1, "div", 142)(2, "div")(3, "p", 143);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "p", 149);
+    \u0275\u0275elementStart(5, "p", 144);
     \u0275\u0275text(6);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "span", 150);
+    \u0275\u0275elementStart(7, "span", 145);
     \u0275\u0275text(8, "\u2192");
     \u0275\u0275elementEnd()()();
   }
@@ -56988,8 +57259,8 @@ function AppComponent_Conditional_15_Conditional_5_Conditional_13_For_2_Template
 }
 function AppComponent_Conditional_15_Conditional_5_Conditional_13_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 140);
-    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_5_Conditional_13_For_2_Template, 9, 2, "button", 145, _forTrack024);
+    \u0275\u0275elementStart(0, "div", 135);
+    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_5_Conditional_13_For_2_Template, 9, 2, "button", 140, _forTrack024);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -57001,30 +57272,30 @@ function AppComponent_Conditional_15_Conditional_5_Conditional_13_Template(rf, c
 function AppComponent_Conditional_15_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
     const _r7 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 118);
+    \u0275\u0275elementStart(0, "div", 113);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_5_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showInviteGroupDialog.set(false));
     });
-    \u0275\u0275elementStart(1, "div", 119);
+    \u0275\u0275elementStart(1, "div", 114);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_5_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r7);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 120)(3, "div", 136)(4, "span", 137);
+    \u0275\u0275elementStart(2, "div", 115)(3, "div", 131)(4, "span", 132);
     \u0275\u0275text(5, "\u{1F465}");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(6, "div")(7, "h3", 126);
+    \u0275\u0275elementStart(6, "div")(7, "h3", 121);
     \u0275\u0275text(8, "\u9080\u8ACB\u9032\u7FA4");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(9, "p", 32);
     \u0275\u0275text(10, "\u9078\u64C7\u5354\u4F5C\u7FA4\u7D44");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(11, "div", 138);
-    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_5_Conditional_12_Template, 5, 0, "div", 139)(13, AppComponent_Conditional_15_Conditional_5_Conditional_13_Template, 3, 0, "div", 140);
+    \u0275\u0275elementStart(11, "div", 133);
+    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_5_Conditional_12_Template, 5, 0, "div", 134)(13, AppComponent_Conditional_15_Conditional_5_Conditional_13_Template, 3, 0, "div", 135);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "div", 141)(15, "button", 142);
+    \u0275\u0275elementStart(14, "div", 136)(15, "button", 137);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_5_Template_button_click_15_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r0 = \u0275\u0275nextContext(2);
@@ -57041,10 +57312,10 @@ function AppComponent_Conditional_15_Conditional_5_Template(rf, ctx) {
 }
 function AppComponent_Conditional_15_Conditional_27_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div")(1, "h1", 151);
+    \u0275\u0275elementStart(0, "div")(1, "h1", 146);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "p", 152);
+    \u0275\u0275elementStart(3, "p", 147);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
   }
@@ -57058,43 +57329,43 @@ function AppComponent_Conditional_15_Conditional_27_Template(rf, ctx) {
 }
 function AppComponent_Conditional_15_Conditional_35_Case_1_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 154);
+    \u0275\u0275elementStart(0, "span", 149);
     \u0275\u0275text(1, "\u{1F948}");
     \u0275\u0275elementEnd();
   }
 }
 function AppComponent_Conditional_15_Conditional_35_Case_2_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 154);
+    \u0275\u0275elementStart(0, "span", 149);
     \u0275\u0275text(1, "\u{1F947}");
     \u0275\u0275elementEnd();
   }
 }
 function AppComponent_Conditional_15_Conditional_35_Case_3_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 154);
+    \u0275\u0275elementStart(0, "span", 149);
     \u0275\u0275text(1, "\u{1F48E}");
     \u0275\u0275elementEnd();
   }
 }
 function AppComponent_Conditional_15_Conditional_35_Case_4_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 154);
+    \u0275\u0275elementStart(0, "span", 149);
     \u0275\u0275text(1, "\u{1F31F}");
     \u0275\u0275elementEnd();
   }
 }
 function AppComponent_Conditional_15_Conditional_35_Case_5_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 155);
+    \u0275\u0275elementStart(0, "span", 150);
     \u0275\u0275text(1, "\u{1F451}");
     \u0275\u0275elementEnd();
   }
 }
 function AppComponent_Conditional_15_Conditional_35_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 153);
-    \u0275\u0275conditionalCreate(1, AppComponent_Conditional_15_Conditional_35_Case_1_Template, 2, 0, "span", 154)(2, AppComponent_Conditional_15_Conditional_35_Case_2_Template, 2, 0, "span", 154)(3, AppComponent_Conditional_15_Conditional_35_Case_3_Template, 2, 0, "span", 154)(4, AppComponent_Conditional_15_Conditional_35_Case_4_Template, 2, 0, "span", 154)(5, AppComponent_Conditional_15_Conditional_35_Case_5_Template, 2, 0, "span", 155);
+    \u0275\u0275elementStart(0, "div", 148);
+    \u0275\u0275conditionalCreate(1, AppComponent_Conditional_15_Conditional_35_Case_1_Template, 2, 0, "span", 149)(2, AppComponent_Conditional_15_Conditional_35_Case_2_Template, 2, 0, "span", 149)(3, AppComponent_Conditional_15_Conditional_35_Case_3_Template, 2, 0, "span", 149)(4, AppComponent_Conditional_15_Conditional_35_Case_4_Template, 2, 0, "span", 149)(5, AppComponent_Conditional_15_Conditional_35_Case_5_Template, 2, 0, "span", 150);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -57105,153 +57376,63 @@ function AppComponent_Conditional_15_Conditional_35_Template(rf, ctx) {
     \u0275\u0275conditional((tmp_9_0 = ctx_r0.userMembershipLevel()) === "silver" ? 1 : tmp_9_0 === "gold" ? 2 : tmp_9_0 === "diamond" ? 3 : tmp_9_0 === "star" ? 4 : tmp_9_0 === "king" ? 5 : -1);
   }
 }
-function AppComponent_Conditional_15_Case_40_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 73)(1, "span", 156);
-    \u0275\u0275text(2, "\u{1F948}");
-    \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 157);
-    \u0275\u0275text(4);
-    \u0275\u0275elementEnd()();
-  }
-  if (rf & 2) {
-    const ctx_r0 = \u0275\u0275nextContext(2);
-    \u0275\u0275advance(4);
-    \u0275\u0275textInterpolate(ctx_r0.t("membershipLevels.silver"));
-  }
-}
-function AppComponent_Conditional_15_Case_41_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 74)(1, "span", 156);
-    \u0275\u0275text(2, "\u{1F947}");
-    \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 157);
-    \u0275\u0275text(4);
-    \u0275\u0275elementEnd()();
-  }
-  if (rf & 2) {
-    const ctx_r0 = \u0275\u0275nextContext(2);
-    \u0275\u0275advance(4);
-    \u0275\u0275textInterpolate(ctx_r0.t("membershipLevels.gold"));
-  }
-}
-function AppComponent_Conditional_15_Case_42_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 75)(1, "span", 156);
-    \u0275\u0275text(2, "\u{1F48E}");
-    \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 157);
-    \u0275\u0275text(4);
-    \u0275\u0275elementEnd()();
-  }
-  if (rf & 2) {
-    const ctx_r0 = \u0275\u0275nextContext(2);
-    \u0275\u0275advance(4);
-    \u0275\u0275textInterpolate(ctx_r0.t("membershipLevels.diamond"));
-  }
-}
-function AppComponent_Conditional_15_Case_43_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 76)(1, "span", 156);
-    \u0275\u0275text(2, "\u{1F31F}");
-    \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 157);
-    \u0275\u0275text(4);
-    \u0275\u0275elementEnd()();
-  }
-  if (rf & 2) {
-    const ctx_r0 = \u0275\u0275nextContext(2);
-    \u0275\u0275advance(4);
-    \u0275\u0275textInterpolate(ctx_r0.t("membershipLevels.star"));
-  }
-}
-function AppComponent_Conditional_15_Case_44_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 77)(1, "span", 156);
-    \u0275\u0275text(2, "\u{1F451}");
-    \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 157);
-    \u0275\u0275text(4);
-    \u0275\u0275elementEnd()();
-  }
-  if (rf & 2) {
-    const ctx_r0 = \u0275\u0275nextContext(2);
-    \u0275\u0275advance(4);
-    \u0275\u0275textInterpolate(ctx_r0.t("membershipLevels.king"));
-  }
-}
-function AppComponent_Conditional_15_Case_45_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 78)(1, "span", 156);
-    \u0275\u0275text(2, "\u2694\uFE0F");
-    \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 157);
-    \u0275\u0275text(4);
-    \u0275\u0275elementEnd()();
-  }
-  if (rf & 2) {
-    const ctx_r0 = \u0275\u0275nextContext(2);
-    \u0275\u0275advance(4);
-    \u0275\u0275textInterpolate(ctx_r0.t("membershipLevels.bronze"));
-  }
-}
-function AppComponent_Conditional_15_Conditional_76_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_71_Template(rf, ctx) {
   if (rf & 1) {
     const _r11 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 97)(1, "a", 158);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_76_Template_a_click_1_listener() {
+    \u0275\u0275elementStart(0, "div", 92)(1, "a", 151);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_71_Template_a_click_1_listener() {
       \u0275\u0275restoreView(_r11);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("accounts"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(2, "svg", 84);
-    \u0275\u0275element(3, "path", 159)(4, "circle", 160)(5, "path", 161)(6, "path", 162);
+    \u0275\u0275elementStart(2, "svg", 79);
+    \u0275\u0275element(3, "path", 152)(4, "circle", 153)(5, "path", 154)(6, "path", 155);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(7, "span");
     \u0275\u0275text(8);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(9, "a", 163);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_76_Template_a_click_9_listener() {
+    \u0275\u0275elementStart(9, "a", 156);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_71_Template_a_click_9_listener() {
       \u0275\u0275restoreView(_r11);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("search-discovery"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(10, "svg", 84);
-    \u0275\u0275element(11, "circle", 164)(12, "path", 165);
+    \u0275\u0275elementStart(10, "svg", 79);
+    \u0275\u0275element(11, "circle", 157)(12, "path", 158);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(13, "span");
     \u0275\u0275text(14);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(15, "span", 166);
+    \u0275\u0275elementStart(15, "span", 159);
     \u0275\u0275text(16, "NEW");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(17, "a", 167);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_76_Template_a_click_17_listener() {
+    \u0275\u0275elementStart(17, "a", 160);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_71_Template_a_click_17_listener() {
       \u0275\u0275restoreView(_r11);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("resource-center"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(18, "svg", 84);
-    \u0275\u0275element(19, "ellipse", 168)(20, "path", 169)(21, "path", 170);
+    \u0275\u0275elementStart(18, "svg", 79);
+    \u0275\u0275element(19, "ellipse", 161)(20, "path", 162)(21, "path", 163);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(22, "span");
     \u0275\u0275text(23);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(24, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_76_Template_a_click_24_listener() {
+    \u0275\u0275elementStart(24, "a", 78);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_71_Template_a_click_24_listener() {
       \u0275\u0275restoreView(_r11);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("leads"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(25, "svg", 84);
-    \u0275\u0275element(26, "path", 171)(27, "path", 172);
+    \u0275\u0275elementStart(25, "svg", 79);
+    \u0275\u0275element(26, "path", 164)(27, "path", 165);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(28, "span");
@@ -57260,7 +57441,7 @@ function AppComponent_Conditional_15_Conditional_76_Template(rf, ctx) {
   }
   if (rf & 2) {
     \u0275\u0275nextContext();
-    const view_r12 = \u0275\u0275readContextLet(50);
+    const view_r12 = \u0275\u0275readContextLet(45);
     const ctx_r0 = \u0275\u0275nextContext();
     \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "accounts" || view_r12 === "add-account" || view_r12 === "api-credentials" ? "var(--sidebar-item-active)" : "transparent")("color", view_r12 === "accounts" || view_r12 === "add-account" || view_r12 === "api-credentials" ? "var(--sidebar-text-active)" : "var(--sidebar-text)");
@@ -57284,103 +57465,103 @@ function AppComponent_Conditional_15_Conditional_76_Template(rf, ctx) {
     \u0275\u0275textInterpolate(ctx_r0.t("menu.sendConsole"));
   }
 }
-function AppComponent_Conditional_15_Conditional_85_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_80_Template(rf, ctx) {
   if (rf & 1) {
     const _r13 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 97)(1, "a", 173);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_1_listener() {
+    \u0275\u0275elementStart(0, "div", 92)(1, "a", 166);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_80_Template_a_click_1_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("automation"));
     });
-    \u0275\u0275elementStart(2, "div", 174)(3, "span", 175);
+    \u0275\u0275elementStart(2, "div", 167)(3, "span", 168);
     \u0275\u0275text(4, "\u{1F4CA}");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(5, "div", 176)(6, "span", 177);
+    \u0275\u0275elementStart(5, "div", 169)(6, "span", 170);
     \u0275\u0275text(7);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "span", 178);
+    \u0275\u0275elementStart(8, "span", 171);
     \u0275\u0275text(9);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(10, "a", 179);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_10_listener() {
+    \u0275\u0275elementStart(10, "a", 172);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_80_Template_a_click_10_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("monitoring-accounts"));
     });
-    \u0275\u0275elementStart(11, "span", 180);
+    \u0275\u0275elementStart(11, "span", 173);
     \u0275\u0275text(12, "\u{1F4F1}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(13, "span");
     \u0275\u0275text(14);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(15, "a", 179);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_15_listener() {
+    \u0275\u0275elementStart(15, "a", 172);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_80_Template_a_click_15_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("monitoring-groups"));
     });
-    \u0275\u0275elementStart(16, "span", 180);
+    \u0275\u0275elementStart(16, "span", 173);
     \u0275\u0275text(17, "\u{1F4AC}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(18, "span");
     \u0275\u0275text(19);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(20, "a", 179);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_20_listener() {
+    \u0275\u0275elementStart(20, "a", 172);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_80_Template_a_click_20_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("keyword-sets"));
     });
-    \u0275\u0275elementStart(21, "span", 180);
+    \u0275\u0275elementStart(21, "span", 173);
     \u0275\u0275text(22, "\u{1F511}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(23, "span");
     \u0275\u0275text(24);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(25, "a", 179);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_25_listener() {
+    \u0275\u0275elementStart(25, "a", 172);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_80_Template_a_click_25_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("chat-templates"));
     });
-    \u0275\u0275elementStart(26, "span", 180);
+    \u0275\u0275elementStart(26, "span", 173);
     \u0275\u0275text(27, "\u{1F4DD}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(28, "span");
     \u0275\u0275text(29);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(30, "a", 179);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_30_listener() {
+    \u0275\u0275elementStart(30, "a", 172);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_80_Template_a_click_30_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("trigger-rules"));
     });
-    \u0275\u0275elementStart(31, "span", 180);
+    \u0275\u0275elementStart(31, "span", 173);
     \u0275\u0275text(32, "\u26A1");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(33, "span");
     \u0275\u0275text(34);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(35, "a", 179);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_35_listener() {
+    \u0275\u0275elementStart(35, "a", 172);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_80_Template_a_click_35_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("collected-users"));
     });
-    \u0275\u0275elementStart(36, "span", 180);
+    \u0275\u0275elementStart(36, "span", 173);
     \u0275\u0275text(37, "\u{1F465}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(38, "span");
     \u0275\u0275text(39);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(40, "span", 181);
+    \u0275\u0275elementStart(40, "span", 174);
     \u0275\u0275text(41, "NEW");
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
     \u0275\u0275nextContext();
-    const view_r12 = \u0275\u0275readContextLet(50);
+    const view_r12 = \u0275\u0275readContextLet(45);
     const ctx_r0 = \u0275\u0275nextContext();
     \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "automation" ? "rgba(6, 182, 212, 0.15)" : "transparent")("color", view_r12 === "automation" ? "#22d3ee" : "var(--sidebar-text)");
@@ -57423,106 +57604,106 @@ function AppComponent_Conditional_15_Conditional_85_Template(rf, ctx) {
     \u0275\u0275textInterpolate(ctx_r0.t("menu.collectedUsers"));
   }
 }
-function AppComponent_Conditional_15_Conditional_94_Conditional_10_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_89_Conditional_10_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 183);
+    \u0275\u0275elementStart(0, "span", 176);
     \u0275\u0275text(1, "1");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_94_Conditional_11_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_89_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 184);
+    \u0275\u0275elementStart(0, "span", 177);
     \u0275\u0275text(1, "\u{1F48E}");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_94_Conditional_21_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_89_Conditional_21_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 186);
+    \u0275\u0275elementStart(0, "span", 179);
     \u0275\u0275text(1, "2");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_94_Conditional_22_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_89_Conditional_22_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 184);
+    \u0275\u0275elementStart(0, "span", 177);
     \u0275\u0275text(1, "\u{1F48E}");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_94_Conditional_32_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_89_Conditional_32_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 187);
+    \u0275\u0275elementStart(0, "span", 180);
     \u0275\u0275text(1, "3");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_94_Conditional_33_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_89_Conditional_33_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 184);
+    \u0275\u0275elementStart(0, "span", 177);
     \u0275\u0275text(1, "\u{1F947}");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_94_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_89_Template(rf, ctx) {
   if (rf & 1) {
     const _r14 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 97)(1, "a", 182);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_94_Template_a_click_1_listener() {
+    \u0275\u0275elementStart(0, "div", 92)(1, "a", 175);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_89_Template_a_click_1_listener() {
       \u0275\u0275restoreView(_r14);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("ai-assistant"));
     });
-    \u0275\u0275elementStart(2, "div", 174)(3, "span", 175);
+    \u0275\u0275elementStart(2, "div", 167)(3, "span", 168);
     \u0275\u0275text(4, "\u{1F3AF}");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(5, "div", 176)(6, "span", 177);
+    \u0275\u0275elementStart(5, "div", 169)(6, "span", 170);
     \u0275\u0275text(7, "\u7B56\u7565\u898F\u5283");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "span", 178);
+    \u0275\u0275elementStart(8, "span", 171);
     \u0275\u0275text(9, "AI \u71DF\u92B7\u52A9\u624B");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(10, AppComponent_Conditional_15_Conditional_94_Conditional_10_Template, 2, 0, "span", 183)(11, AppComponent_Conditional_15_Conditional_94_Conditional_11_Template, 2, 0, "span", 184);
+    \u0275\u0275conditionalCreate(10, AppComponent_Conditional_15_Conditional_89_Conditional_10_Template, 2, 0, "span", 176)(11, AppComponent_Conditional_15_Conditional_89_Conditional_11_Template, 2, 0, "span", 177);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "a", 185);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_94_Template_a_click_12_listener() {
+    \u0275\u0275elementStart(12, "a", 178);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_89_Template_a_click_12_listener() {
       \u0275\u0275restoreView(_r14);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("ai-team"));
     });
-    \u0275\u0275elementStart(13, "div", 174)(14, "span", 175);
+    \u0275\u0275elementStart(13, "div", 167)(14, "span", 168);
     \u0275\u0275text(15, "\u{1F916}");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(16, "div", 176)(17, "span", 177);
+    \u0275\u0275elementStart(16, "div", 169)(17, "span", 170);
     \u0275\u0275text(18, "\u81EA\u52D5\u57F7\u884C");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(19, "span", 178);
+    \u0275\u0275elementStart(19, "span", 171);
     \u0275\u0275text(20, "AI \u5718\u968A\u92B7\u552E");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(21, AppComponent_Conditional_15_Conditional_94_Conditional_21_Template, 2, 0, "span", 186)(22, AppComponent_Conditional_15_Conditional_94_Conditional_22_Template, 2, 0, "span", 184);
+    \u0275\u0275conditionalCreate(21, AppComponent_Conditional_15_Conditional_89_Conditional_21_Template, 2, 0, "span", 179)(22, AppComponent_Conditional_15_Conditional_89_Conditional_22_Template, 2, 0, "span", 177);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(23, "a", 185);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_94_Template_a_click_23_listener() {
+    \u0275\u0275elementStart(23, "a", 178);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_89_Template_a_click_23_listener() {
       \u0275\u0275restoreView(_r14);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("analytics"));
     });
-    \u0275\u0275elementStart(24, "div", 174)(25, "span", 175);
+    \u0275\u0275elementStart(24, "div", 167)(25, "span", 168);
     \u0275\u0275text(26, "\u{1F4CA}");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(27, "div", 176)(28, "span", 177);
+    \u0275\u0275elementStart(27, "div", 169)(28, "span", 170);
     \u0275\u0275text(29, "\u6578\u64DA\u6D1E\u5BDF");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(30, "span", 178);
+    \u0275\u0275elementStart(30, "span", 171);
     \u0275\u0275text(31, "\u667A\u80FD\u5206\u6790\u5831\u544A");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(32, AppComponent_Conditional_15_Conditional_94_Conditional_32_Template, 2, 0, "span", 187)(33, AppComponent_Conditional_15_Conditional_94_Conditional_33_Template, 2, 0, "span", 184);
+    \u0275\u0275conditionalCreate(32, AppComponent_Conditional_15_Conditional_89_Conditional_32_Template, 2, 0, "span", 180)(33, AppComponent_Conditional_15_Conditional_89_Conditional_33_Template, 2, 0, "span", 177);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
     \u0275\u0275nextContext();
-    const view_r12 = \u0275\u0275readContextLet(50);
+    const view_r12 = \u0275\u0275readContextLet(45);
     const ctx_r0 = \u0275\u0275nextContext();
     \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "ai-assistant" ? "rgba(249, 115, 22, 0.15)" : "transparent")("color", view_r12 === "ai-assistant" ? "#fb923c" : "var(--sidebar-text)");
@@ -57550,68 +57731,68 @@ function AppComponent_Conditional_15_Conditional_94_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.membershipService.hasFeature("dataInsightsBasic") ? 32 : 33);
   }
 }
-function AppComponent_Conditional_15_Conditional_101_Conditional_24_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_96_Conditional_24_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 195);
+    \u0275\u0275elementStart(0, "span", 188);
     \u0275\u0275text(1, "\u{1F48E}");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_101_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_96_Template(rf, ctx) {
   if (rf & 1) {
     const _r15 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 97)(1, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_101_Template_a_click_1_listener() {
+    \u0275\u0275elementStart(0, "div", 92)(1, "a", 78);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_96_Template_a_click_1_listener() {
       \u0275\u0275restoreView(_r15);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("analytics-center"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(2, "svg", 84);
-    \u0275\u0275element(3, "path", 188)(4, "path", 189)(5, "path", 190);
+    \u0275\u0275elementStart(2, "svg", 79);
+    \u0275\u0275element(3, "path", 181)(4, "path", 182)(5, "path", 183);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(6, "span");
     \u0275\u0275text(7, "\u5206\u6790\u4E2D\u5FC3");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(8, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_101_Template_a_click_8_listener() {
+    \u0275\u0275elementStart(8, "a", 78);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_96_Template_a_click_8_listener() {
       \u0275\u0275restoreView(_r15);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("lead-nurturing"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(9, "svg", 84);
-    \u0275\u0275element(10, "path", 191)(11, "circle", 192);
+    \u0275\u0275elementStart(9, "svg", 79);
+    \u0275\u0275element(10, "path", 184)(11, "circle", 185);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(12, "span");
     \u0275\u0275text(13, "\u5BA2\u6236\u57F9\u80B2");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "span", 193);
+    \u0275\u0275elementStart(14, "span", 186);
     \u0275\u0275text(15, "AI");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(16, "a", 194);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_101_Template_a_click_16_listener() {
+    \u0275\u0275elementStart(16, "a", 187);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_96_Template_a_click_16_listener() {
       \u0275\u0275restoreView(_r15);
       const ctx_r0 = \u0275\u0275nextContext(2);
       ctx_r0.changeView("multi-role");
       return \u0275\u0275resetView(ctx_r0.loadMultiRoleData());
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(17, "svg", 84);
-    \u0275\u0275element(18, "path", 159)(19, "circle", 160)(20, "path", 161)(21, "path", 162);
+    \u0275\u0275elementStart(17, "svg", 79);
+    \u0275\u0275element(18, "path", 152)(19, "circle", 153)(20, "path", 154)(21, "path", 155);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(22, "span");
     \u0275\u0275text(23, "\u591A\u89D2\u8272\u5354\u4F5C");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(24, AppComponent_Conditional_15_Conditional_101_Conditional_24_Template, 2, 0, "span", 195);
+    \u0275\u0275conditionalCreate(24, AppComponent_Conditional_15_Conditional_96_Conditional_24_Template, 2, 0, "span", 188);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
     \u0275\u0275nextContext();
-    const view_r12 = \u0275\u0275readContextLet(50);
+    const view_r12 = \u0275\u0275readContextLet(45);
     const ctx_r0 = \u0275\u0275nextContext();
     \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "analytics-center" || view_r12 === "nurturing-analytics" ? "rgba(6, 182, 212, 0.15)" : "transparent")("color", view_r12 === "analytics-center" || view_r12 === "nurturing-analytics" ? "#22d3ee" : "var(--sidebar-text)");
@@ -57627,9 +57808,9 @@ function AppComponent_Conditional_15_Conditional_101_Template(rf, ctx) {
     \u0275\u0275conditional(!ctx_r0.membershipService.hasFeature("multiRole") ? 24 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_108_Conditional_9_Conditional_16_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_103_Conditional_9_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 203);
+    \u0275\u0275elementStart(0, "span", 196);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -57639,11 +57820,11 @@ function AppComponent_Conditional_15_Conditional_108_Conditional_9_Conditional_1
     \u0275\u0275textInterpolate(ctx_r0.ragBrainService.gapsCount());
   }
 }
-function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_103_Conditional_9_Template(rf, ctx) {
   if (rf & 1) {
     const _r17 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 199)(1, "a", 201);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template_a_click_1_listener() {
+    \u0275\u0275elementStart(0, "div", 192)(1, "a", 194);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_103_Conditional_9_Template_a_click_1_listener() {
       \u0275\u0275restoreView(_r17);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.changeView("knowledge-brain"));
@@ -57654,8 +57835,8 @@ function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template(rf, 
     \u0275\u0275elementStart(4, "span");
     \u0275\u0275text(5);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(6, "a", 201);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template_a_click_6_listener() {
+    \u0275\u0275elementStart(6, "a", 194);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_103_Conditional_9_Template_a_click_6_listener() {
       \u0275\u0275restoreView(_r17);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.changeView("knowledge-manage"));
@@ -57666,8 +57847,8 @@ function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template(rf, 
     \u0275\u0275elementStart(9, "span");
     \u0275\u0275text(10);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(11, "a", 202);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template_a_click_11_listener() {
+    \u0275\u0275elementStart(11, "a", 195);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_103_Conditional_9_Template_a_click_11_listener() {
       \u0275\u0275restoreView(_r17);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.changeView("knowledge-gaps"));
@@ -57678,12 +57859,12 @@ function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template(rf, 
     \u0275\u0275elementStart(14, "span");
     \u0275\u0275text(15);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_108_Conditional_9_Conditional_16_Template, 2, 1, "span", 203);
+    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_103_Conditional_9_Conditional_16_Template, 2, 1, "span", 196);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
     \u0275\u0275nextContext(2);
-    const view_r12 = \u0275\u0275readContextLet(50);
+    const view_r12 = \u0275\u0275readContextLet(45);
     const ctx_r0 = \u0275\u0275nextContext();
     \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "knowledge-brain" ? "rgba(236, 72, 153, 0.1)" : "transparent")("color", view_r12 === "knowledge-brain" ? "#f472b6" : "var(--sidebar-text-muted)");
@@ -57704,35 +57885,35 @@ function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template(rf, 
     \u0275\u0275conditional(ctx_r0.ragBrainService.gapsCount() > 0 ? 16 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_108_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_103_Template(rf, ctx) {
   if (rf & 1) {
     const _r16 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 97)(1, "div", 196)(2, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_108_Template_a_click_2_listener() {
+    \u0275\u0275elementStart(0, "div", 92)(1, "div", 189)(2, "a", 78);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_103_Template_a_click_2_listener() {
       \u0275\u0275restoreView(_r16);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.toggleKnowledgeMenu());
     });
-    \u0275\u0275elementStart(3, "span", 175);
+    \u0275\u0275elementStart(3, "span", 168);
     \u0275\u0275text(4, "\u{1F9E0}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "span", 197);
+    \u0275\u0275elementStart(5, "span", 190);
     \u0275\u0275text(6);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "span", 198);
+    \u0275\u0275elementStart(7, "span", 191);
     \u0275\u0275text(8, "\u25BC");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(9, AppComponent_Conditional_15_Conditional_108_Conditional_9_Template, 17, 22, "div", 199);
+    \u0275\u0275conditionalCreate(9, AppComponent_Conditional_15_Conditional_103_Conditional_9_Template, 17, 22, "div", 192);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(10, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_108_Template_a_click_10_listener() {
+    \u0275\u0275elementStart(10, "a", 78);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_103_Template_a_click_10_listener() {
       \u0275\u0275restoreView(_r16);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("ai-center"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(11, "svg", 84);
-    \u0275\u0275element(12, "path", 200);
+    \u0275\u0275elementStart(11, "svg", 79);
+    \u0275\u0275element(12, "path", 193);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(13, "span");
@@ -57741,7 +57922,7 @@ function AppComponent_Conditional_15_Conditional_108_Template(rf, ctx) {
   }
   if (rf & 2) {
     \u0275\u0275nextContext();
-    const view_r12 = \u0275\u0275readContextLet(50);
+    const view_r12 = \u0275\u0275readContextLet(45);
     const ctx_r0 = \u0275\u0275nextContext();
     \u0275\u0275advance(2);
     \u0275\u0275styleProp("background-color", ctx_r0.isKnowledgeView() ? "rgba(236, 72, 153, 0.15)" : "transparent")("color", ctx_r0.isKnowledgeView() ? "#f472b6" : "var(--sidebar-text)");
@@ -57759,18 +57940,18 @@ function AppComponent_Conditional_15_Conditional_108_Template(rf, ctx) {
     \u0275\u0275textInterpolate(ctx_r0.t("aiCenter"));
   }
 }
-function AppComponent_Conditional_15_Conditional_115_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_110_Template(rf, ctx) {
   if (rf & 1) {
     const _r18 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 97)(1, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_115_Template_a_click_1_listener() {
+    \u0275\u0275elementStart(0, "div", 92)(1, "a", 78);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_110_Template_a_click_1_listener() {
       \u0275\u0275restoreView(_r18);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("settings"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(2, "svg", 84);
-    \u0275\u0275element(3, "circle", 204)(4, "path", 205);
+    \u0275\u0275elementStart(2, "svg", 79);
+    \u0275\u0275element(3, "circle", 197)(4, "path", 198);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(5, "span");
@@ -57779,7 +57960,7 @@ function AppComponent_Conditional_15_Conditional_115_Template(rf, ctx) {
   }
   if (rf & 2) {
     \u0275\u0275nextContext();
-    const view_r12 = \u0275\u0275readContextLet(50);
+    const view_r12 = \u0275\u0275readContextLet(45);
     const ctx_r0 = \u0275\u0275nextContext();
     \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "settings" ? "var(--sidebar-item-active)" : "transparent")("color", view_r12 === "settings" ? "var(--sidebar-text-active)" : "var(--sidebar-text)");
@@ -57788,25 +57969,25 @@ function AppComponent_Conditional_15_Conditional_115_Template(rf, ctx) {
     \u0275\u0275textInterpolate(ctx_r0.t("settings"));
   }
 }
-function AppComponent_Conditional_15_Case_137_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_132_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-dashboard-view");
   }
 }
-function AppComponent_Conditional_15_Case_138_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_133_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-accounts-view");
   }
 }
-function AppComponent_Conditional_15_Case_139_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_134_Template(rf, ctx) {
   if (rf & 1) {
     const _r19 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "app-add-account-page", 206);
-    \u0275\u0275listener("accountAdded", function AppComponent_Conditional_15_Case_139_Template_app_add_account_page_accountAdded_0_listener($event) {
+    \u0275\u0275elementStart(0, "app-add-account-page", 199);
+    \u0275\u0275listener("accountAdded", function AppComponent_Conditional_15_Case_134_Template_app_add_account_page_accountAdded_0_listener($event) {
       \u0275\u0275restoreView(_r19);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onAccountAdded($event));
-    })("back", function AppComponent_Conditional_15_Case_139_Template_app_add_account_page_back_0_listener() {
+    })("back", function AppComponent_Conditional_15_Case_134_Template_app_add_account_page_back_0_listener() {
       \u0275\u0275restoreView(_r19);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("accounts"));
@@ -57814,70 +57995,95 @@ function AppComponent_Conditional_15_Case_139_Template(rf, ctx) {
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Case_140_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_135_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-api-credentials-view");
   }
 }
-function AppComponent_Conditional_15_Case_141_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_136_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-settings-view");
   }
 }
-function AppComponent_Conditional_15_Case_142_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_137_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-leads-view");
   }
 }
-function AppComponent_Conditional_15_Case_143_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_138_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-automation-view");
   }
 }
-function AppComponent_Conditional_15_Case_144_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_139_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-resource-discovery-view");
   }
 }
-function AppComponent_Conditional_15_Case_145_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_140_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-resource-discovery-view");
   }
 }
-function AppComponent_Conditional_15_Case_146_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_141_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-ai-center-view");
   }
 }
-function AppComponent_Conditional_15_Case_147_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_142_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 111);
+    \u0275\u0275elementStart(0, "div", 106);
     \u0275\u0275element(1, "app-ai-brain");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Case_148_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_143_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 112);
+    \u0275\u0275elementStart(0, "div", 107);
     \u0275\u0275element(1, "app-knowledge-gaps");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Case_149_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_144_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 112);
+    \u0275\u0275elementStart(0, "div", 107);
     \u0275\u0275element(1, "app-knowledge-manage");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Case_150_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_145_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-multi-role-view");
   }
 }
-function AppComponent_Conditional_15_Case_151_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_146_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-analytics-view");
+  }
+}
+function AppComponent_Conditional_15_Case_147_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-monitoring-view");
+  }
+}
+function AppComponent_Conditional_15_Case_148_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-monitoring-view");
+  }
+}
+function AppComponent_Conditional_15_Case_149_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-monitoring-view");
+  }
+}
+function AppComponent_Conditional_15_Case_150_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-monitoring-view");
+  }
+}
+function AppComponent_Conditional_15_Case_151_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-monitoring-view");
   }
 }
 function AppComponent_Conditional_15_Case_152_Template(rf, ctx) {
@@ -57892,155 +58098,130 @@ function AppComponent_Conditional_15_Case_153_Template(rf, ctx) {
 }
 function AppComponent_Conditional_15_Case_154_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-monitoring-view");
+    \u0275\u0275element(0, "app-runtime-logs-view");
   }
 }
 function AppComponent_Conditional_15_Case_155_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-monitoring-view");
+    \u0275\u0275element(0, "app-membership-center");
   }
 }
 function AppComponent_Conditional_15_Case_156_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-monitoring-view");
+    \u0275\u0275element(0, "app-wallet-view");
   }
 }
 function AppComponent_Conditional_15_Case_157_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-monitoring-view");
+    \u0275\u0275element(0, "app-wallet-recharge");
   }
 }
 function AppComponent_Conditional_15_Case_158_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-monitoring-view");
+    \u0275\u0275element(0, "app-wallet-withdraw");
   }
 }
 function AppComponent_Conditional_15_Case_159_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-runtime-logs-view");
+    \u0275\u0275element(0, "app-wallet-transactions");
   }
 }
 function AppComponent_Conditional_15_Case_160_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-membership-center");
+    \u0275\u0275element(0, "app-wallet-orders");
   }
 }
 function AppComponent_Conditional_15_Case_161_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-wallet-view");
+    \u0275\u0275element(0, "app-wallet-analytics");
   }
 }
 function AppComponent_Conditional_15_Case_162_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-wallet-recharge");
+    \u0275\u0275element(0, "app-profile");
   }
 }
 function AppComponent_Conditional_15_Case_163_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-wallet-withdraw");
+    \u0275\u0275element(0, "app-resource-center");
   }
 }
 function AppComponent_Conditional_15_Case_164_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-wallet-transactions");
+    \u0275\u0275element(0, "app-search-discovery");
   }
 }
 function AppComponent_Conditional_15_Case_165_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-wallet-orders");
+    \u0275\u0275element(0, "app-ai-marketing-assistant");
   }
 }
 function AppComponent_Conditional_15_Case_166_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-wallet-analytics");
+    \u0275\u0275element(0, "app-ai-team-hub");
   }
 }
 function AppComponent_Conditional_15_Case_167_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-profile");
+    \u0275\u0275element(0, "app-member-database");
   }
 }
 function AppComponent_Conditional_15_Case_168_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-resource-center");
+    \u0275\u0275element(0, "app-leads-view");
   }
 }
 function AppComponent_Conditional_15_Case_169_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-search-discovery");
+    \u0275\u0275element(0, "app-analytics-view");
   }
 }
 function AppComponent_Conditional_15_Case_170_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-ai-marketing-assistant");
+    \u0275\u0275element(0, "app-analytics-view");
   }
 }
 function AppComponent_Conditional_15_Case_171_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-ai-team-hub");
+    \u0275\u0275element(0, "app-automation-view");
   }
 }
 function AppComponent_Conditional_15_Case_172_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-member-database");
+    \u0275\u0275element(0, "app-automation-view");
   }
 }
 function AppComponent_Conditional_15_Case_173_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-leads-view");
+    \u0275\u0275element(0, "app-analytics-view");
   }
 }
 function AppComponent_Conditional_15_Case_174_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-analytics-view");
+    \u0275\u0275element(0, "app-marketing-report");
   }
 }
 function AppComponent_Conditional_15_Case_175_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-analytics-view");
+    \u0275\u0275element(0, "app-runtime-logs-view");
   }
 }
 function AppComponent_Conditional_15_Case_176_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-automation-view");
+    \u0275\u0275element(0, "app-runtime-logs-view");
   }
 }
 function AppComponent_Conditional_15_Case_177_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-automation-view");
+    \u0275\u0275element(0, "app-runtime-logs-view");
   }
 }
 function AppComponent_Conditional_15_Case_178_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-analytics-view");
-  }
-}
-function AppComponent_Conditional_15_Case_179_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275element(0, "app-marketing-report");
-  }
-}
-function AppComponent_Conditional_15_Case_180_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275element(0, "app-runtime-logs-view");
-  }
-}
-function AppComponent_Conditional_15_Case_181_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275element(0, "app-runtime-logs-view");
-  }
-}
-function AppComponent_Conditional_15_Case_182_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275element(0, "app-runtime-logs-view");
-  }
-}
-function AppComponent_Conditional_15_Case_183_Template(rf, ctx) {
-  if (rf & 1) {
     \u0275\u0275element(0, "app-dashboard-view");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_10_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_10_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
   }
@@ -58049,7 +58230,7 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_10_Template(rf,
     \u0275\u0275textInterpolate1(" @", lead_r21.username, " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_11_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
   }
@@ -58058,7 +58239,7 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_11_Template(rf,
     \u0275\u0275textInterpolate2(" ", lead_r21.firstName, " ", lead_r21.lastName || "", " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_12_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_12_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
     \u0275\u0275pipe(1, "slice");
@@ -58068,9 +58249,9 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_12_Template(rf,
     \u0275\u0275textInterpolate1(" ID: ", \u0275\u0275pipeBind3(1, 1, lead_r21.userId, 0, 12), " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_14_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "p", 216);
+    \u0275\u0275elementStart(0, "p", 209);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -58080,9 +58261,9 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_14_Template(rf,
     \u0275\u0275textInterpolate1("\u{1F4F1} ", lead_r21.phone);
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_16_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 218);
+    \u0275\u0275elementStart(0, "span", 211);
     \u0275\u0275text(1);
     \u0275\u0275pipe(2, "slice");
     \u0275\u0275elementEnd();
@@ -58093,9 +58274,9 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_16_Template(rf,
     \u0275\u0275textInterpolate1("\u{1F4CD} ", \u0275\u0275pipeBind3(2, 1, lead_r21.sourceGroup, 0, 20));
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_17_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_17_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 219);
+    \u0275\u0275elementStart(0, "span", 212);
     \u0275\u0275text(1);
     \u0275\u0275pipe(2, "slice");
     \u0275\u0275elementEnd();
@@ -58106,9 +58287,9 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_17_Template(rf,
     \u0275\u0275textInterpolate1("\u{1F511} ", \u0275\u0275pipeBind3(2, 1, lead_r21.triggeredKeyword, 0, 15));
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_18_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_18_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 228);
+    \u0275\u0275elementStart(0, "span", 221);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -58120,9 +58301,9 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_18_Template(rf,
     \u0275\u0275textInterpolate2("", ctx_r0.getIntentLevelEmoji(lead_r21.intentLevel), " ", ctx_r0.t(lead_r21.intentLevel));
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_5_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "option", 232);
+    \u0275\u0275elementStart(0, "option", 225);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -58132,9 +58313,9 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("noSenderAccounts"));
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_6_For_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_6_For_3_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "option", 253);
+    \u0275\u0275elementStart(0, "option", 246);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -58146,12 +58327,12 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275textInterpolate2("", account_r23.phone, " (", account_r23.username || ctx_r0.t(account_r23.status), ")");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_6_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "option", 232);
+    \u0275\u0275elementStart(0, "option", 225);
     \u0275\u0275text(1, "\u9078\u64C7\u767C\u9001\u5E33\u865F...");
     \u0275\u0275elementEnd();
-    \u0275\u0275repeaterCreate(2, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_6_For_3_Template, 2, 3, "option", 253, _forTrack024);
+    \u0275\u0275repeaterCreate(2, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_6_For_3_Template, 2, 3, "option", 246, _forTrack024);
   }
   if (rf & 2) {
     const ctx_r0 = \u0275\u0275nextContext(4);
@@ -58159,14 +58340,14 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275repeater(ctx_r0.senderAccounts());
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
     const _r24 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 233)(1, "p", 20);
+    \u0275\u0275elementStart(0, "div", 226)(1, "p", 20);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "a", 254);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_7_Template_a_click_3_listener() {
+    \u0275\u0275elementStart(3, "a", 247);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_7_Template_a_click_3_listener() {
       \u0275\u0275restoreView(_r24);
       const ctx_r0 = \u0275\u0275nextContext(4);
       ctx_r0.currentView.set("accounts");
@@ -58181,21 +58362,21 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1("\u26A0\uFE0F ", ctx_r0.t("noSenderAccountsHint"));
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 256);
+    \u0275\u0275elementStart(0, "span", 249);
     \u0275\u0275text(1, "\u2713 \u5DF2\u9023\u63A5");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_8_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_8_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 257);
+    \u0275\u0275elementStart(0, "span", 250);
     \u0275\u0275text(1, "\u{1F4DA} RAG \u5DF2\u555F\u7528");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_9_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
   }
@@ -58204,7 +58385,7 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1(" | \u4F86\u6E90: ", ctx_r0.generationState().lead.sourceGroup, " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_9_Conditional_5_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
   }
@@ -58213,14 +58394,14 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1(" | \u89F8\u767C\u8A5E: ", ctx_r0.generationState().lead.triggerKeyword, " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_9_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 258)(1, "strong", 267);
+    \u0275\u0275elementStart(0, "div", 251)(1, "strong", 260);
     \u0275\u0275text(2, "\u5BA2\u6236\u8CC7\u8A0A\uFF1A");
     \u0275\u0275elementEnd();
     \u0275\u0275text(3);
-    \u0275\u0275conditionalCreate(4, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_9_Conditional_4_Template, 1, 1);
-    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_9_Conditional_5_Template, 1, 1);
+    \u0275\u0275conditionalCreate(4, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Conditional_4_Template, 1, 1);
+    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Conditional_5_Template, 1, 1);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58233,9 +58414,9 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275conditional(ctx_r0.generationState().lead.triggerKeyword ? 5 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_17_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_17_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 268);
+    \u0275\u0275elementStart(0, "span", 261);
     \u0275\u0275text(1, "\u27F3");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(2, "span");
@@ -58248,7 +58429,7 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("generating"));
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_18_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_18_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span");
     \u0275\u0275text(1, "\u2728");
@@ -58263,11 +58444,11 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("generateWithAi"));
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_19_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_19_Template(rf, ctx) {
   if (rf & 1) {
     const _r26 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 269);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_19_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 262);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_19_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r26);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.generateMessage());
@@ -58276,13 +58457,13 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_20_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_20_Template(rf, ctx) {
   if (rf & 1) {
     const _r27 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 264);
+    \u0275\u0275elementStart(0, "div", 257);
     \u0275\u0275text(1);
-    \u0275\u0275elementStart(2, "a", 270);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_20_Template_a_click_2_listener() {
+    \u0275\u0275elementStart(2, "a", 263);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_20_Template_a_click_2_listener() {
       \u0275\u0275restoreView(_r27);
       const ctx_r0 = \u0275\u0275nextContext(5);
       ctx_r0.currentView.set("settings");
@@ -58299,15 +58480,15 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("goToSettings"));
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_21_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_21_Template(rf, ctx) {
   if (rf & 1) {
     const _r28 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 265)(1, "strong");
+    \u0275\u0275elementStart(0, "div", 258)(1, "strong");
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
     \u0275\u0275text(3);
-    \u0275\u0275elementStart(4, "button", 271);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_21_Template_button_click_4_listener() {
+    \u0275\u0275elementStart(4, "button", 264);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_21_Template_button_click_4_listener() {
       \u0275\u0275restoreView(_r28);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.generateMessage());
@@ -58323,51 +58504,51 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1(" ", ctx_r0.generationState().error, " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_22_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_22_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 266)(1, "p", 272);
+    \u0275\u0275elementStart(0, "div", 259)(1, "p", 265);
     \u0275\u0275text(2, "\u2713 AI \u5DF2\u751F\u6210\u6D88\u606F\uFF0C\u60A8\u53EF\u4EE5\u5728\u4E0B\u65B9\u7DE8\u8F2F\u5F8C\u767C\u9001");
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Template(rf, ctx) {
   if (rf & 1) {
     const _r25 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 238)(1, "div", 255)(2, "div", 213)(3, "span", 175);
+    \u0275\u0275elementStart(0, "div", 231)(1, "div", 248)(2, "div", 206)(3, "span", 168);
     \u0275\u0275text(4, "\u{1F916}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(5, "span", 32);
     \u0275\u0275text(6);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_7_Template, 2, 0, "span", 256);
+    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_7_Template, 2, 0, "span", 249);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(8, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_8_Template, 2, 0, "span", 257);
+    \u0275\u0275conditionalCreate(8, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_8_Template, 2, 0, "span", 250);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(9, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_9_Template, 6, 3, "div", 258);
-    \u0275\u0275elementStart(10, "div")(11, "label", 259);
+    \u0275\u0275conditionalCreate(9, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Template, 6, 3, "div", 251);
+    \u0275\u0275elementStart(10, "div")(11, "label", 252);
     \u0275\u0275text(12);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(13, "textarea", 260);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Template_textarea_ngModelChange_13_listener($event) {
+    \u0275\u0275elementStart(13, "textarea", 253);
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Template_textarea_ngModelChange_13_listener($event) {
       \u0275\u0275restoreView(_r25);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.updateCustomPrompt($event));
     });
     \u0275\u0275text(14, "                        ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(15, "div", 261)(16, "button", 262);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Template_button_click_16_listener() {
+    \u0275\u0275elementStart(15, "div", 254)(16, "button", 255);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Template_button_click_16_listener() {
       \u0275\u0275restoreView(_r25);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.generateMessage());
     });
-    \u0275\u0275conditionalCreate(17, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_17_Template, 4, 1)(18, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_18_Template, 4, 1);
+    \u0275\u0275conditionalCreate(17, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_17_Template, 4, 1)(18, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_18_Template, 4, 1);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_19_Template, 2, 0, "button", 263);
+    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_19_Template, 2, 0, "button", 256);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_20_Template, 4, 2, "div", 264);
-    \u0275\u0275conditionalCreate(21, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_21_Template, 6, 2, "div", 265);
-    \u0275\u0275conditionalCreate(22, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_22_Template, 3, 0, "div", 266);
+    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_20_Template, 4, 2, "div", 257);
+    \u0275\u0275conditionalCreate(21, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_21_Template, 6, 2, "div", 258);
+    \u0275\u0275conditionalCreate(22, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_22_Template, 3, 0, "div", 259);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58398,9 +58579,9 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275conditional(ctx_r0.generationState().status === "success" && ctx_r0.generationState().generatedMessage ? 22 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_25_For_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_For_7_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "option", 253);
+    \u0275\u0275elementStart(0, "option", 246);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -58411,22 +58592,22 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(template_r30.name);
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_25_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_Template(rf, ctx) {
   if (rf & 1) {
     const _r29 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 229)(1, "label", 230);
+    \u0275\u0275elementStart(0, "div", 222)(1, "label", 223);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "select", 273);
-    \u0275\u0275listener("change", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_25_Template_select_change_3_listener($event) {
+    \u0275\u0275elementStart(3, "select", 266);
+    \u0275\u0275listener("change", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_Template_select_change_3_listener($event) {
       \u0275\u0275restoreView(_r29);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.applyTemplate($event));
     });
-    \u0275\u0275elementStart(4, "option", 232);
+    \u0275\u0275elementStart(4, "option", 225);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd();
-    \u0275\u0275repeaterCreate(6, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_25_For_7_Template, 2, 2, "option", 253, _forTrack024);
+    \u0275\u0275repeaterCreate(6, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_For_7_Template, 2, 2, "option", 246, _forTrack024);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -58439,19 +58620,19 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275repeater(ctx_r0.messageTemplates());
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_40_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_40_Template(rf, ctx) {
   if (rf & 1) {
     const _r31 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 274);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_40_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 267);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_40_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r31);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.addMoreAttachments("file"));
     });
     \u0275\u0275text(1, " \u2795 \u6DFB\u52A0\u66F4\u591A ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(2, "button", 275);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_40_Template_button_click_2_listener() {
+    \u0275\u0275elementStart(2, "button", 268);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_40_Template_button_click_2_listener() {
       \u0275\u0275restoreView(_r31);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.clearAllAttachments());
@@ -58460,23 +58641,23 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_2_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 280);
+    \u0275\u0275elementStart(0, "span", 273);
     \u0275\u0275text(1, "\u{1F5BC}\uFE0F");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 281);
+    \u0275\u0275elementStart(0, "span", 274);
     \u0275\u0275text(1, "\u{1F4C4}");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_6_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 283);
+    \u0275\u0275elementStart(0, "span", 276);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -58486,29 +58667,29 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1(" (", (attachment_r33.fileSize / 1024 / 1024).toFixed(2), " MB) ");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 284);
+    \u0275\u0275elementStart(0, "span", 277);
     \u0275\u0275text(1, "\u2713");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Template(rf, ctx) {
   if (rf & 1) {
     const _r32 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 278)(1, "div", 279);
-    \u0275\u0275conditionalCreate(2, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_2_Template, 2, 0, "span", 280)(3, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_3_Template, 2, 0, "span", 281);
-    \u0275\u0275elementStart(4, "span", 282);
+    \u0275\u0275elementStart(0, "div", 271)(1, "div", 272);
+    \u0275\u0275conditionalCreate(2, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_2_Template, 2, 0, "span", 273)(3, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_3_Template, 2, 0, "span", 274);
+    \u0275\u0275elementStart(4, "span", 275);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(6, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_6_Template, 2, 1, "span", 283);
-    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_7_Template, 2, 0, "span", 284);
+    \u0275\u0275conditionalCreate(6, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_6_Template, 2, 1, "span", 276);
+    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_7_Template, 2, 0, "span", 277);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "button", 285);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Template_button_click_8_listener() {
-      const \u0275$index_1275_r34 = \u0275\u0275restoreView(_r32).$index;
+    \u0275\u0275elementStart(8, "button", 278);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Template_button_click_8_listener() {
+      const \u0275$index_1223_r34 = \u0275\u0275restoreView(_r32).$index;
       const ctx_r0 = \u0275\u0275nextContext(5);
-      return \u0275\u0275resetView(ctx_r0.removeAttachmentByIndex(\u0275$index_1275_r34));
+      return \u0275\u0275resetView(ctx_r0.removeAttachmentByIndex(\u0275$index_1223_r34));
     });
     \u0275\u0275text(9, "\xD7");
     \u0275\u0275elementEnd()();
@@ -58525,16 +58706,16 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275conditional(attachment_r33.filePath ? 7 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 245)(1, "div", 239)(2, "span", 276);
+    \u0275\u0275elementStart(0, "div", 238)(1, "div", 232)(2, "span", 269);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "span", 149);
+    \u0275\u0275elementStart(4, "span", 144);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(6, "div", 277);
-    \u0275\u0275repeaterCreate(7, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Template, 10, 4, "div", 278, _forTrack19);
+    \u0275\u0275elementStart(6, "div", 270);
+    \u0275\u0275repeaterCreate(7, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Template, 10, 4, "div", 271, _forTrack19);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -58547,25 +58728,25 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275repeater(ctx_r0.generationState().attachments);
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Conditional_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_2_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0, " \u26A0\uFE0F \u7121\u53EF\u7528\u767C\u9001\u5E33\u865F ");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0, " \u26A0\uFE0F \u8ACB\u9078\u64C7\u767C\u9001\u5E33\u865F ");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0, " \u26A0\uFE0F \u8ACB\u8F38\u5165\u8A0A\u606F\u5167\u5BB9\u6216\u6DFB\u52A0\u9644\u4EF6 ");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 246)(1, "p", 286);
-    \u0275\u0275conditionalCreate(2, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Conditional_2_Template, 1, 0)(3, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Conditional_3_Template, 1, 0)(4, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Conditional_4_Template, 1, 0);
+    \u0275\u0275elementStart(0, "div", 239)(1, "p", 279);
+    \u0275\u0275conditionalCreate(2, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_2_Template, 1, 0)(3, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_3_Template, 1, 0)(4, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_4_Template, 1, 0);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -58574,105 +58755,105 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_
     \u0275\u0275conditional(ctx_r0.senderAccounts().length === 0 ? 2 : !ctx_r0.selectedSenderId() ? 3 : ctx_r0.editableMessage().trim().length === 0 && !ctx_r0.generationState().attachment && ctx_r0.generationState().attachments.length === 0 ? 4 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_43_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_43_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 247)(1, "p", 287);
+    \u0275\u0275elementStart(0, "div", 240)(1, "p", 280);
     \u0275\u0275text(2, "\u{1F6AB} \u6B64\u5BA2\u6236\u5DF2\u52A0\u5165\u9ED1\u540D\u55AE\uFF0C\u7121\u6CD5\u767C\u9001\u8A0A\u606F");
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template(rf, ctx) {
   if (rf & 1) {
     const _r22 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 226)(1, "div", 229)(2, "label", 230);
+    \u0275\u0275elementStart(0, "div", 219)(1, "div", 222)(2, "label", 223);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "select", 231);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_select_ngModelChange_4_listener($event) {
+    \u0275\u0275elementStart(4, "select", 224);
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_select_ngModelChange_4_listener($event) {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.selectedSenderId.set($event));
     });
-    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_5_Template, 2, 1, "option", 232)(6, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_6_Template, 4, 0);
+    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_5_Template, 2, 1, "option", 225)(6, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_6_Template, 4, 0);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_7_Template, 5, 1, "div", 233);
+    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_7_Template, 5, 1, "div", 226);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "div", 234)(9, "label", 235);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_label_click_9_listener() {
+    \u0275\u0275elementStart(8, "div", 227)(9, "label", 228);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_label_click_9_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.messageMode.set("manual"));
     });
-    \u0275\u0275elementStart(10, "div", 236);
+    \u0275\u0275elementStart(10, "div", 229);
     \u0275\u0275text(11, "\u{1F4DD}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "span", 237);
+    \u0275\u0275elementStart(12, "span", 230);
     \u0275\u0275text(13);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(14, "label", 235);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_label_click_14_listener() {
+    \u0275\u0275elementStart(14, "label", 228);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_label_click_14_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.messageMode.set("ai"));
     });
-    \u0275\u0275elementStart(15, "div", 236);
+    \u0275\u0275elementStart(15, "div", 229);
     \u0275\u0275text(16, "\u{1F916}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "span", 237);
+    \u0275\u0275elementStart(17, "span", 230);
     \u0275\u0275text(18);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(19, "label", 235);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_label_click_19_listener() {
+    \u0275\u0275elementStart(19, "label", 228);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_label_click_19_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.messageMode.set("template"));
     });
-    \u0275\u0275elementStart(20, "div", 236);
+    \u0275\u0275elementStart(20, "div", 229);
     \u0275\u0275text(21, "\u{1F4CB}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(22, "span", 237);
+    \u0275\u0275elementStart(22, "span", 230);
     \u0275\u0275text(23);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275conditionalCreate(24, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Template, 23, 13, "div", 238);
-    \u0275\u0275conditionalCreate(25, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_25_Template, 8, 2, "div", 229);
-    \u0275\u0275elementStart(26, "div", 229)(27, "div", 239)(28, "label", 240);
+    \u0275\u0275conditionalCreate(24, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Template, 23, 13, "div", 231);
+    \u0275\u0275conditionalCreate(25, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_Template, 8, 2, "div", 222);
+    \u0275\u0275elementStart(26, "div", 222)(27, "div", 232)(28, "label", 233);
     \u0275\u0275text(29);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(30, "span", 241);
+    \u0275\u0275elementStart(30, "span", 234);
     \u0275\u0275text(31);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(32, "textarea", 242);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_textarea_ngModelChange_32_listener($event) {
+    \u0275\u0275elementStart(32, "textarea", 235);
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_textarea_ngModelChange_32_listener($event) {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.editableMessage.set($event));
     });
     \u0275\u0275text(33, "                ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(34, "div", 238)(35, "div", 243)(36, "button", 244);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_button_click_36_listener() {
+    \u0275\u0275elementStart(34, "div", 231)(35, "div", 236)(36, "button", 237);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_36_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.selectAttachment("image", true));
     });
     \u0275\u0275text(37);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(38, "button", 244);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_button_click_38_listener() {
+    \u0275\u0275elementStart(38, "button", 237);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_38_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.selectAttachment("file", true));
     });
     \u0275\u0275text(39);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(40, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_40_Template, 4, 0);
+    \u0275\u0275conditionalCreate(40, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_40_Template, 4, 0);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(41, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_Template, 9, 2, "div", 245);
+    \u0275\u0275conditionalCreate(41, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_Template, 9, 2, "div", 238);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(42, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Template, 5, 1, "div", 246);
-    \u0275\u0275conditionalCreate(43, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_43_Template, 3, 0, "div", 247);
-    \u0275\u0275elementStart(44, "div", 248)(45, "button", 249);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_button_click_45_listener() {
+    \u0275\u0275conditionalCreate(42, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Template, 5, 1, "div", 239);
+    \u0275\u0275conditionalCreate(43, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_43_Template, 3, 0, "div", 240);
+    \u0275\u0275elementStart(44, "div", 241)(45, "button", 242);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_45_listener() {
       \u0275\u0275restoreView(_r22);
       const lead_r21 = \u0275\u0275nextContext();
       const ctx_r0 = \u0275\u0275nextContext(2);
@@ -58680,16 +58861,16 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template(rf,
     });
     \u0275\u0275text(46);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(47, "div", 250)(48, "button", 251);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_button_click_48_listener() {
+    \u0275\u0275elementStart(47, "div", 243)(48, "button", 244);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_48_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.closeLeadDetailModal());
     });
     \u0275\u0275text(49);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(50, "button", 252);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_button_click_50_listener() {
+    \u0275\u0275elementStart(50, "button", 245);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_50_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.sendMessageToLead());
@@ -58754,9 +58935,9 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template(rf,
     \u0275\u0275textInterpolate1(" \u2708\uFE0F ", ctx_r0.t("sendMessage"), " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 268);
+    \u0275\u0275elementStart(0, "span", 261);
     \u0275\u0275text(1, "\u27F3");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(2, "span");
@@ -58764,7 +58945,7 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span");
     \u0275\u0275text(1, "\u{1F4AC}");
@@ -58774,9 +58955,9 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_5_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 149);
+    \u0275\u0275elementStart(0, "span", 144);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -58786,9 +58967,9 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_
     \u0275\u0275textInterpolate1("\u5171 ", ctx_r0.chatHistory().length, " \u689D\u6D88\u606F");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_For_2_Conditional_0_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Conditional_0_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 298)(1, "div", 300)(2, "div", 301)(3, "p", 302);
+    \u0275\u0275elementStart(0, "div", 291)(1, "div", 293)(2, "div", 294)(3, "p", 295);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(5, "p", 15);
@@ -58804,15 +58985,15 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.formatTimestamp(message_r37.timestamp));
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_For_2_Conditional_1_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Conditional_1_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 299)(1, "div", 300)(2, "div", 303)(3, "p", 302);
+    \u0275\u0275elementStart(0, "div", 292)(1, "div", 293)(2, "div", 296)(3, "p", 295);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(5, "div", 304)(6, "span", 149);
+    \u0275\u0275elementStart(5, "div", 297)(6, "span", 144);
     \u0275\u0275text(7);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "span", 305);
+    \u0275\u0275elementStart(8, "span", 298);
     \u0275\u0275text(9, "\u{1F916} AI");
     \u0275\u0275elementEnd()()()();
   }
@@ -58825,30 +59006,30 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.formatTimestamp(message_r37.timestamp));
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_For_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275conditionalCreate(0, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_For_2_Conditional_0_Template, 7, 2, "div", 298)(1, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_For_2_Conditional_1_Template, 10, 2, "div", 299);
+    \u0275\u0275conditionalCreate(0, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Conditional_0_Template, 7, 2, "div", 291)(1, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Conditional_1_Template, 10, 2, "div", 292);
   }
   if (rf & 2) {
     const message_r37 = ctx.$implicit;
     \u0275\u0275conditional(message_r37.role === "user" ? 0 : message_r37.role === "assistant" ? 1 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 296)(1, "span", 306);
+    \u0275\u0275elementStart(0, "div", 289)(1, "span", 299);
     \u0275\u0275text(2, "\u27F3");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 307);
+    \u0275\u0275elementStart(3, "span", 300);
     \u0275\u0275text(4, "\u52A0\u8F09\u4E2D...");
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     const _r38 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 297)(1, "button", 308);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Conditional_4_Template_button_click_1_listener() {
+    \u0275\u0275elementStart(0, "div", 290)(1, "button", 301);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_4_Template_button_click_1_listener() {
       \u0275\u0275restoreView(_r38);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.loadMoreChatHistory());
@@ -58857,18 +59038,18 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
     const _r36 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 295);
-    \u0275\u0275listener("scroll", function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Template_div_scroll_0_listener($event) {
+    \u0275\u0275elementStart(0, "div", 288);
+    \u0275\u0275listener("scroll", function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Template_div_scroll_0_listener($event) {
       \u0275\u0275restoreView(_r36);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.onChatHistoryScroll($event));
     });
-    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_For_2_Template, 2, 1, null, null, \u0275\u0275componentInstance().trackByChatMessageId, true);
-    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Conditional_3_Template, 5, 0, "div", 296);
-    \u0275\u0275conditionalCreate(4, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Conditional_4_Template, 3, 0, "div", 297);
+    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Template, 2, 1, null, null, \u0275\u0275componentInstance().trackByChatMessageId, true);
+    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_3_Template, 5, 0, "div", 289);
+    \u0275\u0275conditionalCreate(4, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_4_Template, 3, 0, "div", 290);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58881,22 +59062,22 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_
     \u0275\u0275conditional(ctx_r0.chatHistoryHasMore() && !ctx_r0.chatHistoryLoadingMore() ? 4 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_0_Conditional_8_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_0_Conditional_8_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 305);
+    \u0275\u0275elementStart(0, "span", 298);
     \u0275\u0275text(1, "\u{1F916} AI");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_0_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_0_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 299)(1, "div", 300)(2, "div", 303)(3, "p", 302);
+    \u0275\u0275elementStart(0, "div", 292)(1, "div", 293)(2, "div", 296)(3, "p", 295);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(5, "div", 304)(6, "span", 149);
+    \u0275\u0275elementStart(5, "div", 297)(6, "span", 144);
     \u0275\u0275text(7);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(8, AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_0_Conditional_8_Template, 2, 0, "span", 305);
+    \u0275\u0275conditionalCreate(8, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_0_Conditional_8_Template, 2, 0, "span", 298);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -58910,9 +59091,9 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Condi
     \u0275\u0275conditional(item_r39.type.includes("AI") ? 8 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_1_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_1_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 298)(1, "div", 300)(2, "div", 301)(3, "p", 302);
+    \u0275\u0275elementStart(0, "div", 291)(1, "div", 293)(2, "div", 294)(3, "p", 295);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(5, "p", 15);
@@ -58928,9 +59109,9 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Condi
     \u0275\u0275textInterpolate(ctx_r0.formatTimestamp(item_r39.timestamp));
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_2_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 309)(1, "div", 310);
+    \u0275\u0275elementStart(0, "div", 302)(1, "div", 303);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd()();
   }
@@ -58941,24 +59122,24 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Condi
     \u0275\u0275textInterpolate3(" ", item_r39.type, ": ", item_r39.content, " \xB7 ", ctx_r0.formatTimestamp(item_r39.timestamp), " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275conditionalCreate(0, AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_0_Template, 9, 3, "div", 299)(1, AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_1_Template, 7, 2, "div", 298)(2, AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_2_Template, 3, 3, "div", 309);
+    \u0275\u0275conditionalCreate(0, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_0_Template, 9, 3, "div", 292)(1, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_1_Template, 7, 2, "div", 291)(2, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_2_Template, 3, 3, "div", 302);
   }
   if (rf & 2) {
     const item_r39 = ctx.$implicit;
     \u0275\u0275conditional(item_r39.type.includes("Sent") || item_r39.type.includes("Message") ? 0 : item_r39.type.includes("Reply") || item_r39.type.includes("Received") ? 1 : 2);
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_11_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 293)(1, "div", 311);
+    \u0275\u0275elementStart(0, "div", 286)(1, "div", 304);
     \u0275\u0275text(2, "\u{1F4AC}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "p", 312);
+    \u0275\u0275elementStart(3, "p", 305);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "p", 313);
+    \u0275\u0275elementStart(5, "p", 306);
     \u0275\u0275text(6, "\u9EDE\u64CA\u300C\u52A0\u8F09\u5B8C\u6574\u804A\u5929\u8A18\u9304\u300D\u67E5\u770B\u6240\u6709\u5C0D\u8A71");
     \u0275\u0275elementEnd()();
   }
@@ -58968,29 +59149,29 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("noHistoryFound"));
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_12_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_12_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 294)(1, "h4", 314)(2, "span");
+    \u0275\u0275elementStart(0, "div", 287)(1, "h4", 307)(2, "span");
     \u0275\u0275text(3, "\u{1F4CA}");
     \u0275\u0275elementEnd();
     \u0275\u0275text(4, " AI \u5C0D\u8A71\u5206\u6790 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "div", 315)(6, "div", 316)(7, "p", 317);
+    \u0275\u0275elementStart(5, "div", 308)(6, "div", 309)(7, "p", 310);
     \u0275\u0275text(8, "\u7E3D\u4E92\u52D5");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "p", 126);
+    \u0275\u0275elementStart(9, "p", 121);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(11, "div", 316)(12, "p", 317);
+    \u0275\u0275elementStart(11, "div", 309)(12, "p", 310);
     \u0275\u0275text(13, "\u5C0D\u8A71\u968E\u6BB5");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "p", 318);
+    \u0275\u0275elementStart(14, "p", 311);
     \u0275\u0275text(15);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(16, "div", 316)(17, "p", 317);
+    \u0275\u0275elementStart(16, "div", 309)(17, "p", 310);
     \u0275\u0275text(18, "\u8208\u8DA3\u7A0B\u5EA6");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(19, "p", 175);
+    \u0275\u0275elementStart(19, "p", 168);
     \u0275\u0275text(20, "\u2B50\u2B50\u2B50");
     \u0275\u0275elementEnd()()()();
   }
@@ -59002,26 +59183,26 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_
     \u0275\u0275textInterpolate(lead_r21.status || "\u521D\u6B21\u63A5\u89F8");
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Conditional_29_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Template(rf, ctx) {
   if (rf & 1) {
     const _r35 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 227)(1, "div", 288)(2, "button", 289);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_29_Template_button_click_2_listener() {
+    \u0275\u0275elementStart(0, "div", 220)(1, "div", 281)(2, "button", 282);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_29_Template_button_click_2_listener() {
       \u0275\u0275restoreView(_r35);
       const lead_r21 = \u0275\u0275nextContext();
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.loadChatHistory(lead_r21.userId));
     });
-    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_3_Template, 4, 0)(4, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_4_Template, 4, 0);
+    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_3_Template, 4, 0)(4, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_4_Template, 4, 0);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_5_Template, 2, 1, "span", 149);
+    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_5_Template, 2, 1, "span", 144);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(6, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Template, 5, 2, "div", 290);
-    \u0275\u0275elementStart(7, "div", 291)(8, "div", 292);
-    \u0275\u0275repeaterCreate(9, AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Template, 3, 1, null, null, \u0275\u0275componentInstance().trackByChatMessageId, true);
+    \u0275\u0275conditionalCreate(6, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Template, 5, 2, "div", 283);
+    \u0275\u0275elementStart(7, "div", 284)(8, "div", 285);
+    \u0275\u0275repeaterCreate(9, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Template, 3, 1, null, null, \u0275\u0275componentInstance().trackByChatMessageId, true);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(11, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_11_Template, 7, 1, "div", 293);
-    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_12_Template, 21, 2, "div", 294);
+    \u0275\u0275conditionalCreate(11, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_11_Template, 7, 1, "div", 286);
+    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_12_Template, 21, 2, "div", 287);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -59043,61 +59224,61 @@ function AppComponent_Conditional_15_Conditional_184_Conditional_29_Template(rf,
     \u0275\u0275conditional(lead_r21.interactionHistory.length > 0 ? 12 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Template(rf, ctx) {
   if (rf & 1) {
     const _r20 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 207);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Template_div_click_0_listener() {
+    \u0275\u0275elementStart(0, "div", 200);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r20);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.closeLeadDetailModal());
     });
-    \u0275\u0275elementStart(1, "div", 208);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Template_div_click_1_listener($event) {
+    \u0275\u0275elementStart(1, "div", 201);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r20);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 209)(3, "div", 210)(4, "div", 211)(5, "div", 212);
+    \u0275\u0275elementStart(2, "div", 202)(3, "div", 203)(4, "div", 204)(5, "div", 205);
     \u0275\u0275text(6);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "div")(8, "div", 213)(9, "h3", 214);
-    \u0275\u0275conditionalCreate(10, AppComponent_Conditional_15_Conditional_184_Conditional_10_Template, 1, 1)(11, AppComponent_Conditional_15_Conditional_184_Conditional_11_Template, 1, 2)(12, AppComponent_Conditional_15_Conditional_184_Conditional_12_Template, 2, 5);
+    \u0275\u0275elementStart(7, "div")(8, "div", 206)(9, "h3", 207);
+    \u0275\u0275conditionalCreate(10, AppComponent_Conditional_15_Conditional_179_Conditional_10_Template, 1, 1)(11, AppComponent_Conditional_15_Conditional_179_Conditional_11_Template, 1, 2)(12, AppComponent_Conditional_15_Conditional_179_Conditional_12_Template, 2, 5);
     \u0275\u0275elementEnd();
-    \u0275\u0275element(13, "span", 215);
+    \u0275\u0275element(13, "span", 208);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_184_Conditional_14_Template, 2, 1, "p", 216);
-    \u0275\u0275elementStart(15, "div", 217);
-    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_184_Conditional_16_Template, 3, 5, "span", 218);
-    \u0275\u0275conditionalCreate(17, AppComponent_Conditional_15_Conditional_184_Conditional_17_Template, 3, 5, "span", 219);
-    \u0275\u0275conditionalCreate(18, AppComponent_Conditional_15_Conditional_184_Conditional_18_Template, 2, 4, "span", 220);
+    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_179_Conditional_14_Template, 2, 1, "p", 209);
+    \u0275\u0275elementStart(15, "div", 210);
+    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_179_Conditional_16_Template, 3, 5, "span", 211);
+    \u0275\u0275conditionalCreate(17, AppComponent_Conditional_15_Conditional_179_Conditional_17_Template, 3, 5, "span", 212);
+    \u0275\u0275conditionalCreate(18, AppComponent_Conditional_15_Conditional_179_Conditional_18_Template, 2, 4, "span", 213);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(19, "button", 221);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Template_button_click_19_listener() {
+    \u0275\u0275elementStart(19, "button", 214);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_button_click_19_listener() {
       \u0275\u0275restoreView(_r20);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.closeLeadDetailModal());
     });
     \u0275\u0275text(20, "\u2715");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(21, "div", 222)(22, "nav", 223)(23, "a", 224);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Template_a_click_23_listener() {
+    \u0275\u0275elementStart(21, "div", 215)(22, "nav", 216)(23, "a", 217);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_a_click_23_listener() {
       \u0275\u0275restoreView(_r20);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.leadDetailView.set("sendMessage"));
     });
     \u0275\u0275text(24);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(25, "a", 224);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Template_a_click_25_listener() {
+    \u0275\u0275elementStart(25, "a", 217);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_a_click_25_listener() {
       \u0275\u0275restoreView(_r20);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.leadDetailView.set("history"));
     });
     \u0275\u0275text(26);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(27, "div", 225);
-    \u0275\u0275conditionalCreate(28, AppComponent_Conditional_15_Conditional_184_Conditional_28_Template, 52, 31, "div", 226);
-    \u0275\u0275conditionalCreate(29, AppComponent_Conditional_15_Conditional_184_Conditional_29_Template, 13, 6, "div", 227);
+    \u0275\u0275elementStart(27, "div", 218);
+    \u0275\u0275conditionalCreate(28, AppComponent_Conditional_15_Conditional_179_Conditional_28_Template, 52, 31, "div", 219);
+    \u0275\u0275conditionalCreate(29, AppComponent_Conditional_15_Conditional_179_Conditional_29_Template, 13, 6, "div", 220);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -59131,12 +59312,12 @@ function AppComponent_Conditional_15_Conditional_184_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.leadDetailView() === "history" ? 29 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_185_Conditional_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_180_Conditional_14_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 332);
+    \u0275\u0275elementStart(0, "div", 325);
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(1, "svg", 335);
-    \u0275\u0275element(2, "circle", 336)(3, "path", 337);
+    \u0275\u0275elementStart(1, "svg", 328);
+    \u0275\u0275element(2, "circle", 329)(3, "path", 330);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(4, "p");
@@ -59144,16 +59325,16 @@ function AppComponent_Conditional_15_Conditional_185_Conditional_14_Template(rf,
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Conditional_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_14_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 342);
+    \u0275\u0275elementStart(0, "span", 335);
     \u0275\u0275text(1, "\uFF08\u5DF2\u64A4\u92B7\uFF09");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Conditional_19_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_19_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 343);
+    \u0275\u0275elementStart(0, "span", 336);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -59163,11 +59344,11 @@ function AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Condit
     \u0275\u0275textInterpolate1("", op_r41.failureCount, " \u5931\u6557");
   }
 }
-function AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Conditional_20_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_20_Template(rf, ctx) {
   if (rf & 1) {
     const _r42 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 345);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Conditional_20_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 338);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_20_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r42);
       const op_r41 = \u0275\u0275nextContext().$implicit;
       const ctx_r0 = \u0275\u0275nextContext(4);
@@ -59177,27 +59358,27 @@ function AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Condit
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 339)(1, "div", 147)(2, "div", 64)(3, "div", 340);
+    \u0275\u0275elementStart(0, "div", 332)(1, "div", 142)(2, "div", 64)(3, "div", 333);
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(4, "svg", 133);
-    \u0275\u0275element(5, "rect", 88)(6, "rect", 89)(7, "rect", 90)(8, "rect", 91);
+    \u0275\u0275elementStart(4, "svg", 128);
+    \u0275\u0275element(5, "rect", 83)(6, "rect", 84)(7, "rect", 85)(8, "rect", 86);
     \u0275\u0275elementEnd()();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(9, "div")(10, "p", 341);
+    \u0275\u0275elementStart(9, "div")(10, "p", 334);
     \u0275\u0275text(11);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "p", 149);
+    \u0275\u0275elementStart(12, "p", 144);
     \u0275\u0275text(13);
-    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Conditional_14_Template, 2, 0, "span", 342);
+    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_14_Template, 2, 0, "span", 335);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(15, "div", 64)(16, "div", 302)(17, "span", 280);
+    \u0275\u0275elementStart(15, "div", 64)(16, "div", 295)(17, "span", 273);
     \u0275\u0275text(18);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Conditional_19_Template, 2, 1, "span", 343);
+    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_19_Template, 2, 1, "span", 336);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Conditional_20_Template, 2, 0, "button", 344);
+    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_20_Template, 2, 0, "button", 337);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -59222,10 +59403,10 @@ function AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Templa
     \u0275\u0275conditional(op_r41.isReversible && !op_r41.reversed ? 20 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_185_Conditional_15_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_180_Conditional_15_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 238);
-    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Template, 21, 21, "div", 338, _forTrack024);
+    \u0275\u0275elementStart(0, "div", 231);
+    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Template, 21, 21, "div", 331, _forTrack024);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -59234,44 +59415,44 @@ function AppComponent_Conditional_15_Conditional_185_Conditional_15_Template(rf,
     \u0275\u0275repeater(ctx_r0.batchOperationHistory());
   }
 }
-function AppComponent_Conditional_15_Conditional_185_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_180_Template(rf, ctx) {
   if (rf & 1) {
     const _r40 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 319);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_div_click_0_listener() {
+    \u0275\u0275elementStart(0, "div", 312);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r40);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBatchOperationHistory.set(false));
     });
-    \u0275\u0275elementStart(1, "div", 320);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_div_click_1_listener($event) {
+    \u0275\u0275elementStart(1, "div", 313);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r40);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 321)(3, "h3", 322);
+    \u0275\u0275elementStart(2, "div", 314)(3, "h3", 315);
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(4, "svg", 323);
-    \u0275\u0275element(5, "path", 324)(6, "path", 325)(7, "path", 326);
+    \u0275\u0275elementStart(4, "svg", 316);
+    \u0275\u0275element(5, "path", 317)(6, "path", 318)(7, "path", 319);
     \u0275\u0275elementEnd();
     \u0275\u0275text(8, " \u6279\u91CF\u64CD\u4F5C\u6B77\u53F2 ");
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(9, "button", 327);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_button_click_9_listener() {
+    \u0275\u0275elementStart(9, "button", 320);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Template_button_click_9_listener() {
       \u0275\u0275restoreView(_r40);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBatchOperationHistory.set(false));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(10, "svg", 328);
-    \u0275\u0275element(11, "line", 329)(12, "line", 330);
+    \u0275\u0275elementStart(10, "svg", 321);
+    \u0275\u0275element(11, "line", 322)(12, "line", 323);
     \u0275\u0275elementEnd()()();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(13, "div", 331);
-    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_185_Conditional_14_Template, 6, 0, "div", 332)(15, AppComponent_Conditional_15_Conditional_185_Conditional_15_Template, 3, 0, "div", 238);
+    \u0275\u0275elementStart(13, "div", 324);
+    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_180_Conditional_14_Template, 6, 0, "div", 325)(15, AppComponent_Conditional_15_Conditional_180_Conditional_15_Template, 3, 0, "div", 231);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(16, "div", 333)(17, "button", 334);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_button_click_17_listener() {
+    \u0275\u0275elementStart(16, "div", 326)(17, "button", 327);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Template_button_click_17_listener() {
       \u0275\u0275restoreView(_r40);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBatchOperationHistory.set(false));
@@ -59285,45 +59466,45 @@ function AppComponent_Conditional_15_Conditional_185_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.batchOperationHistory().length === 0 ? 14 : 15);
   }
 }
-function AppComponent_Conditional_15_Conditional_186_Case_12_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_12_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 353)(1, "div", 359)(2, "div", 360)(3, "div", 361);
+    \u0275\u0275elementStart(0, "div", 346)(1, "div", 352)(2, "div", 353)(3, "div", 354);
     \u0275\u0275text(4, "\u{1F916}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "div", 362);
+    \u0275\u0275elementStart(5, "div", 355);
     \u0275\u0275text(6, "AI \u81EA\u52D5\u56DE\u8986");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(7, "div", 14);
     \u0275\u0275text(8, "\u667A\u80FD\u5BA2\u670D\u52A9\u624B");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(9, "div", 360)(10, "div", 361);
+    \u0275\u0275elementStart(9, "div", 353)(10, "div", 354);
     \u0275\u0275text(11, "\u{1F50D}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "div", 362);
+    \u0275\u0275elementStart(12, "div", 355);
     \u0275\u0275text(13, "\u8CC7\u6E90\u767C\u73FE");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(14, "div", 14);
     \u0275\u0275text(15, "\u81EA\u52D5\u641C\u7D22\u7FA4\u7D44");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(16, "div", 360)(17, "div", 361);
+    \u0275\u0275elementStart(16, "div", 353)(17, "div", 354);
     \u0275\u0275text(18, "\u{1F4CA}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(19, "div", 362);
+    \u0275\u0275elementStart(19, "div", 355);
     \u0275\u0275text(20, "\u6578\u64DA\u5206\u6790");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(21, "div", 14);
     \u0275\u0275text(22, "\u8F49\u5316\u8FFD\u8E64\u5831\u8868");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(23, "p", 363);
+    \u0275\u0275elementStart(23, "p", 356);
     \u0275\u0275text(24, " TG-AI\u667A\u63A7\u738B \u5C07\u5E6B\u52A9\u60A8\u81EA\u52D5\u5316 Telegram \u71DF\u92B7\u6D41\u7A0B\uFF0C");
     \u0275\u0275element(25, "br");
     \u0275\u0275text(26, " \u8B93\u60A8\u5C08\u6CE8\u65BC\u696D\u52D9\u589E\u9577\u800C\u975E\u91CD\u8907\u64CD\u4F5C\u3002 ");
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_3_For_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_For_2_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "option", 253);
+    \u0275\u0275elementStart(0, "option", 246);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -59334,16 +59515,16 @@ function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Cond
     \u0275\u0275textInterpolate(model_r46);
   }
 }
-function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
     const _r45 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "select", 372);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_3_Template_select_ngModelChange_0_listener($event) {
+    \u0275\u0275elementStart(0, "select", 365);
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_Template_select_ngModelChange_0_listener($event) {
       \u0275\u0275restoreView(_r45);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.localAiModel.set($event));
     });
-    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_3_For_2_Template, 2, 2, "option", 253, \u0275\u0275repeaterTrackByIdentity);
+    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_For_2_Template, 2, 2, "option", 246, \u0275\u0275repeaterTrackByIdentity);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -59353,11 +59534,11 @@ function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Cond
     \u0275\u0275repeater(ctx_r0.detectedOllamaModels());
   }
 }
-function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     const _r47 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "input", 373);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_4_Template_input_ngModelChange_0_listener($event) {
+    \u0275\u0275elementStart(0, "input", 366);
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_4_Template_input_ngModelChange_0_listener($event) {
       \u0275\u0275restoreView(_r47);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.localAiModel.set($event));
@@ -59369,12 +59550,12 @@ function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Cond
     \u0275\u0275property("ngModel", ctx_r0.localAiModel());
   }
 }
-function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 360)(1, "label", 369);
+    \u0275\u0275elementStart(0, "div", 353)(1, "label", 362);
     \u0275\u0275text(2, "\u9078\u64C7 AI \u6A21\u578B");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_3_Template, 3, 1, "select", 370)(4, AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_4_Template, 1, 1, "input", 371);
+    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_Template, 3, 1, "select", 363)(4, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_4_Template, 1, 1, "input", 364);
     \u0275\u0275elementStart(5, "p", 15);
     \u0275\u0275text(6, "\u63A8\u85A6\uFF1Aqwen2:7b\uFF08\u4E2D\u82F1\u6587\u901A\u7528\uFF09");
     \u0275\u0275elementEnd()();
@@ -59385,19 +59566,19 @@ function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Temp
     \u0275\u0275conditional(ctx_r0.detectedOllamaModels().length > 0 ? 3 : 4);
   }
 }
-function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_16_Conditional_16_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
     const _r49 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 379)(1, "select", 380);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_16_Conditional_16_Template_select_ngModelChange_1_listener($event) {
+    \u0275\u0275elementStart(0, "div", 372)(1, "select", 373);
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Conditional_16_Template_select_ngModelChange_1_listener($event) {
       \u0275\u0275restoreView(_r49);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.aiBackupProvider.set($event));
     });
-    \u0275\u0275elementStart(2, "option", 381);
+    \u0275\u0275elementStart(2, "option", 374);
     \u0275\u0275text(3, "Google Gemini\uFF08\u514D\u8CBB\u984D\u5EA6\uFF09");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "option", 382);
+    \u0275\u0275elementStart(4, "option", 375);
     \u0275\u0275text(5, "OpenAI GPT");
     \u0275\u0275elementEnd()()();
   }
@@ -59407,33 +59588,33 @@ function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_16_Cond
     \u0275\u0275property("ngModel", ctx_r0.aiBackupProvider());
   }
 }
-function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_16_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
     const _r48 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 360)(1, "div", 374)(2, "p", 177);
+    \u0275\u0275elementStart(0, "div", 353)(1, "div", 367)(2, "p", 170);
     \u0275\u0275text(3, "\u{1F4E6} \u5B89\u88DD Ollama\uFF08\u514D\u8CBB\uFF09\uFF1A");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "code", 375);
+    \u0275\u0275elementStart(4, "code", 368);
     \u0275\u0275text(5, " curl -fsSL https://ollama.com/install.sh | sh ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "p", 149);
+    \u0275\u0275elementStart(6, "p", 144);
     \u0275\u0275text(7, " \u5B89\u88DD\u5F8C\u904B\u884C ");
-    \u0275\u0275elementStart(8, "code", 267);
+    \u0275\u0275elementStart(8, "code", 260);
     \u0275\u0275text(9, "ollama pull qwen2:7b");
     \u0275\u0275elementEnd();
     \u0275\u0275text(10, " \u4E0B\u8F09\u6A21\u578B ");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(11, "div", 360)(12, "label", 376)(13, "input", 377);
-    \u0275\u0275listener("change", function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_16_Template_input_change_13_listener() {
+    \u0275\u0275elementStart(11, "div", 353)(12, "label", 369)(13, "input", 370);
+    \u0275\u0275listener("change", function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Template_input_change_13_listener() {
       \u0275\u0275restoreView(_r48);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.aiAutoFallback.set(!ctx_r0.aiAutoFallback()));
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "span", 378);
+    \u0275\u0275elementStart(14, "span", 371);
     \u0275\u0275text(15, "\u4F7F\u7528\u96F2\u7AEF AI \u4F5C\u70BA\u5099\u9078");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_16_Conditional_16_Template, 6, 1, "div", 379);
+    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Conditional_16_Template, 6, 1, "div", 372);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -59444,30 +59625,30 @@ function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_16_Temp
     \u0275\u0275conditional(ctx_r0.aiAutoFallback() ? 16 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_186_Case_13_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_13_Template(rf, ctx) {
   if (rf & 1) {
     const _r44 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 226)(1, "h3", 364);
+    \u0275\u0275elementStart(0, "div", 219)(1, "h3", 357);
     \u0275\u0275text(2, "\u{1F999} AI \u670D\u52D9\u914D\u7F6E");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "div", 365)(4, "div", 147)(5, "div", 64)(6, "span", 366);
+    \u0275\u0275elementStart(3, "div", 358)(4, "div", 142)(5, "div", 64)(6, "span", 359);
     \u0275\u0275text(7);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "div")(9, "div", 367);
+    \u0275\u0275elementStart(8, "div")(9, "div", 360);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(11, "div", 32);
     \u0275\u0275text(12);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(13, "button", 368);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_186_Case_13_Template_button_click_13_listener() {
+    \u0275\u0275elementStart(13, "button", 361);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Case_13_Template_button_click_13_listener() {
       \u0275\u0275restoreView(_r44);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.detectOllama());
     });
     \u0275\u0275text(14);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275conditionalCreate(15, AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Template, 7, 1, "div", 360)(16, AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_16_Template, 17, 2);
+    \u0275\u0275conditionalCreate(15, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Template, 7, 1, "div", 353)(16, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Template, 17, 2);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -59488,7 +59669,7 @@ function AppComponent_Conditional_15_Conditional_186_Case_13_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.ollamaDetected() ? 15 : 16);
   }
 }
-function AppComponent_Conditional_15_Conditional_186_Case_14_Conditional_13_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_14_Conditional_13_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "p");
     \u0275\u0275text(1);
@@ -59500,23 +59681,23 @@ function AppComponent_Conditional_15_Conditional_186_Case_14_Conditional_13_Temp
     \u0275\u0275textInterpolate1("\u2705 \u6A21\u578B\uFF1A", ctx_r0.localAiModel());
   }
 }
-function AppComponent_Conditional_15_Conditional_186_Case_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_14_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 353)(1, "div", 383);
+    \u0275\u0275elementStart(0, "div", 346)(1, "div", 376);
     \u0275\u0275text(2, "\u{1F389}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "h3", 384);
+    \u0275\u0275elementStart(3, "h3", 377);
     \u0275\u0275text(4, "\u8A2D\u7F6E\u5B8C\u6210\uFF01");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "p", 363);
+    \u0275\u0275elementStart(5, "p", 356);
     \u0275\u0275text(6, " \u60A8\u5DF2\u6E96\u5099\u597D\u958B\u59CB\u4F7F\u7528 TG-AI\u667A\u63A7\u738B\u3002");
     \u0275\u0275element(7, "br");
     \u0275\u0275text(8, " \u63A5\u4E0B\u4F86\u8ACB\u6DFB\u52A0\u60A8\u7684\u7B2C\u4E00\u500B Telegram \u5E33\u865F\u3002 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "div", 385)(10, "div", 386)(11, "p");
+    \u0275\u0275elementStart(9, "div", 378)(10, "div", 379)(11, "p");
     \u0275\u0275text(12);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(13, AppComponent_Conditional_15_Conditional_186_Case_14_Conditional_13_Template, 2, 1, "p");
+    \u0275\u0275conditionalCreate(13, AppComponent_Conditional_15_Conditional_181_Case_14_Conditional_13_Template, 2, 1, "p");
     \u0275\u0275elementStart(14, "p");
     \u0275\u0275text(15);
     \u0275\u0275elementEnd()()()();
@@ -59531,11 +59712,11 @@ function AppComponent_Conditional_15_Conditional_186_Case_14_Template(rf, ctx) {
     \u0275\u0275textInterpolate1("\u2705 \u81EA\u52D5\u964D\u7D1A\uFF1A", ctx_r0.aiAutoFallback() ? "\u5DF2\u555F\u7528" : "\u5DF2\u7981\u7528");
   }
 }
-function AppComponent_Conditional_15_Conditional_186_Conditional_19_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Conditional_19_Template(rf, ctx) {
   if (rf & 1) {
     const _r50 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 387);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_186_Conditional_19_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 380);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Conditional_19_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r50);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.welcomeStep.set(ctx_r0.welcomeStep() - 1));
@@ -59544,11 +59725,11 @@ function AppComponent_Conditional_15_Conditional_186_Conditional_19_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_186_Conditional_20_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Conditional_20_Template(rf, ctx) {
   if (rf & 1) {
     const _r51 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 388);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_186_Conditional_20_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 381);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Conditional_20_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r51);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.welcomeStep.set(ctx_r0.welcomeStep() + 1));
@@ -59557,11 +59738,11 @@ function AppComponent_Conditional_15_Conditional_186_Conditional_20_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_186_Conditional_21_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Conditional_21_Template(rf, ctx) {
   if (rf & 1) {
     const _r52 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 389);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_186_Conditional_21_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 382);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Conditional_21_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r52);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.completeFirstRunSetup());
@@ -59570,32 +59751,32 @@ function AppComponent_Conditional_15_Conditional_186_Conditional_21_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_186_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Template(rf, ctx) {
   if (rf & 1) {
     const _r43 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 115)(1, "div", 346)(2, "div", 347)(3, "h1", 348);
+    \u0275\u0275elementStart(0, "div", 110)(1, "div", 339)(2, "div", 340)(3, "h1", 341);
     \u0275\u0275text(4, "\u{1F680} \u6B61\u8FCE\u4F7F\u7528 TG-AI\u667A\u63A7\u738B");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "p", 349);
+    \u0275\u0275elementStart(5, "p", 342);
     \u0275\u0275text(6, "AI \u9A45\u52D5\u7684 Telegram \u71DF\u92B7\u81EA\u52D5\u5316\u5E73\u53F0");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "div", 350);
-    \u0275\u0275element(8, "div", 351)(9, "div", 351)(10, "div", 351);
+    \u0275\u0275elementStart(7, "div", 343);
+    \u0275\u0275element(8, "div", 344)(9, "div", 344)(10, "div", 344);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "div", 352);
-    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_186_Case_12_Template, 27, 0, "div", 353)(13, AppComponent_Conditional_15_Conditional_186_Case_13_Template, 17, 8, "div", 226)(14, AppComponent_Conditional_15_Conditional_186_Case_14_Template, 16, 3, "div", 353);
+    \u0275\u0275elementStart(11, "div", 345);
+    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_181_Case_12_Template, 27, 0, "div", 346)(13, AppComponent_Conditional_15_Conditional_181_Case_13_Template, 17, 8, "div", 219)(14, AppComponent_Conditional_15_Conditional_181_Case_14_Template, 16, 3, "div", 346);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(15, "div", 354)(16, "button", 355);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_186_Template_button_click_16_listener() {
+    \u0275\u0275elementStart(15, "div", 347)(16, "button", 348);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Template_button_click_16_listener() {
       \u0275\u0275restoreView(_r43);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.skipFirstRunSetup());
     });
     \u0275\u0275text(17, " \u8DF3\u904E\u8A2D\u7F6E ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(18, "div", 250);
-    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_186_Conditional_19_Template, 2, 0, "button", 356);
-    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_186_Conditional_20_Template, 2, 0, "button", 357)(21, AppComponent_Conditional_15_Conditional_186_Conditional_21_Template, 2, 0, "button", 358);
+    \u0275\u0275elementStart(18, "div", 243);
+    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_181_Conditional_19_Template, 2, 0, "button", 349);
+    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_181_Conditional_20_Template, 2, 0, "button", 350)(21, AppComponent_Conditional_15_Conditional_181_Conditional_21_Template, 2, 0, "button", 351);
     \u0275\u0275elementEnd()()()();
   }
   if (rf & 2) {
@@ -59615,9 +59796,9 @@ function AppComponent_Conditional_15_Conditional_186_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.welcomeStep() < 3 ? 20 : 21);
   }
 }
-function AppComponent_Conditional_15_Conditional_187_For_14_Conditional_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_182_For_14_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "p", 405);
+    \u0275\u0275elementStart(0, "p", 398);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -59627,22 +59808,22 @@ function AppComponent_Conditional_15_Conditional_187_For_14_Conditional_7_Templa
     \u0275\u0275textInterpolate2(" \u2713 \u6709\u5143\u6578\u64DA: ", session_r54.metadata.firstName || "", " ", session_r54.metadata.username ? "@" + session_r54.metadata.username : "", " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_187_For_14_Conditional_8_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_182_For_14_Conditional_8_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "p", 406);
+    \u0275\u0275elementStart(0, "p", 399);
     \u0275\u0275text(1, "\u26A0 \u7121\u5143\u6578\u64DA\uFF0C\u9700\u8981\u91CD\u65B0\u767B\u9304\u9A57\u8B49");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_187_For_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_182_For_14_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 398)(1, "div", 64)(2, "span", 366);
+    \u0275\u0275elementStart(0, "div", 391)(1, "div", 64)(2, "span", 359);
     \u0275\u0275text(3, "\u{1F4F1}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "div")(5, "p", 404);
+    \u0275\u0275elementStart(4, "div")(5, "p", 397);
     \u0275\u0275text(6);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_187_For_14_Conditional_7_Template, 2, 2, "p", 405)(8, AppComponent_Conditional_15_Conditional_187_For_14_Conditional_8_Template, 2, 0, "p", 406);
+    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_182_For_14_Conditional_7_Template, 2, 2, "p", 398)(8, AppComponent_Conditional_15_Conditional_182_For_14_Conditional_8_Template, 2, 0, "p", 399);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -59653,9 +59834,9 @@ function AppComponent_Conditional_15_Conditional_187_For_14_Template(rf, ctx) {
     \u0275\u0275conditional(session_r54.hasMetadata && session_r54.metadata ? 7 : 8);
   }
 }
-function AppComponent_Conditional_15_Conditional_187_Conditional_25_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_182_Conditional_25_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 268);
+    \u0275\u0275elementStart(0, "span", 261);
     \u0275\u0275text(1, "\u23F3");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(2, "span");
@@ -59663,7 +59844,7 @@ function AppComponent_Conditional_15_Conditional_187_Conditional_25_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_187_Conditional_26_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_182_Conditional_26_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span");
     \u0275\u0275text(1, "\u{1F504}");
@@ -59673,46 +59854,46 @@ function AppComponent_Conditional_15_Conditional_187_Conditional_26_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_187_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_182_Template(rf, ctx) {
   if (rf & 1) {
     const _r53 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 115)(1, "div", 390)(2, "div", 391)(3, "div", 392);
+    \u0275\u0275elementStart(0, "div", 110)(1, "div", 383)(2, "div", 384)(3, "div", 385);
     \u0275\u0275text(4, "\u{1F504}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "h2", 393);
+    \u0275\u0275elementStart(5, "h2", 386);
     \u0275\u0275text(6, "\u767C\u73FE\u53EF\u6062\u5FA9\u7684\u5E33\u865F");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "p", 394);
+    \u0275\u0275elementStart(7, "p", 387);
     \u0275\u0275text(8);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(9, "div", 395)(10, "p", 396);
+    \u0275\u0275elementStart(9, "div", 388)(10, "p", 389);
     \u0275\u0275text(11, " \u9019\u4E9B Session \u6587\u4EF6\u5B58\u5728\u65BC\u7CFB\u7D71\u4E2D\uFF0C\u4F46\u672A\u5728\u6578\u64DA\u5EAB\u4E2D\u627E\u5230\u5C0D\u61C9\u7684\u5E33\u865F\u8A18\u9304\u3002 \u60A8\u53EF\u4EE5\u5617\u8A66\u6062\u5FA9\u9019\u4E9B\u5E33\u865F\uFF0C\u6216\u9078\u64C7\u5FFD\u7565\u3002 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "div", 397);
-    \u0275\u0275repeaterCreate(13, AppComponent_Conditional_15_Conditional_187_For_14_Template, 9, 2, "div", 398, _forTrack25);
+    \u0275\u0275elementStart(12, "div", 390);
+    \u0275\u0275repeaterCreate(13, AppComponent_Conditional_15_Conditional_182_For_14_Template, 9, 2, "div", 391, _forTrack25);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(15, "div", 399)(16, "p", 400);
+    \u0275\u0275elementStart(15, "div", 392)(16, "p", 393);
     \u0275\u0275text(17, " \u{1F4A1} ");
     \u0275\u0275elementStart(18, "strong");
     \u0275\u0275text(19, "\u63D0\u793A\uFF1A");
     \u0275\u0275elementEnd();
     \u0275\u0275text(20, " \u6062\u5FA9\u5F8C\uFF0C\u5E33\u865F\u5C07\u4EE5\u300C\u96E2\u7DDA\u300D\u72C0\u614B\u6DFB\u52A0\u5230\u5217\u8868\u4E2D\u3002 \u60A8\u9700\u8981\u9EDE\u64CA\u300C\u767B\u9304\u300D\u4F86\u91CD\u65B0\u9023\u63A5\u5E33\u865F\u3002 ");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(21, "div", 401)(22, "button", 402);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_187_Template_button_click_22_listener() {
+    \u0275\u0275elementStart(21, "div", 394)(22, "button", 395);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_182_Template_button_click_22_listener() {
       \u0275\u0275restoreView(_r53);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.dismissOrphanSessionDialog());
     });
     \u0275\u0275text(23, " \u7A0D\u5F8C\u8655\u7406 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(24, "button", 403);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_187_Template_button_click_24_listener() {
+    \u0275\u0275elementStart(24, "button", 396);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_182_Template_button_click_24_listener() {
       \u0275\u0275restoreView(_r53);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.recoverOrphanSessions());
     });
-    \u0275\u0275conditionalCreate(25, AppComponent_Conditional_15_Conditional_187_Conditional_25_Template, 4, 0)(26, AppComponent_Conditional_15_Conditional_187_Conditional_26_Template, 4, 0);
+    \u0275\u0275conditionalCreate(25, AppComponent_Conditional_15_Conditional_182_Conditional_25_Template, 4, 0)(26, AppComponent_Conditional_15_Conditional_182_Conditional_26_Template, 4, 0);
     \u0275\u0275elementEnd()()()();
   }
   if (rf & 2) {
@@ -59727,9 +59908,9 @@ function AppComponent_Conditional_15_Conditional_187_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.isRecoveringOrphanSessions() ? 25 : 26);
   }
 }
-function AppComponent_Conditional_15_Conditional_188_Conditional_41_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_183_Conditional_41_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 415)(1, "p", 416)(2, "span", 177);
+    \u0275\u0275elementStart(0, "div", 408)(1, "p", 409)(2, "span", 170);
     \u0275\u0275text(3, "\u932F\u8AA4\u8A73\u60C5\uFF1A");
     \u0275\u0275elementEnd();
     \u0275\u0275text(4);
@@ -59741,55 +59922,55 @@ function AppComponent_Conditional_15_Conditional_188_Conditional_41_Template(rf,
     \u0275\u0275textInterpolate1(" ", ctx_r0.backendError(), " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_188_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_183_Template(rf, ctx) {
   if (rf & 1) {
     const _r55 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 115)(1, "div", 407)(2, "div", 408)(3, "div", 392);
+    \u0275\u0275elementStart(0, "div", 110)(1, "div", 400)(2, "div", 401)(3, "div", 385);
     \u0275\u0275text(4, "\u26A0\uFE0F");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "h2", 409);
+    \u0275\u0275elementStart(5, "h2", 402);
     \u0275\u0275text(6, "Python \u5F8C\u7AEF\u672A\u904B\u884C");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "div", 395)(8, "p", 363);
+    \u0275\u0275elementStart(7, "div", 388)(8, "p", 356);
     \u0275\u0275text(9, " \u7A0B\u5E8F\u9700\u8981 Python \u74B0\u5883\u624D\u80FD\u6B63\u5E38\u904B\u884C\u3002\u8ACB\u78BA\u4FDD\uFF1A ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(10, "div", 410)(11, "div", 411)(12, "span", 267);
+    \u0275\u0275elementStart(10, "div", 403)(11, "div", 404)(12, "span", 260);
     \u0275\u0275text(13, "1.");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "div")(15, "p", 404);
+    \u0275\u0275elementStart(14, "div")(15, "p", 397);
     \u0275\u0275text(16, "\u5B89\u88DD Python 3.9+");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "a", 412);
+    \u0275\u0275elementStart(17, "a", 405);
     \u0275\u0275text(18, " https://www.python.org/downloads/ ");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(19, "div", 411)(20, "span", 267);
+    \u0275\u0275elementStart(19, "div", 404)(20, "span", 260);
     \u0275\u0275text(21, "2.");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(22, "div")(23, "p", 404);
+    \u0275\u0275elementStart(22, "div")(23, "p", 397);
     \u0275\u0275text(24, '\u5B89\u88DD\u6642\u52FE\u9078 "Add Python to PATH"');
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(25, "p", 413);
+    \u0275\u0275elementStart(25, "p", 406);
     \u0275\u0275text(26, "\u78BA\u4FDD Python \u6DFB\u52A0\u5230\u7CFB\u7D71\u74B0\u5883\u8B8A\u91CF");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(27, "div", 411)(28, "span", 267);
+    \u0275\u0275elementStart(27, "div", 404)(28, "span", 260);
     \u0275\u0275text(29, "3.");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(30, "div")(31, "p", 404);
+    \u0275\u0275elementStart(30, "div")(31, "p", 397);
     \u0275\u0275text(32, "\u5B89\u88DD\u4F9D\u8CF4");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(33, "code", 414);
+    \u0275\u0275elementStart(33, "code", 407);
     \u0275\u0275text(34, " pip install pyrogram tgcrypto aiosqlite ");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(35, "div", 411)(36, "span", 267);
+    \u0275\u0275elementStart(35, "div", 404)(36, "span", 260);
     \u0275\u0275text(37, "4.");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(38, "div")(39, "p", 404);
+    \u0275\u0275elementStart(38, "div")(39, "p", 397);
     \u0275\u0275text(40, "\u91CD\u65B0\u555F\u52D5\u7A0B\u5E8F");
     \u0275\u0275elementEnd()()()();
-    \u0275\u0275conditionalCreate(41, AppComponent_Conditional_15_Conditional_188_Conditional_41_Template, 5, 1, "div", 415);
+    \u0275\u0275conditionalCreate(41, AppComponent_Conditional_15_Conditional_183_Conditional_41_Template, 5, 1, "div", 408);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(42, "div", 401)(43, "button", 402);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_188_Template_button_click_43_listener() {
+    \u0275\u0275elementStart(42, "div", 394)(43, "button", 395);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_183_Template_button_click_43_listener() {
       \u0275\u0275restoreView(_r55);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBackendErrorDialog.set(false));
@@ -59803,69 +59984,69 @@ function AppComponent_Conditional_15_Conditional_188_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.backendError() ? 41 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_189_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Template(rf, ctx) {
   if (rf & 1) {
     const _r56 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 417);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_189_Template_div_click_0_listener() {
+    \u0275\u0275elementStart(0, "div", 410);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r56);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBackendErrorDialog.set(true));
     });
-    \u0275\u0275elementStart(1, "span", 154);
+    \u0275\u0275elementStart(1, "span", 149);
     \u0275\u0275text(2, "\u26A0\uFE0F");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 237);
+    \u0275\u0275elementStart(3, "span", 230);
     \u0275\u0275text(4, "Python \u5F8C\u7AEF\u672A\u904B\u884C");
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_190_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_185_Template(rf, ctx) {
   if (rf & 1) {
     const _r57 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 418);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_190_Template_div_click_0_listener() {
+    \u0275\u0275elementStart(0, "div", 411);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.cancelNewKeywordSet());
     });
-    \u0275\u0275elementStart(1, "div", 419);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_190_Template_div_click_1_listener($event) {
+    \u0275\u0275elementStart(1, "div", 412);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r57);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 420)(3, "h2", 421)(4, "span");
+    \u0275\u0275elementStart(2, "div", 413)(3, "h2", 414)(4, "span");
     \u0275\u0275text(5, "\u{1F511}");
     \u0275\u0275elementEnd();
     \u0275\u0275text(6, " \u5275\u5EFA\u95DC\u9375\u8A5E\u96C6 ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "div", 352)(8, "label", 422);
+    \u0275\u0275elementStart(7, "div", 345)(8, "label", 415);
     \u0275\u0275text(9, "\u95DC\u9375\u8A5E\u96C6\u540D\u7A31");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(10, "input", 423);
-    \u0275\u0275listener("input", function AppComponent_Conditional_15_Conditional_190_Template_input_input_10_listener($event) {
+    \u0275\u0275elementStart(10, "input", 416);
+    \u0275\u0275listener("input", function AppComponent_Conditional_15_Conditional_185_Template_input_input_10_listener($event) {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.newKeywordSet.set({ name: $event.target.value }));
-    })("keyup.enter", function AppComponent_Conditional_15_Conditional_190_Template_input_keyup_enter_10_listener() {
+    })("keyup.enter", function AppComponent_Conditional_15_Conditional_185_Template_input_keyup_enter_10_listener() {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.submitNewKeywordSet());
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "p", 313);
+    \u0275\u0275elementStart(11, "p", 306);
     \u0275\u0275text(12, " \u{1F4A1} \u5275\u5EFA\u5F8C\u53EF\u5728\u8A5E\u96C6\u4E2D\u6DFB\u52A0\u591A\u500B\u95DC\u9375\u8A5E ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(13, "div", 401)(14, "button", 402);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_190_Template_button_click_14_listener() {
+    \u0275\u0275elementStart(13, "div", 394)(14, "button", 395);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_button_click_14_listener() {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.cancelNewKeywordSet());
     });
     \u0275\u0275text(15, " \u53D6\u6D88 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(16, "button", 424);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_190_Template_button_click_16_listener() {
+    \u0275\u0275elementStart(16, "button", 417);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_button_click_16_listener() {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.submitNewKeywordSet());
@@ -59934,217 +60115,216 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275text(38);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(39, "div", 72);
-    \u0275\u0275conditionalCreate(40, AppComponent_Conditional_15_Case_40_Template, 5, 1, "span", 73)(41, AppComponent_Conditional_15_Case_41_Template, 5, 1, "span", 74)(42, AppComponent_Conditional_15_Case_42_Template, 5, 1, "span", 75)(43, AppComponent_Conditional_15_Case_43_Template, 5, 1, "span", 76)(44, AppComponent_Conditional_15_Case_44_Template, 5, 1, "span", 77)(45, AppComponent_Conditional_15_Case_45_Template, 5, 1, "span", 78);
+    \u0275\u0275element(40, "user-level-badge", 73);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(46, "div", 79);
+    \u0275\u0275elementStart(41, "div", 74);
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(47, "svg", 80);
-    \u0275\u0275element(48, "polyline", 81);
+    \u0275\u0275elementStart(42, "svg", 75);
+    \u0275\u0275element(43, "polyline", 76);
     \u0275\u0275elementEnd()()()()();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(49, "nav", 82);
-    \u0275\u0275declareLet(50);
-    \u0275\u0275elementStart(51, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_a_click_51_listener() {
+    \u0275\u0275elementStart(44, "nav", 77);
+    \u0275\u0275declareLet(45);
+    \u0275\u0275elementStart(46, "a", 78);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_a_click_46_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.changeView("membership-center"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(52, "svg", 84);
-    \u0275\u0275element(53, "polygon", 85);
+    \u0275\u0275elementStart(47, "svg", 79);
+    \u0275\u0275element(48, "polygon", 80);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(54, "span");
-    \u0275\u0275text(55);
+    \u0275\u0275elementStart(49, "span");
+    \u0275\u0275text(50);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(56, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_a_click_56_listener() {
+    \u0275\u0275elementStart(51, "a", 78);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_a_click_51_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.changeView("wallet"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(57, "svg", 84);
-    \u0275\u0275element(58, "rect", 86)(59, "line", 87);
+    \u0275\u0275elementStart(52, "svg", 79);
+    \u0275\u0275element(53, "rect", 81)(54, "line", 82);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(60, "span");
-    \u0275\u0275text(61);
+    \u0275\u0275elementStart(55, "span");
+    \u0275\u0275text(56);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(62, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_a_click_62_listener() {
+    \u0275\u0275elementStart(57, "a", 78);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_a_click_57_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.changeView("dashboard"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(63, "svg", 84);
-    \u0275\u0275element(64, "rect", 88)(65, "rect", 89)(66, "rect", 90)(67, "rect", 91);
+    \u0275\u0275elementStart(58, "svg", 79);
+    \u0275\u0275element(59, "rect", 83)(60, "rect", 84)(61, "rect", 85)(62, "rect", 86);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(68, "span");
-    \u0275\u0275text(69);
+    \u0275\u0275elementStart(63, "span");
+    \u0275\u0275text(64);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(70, "div", 92)(71, "button", 93);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_71_listener() {
+    \u0275\u0275elementStart(65, "div", 87)(66, "button", 88);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_66_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.toggleSidebarGroup("manual"));
     });
-    \u0275\u0275elementStart(72, "span", 94);
-    \u0275\u0275text(73);
+    \u0275\u0275elementStart(67, "span", 89);
+    \u0275\u0275text(68);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(74, "svg", 95);
-    \u0275\u0275element(75, "polyline", 96);
+    \u0275\u0275elementStart(69, "svg", 90);
+    \u0275\u0275element(70, "polyline", 91);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(76, AppComponent_Conditional_15_Conditional_76_Template, 30, 28, "div", 97);
+    \u0275\u0275conditionalCreate(71, AppComponent_Conditional_15_Conditional_71_Template, 30, 28, "div", 92);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(77, "div", 92)(78, "button", 93);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_78_listener() {
+    \u0275\u0275elementStart(72, "div", 87)(73, "button", 88);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_73_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.toggleSidebarGroup("monitoring"));
     });
-    \u0275\u0275elementStart(79, "span", 98)(80, "span", 99);
-    \u0275\u0275text(81, "\u{1F4E1}");
+    \u0275\u0275elementStart(74, "span", 93)(75, "span", 94);
+    \u0275\u0275text(76, "\u{1F4E1}");
     \u0275\u0275elementEnd();
-    \u0275\u0275text(82);
+    \u0275\u0275text(77);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(83, "svg", 95);
-    \u0275\u0275element(84, "polyline", 96);
+    \u0275\u0275elementStart(78, "svg", 90);
+    \u0275\u0275element(79, "polyline", 91);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(85, AppComponent_Conditional_15_Conditional_85_Template, 42, 60, "div", 97);
+    \u0275\u0275conditionalCreate(80, AppComponent_Conditional_15_Conditional_80_Template, 42, 60, "div", 92);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(86, "div", 92)(87, "button", 93);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_87_listener() {
+    \u0275\u0275elementStart(81, "div", 87)(82, "button", 88);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_82_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.toggleSidebarGroup("marketing"));
     });
-    \u0275\u0275elementStart(88, "span", 98)(89, "span", 100);
-    \u0275\u0275text(90, "AI");
+    \u0275\u0275elementStart(83, "span", 93)(84, "span", 95);
+    \u0275\u0275text(85, "AI");
     \u0275\u0275elementEnd();
-    \u0275\u0275text(91);
+    \u0275\u0275text(86);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(92, "svg", 95);
-    \u0275\u0275element(93, "polyline", 96);
+    \u0275\u0275elementStart(87, "svg", 90);
+    \u0275\u0275element(88, "polyline", 91);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(94, AppComponent_Conditional_15_Conditional_94_Template, 34, 60, "div", 97);
+    \u0275\u0275conditionalCreate(89, AppComponent_Conditional_15_Conditional_89_Template, 34, 60, "div", 92);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(95, "div", 92)(96, "button", 93);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_96_listener() {
+    \u0275\u0275elementStart(90, "div", 87)(91, "button", 88);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_91_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.toggleSidebarGroup("analytics"));
     });
-    \u0275\u0275elementStart(97, "span", 94);
-    \u0275\u0275text(98, " \u{1F4CA} \u6578\u64DA\u5206\u6790 ");
+    \u0275\u0275elementStart(92, "span", 89);
+    \u0275\u0275text(93, " \u{1F4CA} \u6578\u64DA\u5206\u6790 ");
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(99, "svg", 95);
-    \u0275\u0275element(100, "polyline", 96);
+    \u0275\u0275elementStart(94, "svg", 90);
+    \u0275\u0275element(95, "polyline", 91);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(101, AppComponent_Conditional_15_Conditional_101_Template, 25, 24, "div", 97);
+    \u0275\u0275conditionalCreate(96, AppComponent_Conditional_15_Conditional_96_Template, 25, 24, "div", 92);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(102, "div", 92)(103, "button", 93);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_103_listener() {
+    \u0275\u0275elementStart(97, "div", 87)(98, "button", 88);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_98_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.toggleSidebarGroup("ai"));
     });
-    \u0275\u0275elementStart(104, "span", 94);
-    \u0275\u0275text(105);
+    \u0275\u0275elementStart(99, "span", 89);
+    \u0275\u0275text(100);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(106, "svg", 95);
-    \u0275\u0275element(107, "polyline", 96);
+    \u0275\u0275elementStart(101, "svg", 90);
+    \u0275\u0275element(102, "polyline", 91);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(108, AppComponent_Conditional_15_Conditional_108_Template, 15, 17, "div", 97);
+    \u0275\u0275conditionalCreate(103, AppComponent_Conditional_15_Conditional_103_Template, 15, 17, "div", 92);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(109, "div", 92)(110, "button", 93);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_110_listener() {
+    \u0275\u0275elementStart(104, "div", 87)(105, "button", 88);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_105_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.toggleSidebarGroup("system"));
     });
-    \u0275\u0275elementStart(111, "span", 94);
-    \u0275\u0275text(112);
+    \u0275\u0275elementStart(106, "span", 89);
+    \u0275\u0275text(107);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(113, "svg", 95);
-    \u0275\u0275element(114, "polyline", 96);
+    \u0275\u0275elementStart(108, "svg", 90);
+    \u0275\u0275element(109, "polyline", 91);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(115, AppComponent_Conditional_15_Conditional_115_Template, 7, 7, "div", 97);
+    \u0275\u0275conditionalCreate(110, AppComponent_Conditional_15_Conditional_110_Template, 7, 7, "div", 92);
     \u0275\u0275elementEnd()();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(116, "div", 101)(117, "button", 102);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_117_listener() {
+    \u0275\u0275elementStart(111, "div", 96)(112, "button", 97);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_112_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.openOnboarding());
     });
-    \u0275\u0275elementStart(118, "span", 103);
-    \u0275\u0275text(119, "\u2753");
+    \u0275\u0275elementStart(113, "span", 98);
+    \u0275\u0275text(114, "\u2753");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(120, "span");
-    \u0275\u0275text(121);
+    \u0275\u0275elementStart(115, "span");
+    \u0275\u0275text(116);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(122, "div")(123, "label", 104);
-    \u0275\u0275text(124);
+    \u0275\u0275elementStart(117, "div")(118, "label", 99);
+    \u0275\u0275text(119);
     \u0275\u0275elementEnd();
-    \u0275\u0275element(125, "app-language-switcher-compact");
+    \u0275\u0275element(120, "app-language-switcher-compact");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(126, "div")(127, "label", 104);
-    \u0275\u0275text(128);
+    \u0275\u0275elementStart(121, "div")(122, "label", 99);
+    \u0275\u0275text(123);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(129, "div", 105)(130, "button", 106);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_130_listener() {
+    \u0275\u0275elementStart(124, "div", 100)(125, "button", 101);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_125_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.theme.set("light"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(131, "svg", 107);
-    \u0275\u0275element(132, "path", 108);
+    \u0275\u0275elementStart(126, "svg", 102);
+    \u0275\u0275element(127, "path", 103);
     \u0275\u0275elementEnd()();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(133, "button", 106);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_133_listener() {
+    \u0275\u0275elementStart(128, "button", 101);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_128_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.theme.set("dark"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(134, "svg", 107);
-    \u0275\u0275element(135, "path", 109);
+    \u0275\u0275elementStart(129, "svg", 102);
+    \u0275\u0275element(130, "path", 104);
     \u0275\u0275elementEnd()()()()()();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(136, "main", 110);
-    \u0275\u0275conditionalCreate(137, AppComponent_Conditional_15_Case_137_Template, 1, 0, "app-dashboard-view")(138, AppComponent_Conditional_15_Case_138_Template, 1, 0, "app-accounts-view")(139, AppComponent_Conditional_15_Case_139_Template, 1, 0, "app-add-account-page")(140, AppComponent_Conditional_15_Case_140_Template, 1, 0, "app-api-credentials-view")(141, AppComponent_Conditional_15_Case_141_Template, 1, 0, "app-settings-view")(142, AppComponent_Conditional_15_Case_142_Template, 1, 0, "app-leads-view")(143, AppComponent_Conditional_15_Case_143_Template, 1, 0, "app-automation-view")(144, AppComponent_Conditional_15_Case_144_Template, 1, 0, "app-resource-discovery-view")(145, AppComponent_Conditional_15_Case_145_Template, 1, 0, "app-resource-discovery-view")(146, AppComponent_Conditional_15_Case_146_Template, 1, 0, "app-ai-center-view")(147, AppComponent_Conditional_15_Case_147_Template, 2, 0, "div", 111)(148, AppComponent_Conditional_15_Case_148_Template, 2, 0, "div", 112)(149, AppComponent_Conditional_15_Case_149_Template, 2, 0, "div", 112)(150, AppComponent_Conditional_15_Case_150_Template, 1, 0, "app-multi-role-view")(151, AppComponent_Conditional_15_Case_151_Template, 1, 0, "app-analytics-view")(152, AppComponent_Conditional_15_Case_152_Template, 1, 0, "app-monitoring-view")(153, AppComponent_Conditional_15_Case_153_Template, 1, 0, "app-monitoring-view")(154, AppComponent_Conditional_15_Case_154_Template, 1, 0, "app-monitoring-view")(155, AppComponent_Conditional_15_Case_155_Template, 1, 0, "app-monitoring-view")(156, AppComponent_Conditional_15_Case_156_Template, 1, 0, "app-monitoring-view")(157, AppComponent_Conditional_15_Case_157_Template, 1, 0, "app-monitoring-view")(158, AppComponent_Conditional_15_Case_158_Template, 1, 0, "app-monitoring-view")(159, AppComponent_Conditional_15_Case_159_Template, 1, 0, "app-runtime-logs-view")(160, AppComponent_Conditional_15_Case_160_Template, 1, 0, "app-membership-center")(161, AppComponent_Conditional_15_Case_161_Template, 1, 0, "app-wallet-view")(162, AppComponent_Conditional_15_Case_162_Template, 1, 0, "app-wallet-recharge")(163, AppComponent_Conditional_15_Case_163_Template, 1, 0, "app-wallet-withdraw")(164, AppComponent_Conditional_15_Case_164_Template, 1, 0, "app-wallet-transactions")(165, AppComponent_Conditional_15_Case_165_Template, 1, 0, "app-wallet-orders")(166, AppComponent_Conditional_15_Case_166_Template, 1, 0, "app-wallet-analytics")(167, AppComponent_Conditional_15_Case_167_Template, 1, 0, "app-profile")(168, AppComponent_Conditional_15_Case_168_Template, 1, 0, "app-resource-center")(169, AppComponent_Conditional_15_Case_169_Template, 1, 0, "app-search-discovery")(170, AppComponent_Conditional_15_Case_170_Template, 1, 0, "app-ai-marketing-assistant")(171, AppComponent_Conditional_15_Case_171_Template, 1, 0, "app-ai-team-hub")(172, AppComponent_Conditional_15_Case_172_Template, 1, 0, "app-member-database")(173, AppComponent_Conditional_15_Case_173_Template, 1, 0, "app-leads-view")(174, AppComponent_Conditional_15_Case_174_Template, 1, 0, "app-analytics-view")(175, AppComponent_Conditional_15_Case_175_Template, 1, 0, "app-analytics-view")(176, AppComponent_Conditional_15_Case_176_Template, 1, 0, "app-automation-view")(177, AppComponent_Conditional_15_Case_177_Template, 1, 0, "app-automation-view")(178, AppComponent_Conditional_15_Case_178_Template, 1, 0, "app-analytics-view")(179, AppComponent_Conditional_15_Case_179_Template, 1, 0, "app-marketing-report")(180, AppComponent_Conditional_15_Case_180_Template, 1, 0, "app-runtime-logs-view")(181, AppComponent_Conditional_15_Case_181_Template, 1, 0, "app-runtime-logs-view")(182, AppComponent_Conditional_15_Case_182_Template, 1, 0, "app-runtime-logs-view")(183, AppComponent_Conditional_15_Case_183_Template, 1, 0, "app-dashboard-view");
+    \u0275\u0275elementStart(131, "main", 105);
+    \u0275\u0275conditionalCreate(132, AppComponent_Conditional_15_Case_132_Template, 1, 0, "app-dashboard-view")(133, AppComponent_Conditional_15_Case_133_Template, 1, 0, "app-accounts-view")(134, AppComponent_Conditional_15_Case_134_Template, 1, 0, "app-add-account-page")(135, AppComponent_Conditional_15_Case_135_Template, 1, 0, "app-api-credentials-view")(136, AppComponent_Conditional_15_Case_136_Template, 1, 0, "app-settings-view")(137, AppComponent_Conditional_15_Case_137_Template, 1, 0, "app-leads-view")(138, AppComponent_Conditional_15_Case_138_Template, 1, 0, "app-automation-view")(139, AppComponent_Conditional_15_Case_139_Template, 1, 0, "app-resource-discovery-view")(140, AppComponent_Conditional_15_Case_140_Template, 1, 0, "app-resource-discovery-view")(141, AppComponent_Conditional_15_Case_141_Template, 1, 0, "app-ai-center-view")(142, AppComponent_Conditional_15_Case_142_Template, 2, 0, "div", 106)(143, AppComponent_Conditional_15_Case_143_Template, 2, 0, "div", 107)(144, AppComponent_Conditional_15_Case_144_Template, 2, 0, "div", 107)(145, AppComponent_Conditional_15_Case_145_Template, 1, 0, "app-multi-role-view")(146, AppComponent_Conditional_15_Case_146_Template, 1, 0, "app-analytics-view")(147, AppComponent_Conditional_15_Case_147_Template, 1, 0, "app-monitoring-view")(148, AppComponent_Conditional_15_Case_148_Template, 1, 0, "app-monitoring-view")(149, AppComponent_Conditional_15_Case_149_Template, 1, 0, "app-monitoring-view")(150, AppComponent_Conditional_15_Case_150_Template, 1, 0, "app-monitoring-view")(151, AppComponent_Conditional_15_Case_151_Template, 1, 0, "app-monitoring-view")(152, AppComponent_Conditional_15_Case_152_Template, 1, 0, "app-monitoring-view")(153, AppComponent_Conditional_15_Case_153_Template, 1, 0, "app-monitoring-view")(154, AppComponent_Conditional_15_Case_154_Template, 1, 0, "app-runtime-logs-view")(155, AppComponent_Conditional_15_Case_155_Template, 1, 0, "app-membership-center")(156, AppComponent_Conditional_15_Case_156_Template, 1, 0, "app-wallet-view")(157, AppComponent_Conditional_15_Case_157_Template, 1, 0, "app-wallet-recharge")(158, AppComponent_Conditional_15_Case_158_Template, 1, 0, "app-wallet-withdraw")(159, AppComponent_Conditional_15_Case_159_Template, 1, 0, "app-wallet-transactions")(160, AppComponent_Conditional_15_Case_160_Template, 1, 0, "app-wallet-orders")(161, AppComponent_Conditional_15_Case_161_Template, 1, 0, "app-wallet-analytics")(162, AppComponent_Conditional_15_Case_162_Template, 1, 0, "app-profile")(163, AppComponent_Conditional_15_Case_163_Template, 1, 0, "app-resource-center")(164, AppComponent_Conditional_15_Case_164_Template, 1, 0, "app-search-discovery")(165, AppComponent_Conditional_15_Case_165_Template, 1, 0, "app-ai-marketing-assistant")(166, AppComponent_Conditional_15_Case_166_Template, 1, 0, "app-ai-team-hub")(167, AppComponent_Conditional_15_Case_167_Template, 1, 0, "app-member-database")(168, AppComponent_Conditional_15_Case_168_Template, 1, 0, "app-leads-view")(169, AppComponent_Conditional_15_Case_169_Template, 1, 0, "app-analytics-view")(170, AppComponent_Conditional_15_Case_170_Template, 1, 0, "app-analytics-view")(171, AppComponent_Conditional_15_Case_171_Template, 1, 0, "app-automation-view")(172, AppComponent_Conditional_15_Case_172_Template, 1, 0, "app-automation-view")(173, AppComponent_Conditional_15_Case_173_Template, 1, 0, "app-analytics-view")(174, AppComponent_Conditional_15_Case_174_Template, 1, 0, "app-marketing-report")(175, AppComponent_Conditional_15_Case_175_Template, 1, 0, "app-runtime-logs-view")(176, AppComponent_Conditional_15_Case_176_Template, 1, 0, "app-runtime-logs-view")(177, AppComponent_Conditional_15_Case_177_Template, 1, 0, "app-runtime-logs-view")(178, AppComponent_Conditional_15_Case_178_Template, 1, 0, "app-dashboard-view");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(184, AppComponent_Conditional_15_Conditional_184_Template, 30, 24, "div", 113);
-    \u0275\u0275conditionalCreate(185, AppComponent_Conditional_15_Conditional_185_Template, 19, 1, "div", 114);
-    \u0275\u0275conditionalCreate(186, AppComponent_Conditional_15_Conditional_186_Template, 22, 9, "div", 115);
-    \u0275\u0275conditionalCreate(187, AppComponent_Conditional_15_Conditional_187_Template, 27, 3, "div", 115);
-    \u0275\u0275conditionalCreate(188, AppComponent_Conditional_15_Conditional_188_Template, 45, 1, "div", 115);
-    \u0275\u0275conditionalCreate(189, AppComponent_Conditional_15_Conditional_189_Template, 5, 0, "div", 116);
-    \u0275\u0275conditionalCreate(190, AppComponent_Conditional_15_Conditional_190_Template, 18, 1, "div", 117);
+    \u0275\u0275conditionalCreate(179, AppComponent_Conditional_15_Conditional_179_Template, 30, 24, "div", 108);
+    \u0275\u0275conditionalCreate(180, AppComponent_Conditional_15_Conditional_180_Template, 19, 1, "div", 109);
+    \u0275\u0275conditionalCreate(181, AppComponent_Conditional_15_Conditional_181_Template, 22, 9, "div", 110);
+    \u0275\u0275conditionalCreate(182, AppComponent_Conditional_15_Conditional_182_Template, 27, 3, "div", 110);
+    \u0275\u0275conditionalCreate(183, AppComponent_Conditional_15_Conditional_183_Template, 45, 1, "div", 110);
+    \u0275\u0275conditionalCreate(184, AppComponent_Conditional_15_Conditional_184_Template, 5, 0, "div", 111);
+    \u0275\u0275conditionalCreate(185, AppComponent_Conditional_15_Conditional_185_Template, 18, 1, "div", 112);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
     let tmp_38_0;
     let tmp_38_1;
     let tmp_40_0;
-    let tmp_41_0;
     let tmp_81_0;
     let tmp_82_0;
     const ctx_r0 = \u0275\u0275nextContext();
@@ -60179,8 +60359,8 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275advance(3);
     \u0275\u0275textInterpolate1(" ", ((tmp_40_0 = ctx_r0.currentUser()) == null ? null : tmp_40_0.displayName) || ((tmp_40_0 = ctx_r0.currentUser()) == null ? null : tmp_40_0.username) || "\u7528\u6236", " ");
     \u0275\u0275advance(2);
-    \u0275\u0275conditional((tmp_41_0 = ctx_r0.userMembershipLevel()) === "silver" ? 40 : tmp_41_0 === "gold" ? 41 : tmp_41_0 === "diamond" ? 42 : tmp_41_0 === "star" ? 43 : tmp_41_0 === "king" ? 44 : 45);
-    \u0275\u0275advance(10);
+    \u0275\u0275property("level", ctx_r0.userMembershipLevel());
+    \u0275\u0275advance(5);
     const view_r58 = \u0275\u0275storeLet(ctx_r0.currentView());
     \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r58 === "membership-center" ? "var(--sidebar-item-active)" : "transparent")("color", view_r58 === "membership-center" ? "var(--sidebar-text-active)" : "var(--sidebar-text)");
@@ -60202,35 +60382,35 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275advance();
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("manual"));
     \u0275\u0275advance(2);
-    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("manual") ? 76 : -1);
+    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("manual") ? 71 : -1);
     \u0275\u0275advance(6);
     \u0275\u0275textInterpolate1(" ", ctx_r0.t("menu.monitoringCenter"), " ");
     \u0275\u0275advance();
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("monitoring"));
     \u0275\u0275advance(2);
-    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("monitoring") ? 85 : -1);
+    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("monitoring") ? 80 : -1);
     \u0275\u0275advance(6);
     \u0275\u0275textInterpolate1(" ", ctx_r0.t("menu.aiMarketing"), " ");
     \u0275\u0275advance();
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("marketing"));
     \u0275\u0275advance(2);
-    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("marketing") ? 94 : -1);
+    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("marketing") ? 89 : -1);
     \u0275\u0275advance(5);
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("analytics"));
     \u0275\u0275advance(2);
-    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("analytics") ? 101 : -1);
+    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("analytics") ? 96 : -1);
     \u0275\u0275advance(4);
     \u0275\u0275textInterpolate1(" \u{1F9E0} ", ctx_r0.t("aiIntelligence"), " ");
     \u0275\u0275advance();
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("ai"));
     \u0275\u0275advance(2);
-    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("ai") ? 108 : -1);
+    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("ai") ? 103 : -1);
     \u0275\u0275advance(4);
     \u0275\u0275textInterpolate1(" \u2699\uFE0F ", ctx_r0.t("systemMonitor"), " ");
     \u0275\u0275advance();
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("system"));
     \u0275\u0275advance(2);
-    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("system") ? 115 : -1);
+    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("system") ? 110 : -1);
     \u0275\u0275advance(6);
     \u0275\u0275textInterpolate(ctx_r0.t("menu.help"));
     \u0275\u0275advance(3);
@@ -60242,21 +60422,21 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275advance(3);
     \u0275\u0275styleProp("background-color", ctx_r0.theme() === "dark" ? "var(--primary-bg)" : "transparent")("color", ctx_r0.theme() === "dark" ? "var(--primary)" : "var(--text-muted)")("box-shadow", ctx_r0.theme() === "dark" ? "var(--shadow-sm)" : "none");
     \u0275\u0275advance(4);
-    \u0275\u0275conditional((tmp_81_0 = ctx_r0.currentView()) === "dashboard" ? 137 : tmp_81_0 === "accounts" ? 138 : tmp_81_0 === "add-account" ? 139 : tmp_81_0 === "api-credentials" ? 140 : tmp_81_0 === "settings" ? 141 : tmp_81_0 === "leads" ? 142 : tmp_81_0 === "automation" ? 143 : tmp_81_0 === "resource-discovery" ? 144 : tmp_81_0 === "resources" ? 145 : tmp_81_0 === "ai-center" ? 146 : tmp_81_0 === "knowledge-brain" ? 147 : tmp_81_0 === "knowledge-gaps" ? 148 : tmp_81_0 === "knowledge-manage" ? 149 : tmp_81_0 === "multi-role" ? 150 : tmp_81_0 === "analytics" ? 151 : tmp_81_0 === "monitoring" ? 152 : tmp_81_0 === "monitoring-accounts" ? 153 : tmp_81_0 === "monitoring-groups" ? 154 : tmp_81_0 === "keyword-sets" ? 155 : tmp_81_0 === "chat-templates" ? 156 : tmp_81_0 === "trigger-rules" ? 157 : tmp_81_0 === "collected-users" ? 158 : tmp_81_0 === "runtime-logs" ? 159 : tmp_81_0 === "membership-center" ? 160 : tmp_81_0 === "wallet" ? 161 : tmp_81_0 === "wallet-recharge" ? 162 : tmp_81_0 === "wallet-withdraw" ? 163 : tmp_81_0 === "wallet-transactions" ? 164 : tmp_81_0 === "wallet-orders" ? 165 : tmp_81_0 === "wallet-analytics" ? 166 : tmp_81_0 === "profile" ? 167 : tmp_81_0 === "resource-center" ? 168 : tmp_81_0 === "search-discovery" ? 169 : tmp_81_0 === "ai-assistant" ? 170 : tmp_81_0 === "ai-team" ? 171 : tmp_81_0 === "member-database" ? 172 : tmp_81_0 === "lead-nurturing" ? 173 : tmp_81_0 === "nurturing-analytics" ? 174 : tmp_81_0 === "user-tracking" ? 175 : tmp_81_0 === "ads" ? 176 : tmp_81_0 === "campaigns" ? 177 : tmp_81_0 === "analytics-center" ? 178 : tmp_81_0 === "marketing-report" ? 179 : tmp_81_0 === "performance" ? 180 : tmp_81_0 === "alerts" ? 181 : tmp_81_0 === "logs" ? 182 : 183);
+    \u0275\u0275conditional((tmp_81_0 = ctx_r0.currentView()) === "dashboard" ? 132 : tmp_81_0 === "accounts" ? 133 : tmp_81_0 === "add-account" ? 134 : tmp_81_0 === "api-credentials" ? 135 : tmp_81_0 === "settings" ? 136 : tmp_81_0 === "leads" ? 137 : tmp_81_0 === "automation" ? 138 : tmp_81_0 === "resource-discovery" ? 139 : tmp_81_0 === "resources" ? 140 : tmp_81_0 === "ai-center" ? 141 : tmp_81_0 === "knowledge-brain" ? 142 : tmp_81_0 === "knowledge-gaps" ? 143 : tmp_81_0 === "knowledge-manage" ? 144 : tmp_81_0 === "multi-role" ? 145 : tmp_81_0 === "analytics" ? 146 : tmp_81_0 === "monitoring" ? 147 : tmp_81_0 === "monitoring-accounts" ? 148 : tmp_81_0 === "monitoring-groups" ? 149 : tmp_81_0 === "keyword-sets" ? 150 : tmp_81_0 === "chat-templates" ? 151 : tmp_81_0 === "trigger-rules" ? 152 : tmp_81_0 === "collected-users" ? 153 : tmp_81_0 === "runtime-logs" ? 154 : tmp_81_0 === "membership-center" ? 155 : tmp_81_0 === "wallet" ? 156 : tmp_81_0 === "wallet-recharge" ? 157 : tmp_81_0 === "wallet-withdraw" ? 158 : tmp_81_0 === "wallet-transactions" ? 159 : tmp_81_0 === "wallet-orders" ? 160 : tmp_81_0 === "wallet-analytics" ? 161 : tmp_81_0 === "profile" ? 162 : tmp_81_0 === "resource-center" ? 163 : tmp_81_0 === "search-discovery" ? 164 : tmp_81_0 === "ai-assistant" ? 165 : tmp_81_0 === "ai-team" ? 166 : tmp_81_0 === "member-database" ? 167 : tmp_81_0 === "lead-nurturing" ? 168 : tmp_81_0 === "nurturing-analytics" ? 169 : tmp_81_0 === "user-tracking" ? 170 : tmp_81_0 === "ads" ? 171 : tmp_81_0 === "campaigns" ? 172 : tmp_81_0 === "analytics-center" ? 173 : tmp_81_0 === "marketing-report" ? 174 : tmp_81_0 === "performance" ? 175 : tmp_81_0 === "alerts" ? 176 : tmp_81_0 === "logs" ? 177 : 178);
     \u0275\u0275advance(47);
-    \u0275\u0275conditional((tmp_82_0 = ctx_r0.generationState().lead) ? 184 : -1, tmp_82_0);
+    \u0275\u0275conditional((tmp_82_0 = ctx_r0.generationState().lead) ? 179 : -1, tmp_82_0);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showBatchOperationHistory() ? 185 : -1);
+    \u0275\u0275conditional(ctx_r0.showBatchOperationHistory() ? 180 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showWelcomeDialog() ? 186 : -1);
+    \u0275\u0275conditional(ctx_r0.showWelcomeDialog() ? 181 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showOrphanSessionDialog() ? 187 : -1);
+    \u0275\u0275conditional(ctx_r0.showOrphanSessionDialog() ? 182 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showBackendErrorDialog() ? 188 : -1);
+    \u0275\u0275conditional(ctx_r0.showBackendErrorDialog() ? 183 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(!ctx_r0.backendRunning() ? 189 : -1);
+    \u0275\u0275conditional(!ctx_r0.backendRunning() ? 184 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showKeywordSetCreator() ? 190 : -1);
+    \u0275\u0275conditional(ctx_r0.showKeywordSetCreator() ? 185 : -1);
   }
 }
 function AppComponent_Conditional_16_Template(rf, ctx) {
@@ -64846,6 +65026,11 @@ ${details.suggestion || "\u8ACB\u5237\u65B0\u8CC7\u6E90\u5217\u8868"}`);
               telegramId: user.telegramId || user.telegram_id,
               membership: this.authService.membershipLevel()
             });
+            if (this.membershipService.isSaaSMode()) {
+              const level = this.authService.membershipLevel();
+              const expires = this.authService.user()?.membershipExpires;
+              this.membershipService.syncFromAuthService(level, expires);
+            }
             this.cdr.detectChanges();
           }
         }).catch((err) => console.warn("[App] Failed to refresh user data:", err));
@@ -65013,6 +65198,19 @@ ${details.suggestion || "\u8ACB\u5237\u65B0\u8CC7\u6E90\u5217\u8868"}`);
       this.queueRefreshInterval = setInterval(() => {
         this.refreshQueueStatusThrottled();
       }, 6e4);
+    }
+    if (this.isAuthenticated()) {
+      this.authService.forceRefreshUser().then((user) => {
+        if (user) {
+          console.log("[App] \u9801\u9762\u53EF\u898B\uFF0C\u7528\u6236\u6578\u64DA\u5DF2\u5237\u65B0:", {
+            displayName: user.displayName,
+            membershipLevel: user.membershipLevel
+          });
+          this.cdr.detectChanges();
+        }
+      }).catch((err) => {
+        console.warn("[App] \u9801\u9762\u53EF\u898B\u6642\u5237\u65B0\u7528\u6236\u6578\u64DA\u5931\u6557:", err);
+      });
     }
   }
   setupKeyboardShortcuts() {
@@ -71457,7 +71655,7 @@ ${details}`, 12e3);
           return ctx.onDocumentClick($event);
         }, \u0275\u0275resolveDocument);
       }
-    }, features: [\u0275\u0275ProvidersFeature([AccountLoaderService, ToastService])], decls: 17, vars: 11, consts: [["onboardingRef", ""], [1, "fixed", "bottom-4", "right-4", "z-50"], [1, "fixed", "inset-0", "z-[100]", "flex", "items-center", "justify-center", "pointer-events-none"], [3, "navigate"], [3, "closeDialog", "sendComplete", "isOpen", "targets"], [3, "closeDialog", "inviteComplete", "isOpen", "targets", "accounts"], [3, "closeDialog", "startExtractionEvent", "memberCountRefreshed", "isOpen", "group"], [1, "fixed", "inset-0", "z-50", "flex", "items-center", "justify-center"], [1, "flex", "h-screen", 2, "background-color", "var(--bg-primary)", "color", "var(--text-primary)"], [1, "auth-wrapper", 2, "min-height", "100vh", "background", "linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a)"], [1, "group", "relative"], [1, "w-3", "h-3", "rounded-full", "bg-slate-500", "cursor-default"], [1, "absolute", "bottom-full", "right-0", "mb-2", "hidden", "group-hover:block"], [1, "bg-slate-800/95", "backdrop-blur-sm", "rounded-lg", "px-3", "py-2", "shadow-lg", "border", "border-slate-700", "whitespace-nowrap"], [1, "text-xs", "text-slate-400"], [1, "text-xs", "text-slate-500", "mt-1"], [1, "text-xs", "text-amber-400", "mt-1"], [1, "w-3", "h-3", "rounded-full", "bg-cyan-500", "animate-pulse", "cursor-default"], [1, "text-xs", "text-slate-300"], [1, "w-3", "h-3", "rounded-full", "bg-amber-500", "cursor-pointer", 3, "click"], [1, "text-xs", "text-amber-400"], [1, "w-3", "h-3", "rounded-full", "bg-red-500", "cursor-pointer", "animate-pulse", 3, "click"], [1, "text-xs", "text-red-400"], [1, "absolute", "inset-0", "bg-black/40", "animate-fade-in"], [1, "relative", "z-10", "animate-success-pop"], [1, "absolute", "inset-0", "-m-8", "rounded-full", "bg-gradient-to-r", "from-emerald-500/20", "to-cyan-500/20", "blur-xl", "animate-pulse"], [1, "relative", "bg-gradient-to-br", "from-slate-800", "to-slate-900", "rounded-2xl", "p-8", "shadow-2xl", "border", "border-emerald-500/30"], [1, "flex", "justify-center", "mb-4"], [1, "w-20", "h-20", "rounded-full", "bg-gradient-to-r", "from-emerald-500", "to-cyan-500", "flex", "items-center", "justify-center", "shadow-lg", "shadow-emerald-500/30"], [1, "text-4xl", "animate-bounce"], [1, "text-center"], [1, "text-xl", "font-bold", "text-white", "mb-1"], [1, "text-sm", "text-slate-400"], [1, "absolute", "-top-2", "-left-2", "w-4", "h-4", "bg-emerald-400", "rounded-full", "animate-ping"], [1, "absolute", "-top-1", "-right-3", "w-3", "h-3", "bg-cyan-400", "rounded-full", "animate-ping", 2, "animation-delay", "0.1s"], [1, "absolute", "-bottom-2", "-left-1", "w-2", "h-2", "bg-emerald-300", "rounded-full", "animate-ping", 2, "animation-delay", "0.2s"], [1, "absolute", "-bottom-1", "-right-2", "w-3", "h-3", "bg-cyan-300", "rounded-full", "animate-ping", 2, "animation-delay", "0.3s"], [1, "absolute", "inset-0", "bg-black/60", "backdrop-blur-sm", 3, "click"], [1, "relative", "z-10"], [3, "closed", "loginSuccess"], [3, "navigateEvent"], [3, "show", "title", "progress", "cancellable"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "z-[100]", "flex", "items-center", "justify-center"], [1, "backdrop-blur-sm", "flex-shrink-0", "flex", "flex-col", "sidebar", "h-screen", "transition-all", "duration-300", 2, "background-color", "var(--bg-sidebar)", "border-right", "1px solid var(--border-default)"], [1, "flex-shrink-0"], [1, "absolute", "top-3", "-right-3", "z-50", "w-6", "h-6", "rounded-full", "flex", "items-center", "justify-center", "transition-all", "duration-200", "hover:scale-110", 2, "background", "linear-gradient(135deg, #06b6d4, #8b5cf6)", "box-shadow", "0 2px 8px rgba(6, 182, 212, 0.4)", 3, "click", "title"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "w-3.5", "h-3.5", "text-white", "transition-transform", "duration-200"], ["points", "15 18 9 12 15 6"], [1, "flex", "items-center", "gap-3", "p-4"], [1, "relative", "flex-shrink-0"], [1, "absolute", "inset-0", "rounded-xl", "blur-md", "opacity-50", 2, "background", "linear-gradient(135deg, #06b6d4, #8b5cf6)"], ["viewBox", "0 0 64 64", "fill", "none", 1, "h-10", "w-10", "relative", "z-10"], ["d", "M32 8L52 20V44L32 56L12 44V20L32 8Z", "fill", "url(#sidebarLogoGrad)", "stroke", "url(#sidebarLogoStroke)", "stroke-width", "1.5"], ["d", "M22 28L40 22L34 36L28 32L22 28Z", "fill", "white", "opacity", "0.95"], ["d", "M28 32L34 36L32 42L28 32Z", "fill", "white", "opacity", "0.8"], ["d", "M24 12L28 8L32 11L36 8L40 12L38 16H26L24 12Z", "fill", "#fbbf24"], ["cx", "32", "cy", "8", "r", "1.2", "fill", "#fef3c7"], ["id", "sidebarLogoGrad", "x1", "0%", "y1", "0%", "x2", "100%", "y2", "100%"], ["offset", "0%", "stop-color", "#0891b2"], ["offset", "100%", "stop-color", "#7c3aed"], ["id", "sidebarLogoStroke", "x1", "0%", "y1", "0%", "x2", "100%", "y2", "100%"], ["offset", "0%", "stop-color", "#22d3ee"], ["offset", "100%", "stop-color", "#a78bfa"], [1, "user-profile-card", "mx-3", "mb-4", "p-3", "rounded-xl", "cursor-pointer", "transition-all", "duration-300", "hover:scale-[1.02]", "group", 3, "click"], [1, "flex", "items-center", "gap-3"], [1, "avatar-wrapper", "relative"], [1, "avatar-glow", "absolute", "inset-0", "rounded-full", "opacity-0", "group-hover:opacity-100", "transition-opacity", "duration-300"], [1, "avatar-border", "w-12", "h-12", "rounded-full", "p-[2px]"], [1, "w-full", "h-full", "rounded-full", "flex", "items-center", "justify-center", "text-white", "font-bold", "text-lg", "avatar-inner"], [1, "vip-badge", "absolute", "-bottom-1", "-right-1", "w-5", "h-5", "rounded-full", "flex", "items-center", "justify-center", "text-[10px]", "shadow-lg", 3, "badge-silver", "badge-gold", "badge-diamond", "badge-star", "badge-king"], [1, "flex-1", "min-w-0"], [1, "text-sm", "font-semibold", "truncate", 2, "color", "var(--text-primary)"], [1, "flex", "items-center", "gap-1.5", "mt-0.5"], [1, "vip-tag", "vip-tag-silver"], [1, "vip-tag", "vip-tag-gold"], [1, "vip-tag", "vip-tag-diamond"], [1, "vip-tag", "vip-tag-star"], [1, "vip-tag", "vip-tag-king"], [1, "vip-tag", "vip-tag-bronze"], [1, "arrow-icon", "transition-transform", "duration-300", "group-hover:translate-x-1"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "w-4", "h-4", 2, "color", "var(--text-muted)"], ["points", "9 18 15 12 9 6"], [1, "flex-1", "overflow-y-auto", "overflow-x-hidden", "sidebar-nav", "mt-2", "px-2", "pb-2"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", "stroke-linecap", "round", "stroke-linejoin", "round", 1, "h-5", "w-5", "sidebar-icon"], ["points", "12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"], ["x", "1", "y", "4", "width", "22", "height", "16", "rx", "2", "ry", "2"], ["x1", "1", "y1", "10", "x2", "23", "y2", "10"], ["x", "3", "y", "3", "width", "7", "height", "7"], ["x", "14", "y", "3", "width", "7", "height", "7"], ["x", "14", "y", "14", "width", "7", "height", "7"], ["x", "3", "y", "14", "width", "7", "height", "7"], [1, "sidebar-group"], [1, "w-full", "flex", "items-center", "justify-between", "px-3", "py-2", "mt-2", "rounded-md", "hover:bg-white/5", "transition-colors", "cursor-pointer", "group", 3, "click"], [1, "sidebar-group-title", "text-xs", "uppercase", "tracking-wider", "flex", "items-center", "gap-1", 2, "color", "var(--sidebar-group-title)"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "w-3.5", "h-3.5", "transition-transform", "duration-200", 2, "color", "var(--sidebar-group-title)"], ["points", "6 9 12 15 18 9"], [1, "sidebar-group-content", "overflow-hidden"], [1, "sidebar-group-title", "text-xs", "uppercase", "tracking-wider", "font-semibold", "flex", "items-center", "gap-1", 2, "color", "var(--sidebar-group-title)"], [1, "inline-block", "w-5", "h-5", "rounded", "bg-gradient-to-br", "from-cyan-500", "to-blue-500", "text-center", "leading-5", "text-[10px]"], [1, "inline-block", "w-5", "h-5", "rounded", "bg-gradient-to-br", "from-violet-500", "to-fuchsia-500", "text-center", "leading-5", "text-[10px]"], [1, "flex-shrink-0", "p-4", "space-y-3", "border-t", 2, "border-color", "var(--border-default)", "background-color", "var(--bg-sidebar)"], [1, "w-full", "flex", "items-center", "justify-center", "gap-2", "px-4", "py-2.5", "bg-gradient-to-r", "from-cyan-500/10", "to-blue-500/10", "hover:from-cyan-500/20", "hover:to-blue-500/20", "border", "border-cyan-500/30", "hover:border-cyan-500/50", "text-cyan-400", "rounded-xl", "transition-all", "text-sm", "font-medium", "group", 3, "click"], [1, "text-lg", "group-hover:animate-bounce"], [1, "block", "text-sm", "font-medium", "mb-2", 2, "color", "var(--sidebar-group-title)"], [1, "flex", "rounded-md", "shadow-sm", "p-1", 2, "background-color", "var(--bg-tertiary)"], [1, "w-full", "text-sm", "py-1.5", "rounded", "transition-colors", "flex", "items-center", "justify-center", "gap-2", 3, "click"], ["xmlns", "http://www.w3.org/2000/svg", "fill", "none", "viewBox", "0 0 24 24", "stroke", "currentColor", 1, "h-4", "w-4"], ["stroke-linecap", "round", "stroke-linejoin", "round", "stroke-width", "2", "d", "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"], ["stroke-linecap", "round", "stroke-linejoin", "round", "stroke-width", "2", "d", "M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"], [1, "flex-1", "p-8", "overflow-y-auto", 2, "background-color", "var(--bg-primary)"], [1, "h-full", "p-6", "overflow-auto"], [1, "h-full", "overflow-auto"], [1, "fixed", "inset-0", "bg-black/70", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-50"], [1, "fixed", "inset-0", "bg-black/70", "flex", "items-center", "justify-center", "z-50", "backdrop-blur-sm"], [1, "fixed", "inset-0", "bg-black/70", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-[100]"], [1, "fixed", "bottom-4", "right-4", "z-50", "bg-red-500/90", "text-white", "px-4", "py-2", "rounded-lg", "shadow-lg", "flex", "items-center", "gap-2", "cursor-pointer", "hover:bg-red-600"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-[100]"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "z-[100]", "flex", "items-center", "justify-center", 3, "click"], [1, "bg-slate-900", "border", "border-slate-700", "rounded-2xl", "shadow-2xl", "w-full", "max-w-md", "mx-4", "overflow-hidden", 3, "click"], [1, "px-6", "py-4", "border-b", "border-slate-700", "flex", "items-center", "gap-3"], [1, "p-2", "bg-red-500/20", "rounded-lg"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-6", "w-6", "text-red-400"], ["d", "M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"], ["x1", "10", "y1", "11", "x2", "10", "y2", "17"], ["x1", "14", "y1", "11", "x2", "14", "y2", "17"], [1, "text-lg", "font-bold", "text-white"], [1, "px-6", "py-6"], [1, "text-slate-300", "mb-4"], [1, "bg-red-500/10", "border", "border-red-500/20", "rounded-lg", "p-3", "text-sm", "text-red-300"], [1, "px-6", "py-4", "border-t", "border-slate-700", "flex", "justify-end", "gap-3"], [1, "px-4", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-slate-300", "rounded-lg", "transition-colors", 3, "click"], [1, "px-4", "py-2", "bg-red-500", "hover:bg-red-600", "text-white", "rounded-lg", "transition-colors", "flex", "items-center", "gap-2", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-4", "w-4"], [1, "font-bold", "text-cyan-400"], [1, "font-bold", "text-red-400"], [1, "p-2", "bg-emerald-500/20", "rounded-lg"], [1, "text-xl"], [1, "px-6", "py-4", "max-h-64", "overflow-y-auto"], [1, "text-center", "py-8", "text-slate-400"], [1, "space-y-2"], [1, "px-6", "py-4", "border-t", "border-slate-700"], [1, "w-full", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-slate-300", "rounded-lg", "transition-colors", 3, "click"], [1, "mb-2"], [1, "text-cyan-400", "hover:underline", "text-sm", 3, "click"], [1, "w-full", "p-3", "bg-slate-800/50", "hover:bg-emerald-500/20", "border", "border-slate-700", "hover:border-emerald-500/50", "rounded-xl", "text-left", "transition-all", "group"], [1, "w-full", "p-3", "bg-slate-800/50", "hover:bg-emerald-500/20", "border", "border-slate-700", "hover:border-emerald-500/50", "rounded-xl", "text-left", "transition-all", "group", 3, "click"], [1, "flex", "items-center", "justify-between"], [1, "font-medium", "text-white", "group-hover:text-emerald-400"], [1, "text-xs", "text-slate-500"], [1, "text-emerald-400", "opacity-0", "group-hover:opacity-100", "transition-opacity"], [1, "text-xl", "font-bold", "bg-gradient-to-r", "from-cyan-400", "to-purple-400", "bg-clip-text", "text-transparent"], [1, "text-xs", 2, "color", "var(--text-muted)"], [1, "vip-badge", "absolute", "-bottom-1", "-right-1", "w-5", "h-5", "rounded-full", "flex", "items-center", "justify-center", "text-[10px]", "shadow-lg"], [1, "animate-pulse"], [1, "animate-bounce"], [1, "vip-icon"], [1, "vip-text"], ["data-tour", "accounts", 1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click"], ["d", "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"], ["cx", "9", "cy", "7", "r", "4"], ["d", "M23 21v-2a4 4 0 0 0-3-3.87"], ["d", "M16 3.13a4 4 0 0 1 0 7.75"], ["data-tour", "search-discovery", 1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", "relative", 3, "click"], ["cx", "11", "cy", "11", "r", "8"], ["d", "M21 21l-4.35-4.35"], [1, "absolute", "right-2", "px-1.5", "py-0.5", "text-[10px]", "bg-gradient-to-r", "from-cyan-500", "to-blue-500", "text-white", "rounded-full", "font-bold"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", "relative", 3, "click"], ["cx", "12", "cy", "5", "rx", "9", "ry", "3"], ["d", "M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"], ["d", "M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"], ["d", "M22 2L11 13"], ["d", "M22 2L15 22L11 13L2 9L22 2Z"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-lg", "transition-all", "duration-200", "cursor-pointer", "mb-1", "relative", "group", 3, "click"], [1, "w-8", "h-8", "rounded-lg", "flex", "items-center", "justify-center", "transition-all"], [1, "text-lg"], [1, "flex", "flex-col"], [1, "font-medium"], [1, "text-[10px]", "opacity-60"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click"], [1, "text-lg", "ml-1"], [1, "ml-auto", "text-xs", "px-1.5", "py-0.5", "bg-violet-500/20", "text-violet-400", "rounded"], ["data-tour", "ai-assistant", 1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-lg", "transition-all", "duration-200", "cursor-pointer", "mb-1.5", "relative", "group", 3, "click", "title"], [1, "absolute", "right-2", "px-2", "py-0.5", "text-[9px]", "bg-gradient-to-r", "from-orange-500", "to-amber-500", "text-white", "rounded-full", "font-bold", "shadow-lg", "shadow-orange-500/20"], [1, "absolute", "right-2", "text-xs"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-lg", "transition-all", "duration-200", "cursor-pointer", "mb-1.5", "relative", "group", 3, "click", "title"], [1, "absolute", "right-2", "px-2", "py-0.5", "text-[9px]", "bg-gradient-to-r", "from-purple-500", "to-pink-500", "text-white", "rounded-full", "font-bold", "shadow-lg", "shadow-purple-500/20"], [1, "absolute", "right-2", "px-2", "py-0.5", "text-[9px]", "bg-gradient-to-r", "from-cyan-500", "to-blue-500", "text-white", "rounded-full", "font-bold", "shadow-lg", "shadow-cyan-500/20"], ["d", "M18 20V10"], ["d", "M12 20V4"], ["d", "M6 20v-6"], ["d", "M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"], ["cx", "12", "cy", "12", "r", "4"], [1, "ml-auto", "px-1.5", "py-0.5", "text-xs", "bg-pink-500/20", "text-pink-400", "rounded"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click", "title"], [1, "ml-auto", "text-xs", "opacity-60"], [1, "knowledge-menu"], [1, "flex-1"], [1, "text-xs", "transition-transform", "duration-200"], [1, "pl-6", "space-y-1"], ["d", "M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3"], [1, "sidebar-item", "flex", "items-center", "gap-2", "px-3", "py-2", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "text-sm", 3, "click"], [1, "sidebar-item", "flex", "items-center", "gap-2", "px-3", "py-2", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "text-sm", "relative", 3, "click"], [1, "ml-auto", "text-xs", "font-bold", "rounded-full", "px-1.5", "py-0.5", 2, "background-color", "rgba(239, 68, 68, 0.2)", "color", "#f87171"], ["cx", "12", "cy", "12", "r", "3"], ["d", "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"], [3, "accountAdded", "back"], [1, "fixed", "inset-0", "bg-black/70", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-50", 3, "click"], [1, "bg-gradient-to-br", "from-slate-900", "via-slate-900", "to-slate-800", "border", "border-cyan-500/30", "rounded-2xl", "shadow-2xl", "shadow-cyan-500/10", "w-full", "max-w-2xl", "max-h-[90vh]", "overflow-hidden", "text-slate-200", 3, "click"], [1, "bg-gradient-to-r", "from-cyan-500/10", "via-blue-500/10", "to-purple-500/10", "border-b", "border-cyan-500/20", "p-5"], [1, "flex", "justify-between", "items-start"], [1, "flex", "items-center", "gap-4"], [1, "w-14", "h-14", "rounded-full", "bg-gradient-to-br", "from-cyan-500", "to-blue-600", "flex", "items-center", "justify-center", "text-white", "font-bold", "text-xl", "shadow-lg", "shadow-cyan-500/30"], [1, "flex", "items-center", "gap-2"], [1, "text-xl", "font-bold", "text-white"], [1, "h-2.5", "w-2.5", "rounded-full", "animate-pulse"], [1, "text-sm", "text-cyan-400"], [1, "flex", "items-center", "gap-2", "mt-1", "flex-wrap"], [1, "text-xs", "px-2", "py-0.5", "rounded-full", "bg-purple-500/20", "text-purple-400", "border", "border-purple-500/30"], [1, "text-xs", "px-2", "py-0.5", "rounded-full", "bg-cyan-500/20", "text-cyan-400", "border", "border-cyan-500/30"], [1, "text-xs", "px-2", "py-0.5", "rounded-full", 3, "class"], [1, "text-slate-400", "hover:text-white", "text-2xl", "leading-none", "transition-colors", "p-2", "hover:bg-white/10", "rounded-lg", 3, "click"], [1, "border-b", "border-cyan-500/20", "bg-slate-900/50"], ["aria-label", "Tabs", 1, "flex", "px-5"], [1, "whitespace-nowrap", "py-3", "px-4", "border-b-2", "border-transparent", "font-medium", "text-sm", "cursor-pointer", "text-slate-400", "hover:text-cyan-400", "hover:bg-cyan-500/5", "transition-all", "rounded-t-lg", "flex", "items-center", "gap-2", 3, "click"], [1, "overflow-y-auto", "max-h-[calc(90vh-220px)]", "p-5"], [1, "space-y-4"], [1, "py-4"], [1, "text-xs", "px-2", "py-0.5", "rounded-full"], [1, "bg-slate-800/50", "rounded-xl", "p-4", "border", "border-slate-700/50"], [1, "block", "text-sm", "font-medium", "text-cyan-400", "mb-2"], [1, "form-select", "w-full", "bg-slate-900/50", "border-cyan-500/30", "rounded-lg", "py-2.5", "px-3", "text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", "focus:border-cyan-500", 3, "ngModelChange", "ngModel"], ["value", ""], [1, "mt-2", "p-2", "bg-amber-500/10", "border", "border-amber-500/30", "rounded-lg"], [1, "grid", "grid-cols-3", "gap-3"], [1, "cursor-pointer", "p-3", "rounded-xl", "border-2", "transition-all", "text-center", 3, "click"], [1, "text-2xl", "mb-1"], [1, "text-sm", "font-medium"], [1, "space-y-3"], [1, "flex", "items-center", "justify-between", "mb-2"], [1, "text-sm", "font-medium", "text-cyan-400"], [1, "text-xs", "text-slate-500", "bg-slate-700/50", "px-2", "py-1", "rounded"], ["rows", "5", 1, "form-textarea", "w-full", "bg-slate-900/50", "border-cyan-500/30", "rounded-lg", "py-3", "px-3", "text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", "resize-none", "placeholder-slate-500", 3, "ngModelChange", "ngModel", "placeholder"], [1, "flex", "items-center", "gap-3", "flex-wrap"], [1, "flex", "items-center", "gap-2", "bg-slate-800/50", "hover:bg-cyan-500/20", "text-slate-300", "hover:text-cyan-400", "text-sm", "font-medium", "py-2", "px-4", "rounded-lg", "transition-all", "border", "border-slate-700/50", "hover:border-cyan-500/30", 3, "click"], [1, "p-3", "rounded-xl", "bg-cyan-500/10", "border", "border-cyan-500/30"], [1, "p-3", "bg-amber-500/10", "border", "border-amber-500/30", "rounded-xl"], [1, "p-3", "bg-red-500/10", "border", "border-red-500/30", "rounded-xl"], [1, "flex", "justify-between", "items-center", "pt-4", "border-t", "border-cyan-500/20"], [1, "text-sm", "text-red-400", "hover:text-red-300", "disabled:text-slate-500", "disabled:cursor-not-allowed", "flex", "items-center", "gap-1.5", "px-3", "py-2", "rounded-lg", "hover:bg-red-500/10", "transition-all", 3, "click", "disabled"], [1, "flex", "gap-3"], [1, "bg-slate-700/80", "hover:bg-slate-600", "text-slate-300", "font-medium", "py-2.5", "px-5", "rounded-xl", "transition-all", "border", "border-slate-600/50", "hover:border-slate-500", 3, "click"], [1, "bg-gradient-to-r", "from-cyan-500", "to-blue-500", "hover:from-cyan-400", "hover:to-blue-400", "text-white", "font-bold", "py-2.5", "px-6", "rounded-xl", "shadow-lg", "shadow-cyan-500/30", "disabled:from-slate-500", "disabled:to-slate-600", "disabled:shadow-none", "disabled:cursor-not-allowed", "flex", "items-center", "gap-2", "transition-all", 3, "click", "disabled"], [3, "value"], [1, "text-xs", "text-cyan-400", "hover:underline", "cursor-pointer", "mt-1", "inline-block", 3, "click"], [1, "flex", "items-center", "justify-between", "p-2", "bg-slate-200/30", "dark:bg-slate-800/30", "rounded-lg"], [1, "text-xs", "text-green-400"], [1, "text-xs", "bg-purple-500/20", "text-purple-400", "px-2", "py-1", "rounded"], [1, "p-2", "bg-cyan-500/10", "border", "border-cyan-500/20", "rounded-lg", "text-xs", "text-slate-400"], [1, "block", "text-sm", "font-medium", "text-slate-500", "dark:text-slate-400", "mb-1"], ["rows", "2", 1, "form-textarea", "w-full", "bg-slate-200/50", "dark:bg-slate-800/50", "border-slate-300", "dark:border-slate-700", "rounded-lg", "py-2", "px-3", "text-slate-800", "dark:text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", 3, "ngModelChange", "ngModel", "placeholder"], [1, "flex", "items-center", "justify-center", "gap-3"], [1, "bg-gradient-to-r", "from-purple-500", "to-cyan-500", "hover:from-purple-600", "hover:to-cyan-600", "text-white", "font-bold", "py-2", "px-6", "rounded-lg", "transition", "duration-200", "shadow-lg", "disabled:from-slate-400", "disabled:to-slate-500", "disabled:shadow-none", "disabled:cursor-not-allowed", "flex", "items-center", "gap-2", 3, "click", "disabled"], ["title", "\u91CD\u65B0\u751F\u6210", 1, "p-2", "bg-slate-600", "hover:bg-slate-500", "text-white", "rounded-lg"], [1, "p-3", "bg-amber-500/10", "border", "border-amber-500/20", "text-amber-400", "rounded-lg", "text-sm", "text-center"], [1, "p-3", "bg-red-500/10", "border", "border-red-500/20", "text-red-400", "rounded-lg", "text-sm"], [1, "p-3", "bg-green-500/10", "border", "border-green-500/20", "rounded-lg"], [1, "text-cyan-400"], [1, "animate-spin"], ["title", "\u91CD\u65B0\u751F\u6210", 1, "p-2", "bg-slate-600", "hover:bg-slate-500", "text-white", "rounded-lg", 3, "click"], [1, "text-cyan-400", "hover:underline", "cursor-pointer", "ml-1", 3, "click"], [1, "ml-2", "text-cyan-400", "hover:underline", 3, "click"], [1, "text-xs", "text-green-400", "mb-2"], [1, "form-select", "w-full", "bg-slate-900/50", "border-cyan-500/30", "rounded-lg", "py-2.5", "px-3", "text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", 3, "change"], [1, "flex", "items-center", "gap-2", "bg-green-500/20", "hover:bg-green-500/30", "text-green-400", "text-sm", "font-medium", "py-2", "px-3", "rounded-lg", "transition-all", "border", "border-green-500/30", 3, "click"], [1, "flex", "items-center", "gap-2", "bg-red-500/20", "hover:bg-red-500/30", "text-red-400", "text-sm", "font-medium", "py-2", "px-3", "rounded-lg", "transition-all", "border", "border-red-500/30", 3, "click"], [1, "text-sm", "text-cyan-400", "font-medium"], [1, "space-y-2", "max-h-40", "overflow-y-auto"], [1, "flex", "items-center", "justify-between", "text-sm", "bg-slate-800/50", "rounded-lg", "px-3", "py-2"], [1, "flex", "items-center", "gap-2", "truncate", "flex-1", "min-w-0"], [1, "text-green-400"], [1, "text-blue-400"], [1, "truncate", "text-white"], [1, "text-slate-500", "text-xs", "whitespace-nowrap"], [1, "text-green-500", "text-xs"], [1, "text-red-400", "hover:text-red-300", "text-lg", "font-bold", "p-1", "hover:bg-red-500/20", "rounded", "ml-2", 3, "click"], [1, "text-sm", "text-amber-400"], [1, "text-sm", "text-red-400"], [1, "mb-4", "flex", "items-center", "justify-between"], [1, "bg-cyan-500", "hover:bg-cyan-600", "text-white", "font-bold", "py-2", "px-4", "rounded-lg", "text-sm", "disabled:bg-slate-500", "disabled:cursor-not-allowed", "flex", "items-center", "gap-2", 3, "click", "disabled"], [1, "h-96", "overflow-y-auto", "space-y-3", "mb-4", "bg-slate-200/30", "dark:bg-slate-800/30", "rounded-lg", "p-4"], [1, "h-96", "overflow-y-auto"], [1, "space-y-3", "mb-4"], [1, "text-center", "py-8"], [1, "mt-4", "p-3", "bg-slate-800/50", "rounded-lg", "border", "border-cyan-500/20"], [1, "h-96", "overflow-y-auto", "space-y-3", "mb-4", "bg-slate-200/30", "dark:bg-slate-800/30", "rounded-lg", "p-4", 3, "scroll"], [1, "text-center", "py-4"], [1, "text-center", "py-2"], [1, "flex", "justify-start"], [1, "flex", "justify-end"], [1, "max-w-[75%]"], [1, "bg-slate-700", "text-white", "rounded-2xl", "rounded-bl-sm", "px-4", "py-2"], [1, "text-sm"], [1, "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "text-white", "rounded-2xl", "rounded-br-sm", "px-4", "py-2", "shadow-lg"], [1, "flex", "items-center", "justify-end", "gap-2", "mt-1"], [1, "text-xs", "bg-purple-500/20", "text-purple-400", "px-1.5", "py-0.5", "rounded"], [1, "animate-spin", "text-cyan-400"], [1, "ml-2", "text-sm", "text-slate-500"], [1, "text-sm", "text-cyan-400", "hover:text-cyan-300", 3, "click"], [1, "flex", "justify-center"], [1, "bg-slate-800/50", "text-slate-400", "text-xs", "px-3", "py-1", "rounded-full"], [1, "text-4xl", "mb-2"], [1, "text-slate-500", "dark:text-slate-400"], [1, "text-xs", "text-slate-500", "mt-2"], [1, "text-sm", "font-medium", "text-cyan-400", "mb-2", "flex", "items-center", "gap-2"], [1, "grid", "grid-cols-3", "gap-2", "text-center", "text-xs"], [1, "p-2", "bg-slate-700/50", "rounded"], [1, "text-slate-400"], [1, "text-sm", "font-bold", "text-cyan-400"], [1, "fixed", "inset-0", "bg-black/70", "flex", "items-center", "justify-center", "z-50", "backdrop-blur-sm", 3, "click"], [1, "bg-slate-100", "dark:bg-slate-900", "rounded-2xl", "shadow-2xl", "border", "border-slate-300", "dark:border-slate-700", "w-full", "max-w-3xl", "max-h-[80vh]", "overflow-hidden", 3, "click"], [1, "p-4", "border-b", "border-slate-300", "dark:border-slate-700", "flex", "items-center", "justify-between", "bg-slate-200/50", "dark:bg-slate-800/50"], [1, "text-lg", "font-bold", "text-slate-900", "dark:text-white", "flex", "items-center", "gap-2"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-5", "w-5", "text-purple-500"], ["d", "M3 3v5h5"], ["d", "M3.05 13A9 9 0 1 0 6 5.3L3 8"], ["d", "M12 7v5l4 2"], [1, "text-slate-500", "hover:text-slate-700", "dark:text-slate-400", "dark:hover:text-white", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-5", "w-5"], ["x1", "18", "y1", "6", "x2", "6", "y2", "18"], ["x1", "6", "y1", "6", "x2", "18", "y2", "18"], [1, "p-4", "overflow-y-auto", "max-h-[60vh]"], [1, "text-center", "py-8", "text-slate-500"], [1, "p-4", "border-t", "border-slate-300", "dark:border-slate-700", "bg-slate-200/50", "dark:bg-slate-800/50", "flex", "justify-end"], [1, "px-4", "py-2", "bg-slate-300", "dark:bg-slate-700", "hover:bg-slate-400", "dark:hover:bg-slate-600", "rounded-lg", "text-sm", "font-medium", "transition-colors", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-12", "w-12", "mx-auto", "mb-3", "text-slate-400"], ["cx", "12", "cy", "12", "r", "10"], ["d", "M12 8v4l3 3"], [1, "bg-slate-200/50", "dark:bg-slate-800/50", "rounded-lg", "p-3", "border", "border-slate-300", "dark:border-slate-700", 3, "opacity-50"], [1, "bg-slate-200/50", "dark:bg-slate-800/50", "rounded-lg", "p-3", "border", "border-slate-300", "dark:border-slate-700"], [1, "p-2", "rounded-lg"], [1, "font-medium", "text-slate-900", "dark:text-white"], [1, "text-yellow-500", "ml-2"], [1, "text-red-400", "ml-2"], [1, "text-xs", "bg-yellow-500/20", "hover:bg-yellow-500/30", "text-yellow-400", "px-2", "py-1", "rounded"], [1, "text-xs", "bg-yellow-500/20", "hover:bg-yellow-500/30", "text-yellow-400", "px-2", "py-1", "rounded", 3, "click"], [1, "bg-gradient-to-br", "from-slate-800", "to-slate-900", "rounded-2xl", "shadow-2xl", "w-full", "max-w-2xl", "mx-4", "overflow-hidden", "border", "border-cyan-500/30"], [1, "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "p-6", "text-center"], [1, "text-3xl", "font-bold", "text-white", "mb-2"], [1, "text-cyan-100"], [1, "flex", "justify-center", "gap-2", "py-4", "bg-slate-800/50"], [1, "w-3", "h-3", "rounded-full", "transition-all"], [1, "p-6"], [1, "text-center", "space-y-6"], [1, "p-6", "bg-slate-800/50", "flex", "justify-between", "items-center"], [1, "text-sm", "text-slate-400", "hover:text-white", "transition-colors", 3, "click"], [1, "px-4", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-white", "rounded-lg", "transition-colors"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "hover:from-cyan-600", "hover:to-purple-600", "text-white", "font-medium", "rounded-lg", "transition-all"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-green-500", "to-emerald-500", "hover:from-green-600", "hover:to-emerald-600", "text-white", "font-medium", "rounded-lg", "transition-all"], [1, "grid", "grid-cols-3", "gap-4", "mb-6"], [1, "p-4", "bg-slate-700/50", "rounded-xl"], [1, "text-3xl", "mb-2"], [1, "text-sm", "font-medium", "text-white"], [1, "text-slate-300"], [1, "text-lg", "font-semibold", "text-white", "text-center", "mb-4"], [1, "p-4", "rounded-xl"], [1, "text-2xl"], [1, "font-medium", "text-white"], [1, "px-3", "py-1", "bg-slate-700", "hover:bg-slate-600", "rounded", "text-sm", "text-white", "disabled:opacity-50", 3, "click", "disabled"], [1, "block", "text-sm", "font-medium", "text-slate-300", "mb-2"], [1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModel"], ["placeholder", "qwen2:7b", 1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModel"], [1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModelChange", "ngModel"], ["placeholder", "qwen2:7b", 1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModelChange", "ngModel"], [1, "text-sm", "text-slate-300", "space-y-2"], [1, "block", "bg-slate-800", "p-2", "rounded", "text-cyan-400", "text-xs"], [1, "flex", "items-center", "gap-2", "cursor-pointer"], ["type", "checkbox", 1, "w-4", "h-4", "text-cyan-500", "rounded", 3, "change", "checked"], [1, "text-sm", "text-slate-300"], [1, "mt-2"], [1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded", "py-1", "px-2", "text-sm", "text-white", 3, "ngModelChange", "ngModel"], ["value", "gemini"], ["value", "openai"], [1, "text-6xl", "mb-4"], [1, "text-2xl", "font-bold", "text-white"], [1, "p-4", "bg-cyan-500/10", "rounded-xl", "border", "border-cyan-500/30"], [1, "text-sm", "text-slate-300", "space-y-1"], [1, "px-4", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-white", "rounded-lg", "transition-colors", 3, "click"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "hover:from-cyan-600", "hover:to-purple-600", "text-white", "font-medium", "rounded-lg", "transition-all", 3, "click"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-green-500", "to-emerald-500", "hover:from-green-600", "hover:to-emerald-600", "text-white", "font-medium", "rounded-lg", "transition-all", 3, "click"], [1, "bg-slate-800", "rounded-2xl", "shadow-2xl", "w-full", "max-w-lg", "mx-4", "overflow-hidden", "border", "border-amber-500/50"], [1, "bg-amber-500/20", "p-6", "text-center", "border-b", "border-amber-500/30"], [1, "text-5xl", "mb-3"], [1, "text-xl", "font-bold", "text-amber-400"], [1, "text-slate-400", "text-sm", "mt-2"], [1, "p-6", "space-y-4"], [1, "text-slate-300", "text-sm"], [1, "bg-slate-700/50", "rounded-lg", "p-3", "max-h-48", "overflow-y-auto", "space-y-2"], [1, "flex", "items-center", "justify-between", "p-2", "bg-slate-600/50", "rounded-lg"], [1, "bg-blue-500/10", "border", "border-blue-500/30", "rounded-lg", "p-3"], [1, "text-blue-400", "text-sm"], [1, "p-4", "bg-slate-700/30", "flex", "justify-end", "gap-3"], [1, "px-4", "py-2", "bg-slate-600", "hover:bg-slate-500", "text-white", "rounded-lg", "transition-colors", 3, "click"], [1, "px-4", "py-2", "bg-amber-500", "hover:bg-amber-600", "disabled:opacity-50", "text-white", "rounded-lg", "transition-colors", "flex", "items-center", "gap-2", 3, "click", "disabled"], [1, "text-white", "font-medium"], [1, "text-green-400", "text-xs"], [1, "text-amber-400", "text-xs"], [1, "bg-slate-800", "rounded-2xl", "shadow-2xl", "w-full", "max-w-lg", "mx-4", "overflow-hidden", "border", "border-red-500/50"], [1, "bg-red-500/20", "p-6", "text-center", "border-b", "border-red-500/30"], [1, "text-xl", "font-bold", "text-red-400"], [1, "bg-slate-700/50", "rounded-lg", "p-4", "space-y-3"], [1, "flex", "items-start", "gap-3"], ["href", "https://www.python.org/downloads/", "target", "_blank", 1, "text-cyan-400", "text-sm", "hover:underline"], [1, "text-slate-400", "text-sm"], [1, "block", "bg-slate-800", "text-green-400", "text-sm", "p-2", "rounded", "mt-1"], [1, "bg-red-500/10", "border", "border-red-500/30", "rounded-lg", "p-3"], [1, "text-red-400", "text-sm"], [1, "fixed", "bottom-4", "right-4", "z-50", "bg-red-500/90", "text-white", "px-4", "py-2", "rounded-lg", "shadow-lg", "flex", "items-center", "gap-2", "cursor-pointer", "hover:bg-red-600", 3, "click"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-[100]", 3, "click"], [1, "bg-slate-800", "rounded-2xl", "shadow-2xl", "w-full", "max-w-md", "mx-4", "overflow-hidden", "border", "border-cyan-500/30", 3, "click"], [1, "bg-gradient-to-r", "from-cyan-500/20", "to-blue-500/20", "p-4", "border-b", "border-slate-700/50"], [1, "text-lg", "font-bold", "text-white", "flex", "items-center", "gap-2"], [1, "block", "text-sm", "text-slate-400", "mb-2"], ["type", "text", "placeholder", "\u4F8B\u5982\uFF1A\u8CB7\u5BB6\u610F\u5411\u3001\u7522\u54C1\u8AEE\u8A62...", "autofocus", "", 1, "w-full", "bg-slate-900/50", "border", "border-slate-600", "rounded-lg", "px-4", "py-3", "text-white", "focus:border-cyan-500", "focus:ring-1", "focus:ring-cyan-500", "transition-colors", 3, "input", "keyup.enter", "value"], [1, "px-4", "py-2", "bg-cyan-500", "hover:bg-cyan-400", "text-white", "rounded-lg", "transition-colors", "font-medium", 3, "click"]], template: function AppComponent_Template(rf, ctx) {
+    }, features: [\u0275\u0275ProvidersFeature([AccountLoaderService, ToastService])], decls: 17, vars: 11, consts: [["onboardingRef", ""], [1, "fixed", "bottom-4", "right-4", "z-50"], [1, "fixed", "inset-0", "z-[100]", "flex", "items-center", "justify-center", "pointer-events-none"], [3, "navigate"], [3, "closeDialog", "sendComplete", "isOpen", "targets"], [3, "closeDialog", "inviteComplete", "isOpen", "targets", "accounts"], [3, "closeDialog", "startExtractionEvent", "memberCountRefreshed", "isOpen", "group"], [1, "fixed", "inset-0", "z-50", "flex", "items-center", "justify-center"], [1, "flex", "h-screen", 2, "background-color", "var(--bg-primary)", "color", "var(--text-primary)"], [1, "auth-wrapper", 2, "min-height", "100vh", "background", "linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a)"], [1, "group", "relative"], [1, "w-3", "h-3", "rounded-full", "bg-slate-500", "cursor-default"], [1, "absolute", "bottom-full", "right-0", "mb-2", "hidden", "group-hover:block"], [1, "bg-slate-800/95", "backdrop-blur-sm", "rounded-lg", "px-3", "py-2", "shadow-lg", "border", "border-slate-700", "whitespace-nowrap"], [1, "text-xs", "text-slate-400"], [1, "text-xs", "text-slate-500", "mt-1"], [1, "text-xs", "text-amber-400", "mt-1"], [1, "w-3", "h-3", "rounded-full", "bg-cyan-500", "animate-pulse", "cursor-default"], [1, "text-xs", "text-slate-300"], [1, "w-3", "h-3", "rounded-full", "bg-amber-500", "cursor-pointer", 3, "click"], [1, "text-xs", "text-amber-400"], [1, "w-3", "h-3", "rounded-full", "bg-red-500", "cursor-pointer", "animate-pulse", 3, "click"], [1, "text-xs", "text-red-400"], [1, "absolute", "inset-0", "bg-black/40", "animate-fade-in"], [1, "relative", "z-10", "animate-success-pop"], [1, "absolute", "inset-0", "-m-8", "rounded-full", "bg-gradient-to-r", "from-emerald-500/20", "to-cyan-500/20", "blur-xl", "animate-pulse"], [1, "relative", "bg-gradient-to-br", "from-slate-800", "to-slate-900", "rounded-2xl", "p-8", "shadow-2xl", "border", "border-emerald-500/30"], [1, "flex", "justify-center", "mb-4"], [1, "w-20", "h-20", "rounded-full", "bg-gradient-to-r", "from-emerald-500", "to-cyan-500", "flex", "items-center", "justify-center", "shadow-lg", "shadow-emerald-500/30"], [1, "text-4xl", "animate-bounce"], [1, "text-center"], [1, "text-xl", "font-bold", "text-white", "mb-1"], [1, "text-sm", "text-slate-400"], [1, "absolute", "-top-2", "-left-2", "w-4", "h-4", "bg-emerald-400", "rounded-full", "animate-ping"], [1, "absolute", "-top-1", "-right-3", "w-3", "h-3", "bg-cyan-400", "rounded-full", "animate-ping", 2, "animation-delay", "0.1s"], [1, "absolute", "-bottom-2", "-left-1", "w-2", "h-2", "bg-emerald-300", "rounded-full", "animate-ping", 2, "animation-delay", "0.2s"], [1, "absolute", "-bottom-1", "-right-2", "w-3", "h-3", "bg-cyan-300", "rounded-full", "animate-ping", 2, "animation-delay", "0.3s"], [1, "absolute", "inset-0", "bg-black/60", "backdrop-blur-sm", 3, "click"], [1, "relative", "z-10"], [3, "closed", "loginSuccess"], [3, "navigateEvent"], [3, "show", "title", "progress", "cancellable"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "z-[100]", "flex", "items-center", "justify-center"], [1, "backdrop-blur-sm", "flex-shrink-0", "flex", "flex-col", "sidebar", "h-screen", "transition-all", "duration-300", 2, "background-color", "var(--bg-sidebar)", "border-right", "1px solid var(--border-default)"], [1, "flex-shrink-0"], [1, "absolute", "top-3", "-right-3", "z-50", "w-6", "h-6", "rounded-full", "flex", "items-center", "justify-center", "transition-all", "duration-200", "hover:scale-110", 2, "background", "linear-gradient(135deg, #06b6d4, #8b5cf6)", "box-shadow", "0 2px 8px rgba(6, 182, 212, 0.4)", 3, "click", "title"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "w-3.5", "h-3.5", "text-white", "transition-transform", "duration-200"], ["points", "15 18 9 12 15 6"], [1, "flex", "items-center", "gap-3", "p-4"], [1, "relative", "flex-shrink-0"], [1, "absolute", "inset-0", "rounded-xl", "blur-md", "opacity-50", 2, "background", "linear-gradient(135deg, #06b6d4, #8b5cf6)"], ["viewBox", "0 0 64 64", "fill", "none", 1, "h-10", "w-10", "relative", "z-10"], ["d", "M32 8L52 20V44L32 56L12 44V20L32 8Z", "fill", "url(#sidebarLogoGrad)", "stroke", "url(#sidebarLogoStroke)", "stroke-width", "1.5"], ["d", "M22 28L40 22L34 36L28 32L22 28Z", "fill", "white", "opacity", "0.95"], ["d", "M28 32L34 36L32 42L28 32Z", "fill", "white", "opacity", "0.8"], ["d", "M24 12L28 8L32 11L36 8L40 12L38 16H26L24 12Z", "fill", "#fbbf24"], ["cx", "32", "cy", "8", "r", "1.2", "fill", "#fef3c7"], ["id", "sidebarLogoGrad", "x1", "0%", "y1", "0%", "x2", "100%", "y2", "100%"], ["offset", "0%", "stop-color", "#0891b2"], ["offset", "100%", "stop-color", "#7c3aed"], ["id", "sidebarLogoStroke", "x1", "0%", "y1", "0%", "x2", "100%", "y2", "100%"], ["offset", "0%", "stop-color", "#22d3ee"], ["offset", "100%", "stop-color", "#a78bfa"], [1, "user-profile-card", "mx-3", "mb-4", "p-3", "rounded-xl", "cursor-pointer", "transition-all", "duration-300", "hover:scale-[1.02]", "group", 3, "click"], [1, "flex", "items-center", "gap-3"], [1, "avatar-wrapper", "relative"], [1, "avatar-glow", "absolute", "inset-0", "rounded-full", "opacity-0", "group-hover:opacity-100", "transition-opacity", "duration-300"], [1, "avatar-border", "w-12", "h-12", "rounded-full", "p-[2px]"], [1, "w-full", "h-full", "rounded-full", "flex", "items-center", "justify-center", "text-white", "font-bold", "text-lg", "avatar-inner"], [1, "vip-badge", "absolute", "-bottom-1", "-right-1", "w-5", "h-5", "rounded-full", "flex", "items-center", "justify-center", "text-[10px]", "shadow-lg", 3, "badge-silver", "badge-gold", "badge-diamond", "badge-star", "badge-king"], [1, "flex-1", "min-w-0"], [1, "text-sm", "font-semibold", "truncate", 2, "color", "var(--text-primary)"], [1, "flex", "items-center", "gap-1.5", "mt-0.5"], ["size", "sm", 3, "level"], [1, "arrow-icon", "transition-transform", "duration-300", "group-hover:translate-x-1"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "w-4", "h-4", 2, "color", "var(--text-muted)"], ["points", "9 18 15 12 9 6"], [1, "flex-1", "overflow-y-auto", "overflow-x-hidden", "sidebar-nav", "mt-2", "px-2", "pb-2"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", "stroke-linecap", "round", "stroke-linejoin", "round", 1, "h-5", "w-5", "sidebar-icon"], ["points", "12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"], ["x", "1", "y", "4", "width", "22", "height", "16", "rx", "2", "ry", "2"], ["x1", "1", "y1", "10", "x2", "23", "y2", "10"], ["x", "3", "y", "3", "width", "7", "height", "7"], ["x", "14", "y", "3", "width", "7", "height", "7"], ["x", "14", "y", "14", "width", "7", "height", "7"], ["x", "3", "y", "14", "width", "7", "height", "7"], [1, "sidebar-group"], [1, "w-full", "flex", "items-center", "justify-between", "px-3", "py-2", "mt-2", "rounded-md", "hover:bg-white/5", "transition-colors", "cursor-pointer", "group", 3, "click"], [1, "sidebar-group-title", "text-xs", "uppercase", "tracking-wider", "flex", "items-center", "gap-1", 2, "color", "var(--sidebar-group-title)"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "w-3.5", "h-3.5", "transition-transform", "duration-200", 2, "color", "var(--sidebar-group-title)"], ["points", "6 9 12 15 18 9"], [1, "sidebar-group-content", "overflow-hidden"], [1, "sidebar-group-title", "text-xs", "uppercase", "tracking-wider", "font-semibold", "flex", "items-center", "gap-1", 2, "color", "var(--sidebar-group-title)"], [1, "inline-block", "w-5", "h-5", "rounded", "bg-gradient-to-br", "from-cyan-500", "to-blue-500", "text-center", "leading-5", "text-[10px]"], [1, "inline-block", "w-5", "h-5", "rounded", "bg-gradient-to-br", "from-violet-500", "to-fuchsia-500", "text-center", "leading-5", "text-[10px]"], [1, "flex-shrink-0", "p-4", "space-y-3", "border-t", 2, "border-color", "var(--border-default)", "background-color", "var(--bg-sidebar)"], [1, "w-full", "flex", "items-center", "justify-center", "gap-2", "px-4", "py-2.5", "bg-gradient-to-r", "from-cyan-500/10", "to-blue-500/10", "hover:from-cyan-500/20", "hover:to-blue-500/20", "border", "border-cyan-500/30", "hover:border-cyan-500/50", "text-cyan-400", "rounded-xl", "transition-all", "text-sm", "font-medium", "group", 3, "click"], [1, "text-lg", "group-hover:animate-bounce"], [1, "block", "text-sm", "font-medium", "mb-2", 2, "color", "var(--sidebar-group-title)"], [1, "flex", "rounded-md", "shadow-sm", "p-1", 2, "background-color", "var(--bg-tertiary)"], [1, "w-full", "text-sm", "py-1.5", "rounded", "transition-colors", "flex", "items-center", "justify-center", "gap-2", 3, "click"], ["xmlns", "http://www.w3.org/2000/svg", "fill", "none", "viewBox", "0 0 24 24", "stroke", "currentColor", 1, "h-4", "w-4"], ["stroke-linecap", "round", "stroke-linejoin", "round", "stroke-width", "2", "d", "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"], ["stroke-linecap", "round", "stroke-linejoin", "round", "stroke-width", "2", "d", "M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"], [1, "flex-1", "p-8", "overflow-y-auto", 2, "background-color", "var(--bg-primary)"], [1, "h-full", "p-6", "overflow-auto"], [1, "h-full", "overflow-auto"], [1, "fixed", "inset-0", "bg-black/70", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-50"], [1, "fixed", "inset-0", "bg-black/70", "flex", "items-center", "justify-center", "z-50", "backdrop-blur-sm"], [1, "fixed", "inset-0", "bg-black/70", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-[100]"], [1, "fixed", "bottom-4", "right-4", "z-50", "bg-red-500/90", "text-white", "px-4", "py-2", "rounded-lg", "shadow-lg", "flex", "items-center", "gap-2", "cursor-pointer", "hover:bg-red-600"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-[100]"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "z-[100]", "flex", "items-center", "justify-center", 3, "click"], [1, "bg-slate-900", "border", "border-slate-700", "rounded-2xl", "shadow-2xl", "w-full", "max-w-md", "mx-4", "overflow-hidden", 3, "click"], [1, "px-6", "py-4", "border-b", "border-slate-700", "flex", "items-center", "gap-3"], [1, "p-2", "bg-red-500/20", "rounded-lg"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-6", "w-6", "text-red-400"], ["d", "M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"], ["x1", "10", "y1", "11", "x2", "10", "y2", "17"], ["x1", "14", "y1", "11", "x2", "14", "y2", "17"], [1, "text-lg", "font-bold", "text-white"], [1, "px-6", "py-6"], [1, "text-slate-300", "mb-4"], [1, "bg-red-500/10", "border", "border-red-500/20", "rounded-lg", "p-3", "text-sm", "text-red-300"], [1, "px-6", "py-4", "border-t", "border-slate-700", "flex", "justify-end", "gap-3"], [1, "px-4", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-slate-300", "rounded-lg", "transition-colors", 3, "click"], [1, "px-4", "py-2", "bg-red-500", "hover:bg-red-600", "text-white", "rounded-lg", "transition-colors", "flex", "items-center", "gap-2", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-4", "w-4"], [1, "font-bold", "text-cyan-400"], [1, "font-bold", "text-red-400"], [1, "p-2", "bg-emerald-500/20", "rounded-lg"], [1, "text-xl"], [1, "px-6", "py-4", "max-h-64", "overflow-y-auto"], [1, "text-center", "py-8", "text-slate-400"], [1, "space-y-2"], [1, "px-6", "py-4", "border-t", "border-slate-700"], [1, "w-full", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-slate-300", "rounded-lg", "transition-colors", 3, "click"], [1, "mb-2"], [1, "text-cyan-400", "hover:underline", "text-sm", 3, "click"], [1, "w-full", "p-3", "bg-slate-800/50", "hover:bg-emerald-500/20", "border", "border-slate-700", "hover:border-emerald-500/50", "rounded-xl", "text-left", "transition-all", "group"], [1, "w-full", "p-3", "bg-slate-800/50", "hover:bg-emerald-500/20", "border", "border-slate-700", "hover:border-emerald-500/50", "rounded-xl", "text-left", "transition-all", "group", 3, "click"], [1, "flex", "items-center", "justify-between"], [1, "font-medium", "text-white", "group-hover:text-emerald-400"], [1, "text-xs", "text-slate-500"], [1, "text-emerald-400", "opacity-0", "group-hover:opacity-100", "transition-opacity"], [1, "text-xl", "font-bold", "bg-gradient-to-r", "from-cyan-400", "to-purple-400", "bg-clip-text", "text-transparent"], [1, "text-xs", 2, "color", "var(--text-muted)"], [1, "vip-badge", "absolute", "-bottom-1", "-right-1", "w-5", "h-5", "rounded-full", "flex", "items-center", "justify-center", "text-[10px]", "shadow-lg"], [1, "animate-pulse"], [1, "animate-bounce"], ["data-tour", "accounts", 1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click"], ["d", "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"], ["cx", "9", "cy", "7", "r", "4"], ["d", "M23 21v-2a4 4 0 0 0-3-3.87"], ["d", "M16 3.13a4 4 0 0 1 0 7.75"], ["data-tour", "search-discovery", 1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", "relative", 3, "click"], ["cx", "11", "cy", "11", "r", "8"], ["d", "M21 21l-4.35-4.35"], [1, "absolute", "right-2", "px-1.5", "py-0.5", "text-[10px]", "bg-gradient-to-r", "from-cyan-500", "to-blue-500", "text-white", "rounded-full", "font-bold"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", "relative", 3, "click"], ["cx", "12", "cy", "5", "rx", "9", "ry", "3"], ["d", "M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"], ["d", "M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"], ["d", "M22 2L11 13"], ["d", "M22 2L15 22L11 13L2 9L22 2Z"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-lg", "transition-all", "duration-200", "cursor-pointer", "mb-1", "relative", "group", 3, "click"], [1, "w-8", "h-8", "rounded-lg", "flex", "items-center", "justify-center", "transition-all"], [1, "text-lg"], [1, "flex", "flex-col"], [1, "font-medium"], [1, "text-[10px]", "opacity-60"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click"], [1, "text-lg", "ml-1"], [1, "ml-auto", "text-xs", "px-1.5", "py-0.5", "bg-violet-500/20", "text-violet-400", "rounded"], ["data-tour", "ai-assistant", 1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-lg", "transition-all", "duration-200", "cursor-pointer", "mb-1.5", "relative", "group", 3, "click", "title"], [1, "absolute", "right-2", "px-2", "py-0.5", "text-[9px]", "bg-gradient-to-r", "from-orange-500", "to-amber-500", "text-white", "rounded-full", "font-bold", "shadow-lg", "shadow-orange-500/20"], [1, "absolute", "right-2", "text-xs"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-lg", "transition-all", "duration-200", "cursor-pointer", "mb-1.5", "relative", "group", 3, "click", "title"], [1, "absolute", "right-2", "px-2", "py-0.5", "text-[9px]", "bg-gradient-to-r", "from-purple-500", "to-pink-500", "text-white", "rounded-full", "font-bold", "shadow-lg", "shadow-purple-500/20"], [1, "absolute", "right-2", "px-2", "py-0.5", "text-[9px]", "bg-gradient-to-r", "from-cyan-500", "to-blue-500", "text-white", "rounded-full", "font-bold", "shadow-lg", "shadow-cyan-500/20"], ["d", "M18 20V10"], ["d", "M12 20V4"], ["d", "M6 20v-6"], ["d", "M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"], ["cx", "12", "cy", "12", "r", "4"], [1, "ml-auto", "px-1.5", "py-0.5", "text-xs", "bg-pink-500/20", "text-pink-400", "rounded"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click", "title"], [1, "ml-auto", "text-xs", "opacity-60"], [1, "knowledge-menu"], [1, "flex-1"], [1, "text-xs", "transition-transform", "duration-200"], [1, "pl-6", "space-y-1"], ["d", "M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3"], [1, "sidebar-item", "flex", "items-center", "gap-2", "px-3", "py-2", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "text-sm", 3, "click"], [1, "sidebar-item", "flex", "items-center", "gap-2", "px-3", "py-2", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "text-sm", "relative", 3, "click"], [1, "ml-auto", "text-xs", "font-bold", "rounded-full", "px-1.5", "py-0.5", 2, "background-color", "rgba(239, 68, 68, 0.2)", "color", "#f87171"], ["cx", "12", "cy", "12", "r", "3"], ["d", "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"], [3, "accountAdded", "back"], [1, "fixed", "inset-0", "bg-black/70", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-50", 3, "click"], [1, "bg-gradient-to-br", "from-slate-900", "via-slate-900", "to-slate-800", "border", "border-cyan-500/30", "rounded-2xl", "shadow-2xl", "shadow-cyan-500/10", "w-full", "max-w-2xl", "max-h-[90vh]", "overflow-hidden", "text-slate-200", 3, "click"], [1, "bg-gradient-to-r", "from-cyan-500/10", "via-blue-500/10", "to-purple-500/10", "border-b", "border-cyan-500/20", "p-5"], [1, "flex", "justify-between", "items-start"], [1, "flex", "items-center", "gap-4"], [1, "w-14", "h-14", "rounded-full", "bg-gradient-to-br", "from-cyan-500", "to-blue-600", "flex", "items-center", "justify-center", "text-white", "font-bold", "text-xl", "shadow-lg", "shadow-cyan-500/30"], [1, "flex", "items-center", "gap-2"], [1, "text-xl", "font-bold", "text-white"], [1, "h-2.5", "w-2.5", "rounded-full", "animate-pulse"], [1, "text-sm", "text-cyan-400"], [1, "flex", "items-center", "gap-2", "mt-1", "flex-wrap"], [1, "text-xs", "px-2", "py-0.5", "rounded-full", "bg-purple-500/20", "text-purple-400", "border", "border-purple-500/30"], [1, "text-xs", "px-2", "py-0.5", "rounded-full", "bg-cyan-500/20", "text-cyan-400", "border", "border-cyan-500/30"], [1, "text-xs", "px-2", "py-0.5", "rounded-full", 3, "class"], [1, "text-slate-400", "hover:text-white", "text-2xl", "leading-none", "transition-colors", "p-2", "hover:bg-white/10", "rounded-lg", 3, "click"], [1, "border-b", "border-cyan-500/20", "bg-slate-900/50"], ["aria-label", "Tabs", 1, "flex", "px-5"], [1, "whitespace-nowrap", "py-3", "px-4", "border-b-2", "border-transparent", "font-medium", "text-sm", "cursor-pointer", "text-slate-400", "hover:text-cyan-400", "hover:bg-cyan-500/5", "transition-all", "rounded-t-lg", "flex", "items-center", "gap-2", 3, "click"], [1, "overflow-y-auto", "max-h-[calc(90vh-220px)]", "p-5"], [1, "space-y-4"], [1, "py-4"], [1, "text-xs", "px-2", "py-0.5", "rounded-full"], [1, "bg-slate-800/50", "rounded-xl", "p-4", "border", "border-slate-700/50"], [1, "block", "text-sm", "font-medium", "text-cyan-400", "mb-2"], [1, "form-select", "w-full", "bg-slate-900/50", "border-cyan-500/30", "rounded-lg", "py-2.5", "px-3", "text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", "focus:border-cyan-500", 3, "ngModelChange", "ngModel"], ["value", ""], [1, "mt-2", "p-2", "bg-amber-500/10", "border", "border-amber-500/30", "rounded-lg"], [1, "grid", "grid-cols-3", "gap-3"], [1, "cursor-pointer", "p-3", "rounded-xl", "border-2", "transition-all", "text-center", 3, "click"], [1, "text-2xl", "mb-1"], [1, "text-sm", "font-medium"], [1, "space-y-3"], [1, "flex", "items-center", "justify-between", "mb-2"], [1, "text-sm", "font-medium", "text-cyan-400"], [1, "text-xs", "text-slate-500", "bg-slate-700/50", "px-2", "py-1", "rounded"], ["rows", "5", 1, "form-textarea", "w-full", "bg-slate-900/50", "border-cyan-500/30", "rounded-lg", "py-3", "px-3", "text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", "resize-none", "placeholder-slate-500", 3, "ngModelChange", "ngModel", "placeholder"], [1, "flex", "items-center", "gap-3", "flex-wrap"], [1, "flex", "items-center", "gap-2", "bg-slate-800/50", "hover:bg-cyan-500/20", "text-slate-300", "hover:text-cyan-400", "text-sm", "font-medium", "py-2", "px-4", "rounded-lg", "transition-all", "border", "border-slate-700/50", "hover:border-cyan-500/30", 3, "click"], [1, "p-3", "rounded-xl", "bg-cyan-500/10", "border", "border-cyan-500/30"], [1, "p-3", "bg-amber-500/10", "border", "border-amber-500/30", "rounded-xl"], [1, "p-3", "bg-red-500/10", "border", "border-red-500/30", "rounded-xl"], [1, "flex", "justify-between", "items-center", "pt-4", "border-t", "border-cyan-500/20"], [1, "text-sm", "text-red-400", "hover:text-red-300", "disabled:text-slate-500", "disabled:cursor-not-allowed", "flex", "items-center", "gap-1.5", "px-3", "py-2", "rounded-lg", "hover:bg-red-500/10", "transition-all", 3, "click", "disabled"], [1, "flex", "gap-3"], [1, "bg-slate-700/80", "hover:bg-slate-600", "text-slate-300", "font-medium", "py-2.5", "px-5", "rounded-xl", "transition-all", "border", "border-slate-600/50", "hover:border-slate-500", 3, "click"], [1, "bg-gradient-to-r", "from-cyan-500", "to-blue-500", "hover:from-cyan-400", "hover:to-blue-400", "text-white", "font-bold", "py-2.5", "px-6", "rounded-xl", "shadow-lg", "shadow-cyan-500/30", "disabled:from-slate-500", "disabled:to-slate-600", "disabled:shadow-none", "disabled:cursor-not-allowed", "flex", "items-center", "gap-2", "transition-all", 3, "click", "disabled"], [3, "value"], [1, "text-xs", "text-cyan-400", "hover:underline", "cursor-pointer", "mt-1", "inline-block", 3, "click"], [1, "flex", "items-center", "justify-between", "p-2", "bg-slate-200/30", "dark:bg-slate-800/30", "rounded-lg"], [1, "text-xs", "text-green-400"], [1, "text-xs", "bg-purple-500/20", "text-purple-400", "px-2", "py-1", "rounded"], [1, "p-2", "bg-cyan-500/10", "border", "border-cyan-500/20", "rounded-lg", "text-xs", "text-slate-400"], [1, "block", "text-sm", "font-medium", "text-slate-500", "dark:text-slate-400", "mb-1"], ["rows", "2", 1, "form-textarea", "w-full", "bg-slate-200/50", "dark:bg-slate-800/50", "border-slate-300", "dark:border-slate-700", "rounded-lg", "py-2", "px-3", "text-slate-800", "dark:text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", 3, "ngModelChange", "ngModel", "placeholder"], [1, "flex", "items-center", "justify-center", "gap-3"], [1, "bg-gradient-to-r", "from-purple-500", "to-cyan-500", "hover:from-purple-600", "hover:to-cyan-600", "text-white", "font-bold", "py-2", "px-6", "rounded-lg", "transition", "duration-200", "shadow-lg", "disabled:from-slate-400", "disabled:to-slate-500", "disabled:shadow-none", "disabled:cursor-not-allowed", "flex", "items-center", "gap-2", 3, "click", "disabled"], ["title", "\u91CD\u65B0\u751F\u6210", 1, "p-2", "bg-slate-600", "hover:bg-slate-500", "text-white", "rounded-lg"], [1, "p-3", "bg-amber-500/10", "border", "border-amber-500/20", "text-amber-400", "rounded-lg", "text-sm", "text-center"], [1, "p-3", "bg-red-500/10", "border", "border-red-500/20", "text-red-400", "rounded-lg", "text-sm"], [1, "p-3", "bg-green-500/10", "border", "border-green-500/20", "rounded-lg"], [1, "text-cyan-400"], [1, "animate-spin"], ["title", "\u91CD\u65B0\u751F\u6210", 1, "p-2", "bg-slate-600", "hover:bg-slate-500", "text-white", "rounded-lg", 3, "click"], [1, "text-cyan-400", "hover:underline", "cursor-pointer", "ml-1", 3, "click"], [1, "ml-2", "text-cyan-400", "hover:underline", 3, "click"], [1, "text-xs", "text-green-400", "mb-2"], [1, "form-select", "w-full", "bg-slate-900/50", "border-cyan-500/30", "rounded-lg", "py-2.5", "px-3", "text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", 3, "change"], [1, "flex", "items-center", "gap-2", "bg-green-500/20", "hover:bg-green-500/30", "text-green-400", "text-sm", "font-medium", "py-2", "px-3", "rounded-lg", "transition-all", "border", "border-green-500/30", 3, "click"], [1, "flex", "items-center", "gap-2", "bg-red-500/20", "hover:bg-red-500/30", "text-red-400", "text-sm", "font-medium", "py-2", "px-3", "rounded-lg", "transition-all", "border", "border-red-500/30", 3, "click"], [1, "text-sm", "text-cyan-400", "font-medium"], [1, "space-y-2", "max-h-40", "overflow-y-auto"], [1, "flex", "items-center", "justify-between", "text-sm", "bg-slate-800/50", "rounded-lg", "px-3", "py-2"], [1, "flex", "items-center", "gap-2", "truncate", "flex-1", "min-w-0"], [1, "text-green-400"], [1, "text-blue-400"], [1, "truncate", "text-white"], [1, "text-slate-500", "text-xs", "whitespace-nowrap"], [1, "text-green-500", "text-xs"], [1, "text-red-400", "hover:text-red-300", "text-lg", "font-bold", "p-1", "hover:bg-red-500/20", "rounded", "ml-2", 3, "click"], [1, "text-sm", "text-amber-400"], [1, "text-sm", "text-red-400"], [1, "mb-4", "flex", "items-center", "justify-between"], [1, "bg-cyan-500", "hover:bg-cyan-600", "text-white", "font-bold", "py-2", "px-4", "rounded-lg", "text-sm", "disabled:bg-slate-500", "disabled:cursor-not-allowed", "flex", "items-center", "gap-2", 3, "click", "disabled"], [1, "h-96", "overflow-y-auto", "space-y-3", "mb-4", "bg-slate-200/30", "dark:bg-slate-800/30", "rounded-lg", "p-4"], [1, "h-96", "overflow-y-auto"], [1, "space-y-3", "mb-4"], [1, "text-center", "py-8"], [1, "mt-4", "p-3", "bg-slate-800/50", "rounded-lg", "border", "border-cyan-500/20"], [1, "h-96", "overflow-y-auto", "space-y-3", "mb-4", "bg-slate-200/30", "dark:bg-slate-800/30", "rounded-lg", "p-4", 3, "scroll"], [1, "text-center", "py-4"], [1, "text-center", "py-2"], [1, "flex", "justify-start"], [1, "flex", "justify-end"], [1, "max-w-[75%]"], [1, "bg-slate-700", "text-white", "rounded-2xl", "rounded-bl-sm", "px-4", "py-2"], [1, "text-sm"], [1, "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "text-white", "rounded-2xl", "rounded-br-sm", "px-4", "py-2", "shadow-lg"], [1, "flex", "items-center", "justify-end", "gap-2", "mt-1"], [1, "text-xs", "bg-purple-500/20", "text-purple-400", "px-1.5", "py-0.5", "rounded"], [1, "animate-spin", "text-cyan-400"], [1, "ml-2", "text-sm", "text-slate-500"], [1, "text-sm", "text-cyan-400", "hover:text-cyan-300", 3, "click"], [1, "flex", "justify-center"], [1, "bg-slate-800/50", "text-slate-400", "text-xs", "px-3", "py-1", "rounded-full"], [1, "text-4xl", "mb-2"], [1, "text-slate-500", "dark:text-slate-400"], [1, "text-xs", "text-slate-500", "mt-2"], [1, "text-sm", "font-medium", "text-cyan-400", "mb-2", "flex", "items-center", "gap-2"], [1, "grid", "grid-cols-3", "gap-2", "text-center", "text-xs"], [1, "p-2", "bg-slate-700/50", "rounded"], [1, "text-slate-400"], [1, "text-sm", "font-bold", "text-cyan-400"], [1, "fixed", "inset-0", "bg-black/70", "flex", "items-center", "justify-center", "z-50", "backdrop-blur-sm", 3, "click"], [1, "bg-slate-100", "dark:bg-slate-900", "rounded-2xl", "shadow-2xl", "border", "border-slate-300", "dark:border-slate-700", "w-full", "max-w-3xl", "max-h-[80vh]", "overflow-hidden", 3, "click"], [1, "p-4", "border-b", "border-slate-300", "dark:border-slate-700", "flex", "items-center", "justify-between", "bg-slate-200/50", "dark:bg-slate-800/50"], [1, "text-lg", "font-bold", "text-slate-900", "dark:text-white", "flex", "items-center", "gap-2"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-5", "w-5", "text-purple-500"], ["d", "M3 3v5h5"], ["d", "M3.05 13A9 9 0 1 0 6 5.3L3 8"], ["d", "M12 7v5l4 2"], [1, "text-slate-500", "hover:text-slate-700", "dark:text-slate-400", "dark:hover:text-white", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-5", "w-5"], ["x1", "18", "y1", "6", "x2", "6", "y2", "18"], ["x1", "6", "y1", "6", "x2", "18", "y2", "18"], [1, "p-4", "overflow-y-auto", "max-h-[60vh]"], [1, "text-center", "py-8", "text-slate-500"], [1, "p-4", "border-t", "border-slate-300", "dark:border-slate-700", "bg-slate-200/50", "dark:bg-slate-800/50", "flex", "justify-end"], [1, "px-4", "py-2", "bg-slate-300", "dark:bg-slate-700", "hover:bg-slate-400", "dark:hover:bg-slate-600", "rounded-lg", "text-sm", "font-medium", "transition-colors", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-12", "w-12", "mx-auto", "mb-3", "text-slate-400"], ["cx", "12", "cy", "12", "r", "10"], ["d", "M12 8v4l3 3"], [1, "bg-slate-200/50", "dark:bg-slate-800/50", "rounded-lg", "p-3", "border", "border-slate-300", "dark:border-slate-700", 3, "opacity-50"], [1, "bg-slate-200/50", "dark:bg-slate-800/50", "rounded-lg", "p-3", "border", "border-slate-300", "dark:border-slate-700"], [1, "p-2", "rounded-lg"], [1, "font-medium", "text-slate-900", "dark:text-white"], [1, "text-yellow-500", "ml-2"], [1, "text-red-400", "ml-2"], [1, "text-xs", "bg-yellow-500/20", "hover:bg-yellow-500/30", "text-yellow-400", "px-2", "py-1", "rounded"], [1, "text-xs", "bg-yellow-500/20", "hover:bg-yellow-500/30", "text-yellow-400", "px-2", "py-1", "rounded", 3, "click"], [1, "bg-gradient-to-br", "from-slate-800", "to-slate-900", "rounded-2xl", "shadow-2xl", "w-full", "max-w-2xl", "mx-4", "overflow-hidden", "border", "border-cyan-500/30"], [1, "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "p-6", "text-center"], [1, "text-3xl", "font-bold", "text-white", "mb-2"], [1, "text-cyan-100"], [1, "flex", "justify-center", "gap-2", "py-4", "bg-slate-800/50"], [1, "w-3", "h-3", "rounded-full", "transition-all"], [1, "p-6"], [1, "text-center", "space-y-6"], [1, "p-6", "bg-slate-800/50", "flex", "justify-between", "items-center"], [1, "text-sm", "text-slate-400", "hover:text-white", "transition-colors", 3, "click"], [1, "px-4", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-white", "rounded-lg", "transition-colors"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "hover:from-cyan-600", "hover:to-purple-600", "text-white", "font-medium", "rounded-lg", "transition-all"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-green-500", "to-emerald-500", "hover:from-green-600", "hover:to-emerald-600", "text-white", "font-medium", "rounded-lg", "transition-all"], [1, "grid", "grid-cols-3", "gap-4", "mb-6"], [1, "p-4", "bg-slate-700/50", "rounded-xl"], [1, "text-3xl", "mb-2"], [1, "text-sm", "font-medium", "text-white"], [1, "text-slate-300"], [1, "text-lg", "font-semibold", "text-white", "text-center", "mb-4"], [1, "p-4", "rounded-xl"], [1, "text-2xl"], [1, "font-medium", "text-white"], [1, "px-3", "py-1", "bg-slate-700", "hover:bg-slate-600", "rounded", "text-sm", "text-white", "disabled:opacity-50", 3, "click", "disabled"], [1, "block", "text-sm", "font-medium", "text-slate-300", "mb-2"], [1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModel"], ["placeholder", "qwen2:7b", 1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModel"], [1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModelChange", "ngModel"], ["placeholder", "qwen2:7b", 1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModelChange", "ngModel"], [1, "text-sm", "text-slate-300", "space-y-2"], [1, "block", "bg-slate-800", "p-2", "rounded", "text-cyan-400", "text-xs"], [1, "flex", "items-center", "gap-2", "cursor-pointer"], ["type", "checkbox", 1, "w-4", "h-4", "text-cyan-500", "rounded", 3, "change", "checked"], [1, "text-sm", "text-slate-300"], [1, "mt-2"], [1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded", "py-1", "px-2", "text-sm", "text-white", 3, "ngModelChange", "ngModel"], ["value", "gemini"], ["value", "openai"], [1, "text-6xl", "mb-4"], [1, "text-2xl", "font-bold", "text-white"], [1, "p-4", "bg-cyan-500/10", "rounded-xl", "border", "border-cyan-500/30"], [1, "text-sm", "text-slate-300", "space-y-1"], [1, "px-4", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-white", "rounded-lg", "transition-colors", 3, "click"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "hover:from-cyan-600", "hover:to-purple-600", "text-white", "font-medium", "rounded-lg", "transition-all", 3, "click"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-green-500", "to-emerald-500", "hover:from-green-600", "hover:to-emerald-600", "text-white", "font-medium", "rounded-lg", "transition-all", 3, "click"], [1, "bg-slate-800", "rounded-2xl", "shadow-2xl", "w-full", "max-w-lg", "mx-4", "overflow-hidden", "border", "border-amber-500/50"], [1, "bg-amber-500/20", "p-6", "text-center", "border-b", "border-amber-500/30"], [1, "text-5xl", "mb-3"], [1, "text-xl", "font-bold", "text-amber-400"], [1, "text-slate-400", "text-sm", "mt-2"], [1, "p-6", "space-y-4"], [1, "text-slate-300", "text-sm"], [1, "bg-slate-700/50", "rounded-lg", "p-3", "max-h-48", "overflow-y-auto", "space-y-2"], [1, "flex", "items-center", "justify-between", "p-2", "bg-slate-600/50", "rounded-lg"], [1, "bg-blue-500/10", "border", "border-blue-500/30", "rounded-lg", "p-3"], [1, "text-blue-400", "text-sm"], [1, "p-4", "bg-slate-700/30", "flex", "justify-end", "gap-3"], [1, "px-4", "py-2", "bg-slate-600", "hover:bg-slate-500", "text-white", "rounded-lg", "transition-colors", 3, "click"], [1, "px-4", "py-2", "bg-amber-500", "hover:bg-amber-600", "disabled:opacity-50", "text-white", "rounded-lg", "transition-colors", "flex", "items-center", "gap-2", 3, "click", "disabled"], [1, "text-white", "font-medium"], [1, "text-green-400", "text-xs"], [1, "text-amber-400", "text-xs"], [1, "bg-slate-800", "rounded-2xl", "shadow-2xl", "w-full", "max-w-lg", "mx-4", "overflow-hidden", "border", "border-red-500/50"], [1, "bg-red-500/20", "p-6", "text-center", "border-b", "border-red-500/30"], [1, "text-xl", "font-bold", "text-red-400"], [1, "bg-slate-700/50", "rounded-lg", "p-4", "space-y-3"], [1, "flex", "items-start", "gap-3"], ["href", "https://www.python.org/downloads/", "target", "_blank", 1, "text-cyan-400", "text-sm", "hover:underline"], [1, "text-slate-400", "text-sm"], [1, "block", "bg-slate-800", "text-green-400", "text-sm", "p-2", "rounded", "mt-1"], [1, "bg-red-500/10", "border", "border-red-500/30", "rounded-lg", "p-3"], [1, "text-red-400", "text-sm"], [1, "fixed", "bottom-4", "right-4", "z-50", "bg-red-500/90", "text-white", "px-4", "py-2", "rounded-lg", "shadow-lg", "flex", "items-center", "gap-2", "cursor-pointer", "hover:bg-red-600", 3, "click"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-[100]", 3, "click"], [1, "bg-slate-800", "rounded-2xl", "shadow-2xl", "w-full", "max-w-md", "mx-4", "overflow-hidden", "border", "border-cyan-500/30", 3, "click"], [1, "bg-gradient-to-r", "from-cyan-500/20", "to-blue-500/20", "p-4", "border-b", "border-slate-700/50"], [1, "text-lg", "font-bold", "text-white", "flex", "items-center", "gap-2"], [1, "block", "text-sm", "text-slate-400", "mb-2"], ["type", "text", "placeholder", "\u4F8B\u5982\uFF1A\u8CB7\u5BB6\u610F\u5411\u3001\u7522\u54C1\u8AEE\u8A62...", "autofocus", "", 1, "w-full", "bg-slate-900/50", "border", "border-slate-600", "rounded-lg", "px-4", "py-3", "text-white", "focus:border-cyan-500", "focus:ring-1", "focus:ring-cyan-500", "transition-colors", 3, "input", "keyup.enter", "value"], [1, "px-4", "py-2", "bg-cyan-500", "hover:bg-cyan-400", "text-white", "rounded-lg", "transition-colors", "font-medium", 3, "click"]], template: function AppComponent_Template(rf, ctx) {
       if (rf & 1) {
         \u0275\u0275element(0, "app-network-status")(1, "app-auth-transition")(2, "app-toast")(3, "app-global-confirm-dialog")(4, "app-global-input-dialog");
         \u0275\u0275conditionalCreate(5, AppComponent_Conditional_5_Template, 5, 1, "div", 1);
@@ -71492,7 +71690,7 @@ ${details}`, 12e3);
         \u0275\u0275elementEnd();
         \u0275\u0275element(11, "app-membership-dialog")(12, "app-payment")(13, "app-upgrade-prompt");
         \u0275\u0275conditionalCreate(14, AppComponent_Conditional_14_Template, 4, 0, "div", 7);
-        \u0275\u0275conditionalCreate(15, AppComponent_Conditional_15_Template, 191, 136, "div", 8)(16, AppComponent_Conditional_16_Template, 2, 0, "div", 9);
+        \u0275\u0275conditionalCreate(15, AppComponent_Conditional_15_Template, 186, 136, "div", 8)(16, AppComponent_Conditional_16_Template, 2, 0, "div", 9);
       }
       if (rf & 2) {
         \u0275\u0275advance(5);
@@ -71561,6 +71759,8 @@ ${details}`, 12e3);
       GlobalConfirmDialogComponent,
       GlobalInputDialogComponent,
       ProgressDialogComponent,
+      // 🔧 P1-2: 統一會員等級徽章組件
+      UserLevelBadgeComponent,
       // 會員相關（模板中使用）
       MembershipDialogComponent,
       UpgradePromptComponent,
@@ -71632,6 +71832,8 @@ ${details}`, 12e3);
       GlobalConfirmDialogComponent,
       GlobalInputDialogComponent,
       ProgressDialogComponent,
+      // 🔧 P1-2: 統一會員等級徽章組件
+      UserLevelBadgeComponent,
       // 會員相關（模板中使用）
       MembershipDialogComponent,
       UpgradePromptComponent,
@@ -72053,45 +72255,8 @@ ${details}`, 12e3);
                 {{ currentUser()?.displayName || currentUser()?.username || '\u7528\u6236' }}
               </div>
               <div class="flex items-center gap-1.5 mt-0.5">
-                <!-- \u6703\u54E1\u6A19\u7C64\uFF08\u738B\u8005\u69AE\u8000\u98A8\u683C\uFF09 -->
-                @switch (userMembershipLevel()) {
-                  @case ('silver') {
-                    <span class="vip-tag vip-tag-silver">
-                      <span class="vip-icon">\u{1F948}</span>
-                      <span class="vip-text">{{ t('membershipLevels.silver') }}</span>
-                    </span>
-                  }
-                  @case ('gold') {
-                    <span class="vip-tag vip-tag-gold">
-                      <span class="vip-icon">\u{1F947}</span>
-                      <span class="vip-text">{{ t('membershipLevels.gold') }}</span>
-                    </span>
-                  }
-                  @case ('diamond') {
-                    <span class="vip-tag vip-tag-diamond">
-                      <span class="vip-icon">\u{1F48E}</span>
-                      <span class="vip-text">{{ t('membershipLevels.diamond') }}</span>
-                    </span>
-                  }
-                  @case ('star') {
-                    <span class="vip-tag vip-tag-star">
-                      <span class="vip-icon">\u{1F31F}</span>
-                      <span class="vip-text">{{ t('membershipLevels.star') }}</span>
-                    </span>
-                  }
-                  @case ('king') {
-                    <span class="vip-tag vip-tag-king">
-                      <span class="vip-icon">\u{1F451}</span>
-                      <span class="vip-text">{{ t('membershipLevels.king') }}</span>
-                    </span>
-                  }
-                  @default {
-                    <span class="vip-tag vip-tag-bronze">
-                      <span class="vip-icon">\u2694\uFE0F</span>
-                      <span class="vip-text">{{ t('membershipLevels.bronze') }}</span>
-                    </span>
-                  }
-                }
+                <!-- \u{1F527} P1-2: \u4F7F\u7528\u7D71\u4E00\u7684\u6703\u54E1\u7B49\u7D1A\u5FBD\u7AE0\u7D44\u4EF6 -->
+                <user-level-badge [level]="userMembershipLevel()" size="sm" />
               </div>
             </div>
             
@@ -73719,7 +73884,7 @@ ${details}`, 12e3);
   }] });
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(AppComponent, { className: "AppComponent", filePath: "src/app.component.ts", lineNumber: 332 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(AppComponent, { className: "AppComponent", filePath: "src/app.component.ts", lineNumber: 335 });
 })();
 
 // src/guards/auth.guard.ts
@@ -73815,7 +73980,7 @@ var routes = [
   // 認證路由（公開）
   {
     path: "auth",
-    loadChildren: () => import("./chunk-RJSAITN2.js").then((m) => m.AUTH_ROUTES)
+    loadChildren: () => import("./chunk-JGJ5MPWL.js").then((m) => m.AUTH_ROUTES)
   },
   // 簡化路由
   {
@@ -73836,40 +74001,40 @@ var routes = [
   // 核心功能 - SaaS 模式需要登入
   {
     path: "dashboard",
-    loadComponent: () => import("./chunk-E3MS3FXS.js").then((m) => m.DashboardViewComponent),
+    loadComponent: () => import("./chunk-LK4JPIEC.js").then((m) => m.DashboardViewComponent),
     title: "\u5100\u8868\u677F",
     canActivate: [authGuard]
   },
   {
     path: "accounts",
-    loadComponent: () => import("./chunk-SUCRCJ3C.js").then((m) => m.AccountsViewComponent),
+    loadComponent: () => import("./chunk-3NVFVOGE.js").then((m) => m.AccountsViewComponent),
     title: "\u5E33\u865F\u7BA1\u7406",
     canActivate: [authGuard]
   },
   {
     path: "settings",
-    loadComponent: () => import("./chunk-EKNLXUNE.js").then((m) => m.SettingsViewComponent),
+    loadComponent: () => import("./chunk-GBWLGVBG.js").then((m) => m.SettingsViewComponent),
     title: "\u8A2D\u5B9A",
     canActivate: [authGuard]
   },
   // 用戶設置頁面
   {
     path: "user-settings",
-    loadComponent: () => import("./chunk-4K7EPQLZ.js").then((m) => m.UserSettingsViewComponent),
+    loadComponent: () => import("./chunk-4ZMKR3Y7.js").then((m) => m.UserSettingsViewComponent),
     title: "\u7528\u6236\u8A2D\u7F6E",
     canActivate: [authGuard]
   },
   // 訂閱升級頁面
   {
     path: "upgrade",
-    loadComponent: () => import("./chunk-NGY4UN6V.js").then((m) => m.UpgradeViewComponent),
+    loadComponent: () => import("./chunk-7HNFJRWX.js").then((m) => m.UpgradeViewComponent),
     title: "\u5347\u7D1A\u65B9\u6848",
     canActivate: [authGuard]
   },
   // 配額管理儀表板
   {
     path: "quota",
-    loadComponent: () => import("./chunk-ZZ5TJKBM.js").then((m) => m.QuotaDashboardViewComponent),
+    loadComponent: () => import("./chunk-RFW7I5VS.js").then((m) => m.QuotaDashboardViewComponent),
     title: "\u914D\u984D\u7BA1\u7406",
     canActivate: [authGuard]
   },
@@ -73929,19 +74094,19 @@ var routes = [
   // 營銷功能 - 需要會員權限
   {
     path: "leads",
-    loadComponent: () => import("./chunk-VILAJUIX.js").then((m) => m.LeadsViewComponent),
+    loadComponent: () => import("./chunk-TUVP7UHE.js").then((m) => m.LeadsViewComponent),
     title: "\u6F5B\u5728\u5BA2\u6236",
     canActivate: [membershipGuard]
   },
   {
     path: "automation",
-    loadComponent: () => import("./chunk-SY7H7ZZ3.js").then((m) => m.AutomationViewComponent),
+    loadComponent: () => import("./chunk-YQCUBKDK.js").then((m) => m.AutomationViewComponent),
     title: "\u81EA\u52D5\u5316\u4E2D\u5FC3",
     canActivate: [membershipGuard]
   },
   {
     path: "resource-discovery",
-    loadComponent: () => import("./chunk-KFP6RLVL.js").then((m) => m.ResourceDiscoveryViewComponent),
+    loadComponent: () => import("./chunk-RYUETRTN.js").then((m) => m.ResourceDiscoveryViewComponent),
     title: "\u8CC7\u6E90\u767C\u73FE",
     canActivate: [membershipGuard]
   },
@@ -73949,21 +74114,21 @@ var routes = [
   // 營銷任務中心（核心入口）
   {
     path: "marketing-hub",
-    loadComponent: () => import("./chunk-V5PTZIL2.js").then((m) => m.SmartMarketingViewComponent),
+    loadComponent: () => import("./chunk-444JVDBM.js").then((m) => m.SmartMarketingViewComponent),
     title: "\u71DF\u92B7\u4EFB\u52D9\u4E2D\u5FC3",
     canActivate: [membershipGuard]
   },
   // 角色資源庫（原多角色協作的資產部分）
   {
     path: "role-library",
-    loadComponent: () => import("./chunk-C6OUJJP7.js").then((m) => m.MultiRoleViewComponent),
+    loadComponent: () => import("./chunk-KVOIMJ2A.js").then((m) => m.MultiRoleViewComponent),
     title: "\u89D2\u8272\u8CC7\u6E90\u5EAB",
     canActivate: [membershipGuard]
   },
   // 智能引擎（原 AI 中心的配置部分）
   {
     path: "ai-engine",
-    loadComponent: () => import("./chunk-VDWXJIUC.js").then((m) => m.AiCenterViewComponent),
+    loadComponent: () => import("./chunk-6WVCCXFF.js").then((m) => m.AiCenterViewComponent),
     title: "\u667A\u80FD\u5F15\u64CE",
     canActivate: [membershipGuard]
   },
@@ -73986,14 +74151,14 @@ var routes = [
   // 數據分析 - 需要高級會員
   {
     path: "analytics",
-    loadComponent: () => import("./chunk-IS6VYSYW.js").then((m) => m.AnalyticsViewComponent),
+    loadComponent: () => import("./chunk-C3M7OM7E.js").then((m) => m.AnalyticsViewComponent),
     title: "\u6578\u64DA\u5206\u6790",
     canActivate: [membershipGuard]
   },
   // 系統功能 - 無權限限制
   {
     path: "monitoring",
-    loadComponent: () => import("./chunk-XHNWZCGE.js").then((m) => m.MonitoringViewComponent),
+    loadComponent: () => import("./chunk-OWACCOCG.js").then((m) => m.MonitoringViewComponent),
     title: "\u76E3\u63A7\u4E2D\u5FC3"
   },
   // 向下兼容舊路由（重定向到設置頁）

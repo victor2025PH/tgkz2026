@@ -40836,6 +40836,7 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
     this.licenseClient = inject(LicenseClientService);
     this.cdr = inject(ChangeDetectorRef);
     this.walletService = inject(WalletService);
+    this.router = inject(Router);
     this.membershipUpdateHandler = null;
     this.activeTab = signal("overview", ...ngDevMode ? [{ debugName: "activeTab" }] : []);
     this.selectedPayment = signal("alipay", ...ngDevMode ? [{ debugName: "selectedPayment" }] : []);
@@ -40907,10 +40908,10 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
     }
   }
   goToWallet() {
-    window.dispatchEvent(new CustomEvent("changeView", { detail: "wallet" }));
+    this.router.navigate(["/wallet"]);
   }
   goToRecharge() {
-    window.dispatchEvent(new CustomEvent("changeView", { detail: "wallet" }));
+    this.router.navigate(["/wallet/recharge"]);
   }
   getMembershipIcon() {
     const icons = {
@@ -41730,7 +41731,7 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
   }], null, null);
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(MembershipCenterComponent, { className: "MembershipCenterComponent", filePath: "src/membership-center.component.ts", lineNumber: 1216 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(MembershipCenterComponent, { className: "MembershipCenterComponent", filePath: "src/membership-center.component.ts", lineNumber: 1217 });
 })();
 
 // src/profile.component.ts

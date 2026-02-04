@@ -6568,7 +6568,7 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
             return web.json_response({'success': False, 'message': str(e)})
     
     async def admin_panel_user_detail(self, request: web.Request) -> web.Response:
-        """用戶詳情"""
+        """用戶詳情 - 包含錢包信息"""
         admin = self._verify_admin_token(request)
         if not admin:
             return web.json_response({'success': False, 'message': '未授權'}, status=401)
@@ -6577,15 +6577,103 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
         try:
             conn = self._get_admin_db()
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
+            
+            # 檢查表結構，支持兩種 schema
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            # 根據 schema 選擇正確的 ID 字段
+            if 'subscription_tier' in columns:  # SAAS schema
+                cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))
+            else:  # License schema
+                cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
+            
             user = cursor.fetchone()
-            conn.close()
             
             if not user:
+                conn.close()
                 return web.json_response({'success': False, 'message': '用戶不存在'})
             
-            return web.json_response({'success': True, 'data': dict(user)})
+            user_data = dict(user)
+            
+            # 標準化用戶數據
+            result = {
+                'userId': user_data.get('id') or user_data.get('user_id'),
+                'email': user_data.get('email', ''),
+                'nickname': user_data.get('display_name') or user_data.get('nickname') or user_data.get('username', ''),
+                'level': user_data.get('subscription_tier') or user_data.get('membership_level', 'free'),
+                'expiresAt': user_data.get('subscription_expires') or user_data.get('expires_at', ''),
+                'isBanned': not user_data.get('is_active', True) or user_data.get('is_banned', False),
+                'telegramId': user_data.get('telegram_id', ''),
+                'telegramUsername': user_data.get('telegram_username', ''),
+                'createdAt': user_data.get('created_at', ''),
+                'lastLoginAt': user_data.get('last_login_at', ''),
+                'avatarUrl': user_data.get('avatar_url') or user_data.get('telegram_photo_url', ''),
+                'authProvider': user_data.get('auth_provider', ''),
+                'isVerified': user_data.get('is_verified', False),
+                'twoFactorEnabled': user_data.get('two_factor_enabled', False),
+            }
+            
+            # 嘗試獲取錢包數據
+            wallet_data = None
+            try:
+                cursor.execute('''
+                    SELECT main_balance, bonus_balance, frozen_balance, 
+                           total_recharged, total_consumed, status, version
+                    FROM wallets WHERE user_id = ?
+                ''', (user_id,))
+                wallet = cursor.fetchone()
+                if wallet:
+                    w = dict(wallet)
+                    wallet_data = {
+                        'balance': w.get('main_balance', 0),
+                        'balanceDisplay': f"${w.get('main_balance', 0) / 100:.2f}",
+                        'bonusBalance': w.get('bonus_balance', 0),
+                        'bonusDisplay': f"${w.get('bonus_balance', 0) / 100:.2f}",
+                        'frozenBalance': w.get('frozen_balance', 0),
+                        'frozenDisplay': f"${w.get('frozen_balance', 0) / 100:.2f}",
+                        'totalRecharged': w.get('total_recharged', 0),
+                        'totalRechargedDisplay': f"${w.get('total_recharged', 0) / 100:.2f}",
+                        'totalConsumed': w.get('total_consumed', 0),
+                        'totalConsumedDisplay': f"${w.get('total_consumed', 0) / 100:.2f}",
+                        'status': w.get('status', 'active'),
+                    }
+            except Exception as e:
+                logger.warning(f"Failed to get wallet for user {user_id}: {e}")
+            
+            result['wallet'] = wallet_data
+            
+            # 嘗試獲取最近交易記錄
+            recent_transactions = []
+            try:
+                cursor.execute('''
+                    SELECT type, amount, balance_after, description, created_at
+                    FROM wallet_transactions 
+                    WHERE user_id = ? 
+                    ORDER BY created_at DESC LIMIT 5
+                ''', (user_id,))
+                for tx in cursor.fetchall():
+                    t = dict(tx)
+                    recent_transactions.append({
+                        'type': t.get('type', ''),
+                        'amount': t.get('amount', 0),
+                        'amountDisplay': f"${abs(t.get('amount', 0)) / 100:.2f}",
+                        'balanceAfter': t.get('balance_after', 0),
+                        'description': t.get('description', ''),
+                        'createdAt': t.get('created_at', ''),
+                    })
+            except Exception as e:
+                logger.warning(f"Failed to get transactions for user {user_id}: {e}")
+            
+            result['recentTransactions'] = recent_transactions
+            
+            conn.close()
+            return web.json_response({'success': True, 'data': result})
+            
         except Exception as e:
+            import traceback
+            logger.error(f"User detail error: {e}")
+            logger.error(traceback.format_exc())
             return web.json_response({'success': False, 'message': str(e)})
     
     async def admin_panel_user_extend(self, request: web.Request) -> web.Response:

@@ -11,6 +11,7 @@ import { MembershipService, MembershipLevel } from './membership.service';
 import { I18nService } from './i18n.service';
 import { ToastService } from './toast.service';
 import { LicenseClientService } from './license-client.service';
+import { WalletService, Wallet } from './services/wallet.service';
 
 type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
 
@@ -53,6 +54,25 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
               🚀 立即升級
             </button>
           }
+        </div>
+      </div>
+      
+      <!-- 錢包餘額卡片 -->
+      <div class="wallet-card" (click)="goToWallet()">
+        <div class="wallet-left">
+          <div class="wallet-icon">💰</div>
+          <div class="wallet-info">
+            <div class="wallet-label">賬戶餘額</div>
+            <div class="wallet-amount">{{ walletBalanceDisplay() }}</div>
+          </div>
+        </div>
+        <div class="wallet-right">
+          <div class="wallet-bonus" *ngIf="walletBonusDisplay() !== '$0.00'">
+            贈送: {{ walletBonusDisplay() }}
+          </div>
+          <button class="wallet-recharge-btn" (click)="goToRecharge(); $event.stopPropagation()">
+            💳 充值
+          </button>
         </div>
       </div>
       
@@ -615,6 +635,75 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
       border-color: rgba(236, 72, 153, 0.5);
     }
     
+    /* 錢包卡片樣式 */
+    .wallet-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      border-radius: 1rem;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+      border: 1px solid rgba(102, 126, 234, 0.5);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .wallet-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    
+    .wallet-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .wallet-icon {
+      font-size: 2rem;
+    }
+    
+    .wallet-label {
+      font-size: 0.875rem;
+      color: var(--text-muted, #94a3b8);
+    }
+    
+    .wallet-amount {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #22c55e;
+    }
+    
+    .wallet-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .wallet-bonus {
+      font-size: 0.875rem;
+      color: #f59e0b;
+      background: rgba(245, 158, 11, 0.1);
+      padding: 0.25rem 0.75rem;
+      border-radius: 1rem;
+    }
+    
+    .wallet-recharge-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      border: none;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .wallet-recharge-btn:hover {
+      transform: scale(1.05);
+    }
+    
     .status-left {
       display: flex;
       align-items: center;
@@ -1130,14 +1219,28 @@ export class MembershipCenterComponent implements OnInit, OnDestroy {
   private toast = inject(ToastService);
   private licenseClient = inject(LicenseClientService);
   private cdr = inject(ChangeDetectorRef);
+  private walletService = inject(WalletService);
   
-  // 用於清理事件監聽
+  // 用於清理事件監聯
   private membershipUpdateHandler: ((event: Event) => void) | null = null;
 
   // 狀態
   activeTab = signal<MembershipTab>('overview');
   selectedPayment = signal<'alipay' | 'wechat' | 'usdt'>('alipay');
   licenseKey = '';
+  
+  // 錢包狀態
+  wallet = signal<Wallet | null>(null);
+  walletBalanceDisplay = computed(() => {
+    const w = this.wallet();
+    if (!w) return '$0.00';
+    return '$' + (w.available_balance / 100).toFixed(2);
+  });
+  walletBonusDisplay = computed(() => {
+    const w = this.wallet();
+    if (!w) return '$0.00';
+    return '$' + ((w.bonus_balance || 0) / 100).toFixed(2);
+  });
   
   // 計算屬性
   user = computed(() => this.authService.user());
@@ -1160,6 +1263,9 @@ export class MembershipCenterComponent implements OnInit, OnDestroy {
     this.invitedCount.set(rewards.invitedCount);
     this.rewardDays.set(rewards.rewardDays);
 
+    // 載入錢包數據
+    await this.loadWallet();
+    
     // 載入訂閱記錄
     await this.loadSubscriptionHistory();
     
@@ -1192,6 +1298,27 @@ export class MembershipCenterComponent implements OnInit, OnDestroy {
     } finally {
       this.isLoadingHistory.set(false);
     }
+  }
+  
+  async loadWallet(): Promise<void> {
+    try {
+      const wallet = await this.walletService.loadWallet();
+      if (wallet) {
+        this.wallet.set(wallet);
+      }
+    } catch (error) {
+      console.error('載入錢包失敗:', error);
+    }
+  }
+  
+  goToWallet(): void {
+    // 觸發視圖切換（通過事件或路由）
+    window.dispatchEvent(new CustomEvent('changeView', { detail: 'wallet' }));
+  }
+  
+  goToRecharge(): void {
+    // 導航到充值頁面
+    window.dispatchEvent(new CustomEvent('changeView', { detail: 'wallet' }));
   }
   
   getMembershipIcon(): string {

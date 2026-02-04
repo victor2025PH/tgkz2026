@@ -466,6 +466,16 @@
            <span>會員中心</span>
         </a>
         
+        <!-- 我的錢包 -->
+        <a (click)="changeView('wallet')" 
+           class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1"
+           [class.active]="view === 'wallet'"
+           [style.background-color]="view === 'wallet' ? 'var(--sidebar-item-active)' : 'transparent'"
+           [style.color]="view === 'wallet' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
+           <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+           <span>我的錢包</span>
+        </a>
+        
         <!-- 儀表盤 -->
         <a (click)="changeView('dashboard')" 
            class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1"
@@ -1034,6 +1044,9 @@
       <!-- 🆕 Phase P0: 補全缺失的視圖 -->
       @case ('membership-center') {
         <app-membership-center></app-membership-center>
+      }
+      @case ('wallet') {
+        <app-wallet-view></app-wallet-view>
       }
       @case ('profile') {
         <app-profile></app-profile>

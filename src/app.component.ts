@@ -122,9 +122,11 @@ import { KnowledgeManageComponent } from './ai-center/knowledge-manage.component
 import { RAGBrainService } from './services/rag-brain.service';
 // 🆕 P2: 營銷報表組件
 import { MarketingReportComponent } from './components/marketing-report.component';
+// 🆕 錢包視圖組件
+import { WalletViewComponent } from './views/wallet-view.component';
 
 // 視圖類型定義
-type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'resource-discovery' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps' | 'settings' | 'analytics' | 'analytics-center' | 'marketing-report' | 'profile' | 'membership-center' | 'monitoring' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules' | 'collected-users';
+type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'resource-discovery' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps' | 'settings' | 'analytics' | 'analytics-center' | 'marketing-report' | 'profile' | 'membership-center' | 'wallet' | 'monitoring' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules' | 'collected-users';
 type LeadDetailView = 'sendMessage' | 'history';
 type LeadsViewMode = 'kanban' | 'list';
 
@@ -155,6 +157,8 @@ interface SuccessOverlayConfig {
     MembershipCenterComponent, ProfileComponent, ResourceCenterComponent,
     SearchDiscoveryComponent, AiMarketingAssistantComponent, AiTeamHubComponent,
     MemberDatabaseComponent, ApiCredentialsViewComponent,
+    // 🆕 錢包視圖
+    WalletViewComponent,
     // 🆕 知識大腦獨立組件
     AIBrainComponent, KnowledgeGapsComponent, KnowledgeManageComponent, KnowledgeManageComponent,
     // 🆕 P2: 營銷報表
@@ -6115,6 +6119,14 @@ export class AppComponent implements OnDestroy, OnInit {
     
     // 🆕 加載保存的側邊欄分組狀態
     this.loadSidebarGroupsState();
+    
+    // 🆕 監聽視圖切換事件（從子組件觸發）
+    window.addEventListener('changeView', (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail) {
+        this.changeView(customEvent.detail as View);
+      }
+    });
     
     // 🆕 性能優化：設置頁面可見性監聯（Tab 不活躍時暫停刷新）
     this.setupVisibilityListener();

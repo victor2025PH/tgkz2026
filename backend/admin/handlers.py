@@ -380,13 +380,12 @@ class AdminHandlers:
     
     @handle_exception
     async def get_users(self, request: web.Request) -> web.Response:
-        """獲取用戶列表"""
+        """獲取用戶列表（包含錢包餘額）"""
         admin = self._require_auth(request)
         
         conn = self.adapter.get_connection()
         try:
             schema = self.adapter.detect_schema(conn)
-            query = self.adapter.get_user_select_query(schema)
             
             # 添加分頁
             page = int(request.query.get('page', 1))
@@ -399,12 +398,61 @@ class AdminHandlers:
             cursor.execute('SELECT COUNT(*) as count FROM users')
             total = cursor.fetchone()['count']
             
+            # 檢查 wallets 表是否存在
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wallets'")
+            has_wallets = cursor.fetchone() is not None
+            
+            # 構建查詢（帶錢包信息的 LEFT JOIN）
+            if schema == SchemaType.SAAS:
+                id_field = 'u.id'
+                user_query = '''
+                    SELECT u.*, 
+                           w.main_balance as wallet_balance,
+                           w.bonus_balance as wallet_bonus,
+                           w.frozen_balance as wallet_frozen,
+                           w.total_consumed as wallet_consumed,
+                           w.status as wallet_status
+                    FROM users u
+                '''
+            else:
+                id_field = 'u.user_id'
+                user_query = '''
+                    SELECT u.*, 
+                           w.main_balance as wallet_balance,
+                           w.bonus_balance as wallet_bonus,
+                           w.frozen_balance as wallet_frozen,
+                           w.total_consumed as wallet_consumed,
+                           w.status as wallet_status
+                    FROM users u
+                '''
+            
+            if has_wallets:
+                user_query += f' LEFT JOIN wallets w ON {id_field} = w.user_id'
+            
+            user_query += ' ORDER BY u.created_at DESC LIMIT ? OFFSET ?'
+            
             # 獲取用戶列表
-            cursor.execute(f'{query} LIMIT ? OFFSET ?', (page_size, offset))
+            cursor.execute(user_query, (page_size, offset))
             users = []
             for row in cursor.fetchall():
                 user = self.adapter.normalize_user(row)
-                users.append(user.to_dict())
+                user_dict = user.to_dict()
+                
+                # 添加錢包數據
+                row_dict = dict(row)
+                wallet_balance = row_dict.get('wallet_balance', 0) or 0
+                wallet_bonus = row_dict.get('wallet_bonus', 0) or 0
+                wallet_consumed = row_dict.get('wallet_consumed', 0) or 0
+                
+                user_dict['walletBalance'] = wallet_balance
+                user_dict['walletBalanceDisplay'] = f"${wallet_balance / 100:.2f}"
+                user_dict['walletBonus'] = wallet_bonus
+                user_dict['walletBonusDisplay'] = f"${wallet_bonus / 100:.2f}"
+                user_dict['walletStatus'] = row_dict.get('wallet_status', 'none')
+                user_dict['totalConsumed'] = wallet_consumed
+                user_dict['totalConsumedDisplay'] = f"${wallet_consumed / 100:.2f}"
+                
+                users.append(user_dict)
             
             return success_response({
                 'users': users,

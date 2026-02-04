@@ -236,7 +236,7 @@
                                     <th class="text-left px-6 py-4 font-medium">等級</th>
                                     <th class="text-left px-6 py-4 font-medium">到期時間</th>
                                     <th class="text-left px-6 py-4 font-medium">邀請數</th>
-                                    <th class="text-left px-6 py-4 font-medium">消費</th>
+                                    <th class="text-left px-6 py-4 font-medium">餘額/消費</th>
                                     <th class="text-left px-6 py-4 font-medium">註冊時間</th>
                                     <th class="text-left px-6 py-4 font-medium">操作</th>
                                 </tr>
@@ -277,10 +277,19 @@
                                         <span v-else class="text-gray-500">-</span>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <span v-if="user.totalSpent > 0" class="text-green-400">
-                                            {{ user.totalSpent }} USDT
-                                        </span>
-                                        <span v-else class="text-gray-500">-</span>
+                                        <div class="space-y-1">
+                                            <div v-if="user.walletBalance > 0 || user.walletBonus > 0" class="text-green-400 font-medium">
+                                                💰 {{ user.walletBalanceDisplay }}
+                                                <span v-if="user.walletBonus > 0" class="text-yellow-400 text-xs">(+{{ user.walletBonusDisplay }})</span>
+                                            </div>
+                                            <div v-if="user.totalConsumed > 0" class="text-gray-400 text-xs">
+                                                消費: {{ user.totalConsumedDisplay }}
+                                            </div>
+                                            <div v-if="user.walletStatus === 'frozen'" class="text-red-400 text-xs">
+                                                🔒 已凍結
+                                            </div>
+                                            <span v-if="user.walletBalance === 0 && user.walletBonus === 0 && user.totalConsumed === 0" class="text-gray-500">-</span>
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 text-gray-400 text-sm">{{ formatDate(user.createdAt) }}</td>
                                     <td class="px-6 py-4">
@@ -2119,14 +2128,75 @@ host:port"></textarea>
                         </div>
                     </div>
                     
-                    <!-- 消費信息 -->
+                    <!-- 錢包信息 -->
                     <div class="bg-gray-700/50 rounded-lg p-4">
-                        <h4 class="text-sm text-gray-400 mb-3">消費信息</h4>
-                        <div class="grid grid-cols-4 gap-4 text-center">
+                        <h4 class="text-sm text-gray-400 mb-3">💰 錢包信息</h4>
+                        <div v-if="userDetail.wallet" class="grid grid-cols-4 gap-4 text-center">
                             <div>
-                                <p class="text-2xl font-bold text-green-400">{{ userDetail.user?.total_spent || 0 }} USDT</p>
+                                <p class="text-2xl font-bold text-green-400">{{ userDetail.wallet?.balanceDisplay || '$0.00' }}</p>
+                                <p class="text-gray-400 text-sm">主餘額</p>
+                            </div>
+                            <div>
+                                <p class="text-2xl font-bold text-yellow-400">{{ userDetail.wallet?.bonusDisplay || '$0.00' }}</p>
+                                <p class="text-gray-400 text-sm">贈送餘額</p>
+                            </div>
+                            <div>
+                                <p class="text-2xl font-bold text-red-400">{{ userDetail.wallet?.frozenDisplay || '$0.00' }}</p>
+                                <p class="text-gray-400 text-sm">凍結金額</p>
+                            </div>
+                            <div>
+                                <p class="text-2xl font-bold text-blue-400">{{ userDetail.wallet?.totalConsumedDisplay || '$0.00' }}</p>
                                 <p class="text-gray-400 text-sm">累計消費</p>
                             </div>
+                        </div>
+                        <div v-else class="text-center text-gray-500 py-4">
+                            該用戶尚未開通錢包
+                        </div>
+                        <!-- 錢包狀態與操作 -->
+                        <div v-if="userDetail.wallet" class="mt-4 flex justify-between items-center border-t border-gray-600 pt-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-400 text-sm">錢包狀態:</span>
+                                <span v-if="userDetail.wallet?.status === 'active'" class="text-green-400">✅ 正常</span>
+                                <span v-else-if="userDetail.wallet?.status === 'frozen'" class="text-red-400">🔒 已凍結</span>
+                                <span v-else class="text-gray-400">{{ userDetail.wallet?.status }}</span>
+                            </div>
+                            <div class="flex gap-2">
+                                <button @click="adjustUserBalance(userDetail)" 
+                                        class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">
+                                    💵 調賬
+                                </button>
+                                <button v-if="userDetail.wallet?.status === 'active'" 
+                                        @click="freezeUserWallet(userDetail)"
+                                        class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm">
+                                    🔒 凍結
+                                </button>
+                                <button v-else @click="unfreezeUserWallet(userDetail)"
+                                        class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm">
+                                    🔓 解凍
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 最近交易記錄 -->
+                    <div v-if="userDetail.recentTransactions?.length" class="bg-gray-700/50 rounded-lg p-4">
+                        <h4 class="text-sm text-gray-400 mb-3">📋 最近交易</h4>
+                        <div class="space-y-2 max-h-40 overflow-y-auto">
+                            <div v-for="(tx, idx) in userDetail.recentTransactions" :key="idx"
+                                 class="flex justify-between items-center bg-gray-800 rounded p-2 text-sm">
+                                <span :class="tx.amount >= 0 ? 'text-green-400' : 'text-red-400'">
+                                    {{ tx.amount >= 0 ? '+' : '-' }}{{ tx.amountDisplay }}
+                                </span>
+                                <span class="text-gray-400 flex-1 mx-4 truncate">{{ tx.description }}</span>
+                                <span class="text-gray-500 text-xs">{{ formatDate(tx.createdAt) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 其他統計 -->
+                    <div class="bg-gray-700/50 rounded-lg p-4">
+                        <h4 class="text-sm text-gray-400 mb-3">📊 其他統計</h4>
+                        <div class="grid grid-cols-3 gap-4 text-center">
                             <div>
                                 <p class="text-2xl font-bold text-blue-400">{{ userDetail.licenses?.length || 0 }}</p>
                                 <p class="text-gray-400 text-sm">使用卡密數</p>
@@ -2136,8 +2206,8 @@ host:port"></textarea>
                                 <p class="text-gray-400 text-sm">邀請記錄</p>
                             </div>
                             <div>
-                                <p class="text-2xl font-bold" :class="userDetail.user?.is_banned ? 'text-red-400' : 'text-green-400'">
-                                    {{ userDetail.user?.is_banned ? '已封禁' : '正常' }}
+                                <p class="text-2xl font-bold" :class="userDetail.isBanned ? 'text-red-400' : 'text-green-400'">
+                                    {{ userDetail.isBanned ? '已封禁' : '正常' }}
                                 </p>
                                 <p class="text-gray-400 text-sm">帳號狀態</p>
                             </div>

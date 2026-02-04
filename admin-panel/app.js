@@ -410,6 +410,14 @@ createApp({
                         // 邀請和消費
                         totalInvites: user.totalInvites || user.total_invites || 0,
                         totalSpent: user.totalSpent || user.total_spent || 0,
+                        // 錢包信息
+                        walletBalance: user.walletBalance || 0,
+                        walletBalanceDisplay: user.walletBalanceDisplay || '$0.00',
+                        walletBonus: user.walletBonus || 0,
+                        walletBonusDisplay: user.walletBonusDisplay || '$0.00',
+                        walletStatus: user.walletStatus || 'none',
+                        totalConsumed: user.totalConsumed || 0,
+                        totalConsumedDisplay: user.totalConsumedDisplay || '$0.00',
                         // 時間
                         createdAt: user.createdAt || user.created_at || '',
                         lastLoginAt: user.lastLoginAt || user.last_login_at || ''
@@ -1296,6 +1304,78 @@ createApp({
             }
         };
         
+        // ============ 錢包操作 ============
+        
+        const adjustUserBalance = async (detail) => {
+            const userId = detail.userId || detail.user?.userId || detail.user?.id;
+            const amount = prompt('請輸入調賬金額（正數為加款，負數為扣款，單位：美元）：');
+            if (amount === null) return;
+            
+            const amountNum = parseFloat(amount);
+            if (isNaN(amountNum) || amountNum === 0) {
+                showToast('請輸入有效的金額', 'error');
+                return;
+            }
+            
+            const reason = prompt('請輸入調賬原因：');
+            if (!reason) {
+                showToast('請輸入調賬原因', 'error');
+                return;
+            }
+            
+            const result = await apiRequest(`/admin/wallets/${userId}/adjust`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    amount: Math.round(amountNum * 100), // 轉換為分
+                    reason: reason
+                })
+            });
+            
+            if (result.success) {
+                showToast(`調賬成功: ${amountNum > 0 ? '+' : ''}$${amountNum.toFixed(2)}`, 'success');
+                await viewUser(detail.user || detail);
+            } else {
+                showToast('調賬失敗: ' + (result.error || result.message), 'error');
+            }
+        };
+        
+        const freezeUserWallet = async (detail) => {
+            const userId = detail.userId || detail.user?.userId || detail.user?.id;
+            showConfirm(
+                '凍結錢包',
+                '確定要凍結該用戶的錢包嗎？凍結後用戶將無法進行任何消費操作。',
+                async () => {
+                    const result = await apiRequest(`/admin/wallets/${userId}/freeze`, {
+                        method: 'POST',
+                        body: JSON.stringify({ reason: '管理員凍結' })
+                    });
+                    
+                    if (result.success) {
+                        showToast('錢包已凍結', 'success');
+                        await viewUser(detail.user || detail);
+                    } else {
+                        showToast('操作失敗: ' + (result.error || result.message), 'error');
+                    }
+                },
+                'danger',
+                '🔒'
+            );
+        };
+        
+        const unfreezeUserWallet = async (detail) => {
+            const userId = detail.userId || detail.user?.userId || detail.user?.id;
+            const result = await apiRequest(`/admin/wallets/${userId}/unfreeze`, {
+                method: 'POST'
+            });
+            
+            if (result.success) {
+                showToast('錢包已解凍', 'success');
+                await viewUser(detail.user || detail);
+            } else {
+                showToast('操作失敗: ' + (result.error || result.message), 'error');
+            }
+        };
+        
         // ============ 卡密操作 ============
         
         const copyLicense = (key) => {
@@ -2005,6 +2085,11 @@ createApp({
             submitExtend,
             banUser,
             unbanUser,
+            
+            // 錢包操作
+            adjustUserBalance,
+            freezeUserWallet,
+            unfreezeUserWallet,
             
             // 卡密操作
             copyLicense,

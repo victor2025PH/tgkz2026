@@ -1198,6 +1198,7 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
 export class MembershipCenterComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private membershipService = inject(MembershipService);
+  private i18n = inject(I18nService);
   private toast = inject(ToastService);
   private licenseClient = inject(LicenseClientService);
   private cdr = inject(ChangeDetectorRef);
@@ -1317,15 +1318,8 @@ export class MembershipCenterComponent implements OnInit, OnDestroy {
   }
   
   getMembershipName(): string {
-    const names: Record<string, string> = {
-      bronze: '青銅戰士',
-      silver: '白銀精英',
-      gold: '黃金大師',
-      diamond: '鑽石王牌',
-      star: '星耀傳說',
-      king: '榮耀王者'
-    };
-    return names[this.membershipLevel()] || '青銅戰士';
+    const level = this.membershipLevel();
+    return this.i18n.t(`membershipLevels.${level}`) || this.i18n.t('membershipLevels.bronze');
   }
   
   formatDate(dateString?: string): string {

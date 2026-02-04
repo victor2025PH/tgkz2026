@@ -22,6 +22,8 @@ export interface User {
   phone?: string;
   avatar?: string;
   membershipLevel: MembershipLevel;
+  // 🔧 P0 修復：保留原始 subscription_tier，供 core/auth.service.ts 使用
+  subscription_tier?: string;
   membershipExpires?: string;
   inviteCode: string;
   invitedCount: number;
@@ -226,6 +228,8 @@ export class AuthService implements OnDestroy {
           const rawUser = JSON.parse(storedUser);
           
           // 🔧 轉換用戶對象格式（新版 API 返回的格式可能不同）
+          // 🔧 P0 修復：保留原始 subscription_tier
+          const originalTier = rawUser.subscription_tier || rawUser.membershipLevel || 'free';
           const user: User = {
             id: rawUser.id || 0,
             username: rawUser.username || 'User',
@@ -235,8 +239,8 @@ export class AuthService implements OnDestroy {
             email: rawUser.email || undefined,
             phone: rawUser.phone || undefined,
             avatar: rawUser.avatar_url || rawUser.avatar || undefined,
-            // 🔧 從 subscription_tier 轉換到 membershipLevel
-            membershipLevel: this.tierToLevel(rawUser.subscription_tier || rawUser.membershipLevel || 'free'),
+            membershipLevel: this.tierToLevel(originalTier),
+            subscription_tier: originalTier,  // 🔧 保留原始值
             membershipExpires: rawUser.membershipExpires || rawUser.subscription_expires || undefined,
             inviteCode: rawUser.inviteCode || rawUser.invite_code || '',
             invitedCount: rawUser.invitedCount || rawUser.invited_count || 0,
@@ -330,6 +334,8 @@ export class AuthService implements OnDestroy {
       if (result.success && result.data) {
         // 轉換為本地 User 格式
         const rawUser = result.data;
+        // 🔧 P0 修復：保留原始 subscription_tier，供 core/auth.service.ts 使用
+        const originalTier = rawUser.subscription_tier || rawUser.membershipLevel || 'free';
         const user: User = {
           id: rawUser.id || 0,
           username: rawUser.username || 'User',
@@ -339,7 +345,8 @@ export class AuthService implements OnDestroy {
           email: rawUser.email || undefined,
           phone: rawUser.phone || undefined,
           avatar: rawUser.avatar_url || rawUser.avatar || undefined,
-          membershipLevel: this.tierToLevel(rawUser.subscription_tier || rawUser.membershipLevel || 'free'),
+          membershipLevel: this.tierToLevel(originalTier),
+          subscription_tier: originalTier,  // 🔧 保留原始值
           membershipExpires: rawUser.membershipExpires || rawUser.subscription_expires || undefined,
           inviteCode: rawUser.inviteCode || rawUser.invite_code || '',
           invitedCount: rawUser.invitedCount || rawUser.invited_count || 0,
@@ -1131,6 +1138,8 @@ export class AuthService implements OnDestroy {
       
       if (storedToken && storedUser) {
         // 標準化用戶數據格式
+        // 🔧 P0 修復：保留原始 subscription_tier
+        const originalTier = storedUser.subscription_tier || storedUser.membershipLevel || 'free';
         const user: User = {
           id: storedUser.id || 0,
           username: storedUser.username || 'User',
@@ -1140,7 +1149,8 @@ export class AuthService implements OnDestroy {
           email: storedUser.email || undefined,
           phone: storedUser.phone || undefined,
           avatar: storedUser.avatar_url || storedUser.avatar || undefined,
-          membershipLevel: this.tierToLevel(storedUser.subscription_tier || storedUser.membershipLevel || 'free'),
+          membershipLevel: this.tierToLevel(originalTier),
+          subscription_tier: originalTier,  // 🔧 保留原始值
           membershipExpires: storedUser.membershipExpires || storedUser.subscription_expires || undefined,
           inviteCode: storedUser.inviteCode || storedUser.invite_code || '',
           invitedCount: storedUser.invitedCount || storedUser.invited_count || 0,

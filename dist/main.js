@@ -27127,6 +27127,7 @@ var AuthService2 = class _AuthService {
       if (storedToken && storedUser) {
         try {
           const rawUser = JSON.parse(storedUser);
+          const originalTier = rawUser.subscription_tier || rawUser.membershipLevel || "free";
           const user = {
             id: rawUser.id || 0,
             username: rawUser.username || "User",
@@ -27138,8 +27139,9 @@ var AuthService2 = class _AuthService {
             email: rawUser.email || void 0,
             phone: rawUser.phone || void 0,
             avatar: rawUser.avatar_url || rawUser.avatar || void 0,
-            // 🔧 從 subscription_tier 轉換到 membershipLevel
-            membershipLevel: this.tierToLevel(rawUser.subscription_tier || rawUser.membershipLevel || "free"),
+            membershipLevel: this.tierToLevel(originalTier),
+            subscription_tier: originalTier,
+            // 🔧 保留原始值
             membershipExpires: rawUser.membershipExpires || rawUser.subscription_expires || void 0,
             inviteCode: rawUser.inviteCode || rawUser.invite_code || "",
             invitedCount: rawUser.invitedCount || rawUser.invited_count || 0,
@@ -27208,6 +27210,7 @@ var AuthService2 = class _AuthService {
       const result = await response.json();
       if (result.success && result.data) {
         const rawUser = result.data;
+        const originalTier = rawUser.subscription_tier || rawUser.membershipLevel || "free";
         const user = {
           id: rawUser.id || 0,
           username: rawUser.username || "User",
@@ -27219,7 +27222,9 @@ var AuthService2 = class _AuthService {
           email: rawUser.email || void 0,
           phone: rawUser.phone || void 0,
           avatar: rawUser.avatar_url || rawUser.avatar || void 0,
-          membershipLevel: this.tierToLevel(rawUser.subscription_tier || rawUser.membershipLevel || "free"),
+          membershipLevel: this.tierToLevel(originalTier),
+          subscription_tier: originalTier,
+          // 🔧 保留原始值
           membershipExpires: rawUser.membershipExpires || rawUser.subscription_expires || void 0,
           inviteCode: rawUser.inviteCode || rawUser.invite_code || "",
           invitedCount: rawUser.invitedCount || rawUser.invited_count || 0,
@@ -27862,6 +27867,7 @@ var AuthService2 = class _AuthService {
       const storedToken = this.authEvents.getStoredToken();
       const storedUser = this.authEvents.getStoredUser();
       if (storedToken && storedUser) {
+        const originalTier = storedUser.subscription_tier || storedUser.membershipLevel || "free";
         const user = {
           id: storedUser.id || 0,
           username: storedUser.username || "User",
@@ -27873,7 +27879,9 @@ var AuthService2 = class _AuthService {
           email: storedUser.email || void 0,
           phone: storedUser.phone || void 0,
           avatar: storedUser.avatar_url || storedUser.avatar || void 0,
-          membershipLevel: this.tierToLevel(storedUser.subscription_tier || storedUser.membershipLevel || "free"),
+          membershipLevel: this.tierToLevel(originalTier),
+          subscription_tier: originalTier,
+          // 🔧 保留原始值
           membershipExpires: storedUser.membershipExpires || storedUser.subscription_expires || void 0,
           inviteCode: storedUser.inviteCode || storedUser.invite_code || "",
           invitedCount: storedUser.invitedCount || storedUser.invited_count || 0,

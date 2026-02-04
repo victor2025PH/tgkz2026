@@ -1364,28 +1364,22 @@ export class ProfileComponent implements OnInit, OnDestroy {
   }
   
   /**
-   * 🔧 修復：確保用戶信息已加載
-   * 如果沒有用戶信息，主動從後端獲取
+   * 🔧 P0 修復：確保用戶信息已加載且是最新的
+   * 總是從後端刷新，確保數據一致性
    */
   async ensureUserLoaded(): Promise<void> {
-    // 如果已有用戶信息，直接返回
-    if (this.user()?.username) {
-      console.log('[Profile] User already loaded:', this.user()?.username);
-      // 🆕 廣播用戶數據，確保其他服務也同步
-      this.authEvents.emitUserUpdate(this.user());
-      return;
-    }
-    
     this.isLoadingUser.set(true);
     this.userLoadError.set(null);
     
     try {
-      console.log('[Profile] Fetching user info...');
+      // 🔧 P0 修復：總是從後端刷新，不使用緩存
+      // 解決菜單欄和用戶信息頁數據不一致的問題
+      console.log('[Profile] Fetching fresh user info from backend...');
       const user = await this.authService.fetchCurrentUser();
       
       if (user) {
-        console.log('[Profile] User loaded successfully:', user.username);
-        // 🆕 廣播用戶更新事件，通知其他服務同步
+        console.log('[Profile] User loaded successfully:', user.username, 'Level:', user.membershipLevel);
+        // 🆕 廣播用戶更新事件，通知所有服務同步（包括 core/auth.service.ts）
         this.authEvents.emitUserUpdate(user);
       } else {
         console.warn('[Profile] No user returned from API');

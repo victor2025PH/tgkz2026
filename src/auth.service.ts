@@ -16,6 +16,8 @@ export interface User {
   id: number;
   username: string;
   displayName?: string;  // 用戶暱稱/顯示名稱
+  telegramId?: string;   // 🆕 Telegram ID
+  telegramUsername?: string;  // 🆕 Telegram 用戶名
   email?: string;
   phone?: string;
   avatar?: string;
@@ -218,7 +220,9 @@ export class AuthService implements OnDestroy {
           const user: User = {
             id: rawUser.id || 0,
             username: rawUser.username || 'User',
-            displayName: rawUser.display_name || rawUser.displayName || rawUser.nickname || undefined,
+            displayName: rawUser.display_name || rawUser.displayName || rawUser.nickname || rawUser.telegram_first_name || undefined,
+            telegramId: rawUser.telegram_id || rawUser.telegramId || undefined,  // 🆕 Telegram ID
+            telegramUsername: rawUser.telegram_username || rawUser.telegramUsername || undefined,  // 🆕 Telegram 用戶名
             email: rawUser.email || undefined,
             phone: rawUser.phone || undefined,
             avatar: rawUser.avatar_url || rawUser.avatar || undefined,
@@ -292,7 +296,9 @@ export class AuthService implements OnDestroy {
         const user: User = {
           id: rawUser.id || 0,
           username: rawUser.username || 'User',
-          displayName: rawUser.display_name || rawUser.displayName || rawUser.nickname || undefined,
+          displayName: rawUser.display_name || rawUser.displayName || rawUser.nickname || rawUser.telegram_first_name || undefined,
+          telegramId: rawUser.telegram_id || rawUser.telegramId || undefined,  // 🆕 Telegram ID
+          telegramUsername: rawUser.telegram_username || rawUser.telegramUsername || undefined,  // 🆕 Telegram 用戶名
           email: rawUser.email || undefined,
           phone: rawUser.phone || undefined,
           avatar: rawUser.avatar_url || rawUser.avatar || undefined,
@@ -908,7 +914,9 @@ export class AuthService implements OnDestroy {
         const user: User = {
           id: storedUser.id || 0,
           username: storedUser.username || 'User',
-          displayName: storedUser.display_name || storedUser.displayName || storedUser.nickname || undefined,
+          displayName: storedUser.display_name || storedUser.displayName || storedUser.nickname || storedUser.telegram_first_name || undefined,
+          telegramId: storedUser.telegram_id || storedUser.telegramId || undefined,  // 🆕 Telegram ID
+          telegramUsername: storedUser.telegram_username || storedUser.telegramUsername || undefined,  // 🆕 Telegram 用戶名
           email: storedUser.email || undefined,
           phone: storedUser.phone || undefined,
           avatar: storedUser.avatar_url || storedUser.avatar || undefined,

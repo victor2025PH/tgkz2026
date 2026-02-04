@@ -106,10 +106,12 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
             
             <div class="info-grid">
               <div class="info-item">
-                <span class="info-label">用戶ID</span>
+                <span class="info-label">Telegram ID</span>
                 <span class="info-value user-id">
-                  <span class="id-text">{{ user()?.id || '-' }}</span>
-                  <button class="copy-id-btn" (click)="copyUserId()" title="複製ID">📋</button>
+                  <span class="id-text">{{ user()?.telegramId || '未綁定' }}</span>
+                  @if (user()?.telegramId) {
+                    <button class="copy-id-btn" (click)="copyTelegramId()" title="複製 Telegram ID">📋</button>
+                  }
                 </span>
               </div>
               <div class="info-item">
@@ -1541,12 +1543,12 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.toast.success('邀請鏈接已複製');
   }
   
-  // 🆕 複製用戶ID
-  copyUserId(): void {
-    const userId = this.user()?.id;
-    if (userId) {
-      navigator.clipboard.writeText(String(userId));
-      this.toast.success('用戶ID已複製');
+  // 🆕 複製 Telegram ID
+  copyTelegramId(): void {
+    const telegramId = this.user()?.telegramId;
+    if (telegramId) {
+      navigator.clipboard.writeText(telegramId);
+      this.toast.success('Telegram ID 已複製');
     }
   }
   

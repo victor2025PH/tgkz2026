@@ -1,6 +1,6 @@
 import {
   authGuard
-} from "./chunk-KEAO7OI7.js";
+} from "./chunk-NBA6WUCF.js";
 import {
   WalletOrdersComponent
 } from "./chunk-MEWYCPNB.js";
@@ -10,7 +10,7 @@ import {
 import {
   AuthEventsService,
   AuthService
-} from "./chunk-AHTF6AO6.js";
+} from "./chunk-SW4QBT65.js";
 import {
   AiCenterViewComponent
 } from "./chunk-AIZRAQX3.js";
@@ -27124,7 +27124,11 @@ var AuthService2 = class _AuthService {
           const user = {
             id: rawUser.id || 0,
             username: rawUser.username || "User",
-            displayName: rawUser.display_name || rawUser.displayName || rawUser.nickname || void 0,
+            displayName: rawUser.display_name || rawUser.displayName || rawUser.nickname || rawUser.telegram_first_name || void 0,
+            telegramId: rawUser.telegram_id || rawUser.telegramId || void 0,
+            // 🆕 Telegram ID
+            telegramUsername: rawUser.telegram_username || rawUser.telegramUsername || void 0,
+            // 🆕 Telegram 用戶名
             email: rawUser.email || void 0,
             phone: rawUser.phone || void 0,
             avatar: rawUser.avatar_url || rawUser.avatar || void 0,
@@ -27183,7 +27187,11 @@ var AuthService2 = class _AuthService {
         const user = {
           id: rawUser.id || 0,
           username: rawUser.username || "User",
-          displayName: rawUser.display_name || rawUser.displayName || rawUser.nickname || void 0,
+          displayName: rawUser.display_name || rawUser.displayName || rawUser.nickname || rawUser.telegram_first_name || void 0,
+          telegramId: rawUser.telegram_id || rawUser.telegramId || void 0,
+          // 🆕 Telegram ID
+          telegramUsername: rawUser.telegram_username || rawUser.telegramUsername || void 0,
+          // 🆕 Telegram 用戶名
           email: rawUser.email || void 0,
           phone: rawUser.phone || void 0,
           avatar: rawUser.avatar_url || rawUser.avatar || void 0,
@@ -27704,7 +27712,11 @@ var AuthService2 = class _AuthService {
         const user = {
           id: storedUser.id || 0,
           username: storedUser.username || "User",
-          displayName: storedUser.display_name || storedUser.displayName || storedUser.nickname || void 0,
+          displayName: storedUser.display_name || storedUser.displayName || storedUser.nickname || storedUser.telegram_first_name || void 0,
+          telegramId: storedUser.telegram_id || storedUser.telegramId || void 0,
+          // 🆕 Telegram ID
+          telegramUsername: storedUser.telegram_username || storedUser.telegramUsername || void 0,
+          // 🆕 Telegram 用戶名
           email: storedUser.email || void 0,
           phone: storedUser.phone || void 0,
           avatar: storedUser.avatar_url || storedUser.avatar || void 0,
@@ -41831,82 +41843,95 @@ function ProfileComponent_Conditional_17_Template(rf, ctx) {
     \u0275\u0275text(0, " \u{1F6AA} \u9000\u51FA ");
   }
 }
-function ProfileComponent_Conditional_29_Conditional_44_Conditional_22_Template(rf, ctx) {
+function ProfileComponent_Conditional_29_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "span", 48);
+    const _r4 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "button", 36);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_11_Template_button_click_0_listener() {
+      \u0275\u0275restoreView(_r4);
+      const ctx_r1 = \u0275\u0275nextContext(2);
+      return \u0275\u0275resetView(ctx_r1.copyTelegramId());
+    });
+    \u0275\u0275text(1, "\u{1F4CB}");
+    \u0275\u0275elementEnd();
+  }
+}
+function ProfileComponent_Conditional_29_Conditional_43_Conditional_22_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "span", 49);
     \u0275\u0275text(1, " \u4FDD\u5B58\u4E2D... ");
   }
 }
-function ProfileComponent_Conditional_29_Conditional_44_Conditional_23_Template(rf, ctx) {
+function ProfileComponent_Conditional_29_Conditional_43_Conditional_23_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0, " \u78BA\u8A8D\u4FEE\u6539 ");
   }
 }
-function ProfileComponent_Conditional_29_Conditional_44_Template(rf, ctx) {
+function ProfileComponent_Conditional_29_Conditional_43_Template(rf, ctx) {
   if (rf & 1) {
-    const _r4 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 36);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_div_click_0_listener() {
-      \u0275\u0275restoreView(_r4);
+    const _r5 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "div", 37);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_43_Template_div_click_0_listener() {
+      \u0275\u0275restoreView(_r5);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.closeEmailEditor());
     });
-    \u0275\u0275elementStart(1, "div", 37);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_div_click_1_listener($event) {
-      \u0275\u0275restoreView(_r4);
+    \u0275\u0275elementStart(1, "div", 38);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_43_Template_div_click_1_listener($event) {
+      \u0275\u0275restoreView(_r5);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 38)(3, "h3");
+    \u0275\u0275elementStart(2, "div", 39)(3, "h3");
     \u0275\u0275text(4, "\u{1F4E7} \u4FEE\u6539\u90F5\u7BB1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "button", 39);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_button_click_5_listener() {
-      \u0275\u0275restoreView(_r4);
+    \u0275\u0275elementStart(5, "button", 40);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_43_Template_button_click_5_listener() {
+      \u0275\u0275restoreView(_r5);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.closeEmailEditor());
     });
     \u0275\u0275text(6, "\xD7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "div", 40)(8, "div", 41)(9, "label");
+    \u0275\u0275elementStart(7, "div", 41)(8, "div", 42)(9, "label");
     \u0275\u0275text(10, "\u65B0\u90F5\u7BB1\u5730\u5740");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "input", 42);
-    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_44_Template_input_ngModelChange_11_listener($event) {
-      \u0275\u0275restoreView(_r4);
+    \u0275\u0275elementStart(11, "input", 43);
+    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_43_Template_input_ngModelChange_11_listener($event) {
+      \u0275\u0275restoreView(_r5);
       const ctx_r1 = \u0275\u0275nextContext(2);
       \u0275\u0275twoWayBindingSet(ctx_r1.emailForm.newEmail, $event) || (ctx_r1.emailForm.newEmail = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(12, "div", 41)(13, "label");
+    \u0275\u0275elementStart(12, "div", 42)(13, "label");
     \u0275\u0275text(14, "\u7576\u524D\u5BC6\u78BC\uFF08\u9A57\u8B49\u8EAB\u4EFD\uFF09");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(15, "input", 43);
-    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_44_Template_input_ngModelChange_15_listener($event) {
-      \u0275\u0275restoreView(_r4);
+    \u0275\u0275elementStart(15, "input", 44);
+    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_43_Template_input_ngModelChange_15_listener($event) {
+      \u0275\u0275restoreView(_r5);
       const ctx_r1 = \u0275\u0275nextContext(2);
       \u0275\u0275twoWayBindingSet(ctx_r1.emailForm.password, $event) || (ctx_r1.emailForm.password = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(16, "p", 44);
+    \u0275\u0275elementStart(16, "p", 45);
     \u0275\u0275text(17, "\u26A0\uFE0F \u4FEE\u6539\u90F5\u7BB1\u9700\u8981\u9A57\u8B49\u7576\u524D\u5BC6\u78BC");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(18, "div", 45)(19, "button", 46);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_button_click_19_listener() {
-      \u0275\u0275restoreView(_r4);
+    \u0275\u0275elementStart(18, "div", 46)(19, "button", 47);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_43_Template_button_click_19_listener() {
+      \u0275\u0275restoreView(_r5);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.closeEmailEditor());
     });
     \u0275\u0275text(20, "\u53D6\u6D88");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(21, "button", 47);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_button_click_21_listener() {
-      \u0275\u0275restoreView(_r4);
+    \u0275\u0275elementStart(21, "button", 48);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_43_Template_button_click_21_listener() {
+      \u0275\u0275restoreView(_r5);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.onSaveEmail());
     });
-    \u0275\u0275conditionalCreate(22, ProfileComponent_Conditional_29_Conditional_44_Conditional_22_Template, 2, 0)(23, ProfileComponent_Conditional_29_Conditional_44_Conditional_23_Template, 1, 0);
+    \u0275\u0275conditionalCreate(22, ProfileComponent_Conditional_29_Conditional_43_Conditional_22_Template, 2, 0)(23, ProfileComponent_Conditional_29_Conditional_43_Conditional_23_Template, 1, 0);
     \u0275\u0275elementEnd()()()();
   }
   if (rf & 2) {
@@ -41921,71 +41946,71 @@ function ProfileComponent_Conditional_29_Conditional_44_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r1.isSavingEmail() ? 22 : 23);
   }
 }
-function ProfileComponent_Conditional_29_Conditional_45_Conditional_18_Template(rf, ctx) {
+function ProfileComponent_Conditional_29_Conditional_44_Conditional_18_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "span", 48);
+    \u0275\u0275element(0, "span", 49);
     \u0275\u0275text(1, " \u4FDD\u5B58\u4E2D... ");
   }
 }
-function ProfileComponent_Conditional_29_Conditional_45_Conditional_19_Template(rf, ctx) {
+function ProfileComponent_Conditional_29_Conditional_44_Conditional_19_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0, " \u78BA\u8A8D\u4FEE\u6539 ");
   }
 }
-function ProfileComponent_Conditional_29_Conditional_45_Template(rf, ctx) {
+function ProfileComponent_Conditional_29_Conditional_44_Template(rf, ctx) {
   if (rf & 1) {
-    const _r5 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 36);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_45_Template_div_click_0_listener() {
-      \u0275\u0275restoreView(_r5);
+    const _r6 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "div", 37);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_div_click_0_listener() {
+      \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.closeDisplayNameEditor());
     });
-    \u0275\u0275elementStart(1, "div", 37);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_45_Template_div_click_1_listener($event) {
-      \u0275\u0275restoreView(_r5);
+    \u0275\u0275elementStart(1, "div", 38);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_div_click_1_listener($event) {
+      \u0275\u0275restoreView(_r6);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 38)(3, "h3");
+    \u0275\u0275elementStart(2, "div", 39)(3, "h3");
     \u0275\u0275text(4, "\u270F\uFE0F \u4FEE\u6539\u986F\u793A\u540D\u7A31");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "button", 39);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_45_Template_button_click_5_listener() {
-      \u0275\u0275restoreView(_r5);
+    \u0275\u0275elementStart(5, "button", 40);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_button_click_5_listener() {
+      \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.closeDisplayNameEditor());
     });
     \u0275\u0275text(6, "\xD7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "div", 40)(8, "div", 41)(9, "label");
+    \u0275\u0275elementStart(7, "div", 41)(8, "div", 42)(9, "label");
     \u0275\u0275text(10, "\u986F\u793A\u540D\u7A31");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "input", 49);
-    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_45_Template_input_ngModelChange_11_listener($event) {
-      \u0275\u0275restoreView(_r5);
+    \u0275\u0275elementStart(11, "input", 50);
+    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_44_Template_input_ngModelChange_11_listener($event) {
+      \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       \u0275\u0275twoWayBindingSet(ctx_r1.displayNameForm.newName, $event) || (ctx_r1.displayNameForm.newName = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(12, "p", 44);
+    \u0275\u0275elementStart(12, "p", 45);
     \u0275\u0275text(13, "\u{1F4A1} \u986F\u793A\u540D\u7A31\u6703\u5728\u83DC\u55AE\u6B04\u548C\u500B\u4EBA\u4E2D\u5FC3\u986F\u793A\uFF0C\u6700\u591A30\u500B\u5B57\u7B26");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(14, "div", 45)(15, "button", 46);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_45_Template_button_click_15_listener() {
-      \u0275\u0275restoreView(_r5);
+    \u0275\u0275elementStart(14, "div", 46)(15, "button", 47);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_button_click_15_listener() {
+      \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.closeDisplayNameEditor());
     });
     \u0275\u0275text(16, "\u53D6\u6D88");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "button", 47);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_45_Template_button_click_17_listener() {
-      \u0275\u0275restoreView(_r5);
+    \u0275\u0275elementStart(17, "button", 48);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_44_Template_button_click_17_listener() {
+      \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.onSaveDisplayName());
     });
-    \u0275\u0275conditionalCreate(18, ProfileComponent_Conditional_29_Conditional_45_Conditional_18_Template, 2, 0)(19, ProfileComponent_Conditional_29_Conditional_45_Conditional_19_Template, 1, 0);
+    \u0275\u0275conditionalCreate(18, ProfileComponent_Conditional_29_Conditional_44_Conditional_18_Template, 2, 0)(19, ProfileComponent_Conditional_29_Conditional_44_Conditional_19_Template, 1, 0);
     \u0275\u0275elementEnd()()()();
   }
   if (rf & 2) {
@@ -41998,53 +42023,53 @@ function ProfileComponent_Conditional_29_Conditional_45_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r1.isSavingDisplayName() ? 18 : 19);
   }
 }
-function ProfileComponent_Conditional_29_Conditional_54_Template(rf, ctx) {
+function ProfileComponent_Conditional_29_Conditional_53_Template(rf, ctx) {
   if (rf & 1) {
-    const _r6 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 35)(1, "div", 41)(2, "label");
+    const _r7 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "div", 35)(1, "div", 42)(2, "label");
     \u0275\u0275text(3, "\u7576\u524D\u5BC6\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "input", 50);
-    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_54_Template_input_ngModelChange_4_listener($event) {
-      \u0275\u0275restoreView(_r6);
+    \u0275\u0275elementStart(4, "input", 51);
+    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_53_Template_input_ngModelChange_4_listener($event) {
+      \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext(2);
       \u0275\u0275twoWayBindingSet(ctx_r1.passwordForm.oldPassword, $event) || (ctx_r1.passwordForm.oldPassword = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(5, "div", 41)(6, "label");
+    \u0275\u0275elementStart(5, "div", 42)(6, "label");
     \u0275\u0275text(7, "\u65B0\u5BC6\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "input", 50);
-    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_54_Template_input_ngModelChange_8_listener($event) {
-      \u0275\u0275restoreView(_r6);
+    \u0275\u0275elementStart(8, "input", 51);
+    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_53_Template_input_ngModelChange_8_listener($event) {
+      \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext(2);
       \u0275\u0275twoWayBindingSet(ctx_r1.passwordForm.newPassword, $event) || (ctx_r1.passwordForm.newPassword = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(9, "div", 41)(10, "label");
+    \u0275\u0275elementStart(9, "div", 42)(10, "label");
     \u0275\u0275text(11, "\u78BA\u8A8D\u65B0\u5BC6\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "input", 50);
-    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_54_Template_input_ngModelChange_12_listener($event) {
-      \u0275\u0275restoreView(_r6);
+    \u0275\u0275elementStart(12, "input", 51);
+    \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_29_Conditional_53_Template_input_ngModelChange_12_listener($event) {
+      \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext(2);
       \u0275\u0275twoWayBindingSet(ctx_r1.passwordForm.confirmPassword, $event) || (ctx_r1.passwordForm.confirmPassword = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(13, "div", 51)(14, "button", 46);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_54_Template_button_click_14_listener() {
-      \u0275\u0275restoreView(_r6);
+    \u0275\u0275elementStart(13, "div", 52)(14, "button", 47);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_53_Template_button_click_14_listener() {
+      \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.showChangePassword.set(false));
     });
     \u0275\u0275text(15, "\u53D6\u6D88");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(16, "button", 52);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_54_Template_button_click_16_listener() {
-      \u0275\u0275restoreView(_r6);
+    \u0275\u0275elementStart(16, "button", 53);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Conditional_53_Template_button_click_16_listener() {
+      \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.onChangePassword());
     });
@@ -42068,85 +42093,79 @@ function ProfileComponent_Conditional_29_Template(rf, ctx) {
     \u0275\u0275text(3, "\u{1F4CB} \u57FA\u672C\u4FE1\u606F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(4, "div", 21)(5, "div", 22)(6, "span", 23);
-    \u0275\u0275text(7, "\u7528\u6236ID");
+    \u0275\u0275text(7, "Telegram ID");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(8, "span", 24)(9, "span", 25);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "button", 26);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_11_listener() {
-      \u0275\u0275restoreView(_r3);
-      const ctx_r1 = \u0275\u0275nextContext();
-      return \u0275\u0275resetView(ctx_r1.copyUserId());
-    });
-    \u0275\u0275text(12, "\u{1F4CB}");
-    \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(13, "div", 22)(14, "span", 23);
-    \u0275\u0275text(15, "\u986F\u793A\u540D\u7A31");
+    \u0275\u0275conditionalCreate(11, ProfileComponent_Conditional_29_Conditional_11_Template, 2, 0, "button", 26);
+    \u0275\u0275elementEnd()();
+    \u0275\u0275elementStart(12, "div", 22)(13, "span", 23);
+    \u0275\u0275text(14, "\u986F\u793A\u540D\u7A31");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(16, "span", 27);
-    \u0275\u0275text(17);
+    \u0275\u0275elementStart(15, "span", 27);
+    \u0275\u0275text(16);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(18, "button", 28);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_18_listener() {
+    \u0275\u0275elementStart(17, "button", 28);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_17_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.openDisplayNameEditor());
     });
-    \u0275\u0275text(19, "\u7DE8\u8F2F");
+    \u0275\u0275text(18, "\u7DE8\u8F2F");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(20, "div", 22)(21, "span", 23);
-    \u0275\u0275text(22, "\u7528\u6236\u540D");
+    \u0275\u0275elementStart(19, "div", 22)(20, "span", 23);
+    \u0275\u0275text(21, "\u7528\u6236\u540D");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(23, "span", 29);
-    \u0275\u0275text(24);
+    \u0275\u0275elementStart(22, "span", 29);
+    \u0275\u0275text(23);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(25, "span", 30);
-    \u0275\u0275text(26, "\u767B\u5165\u7528\uFF0C\u4E0D\u53EF\u4FEE\u6539");
+    \u0275\u0275elementStart(24, "span", 30);
+    \u0275\u0275text(25, "\u767B\u5165\u7528\uFF0C\u4E0D\u53EF\u4FEE\u6539");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(27, "div", 22)(28, "span", 23);
-    \u0275\u0275text(29, "\u90F5\u7BB1");
+    \u0275\u0275elementStart(26, "div", 22)(27, "span", 23);
+    \u0275\u0275text(28, "\u90F5\u7BB1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(30, "span", 27);
-    \u0275\u0275text(31);
+    \u0275\u0275elementStart(29, "span", 27);
+    \u0275\u0275text(30);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(32, "button", 28);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_32_listener() {
+    \u0275\u0275elementStart(31, "button", 28);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_31_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.openEmailEditor());
     });
-    \u0275\u0275text(33, "\u7DE8\u8F2F");
+    \u0275\u0275text(32, "\u7DE8\u8F2F");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(34, "div", 22)(35, "span", 23);
-    \u0275\u0275text(36, "\u8A3B\u518A\u6642\u9593");
+    \u0275\u0275elementStart(33, "div", 22)(34, "span", 23);
+    \u0275\u0275text(35, "\u8A3B\u518A\u6642\u9593");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(37, "span", 27);
-    \u0275\u0275text(38);
+    \u0275\u0275elementStart(36, "span", 27);
+    \u0275\u0275text(37);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(39, "div", 22)(40, "span", 23);
-    \u0275\u0275text(41, "\u6700\u5F8C\u767B\u5165");
+    \u0275\u0275elementStart(38, "div", 22)(39, "span", 23);
+    \u0275\u0275text(40, "\u6700\u5F8C\u767B\u5165");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(42, "span", 27);
-    \u0275\u0275text(43);
+    \u0275\u0275elementStart(41, "span", 27);
+    \u0275\u0275text(42);
     \u0275\u0275elementEnd()()()();
-    \u0275\u0275conditionalCreate(44, ProfileComponent_Conditional_29_Conditional_44_Template, 24, 4, "div", 31);
-    \u0275\u0275conditionalCreate(45, ProfileComponent_Conditional_29_Conditional_45_Template, 20, 3, "div", 31);
-    \u0275\u0275elementStart(46, "div", 19)(47, "h3", 20);
-    \u0275\u0275text(48, "\u{1F510} \u5B89\u5168\u8A2D\u7F6E");
+    \u0275\u0275conditionalCreate(43, ProfileComponent_Conditional_29_Conditional_43_Template, 24, 4, "div", 31);
+    \u0275\u0275conditionalCreate(44, ProfileComponent_Conditional_29_Conditional_44_Template, 20, 3, "div", 31);
+    \u0275\u0275elementStart(45, "div", 19)(46, "h3", 20);
+    \u0275\u0275text(47, "\u{1F510} \u5B89\u5168\u8A2D\u7F6E");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(49, "div", 32)(50, "button", 33);
-    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_50_listener() {
+    \u0275\u0275elementStart(48, "div", 32)(49, "button", 33);
+    \u0275\u0275listener("click", function ProfileComponent_Conditional_29_Template_button_click_49_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.showChangePassword.set(true));
     });
-    \u0275\u0275text(51, " \u{1F511} \u4FEE\u6539\u5BC6\u78BC ");
+    \u0275\u0275text(50, " \u{1F511} \u4FEE\u6539\u5BC6\u78BC ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(52, "button", 34);
-    \u0275\u0275text(53, " \u{1F4F1} \u5169\u6B65\u9A57\u8B49 ");
+    \u0275\u0275elementStart(51, "button", 34);
+    \u0275\u0275text(52, " \u{1F4F1} \u5169\u6B65\u9A57\u8B49 ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(54, ProfileComponent_Conditional_29_Conditional_54_Template, 18, 3, "div", 35);
+    \u0275\u0275conditionalCreate(53, ProfileComponent_Conditional_29_Conditional_53_Template, 18, 3, "div", 35);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -42156,74 +42175,77 @@ function ProfileComponent_Conditional_29_Template(rf, ctx) {
     let tmp_4_0;
     let tmp_5_0;
     let tmp_6_0;
+    let tmp_7_0;
     const ctx_r1 = \u0275\u0275nextContext();
     \u0275\u0275advance(10);
-    \u0275\u0275textInterpolate(((tmp_1_0 = ctx_r1.user()) == null ? null : tmp_1_0.id) || "-");
-    \u0275\u0275advance(7);
-    \u0275\u0275textInterpolate(((tmp_2_0 = ctx_r1.user()) == null ? null : tmp_2_0.displayName) || ((tmp_2_0 = ctx_r1.user()) == null ? null : tmp_2_0.username) || "\u672A\u8A2D\u7F6E");
-    \u0275\u0275advance(7);
-    \u0275\u0275textInterpolate((tmp_3_0 = ctx_r1.user()) == null ? null : tmp_3_0.username);
-    \u0275\u0275advance(7);
-    \u0275\u0275textInterpolate(((tmp_4_0 = ctx_r1.user()) == null ? null : tmp_4_0.email) || "\u672A\u8A2D\u7F6E");
-    \u0275\u0275advance(7);
-    \u0275\u0275textInterpolate(ctx_r1.formatDate((tmp_5_0 = ctx_r1.user()) == null ? null : tmp_5_0.createdAt));
+    \u0275\u0275textInterpolate(((tmp_1_0 = ctx_r1.user()) == null ? null : tmp_1_0.telegramId) || "\u672A\u7D81\u5B9A");
+    \u0275\u0275advance();
+    \u0275\u0275conditional(((tmp_2_0 = ctx_r1.user()) == null ? null : tmp_2_0.telegramId) ? 11 : -1);
     \u0275\u0275advance(5);
-    \u0275\u0275textInterpolate(ctx_r1.formatDate((tmp_6_0 = ctx_r1.user()) == null ? null : tmp_6_0.lastLogin));
+    \u0275\u0275textInterpolate(((tmp_3_0 = ctx_r1.user()) == null ? null : tmp_3_0.displayName) || ((tmp_3_0 = ctx_r1.user()) == null ? null : tmp_3_0.username) || "\u672A\u8A2D\u7F6E");
+    \u0275\u0275advance(7);
+    \u0275\u0275textInterpolate((tmp_4_0 = ctx_r1.user()) == null ? null : tmp_4_0.username);
+    \u0275\u0275advance(7);
+    \u0275\u0275textInterpolate(((tmp_5_0 = ctx_r1.user()) == null ? null : tmp_5_0.email) || "\u672A\u8A2D\u7F6E");
+    \u0275\u0275advance(7);
+    \u0275\u0275textInterpolate(ctx_r1.formatDate((tmp_6_0 = ctx_r1.user()) == null ? null : tmp_6_0.createdAt));
+    \u0275\u0275advance(5);
+    \u0275\u0275textInterpolate(ctx_r1.formatDate((tmp_7_0 = ctx_r1.user()) == null ? null : tmp_7_0.lastLogin));
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r1.showEditEmail() ? 44 : -1);
+    \u0275\u0275conditional(ctx_r1.showEditEmail() ? 43 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r1.showEditDisplayName() ? 45 : -1);
+    \u0275\u0275conditional(ctx_r1.showEditDisplayName() ? 44 : -1);
     \u0275\u0275advance(9);
-    \u0275\u0275conditional(ctx_r1.showChangePassword() ? 54 : -1);
+    \u0275\u0275conditional(ctx_r1.showChangePassword() ? 53 : -1);
   }
 }
 function ProfileComponent_Conditional_30_Conditional_14_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 57);
+    \u0275\u0275elementStart(0, "div", 58);
     \u0275\u0275text(1, "\u8F09\u5165\u4E2D...");
     \u0275\u0275elementEnd();
   }
 }
 function ProfileComponent_Conditional_30_Conditional_15_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 58);
+    \u0275\u0275elementStart(0, "div", 59);
     \u0275\u0275text(1, "\u66AB\u7121\u6FC0\u6D3B\u8A18\u9304");
     \u0275\u0275elementEnd();
   }
 }
 function ProfileComponent_Conditional_30_Conditional_16_For_1_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 70)(1, "div", 71)(2, "span", 72);
+    \u0275\u0275elementStart(0, "div", 71)(1, "div", 72)(2, "span", 73);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "span", 73);
+    \u0275\u0275elementStart(4, "span", 74);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(6, "div", 74)(7, "span");
+    \u0275\u0275elementStart(6, "div", 75)(7, "span");
     \u0275\u0275text(8);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "span", 75);
+    \u0275\u0275elementStart(9, "span", 76);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
-    const record_r8 = ctx.$implicit;
+    const record_r9 = ctx.$implicit;
     const ctx_r1 = \u0275\u0275nextContext(3);
     \u0275\u0275advance(3);
-    \u0275\u0275textInterpolate(ctx_r1.formatLicenseKey(record_r8.license_key));
+    \u0275\u0275textInterpolate(ctx_r1.formatLicenseKey(record_r9.license_key));
     \u0275\u0275advance(2);
-    \u0275\u0275textInterpolate3("", record_r8.level_icon, " ", record_r8.level_name, " ", record_r8.duration_name);
+    \u0275\u0275textInterpolate3("", record_r9.level_icon, " ", record_r9.level_name, " ", record_r9.duration_name);
     \u0275\u0275advance(3);
-    \u0275\u0275textInterpolate1("", ctx_r1.formatActivationDate(record_r8.activated_at), " \u6FC0\u6D3B");
+    \u0275\u0275textInterpolate1("", ctx_r1.formatActivationDate(record_r9.activated_at), " \u6FC0\u6D3B");
     \u0275\u0275advance();
-    \u0275\u0275classProp("active", record_r8.is_active)("used", !record_r8.is_active);
+    \u0275\u0275classProp("active", record_r9.is_active)("used", !record_r9.is_active);
     \u0275\u0275advance();
-    \u0275\u0275textInterpolate1(" ", record_r8.is_active ? "\u6709\u6548" : "\u5DF2\u904E\u671F", " ");
+    \u0275\u0275textInterpolate1(" ", record_r9.is_active ? "\u6709\u6548" : "\u5DF2\u904E\u671F", " ");
   }
 }
 function ProfileComponent_Conditional_30_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275repeaterCreate(0, ProfileComponent_Conditional_30_Conditional_16_For_1_Template, 11, 10, "div", 70, _forTrack015);
+    \u0275\u0275repeaterCreate(0, ProfileComponent_Conditional_30_Conditional_16_For_1_Template, 11, 10, "div", 71, _forTrack015);
   }
   if (rf & 2) {
     const ctx_r1 = \u0275\u0275nextContext(2);
@@ -42232,45 +42254,45 @@ function ProfileComponent_Conditional_30_Conditional_16_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_30_Template(rf, ctx) {
   if (rf & 1) {
-    const _r7 = \u0275\u0275getCurrentView();
+    const _r8 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 14)(1, "div", 19)(2, "h3", 20);
     \u0275\u0275text(3, "\u{1F3AB} \u6FC0\u6D3B\u65B0\u5361\u5BC6");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "div", 53)(5, "input", 54);
+    \u0275\u0275elementStart(4, "div", 54)(5, "input", 55);
     \u0275\u0275twoWayListener("ngModelChange", function ProfileComponent_Conditional_30_Template_input_ngModelChange_5_listener($event) {
-      \u0275\u0275restoreView(_r7);
+      \u0275\u0275restoreView(_r8);
       const ctx_r1 = \u0275\u0275nextContext();
       \u0275\u0275twoWayBindingSet(ctx_r1.newLicenseKey, $event) || (ctx_r1.newLicenseKey = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "button", 55);
+    \u0275\u0275elementStart(6, "button", 56);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_30_Template_button_click_6_listener() {
-      \u0275\u0275restoreView(_r7);
+      \u0275\u0275restoreView(_r8);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.onActivateLicense());
     });
     \u0275\u0275text(7, " \u6FC0\u6D3B ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(8, "p", 44);
+    \u0275\u0275elementStart(8, "p", 45);
     \u0275\u0275text(9, "\u8F38\u5165\u8CFC\u8CB7\u7684\u5361\u5BC6\u4EE5\u7E8C\u8CBB\u6216\u5347\u7D1A\u6703\u54E1");
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(10, "div", 19)(11, "h3", 20);
     \u0275\u0275text(12, "\u{1F4DC} \u6FC0\u6D3B\u8A18\u9304");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(13, "div", 56);
-    \u0275\u0275conditionalCreate(14, ProfileComponent_Conditional_30_Conditional_14_Template, 2, 0, "div", 57)(15, ProfileComponent_Conditional_30_Conditional_15_Template, 2, 0, "div", 58)(16, ProfileComponent_Conditional_30_Conditional_16_Template, 2, 0);
+    \u0275\u0275elementStart(13, "div", 57);
+    \u0275\u0275conditionalCreate(14, ProfileComponent_Conditional_30_Conditional_14_Template, 2, 0, "div", 58)(15, ProfileComponent_Conditional_30_Conditional_15_Template, 2, 0, "div", 59)(16, ProfileComponent_Conditional_30_Conditional_16_Template, 2, 0);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(17, "div", 19)(18, "h3", 20);
     \u0275\u0275text(19, "\u{1F6D2} \u8CFC\u8CB7\u5361\u5BC6\uFF08\u738B\u8005\u69AE\u8000\u7B49\u7D1A\uFF09");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(20, "div", 59)(21, "div", 60)(22, "div", 61);
+    \u0275\u0275elementStart(20, "div", 60)(21, "div", 61)(22, "div", 62);
     \u0275\u0275text(23, "\u{1F948} \u767D\u9280\u7CBE\u82F1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(24, "div", 62);
+    \u0275\u0275elementStart(24, "div", 63);
     \u0275\u0275text(25, "4.99 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(26, "ul", 63)(27, "li");
+    \u0275\u0275elementStart(26, "ul", 64)(27, "li");
     \u0275\u0275text(28, "5 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(29, "li");
@@ -42282,19 +42304,19 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(33, "li");
     \u0275\u0275text(34, "10 \u500B\u7FA4\u7D44");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(35, "button", 64);
+    \u0275\u0275elementStart(35, "button", 65);
     \u0275\u0275text(36, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(37, "div", 65)(38, "div", 61);
+    \u0275\u0275elementStart(37, "div", 66)(38, "div", 62);
     \u0275\u0275text(39, "\u{1F947} \u9EC3\u91D1\u5927\u5E2B");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(40, "div", 62);
+    \u0275\u0275elementStart(40, "div", 63);
     \u0275\u0275text(41, "19.9 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(42, "div", 66);
+    \u0275\u0275elementStart(42, "div", 67);
     \u0275\u0275text(43, "\u63A8\u85A6");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(44, "ul", 63)(45, "li");
+    \u0275\u0275elementStart(44, "ul", 64)(45, "li");
     \u0275\u0275text(46, "15 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(47, "li");
@@ -42306,16 +42328,16 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(51, "li");
     \u0275\u0275text(52, "\u6279\u91CF\u64CD\u4F5C");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(53, "button", 64);
+    \u0275\u0275elementStart(53, "button", 65);
     \u0275\u0275text(54, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(55, "div", 67)(56, "div", 61);
+    \u0275\u0275elementStart(55, "div", 68)(56, "div", 62);
     \u0275\u0275text(57, "\u{1F48E} \u947D\u77F3\u738B\u724C");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(58, "div", 62);
+    \u0275\u0275elementStart(58, "div", 63);
     \u0275\u0275text(59, "59.9 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(60, "ul", 63)(61, "li");
+    \u0275\u0275elementStart(60, "ul", 64)(61, "li");
     \u0275\u0275text(62, "50 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(63, "li");
@@ -42327,16 +42349,16 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(67, "li");
     \u0275\u0275text(68, "AI \u92B7\u552E\u6F0F\u6597");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(69, "button", 64);
+    \u0275\u0275elementStart(69, "button", 65);
     \u0275\u0275text(70, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(71, "div", 68)(72, "div", 61);
+    \u0275\u0275elementStart(71, "div", 69)(72, "div", 62);
     \u0275\u0275text(73, "\u{1F31F} \u661F\u8000\u50B3\u8AAA");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(74, "div", 62);
+    \u0275\u0275elementStart(74, "div", 63);
     \u0275\u0275text(75, "199 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(76, "ul", 63)(77, "li");
+    \u0275\u0275elementStart(76, "ul", 64)(77, "li");
     \u0275\u0275text(78, "100 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(79, "li");
@@ -42348,16 +42370,16 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(83, "li");
     \u0275\u0275text(84, "\u667A\u80FD\u9632\u5C01");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(85, "button", 64);
+    \u0275\u0275elementStart(85, "button", 65);
     \u0275\u0275text(86, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(87, "div", 69)(88, "div", 61);
+    \u0275\u0275elementStart(87, "div", 70)(88, "div", 62);
     \u0275\u0275text(89, "\u{1F451} \u69AE\u8000\u738B\u8005");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(90, "div", 62);
+    \u0275\u0275elementStart(90, "div", 63);
     \u0275\u0275text(91, "599 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(92, "ul", 63)(93, "li");
+    \u0275\u0275elementStart(92, "ul", 64)(93, "li");
     \u0275\u0275text(94, "\u7121\u9650\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(95, "li");
@@ -42369,7 +42391,7 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
     \u0275\u0275elementStart(99, "li");
     \u0275\u0275text(100, "\u5C08\u5C6C\u9867\u554F");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(101, "button", 64);
+    \u0275\u0275elementStart(101, "button", 65);
     \u0275\u0275text(102, "\u8CFC\u8CB7");
     \u0275\u0275elementEnd()()()()();
   }
@@ -42385,20 +42407,20 @@ function ProfileComponent_Conditional_30_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_31_For_8_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 89);
+    \u0275\u0275elementStart(0, "span", 90);
     \u0275\u0275text(1, "\u672C\u6A5F");
     \u0275\u0275elementEnd();
   }
 }
 function ProfileComponent_Conditional_31_For_8_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
-    const _r10 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 93);
+    const _r11 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "button", 94);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_31_For_8_Conditional_11_Template_button_click_0_listener() {
-      \u0275\u0275restoreView(_r10);
-      const device_r11 = \u0275\u0275nextContext().$implicit;
+      \u0275\u0275restoreView(_r11);
+      const device_r12 = \u0275\u0275nextContext().$implicit;
       const ctx_r1 = \u0275\u0275nextContext(2);
-      return \u0275\u0275resetView(ctx_r1.onUnbindDevice(device_r11.id));
+      return \u0275\u0275resetView(ctx_r1.onUnbindDevice(device_r12.id));
     });
     \u0275\u0275text(1, " \u89E3\u7D81 ");
     \u0275\u0275elementEnd();
@@ -42410,80 +42432,80 @@ function ProfileComponent_Conditional_31_For_8_Conditional_11_Template(rf, ctx) 
 }
 function ProfileComponent_Conditional_31_For_8_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 85)(1, "div", 86);
+    \u0275\u0275elementStart(0, "div", 86)(1, "div", 87);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "div", 87)(4, "div", 88);
+    \u0275\u0275elementStart(3, "div", 88)(4, "div", 89);
     \u0275\u0275text(5);
-    \u0275\u0275conditionalCreate(6, ProfileComponent_Conditional_31_For_8_Conditional_6_Template, 2, 0, "span", 89);
+    \u0275\u0275conditionalCreate(6, ProfileComponent_Conditional_31_For_8_Conditional_6_Template, 2, 0, "span", 90);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "div", 90);
+    \u0275\u0275elementStart(7, "div", 91);
     \u0275\u0275text(8);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "div", 91);
+    \u0275\u0275elementStart(9, "div", 92);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(11, ProfileComponent_Conditional_31_For_8_Conditional_11_Template, 2, 1, "button", 92);
+    \u0275\u0275conditionalCreate(11, ProfileComponent_Conditional_31_For_8_Conditional_11_Template, 2, 1, "button", 93);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
-    const device_r11 = ctx.$implicit;
+    const device_r12 = ctx.$implicit;
     const ctx_r1 = \u0275\u0275nextContext(2);
-    \u0275\u0275classProp("current", device_r11.isCurrent);
+    \u0275\u0275classProp("current", device_r12.isCurrent);
     \u0275\u0275advance(2);
-    \u0275\u0275textInterpolate1(" ", ctx_r1.getDeviceIcon(device_r11), " ");
+    \u0275\u0275textInterpolate1(" ", ctx_r1.getDeviceIcon(device_r12), " ");
     \u0275\u0275advance(3);
-    \u0275\u0275textInterpolate1(" ", device_r11.deviceName, " ");
+    \u0275\u0275textInterpolate1(" ", device_r12.deviceName, " ");
     \u0275\u0275advance();
-    \u0275\u0275conditional(device_r11.isCurrent ? 6 : -1);
+    \u0275\u0275conditional(device_r12.isCurrent ? 6 : -1);
     \u0275\u0275advance(2);
-    \u0275\u0275textInterpolate(device_r11.deviceCode);
+    \u0275\u0275textInterpolate(device_r12.deviceCode);
     \u0275\u0275advance(2);
-    \u0275\u0275textInterpolate2(" \u7D81\u5B9A\u65BC ", ctx_r1.formatDate(device_r11.boundAt), " \xB7 \u6700\u5F8C\u6D3B\u52D5 ", ctx_r1.formatDate(device_r11.lastSeen), " ");
+    \u0275\u0275textInterpolate2(" \u7D81\u5B9A\u65BC ", ctx_r1.formatDate(device_r12.boundAt), " \xB7 \u6700\u5F8C\u6D3B\u52D5 ", ctx_r1.formatDate(device_r12.lastSeen), " ");
     \u0275\u0275advance();
-    \u0275\u0275conditional(!device_r11.isCurrent ? 11 : -1);
+    \u0275\u0275conditional(!device_r12.isCurrent ? 11 : -1);
   }
 }
 function ProfileComponent_Conditional_31_ForEmpty_9_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 58);
+    \u0275\u0275elementStart(0, "div", 59);
     \u0275\u0275text(1, " \u66AB\u7121\u7D81\u5B9A\u8A2D\u5099\u8A18\u9304 ");
     \u0275\u0275elementEnd();
   }
 }
 function ProfileComponent_Conditional_31_Template(rf, ctx) {
   if (rf & 1) {
-    const _r9 = \u0275\u0275getCurrentView();
+    const _r10 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 14)(1, "div", 19)(2, "h3", 20);
     \u0275\u0275text(3, "\u{1F4BB} \u5DF2\u7D81\u5B9A\u8A2D\u5099");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "p", 76);
+    \u0275\u0275elementStart(4, "p", 77);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "div", 77);
-    \u0275\u0275repeaterCreate(7, ProfileComponent_Conditional_31_For_8_Template, 12, 9, "div", 78, _forTrack015, false, ProfileComponent_Conditional_31_ForEmpty_9_Template, 2, 0, "div", 58);
+    \u0275\u0275elementStart(6, "div", 78);
+    \u0275\u0275repeaterCreate(7, ProfileComponent_Conditional_31_For_8_Template, 12, 9, "div", 79, _forTrack015, false, ProfileComponent_Conditional_31_ForEmpty_9_Template, 2, 0, "div", 59);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(10, "div", 19)(11, "h3", 20);
     \u0275\u0275text(12, "\u{1F4F1} \u7576\u524D\u8A2D\u5099");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(13, "div", 79)(14, "div", 80)(15, "span", 81);
+    \u0275\u0275elementStart(13, "div", 80)(14, "div", 81)(15, "span", 82);
     \u0275\u0275text(16, "\u8A2D\u5099\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "span", 82);
+    \u0275\u0275elementStart(17, "span", 83);
     \u0275\u0275text(18);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(19, "button", 83);
+    \u0275\u0275elementStart(19, "button", 84);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_31_Template_button_click_19_listener() {
-      \u0275\u0275restoreView(_r9);
+      \u0275\u0275restoreView(_r10);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.copyDeviceCode());
     });
     \u0275\u0275text(20, "\u{1F4CB}");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(21, "div", 80)(22, "span", 81);
+    \u0275\u0275elementStart(21, "div", 81)(22, "span", 82);
     \u0275\u0275text(23, "\u8A2D\u5099\u540D\u7A31");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(24, "span", 84);
+    \u0275\u0275elementStart(24, "span", 85);
     \u0275\u0275text(25);
     \u0275\u0275elementEnd()()()()();
   }
@@ -42501,52 +42523,52 @@ function ProfileComponent_Conditional_31_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_32_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 94)(1, "div", 95)(2, "div", 96);
+    \u0275\u0275elementStart(0, "div", 95)(1, "div", 96)(2, "div", 97);
     \u0275\u0275text(3, "\u{1F916}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "div", 97)(5, "div", 98);
+    \u0275\u0275elementStart(4, "div", 98)(5, "div", 99);
     \u0275\u0275text(6, "AI \u8ABF\u7528");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "div", 99);
-    \u0275\u0275element(8, "div", 100);
+    \u0275\u0275elementStart(7, "div", 100);
+    \u0275\u0275element(8, "div", 101);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "div", 101);
+    \u0275\u0275elementStart(9, "div", 102);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(11, "div", 95)(12, "div", 96);
+    \u0275\u0275elementStart(11, "div", 96)(12, "div", 97);
     \u0275\u0275text(13, "\u{1F4E8}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "div", 97)(15, "div", 98);
+    \u0275\u0275elementStart(14, "div", 98)(15, "div", 99);
     \u0275\u0275text(16, "\u6D88\u606F\u767C\u9001");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "div", 99);
-    \u0275\u0275element(18, "div", 100);
+    \u0275\u0275elementStart(17, "div", 100);
+    \u0275\u0275element(18, "div", 101);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(19, "div", 101);
+    \u0275\u0275elementStart(19, "div", 102);
     \u0275\u0275text(20);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(21, "div", 95)(22, "div", 96);
+    \u0275\u0275elementStart(21, "div", 96)(22, "div", 97);
     \u0275\u0275text(23, "\u{1F465}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(24, "div", 97)(25, "div", 98);
+    \u0275\u0275elementStart(24, "div", 98)(25, "div", 99);
     \u0275\u0275text(26, "\u5E33\u865F\u6578\u91CF");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(27, "div", 99);
-    \u0275\u0275element(28, "div", 100);
+    \u0275\u0275elementStart(27, "div", 100);
+    \u0275\u0275element(28, "div", 101);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(29, "div", 101);
+    \u0275\u0275elementStart(29, "div", 102);
     \u0275\u0275text(30);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(31, "div", 95)(32, "div", 96);
+    \u0275\u0275elementStart(31, "div", 96)(32, "div", 97);
     \u0275\u0275text(33, "\u{1F4BE}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(34, "div", 97)(35, "div", 98);
+    \u0275\u0275elementStart(34, "div", 98)(35, "div", 99);
     \u0275\u0275text(36, "\u5B58\u5132\u7A7A\u9593");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(37, "div", 99);
-    \u0275\u0275element(38, "div", 100);
+    \u0275\u0275elementStart(37, "div", 100);
+    \u0275\u0275element(38, "div", 101);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(39, "div", 101);
+    \u0275\u0275elementStart(39, "div", 102);
     \u0275\u0275text(40);
     \u0275\u0275elementEnd()()()();
   }
@@ -42572,7 +42594,7 @@ function ProfileComponent_Conditional_32_Conditional_4_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_32_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 57);
+    \u0275\u0275elementStart(0, "div", 58);
     \u0275\u0275text(1, "\u8F09\u5165\u4E2D...");
     \u0275\u0275elementEnd();
   }
@@ -42582,12 +42604,12 @@ function ProfileComponent_Conditional_32_Template(rf, ctx) {
     \u0275\u0275elementStart(0, "div", 14)(1, "div", 19)(2, "h3", 20);
     \u0275\u0275text(3, "\u{1F4CA} \u672C\u6708\u4F7F\u7528\u60C5\u6CC1");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(4, ProfileComponent_Conditional_32_Conditional_4_Template, 41, 16, "div", 94)(5, ProfileComponent_Conditional_32_Conditional_5_Template, 2, 0, "div", 57);
+    \u0275\u0275conditionalCreate(4, ProfileComponent_Conditional_32_Conditional_4_Template, 41, 16, "div", 95)(5, ProfileComponent_Conditional_32_Conditional_5_Template, 2, 0, "div", 58);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(6, "div", 19)(7, "h3", 20);
     \u0275\u0275text(8, "\u{1F4C8} \u6B77\u53F2\u8DA8\u52E2");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "p", 76);
+    \u0275\u0275elementStart(9, "p", 77);
     \u0275\u0275text(10, "\u656C\u8ACB\u671F\u5F85...");
     \u0275\u0275elementEnd()()();
   }
@@ -42599,38 +42621,38 @@ function ProfileComponent_Conditional_32_Template(rf, ctx) {
 }
 function ProfileComponent_Conditional_33_Template(rf, ctx) {
   if (rf & 1) {
-    const _r12 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 14)(1, "div", 102)(2, "h3", 20);
+    const _r13 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "div", 14)(1, "div", 103)(2, "h3", 20);
     \u0275\u0275text(3, "\u{1F381} \u9080\u8ACB\u597D\u53CB\u5F97\u734E\u52F5");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "p", 76);
+    \u0275\u0275elementStart(4, "p", 77);
     \u0275\u0275text(5, " \u6BCF\u9080\u8ACB 1 \u4F4D\u597D\u53CB\u8A3B\u518A\u4E26\u6FC0\u6D3B\uFF0C\u60A8\u5C07\u7372\u5F97 ");
     \u0275\u0275elementStart(6, "strong");
     \u0275\u0275text(7, "3 \u5929\u767D\u9280\u7CBE\u82F1");
     \u0275\u0275elementEnd();
     \u0275\u0275text(8, " \u734E\u52F5\uFF01 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "div", 103)(10, "span", 104);
+    \u0275\u0275elementStart(9, "div", 104)(10, "span", 105);
     \u0275\u0275text(11, "\u6211\u7684\u9080\u8ACB\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "div", 105);
+    \u0275\u0275elementStart(12, "div", 106);
     \u0275\u0275text(13);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "button", 83);
+    \u0275\u0275elementStart(14, "button", 84);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_33_Template_button_click_14_listener() {
-      \u0275\u0275restoreView(_r12);
+      \u0275\u0275restoreView(_r13);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.copyInviteCode());
     });
     \u0275\u0275text(15, " \u{1F4CB} \u8907\u88FD ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(16, "div", 106)(17, "span", 104);
+    \u0275\u0275elementStart(16, "div", 107)(17, "span", 105);
     \u0275\u0275text(18, "\u9080\u8ACB\u93C8\u63A5");
     \u0275\u0275elementEnd();
-    \u0275\u0275element(19, "input", 107);
-    \u0275\u0275elementStart(20, "button", 83);
+    \u0275\u0275element(19, "input", 108);
+    \u0275\u0275elementStart(20, "button", 84);
     \u0275\u0275listener("click", function ProfileComponent_Conditional_33_Template_button_click_20_listener() {
-      \u0275\u0275restoreView(_r12);
+      \u0275\u0275restoreView(_r13);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.copyInviteLink());
     });
@@ -42639,16 +42661,16 @@ function ProfileComponent_Conditional_33_Template(rf, ctx) {
     \u0275\u0275elementStart(22, "div", 19)(23, "h3", 20);
     \u0275\u0275text(24, "\u{1F4CA} \u9080\u8ACB\u7D71\u8A08");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(25, "div", 108)(26, "div", 109)(27, "div", 110);
+    \u0275\u0275elementStart(25, "div", 109)(26, "div", 110)(27, "div", 111);
     \u0275\u0275text(28);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(29, "div", 111);
+    \u0275\u0275elementStart(29, "div", 112);
     \u0275\u0275text(30, "\u5DF2\u9080\u8ACB\u4EBA\u6578");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(31, "div", 109)(32, "div", 110);
+    \u0275\u0275elementStart(31, "div", 110)(32, "div", 111);
     \u0275\u0275text(33);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(34, "div", 111);
+    \u0275\u0275elementStart(34, "div", 112);
     \u0275\u0275text(35, "\u7372\u5F97\u734E\u52F5\u5929\u6578");
     \u0275\u0275elementEnd()()()()();
   }
@@ -42877,12 +42899,12 @@ var ProfileComponent = class _ProfileComponent {
     navigator.clipboard.writeText(this.inviteLink());
     this.toast.success("\u9080\u8ACB\u93C8\u63A5\u5DF2\u8907\u88FD");
   }
-  // 🆕 複製用戶ID
-  copyUserId() {
-    const userId = this.user()?.id;
-    if (userId) {
-      navigator.clipboard.writeText(String(userId));
-      this.toast.success("\u7528\u6236ID\u5DF2\u8907\u88FD");
+  // 🆕 複製 Telegram ID
+  copyTelegramId() {
+    const telegramId = this.user()?.telegramId;
+    if (telegramId) {
+      navigator.clipboard.writeText(telegramId);
+      this.toast.success("Telegram ID \u5DF2\u8907\u88FD");
     }
   }
   // 🆕 打開郵箱編輯彈窗
@@ -42973,7 +42995,7 @@ var ProfileComponent = class _ProfileComponent {
     };
   }
   static {
-    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _ProfileComponent, selectors: [["app-profile"]], decls: 34, vars: 27, consts: [[1, "profile-container"], [1, "loading-overlay"], [1, "error-alert"], [1, "profile-header"], [1, "avatar-section"], [1, "avatar"], [1, "user-info"], [1, "username"], [1, "email"], [1, "membership-badge"], [1, "expires"], [1, "logout-btn", 3, "click", "disabled"], [1, "tabs"], [1, "tab-btn", 3, "click"], [1, "tab-content"], [1, "loading-spinner"], [1, "error-icon"], [1, "retry-btn", 3, "click"], [1, "logout-spinner"], [1, "section-card"], [1, "section-title"], [1, "info-grid"], [1, "info-item"], [1, "info-label"], [1, "info-value", "user-id"], [1, "id-text"], ["title", "\u8907\u88FDID", 1, "copy-id-btn", 3, "click"], [1, "info-value"], [1, "edit-btn", 3, "click"], [1, "info-value", "username-value"], [1, "info-hint"], [1, "modal-overlay"], [1, "security-actions"], [1, "action-btn", 3, "click"], [1, "action-btn"], [1, "change-password-form"], [1, "modal-overlay", 3, "click"], [1, "modal-content", 3, "click"], [1, "modal-header"], [1, "close-btn", 3, "click"], [1, "modal-body"], [1, "form-group"], ["type", "email", "placeholder", "\u8ACB\u8F38\u5165\u65B0\u90F5\u7BB1", 1, "form-input", 3, "ngModelChange", "ngModel"], ["type", "password", "placeholder", "\u8ACB\u8F38\u5165\u7576\u524D\u5BC6\u78BC", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "hint-text"], [1, "modal-footer"], [1, "cancel-btn", 3, "click"], [1, "save-btn", 3, "click", "disabled"], [1, "btn-spinner"], ["type", "text", "placeholder", "\u8ACB\u8F38\u5165\u986F\u793A\u540D\u7A31", "maxlength", "30", 1, "form-input", 3, "ngModelChange", "ngModel"], ["type", "password", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "form-actions"], [1, "submit-btn", 3, "click"], [1, "license-input-group"], ["type", "text", "placeholder", "XXXX-XXXX-XXXX-XXXX", 1, "form-input", "font-mono", 3, "ngModelChange", "ngModel"], [1, "activate-btn", 3, "click", "disabled"], [1, "license-history"], [1, "loading-state"], [1, "empty-state"], [1, "purchase-options"], [1, "purchase-card", "silver"], [1, "plan-name"], [1, "plan-price"], [1, "plan-features"], [1, "buy-btn"], [1, "purchase-card", "gold"], [1, "recommended"], [1, "purchase-card", "diamond"], [1, "purchase-card", "star"], [1, "purchase-card", "king"], [1, "history-item"], [1, "history-info"], [1, "license-code"], [1, "license-type"], [1, "history-meta"], [1, "status"], [1, "section-desc"], [1, "device-list"], [1, "device-item", 3, "current"], [1, "current-device-info"], [1, "info-row"], [1, "label"], [1, "value", "font-mono"], [1, "copy-btn", 3, "click"], [1, "value"], [1, "device-item"], [1, "device-icon"], [1, "device-info"], [1, "device-name"], [1, "current-badge"], [1, "device-code"], [1, "device-meta"], [1, "unbind-btn", 3, "disabled"], [1, "unbind-btn", 3, "click", "disabled"], [1, "usage-grid"], [1, "usage-item"], [1, "usage-icon"], [1, "usage-info"], [1, "usage-label"], [1, "usage-bar"], [1, "usage-fill"], [1, "usage-text"], [1, "section-card", "highlight"], [1, "invite-code-box"], [1, "invite-label"], [1, "invite-code"], [1, "invite-link-box"], ["type", "text", "readonly", "", 1, "invite-link-input", 3, "value"], [1, "invite-stats"], [1, "stat-item"], [1, "stat-value"], [1, "stat-label"]], template: function ProfileComponent_Template(rf, ctx) {
+    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _ProfileComponent, selectors: [["app-profile"]], decls: 34, vars: 27, consts: [[1, "profile-container"], [1, "loading-overlay"], [1, "error-alert"], [1, "profile-header"], [1, "avatar-section"], [1, "avatar"], [1, "user-info"], [1, "username"], [1, "email"], [1, "membership-badge"], [1, "expires"], [1, "logout-btn", 3, "click", "disabled"], [1, "tabs"], [1, "tab-btn", 3, "click"], [1, "tab-content"], [1, "loading-spinner"], [1, "error-icon"], [1, "retry-btn", 3, "click"], [1, "logout-spinner"], [1, "section-card"], [1, "section-title"], [1, "info-grid"], [1, "info-item"], [1, "info-label"], [1, "info-value", "user-id"], [1, "id-text"], ["title", "\u8907\u88FD Telegram ID", 1, "copy-id-btn"], [1, "info-value"], [1, "edit-btn", 3, "click"], [1, "info-value", "username-value"], [1, "info-hint"], [1, "modal-overlay"], [1, "security-actions"], [1, "action-btn", 3, "click"], [1, "action-btn"], [1, "change-password-form"], ["title", "\u8907\u88FD Telegram ID", 1, "copy-id-btn", 3, "click"], [1, "modal-overlay", 3, "click"], [1, "modal-content", 3, "click"], [1, "modal-header"], [1, "close-btn", 3, "click"], [1, "modal-body"], [1, "form-group"], ["type", "email", "placeholder", "\u8ACB\u8F38\u5165\u65B0\u90F5\u7BB1", 1, "form-input", 3, "ngModelChange", "ngModel"], ["type", "password", "placeholder", "\u8ACB\u8F38\u5165\u7576\u524D\u5BC6\u78BC", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "hint-text"], [1, "modal-footer"], [1, "cancel-btn", 3, "click"], [1, "save-btn", 3, "click", "disabled"], [1, "btn-spinner"], ["type", "text", "placeholder", "\u8ACB\u8F38\u5165\u986F\u793A\u540D\u7A31", "maxlength", "30", 1, "form-input", 3, "ngModelChange", "ngModel"], ["type", "password", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "form-actions"], [1, "submit-btn", 3, "click"], [1, "license-input-group"], ["type", "text", "placeholder", "XXXX-XXXX-XXXX-XXXX", 1, "form-input", "font-mono", 3, "ngModelChange", "ngModel"], [1, "activate-btn", 3, "click", "disabled"], [1, "license-history"], [1, "loading-state"], [1, "empty-state"], [1, "purchase-options"], [1, "purchase-card", "silver"], [1, "plan-name"], [1, "plan-price"], [1, "plan-features"], [1, "buy-btn"], [1, "purchase-card", "gold"], [1, "recommended"], [1, "purchase-card", "diamond"], [1, "purchase-card", "star"], [1, "purchase-card", "king"], [1, "history-item"], [1, "history-info"], [1, "license-code"], [1, "license-type"], [1, "history-meta"], [1, "status"], [1, "section-desc"], [1, "device-list"], [1, "device-item", 3, "current"], [1, "current-device-info"], [1, "info-row"], [1, "label"], [1, "value", "font-mono"], [1, "copy-btn", 3, "click"], [1, "value"], [1, "device-item"], [1, "device-icon"], [1, "device-info"], [1, "device-name"], [1, "current-badge"], [1, "device-code"], [1, "device-meta"], [1, "unbind-btn", 3, "disabled"], [1, "unbind-btn", 3, "click", "disabled"], [1, "usage-grid"], [1, "usage-item"], [1, "usage-icon"], [1, "usage-info"], [1, "usage-label"], [1, "usage-bar"], [1, "usage-fill"], [1, "usage-text"], [1, "section-card", "highlight"], [1, "invite-code-box"], [1, "invite-label"], [1, "invite-code"], [1, "invite-link-box"], ["type", "text", "readonly", "", 1, "invite-link-input", 3, "value"], [1, "invite-stats"], [1, "stat-item"], [1, "stat-value"], [1, "stat-label"]], template: function ProfileComponent_Template(rf, ctx) {
       if (rf & 1) {
         \u0275\u0275elementStart(0, "div", 0);
         \u0275\u0275conditionalCreate(1, ProfileComponent_Conditional_1_Template, 4, 0, "div", 1);
@@ -43027,7 +43049,7 @@ var ProfileComponent = class _ProfileComponent {
         });
         \u0275\u0275text(28, " \u{1F381} \u9080\u8ACB\u734E\u52F5 ");
         \u0275\u0275elementEnd()();
-        \u0275\u0275conditionalCreate(29, ProfileComponent_Conditional_29_Template, 55, 9, "div", 14);
+        \u0275\u0275conditionalCreate(29, ProfileComponent_Conditional_29_Template, 54, 10, "div", 14);
         \u0275\u0275conditionalCreate(30, ProfileComponent_Conditional_30_Template, 103, 3, "div", 14);
         \u0275\u0275conditionalCreate(31, ProfileComponent_Conditional_31_Template, 26, 5, "div", 14);
         \u0275\u0275conditionalCreate(32, ProfileComponent_Conditional_32_Template, 11, 1, "div", 14);
@@ -43173,10 +43195,12 @@ var ProfileComponent = class _ProfileComponent {
             
             <div class="info-grid">
               <div class="info-item">
-                <span class="info-label">\u7528\u6236ID</span>
+                <span class="info-label">Telegram ID</span>
                 <span class="info-value user-id">
-                  <span class="id-text">{{ user()?.id || '-' }}</span>
-                  <button class="copy-id-btn" (click)="copyUserId()" title="\u8907\u88FDID">\u{1F4CB}</button>
+                  <span class="id-text">{{ user()?.telegramId || '\u672A\u7D81\u5B9A' }}</span>
+                  @if (user()?.telegramId) {
+                    <button class="copy-id-btn" (click)="copyTelegramId()" title="\u8907\u88FD Telegram ID">\u{1F4CB}</button>
+                  }
                 </span>
               </div>
               <div class="info-item">
@@ -43612,7 +43636,7 @@ var ProfileComponent = class _ProfileComponent {
   }], null, null);
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(ProfileComponent, { className: "ProfileComponent", filePath: "src/profile.component.ts", lineNumber: 1273 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(ProfileComponent, { className: "ProfileComponent", filePath: "src/profile.component.ts", lineNumber: 1275 });
 })();
 
 // src/manual-mode/resource-center.component.ts
@@ -64811,11 +64835,18 @@ ${details.suggestion || "\u8ACB\u5237\u65B0\u8CC7\u6E90\u5217\u8868"}`);
     console.log("[App] Current URL:", window.location.href);
     this.ipcService.send("get-initial-state");
     if (this.isAuthenticated()) {
-      this.authService.fetchCurrentUser().then((user) => {
-        if (user) {
-          console.log("[App] User data refreshed, membership:", this.authService.membershipLevel());
-        }
-      }).catch((err) => console.warn("[App] Failed to refresh user data:", err));
+      setTimeout(() => {
+        this.authService.fetchCurrentUser().then((user) => {
+          if (user) {
+            console.log("[App] User data refreshed:", {
+              displayName: user.displayName || user.display_name,
+              telegramId: user.telegramId || user.telegram_id,
+              membership: this.authService.membershipLevel()
+            });
+            this.cdr.detectChanges();
+          }
+        }).catch((err) => console.warn("[App] Failed to refresh user data:", err));
+      }, 500);
     }
     this.queueRefreshInterval = setInterval(() => {
       this.refreshQueueStatusThrottled();
@@ -73781,7 +73812,7 @@ var routes = [
   // 認證路由（公開）
   {
     path: "auth",
-    loadChildren: () => import("./chunk-GNAFZAEX.js").then((m) => m.AUTH_ROUTES)
+    loadChildren: () => import("./chunk-4BSZFPUL.js").then((m) => m.AUTH_ROUTES)
   },
   // 簡化路由
   {
@@ -73821,21 +73852,21 @@ var routes = [
   // 用戶設置頁面
   {
     path: "user-settings",
-    loadComponent: () => import("./chunk-A3IC3LYP.js").then((m) => m.UserSettingsViewComponent),
+    loadComponent: () => import("./chunk-K5FXM5K4.js").then((m) => m.UserSettingsViewComponent),
     title: "\u7528\u6236\u8A2D\u7F6E",
     canActivate: [authGuard]
   },
   // 訂閱升級頁面
   {
     path: "upgrade",
-    loadComponent: () => import("./chunk-TNB66RGY.js").then((m) => m.UpgradeViewComponent),
+    loadComponent: () => import("./chunk-4J3DUVC5.js").then((m) => m.UpgradeViewComponent),
     title: "\u5347\u7D1A\u65B9\u6848",
     canActivate: [authGuard]
   },
   // 配額管理儀表板
   {
     path: "quota",
-    loadComponent: () => import("./chunk-MXEJVUE3.js").then((m) => m.QuotaDashboardViewComponent),
+    loadComponent: () => import("./chunk-AP64V2TF.js").then((m) => m.QuotaDashboardViewComponent),
     title: "\u914D\u984D\u7BA1\u7406",
     canActivate: [authGuard]
   },

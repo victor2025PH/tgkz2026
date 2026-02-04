@@ -214,14 +214,32 @@ class WalletService:
             )
         ''')
         
-        # 🔧 數據庫遷移：確保 wallet_transactions 表有 bonus_amount 欄位
-        try:
-            cursor.execute("SELECT bonus_amount FROM wallet_transactions LIMIT 1")
-        except sqlite3.OperationalError:
-            # 欄位不存在，添加它
-            logger.info("Adding bonus_amount column to wallet_transactions table...")
-            cursor.execute("ALTER TABLE wallet_transactions ADD COLUMN bonus_amount INTEGER DEFAULT 0")
-            logger.info("✓ bonus_amount column added successfully")
+        # 🔧 數據庫遷移：確保 wallet_transactions 表有所有必需的欄位
+        migration_columns = [
+            ("bonus_amount", "INTEGER DEFAULT 0"),
+            ("balance_before", "INTEGER DEFAULT 0"),
+            ("balance_after", "INTEGER DEFAULT 0"),
+            ("category", "TEXT"),
+            ("description", "TEXT"),
+            ("reference_id", "TEXT"),
+            ("reference_type", "TEXT"),
+            ("payment_method", "TEXT"),
+            ("payment_channel", "TEXT"),
+            ("external_order_id", "TEXT"),
+            ("fee", "INTEGER DEFAULT 0"),
+            ("operator_id", "TEXT"),
+            ("remark", "TEXT"),
+            ("ip_address", "TEXT"),
+            ("completed_at", "TIMESTAMP"),
+        ]
+        
+        for col_name, col_type in migration_columns:
+            try:
+                cursor.execute(f"SELECT {col_name} FROM wallet_transactions LIMIT 1")
+            except sqlite3.OperationalError:
+                logger.info(f"Adding {col_name} column to wallet_transactions table...")
+                cursor.execute(f"ALTER TABLE wallet_transactions ADD COLUMN {col_name} {col_type}")
+                logger.info(f"✓ {col_name} column added successfully")
         
         # 創建索引
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_wallet_user ON user_wallets(user_id)')

@@ -17,7 +17,7 @@ import { ToastComponent } from './toast.component';
 import { GlobalConfirmDialogComponent } from './global-confirm-dialog.component';
 import { GlobalInputDialogComponent } from './global-input-dialog.component';
 import { ProgressDialogComponent, ProgressInfo } from './progress-dialog.component';
-import { MembershipService } from './membership.service';
+import { MembershipService, MembershipLevel } from './membership.service';
 import { MembershipDialogComponent, UpgradePromptComponent } from './membership-ui.component';
 import { LicenseClientService } from './license-client.service';
 import { UnifiedContactsService } from './services/unified-contacts.service';
@@ -6183,10 +6183,9 @@ export class AppComponent implements OnDestroy, OnInit {
             
             // 🔧 P2: 同步到 MembershipService（確保數據一致性）
             if (this.membershipService.isSaaSMode()) {
-              this.membershipService.syncFromAuthService(
-                this.authService.membershipLevel(),
-                this.authService.user()?.membershipExpires
-              );
+              const level = this.authService.membershipLevel() as MembershipLevel;
+              const expires = this.authService.user()?.membershipExpires;
+              this.membershipService.syncFromAuthService(level, expires);
             }
             
             // 強制變更檢測

@@ -1,7 +1,7 @@
 import { Component, Input, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { I18nService } from '../i18n.service';
-import { MembershipLevel } from '../auth.service';
+import { MembershipLevel } from '../membership.service';
 
 /**
  * 🔧 P1-2: 統一的會員等級徽章組件

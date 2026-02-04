@@ -13,13 +13,14 @@ import { I18nService } from './i18n.service';
 import { ToastService } from './toast.service';
 import { LicenseClientService } from './license-client.service';
 import { WalletService, Wallet } from './services/wallet.service';
+import { UserLevelBadgeComponent } from './components/user-level-badge.component';
 
 type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
 
 @Component({
   selector: 'app-membership-center',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, UserLevelBadgeComponent],
   template: `
     <div class="membership-container">
       <!-- 頁面標題 -->
@@ -38,7 +39,8 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
             {{ getMembershipIcon() }}
           </div>
           <div class="level-info">
-            <h2 class="level-name">{{ getMembershipName() }}</h2>
+            <!-- 🔧 P1-2: 使用統一的會員等級徽章組件 -->
+            <user-level-badge [level]="membershipLevel()" size="lg" />
             @if (membershipExpires()) {
               <p class="expires-info">
                 有效期至 {{ formatDate(membershipExpires()) }}

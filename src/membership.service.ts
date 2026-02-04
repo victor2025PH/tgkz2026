@@ -9,6 +9,20 @@
  * 💎 鑽石王牌 (Diamond) - 專業用戶
  * 🌟 星耀傳說 (Star) - 團隊用戶
  * 👑 榮耀王者 (King) - 無限尊享
+ * 
+ * ============ 🔧 P2 數據源說明 ============
+ * 
+ * 數據源優先級：
+ * 1. SaaS 模式（非 Electron）：AuthService 是唯一數據源
+ *    - 會員等級從 /api/v1/auth/me 獲取
+ *    - 本服務僅提供配額和功能配置查詢
+ * 
+ * 2. Electron 模式：本服務為主要數據源
+ *    - 支持本地卡密激活
+ *    - 數據存儲在 localStorage (tg-matrix-membership)
+ * 
+ * 重要：當需要顯示會員等級時，優先使用 AuthService.membershipLevel()
+ * ==========================================
  */
 import { Injectable, signal, computed, WritableSignal, inject } from '@angular/core';
 
@@ -479,6 +493,56 @@ export class MembershipService {
   
   constructor() {
     this.loadMembership();
+  }
+  
+  // ============ 🔧 P2: 數據同步 ============
+  
+  /**
+   * 從 AuthService 同步會員數據
+   * 用於 SaaS 模式下確保數據一致性
+   * 
+   * @param authLevel 從 AuthService 獲取的會員等級
+   * @param authExpires 從 AuthService 獲取的過期時間
+   */
+  syncFromAuthService(authLevel: MembershipLevel, authExpires?: string): void {
+    // Electron 模式下不同步（本地卡密優先）
+    if (this.SKIP_LOGIN) {
+      console.log('[MembershipService] Electron 模式，跳過 AuthService 同步');
+      return;
+    }
+    
+    const currentMembership = this._membership();
+    const currentLevel = currentMembership?.level;
+    
+    // 檢查是否需要同步
+    if (currentLevel !== authLevel) {
+      console.log(`[MembershipService] 🔄 從 AuthService 同步: ${currentLevel} → ${authLevel}`);
+      
+      const levelConfig = MEMBERSHIP_CONFIG[authLevel];
+      const newMembership: MembershipInfo = {
+        level: authLevel,
+        levelName: levelConfig?.name || '未知',
+        levelIcon: levelConfig?.icon || '?',
+        expiresAt: authExpires ? new Date(authExpires) : undefined,
+        activatedAt: currentMembership?.activatedAt || new Date(),
+        machineId: this.getMachineId(),
+        usage: currentMembership?.usage || this.getDefaultUsage(),
+        inviteCode: currentMembership?.inviteCode || this.generateInviteCode(),
+        inviteCount: currentMembership?.inviteCount || 0,
+        inviteRewards: currentMembership?.inviteRewards || 0,
+      };
+      
+      this._membership.set(newMembership);
+      // 注意：不保存到 localStorage，避免覆蓋本地卡密數據
+      // 下次刷新時會重新從 AuthService 獲取
+    }
+  }
+  
+  /**
+   * 檢查是否為 SaaS 模式（非 Electron）
+   */
+  isSaaSMode(): boolean {
+    return !this.SKIP_LOGIN;
   }
   
   // ============ 會員管理 ============

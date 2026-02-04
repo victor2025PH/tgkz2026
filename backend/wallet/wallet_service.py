@@ -223,6 +223,7 @@ class WalletService:
             ("description", "TEXT"),
             ("reference_id", "TEXT"),
             ("reference_type", "TEXT"),
+            ("status", "TEXT DEFAULT 'pending'"),
             ("payment_method", "TEXT"),
             ("payment_channel", "TEXT"),
             ("external_order_id", "TEXT"),

@@ -6170,7 +6170,7 @@ export class AppComponent implements OnDestroy, OnInit {
     if (this.isAuthenticated()) {
       this.authService.fetchCurrentUser().then(user => {
         if (user) {
-          console.log('[App] User data refreshed, membership:', user.membershipLevel);
+          console.log('[App] User data refreshed, membership:', this.authService.membershipLevel());
         }
       }).catch(err => console.warn('[App] Failed to refresh user data:', err));
     }

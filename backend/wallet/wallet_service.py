@@ -805,39 +805,24 @@ class WalletService:
                 return False, "更新錢包失敗", None
             
             # 創建交易記錄
-            transaction = Transaction(
-                wallet_id=wallet.id,
-                user_id=user_id,
-                order_id=order_id,
-                type=tx_type,
-                amount=amount,
-                bonus_amount=0,
-                balance_before=balance_before,
-                balance_after=new_balance + new_bonus,
-                category="admin_adjust",
-                description=f"管理員調賬: {reason}",
-                reference_id=admin_id,
-                reference_type="admin_adjust",
-                status=TransactionStatus.SUCCESS.value,
-                ip_address=ip_address,
-                completed_at=now
-            )
+            # 適配新表結構：id 是自增整數，wallet_id 也是整數
+            wallet_id_int = current.get('id', 0)  # wallets 表的 id 是整數
             
             cursor.execute('''
                 INSERT INTO wallet_transactions
-                (id, wallet_id, user_id, order_id, type, amount, bonus_amount,
+                (wallet_id, user_id, order_id, type, amount, bonus_amount,
                  balance_before, balance_after, category, description,
                  reference_id, reference_type, status, ip_address,
                  created_at, completed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                transaction.id, transaction.wallet_id, transaction.user_id,
-                transaction.order_id, transaction.type, transaction.amount,
-                transaction.bonus_amount, transaction.balance_before,
-                transaction.balance_after, transaction.category, transaction.description,
-                transaction.reference_id, transaction.reference_type,
-                transaction.status, transaction.ip_address,
-                transaction.created_at, transaction.completed_at
+                wallet_id_int, user_id,
+                order_id, tx_type, amount,
+                0, balance_before,
+                new_balance + new_bonus, "admin_adjust", f"管理員調賬: {reason}",
+                admin_id, "admin_adjust",
+                TransactionStatus.SUCCESS.value, ip_address,
+                now, now
             ))
             
             conn.commit()

@@ -1128,21 +1128,31 @@ export class WalletViewComponent implements OnInit, OnDestroy {
   }
   
   goToRecharge() {
+    console.log('[Wallet] goToRecharge called, isFrozen:', this.isFrozen());
     // 只在錢包凍結時阻止，其他情況允許導航
     if (this.isFrozen()) {
       this.globalError.set('錢包已凍結，無法進行充值操作');
       return;
     }
-    this.router.navigate(['/wallet/recharge']);
+    console.log('[Wallet] Navigating to /wallet/recharge');
+    this.router.navigate(['/wallet/recharge']).then(
+      (success) => console.log('[Wallet] Navigation result:', success),
+      (error) => console.error('[Wallet] Navigation error:', error)
+    );
   }
   
   goToWithdraw() {
+    console.log('[Wallet] goToWithdraw called, isFrozen:', this.isFrozen());
     // 只在錢包凍結時阻止，其他情況允許導航
     if (this.isFrozen()) {
       this.globalError.set('錢包已凍結，無法進行提現操作');
       return;
     }
-    this.router.navigate(['/wallet/withdraw']);
+    console.log('[Wallet] Navigating to /wallet/withdraw');
+    this.router.navigate(['/wallet/withdraw']).then(
+      (success) => console.log('[Wallet] Navigation result:', success),
+      (error) => console.error('[Wallet] Navigation error:', error)
+    );
   }
   
   // P2: 重試連接

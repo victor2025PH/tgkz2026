@@ -64,27 +64,17 @@ function WalletViewComponent_Conditional_36_Template(rf, ctx) {
     \u0275\u0275elementEnd();
   }
 }
-function WalletViewComponent_Conditional_39_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275element(0, "span", 21);
-  }
-}
-function WalletViewComponent_Conditional_40_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275text(0, " \u{1F4B3} ");
-  }
-}
-function WalletViewComponent_Conditional_46_Template(rf, ctx) {
+function WalletViewComponent_Conditional_44_Template(rf, ctx) {
   if (rf & 1) {
     const _r1 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 24)(1, "span", 36);
+    \u0275\u0275elementStart(0, "div", 23)(1, "span", 35);
     \u0275\u0275text(2, "\u{1F4E1}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 37);
+    \u0275\u0275elementStart(3, "span", 36);
     \u0275\u0275text(4, "\u60A8\u76EE\u524D\u8655\u65BC\u96E2\u7DDA\u72C0\u614B");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "button", 38);
-    \u0275\u0275listener("click", function WalletViewComponent_Conditional_46_Template_button_click_5_listener() {
+    \u0275\u0275elementStart(5, "button", 37);
+    \u0275\u0275listener("click", function WalletViewComponent_Conditional_44_Template_button_click_5_listener() {
       \u0275\u0275restoreView(_r1);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.retryConnection());
@@ -93,22 +83,22 @@ function WalletViewComponent_Conditional_46_Template(rf, ctx) {
     \u0275\u0275elementEnd()();
   }
 }
-function WalletViewComponent_Conditional_47_Template(rf, ctx) {
+function WalletViewComponent_Conditional_45_Template(rf, ctx) {
   if (rf & 1) {
     const _r3 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 39);
-    \u0275\u0275listener("click", function WalletViewComponent_Conditional_47_Template_div_click_0_listener() {
+    \u0275\u0275elementStart(0, "div", 38);
+    \u0275\u0275listener("click", function WalletViewComponent_Conditional_45_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.dismissError());
     });
-    \u0275\u0275elementStart(1, "span", 40);
+    \u0275\u0275elementStart(1, "span", 39);
     \u0275\u0275text(2, "\u26A0\uFE0F");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 41);
+    \u0275\u0275elementStart(3, "span", 40);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "button", 42);
+    \u0275\u0275elementStart(5, "button", 41);
     \u0275\u0275text(6, "\xD7");
     \u0275\u0275elementEnd()();
   }
@@ -118,21 +108,21 @@ function WalletViewComponent_Conditional_47_Template(rf, ctx) {
     \u0275\u0275textInterpolate(ctx_r1.globalError());
   }
 }
-function WalletViewComponent_div_48_For_8_Template(rf, ctx) {
+function WalletViewComponent_div_46_For_8_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 46)(1, "div", 47)(2, "span", 4);
+    \u0275\u0275elementStart(0, "div", 45)(1, "div", 46)(2, "span", 4);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "span", 48);
+    \u0275\u0275elementStart(4, "span", 47);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(6, "div", 49);
-    \u0275\u0275element(7, "div", 50);
+    \u0275\u0275elementStart(6, "div", 48);
+    \u0275\u0275element(7, "div", 49);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "div", 51)(9, "span", 13);
+    \u0275\u0275elementStart(8, "div", 50)(9, "span", 13);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "span", 52);
+    \u0275\u0275elementStart(11, "span", 51);
     \u0275\u0275text(12);
     \u0275\u0275elementEnd()()();
   }
@@ -151,27 +141,27 @@ function WalletViewComponent_div_48_For_8_Template(rf, ctx) {
     \u0275\u0275textInterpolate1("", item_r4.percent, "%");
   }
 }
-function WalletViewComponent_div_48_Conditional_9_Template(rf, ctx) {
+function WalletViewComponent_div_46_Conditional_9_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 32)(1, "span", 4);
+    \u0275\u0275elementStart(0, "div", 31)(1, "span", 4);
     \u0275\u0275text(2, "\u{1F4ED}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 53);
+    \u0275\u0275elementStart(3, "span", 52);
     \u0275\u0275text(4, "\u672C\u6708\u66AB\u7121\u6D88\u8CBB");
     \u0275\u0275elementEnd()();
   }
 }
-function WalletViewComponent_div_48_Template(rf, ctx) {
+function WalletViewComponent_div_46_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 43)(1, "div", 28)(2, "h2");
+    \u0275\u0275elementStart(0, "div", 42)(1, "div", 27)(2, "h2");
     \u0275\u0275text(3, "\u{1F4CA} \u672C\u6708\u6D88\u8CBB\u6982\u89BD");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "span", 44);
+    \u0275\u0275elementStart(4, "span", 43);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(6, "div", 45);
-    \u0275\u0275repeaterCreate(7, WalletViewComponent_div_48_For_8_Template, 13, 6, "div", 46, _forTrack1);
-    \u0275\u0275conditionalCreate(9, WalletViewComponent_div_48_Conditional_9_Template, 5, 0, "div", 32);
+    \u0275\u0275elementStart(6, "div", 44);
+    \u0275\u0275repeaterCreate(7, WalletViewComponent_div_46_For_8_Template, 13, 6, "div", 45, _forTrack1);
+    \u0275\u0275conditionalCreate(9, WalletViewComponent_div_46_Conditional_9_Template, 5, 0, "div", 31);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -187,18 +177,18 @@ function WalletViewComponent_div_48_Template(rf, ctx) {
     \u0275\u0275conditional((((tmp_3_0 = ctx_r1.analysis()) == null ? null : tmp_3_0.by_category) || \u0275\u0275pureFunction0(3, _c0)).length === 0 ? 9 : -1);
   }
 }
-function WalletViewComponent_For_57_Template(rf, ctx) {
+function WalletViewComponent_For_55_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 54)(1, "div", 55);
+    \u0275\u0275elementStart(0, "div", 53)(1, "div", 54);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "div", 56)(4, "div", 57);
+    \u0275\u0275elementStart(3, "div", 55)(4, "div", 56);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "div", 58);
+    \u0275\u0275elementStart(6, "div", 57);
     \u0275\u0275text(7);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(8, "div", 59);
+    \u0275\u0275elementStart(8, "div", 58);
     \u0275\u0275text(9);
     \u0275\u0275elementEnd()();
   }
@@ -218,25 +208,25 @@ function WalletViewComponent_For_57_Template(rf, ctx) {
     \u0275\u0275textInterpolate1(" ", tx_r5.amount_display, " ");
   }
 }
-function WalletViewComponent_Conditional_58_Template(rf, ctx) {
+function WalletViewComponent_Conditional_56_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 32)(1, "span", 4);
+    \u0275\u0275elementStart(0, "div", 31)(1, "span", 4);
     \u0275\u0275text(2, "\u{1F4ED}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 53);
+    \u0275\u0275elementStart(3, "span", 52);
     \u0275\u0275text(4, "\u66AB\u7121\u4EA4\u6613\u8A18\u9304");
     \u0275\u0275elementEnd()();
   }
 }
-function WalletViewComponent_div_59_For_6_Template(rf, ctx) {
+function WalletViewComponent_div_57_For_6_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 62)(1, "div", 67);
+    \u0275\u0275elementStart(0, "div", 61)(1, "div", 66);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "div", 68)(4, "div", 69)(5, "span", 70);
+    \u0275\u0275elementStart(3, "div", 67)(4, "div", 68)(5, "span", 69);
     \u0275\u0275text(6);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "div", 71)(8, "span", 70);
+    \u0275\u0275elementStart(7, "div", 70)(8, "span", 69);
     \u0275\u0275text(9);
     \u0275\u0275elementEnd()()()();
   }
@@ -255,21 +245,21 @@ function WalletViewComponent_div_59_For_6_Template(rf, ctx) {
     \u0275\u0275textInterpolate1("\u652F\u51FA: ", month_r6.expense_display);
   }
 }
-function WalletViewComponent_div_59_Template(rf, ctx) {
+function WalletViewComponent_div_57_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 60)(1, "div", 28)(2, "h2");
+    \u0275\u0275elementStart(0, "div", 59)(1, "div", 27)(2, "h2");
     \u0275\u0275text(3, "\u{1F4C5} \u6708\u5EA6\u7D71\u8A08");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(4, "div", 61);
-    \u0275\u0275repeaterCreate(5, WalletViewComponent_div_59_For_6_Template, 10, 7, "div", 62, _forTrack2);
+    \u0275\u0275elementStart(4, "div", 60);
+    \u0275\u0275repeaterCreate(5, WalletViewComponent_div_57_For_6_Template, 10, 7, "div", 61, _forTrack2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "div", 63)(8, "div", 64);
-    \u0275\u0275element(9, "span", 65);
+    \u0275\u0275elementStart(7, "div", 62)(8, "div", 63);
+    \u0275\u0275element(9, "span", 64);
     \u0275\u0275elementStart(10, "span", 16);
     \u0275\u0275text(11, "\u6536\u5165");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(12, "div", 66);
-    \u0275\u0275element(13, "span", 65);
+    \u0275\u0275elementStart(12, "div", 65);
+    \u0275\u0275element(13, "span", 64);
     \u0275\u0275elementStart(14, "span", 16);
     \u0275\u0275text(15, "\u652F\u51FA");
     \u0275\u0275elementEnd()()()();
@@ -280,18 +270,18 @@ function WalletViewComponent_div_59_Template(rf, ctx) {
     \u0275\u0275repeater(ctx_r1.monthlySummary());
   }
 }
-function WalletViewComponent_div_60_Template(rf, ctx) {
+function WalletViewComponent_div_58_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 72);
-    \u0275\u0275element(1, "div", 73);
+    \u0275\u0275elementStart(0, "div", 71);
+    \u0275\u0275element(1, "div", 72);
     \u0275\u0275elementStart(2, "span");
     \u0275\u0275text(3, "\u52A0\u8F09\u4E2D...");
     \u0275\u0275elementEnd()();
   }
 }
-function WalletViewComponent_Conditional_61_Conditional_12_Template(rf, ctx) {
+function WalletViewComponent_Conditional_59_Conditional_12_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 82);
+    \u0275\u0275elementStart(0, "div", 81);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -301,9 +291,9 @@ function WalletViewComponent_Conditional_61_Conditional_12_Template(rf, ctx) {
     \u0275\u0275textInterpolate(ctx_r1.redeemError());
   }
 }
-function WalletViewComponent_Conditional_61_Conditional_13_Template(rf, ctx) {
+function WalletViewComponent_Conditional_59_Conditional_13_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 83);
+    \u0275\u0275elementStart(0, "div", 82);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -313,76 +303,76 @@ function WalletViewComponent_Conditional_61_Conditional_13_Template(rf, ctx) {
     \u0275\u0275textInterpolate(ctx_r1.redeemSuccess());
   }
 }
-function WalletViewComponent_Conditional_61_Conditional_18_Template(rf, ctx) {
+function WalletViewComponent_Conditional_59_Conditional_18_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "span", 21);
+    \u0275\u0275element(0, "span", 86);
     \u0275\u0275text(1, " \u514C\u63DB\u4E2D... ");
   }
 }
-function WalletViewComponent_Conditional_61_Conditional_19_Template(rf, ctx) {
+function WalletViewComponent_Conditional_59_Conditional_19_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0, " \u78BA\u8A8D\u514C\u63DB ");
   }
 }
-function WalletViewComponent_Conditional_61_Template(rf, ctx) {
+function WalletViewComponent_Conditional_59_Template(rf, ctx) {
   if (rf & 1) {
     const _r7 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 74);
-    \u0275\u0275listener("click", function WalletViewComponent_Conditional_61_Template_div_click_0_listener() {
+    \u0275\u0275elementStart(0, "div", 73);
+    \u0275\u0275listener("click", function WalletViewComponent_Conditional_59_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.closeRedeemModal());
     });
-    \u0275\u0275elementStart(1, "div", 75);
-    \u0275\u0275listener("click", function WalletViewComponent_Conditional_61_Template_div_click_1_listener($event) {
+    \u0275\u0275elementStart(1, "div", 74);
+    \u0275\u0275listener("click", function WalletViewComponent_Conditional_59_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r7);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 76)(3, "h3");
+    \u0275\u0275elementStart(2, "div", 75)(3, "h3");
     \u0275\u0275text(4, "\u{1F381} \u514C\u63DB\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "button", 77);
-    \u0275\u0275listener("click", function WalletViewComponent_Conditional_61_Template_button_click_5_listener() {
+    \u0275\u0275elementStart(5, "button", 76);
+    \u0275\u0275listener("click", function WalletViewComponent_Conditional_59_Template_button_click_5_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.closeRedeemModal());
     });
     \u0275\u0275text(6, "\u2715");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "div", 78)(8, "p", 79);
+    \u0275\u0275elementStart(7, "div", 77)(8, "p", 78);
     \u0275\u0275text(9, "\u8F38\u5165\u514C\u63DB\u78BC\u4EE5\u7372\u5F97\u9918\u984D\u6216\u512A\u60E0");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(10, "div", 80)(11, "input", 81);
-    \u0275\u0275twoWayListener("ngModelChange", function WalletViewComponent_Conditional_61_Template_input_ngModelChange_11_listener($event) {
+    \u0275\u0275elementStart(10, "div", 79)(11, "input", 80);
+    \u0275\u0275twoWayListener("ngModelChange", function WalletViewComponent_Conditional_59_Template_input_ngModelChange_11_listener($event) {
       \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext();
       \u0275\u0275twoWayBindingSet(ctx_r1.redeemCode, $event) || (ctx_r1.redeemCode = $event);
       return \u0275\u0275resetView($event);
     });
-    \u0275\u0275listener("keyup.enter", function WalletViewComponent_Conditional_61_Template_input_keyup_enter_11_listener() {
+    \u0275\u0275listener("keyup.enter", function WalletViewComponent_Conditional_59_Template_input_keyup_enter_11_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.submitRedeemCode());
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(12, WalletViewComponent_Conditional_61_Conditional_12_Template, 2, 1, "div", 82);
-    \u0275\u0275conditionalCreate(13, WalletViewComponent_Conditional_61_Conditional_13_Template, 2, 1, "div", 83);
+    \u0275\u0275conditionalCreate(12, WalletViewComponent_Conditional_59_Conditional_12_Template, 2, 1, "div", 81);
+    \u0275\u0275conditionalCreate(13, WalletViewComponent_Conditional_59_Conditional_13_Template, 2, 1, "div", 82);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "div", 84)(15, "button", 85);
-    \u0275\u0275listener("click", function WalletViewComponent_Conditional_61_Template_button_click_15_listener() {
+    \u0275\u0275elementStart(14, "div", 83)(15, "button", 84);
+    \u0275\u0275listener("click", function WalletViewComponent_Conditional_59_Template_button_click_15_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.closeRedeemModal());
     });
     \u0275\u0275text(16, " \u53D6\u6D88 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "button", 86);
-    \u0275\u0275listener("click", function WalletViewComponent_Conditional_61_Template_button_click_17_listener() {
+    \u0275\u0275elementStart(17, "button", 85);
+    \u0275\u0275listener("click", function WalletViewComponent_Conditional_59_Template_button_click_17_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.submitRedeemCode());
     });
-    \u0275\u0275conditionalCreate(18, WalletViewComponent_Conditional_61_Conditional_18_Template, 2, 0)(19, WalletViewComponent_Conditional_61_Conditional_19_Template, 1, 0);
+    \u0275\u0275conditionalCreate(18, WalletViewComponent_Conditional_59_Conditional_18_Template, 2, 0)(19, WalletViewComponent_Conditional_59_Conditional_19_Template, 1, 0);
     \u0275\u0275elementEnd()()()();
   }
   if (rf & 2) {
@@ -494,32 +484,18 @@ var WalletViewComponent = class _WalletViewComponent {
     this.router.navigate(["/"]);
   }
   goToRecharge() {
-    if (!this.canOperate()) {
-      if (this.isFrozen()) {
-        this.globalError.set("\u9322\u5305\u5DF2\u51CD\u7D50\uFF0C\u7121\u6CD5\u9032\u884C\u5145\u503C\u64CD\u4F5C");
-      } else if (!this.isOnline()) {
-        this.globalError.set("\u7DB2\u7D61\u9023\u63A5\u7570\u5E38\uFF0C\u8ACB\u6AA2\u67E5\u7DB2\u7D61\u5F8C\u91CD\u8A66");
-      }
+    if (this.isFrozen()) {
+      this.globalError.set("\u9322\u5305\u5DF2\u51CD\u7D50\uFF0C\u7121\u6CD5\u9032\u884C\u5145\u503C\u64CD\u4F5C");
       return;
     }
-    this.isNavigating.set(true);
-    this.router.navigate(["/wallet/recharge"]).finally(() => {
-      this.isNavigating.set(false);
-    });
+    this.router.navigate(["/wallet/recharge"]);
   }
   goToWithdraw() {
-    if (!this.canOperate()) {
-      if (this.isFrozen()) {
-        this.globalError.set("\u9322\u5305\u5DF2\u51CD\u7D50\uFF0C\u7121\u6CD5\u9032\u884C\u63D0\u73FE\u64CD\u4F5C");
-      } else if (!this.isOnline()) {
-        this.globalError.set("\u7DB2\u7D61\u9023\u63A5\u7570\u5E38\uFF0C\u8ACB\u6AA2\u67E5\u7DB2\u7D61\u5F8C\u91CD\u8A66");
-      }
+    if (this.isFrozen()) {
+      this.globalError.set("\u9322\u5305\u5DF2\u51CD\u7D50\uFF0C\u7121\u6CD5\u9032\u884C\u63D0\u73FE\u64CD\u4F5C");
       return;
     }
-    this.isNavigating.set(true);
-    this.router.navigate(["/wallet/withdraw"]).finally(() => {
-      this.isNavigating.set(false);
-    });
+    this.router.navigate(["/wallet/withdraw"]);
   }
   // P2: 重試連接
   retryConnection() {
@@ -536,12 +512,8 @@ var WalletViewComponent = class _WalletViewComponent {
     this.globalError.set("");
   }
   showRedeemCode() {
-    if (!this.canOperate()) {
-      if (this.isFrozen()) {
-        this.globalError.set("\u9322\u5305\u5DF2\u51CD\u7D50\uFF0C\u7121\u6CD5\u4F7F\u7528\u514C\u63DB\u78BC");
-      } else if (!this.isOnline()) {
-        this.globalError.set("\u7DB2\u7D61\u9023\u63A5\u7570\u5E38\uFF0C\u8ACB\u6AA2\u67E5\u7DB2\u7D61\u5F8C\u91CD\u8A66");
-      }
+    if (this.isFrozen()) {
+      this.globalError.set("\u9322\u5305\u5DF2\u51CD\u7D50\uFF0C\u7121\u6CD5\u4F7F\u7528\u514C\u63DB\u78BC");
       return;
     }
     this.redeemCode = "";
@@ -657,7 +629,7 @@ var WalletViewComponent = class _WalletViewComponent {
     };
   }
   static {
-    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _WalletViewComponent, selectors: [["app-wallet-view"]], decls: 62, vars: 19, consts: [[1, "wallet-view"], [1, "view-header"], [1, "header-left"], [1, "back-btn", 3, "click"], [1, "icon"], [1, "header-actions"], [1, "action-btn", 3, "click"], [1, "balance-card"], [1, "balance-bg"], [1, "balance-content"], [1, "balance-label"], [1, "balance-amount"], [1, "currency"], [1, "amount"], [1, "balance-details"], [1, "detail-item"], [1, "label"], [1, "value"], [1, "frozen-warning"], [1, "balance-actions"], [1, "recharge-btn", 3, "click", "disabled"], [1, "btn-spinner"], [1, "withdraw-btn", 3, "click", "disabled"], [1, "redeem-btn", 3, "click", "disabled"], [1, "offline-banner"], [1, "global-error-toast"], ["class", "section consume-overview", 4, "ngIf"], [1, "section", "recent-transactions"], [1, "section-header"], [1, "view-all-btn", 3, "click"], [1, "transaction-list"], [1, "transaction-item", 3, "income", "expense"], [1, "empty-state"], ["class", "section monthly-stats", 4, "ngIf"], ["class", "loading-overlay", 4, "ngIf"], [1, "modal-overlay"], [1, "offline-icon"], [1, "offline-text"], [1, "retry-btn", 3, "click"], [1, "global-error-toast", 3, "click"], [1, "error-icon"], [1, "error-text"], [1, "dismiss-btn"], [1, "section", "consume-overview"], [1, "total"], [1, "consume-bars"], [1, "consume-bar"], [1, "bar-label"], [1, "name"], [1, "bar-track"], [1, "bar-fill"], [1, "bar-value"], [1, "percent"], [1, "text"], [1, "transaction-item"], [1, "tx-icon"], [1, "tx-info"], [1, "tx-desc"], [1, "tx-time"], [1, "tx-amount"], [1, "section", "monthly-stats"], [1, "monthly-chart"], [1, "month-bar"], [1, "chart-legend"], [1, "legend-item", "income"], [1, "dot"], [1, "legend-item", "expense"], [1, "month-label"], [1, "bars"], [1, "income-bar"], [1, "tooltip"], [1, "expense-bar"], [1, "loading-overlay"], [1, "loading-spinner"], [1, "modal-overlay", 3, "click"], [1, "modal-content", "redeem-modal", 3, "click"], [1, "modal-header"], [1, "close-btn", 3, "click"], [1, "modal-body"], [1, "modal-desc"], [1, "input-group"], ["type", "text", "placeholder", "\u8ACB\u8F38\u5165\u514C\u63DB\u78BC", "maxlength", "32", 1, "redeem-input", 3, "ngModelChange", "keyup.enter", "ngModel", "disabled"], [1, "error-message"], [1, "success-message"], [1, "modal-footer"], [1, "cancel-btn", 3, "click", "disabled"], [1, "submit-btn", 3, "click", "disabled"]], template: function WalletViewComponent_Template(rf, ctx) {
+    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _WalletViewComponent, selectors: [["app-wallet-view"]], decls: 60, vars: 14, consts: [[1, "wallet-view"], [1, "view-header"], [1, "header-left"], [1, "back-btn", 3, "click"], [1, "icon"], [1, "header-actions"], [1, "action-btn", 3, "click"], [1, "balance-card"], [1, "balance-bg"], [1, "balance-content"], [1, "balance-label"], [1, "balance-amount"], [1, "currency"], [1, "amount"], [1, "balance-details"], [1, "detail-item"], [1, "label"], [1, "value"], [1, "frozen-warning"], [1, "balance-actions"], [1, "recharge-btn", 3, "click", "disabled"], [1, "withdraw-btn", 3, "click", "disabled"], [1, "redeem-btn", 3, "click", "disabled"], [1, "offline-banner"], [1, "global-error-toast"], ["class", "section consume-overview", 4, "ngIf"], [1, "section", "recent-transactions"], [1, "section-header"], [1, "view-all-btn", 3, "click"], [1, "transaction-list"], [1, "transaction-item", 3, "income", "expense"], [1, "empty-state"], ["class", "section monthly-stats", 4, "ngIf"], ["class", "loading-overlay", 4, "ngIf"], [1, "modal-overlay"], [1, "offline-icon"], [1, "offline-text"], [1, "retry-btn", 3, "click"], [1, "global-error-toast", 3, "click"], [1, "error-icon"], [1, "error-text"], [1, "dismiss-btn"], [1, "section", "consume-overview"], [1, "total"], [1, "consume-bars"], [1, "consume-bar"], [1, "bar-label"], [1, "name"], [1, "bar-track"], [1, "bar-fill"], [1, "bar-value"], [1, "percent"], [1, "text"], [1, "transaction-item"], [1, "tx-icon"], [1, "tx-info"], [1, "tx-desc"], [1, "tx-time"], [1, "tx-amount"], [1, "section", "monthly-stats"], [1, "monthly-chart"], [1, "month-bar"], [1, "chart-legend"], [1, "legend-item", "income"], [1, "dot"], [1, "legend-item", "expense"], [1, "month-label"], [1, "bars"], [1, "income-bar"], [1, "tooltip"], [1, "expense-bar"], [1, "loading-overlay"], [1, "loading-spinner"], [1, "modal-overlay", 3, "click"], [1, "modal-content", "redeem-modal", 3, "click"], [1, "modal-header"], [1, "close-btn", 3, "click"], [1, "modal-body"], [1, "modal-desc"], [1, "input-group"], ["type", "text", "placeholder", "\u8ACB\u8F38\u5165\u514C\u63DB\u78BC", "maxlength", "32", 1, "redeem-input", 3, "ngModelChange", "keyup.enter", "ngModel", "disabled"], [1, "error-message"], [1, "success-message"], [1, "modal-footer"], [1, "cancel-btn", 3, "click", "disabled"], [1, "submit-btn", 3, "click", "disabled"], [1, "btn-spinner"]], template: function WalletViewComponent_Template(rf, ctx) {
       if (rf & 1) {
         \u0275\u0275elementStart(0, "div", 0)(1, "div", 1)(2, "div", 2)(3, "button", 3);
         \u0275\u0275listener("click", function WalletViewComponent_Template_button_click_3_listener() {
@@ -715,39 +687,38 @@ var WalletViewComponent = class _WalletViewComponent {
         \u0275\u0275listener("click", function WalletViewComponent_Template_button_click_38_listener() {
           return ctx.goToRecharge();
         });
-        \u0275\u0275conditionalCreate(39, WalletViewComponent_Conditional_39_Template, 1, 0, "span", 21)(40, WalletViewComponent_Conditional_40_Template, 1, 0);
-        \u0275\u0275text(41, " \u5145\u503C ");
+        \u0275\u0275text(39, " \u{1F4B3} \u5145\u503C ");
+        \u0275\u0275elementEnd();
+        \u0275\u0275elementStart(40, "button", 21);
+        \u0275\u0275listener("click", function WalletViewComponent_Template_button_click_40_listener() {
+          return ctx.goToWithdraw();
+        });
+        \u0275\u0275text(41, " \u{1F4E4} \u63D0\u73FE ");
         \u0275\u0275elementEnd();
         \u0275\u0275elementStart(42, "button", 22);
         \u0275\u0275listener("click", function WalletViewComponent_Template_button_click_42_listener() {
-          return ctx.goToWithdraw();
-        });
-        \u0275\u0275text(43, " \u{1F4E4} \u63D0\u73FE ");
-        \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(44, "button", 23);
-        \u0275\u0275listener("click", function WalletViewComponent_Template_button_click_44_listener() {
           return ctx.showRedeemCode();
         });
-        \u0275\u0275text(45, " \u{1F381} \u514C\u63DB\u78BC ");
+        \u0275\u0275text(43, " \u{1F381} \u514C\u63DB\u78BC ");
         \u0275\u0275elementEnd()()()();
-        \u0275\u0275conditionalCreate(46, WalletViewComponent_Conditional_46_Template, 7, 0, "div", 24);
-        \u0275\u0275conditionalCreate(47, WalletViewComponent_Conditional_47_Template, 7, 1, "div", 25);
-        \u0275\u0275template(48, WalletViewComponent_div_48_Template, 10, 4, "div", 26);
-        \u0275\u0275elementStart(49, "div", 27)(50, "div", 28)(51, "h2");
-        \u0275\u0275text(52, "\u{1F550} \u6700\u8FD1\u4EA4\u6613");
+        \u0275\u0275conditionalCreate(44, WalletViewComponent_Conditional_44_Template, 7, 0, "div", 23);
+        \u0275\u0275conditionalCreate(45, WalletViewComponent_Conditional_45_Template, 7, 1, "div", 24);
+        \u0275\u0275template(46, WalletViewComponent_div_46_Template, 10, 4, "div", 25);
+        \u0275\u0275elementStart(47, "div", 26)(48, "div", 27)(49, "h2");
+        \u0275\u0275text(50, "\u{1F550} \u6700\u8FD1\u4EA4\u6613");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(53, "button", 29);
-        \u0275\u0275listener("click", function WalletViewComponent_Template_button_click_53_listener() {
+        \u0275\u0275elementStart(51, "button", 28);
+        \u0275\u0275listener("click", function WalletViewComponent_Template_button_click_51_listener() {
           return ctx.showTransactions();
         });
-        \u0275\u0275text(54, " \u67E5\u770B\u5168\u90E8 \u2192 ");
+        \u0275\u0275text(52, " \u67E5\u770B\u5168\u90E8 \u2192 ");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(55, "div", 30);
-        \u0275\u0275repeaterCreate(56, WalletViewComponent_For_57_Template, 10, 12, "div", 31, _forTrack0);
-        \u0275\u0275conditionalCreate(58, WalletViewComponent_Conditional_58_Template, 5, 0, "div", 32);
+        \u0275\u0275elementStart(53, "div", 29);
+        \u0275\u0275repeaterCreate(54, WalletViewComponent_For_55_Template, 10, 12, "div", 30, _forTrack0);
+        \u0275\u0275conditionalCreate(56, WalletViewComponent_Conditional_56_Template, 5, 0, "div", 31);
         \u0275\u0275elementEnd()();
-        \u0275\u0275template(59, WalletViewComponent_div_59_Template, 16, 0, "div", 33)(60, WalletViewComponent_div_60_Template, 4, 0, "div", 34);
-        \u0275\u0275conditionalCreate(61, WalletViewComponent_Conditional_61_Template, 20, 7, "div", 35);
+        \u0275\u0275template(57, WalletViewComponent_div_57_Template, 16, 0, "div", 32)(58, WalletViewComponent_div_58_Template, 4, 0, "div", 33);
+        \u0275\u0275conditionalCreate(59, WalletViewComponent_Conditional_59_Template, 20, 7, "div", 34);
         \u0275\u0275elementEnd();
       }
       if (rf & 2) {
@@ -762,31 +733,27 @@ var WalletViewComponent = class _WalletViewComponent {
         \u0275\u0275advance();
         \u0275\u0275conditional(ctx.isFrozen() ? 36 : -1);
         \u0275\u0275advance(2);
-        \u0275\u0275classProp("loading", ctx.isNavigating());
-        \u0275\u0275property("disabled", !ctx.canOperate() || ctx.isNavigating());
-        \u0275\u0275advance();
-        \u0275\u0275conditional(ctx.isNavigating() ? 39 : 40);
-        \u0275\u0275advance(3);
-        \u0275\u0275classProp("loading", ctx.isNavigating());
-        \u0275\u0275property("disabled", !ctx.canOperate() || ctx.isNavigating());
+        \u0275\u0275property("disabled", ctx.isFrozen());
         \u0275\u0275advance(2);
-        \u0275\u0275property("disabled", !ctx.canOperate());
+        \u0275\u0275property("disabled", ctx.isFrozen());
         \u0275\u0275advance(2);
-        \u0275\u0275conditional(!ctx.isOnline() ? 46 : -1);
+        \u0275\u0275property("disabled", ctx.isFrozen());
+        \u0275\u0275advance(2);
+        \u0275\u0275conditional(!ctx.isOnline() ? 44 : -1);
         \u0275\u0275advance();
-        \u0275\u0275conditional(ctx.globalError() ? 47 : -1);
+        \u0275\u0275conditional(ctx.globalError() ? 45 : -1);
         \u0275\u0275advance();
         \u0275\u0275property("ngIf", ctx.analysis());
         \u0275\u0275advance(8);
         \u0275\u0275repeater(ctx.recentTransactions());
         \u0275\u0275advance(2);
-        \u0275\u0275conditional(ctx.recentTransactions().length === 0 ? 58 : -1);
+        \u0275\u0275conditional(ctx.recentTransactions().length === 0 ? 56 : -1);
         \u0275\u0275advance();
         \u0275\u0275property("ngIf", ctx.monthlySummary().length > 0);
         \u0275\u0275advance();
         \u0275\u0275property("ngIf", ctx.loading());
         \u0275\u0275advance();
-        \u0275\u0275conditional(ctx.showRedeemModal() ? 61 : -1);
+        \u0275\u0275conditional(ctx.showRedeemModal() ? 59 : -1);
       }
     }, dependencies: [CommonModule, NgIf, FormsModule, DefaultValueAccessor, NgControlStatus, MaxLengthValidator, NgModel], styles: ["\n\n.wallet-view[_ngcontent-%COMP%] {\n  min-height: 100vh;\n  background:\n    linear-gradient(\n      135deg,\n      #1a1a2e 0%,\n      #16213e 50%,\n      #0f3460 100%);\n  padding: 20px;\n  color: #fff;\n}\n.view-header[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  margin-bottom: 24px;\n}\n.header-left[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n}\n.back-btn[_ngcontent-%COMP%] {\n  width: 40px;\n  height: 40px;\n  border-radius: 12px;\n  background: rgba(255, 255, 255, 0.1);\n  border: none;\n  color: #fff;\n  font-size: 20px;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.back-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(255, 255, 255, 0.2);\n}\nh1[_ngcontent-%COMP%] {\n  font-size: 24px;\n  font-weight: 600;\n  margin: 0;\n}\n.action-btn[_ngcontent-%COMP%] {\n  padding: 10px 20px;\n  border-radius: 12px;\n  background: rgba(255, 255, 255, 0.1);\n  border: none;\n  color: #fff;\n  font-size: 14px;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.action-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(255, 255, 255, 0.2);\n}\n.balance-card[_ngcontent-%COMP%] {\n  position: relative;\n  border-radius: 24px;\n  overflow: hidden;\n  margin-bottom: 24px;\n}\n.balance-bg[_ngcontent-%COMP%] {\n  position: absolute;\n  inset: 0;\n  background:\n    linear-gradient(\n      135deg,\n      #667eea 0%,\n      #764ba2 100%);\n  pointer-events: none;\n}\n.balance-content[_ngcontent-%COMP%] {\n  position: relative;\n  padding: 32px;\n  z-index: 1;\n}\n.balance-label[_ngcontent-%COMP%] {\n  font-size: 14px;\n  opacity: 0.8;\n  margin-bottom: 8px;\n}\n.balance-amount[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: baseline;\n  gap: 4px;\n  margin-bottom: 24px;\n}\n.balance-amount[_ngcontent-%COMP%]   .currency[_ngcontent-%COMP%] {\n  font-size: 24px;\n  font-weight: 600;\n}\n.balance-amount[_ngcontent-%COMP%]   .amount[_ngcontent-%COMP%] {\n  font-size: 48px;\n  font-weight: 700;\n}\n.balance-details[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 32px;\n  margin-bottom: 24px;\n}\n.detail-item[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n}\n.detail-item[_ngcontent-%COMP%]   .label[_ngcontent-%COMP%] {\n  font-size: 12px;\n  opacity: 0.7;\n}\n.detail-item[_ngcontent-%COMP%]   .value[_ngcontent-%COMP%] {\n  font-size: 16px;\n  font-weight: 500;\n}\n.balance-actions[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 12px;\n}\n.balance-actions[_ngcontent-%COMP%]   button[_ngcontent-%COMP%] {\n  flex: 1;\n  padding: 12px 20px;\n  border-radius: 12px;\n  border: none;\n  font-size: 14px;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.recharge-btn[_ngcontent-%COMP%] {\n  background: #fff;\n  color: #764ba2;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);\n}\n.recharge-btn[_ngcontent-%COMP%]:hover {\n  background: #f8f8ff;\n  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.3);\n}\n.recharge-btn[_ngcontent-%COMP%]:active {\n  transform: scale(0.98);\n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);\n}\n.withdraw-btn[_ngcontent-%COMP%] {\n  background: rgba(255, 255, 255, 0.2);\n  color: #fff;\n  -webkit-backdrop-filter: blur(4px);\n  backdrop-filter: blur(4px);\n}\n.withdraw-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(255, 255, 255, 0.3);\n}\n.withdraw-btn[_ngcontent-%COMP%]:active {\n  transform: scale(0.98);\n  background: rgba(255, 255, 255, 0.25);\n}\n.redeem-btn[_ngcontent-%COMP%] {\n  background: rgba(255, 255, 255, 0.2);\n  color: #fff;\n  -webkit-backdrop-filter: blur(4px);\n  backdrop-filter: blur(4px);\n}\n.redeem-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(255, 255, 255, 0.3);\n}\n.redeem-btn[_ngcontent-%COMP%]:active {\n  transform: scale(0.98);\n  background: rgba(255, 255, 255, 0.25);\n}\n.balance-actions[_ngcontent-%COMP%]   button[_ngcontent-%COMP%]:hover {\n  transform: translateY(-2px);\n}\n.balance-actions[_ngcontent-%COMP%]   button[_ngcontent-%COMP%]:disabled {\n  opacity: 0.6;\n  cursor: not-allowed;\n  transform: none !important;\n}\n.balance-actions[_ngcontent-%COMP%]   button.loading[_ngcontent-%COMP%] {\n  position: relative;\n}\n.frozen-warning[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(239, 68, 68, 0.2) 0%,\n      rgba(185, 28, 28, 0.2) 100%);\n  border: 1px solid rgba(239, 68, 68, 0.4);\n  border-radius: 12px;\n  padding: 12px 16px;\n  margin-bottom: 16px;\n  font-size: 14px;\n  color: #fca5a5;\n  text-align: center;\n  animation: _ngcontent-%COMP%_pulse 2s infinite;\n}\n@keyframes _ngcontent-%COMP%_pulse {\n  0%, 100% {\n    opacity: 1;\n  }\n  50% {\n    opacity: 0.7;\n  }\n}\n.offline-banner[_ngcontent-%COMP%] {\n  position: fixed;\n  top: 60px;\n  left: 50%;\n  transform: translateX(-50%);\n  background:\n    linear-gradient(\n      135deg,\n      #f59e0b 0%,\n      #d97706 100%);\n  color: #fff;\n  padding: 12px 20px;\n  border-radius: 12px;\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);\n  z-index: 1000;\n  animation: _ngcontent-%COMP%_slideDown 0.3s ease;\n}\n@keyframes _ngcontent-%COMP%_slideDown {\n  from {\n    transform: translateX(-50%) translateY(-100%);\n    opacity: 0;\n  }\n  to {\n    transform: translateX(-50%) translateY(0);\n    opacity: 1;\n  }\n}\n.offline-icon[_ngcontent-%COMP%] {\n  font-size: 20px;\n}\n.offline-text[_ngcontent-%COMP%] {\n  font-size: 14px;\n  font-weight: 500;\n}\n.retry-btn[_ngcontent-%COMP%] {\n  background: rgba(255, 255, 255, 0.2);\n  border: none;\n  color: #fff;\n  padding: 6px 12px;\n  border-radius: 6px;\n  font-size: 13px;\n  cursor: pointer;\n  transition: background 0.2s;\n}\n.retry-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(255, 255, 255, 0.3);\n}\n.global-error-toast[_ngcontent-%COMP%] {\n  position: fixed;\n  bottom: 20px;\n  left: 50%;\n  transform: translateX(-50%);\n  background:\n    linear-gradient(\n      135deg,\n      #dc2626 0%,\n      #b91c1c 100%);\n  color: #fff;\n  padding: 12px 20px;\n  border-radius: 12px;\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);\n  z-index: 1000;\n  cursor: pointer;\n  animation: _ngcontent-%COMP%_slideUp 0.3s ease;\n}\n@keyframes _ngcontent-%COMP%_slideUp {\n  from {\n    transform: translateX(-50%) translateY(100%);\n    opacity: 0;\n  }\n  to {\n    transform: translateX(-50%) translateY(0);\n    opacity: 1;\n  }\n}\n.error-icon[_ngcontent-%COMP%] {\n  font-size: 18px;\n}\n.error-text[_ngcontent-%COMP%] {\n  font-size: 14px;\n  max-width: 280px;\n}\n.dismiss-btn[_ngcontent-%COMP%] {\n  background: none;\n  border: none;\n  color: rgba(255, 255, 255, 0.7);\n  font-size: 18px;\n  cursor: pointer;\n  padding: 0 4px;\n}\n.dismiss-btn[_ngcontent-%COMP%]:hover {\n  color: #fff;\n}\n.section[_ngcontent-%COMP%] {\n  background: rgba(255, 255, 255, 0.05);\n  border-radius: 16px;\n  padding: 20px;\n  margin-bottom: 20px;\n}\n.section-header[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  margin-bottom: 16px;\n}\n.section-header[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%] {\n  font-size: 16px;\n  font-weight: 600;\n  margin: 0;\n}\n.section-header[_ngcontent-%COMP%]   .total[_ngcontent-%COMP%] {\n  font-size: 20px;\n  font-weight: 700;\n  color: #f59e0b;\n}\n.view-all-btn[_ngcontent-%COMP%] {\n  background: none;\n  border: none;\n  color: #667eea;\n  font-size: 13px;\n  cursor: pointer;\n}\n.consume-bar[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  margin-bottom: 12px;\n}\n.bar-label[_ngcontent-%COMP%] {\n  width: 100px;\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  font-size: 13px;\n}\n.bar-track[_ngcontent-%COMP%] {\n  flex: 1;\n  height: 8px;\n  background: rgba(255, 255, 255, 0.1);\n  border-radius: 4px;\n  overflow: hidden;\n}\n.bar-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #667eea,\n      #764ba2);\n  border-radius: 4px;\n  transition: width 0.5s ease;\n}\n.bar-value[_ngcontent-%COMP%] {\n  width: 100px;\n  text-align: right;\n  font-size: 13px;\n}\n.bar-value[_ngcontent-%COMP%]   .amount[_ngcontent-%COMP%] {\n  color: #f59e0b;\n  margin-right: 8px;\n}\n.bar-value[_ngcontent-%COMP%]   .percent[_ngcontent-%COMP%] {\n  opacity: 0.6;\n}\n.transaction-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  padding: 12px 0;\n  border-bottom: 1px solid rgba(255, 255, 255, 0.05);\n}\n.transaction-item[_ngcontent-%COMP%]:last-child {\n  border-bottom: none;\n}\n.tx-icon[_ngcontent-%COMP%] {\n  width: 40px;\n  height: 40px;\n  border-radius: 12px;\n  background: rgba(255, 255, 255, 0.1);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 18px;\n}\n.tx-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.tx-desc[_ngcontent-%COMP%] {\n  font-size: 14px;\n  margin-bottom: 4px;\n}\n.tx-time[_ngcontent-%COMP%] {\n  font-size: 12px;\n  opacity: 0.5;\n}\n.tx-amount[_ngcontent-%COMP%] {\n  font-size: 16px;\n  font-weight: 600;\n}\n.tx-amount.positive[_ngcontent-%COMP%] {\n  color: #22c55e;\n}\n.tx-amount.negative[_ngcontent-%COMP%] {\n  color: #ef4444;\n}\n.monthly-chart[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 12px;\n  height: 120px;\n  align-items: flex-end;\n  padding-bottom: 24px;\n}\n.month-bar[_ngcontent-%COMP%] {\n  flex: 1;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 8px;\n}\n.month-label[_ngcontent-%COMP%] {\n  font-size: 11px;\n  opacity: 0.6;\n}\n.bars[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 4px;\n  align-items: flex-end;\n  height: 80px;\n}\n.income-bar[_ngcontent-%COMP%], \n.expense-bar[_ngcontent-%COMP%] {\n  width: 12px;\n  border-radius: 4px 4px 0 0;\n  position: relative;\n  min-height: 4px;\n}\n.income-bar[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      180deg,\n      #22c55e,\n      #16a34a);\n}\n.expense-bar[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      180deg,\n      #ef4444,\n      #dc2626);\n}\n.chart-legend[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: center;\n  gap: 24px;\n  margin-top: 12px;\n}\n.legend-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  font-size: 12px;\n  opacity: 0.7;\n}\n.legend-item[_ngcontent-%COMP%]   .dot[_ngcontent-%COMP%] {\n  width: 8px;\n  height: 8px;\n  border-radius: 50%;\n}\n.legend-item.income[_ngcontent-%COMP%]   .dot[_ngcontent-%COMP%] {\n  background: #22c55e;\n}\n.legend-item.expense[_ngcontent-%COMP%]   .dot[_ngcontent-%COMP%] {\n  background: #ef4444;\n}\n.empty-state[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  padding: 40px;\n  opacity: 0.5;\n}\n.empty-state[_ngcontent-%COMP%]   .icon[_ngcontent-%COMP%] {\n  font-size: 32px;\n  margin-bottom: 8px;\n}\n.loading-overlay[_ngcontent-%COMP%] {\n  position: fixed;\n  inset: 0;\n  background: rgba(0, 0, 0, 0.7);\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  gap: 16px;\n  z-index: 100;\n}\n.loading-spinner[_ngcontent-%COMP%] {\n  width: 40px;\n  height: 40px;\n  border: 3px solid rgba(255, 255, 255, 0.2);\n  border-top-color: #667eea;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 1s linear infinite;\n}\n@keyframes _ngcontent-%COMP%_spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n.modal-overlay[_ngcontent-%COMP%] {\n  position: fixed;\n  inset: 0;\n  background: rgba(0, 0, 0, 0.75);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  z-index: 200;\n  animation: _ngcontent-%COMP%_fadeIn 0.2s ease;\n}\n@keyframes _ngcontent-%COMP%_fadeIn {\n  from {\n    opacity: 0;\n  }\n  to {\n    opacity: 1;\n  }\n}\n.modal-content[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #1e293b 0%,\n      #0f172a 100%);\n  border-radius: 20px;\n  width: 90%;\n  max-width: 400px;\n  border: 1px solid rgba(255, 255, 255, 0.1);\n  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);\n  animation: _ngcontent-%COMP%_slideUp 0.3s ease;\n}\n@keyframes _ngcontent-%COMP%_slideUp {\n  from {\n    transform: translateY(20px);\n    opacity: 0;\n  }\n  to {\n    transform: translateY(0);\n    opacity: 1;\n  }\n}\n.modal-header[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 20px 24px;\n  border-bottom: 1px solid rgba(255, 255, 255, 0.1);\n}\n.modal-header[_ngcontent-%COMP%]   h3[_ngcontent-%COMP%] {\n  margin: 0;\n  font-size: 18px;\n  font-weight: 600;\n}\n.close-btn[_ngcontent-%COMP%] {\n  background: none;\n  border: none;\n  color: #94a3b8;\n  font-size: 18px;\n  cursor: pointer;\n  padding: 4px 8px;\n  border-radius: 6px;\n  transition: all 0.2s;\n}\n.close-btn[_ngcontent-%COMP%]:hover {\n  background: rgba(255, 255, 255, 0.1);\n  color: #fff;\n}\n.modal-body[_ngcontent-%COMP%] {\n  padding: 24px;\n}\n.modal-desc[_ngcontent-%COMP%] {\n  color: #94a3b8;\n  font-size: 14px;\n  margin: 0 0 16px 0;\n}\n.input-group[_ngcontent-%COMP%] {\n  margin-bottom: 16px;\n}\n.redeem-input[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 14px 16px;\n  border-radius: 12px;\n  border: 2px solid rgba(255, 255, 255, 0.1);\n  background: rgba(255, 255, 255, 0.05);\n  color: #fff;\n  font-size: 16px;\n  text-align: center;\n  letter-spacing: 2px;\n  text-transform: uppercase;\n  transition: all 0.2s;\n}\n.redeem-input[_ngcontent-%COMP%]:focus {\n  outline: none;\n  border-color: #667eea;\n  background: rgba(102, 126, 234, 0.1);\n}\n.redeem-input[_ngcontent-%COMP%]:disabled {\n  opacity: 0.5;\n}\n.redeem-input[_ngcontent-%COMP%]::placeholder {\n  color: #64748b;\n  letter-spacing: normal;\n  text-transform: none;\n}\n.error-message[_ngcontent-%COMP%] {\n  padding: 12px 16px;\n  background: rgba(239, 68, 68, 0.15);\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  border-radius: 10px;\n  color: #fca5a5;\n  font-size: 14px;\n  margin-top: 12px;\n}\n.success-message[_ngcontent-%COMP%] {\n  padding: 12px 16px;\n  background: rgba(34, 197, 94, 0.15);\n  border: 1px solid rgba(34, 197, 94, 0.3);\n  border-radius: 10px;\n  color: #86efac;\n  font-size: 14px;\n  margin-top: 12px;\n}\n.modal-footer[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 12px;\n  padding: 20px 24px;\n  border-top: 1px solid rgba(255, 255, 255, 0.1);\n}\n.modal-footer[_ngcontent-%COMP%]   button[_ngcontent-%COMP%] {\n  flex: 1;\n  padding: 14px 20px;\n  border-radius: 12px;\n  font-size: 15px;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n  border: none;\n}\n.cancel-btn[_ngcontent-%COMP%] {\n  background: rgba(255, 255, 255, 0.1);\n  color: #94a3b8;\n}\n.cancel-btn[_ngcontent-%COMP%]:hover:not(:disabled) {\n  background: rgba(255, 255, 255, 0.15);\n  color: #fff;\n}\n.submit-btn[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #667eea 0%,\n      #764ba2 100%);\n  color: #fff;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 8px;\n}\n.submit-btn[_ngcontent-%COMP%]:hover:not(:disabled) {\n  transform: translateY(-1px);\n  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);\n}\n.submit-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.6;\n  cursor: not-allowed;\n}\n.btn-spinner[_ngcontent-%COMP%] {\n  width: 16px;\n  height: 16px;\n  border: 2px solid rgba(255, 255, 255, 0.3);\n  border-top-color: #fff;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 0.8s linear infinite;\n}\n/*# sourceMappingURL=wallet-view.component.css.map */"] });
   }
@@ -847,28 +814,21 @@ var WalletViewComponent = class _WalletViewComponent {
             <button 
               class="recharge-btn" 
               (click)="goToRecharge()"
-              [disabled]="!canOperate() || isNavigating()"
-              [class.loading]="isNavigating()"
+              [disabled]="isFrozen()"
             >
-              @if (isNavigating()) {
-                <span class="btn-spinner"></span>
-              } @else {
-                \u{1F4B3}
-              }
-              \u5145\u503C
+              \u{1F4B3} \u5145\u503C
             </button>
             <button 
               class="withdraw-btn" 
               (click)="goToWithdraw()"
-              [disabled]="!canOperate() || isNavigating()"
-              [class.loading]="isNavigating()"
+              [disabled]="isFrozen()"
             >
               \u{1F4E4} \u63D0\u73FE
             </button>
             <button 
               class="redeem-btn" 
               (click)="showRedeemCode()"
-              [disabled]="!canOperate()"
+              [disabled]="isFrozen()"
             >
               \u{1F381} \u514C\u63DB\u78BC
             </button>
@@ -1049,10 +1009,10 @@ var WalletViewComponent = class _WalletViewComponent {
   }], () => [{ type: WalletService }, { type: Router }, { type: ApiService }], null);
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(WalletViewComponent, { className: "WalletViewComponent", filePath: "src/views/wallet-view.component.ts", lineNumber: 1020 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(WalletViewComponent, { className: "WalletViewComponent", filePath: "src/views/wallet-view.component.ts", lineNumber: 1013 });
 })();
 
 export {
   WalletViewComponent
 };
-//# sourceMappingURL=chunk-FJFTEVR5.js.map
+//# sourceMappingURL=chunk-X2QY2PRD.js.map

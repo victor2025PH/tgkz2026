@@ -79,28 +79,21 @@ import { ApiService } from '../core/api.service';
             <button 
               class="recharge-btn" 
               (click)="goToRecharge()"
-              [disabled]="!canOperate() || isNavigating()"
-              [class.loading]="isNavigating()"
+              [disabled]="isFrozen()"
             >
-              @if (isNavigating()) {
-                <span class="btn-spinner"></span>
-              } @else {
-                💳
-              }
-              充值
+              💳 充值
             </button>
             <button 
               class="withdraw-btn" 
               (click)="goToWithdraw()"
-              [disabled]="!canOperate() || isNavigating()"
-              [class.loading]="isNavigating()"
+              [disabled]="isFrozen()"
             >
               📤 提現
             </button>
             <button 
               class="redeem-btn" 
               (click)="showRedeemCode()"
-              [disabled]="!canOperate()"
+              [disabled]="isFrozen()"
             >
               🎁 兌換碼
             </button>
@@ -1135,33 +1128,21 @@ export class WalletViewComponent implements OnInit, OnDestroy {
   }
   
   goToRecharge() {
-    if (!this.canOperate()) {
-      if (this.isFrozen()) {
-        this.globalError.set('錢包已凍結，無法進行充值操作');
-      } else if (!this.isOnline()) {
-        this.globalError.set('網絡連接異常，請檢查網絡後重試');
-      }
+    // 只在錢包凍結時阻止，其他情況允許導航
+    if (this.isFrozen()) {
+      this.globalError.set('錢包已凍結，無法進行充值操作');
       return;
     }
-    this.isNavigating.set(true);
-    this.router.navigate(['/wallet/recharge']).finally(() => {
-      this.isNavigating.set(false);
-    });
+    this.router.navigate(['/wallet/recharge']);
   }
   
   goToWithdraw() {
-    if (!this.canOperate()) {
-      if (this.isFrozen()) {
-        this.globalError.set('錢包已凍結，無法進行提現操作');
-      } else if (!this.isOnline()) {
-        this.globalError.set('網絡連接異常，請檢查網絡後重試');
-      }
+    // 只在錢包凍結時阻止，其他情況允許導航
+    if (this.isFrozen()) {
+      this.globalError.set('錢包已凍結，無法進行提現操作');
       return;
     }
-    this.isNavigating.set(true);
-    this.router.navigate(['/wallet/withdraw']).finally(() => {
-      this.isNavigating.set(false);
-    });
+    this.router.navigate(['/wallet/withdraw']);
   }
   
   // P2: 重試連接
@@ -1181,13 +1162,9 @@ export class WalletViewComponent implements OnInit, OnDestroy {
   }
   
   showRedeemCode() {
-    // P2: 檢查操作權限
-    if (!this.canOperate()) {
-      if (this.isFrozen()) {
-        this.globalError.set('錢包已凍結，無法使用兌換碼');
-      } else if (!this.isOnline()) {
-        this.globalError.set('網絡連接異常，請檢查網絡後重試');
-      }
+    // 只在錢包凍結時阻止
+    if (this.isFrozen()) {
+      this.globalError.set('錢包已凍結，無法使用兌換碼');
       return;
     }
     

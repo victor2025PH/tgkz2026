@@ -106,13 +106,26 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
             
             <div class="info-grid">
               <div class="info-item">
+                <span class="info-label">用戶ID</span>
+                <span class="info-value user-id">
+                  <span class="id-text">{{ user()?.id || '-' }}</span>
+                  <button class="copy-id-btn" (click)="copyUserId()" title="複製ID">📋</button>
+                </span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">顯示名稱</span>
+                <span class="info-value">{{ user()?.displayName || user()?.username || '未設置' }}</span>
+                <button class="edit-btn" (click)="openDisplayNameEditor()">編輯</button>
+              </div>
+              <div class="info-item">
                 <span class="info-label">用戶名</span>
-                <span class="info-value">{{ user()?.username }}</span>
+                <span class="info-value username-value">{{ user()?.username }}</span>
+                <span class="info-hint">登入用，不可修改</span>
               </div>
               <div class="info-item">
                 <span class="info-label">郵箱</span>
                 <span class="info-value">{{ user()?.email || '未設置' }}</span>
-                <button class="edit-btn">編輯</button>
+                <button class="edit-btn" (click)="openEmailEditor()">編輯</button>
               </div>
               <div class="info-item">
                 <span class="info-label">註冊時間</span>
@@ -124,6 +137,68 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
               </div>
             </div>
           </div>
+          
+          <!-- 🆕 郵箱編輯彈窗 -->
+          @if (showEditEmail()) {
+            <div class="modal-overlay" (click)="closeEmailEditor()">
+              <div class="modal-content" (click)="$event.stopPropagation()">
+                <div class="modal-header">
+                  <h3>📧 修改郵箱</h3>
+                  <button class="close-btn" (click)="closeEmailEditor()">×</button>
+                </div>
+                <div class="modal-body">
+                  <div class="form-group">
+                    <label>新郵箱地址</label>
+                    <input type="email" [(ngModel)]="emailForm.newEmail" class="form-input" placeholder="請輸入新郵箱">
+                  </div>
+                  <div class="form-group">
+                    <label>當前密碼（驗證身份）</label>
+                    <input type="password" [(ngModel)]="emailForm.password" class="form-input" placeholder="請輸入當前密碼">
+                  </div>
+                  <p class="hint-text">⚠️ 修改郵箱需要驗證當前密碼</p>
+                </div>
+                <div class="modal-footer">
+                  <button class="cancel-btn" (click)="closeEmailEditor()">取消</button>
+                  <button class="save-btn" (click)="onSaveEmail()" [disabled]="isSavingEmail()">
+                    @if (isSavingEmail()) {
+                      <span class="btn-spinner"></span> 保存中...
+                    } @else {
+                      確認修改
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+          }
+          
+          <!-- 🆕 顯示名稱編輯彈窗 -->
+          @if (showEditDisplayName()) {
+            <div class="modal-overlay" (click)="closeDisplayNameEditor()">
+              <div class="modal-content" (click)="$event.stopPropagation()">
+                <div class="modal-header">
+                  <h3>✏️ 修改顯示名稱</h3>
+                  <button class="close-btn" (click)="closeDisplayNameEditor()">×</button>
+                </div>
+                <div class="modal-body">
+                  <div class="form-group">
+                    <label>顯示名稱</label>
+                    <input type="text" [(ngModel)]="displayNameForm.newName" class="form-input" placeholder="請輸入顯示名稱" maxlength="30">
+                  </div>
+                  <p class="hint-text">💡 顯示名稱會在菜單欄和個人中心顯示，最多30個字符</p>
+                </div>
+                <div class="modal-footer">
+                  <button class="cancel-btn" (click)="closeDisplayNameEditor()">取消</button>
+                  <button class="save-btn" (click)="onSaveDisplayName()" [disabled]="isSavingDisplayName()">
+                    @if (isSavingDisplayName()) {
+                      <span class="btn-spinner"></span> 保存中...
+                    } @else {
+                      確認修改
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+          }
           
           <div class="section-card">
             <h3 class="section-title">🔐 安全設置</h3>
@@ -1032,6 +1107,167 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
     .retry-btn:hover {
       background: rgba(239, 68, 68, 0.3);
     }
+    
+    /* 🆕 用戶ID樣式 */
+    .user-id {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .id-text {
+      font-family: monospace;
+      font-weight: 600;
+      color: var(--primary, #06b6d4);
+    }
+    
+    .copy-id-btn {
+      padding: 0.25rem 0.5rem;
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      border-radius: 0.375rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.875rem;
+    }
+    
+    .copy-id-btn:hover {
+      background: rgba(6, 182, 212, 0.2);
+      border-color: rgba(6, 182, 212, 0.5);
+    }
+    
+    /* 🆕 用戶名樣式 */
+    .username-value {
+      font-family: monospace;
+      color: var(--text-secondary, #94a3b8);
+    }
+    
+    .info-hint {
+      font-size: 0.75rem;
+      color: var(--text-muted, #64748b);
+      margin-left: 0.5rem;
+    }
+    
+    /* 🆕 郵箱編輯彈窗樣式 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+    }
+    
+    .modal-content {
+      background: var(--bg-card, #1e293b);
+      border-radius: 1rem;
+      width: 100%;
+      max-width: 420px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .modal-header h3 {
+      margin: 0;
+      font-size: 1.125rem;
+      color: var(--text-primary, white);
+    }
+    
+    .close-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-muted, #94a3b8);
+      font-size: 1.25rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .close-btn:hover {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+    
+    .modal-body {
+      padding: 1.5rem;
+    }
+    
+    .modal-footer {
+      display: flex;
+      gap: 0.75rem;
+      padding: 1rem 1.5rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      justify-content: flex-end;
+    }
+    
+    .cancel-btn {
+      padding: 0.625rem 1.25rem;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 0.5rem;
+      color: var(--text-secondary, #cbd5e1);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .cancel-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .save-btn {
+      padding: 0.625rem 1.25rem;
+      background: linear-gradient(135deg, #06b6d4, #0891b2);
+      border: none;
+      border-radius: 0.5rem;
+      color: white;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .save-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+    }
+    
+    .save-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    
+    .btn-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   `]
 })
 export class ProfileComponent implements OnInit, OnDestroy {
@@ -1049,11 +1285,17 @@ export class ProfileComponent implements OnInit, OnDestroy {
   // 狀態
   activeTab = signal<ProfileTab>('account');
   showChangePassword = signal(false);
+  showEditEmail = signal(false);  // 🆕 郵箱編輯彈窗
+  showEditDisplayName = signal(false);  // 🆕 顯示名稱編輯彈窗
   isUnbinding = signal(false);
   isLoggingOut = signal(false);  // 🆕 登出動畫狀態
+  isSavingEmail = signal(false);  // 🆕 保存郵箱狀態
+  isSavingDisplayName = signal(false);  // 🆕 保存顯示名稱狀態
   
   // 表單
   passwordForm = { oldPassword: '', newPassword: '', confirmPassword: '' };
+  emailForm = { newEmail: '', password: '' };  // 🆕 郵箱編輯表單
+  displayNameForm = { newName: '' };  // 🆕 顯示名稱編輯表單
   newLicenseKey = '';
   
   // 計算屬性
@@ -1297,5 +1539,113 @@ export class ProfileComponent implements OnInit, OnDestroy {
   copyInviteLink(): void {
     navigator.clipboard.writeText(this.inviteLink());
     this.toast.success('邀請鏈接已複製');
+  }
+  
+  // 🆕 複製用戶ID
+  copyUserId(): void {
+    const userId = this.user()?.id;
+    if (userId) {
+      navigator.clipboard.writeText(String(userId));
+      this.toast.success('用戶ID已複製');
+    }
+  }
+  
+  // 🆕 打開郵箱編輯彈窗
+  openEmailEditor(): void {
+    this.emailForm = { newEmail: this.user()?.email || '', password: '' };
+    this.showEditEmail.set(true);
+  }
+  
+  // 🆕 關閉郵箱編輯彈窗
+  closeEmailEditor(): void {
+    this.showEditEmail.set(false);
+    this.emailForm = { newEmail: '', password: '' };
+  }
+  
+  // 🆕 保存郵箱
+  async onSaveEmail(): Promise<void> {
+    const newEmail = this.emailForm.newEmail.trim();
+    const password = this.emailForm.password;
+    
+    // 驗證郵箱格式
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!newEmail) {
+      this.toast.error('請輸入郵箱地址');
+      return;
+    }
+    if (!emailRegex.test(newEmail)) {
+      this.toast.error('郵箱格式不正確');
+      return;
+    }
+    if (!password) {
+      this.toast.error('請輸入當前密碼以驗證身份');
+      return;
+    }
+    
+    this.isSavingEmail.set(true);
+    
+    try {
+      const result = await this.authService.updateEmail(newEmail, password);
+      
+      if (result.success) {
+        this.toast.success(result.message || '郵箱更新成功');
+        this.closeEmailEditor();
+        // 刷新用戶信息
+        await this.authService.fetchCurrentUser();
+        this.cdr.detectChanges();
+      } else {
+        this.toast.error(result.message || '郵箱更新失敗');
+      }
+    } catch (error: any) {
+      this.toast.error(error.message || '郵箱更新失敗');
+    } finally {
+      this.isSavingEmail.set(false);
+    }
+  }
+  
+  // 🆕 打開顯示名稱編輯彈窗
+  openDisplayNameEditor(): void {
+    this.displayNameForm = { newName: this.user()?.displayName || '' };
+    this.showEditDisplayName.set(true);
+  }
+  
+  // 🆕 關閉顯示名稱編輯彈窗
+  closeDisplayNameEditor(): void {
+    this.showEditDisplayName.set(false);
+    this.displayNameForm = { newName: '' };
+  }
+  
+  // 🆕 保存顯示名稱
+  async onSaveDisplayName(): Promise<void> {
+    const newName = this.displayNameForm.newName.trim();
+    
+    if (!newName) {
+      this.toast.error('請輸入顯示名稱');
+      return;
+    }
+    if (newName.length > 30) {
+      this.toast.error('顯示名稱最多30個字符');
+      return;
+    }
+    
+    this.isSavingDisplayName.set(true);
+    
+    try {
+      const result = await this.authService.updateDisplayName(newName);
+      
+      if (result.success) {
+        this.toast.success(result.message || '顯示名稱更新成功');
+        this.closeDisplayNameEditor();
+        // 刷新用戶信息
+        await this.authService.fetchCurrentUser();
+        this.cdr.detectChanges();
+      } else {
+        this.toast.error(result.message || '顯示名稱更新失敗');
+      }
+    } catch (error: any) {
+      this.toast.error(error.message || '顯示名稱更新失敗');
+    } finally {
+      this.isSavingDisplayName.set(false);
+    }
   }
 }

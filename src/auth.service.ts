@@ -494,6 +494,108 @@ export class AuthService implements OnDestroy {
   }
 
   /**
+   * 🆕 修改郵箱
+   * 使用 PUT /api/v1/auth/me 接口更新用戶信息
+   */
+  async updateEmail(newEmail: string, password: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // 先驗證密碼（通過嘗試登入）
+      const token = this._token();
+      if (!token) {
+        return { success: false, message: '請先登入' };
+      }
+      
+      // 調用 PUT /api/v1/auth/me 更新用戶信息
+      const baseUrl = localStorage.getItem('api_base_url') || 'https://tg.dairoot.cn';
+      const response = await fetch(`${baseUrl}/api/v1/auth/me`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          email: newEmail,
+          password: password  // 傳遞密碼用於驗證
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // 更新本地用戶信息
+        const currentUser = this._user();
+        if (currentUser) {
+          this._user.set({
+            ...currentUser,
+            email: newEmail
+          });
+          // 更新本地存儲
+          localStorage.setItem('user', JSON.stringify(this._user()));
+        }
+        return { success: true, message: '郵箱更新成功' };
+      }
+      
+      return { success: false, message: result.error || result.message || '郵箱更新失敗' };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || '修改郵箱失敗'
+      };
+    }
+  }
+
+  /**
+   * 🆕 修改顯示名稱
+   */
+  async updateDisplayName(newDisplayName: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const token = this._token();
+      if (!token) {
+        return { success: false, message: '請先登入' };
+      }
+      
+      // 調用 PUT /api/v1/auth/me 更新用戶信息
+      const baseUrl = localStorage.getItem('api_base_url') || 'https://tg.dairoot.cn';
+      const response = await fetch(`${baseUrl}/api/v1/auth/me`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          display_name: newDisplayName
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // 更新本地用戶信息
+        const currentUser = this._user();
+        if (currentUser) {
+          this._user.set({
+            ...currentUser,
+            displayName: newDisplayName
+          });
+          // 更新本地存儲
+          const storedUser = JSON.parse(localStorage.getItem('tgm_user') || '{}');
+          storedUser.display_name = newDisplayName;
+          storedUser.displayName = newDisplayName;
+          localStorage.setItem('tgm_user', JSON.stringify(storedUser));
+        }
+        return { success: true, message: '顯示名稱更新成功' };
+      }
+      
+      return { success: false, message: result.error || result.message || '顯示名稱更新失敗' };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || '修改顯示名稱失敗'
+      };
+    }
+  }
+
+  /**
    * 續費/升級會員（使用卡密）
    * 調用後端 API 激活卡密，並同步更新所有相關狀態
    */

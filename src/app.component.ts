@@ -6166,6 +6166,15 @@ export class AppComponent implements OnDestroy, OnInit {
     // Request initial state from the backend once the app is ready
     this.ipcService.send('get-initial-state');
     
+    // 🆕 刷新用戶數據以確保會員等級同步
+    if (this.isAuthenticated()) {
+      this.authService.fetchCurrentUser().then(user => {
+        if (user) {
+          console.log('[App] User data refreshed, membership:', user.membershipLevel);
+        }
+      }).catch(err => console.warn('[App] Failed to refresh user data:', err));
+    }
+    
     // Refresh queue status periodically (every 60 seconds to reduce load)
     this.queueRefreshInterval = setInterval(() => {
       this.refreshQueueStatusThrottled();

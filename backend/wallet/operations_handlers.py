@@ -474,16 +474,19 @@ class OperationsHandlers:
             cursor = conn.cursor()
             
             try:
-                # 基礎統計
-                cursor.execute('''
+                # 基礎統計（適配兩種表結構）
+                wallet_table = self.wallet_service._wallet_table
+                balance_col = self.wallet_service._balance_column
+                
+                cursor.execute(f'''
                     SELECT 
                         COUNT(*) as total_wallets,
                         COUNT(CASE WHEN status = 'active' THEN 1 END) as active_wallets,
                         COUNT(CASE WHEN status = 'frozen' THEN 1 END) as frozen_wallets,
-                        COALESCE(SUM(balance + bonus_balance), 0) as total_balance,
+                        COALESCE(SUM({balance_col} + bonus_balance), 0) as total_balance,
                         COALESCE(SUM(total_recharged), 0) as total_recharged,
                         COALESCE(SUM(total_consumed), 0) as total_consumed
-                    FROM user_wallets
+                    FROM {wallet_table}
                 ''')
                 stats = dict(cursor.fetchone())
                 

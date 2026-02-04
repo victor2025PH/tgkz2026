@@ -824,8 +824,30 @@ class WalletService:
                 TransactionStatus.SUCCESS.value, ip_address,
                 now, now
             ))
+            row_id = cursor.lastrowid
             
             conn.commit()
+            
+            # 構建返回的流水對象（供後台展示）
+            transaction = Transaction(
+                id=str(row_id) if row_id else "",
+                wallet_id=str(wallet_id_int),
+                user_id=user_id,
+                order_id=order_id,
+                type=tx_type,
+                amount=amount,
+                bonus_amount=0,
+                balance_before=balance_before,
+                balance_after=new_balance + new_bonus,
+                category="admin_adjust",
+                description=f"管理員調賬: {reason}",
+                reference_id=admin_id,
+                reference_type="admin_adjust",
+                status=TransactionStatus.SUCCESS.value,
+                ip_address=ip_address,
+                created_at=now,
+                completed_at=now
+            )
             
             # 日誌記錄
             status_note = "（錢包已凍結）" if is_frozen else ""

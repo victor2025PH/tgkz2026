@@ -206,26 +206,47 @@ class RechargeService:
             conn.close()
     
     def _setup_usdt_order(self, order: RechargeOrder, payment_method: str) -> RechargeOrder:
-        """設置 USDT 訂單專用字段"""
+        """設置 USDT 訂單專用字段（優化：使用地址池）"""
+        from .payment_address_service import get_payment_address_service
+        
         # 確定網絡
         if payment_method == PaymentMethod.USDT_TRC20.value:
             order.usdt_network = "TRC20"
-            # TODO: 從地址池獲取或使用 HD 錢包派生
-            order.usdt_address = os.environ.get(
-                'USDT_TRC20_ADDRESS',
-                'TYourTRC20WalletAddressHere'
-            )
+            network = "trc20"
         else:
             order.usdt_network = "ERC20"
-            order.usdt_address = os.environ.get(
-                'USDT_ERC20_ADDRESS',
-                '0xYourERC20WalletAddressHere'
-            )
+            network = "erc20"
         
-        # 計算 USDT 金額（根據匯率）
+        # 計算 USDT 金額
         usd_amount = order.amount / 100  # 分 -> 美元
         order.usdt_amount = round(usd_amount / USDT_RATE, 2)
         order.usdt_rate = USDT_RATE
+        
+        # 從地址池分配地址
+        address_service = get_payment_address_service()
+        success, message, address = address_service.allocate_address(
+            network=network,
+            order_no=order.order_no,
+            user_id=order.user_id,
+            amount=order.usdt_amount
+        )
+        
+        if success and address:
+            order.usdt_address = address.address
+            logger.info(f"Order {order.order_no} allocated address: {address.address[:10]}...")
+        else:
+            # 備用：使用環境變量配置的地址
+            logger.warning(f"Address pool allocation failed: {message}, using fallback")
+            if network == "trc20":
+                order.usdt_address = os.environ.get(
+                    'USDT_TRC20_ADDRESS',
+                    'TYourTRC20WalletAddressHere'
+                )
+            else:
+                order.usdt_address = os.environ.get(
+                    'USDT_ERC20_ADDRESS',
+                    '0xYourERC20WalletAddressHere'
+                )
         
         return order
     
@@ -480,6 +501,19 @@ class RechargeService:
                 conn.commit()
                 return False, f"入賬失敗: {message}"
             
+            # 釋放地址分配（標記為已確認）
+            if order.payment_method in [PaymentMethod.USDT_TRC20.value, PaymentMethod.USDT_ERC20.value]:
+                try:
+                    from .payment_address_service import get_payment_address_service
+                    address_service = get_payment_address_service()
+                    address_service.release_allocation(
+                        order_no=order.order_no,
+                        confirmed=True,
+                        amount=order.usdt_amount
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to release address allocation: {e}")
+            
             logger.info(f"Order {order_no} confirmed, amount: {order.actual_amount} cents credited")
             
             return True, "充值成功"
@@ -536,6 +570,16 @@ class RechargeService:
         try:
             now = datetime.now().isoformat()
             
+            # 先獲取要過期的訂單號（用於釋放地址分配）
+            cursor.execute('''
+                SELECT order_no FROM recharge_orders
+                WHERE status = 'pending'
+                AND expired_at < ?
+            ''', (now,))
+            
+            expiring_orders = [row[0] for row in cursor.fetchall()]
+            
+            # 更新狀態
             cursor.execute('''
                 UPDATE recharge_orders SET
                     status = 'expired',
@@ -546,6 +590,16 @@ class RechargeService:
             
             count = cursor.rowcount
             conn.commit()
+            
+            # 釋放地址分配
+            if expiring_orders:
+                try:
+                    from .payment_address_service import get_payment_address_service
+                    address_service = get_payment_address_service()
+                    for order_no in expiring_orders:
+                        address_service.release_allocation(order_no, confirmed=False)
+                except Exception as e:
+                    logger.warning(f"Failed to release expired order allocations: {e}")
             
             if count > 0:
                 logger.info(f"Expired {count} pending orders")

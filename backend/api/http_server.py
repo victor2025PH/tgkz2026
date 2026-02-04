@@ -47,6 +47,8 @@ try:
     from wallet.pay_password_handlers import setup_pay_password_routes, pay_password_handlers
     from wallet.coupon_handlers import setup_coupon_routes, coupon_handlers
     from wallet.finance_report_handlers import setup_finance_report_routes, finance_report_handlers
+    # 🆕 Phase 1.1: 支付配置管理
+    from wallet.payment_config_handlers import setup_payment_config_routes, payment_config_handlers
     # 🆕 Phase 2 & 3: 運營工具
     from wallet.operations_handlers import setup_operations_routes, operations_handlers
     from wallet.user_wallet_integration import get_user_wallet_integration, ensure_user_wallet
@@ -69,6 +71,7 @@ except ImportError as e:
     pay_password_handlers = None
     coupon_handlers = None
     finance_report_handlers = None
+    payment_config_handlers = None
     operations_handlers = None
     ensure_user_wallet = None
 except Exception as e:
@@ -86,6 +89,7 @@ except Exception as e:
     pay_password_handlers = None
     coupon_handlers = None
     finance_report_handlers = None
+    payment_config_handlers = None
     operations_handlers = None
     ensure_user_wallet = None
 
@@ -598,6 +602,21 @@ class HttpApiServer:
                 self.app.router.add_get('/api/admin/finance/top-users', finance_report_handlers.get_top_users)
                 self.app.router.add_get('/api/admin/finance/monthly', finance_report_handlers.get_monthly_summary)
                 self.app.router.add_get('/api/admin/finance/export', finance_report_handlers.export_report)
+            # 🆕 Phase 1.1: 支付配置管理 API
+            if payment_config_handlers:
+                # 地址管理
+                self.app.router.add_get('/api/admin/payment/addresses', payment_config_handlers.list_addresses)
+                self.app.router.add_post('/api/admin/payment/addresses', payment_config_handlers.add_address)
+                self.app.router.add_post('/api/admin/payment/addresses/batch', payment_config_handlers.batch_add_addresses)
+                self.app.router.add_put('/api/admin/payment/addresses/{address_id}', payment_config_handlers.update_address)
+                self.app.router.add_delete('/api/admin/payment/addresses/{address_id}', payment_config_handlers.delete_address)
+                # 渠道配置
+                self.app.router.add_get('/api/admin/payment/channels', payment_config_handlers.list_channels)
+                self.app.router.add_put('/api/admin/payment/channels/{channel_type}', payment_config_handlers.update_channel)
+                self.app.router.add_post('/api/admin/payment/channels/{channel_type}/toggle', payment_config_handlers.toggle_channel)
+                # 統計
+                self.app.router.add_get('/api/admin/payment/stats', payment_config_handlers.get_stats)
+                logger.info("✅ Payment config module loaded (Phase 1.1)")
             # 🆕 Phase 2 & 3: 運營工具 API
             if operations_handlers:
                 # 批量操作

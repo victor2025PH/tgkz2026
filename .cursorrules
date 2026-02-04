@@ -217,3 +217,45 @@ search_history.db
 2. 邊界情況（空值、超長文本、並發）
 3. 錯誤恢復（斷網、API 失敗）
 4. **數據庫持久化**（重啟後數據是否還在）
+
+---
+
+## 🖥️ 服務器部署信息
+
+### 生產服務器
+| 項目 | 值 |
+|------|---|
+| **主機** | `165.154.210.154` |
+| **用戶名** | `ubuntu` |
+| **域名** | `tgw.usdt2026.cc` |
+| **部署路徑** | `/opt/tg-matrix` |
+
+### SSH 連接命令
+```bash
+ssh ubuntu@165.154.210.154
+```
+
+### 常用運維命令
+```bash
+# 進入項目目錄
+cd /opt/tg-matrix
+
+# 查看運行狀態
+sudo docker compose ps
+
+# 重啟 API 容器
+sudo docker compose restart api
+
+# 重建並重啟 API（拉取最新代碼後）
+sudo git fetch origin && sudo git reset --hard origin/main
+sudo docker compose up -d --build api
+
+# 查看 API 日誌
+sudo docker compose logs -f --tail=100 api
+
+# 查看所有容器日誌
+sudo docker compose logs -f --tail=50
+```
+
+**注意**：服務器使用 Docker Compose V2 (`docker compose`)，不是 V1 (`docker-compose`)
+

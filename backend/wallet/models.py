@@ -298,6 +298,146 @@ class RechargePackage:
         }
 
 
+# ==================== 支付地址管理（Phase 1.1）====================
+
+class AddressStatus(Enum):
+    """地址狀態"""
+    ACTIVE = "active"          # 活躍（可分配）
+    IN_USE = "in_use"          # 使用中（已分配給訂單）
+    DISABLED = "disabled"      # 停用
+    EXHAUSTED = "exhausted"    # 已耗盡（使用次數過多）
+
+
+class AddressNetwork(Enum):
+    """地址網絡類型"""
+    TRC20 = "trc20"            # TRON 網絡
+    ERC20 = "erc20"            # 以太坊網絡
+    BEP20 = "bep20"            # BSC 網絡
+
+
+@dataclass
+class PaymentAddress:
+    """收款地址"""
+    id: str = ""
+    network: str = "trc20"         # 網絡類型
+    address: str = ""              # 錢包地址
+    label: str = ""                # 標籤/備註
+    status: str = "active"         # 狀態
+    priority: int = 0              # 優先級（數字越小越優先）
+    usage_count: int = 0           # 使用次數
+    max_usage: int = 0             # 最大使用次數（0=無限制）
+    total_received: float = 0.0    # 累計收款金額
+    last_used_at: str = ""         # 最後使用時間
+    created_at: str = ""
+    updated_at: str = ""
+    created_by: str = ""           # 創建者
+    
+    def __post_init__(self):
+        if not self.id:
+            self.id = str(uuid.uuid4())
+        if not self.created_at:
+            self.created_at = datetime.now().isoformat()
+        if not self.updated_at:
+            self.updated_at = self.created_at
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "network": self.network,
+            "address": self.address,
+            "address_masked": self._mask_address(),
+            "label": self.label,
+            "status": self.status,
+            "priority": self.priority,
+            "usage_count": self.usage_count,
+            "max_usage": self.max_usage,
+            "total_received": self.total_received,
+            "total_received_display": f"${self.total_received:.2f}",
+            "last_used_at": self.last_used_at,
+            "created_at": self.created_at,
+        }
+    
+    def _mask_address(self) -> str:
+        """地址脫敏顯示"""
+        if len(self.address) > 12:
+            return f"{self.address[:6]}...{self.address[-4:]}"
+        return self.address
+
+
+@dataclass
+class PaymentChannelConfig:
+    """支付渠道配置"""
+    id: str = ""
+    channel_type: str = ""         # 渠道類型 (usdt_trc20, usdt_erc20, alipay, etc.)
+    display_name: str = ""         # 顯示名稱
+    enabled: bool = True           # 是否啟用
+    fee_rate: float = 0.0          # 手續費率 (0.02 = 2%)
+    min_amount: int = 500          # 最小金額（分）
+    max_amount: int = 100000       # 最大金額（分）
+    daily_limit: int = 0           # 每日限額（0=無限制）
+    priority: int = 0              # 顯示優先級
+    config: Dict[str, Any] = field(default_factory=dict)  # 渠道專用配置
+    created_at: str = ""
+    updated_at: str = ""
+    
+    def __post_init__(self):
+        if not self.id:
+            self.id = str(uuid.uuid4())
+        if not self.created_at:
+            self.created_at = datetime.now().isoformat()
+        if not self.updated_at:
+            self.updated_at = self.created_at
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "channel_type": self.channel_type,
+            "display_name": self.display_name,
+            "enabled": self.enabled,
+            "fee_rate": self.fee_rate,
+            "fee_percent": f"{self.fee_rate * 100:.1f}%",
+            "min_amount": self.min_amount,
+            "min_display": f"${self.min_amount / 100:.2f}",
+            "max_amount": self.max_amount,
+            "max_display": f"${self.max_amount / 100:.2f}",
+            "daily_limit": self.daily_limit,
+            "priority": self.priority,
+            "created_at": self.created_at,
+        }
+
+
+# 默認支付渠道配置
+DEFAULT_PAYMENT_CHANNELS: List[Dict[str, Any]] = [
+    {
+        "channel_type": "usdt_trc20",
+        "display_name": "USDT (TRC20)",
+        "enabled": True,
+        "fee_rate": 0.0,
+        "min_amount": 500,
+        "max_amount": 5000000,
+        "priority": 1
+    },
+    {
+        "channel_type": "usdt_erc20",
+        "display_name": "USDT (ERC20)",
+        "enabled": False,
+        "fee_rate": 0.0,
+        "min_amount": 2000,
+        "max_amount": 5000000,
+        "priority": 2
+    },
+    {
+        "channel_type": "alipay",
+        "display_name": "支付寶",
+        "enabled": False,
+        "fee_rate": 0.02,
+        "min_amount": 100,
+        "max_amount": 50000,
+        "priority": 3
+    },
+]
+
+
 # ==================== 默認充值套餐 ====================
 
 DEFAULT_RECHARGE_PACKAGES: List[Dict[str, Any]] = [

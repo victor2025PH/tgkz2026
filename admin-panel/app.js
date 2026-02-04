@@ -147,6 +147,7 @@ createApp({
             { id: 'expiring', name: '即將到期', icon: '⏰', badge: null },
             { id: 'licenses', name: '卡密管理', icon: '🎟️' },
             { id: 'orders', name: '訂單管理', icon: '💰' },
+            { id: 'payment', name: '支付配置', icon: '💎' },  // 🆕 Phase 1.1: 支付地址管理
             { id: 'walletOps', name: '錢包運營', icon: '💳' },  // 🆕 Phase 3
             { id: 'alerts', name: '告警監控', icon: '🚨', badge: null },  // 🆕 Phase 3
             { id: 'campaigns', name: '營銷活動', icon: '🎯' },  // 🆕 Phase 3
@@ -242,6 +243,21 @@ createApp({
         const alerts = ref([]);
         const alertSummary = ref({ total: 0, unacknowledged: 0, recent_24h: 0, by_severity: {} });
         const alertFilter = ref('');
+        
+        // 🆕 Phase 1.1: 支付配置
+        const paymentAddresses = ref([]);
+        const paymentChannels = ref([]);
+        const paymentStats = ref({ by_network: {}, today: { allocations: 0, confirmed: 0, confirmed_amount: 0 } });
+        const showAddressModal = ref(false);
+        const addressForm = reactive({
+            network: 'trc20',
+            address: '',
+            label: '',
+            priority: 0,
+            max_usage: 0
+        });
+        const pendingRecharges = ref([]);
+        const pendingRechargeStats = ref({ pending: 0, paid: 0 });
         
         // 🆕 Phase 3: 營銷活動
         const showCampaignModal = ref(false);
@@ -865,6 +881,137 @@ createApp({
                 'critical': 'text-red-400'
             };
             return classes[severity] || 'text-gray-400';
+        };
+        
+        // ============ 🆕 Phase 1.1: 支付配置管理 ============
+        
+        const loadPaymentAddresses = async () => {
+            const result = await apiRequest('/admin/payment/addresses?page_size=100');
+            if (result.success) {
+                paymentAddresses.value = result.data?.addresses || [];
+            }
+        };
+        
+        const loadPaymentChannels = async () => {
+            const result = await apiRequest('/admin/payment/channels');
+            if (result.success) {
+                paymentChannels.value = result.data?.channels || [];
+            }
+        };
+        
+        const loadPaymentStats = async () => {
+            const result = await apiRequest('/admin/payment/stats');
+            if (result.success) {
+                paymentStats.value = result.data || { by_network: {}, today: {} };
+            }
+        };
+        
+        const loadPendingRecharges = async () => {
+            const result = await apiRequest('/admin/orders?status=pending&page_size=50');
+            if (result.success) {
+                pendingRecharges.value = result.data?.orders || [];
+                pendingRechargeStats.value = {
+                    pending: (result.data?.orders || []).filter(o => o.status === 'pending').length,
+                    paid: (result.data?.orders || []).filter(o => o.status === 'paid').length
+                };
+            }
+        };
+        
+        const addPaymentAddress = async () => {
+            if (!addressForm.address || !addressForm.network) {
+                showToast('請填寫完整信息', 'error');
+                return;
+            }
+            
+            const result = await apiRequest('/admin/payment/addresses', {
+                method: 'POST',
+                body: JSON.stringify(addressForm)
+            });
+            
+            if (result.success) {
+                showToast('地址添加成功', 'success');
+                showAddressModal.value = false;
+                addressForm.address = '';
+                addressForm.label = '';
+                addressForm.priority = 0;
+                addressForm.max_usage = 0;
+                await loadPaymentAddresses();
+                await loadPaymentStats();
+            } else {
+                showToast(result.error || '添加失敗', 'error');
+            }
+        };
+        
+        const togglePaymentAddress = async (address) => {
+            const newStatus = address.status === 'active' ? 'disabled' : 'active';
+            const result = await apiRequest(`/admin/payment/addresses/${address.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ status: newStatus })
+            });
+            
+            if (result.success) {
+                showToast(newStatus === 'active' ? '地址已啟用' : '地址已停用', 'success');
+                await loadPaymentAddresses();
+            }
+        };
+        
+        const deletePaymentAddress = async (address) => {
+            showConfirmDialog(
+                '確認刪除',
+                `確定要刪除地址 ${address.address_masked || address.address.substring(0, 10)}... 嗎？`,
+                async () => {
+                    const result = await apiRequest(`/admin/payment/addresses/${address.id}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (result.success) {
+                        showToast('地址已刪除', 'success');
+                        await loadPaymentAddresses();
+                        await loadPaymentStats();
+                    }
+                }
+            );
+        };
+        
+        const togglePaymentChannel = async (channel) => {
+            const result = await apiRequest(`/admin/payment/channels/${channel.channel_type}/toggle`, {
+                method: 'POST'
+            });
+            
+            if (result.success) {
+                showToast(result.data?.enabled ? '渠道已啟用' : '渠道已停用', 'success');
+                await loadPaymentChannels();
+            }
+        };
+        
+        const confirmRechargeOrder = async (order) => {
+            showConfirmDialog(
+                '確認入賬',
+                `確定要確認訂單 ${order.order_no} 入賬嗎？金額: $${(order.amount / 100).toFixed(2)}`,
+                async () => {
+                    const result = await apiRequest(`/admin/orders/${order.order_no}/confirm`, {
+                        method: 'POST',
+                        body: JSON.stringify({})
+                    });
+                    
+                    if (result.success) {
+                        showToast('訂單已確認入賬', 'success');
+                        await loadPendingRecharges();
+                        await loadPaymentStats();
+                    } else {
+                        showToast(result.error || '確認失敗', 'error');
+                    }
+                }
+            );
+        };
+        
+        const getNetworkBadgeClass = (network) => {
+            const classes = {
+                'trc20': 'bg-purple-600',
+                'erc20': 'bg-blue-600',
+                'bep20': 'bg-yellow-600'
+            };
+            return classes[network] || 'bg-gray-600';
         };
         
         // ============ 🆕 Phase 3: 營銷活動 ============
@@ -2199,6 +2346,7 @@ createApp({
             else if (newPage === 'expiring') await loadExpiringUsers();
             else if (newPage === 'licenses') await loadLicenses();
             else if (newPage === 'orders') await loadOrders();
+            else if (newPage === 'payment') { await loadPaymentAddresses(); await loadPaymentChannels(); await loadPaymentStats(); await loadPendingRecharges(); }  // 🆕 Phase 1.1
             else if (newPage === 'walletOps') { await loadWalletAnalytics(); await loadWalletOperations(); }  // 🆕
             else if (newPage === 'alerts') { await loadAlerts(); await loadAlertSummary(); }  // 🆕
             else if (newPage === 'campaigns') { await loadWalletOperations(); }  // 🆕
@@ -2294,6 +2442,24 @@ createApp({
             acknowledgeAlert,
             triggerAnomalyScan,
             getAlertSeverityClass,
+            // 🆕 Phase 1.1: 支付配置
+            paymentAddresses,
+            paymentChannels,
+            paymentStats,
+            pendingRecharges,
+            pendingRechargeStats,
+            showAddressModal,
+            addressForm,
+            loadPaymentAddresses,
+            loadPaymentChannels,
+            loadPaymentStats,
+            loadPendingRecharges,
+            addPaymentAddress,
+            togglePaymentAddress,
+            deletePaymentAddress,
+            togglePaymentChannel,
+            confirmRechargeOrder,
+            getNetworkBadgeClass,
             // 🆕 Phase 3: 營銷活動
             showCampaignModal,
             campaignForm,

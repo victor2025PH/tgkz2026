@@ -1249,6 +1249,235 @@ host:port"></textarea>
                     </div>
                 </div>
                 
+                <!-- ==================== 🆕 Phase 1.1: 支付配置 ==================== -->
+                <div v-if="currentPage === 'payment'">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold">💎 支付配置管理</h2>
+                        <button @click="showAddressModal = true" 
+                                class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm">
+                            ➕ 添加收款地址
+                        </button>
+                    </div>
+                    
+                    <!-- 統計卡片 -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gray-800 rounded-xl p-4">
+                            <div class="text-gray-400 text-sm mb-1">今日分配</div>
+                            <div class="text-2xl font-bold text-white">{{ paymentStats.today?.allocations || 0 }}</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-4">
+                            <div class="text-gray-400 text-sm mb-1">今日確認</div>
+                            <div class="text-2xl font-bold text-green-400">{{ paymentStats.today?.confirmed || 0 }}</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-4">
+                            <div class="text-gray-400 text-sm mb-1">今日收款</div>
+                            <div class="text-2xl font-bold text-purple-400">${{ (paymentStats.today?.confirmed_amount || 0).toFixed(2) }}</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-4">
+                            <div class="text-gray-400 text-sm mb-1">待確認訂單</div>
+                            <div class="text-2xl font-bold text-yellow-400">{{ pendingRecharges.length }}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 支付渠道開關 -->
+                    <div class="bg-gray-800 rounded-xl p-6 mb-6">
+                        <h3 class="text-lg font-semibold mb-4">支付渠道配置</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div v-for="channel in paymentChannels" :key="channel.id"
+                                 class="bg-gray-700 rounded-lg p-4 flex items-center justify-between">
+                                <div>
+                                    <div class="font-medium">{{ channel.display_name }}</div>
+                                    <div class="text-sm text-gray-400">
+                                        手續費: {{ (channel.fee_rate * 100).toFixed(1) }}% | 
+                                        最低: ${{ (channel.min_amount / 100).toFixed(0) }}
+                                    </div>
+                                </div>
+                                <button @click="togglePaymentChannel(channel)"
+                                        :class="['px-3 py-1 rounded-full text-sm transition-colors',
+                                                 channel.enabled ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 hover:bg-gray-500']">
+                                    {{ channel.enabled ? '已啟用' : '已停用' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 收款地址列表 -->
+                    <div class="bg-gray-800 rounded-xl p-6 mb-6">
+                        <h3 class="text-lg font-semibold mb-4">收款地址池</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-gray-700">
+                                        <th class="py-3 text-left text-gray-400 text-sm">網絡</th>
+                                        <th class="py-3 text-left text-gray-400 text-sm">地址</th>
+                                        <th class="py-3 text-left text-gray-400 text-sm">標籤</th>
+                                        <th class="py-3 text-center text-gray-400 text-sm">使用次數</th>
+                                        <th class="py-3 text-center text-gray-400 text-sm">累計收款</th>
+                                        <th class="py-3 text-center text-gray-400 text-sm">狀態</th>
+                                        <th class="py-3 text-center text-gray-400 text-sm">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="addr in paymentAddresses" :key="addr.id" 
+                                        class="border-b border-gray-700/50 table-row-hover">
+                                        <td class="py-3">
+                                            <span :class="['px-2 py-1 rounded text-xs uppercase', getNetworkBadgeClass(addr.network)]">
+                                                {{ addr.network }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 font-mono text-sm">{{ addr.address_masked || addr.address }}</td>
+                                        <td class="py-3 text-gray-400">{{ addr.label || '-' }}</td>
+                                        <td class="py-3 text-center">
+                                            {{ addr.usage_count }}
+                                            <span v-if="addr.max_usage > 0" class="text-gray-500">/{{ addr.max_usage }}</span>
+                                        </td>
+                                        <td class="py-3 text-center text-green-400">${{ (addr.total_received || 0).toFixed(2) }}</td>
+                                        <td class="py-3 text-center">
+                                            <span :class="['px-2 py-1 rounded text-xs',
+                                                          addr.status === 'active' ? 'bg-green-600/30 text-green-400' :
+                                                          addr.status === 'exhausted' ? 'bg-yellow-600/30 text-yellow-400' :
+                                                          'bg-red-600/30 text-red-400']">
+                                                {{ addr.status === 'active' ? '活躍' : addr.status === 'exhausted' ? '已耗盡' : '已停用' }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 text-center">
+                                            <button @click="togglePaymentAddress(addr)" 
+                                                    class="text-blue-400 hover:text-blue-300 mr-2">
+                                                {{ addr.status === 'active' ? '停用' : '啟用' }}
+                                            </button>
+                                            <button @click="deletePaymentAddress(addr)" 
+                                                    class="text-red-400 hover:text-red-300">
+                                                刪除
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="paymentAddresses.length === 0">
+                                        <td colspan="7" class="py-8 text-center text-gray-500">
+                                            暫無收款地址，請點擊右上角添加
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- 待確認訂單 -->
+                    <div class="bg-gray-800 rounded-xl p-6">
+                        <h3 class="text-lg font-semibold mb-4">待確認充值訂單</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-gray-700">
+                                        <th class="py-3 text-left text-gray-400 text-sm">訂單號</th>
+                                        <th class="py-3 text-left text-gray-400 text-sm">用戶</th>
+                                        <th class="py-3 text-center text-gray-400 text-sm">金額</th>
+                                        <th class="py-3 text-center text-gray-400 text-sm">支付方式</th>
+                                        <th class="py-3 text-center text-gray-400 text-sm">狀態</th>
+                                        <th class="py-3 text-center text-gray-400 text-sm">創建時間</th>
+                                        <th class="py-3 text-center text-gray-400 text-sm">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="order in pendingRecharges" :key="order.id"
+                                        class="border-b border-gray-700/50 table-row-hover">
+                                        <td class="py-3 font-mono text-sm">{{ order.order_no }}</td>
+                                        <td class="py-3 text-gray-400">{{ order.user_id?.slice(0, 8) }}...</td>
+                                        <td class="py-3 text-center font-bold text-green-400">
+                                            ${{ (order.amount / 100).toFixed(2) }}
+                                        </td>
+                                        <td class="py-3 text-center">
+                                            <span class="px-2 py-1 bg-purple-600/30 rounded text-xs">
+                                                {{ order.payment_method?.toUpperCase() }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 text-center">
+                                            <span :class="['px-2 py-1 rounded text-xs',
+                                                          order.status === 'pending' ? 'bg-yellow-600/30 text-yellow-400' :
+                                                          order.status === 'paid' ? 'bg-blue-600/30 text-blue-400' :
+                                                          'bg-gray-600/30 text-gray-400']">
+                                                {{ order.status === 'pending' ? '待支付' : order.status === 'paid' ? '待確認' : order.status }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 text-center text-gray-400 text-sm">
+                                            {{ new Date(order.created_at).toLocaleString('zh-TW') }}
+                                        </td>
+                                        <td class="py-3 text-center">
+                                            <button @click="confirmRechargeOrder(order)"
+                                                    class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm">
+                                                確認入賬
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="pendingRecharges.length === 0">
+                                        <td colspan="7" class="py-8 text-center text-gray-500">
+                                            暫無待處理訂單
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 添加地址彈窗 -->
+                <div v-if="showAddressModal" 
+                     class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-md mx-4">
+                        <h3 class="text-xl font-bold mb-6">添加收款地址</h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-2">網絡類型</label>
+                                <select v-model="addressForm.network"
+                                        class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
+                                    <option value="trc20">TRC20 (TRON)</option>
+                                    <option value="erc20">ERC20 (Ethereum)</option>
+                                    <option value="bep20">BEP20 (BSC)</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-2">錢包地址</label>
+                                <input v-model="addressForm.address" type="text"
+                                       :placeholder="addressForm.network === 'trc20' ? 'T開頭的34位地址' : '0x開頭的42位地址'"
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 font-mono">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-2">標籤（可選）</label>
+                                <input v-model="addressForm.label" type="text" placeholder="例如：主要收款地址"
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-gray-400 text-sm mb-2">優先級</label>
+                                    <input v-model.number="addressForm.priority" type="number" min="0"
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
+                                    <p class="text-gray-500 text-xs mt-1">數字越小越優先</p>
+                                </div>
+                                <div>
+                                    <label class="block text-gray-400 text-sm mb-2">最大使用次數</label>
+                                    <input v-model.number="addressForm.max_usage" type="number" min="0"
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
+                                    <p class="text-gray-500 text-xs mt-1">0 = 無限制</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-3 mt-6">
+                            <button @click="showAddressModal = false" 
+                                    class="flex-1 bg-gray-600 hover:bg-gray-500 py-2 rounded-lg">
+                                取消
+                            </button>
+                            <button @click="addPaymentAddress" 
+                                    class="flex-1 bg-purple-600 hover:bg-purple-700 py-2 rounded-lg">
+                                添加
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- ==================== 🆕 錢包運營 ==================== -->
                 <div v-if="currentPage === 'walletOps'">
                     <div class="flex justify-between items-center mb-6">

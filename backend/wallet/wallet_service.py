@@ -56,21 +56,65 @@ class WalletService:
             return
         
         if db_path is None:
-            # 默認使用 data 目錄下的 wallet.db
+            # 🔧 修復：使用 tgmatrix.db 與用戶數據統一
             data_dir = Path(__file__).parent.parent / "data"
             data_dir.mkdir(parents=True, exist_ok=True)
-            db_path = str(data_dir / "wallet.db")
+            
+            # 優先使用 tgmatrix.db（與用戶數據在同一個數據庫）
+            tgmatrix_path = data_dir / "tgmatrix.db"
+            if tgmatrix_path.exists():
+                db_path = str(tgmatrix_path)
+            else:
+                # 兼容舊版本，使用 wallet.db
+                db_path = str(data_dir / "wallet.db")
         
         self.db_path = db_path
+        self._use_legacy_table = 'wallet.db' in db_path  # 是否使用舊表結構
         self._init_database()
         self._initialized = True
-        logger.info(f"WalletService initialized with db: {db_path}")
+        logger.info(f"WalletService initialized with db: {db_path}, legacy: {self._use_legacy_table}")
     
     def _get_connection(self) -> sqlite3.Connection:
         """獲取數據庫連接"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
+    
+    @property
+    def _wallet_table(self) -> str:
+        """獲取錢包表名"""
+        return 'user_wallets' if self._use_legacy_table else 'wallets'
+    
+    @property
+    def _balance_column(self) -> str:
+        """獲取餘額列名"""
+        return 'balance' if self._use_legacy_table else 'main_balance'
+    
+    def _row_to_wallet(self, row) -> Optional[Wallet]:
+        """將數據庫行轉換為 Wallet 對象（適配兩種表結構）"""
+        if not row:
+            return None
+        row_dict = dict(row)
+        
+        # 適配列名差異
+        balance = row_dict.get('balance') or row_dict.get('main_balance', 0)
+        wallet_id = str(row_dict.get('id', ''))
+        
+        return Wallet(
+            id=wallet_id,
+            user_id=row_dict.get('user_id', ''),
+            balance=balance,
+            frozen_balance=row_dict.get('frozen_balance', 0),
+            bonus_balance=row_dict.get('bonus_balance', 0),
+            total_recharged=row_dict.get('total_recharged', 0),
+            total_consumed=row_dict.get('total_consumed', 0),
+            total_withdrawn=row_dict.get('total_withdrawn', 0),
+            currency=row_dict.get('currency', 'USD'),
+            status=WalletStatus(row_dict.get('status', 'active')) if row_dict.get('status') else WalletStatus.ACTIVE,
+            version=row_dict.get('version', 0),
+            created_at=row_dict.get('created_at', ''),
+            updated_at=row_dict.get('updated_at', '')
+        )
     
     def _init_database(self):
         """初始化數據庫表"""
@@ -202,14 +246,11 @@ class WalletService:
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        cursor.execute('SELECT * FROM user_wallets WHERE user_id = ?', (user_id,))
+        cursor.execute(f'SELECT * FROM {self._wallet_table} WHERE user_id = ?', (user_id,))
         row = cursor.fetchone()
         conn.close()
         
-        if not row:
-            return None
-        
-        return Wallet(**dict(row))
+        return self._row_to_wallet(row)
     
     def get_or_create_wallet(self, user_id: str) -> Wallet:
         """獲取或創建用戶錢包"""
@@ -224,19 +265,37 @@ class WalletService:
         cursor = conn.cursor()
         
         try:
-            cursor.execute('''
-                INSERT INTO user_wallets 
-                (id, user_id, balance, frozen_balance, bonus_balance, 
-                 total_recharged, total_consumed, total_withdrawn,
-                 currency, status, version, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                wallet.id, wallet.user_id, wallet.balance,
-                wallet.frozen_balance, wallet.bonus_balance,
-                wallet.total_recharged, wallet.total_consumed, wallet.total_withdrawn,
-                wallet.currency, wallet.status, wallet.version,
-                wallet.created_at, wallet.updated_at
-            ))
+            if self._use_legacy_table:
+                # 舊表結構 (wallet.db)
+                cursor.execute('''
+                    INSERT INTO user_wallets 
+                    (id, user_id, balance, frozen_balance, bonus_balance, 
+                     total_recharged, total_consumed, total_withdrawn,
+                     currency, status, version, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    wallet.id, wallet.user_id, wallet.balance,
+                    wallet.frozen_balance, wallet.bonus_balance,
+                    wallet.total_recharged, wallet.total_consumed, wallet.total_withdrawn,
+                    wallet.currency, wallet.status.value if hasattr(wallet.status, 'value') else wallet.status,
+                    wallet.version, wallet.created_at, wallet.updated_at
+                ))
+            else:
+                # 新表結構 (tgmatrix.db)
+                cursor.execute('''
+                    INSERT INTO wallets 
+                    (user_id, main_balance, bonus_balance, frozen_balance, 
+                     total_recharged, total_consumed, status, version)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    wallet.user_id, wallet.balance, wallet.bonus_balance,
+                    wallet.frozen_balance, wallet.total_recharged, wallet.total_consumed,
+                    wallet.status.value if hasattr(wallet.status, 'value') else 'active',
+                    wallet.version
+                ))
+                # 獲取自增 ID
+                wallet.id = str(cursor.lastrowid)
+            
             conn.commit()
             logger.info(f"Created wallet for user {user_id}: {wallet.id}")
         except sqlite3.IntegrityError:

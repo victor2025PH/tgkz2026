@@ -47,14 +47,20 @@ try:
     from wallet.pay_password_handlers import setup_pay_password_routes, pay_password_handlers
     from wallet.coupon_handlers import setup_coupon_routes, coupon_handlers
     from wallet.finance_report_handlers import setup_finance_report_routes, finance_report_handlers
+    # 🆕 Phase 2 & 3: 運營工具
+    from wallet.operations_handlers import setup_operations_routes, operations_handlers
+    from wallet.user_wallet_integration import get_user_wallet_integration, ensure_user_wallet
     WALLET_MODULE_AVAILABLE = True
+    OPERATIONS_MODULE_AVAILABLE = True
     print("✅ Wallet module imported successfully")
+    print("✅ Operations module imported successfully")
 except ImportError as e:
     import traceback
     WALLET_IMPORT_ERROR = f"ImportError: {e}\n{traceback.format_exc()}"
     print(f"⚠️ Wallet module import failed: {e}")
     traceback.print_exc()
     WALLET_MODULE_AVAILABLE = False
+    OPERATIONS_MODULE_AVAILABLE = False
     wallet_handlers = None
     admin_wallet_handlers = None
     purchase_handlers = None
@@ -63,12 +69,15 @@ except ImportError as e:
     pay_password_handlers = None
     coupon_handlers = None
     finance_report_handlers = None
+    operations_handlers = None
+    ensure_user_wallet = None
 except Exception as e:
     import traceback
     WALLET_IMPORT_ERROR = f"Exception: {e}\n{traceback.format_exc()}"
     print(f"⚠️ Wallet module error: {e}")
     traceback.print_exc()
     WALLET_MODULE_AVAILABLE = False
+    OPERATIONS_MODULE_AVAILABLE = False
     wallet_handlers = None
     admin_wallet_handlers = None
     purchase_handlers = None
@@ -77,6 +86,8 @@ except Exception as e:
     pay_password_handlers = None
     coupon_handlers = None
     finance_report_handlers = None
+    operations_handlers = None
+    ensure_user_wallet = None
 
 logger = logging.getLogger(__name__)
 
@@ -587,7 +598,24 @@ class HttpApiServer:
                 self.app.router.add_get('/api/admin/finance/top-users', finance_report_handlers.get_top_users)
                 self.app.router.add_get('/api/admin/finance/monthly', finance_report_handlers.get_monthly_summary)
                 self.app.router.add_get('/api/admin/finance/export', finance_report_handlers.export_report)
-            logger.info("✅ Wallet module loaded with Phase 0-5 (Full Features + Enhancements)")
+            # 🆕 Phase 2 & 3: 運營工具 API
+            if operations_handlers:
+                # 批量操作
+                self.app.router.add_post('/api/admin/wallet/batch/adjust', operations_handlers.batch_adjust_balance)
+                self.app.router.add_post('/api/admin/wallet/batch/freeze', operations_handlers.batch_freeze)
+                self.app.router.add_post('/api/admin/wallet/batch/unfreeze', operations_handlers.batch_unfreeze)
+                self.app.router.add_post('/api/admin/wallet/campaign/reward', operations_handlers.campaign_reward)
+                self.app.router.add_get('/api/admin/wallet/operations', operations_handlers.list_operations)
+                self.app.router.add_get('/api/admin/wallet/operations/{operation_id}', operations_handlers.get_operation_detail)
+                # 監控告警
+                self.app.router.add_get('/api/admin/wallet/alerts', operations_handlers.get_alerts)
+                self.app.router.add_get('/api/admin/wallet/alerts/summary', operations_handlers.get_alert_summary)
+                self.app.router.add_post('/api/admin/wallet/alerts/{alert_id}/acknowledge', operations_handlers.acknowledge_alert)
+                self.app.router.add_post('/api/admin/wallet/alerts/scan', operations_handlers.scan_anomalies)
+                # 統計分析
+                self.app.router.add_get('/api/admin/wallet/analytics', operations_handlers.get_wallet_analytics)
+                logger.info("✅ Operations module loaded (Phase 2 & 3)")
+            logger.info("✅ Wallet module loaded with Phase 0-5 + Operations Tools")
         
         # 保留舊的處理器作為後備（或未遷移的功能）
         self.app.router.add_post('/api/admin/logout', self.admin_panel_logout)
@@ -872,6 +900,18 @@ class HttpApiServer:
                         user_agent=device_info.get('user_agent', ''),
                         success=True
                     )
+                    
+                    # 🆕 Phase 2.1: 登錄成功後自動初始化錢包
+                    if ensure_user_wallet and user_id:
+                        try:
+                            wallet_result = await ensure_user_wallet(user_id, is_new_user=False)
+                            if wallet_result.get('wallet'):
+                                # 將錢包信息添加到返回結果中
+                                if 'data' not in result:
+                                    result['data'] = {}
+                                result['data']['wallet'] = wallet_result['wallet']
+                        except Exception as wallet_err:
+                            logger.debug(f"Wallet initialization skipped: {wallet_err}")
                 else:
                     # 登入失敗
                     audit.log_login(
@@ -1133,7 +1173,19 @@ class HttpApiServer:
             
             tokens = await auth_service.create_session(user.id, device_info)
             
-            return self._json_response({
+            # 🆕 Phase 2.1: OAuth 登錄後自動初始化錢包
+            wallet_data = None
+            is_new_user = not user  # 臨時保存
+            if ensure_user_wallet and user and user.id:
+                try:
+                    wallet_result = await ensure_user_wallet(user.id, is_new_user=is_new_user)
+                    wallet_data = wallet_result.get('wallet')
+                    if wallet_result.get('bonus_granted'):
+                        logger.info(f"New user {user.id} got welcome bonus")
+                except Exception as wallet_err:
+                    logger.debug(f"OAuth wallet initialization skipped: {wallet_err}")
+            
+            response_data = {
                 'success': True,
                 'access_token': tokens.get('access_token'),
                 'refresh_token': tokens.get('refresh_token'),
@@ -1144,8 +1196,13 @@ class HttpApiServer:
                     'avatar_url': getattr(user, 'avatar_url', None),
                     'role': getattr(user, 'role', 'free')
                 },
-                'is_new_user': not user  # 標記是否為新用戶
-            })
+                'is_new_user': is_new_user
+            }
+            
+            if wallet_data:
+                response_data['wallet'] = wallet_data
+            
+            return self._json_response(response_data)
             
         except Exception as e:
             logger.error(f"Telegram OAuth error: {e}")

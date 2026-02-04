@@ -85,6 +85,18 @@ from .finance_report_service import (
 from .finance_report_handlers import (
     setup_finance_report_routes, finance_report_handlers
 )
+from .user_wallet_integration import (
+    UserWalletIntegration, get_user_wallet_integration,
+    ensure_user_wallet, check_user_balance
+)
+from .batch_operations import (
+    BatchOperationService, get_batch_operation_service,
+    BatchOperation, BatchOperationType
+)
+from .monitoring_service import (
+    WalletMonitoringService, get_monitoring_service,
+    Alert, AlertType, AlertSeverity
+)
 
 __all__ = [
     # 枚舉
@@ -117,4 +129,11 @@ __all__ = [
     'setup_coupon_routes', 'coupon_handlers',
     'FinanceReportService', 'get_finance_report_service',
     'setup_finance_report_routes', 'finance_report_handlers',
+    # Phase 2 & 3: 用戶整合與運營工具
+    'UserWalletIntegration', 'get_user_wallet_integration',
+    'ensure_user_wallet', 'check_user_balance',
+    'BatchOperationService', 'get_batch_operation_service',
+    'BatchOperation', 'BatchOperationType',
+    'WalletMonitoringService', 'get_monitoring_service',
+    'Alert', 'AlertType', 'AlertSeverity',
 ]

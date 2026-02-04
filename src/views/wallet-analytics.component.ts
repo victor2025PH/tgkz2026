@@ -580,9 +580,9 @@ export class WalletAnalyticsComponent implements OnInit {
       const analysis = await this.walletService.getConsumeAnalysis();
       
       if (analysis?.by_date) {
-        const daily: DailyData[] = Object.entries(analysis.by_date).map(([date, amount]) => ({
-          date,
-          amount: amount as number
+        const daily: DailyData[] = analysis.by_date.map((item: any) => ({
+          date: item.date,
+          amount: item.amount
         }));
         
         // 按日期排序

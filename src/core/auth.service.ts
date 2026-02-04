@@ -38,6 +38,11 @@ export interface User {
   invite_code?: string;
   inviteCode?: string;
   invited_count?: number;
+  // 🔧 P0 修復：會員到期時間
+  subscription_expires?: string;
+  membershipExpires?: string;  // 兼容別名
+  // 🔧 P0 修復：會員等級
+  membershipLevel?: string;
 }
 
 // 認證狀態
@@ -494,6 +499,15 @@ export class AuthService implements OnDestroy {
       console.error('[AuthService] fetchCurrentUser error:', e);
       return null;
     }
+  }
+  
+  /**
+   * 🔧 P0 修復：強制刷新用戶數據
+   * 供組件在關鍵時機（如頁面可見、會員頁面進入）調用
+   */
+  async forceRefreshUser(): Promise<User | null> {
+    console.log('[AuthService] forceRefreshUser: 強制刷新用戶數據');
+    return this.fetchCurrentUser();
   }
   
   /**

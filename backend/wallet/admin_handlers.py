@@ -213,12 +213,13 @@ class AdminWalletHandlers:
     
     async def adjust_balance(self, request: web.Request) -> web.Response:
         """
-        手動調賬
+        手動調賬（使用專用管理員調賬方法）
         
         POST /api/admin/wallets/{user_id}/adjust
         {
             "amount": 1000,  // 正數加款，負數扣款
-            "reason": "系統補償"
+            "reason": "系統補償",
+            "allow_negative": false  // 可選：是否允許餘額為負
         }
         """
         try:
@@ -232,45 +233,53 @@ class AdminWalletHandlers:
             data = await request.json()
             amount = data.get('amount')
             reason = data.get('reason', '')
+            allow_negative = data.get('allow_negative', False)
             
             if amount is None or amount == 0:
                 return self._error_response("調賬金額不能為0", "INVALID_AMOUNT")
             
-            # 調賬
-            if amount > 0:
-                # 加款
-                success, message, transaction = self.wallet_service.add_balance(
-                    user_id=user_id,
-                    amount=amount,
-                    order_id=f"ADJUST_{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                    description=f"管理員調賬: {reason}",
-                    reference_id=admin_id,
-                    reference_type="admin_adjust"
-                )
-            else:
-                # 扣款
-                success, message, transaction = self.wallet_service.consume(
-                    user_id=user_id,
-                    amount=abs(amount),
-                    category="adjust",
-                    description=f"管理員調賬: {reason}",
-                    order_id=f"ADJUST_{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                    reference_id=admin_id,
-                    reference_type="admin_adjust"
-                )
+            if not reason:
+                return self._error_response("請填寫調賬原因", "MISSING_REASON")
+            
+            # 獲取操作 IP
+            ip_address = request.headers.get('X-Forwarded-For', '').split(',')[0].strip()
+            if not ip_address:
+                ip_address = request.remote or ''
+            
+            # 使用專用的管理員調賬方法（繞過狀態檢查）
+            success, message, transaction = self.wallet_service.admin_adjust_balance(
+                user_id=user_id,
+                amount=amount,
+                reason=reason,
+                admin_id=admin_id,
+                allow_negative=allow_negative,
+                ip_address=ip_address
+            )
             
             if success:
-                logger.info(
-                    f"Admin {admin_id} adjusted balance for {user_id}: "
-                    f"amount={amount}, reason={reason}"
-                )
+                # 獲取更新後的錢包信息
+                wallet = self.wallet_service.get_wallet(user_id)
                 
                 return self._success_response({
                     "transaction_id": transaction.id if transaction else None,
-                    "new_balance": self.wallet_service.get_wallet_balance(user_id)
-                }, "調賬成功")
+                    "amount": amount,
+                    "balance_before": transaction.balance_before if transaction else 0,
+                    "balance_after": transaction.balance_after if transaction else 0,
+                    "new_balance": wallet.available_balance if wallet else 0,
+                    "new_balance_display": wallet.total_display if wallet else "$0.00",
+                    "wallet_status": wallet.status if wallet else "unknown"
+                }, message)
             else:
-                return self._error_response(message, "ADJUST_FAILED")
+                # 返回具體的錯誤原因
+                error_code = "ADJUST_FAILED"
+                if "不存在" in message:
+                    error_code = "WALLET_NOT_FOUND"
+                elif "已關閉" in message:
+                    error_code = "WALLET_CLOSED"
+                elif "餘額不足" in message:
+                    error_code = "INSUFFICIENT_BALANCE"
+                
+                return self._error_response(message, error_code)
             
         except web.HTTPUnauthorized:
             raise

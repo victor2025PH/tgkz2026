@@ -3392,18 +3392,18 @@ var QuickActionsPanelComponent = class _QuickActionsPanelComponent {
 
 // src/views/dashboard-view.component.ts
 var _forTrack04 = ($index, $item) => $item.id;
-function DashboardViewComponent_Conditional_9_Template(rf, ctx) {
+function DashboardViewComponent_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 6);
+    \u0275\u0275elementStart(0, "span", 5);
     \u0275\u0275text(1, "\u{1F512}");
     \u0275\u0275elementEnd();
   }
 }
-function DashboardViewComponent_Conditional_12_Template(rf, ctx) {
+function DashboardViewComponent_Conditional_10_Template(rf, ctx) {
   if (rf & 1) {
     const _r1 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "app-smart-dashboard", 9);
-    \u0275\u0275listener("navigateTo", function DashboardViewComponent_Conditional_12_Template_app_smart_dashboard_navigateTo_0_listener($event) {
+    \u0275\u0275elementStart(0, "app-smart-dashboard", 8);
+    \u0275\u0275listener("navigateTo", function DashboardViewComponent_Conditional_10_Template_app_smart_dashboard_navigateTo_0_listener($event) {
       \u0275\u0275restoreView(_r1);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.navigateTo($event));
@@ -3411,36 +3411,36 @@ function DashboardViewComponent_Conditional_12_Template(rf, ctx) {
     \u0275\u0275elementEnd();
   }
 }
-function DashboardViewComponent_Conditional_13_Conditional_13_Template(rf, ctx) {
+function DashboardViewComponent_Conditional_11_Conditional_13_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "div", 21);
+    \u0275\u0275element(0, "div", 20);
   }
 }
-function DashboardViewComponent_Conditional_13_Conditional_22_Template(rf, ctx) {
+function DashboardViewComponent_Conditional_11_Conditional_22_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "div", 26);
+    \u0275\u0275element(0, "div", 25);
   }
 }
-function DashboardViewComponent_Conditional_13_Conditional_29_Template(rf, ctx) {
+function DashboardViewComponent_Conditional_11_Conditional_29_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "span", 28);
+    \u0275\u0275element(0, "span", 27);
   }
 }
-function DashboardViewComponent_Conditional_13_Conditional_32_Template(rf, ctx) {
+function DashboardViewComponent_Conditional_11_Conditional_32_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "div", 28);
+  }
+}
+function DashboardViewComponent_Conditional_11_Conditional_41_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "div", 29);
   }
 }
-function DashboardViewComponent_Conditional_13_Conditional_41_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275element(0, "div", 30);
-  }
-}
-function DashboardViewComponent_Conditional_13_Conditional_49_Template(rf, ctx) {
+function DashboardViewComponent_Conditional_11_Conditional_49_Template(rf, ctx) {
   if (rf & 1) {
     const _r4 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 53);
-    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_13_Conditional_49_Template_div_click_0_listener() {
+    \u0275\u0275elementStart(0, "div", 52);
+    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_11_Conditional_49_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.navigateTo("trigger-rules"));
@@ -3449,16 +3449,16 @@ function DashboardViewComponent_Conditional_13_Conditional_49_Template(rf, ctx) 
     \u0275\u0275elementEnd();
   }
 }
-function DashboardViewComponent_Conditional_13_Conditional_50_Template(rf, ctx) {
+function DashboardViewComponent_Conditional_11_Conditional_50_Template(rf, ctx) {
   if (rf & 1) {
     const _r5 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 32)(1, "div", 54)(2, "div", 13);
-    \u0275\u0275element(3, "div", 55);
-    \u0275\u0275elementStart(4, "span", 56);
+    \u0275\u0275elementStart(0, "div", 31)(1, "div", 53)(2, "div", 12);
+    \u0275\u0275element(3, "div", 54);
+    \u0275\u0275elementStart(4, "span", 55);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(6, "button", 57);
-    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_13_Conditional_50_Template_button_click_6_listener() {
+    \u0275\u0275elementStart(6, "button", 56);
+    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_11_Conditional_50_Template_button_click_6_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.cancelAndRefresh());
@@ -3469,34 +3469,34 @@ function DashboardViewComponent_Conditional_13_Conditional_50_Template(rf, ctx) 
     \u0275\u0275elementStart(9, "span");
     \u0275\u0275text(10, "\u53D6\u6D88");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(11, "div", 58);
-    \u0275\u0275element(12, "div", 59);
+    \u0275\u0275elementStart(11, "div", 57);
+    \u0275\u0275element(12, "div", 58);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(13, "div", 60)(14, "div", 61)(15, "span");
+    \u0275\u0275elementStart(13, "div", 59)(14, "div", 60)(15, "span");
     \u0275\u0275text(16);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(17, "span");
     \u0275\u0275text(18, "\u5E33\u865F");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(19, "div", 61)(20, "span");
+    \u0275\u0275elementStart(19, "div", 60)(20, "span");
     \u0275\u0275text(21);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(22, "span");
     \u0275\u0275text(23, "\u7FA4\u7D44");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(24, "div", 61)(25, "span");
+    \u0275\u0275elementStart(24, "div", 60)(25, "span");
     \u0275\u0275text(26);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(27, "span");
     \u0275\u0275text(28, "\u76E3\u63A7");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(29, "div", 61)(30, "span");
+    \u0275\u0275elementStart(29, "div", 60)(30, "span");
     \u0275\u0275text(31);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(32, "span");
     \u0275\u0275text(33, "AI");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(34, "div", 61)(35, "span");
+    \u0275\u0275elementStart(34, "div", 60)(35, "span");
     \u0275\u0275text(36);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(37, "span");
@@ -3531,16 +3531,16 @@ function DashboardViewComponent_Conditional_13_Conditional_50_Template(rf, ctx) 
     \u0275\u0275textInterpolate(ctx_r1.startProgress() >= 100 ? "\u2713" : "\u25CB");
   }
 }
-function DashboardViewComponent_Conditional_13_Conditional_52_Template(rf, ctx) {
+function DashboardViewComponent_Conditional_11_Conditional_52_Template(rf, ctx) {
   if (rf & 1) {
     const _r6 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 62);
-    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_13_Conditional_52_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 61);
+    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_11_Conditional_52_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.oneClickStart());
     });
-    \u0275\u0275elementStart(1, "span", 63);
+    \u0275\u0275elementStart(1, "span", 62);
     \u0275\u0275text(2, "\u26A1");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(3, "span");
@@ -3552,16 +3552,16 @@ function DashboardViewComponent_Conditional_13_Conditional_52_Template(rf, ctx) 
     \u0275\u0275property("disabled", ctx_r1.starting());
   }
 }
-function DashboardViewComponent_Conditional_13_Conditional_53_Template(rf, ctx) {
+function DashboardViewComponent_Conditional_11_Conditional_53_Template(rf, ctx) {
   if (rf & 1) {
     const _r7 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 64);
-    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_13_Conditional_53_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 63);
+    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_11_Conditional_53_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.oneClickStop());
     });
-    \u0275\u0275elementStart(1, "span", 63);
+    \u0275\u0275elementStart(1, "span", 62);
     \u0275\u0275text(2, "\u{1F6D1}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(3, "span");
@@ -3569,50 +3569,50 @@ function DashboardViewComponent_Conditional_13_Conditional_53_Template(rf, ctx) 
     \u0275\u0275elementEnd()();
   }
 }
-function DashboardViewComponent_Conditional_13_For_65_For_18_Conditional_3_Template(rf, ctx) {
+function DashboardViewComponent_Conditional_11_For_65_For_18_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 73);
+    \u0275\u0275elementStart(0, "span", 72);
     \u0275\u0275text(1, "\u2192");
     \u0275\u0275elementEnd();
   }
 }
-function DashboardViewComponent_Conditional_13_For_65_For_18_Template(rf, ctx) {
+function DashboardViewComponent_Conditional_11_For_65_For_18_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 71)(1, "span", 72);
+    \u0275\u0275elementStart(0, "div", 70)(1, "span", 71);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(3, DashboardViewComponent_Conditional_13_For_65_For_18_Conditional_3_Template, 2, 0, "span", 73);
+    \u0275\u0275conditionalCreate(3, DashboardViewComponent_Conditional_11_For_65_For_18_Conditional_3_Template, 2, 0, "span", 72);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
     const step_r10 = ctx.$implicit;
-    const \u0275$index_252_r11 = ctx.$index;
+    const \u0275$index_249_r11 = ctx.$index;
     const workflow_r9 = \u0275\u0275nextContext().$implicit;
     const ctx_r1 = \u0275\u0275nextContext(2);
     \u0275\u0275advance(2);
     \u0275\u0275textInterpolate2(" ", ctx_r1.getStepIcon(step_r10.type), " ", step_r10.name, " ");
     \u0275\u0275advance();
-    \u0275\u0275conditional(\u0275$index_252_r11 < workflow_r9.steps.length - 1 ? 3 : -1);
+    \u0275\u0275conditional(\u0275$index_249_r11 < workflow_r9.steps.length - 1 ? 3 : -1);
   }
 }
-function DashboardViewComponent_Conditional_13_For_65_Template(rf, ctx) {
+function DashboardViewComponent_Conditional_11_For_65_Template(rf, ctx) {
   if (rf & 1) {
     const _r8 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 41)(1, "div", 65)(2, "div", 66)(3, "span");
+    \u0275\u0275elementStart(0, "div", 40)(1, "div", 64)(2, "div", 65)(3, "span");
     \u0275\u0275text(4);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "span", 67);
+    \u0275\u0275elementStart(5, "span", 66);
     \u0275\u0275text(6);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "button", 68);
-    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_13_For_65_Template_button_click_7_listener() {
+    \u0275\u0275elementStart(7, "button", 67);
+    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_11_For_65_Template_button_click_7_listener() {
       const workflow_r9 = \u0275\u0275restoreView(_r8).$implicit;
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.automationWorkflow.toggleWorkflow(workflow_r9.id, !workflow_r9.enabled));
     });
     \u0275\u0275text(8);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(9, "div", 69)(10, "span");
+    \u0275\u0275elementStart(9, "div", 68)(10, "span");
     \u0275\u0275text(11);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(12, "span");
@@ -3621,8 +3621,8 @@ function DashboardViewComponent_Conditional_13_For_65_Template(rf, ctx) {
     \u0275\u0275elementStart(14, "span");
     \u0275\u0275text(15);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(16, "div", 70);
-    \u0275\u0275repeaterCreate(17, DashboardViewComponent_Conditional_13_For_65_For_18_Template, 4, 3, "div", 71, _forTrack04);
+    \u0275\u0275elementStart(16, "div", 69);
+    \u0275\u0275repeaterCreate(17, DashboardViewComponent_Conditional_11_For_65_For_18_Template, 4, 3, "div", 70, _forTrack04);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -3648,181 +3648,181 @@ function DashboardViewComponent_Conditional_13_For_65_Template(rf, ctx) {
     \u0275\u0275repeater(workflow_r9.steps);
   }
 }
-function DashboardViewComponent_Conditional_13_Template(rf, ctx) {
+function DashboardViewComponent_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
     const _r3 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "app-quick-actions-panel", 10);
-    \u0275\u0275listener("startMarketing", function DashboardViewComponent_Conditional_13_Template_app_quick_actions_panel_startMarketing_0_listener($event) {
+    \u0275\u0275elementStart(0, "app-quick-actions-panel", 9);
+    \u0275\u0275listener("startMarketing", function DashboardViewComponent_Conditional_11_Template_app_quick_actions_panel_startMarketing_0_listener($event) {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.handleQuickStart($event));
-    })("navigateTo", function DashboardViewComponent_Conditional_13_Template_app_quick_actions_panel_navigateTo_0_listener($event) {
+    })("navigateTo", function DashboardViewComponent_Conditional_11_Template_app_quick_actions_panel_navigateTo_0_listener($event) {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.navigateTo($event));
-    })("viewAlerts", function DashboardViewComponent_Conditional_13_Template_app_quick_actions_panel_viewAlerts_0_listener() {
+    })("viewAlerts", function DashboardViewComponent_Conditional_11_Template_app_quick_actions_panel_viewAlerts_0_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.navigateTo("monitoring"));
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(1, "div", 11)(2, "div", 12)(3, "div", 13)(4, "span", 14);
+    \u0275\u0275elementStart(1, "div", 10)(2, "div", 11)(3, "div", 12)(4, "span", 13);
     \u0275\u0275text(5, "\u{1F680}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "h3", 15);
+    \u0275\u0275elementStart(6, "h3", 14);
     \u0275\u0275text(7, "\u4E00\u9375\u904B\u884C\u4E2D\u5FC3");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(8, "button", 16);
-    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_13_Template_button_click_8_listener() {
+    \u0275\u0275elementStart(8, "button", 15);
+    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_11_Template_button_click_8_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.refreshStatus());
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(9, "svg", 17);
-    \u0275\u0275element(10, "path", 18);
+    \u0275\u0275elementStart(9, "svg", 16);
+    \u0275\u0275element(10, "path", 17);
     \u0275\u0275elementEnd()()();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(11, "div", 19)(12, "div", 20);
-    \u0275\u0275conditionalCreate(13, DashboardViewComponent_Conditional_13_Conditional_13_Template, 1, 0, "div", 21);
-    \u0275\u0275elementStart(14, "div", 22)(15, "div", 23);
+    \u0275\u0275elementStart(11, "div", 18)(12, "div", 19);
+    \u0275\u0275conditionalCreate(13, DashboardViewComponent_Conditional_11_Conditional_13_Template, 1, 0, "div", 20);
+    \u0275\u0275elementStart(14, "div", 21)(15, "div", 22);
     \u0275\u0275text(16, "\u{1F511}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "div", 24);
+    \u0275\u0275elementStart(17, "div", 23);
     \u0275\u0275text(18, "\u5E33\u865F\u5728\u7DDA");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(19, "div", 25);
+    \u0275\u0275elementStart(19, "div", 24);
     \u0275\u0275text(20);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(21, "div", 20);
-    \u0275\u0275conditionalCreate(22, DashboardViewComponent_Conditional_13_Conditional_22_Template, 1, 0, "div", 26);
-    \u0275\u0275elementStart(23, "div", 22)(24, "div", 23);
+    \u0275\u0275elementStart(21, "div", 19);
+    \u0275\u0275conditionalCreate(22, DashboardViewComponent_Conditional_11_Conditional_22_Template, 1, 0, "div", 25);
+    \u0275\u0275elementStart(23, "div", 21)(24, "div", 22);
     \u0275\u0275text(25, "\u{1F4E1}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(26, "div", 24);
+    \u0275\u0275elementStart(26, "div", 23);
     \u0275\u0275text(27, "\u76E3\u63A7\u72C0\u614B");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(28, "div", 27);
-    \u0275\u0275conditionalCreate(29, DashboardViewComponent_Conditional_13_Conditional_29_Template, 1, 0, "span", 28);
+    \u0275\u0275elementStart(28, "div", 26);
+    \u0275\u0275conditionalCreate(29, DashboardViewComponent_Conditional_11_Conditional_29_Template, 1, 0, "span", 27);
     \u0275\u0275text(30);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(31, "div", 20);
-    \u0275\u0275conditionalCreate(32, DashboardViewComponent_Conditional_13_Conditional_32_Template, 1, 0, "div", 29);
-    \u0275\u0275elementStart(33, "div", 22)(34, "div", 23);
+    \u0275\u0275elementStart(31, "div", 19);
+    \u0275\u0275conditionalCreate(32, DashboardViewComponent_Conditional_11_Conditional_32_Template, 1, 0, "div", 28);
+    \u0275\u0275elementStart(33, "div", 21)(34, "div", 22);
     \u0275\u0275text(35, "\u{1F916}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(36, "div", 24);
+    \u0275\u0275elementStart(36, "div", 23);
     \u0275\u0275text(37, "AI \u804A\u5929");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(38, "div", 25);
+    \u0275\u0275elementStart(38, "div", 24);
     \u0275\u0275text(39);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(40, "div", 20);
-    \u0275\u0275conditionalCreate(41, DashboardViewComponent_Conditional_13_Conditional_41_Template, 1, 0, "div", 30);
-    \u0275\u0275elementStart(42, "div", 22)(43, "div", 23);
+    \u0275\u0275elementStart(40, "div", 19);
+    \u0275\u0275conditionalCreate(41, DashboardViewComponent_Conditional_11_Conditional_41_Template, 1, 0, "div", 29);
+    \u0275\u0275elementStart(42, "div", 21)(43, "div", 22);
     \u0275\u0275text(44, "\u26A1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(45, "div", 24);
+    \u0275\u0275elementStart(45, "div", 23);
     \u0275\u0275text(46, "\u89F8\u767C\u898F\u5247");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(47, "div", 25);
+    \u0275\u0275elementStart(47, "div", 24);
     \u0275\u0275text(48);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(49, DashboardViewComponent_Conditional_13_Conditional_49_Template, 2, 0, "div", 31);
+    \u0275\u0275conditionalCreate(49, DashboardViewComponent_Conditional_11_Conditional_49_Template, 2, 0, "div", 30);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275conditionalCreate(50, DashboardViewComponent_Conditional_13_Conditional_50_Template, 39, 28, "div", 32);
-    \u0275\u0275elementStart(51, "div", 33);
-    \u0275\u0275conditionalCreate(52, DashboardViewComponent_Conditional_13_Conditional_52_Template, 5, 1, "button", 34)(53, DashboardViewComponent_Conditional_13_Conditional_53_Template, 5, 0, "button", 35);
+    \u0275\u0275conditionalCreate(50, DashboardViewComponent_Conditional_11_Conditional_50_Template, 39, 28, "div", 31);
+    \u0275\u0275elementStart(51, "div", 32);
+    \u0275\u0275conditionalCreate(52, DashboardViewComponent_Conditional_11_Conditional_52_Template, 5, 1, "button", 33)(53, DashboardViewComponent_Conditional_11_Conditional_53_Template, 5, 0, "button", 34);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(54, "div", 36)(55, "div", 37)(56, "div", 12)(57, "div", 13)(58, "span", 38);
+    \u0275\u0275elementStart(54, "div", 35)(55, "div", 36)(56, "div", 11)(57, "div", 12)(58, "span", 37);
     \u0275\u0275text(59, "\u{1F3AF}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(60, "h3", 39);
+    \u0275\u0275elementStart(60, "h3", 38);
     \u0275\u0275text(61, "\u5F15\u5C0E\u5F0F\u5DE5\u4F5C\u6D41");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(62, "p", 40);
+    \u0275\u0275elementStart(62, "p", 39);
     \u0275\u0275text(63, " \u95DC\u9375\u8A5E\u89F8\u767C \u2192 AI \u7B56\u5283 \u2192 \u79C1\u804A\u57F9\u80B2 \u2192 \u8208\u8DA3\u5EFA\u7FA4 \u2192 \u7D44\u7FA4\u6210\u4EA4 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275repeaterCreate(64, DashboardViewComponent_Conditional_13_For_65_Template, 19, 22, "div", 41, _forTrack04);
-    \u0275\u0275elementStart(66, "div", 42);
+    \u0275\u0275repeaterCreate(64, DashboardViewComponent_Conditional_11_For_65_Template, 19, 22, "div", 40, _forTrack04);
+    \u0275\u0275elementStart(66, "div", 41);
     \u0275\u0275text(67, " \u{1F4A1} \u555F\u7528\u5F8C\uFF0C\u7576\u76E3\u63A7\u7FA4\u7D44\u89F8\u767C\u95DC\u9375\u8A5E\u6642\uFF0C\u5C07\u81EA\u52D5\u57F7\u884C AI \u7B56\u5283\u4E26\u958B\u59CB\u591A\u89D2\u8272\u5354\u4F5C ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(68, "div", 37)(69, "div", 43)(70, "span", 38);
+    \u0275\u0275elementStart(68, "div", 36)(69, "div", 42)(70, "span", 37);
     \u0275\u0275text(71, "\u26A1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(72, "h3", 39);
+    \u0275\u0275elementStart(72, "h3", 38);
     \u0275\u0275text(73, "\u5FEB\u901F\u64CD\u4F5C");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(74, "div", 44)(75, "button", 45);
-    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_13_Template_button_click_75_listener() {
+    \u0275\u0275elementStart(74, "div", 43)(75, "button", 44);
+    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_11_Template_button_click_75_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.navigateTo("multi-role"));
     });
-    \u0275\u0275elementStart(76, "div", 46);
+    \u0275\u0275elementStart(76, "div", 45);
     \u0275\u0275text(77, "\u{1F3AD}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(78, "div", 47);
+    \u0275\u0275elementStart(78, "div", 46);
     \u0275\u0275text(79, "\u624B\u52D5\u7B56\u5283");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(80, "div", 48);
+    \u0275\u0275elementStart(80, "div", 47);
     \u0275\u0275text(81, "\u958B\u59CB AI \u591A\u89D2\u8272\u5354\u4F5C");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(82, "button", 49);
-    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_13_Template_button_click_82_listener() {
+    \u0275\u0275elementStart(82, "button", 48);
+    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_11_Template_button_click_82_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.navigateTo("monitoring-groups"));
     });
-    \u0275\u0275elementStart(83, "div", 46);
+    \u0275\u0275elementStart(83, "div", 45);
     \u0275\u0275text(84, "\u{1F465}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(85, "div", 47);
+    \u0275\u0275elementStart(85, "div", 46);
     \u0275\u0275text(86, "\u76E3\u63A7\u7FA4\u7D44");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(87, "div", 48);
+    \u0275\u0275elementStart(87, "div", 47);
     \u0275\u0275text(88, "\u914D\u7F6E\u76E3\u63A7\u4F86\u6E90");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(89, "button", 50);
-    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_13_Template_button_click_89_listener() {
+    \u0275\u0275elementStart(89, "button", 49);
+    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_11_Template_button_click_89_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.navigateTo("keyword-sets"));
     });
-    \u0275\u0275elementStart(90, "div", 46);
+    \u0275\u0275elementStart(90, "div", 45);
     \u0275\u0275text(91, "\u{1F511}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(92, "div", 47);
+    \u0275\u0275elementStart(92, "div", 46);
     \u0275\u0275text(93, "\u95DC\u9375\u8A5E\u96C6");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(94, "div", 48);
+    \u0275\u0275elementStart(94, "div", 47);
     \u0275\u0275text(95, "\u8A2D\u7F6E\u89F8\u767C\u8A5E");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(96, "button", 51);
-    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_13_Template_button_click_96_listener() {
+    \u0275\u0275elementStart(96, "button", 50);
+    \u0275\u0275listener("click", function DashboardViewComponent_Conditional_11_Template_button_click_96_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.navigateTo("leads"));
     });
-    \u0275\u0275elementStart(97, "div", 46);
+    \u0275\u0275elementStart(97, "div", 45);
     \u0275\u0275text(98, "\u{1F4CB}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(99, "div", 47);
+    \u0275\u0275elementStart(99, "div", 46);
     \u0275\u0275text(100, "\u67E5\u770B\u7DDA\u7D22");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(101, "div", 48);
+    \u0275\u0275elementStart(101, "div", 47);
     \u0275\u0275text(102, "\u7BA1\u7406\u6F5B\u5728\u5BA2\u6236");
     \u0275\u0275elementEnd()()()()();
-    \u0275\u0275elementStart(103, "app-quick-workflow", 52);
-    \u0275\u0275listener("navigateTo", function DashboardViewComponent_Conditional_13_Template_app_quick_workflow_navigateTo_103_listener($event) {
+    \u0275\u0275elementStart(103, "app-quick-workflow", 51);
+    \u0275\u0275listener("navigateTo", function DashboardViewComponent_Conditional_11_Template_app_quick_workflow_navigateTo_103_listener($event) {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.navigateTo($event));
-    })("startMonitoring", function DashboardViewComponent_Conditional_13_Template_app_quick_workflow_startMonitoring_103_listener() {
+    })("startMonitoring", function DashboardViewComponent_Conditional_11_Template_app_quick_workflow_startMonitoring_103_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.startMonitoring());
-    })("stopMonitoring", function DashboardViewComponent_Conditional_13_Template_app_quick_workflow_stopMonitoring_103_listener() {
+    })("stopMonitoring", function DashboardViewComponent_Conditional_11_Template_app_quick_workflow_stopMonitoring_103_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.stopMonitoring());
@@ -4164,42 +4164,39 @@ var DashboardViewComponent = class _DashboardViewComponent {
     };
   }
   static {
-    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _DashboardViewComponent, selectors: [["app-dashboard-view"]], decls: 14, vars: 22, consts: [[1, "page-content"], [1, "bg-green-500", "text-white", "p-4", "rounded-lg", "mb-4", "text-center", "font-bold"], [1, "flex", "items-center", "justify-between", "mb-6"], [1, "text-4xl", "font-bold", 2, "color", "var(--text-primary)"], [1, "flex", "items-center", "gap-2", "bg-slate-800/50", "rounded-xl", "p-1"], [1, "px-4", "py-2", "rounded-lg", "text-sm", "font-medium", "transition-all", "flex", "items-center", "gap-1", 3, "click", "title"], [1, "text-xs"], [1, "px-4", "py-2", "rounded-lg", "text-sm", "font-medium", "transition-all", 3, "click"], [1, "block", "-mx-8", "-mb-8", 2, "height", "calc(100vh - 140px)"], [1, "block", "-mx-8", "-mb-8", 2, "height", "calc(100vh - 140px)", 3, "navigateTo"], [1, "mb-6", 3, "startMarketing", "navigateTo", "viewAlerts"], [1, "rounded-xl", "p-6", "mb-8", 2, "background", "linear-gradient(to right, var(--primary-bg), rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1))", "border", "1px solid var(--primary)", "box-shadow", "var(--shadow-lg)"], [1, "flex", "items-center", "justify-between", "mb-4"], [1, "flex", "items-center", "gap-3"], [1, "text-3xl"], [1, "text-xl", "font-bold", 2, "color", "var(--text-primary)"], ["title", "\u5237\u65B0\u72C0\u614B", 1, "transition-colors", 2, "color", "var(--text-muted)", 3, "click"], ["fill", "none", "viewBox", "0 0 24 24", "stroke", "currentColor", 1, "h-5", "w-5"], ["stroke-linecap", "round", "stroke-linejoin", "round", "stroke-width", "2", "d", "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"], [1, "grid", "grid-cols-2", "md:grid-cols-4", "gap-4", "mb-6"], [1, "rounded-lg", "p-4", "text-center", "relative", "overflow-hidden", 2, "background-color", "var(--bg-card)"], [1, "absolute", "inset-0", "bg-gradient-to-t", "from-emerald-500/10", "to-transparent"], [1, "relative"], [1, "text-2xl", "mb-1"], [1, "text-sm", 2, "color", "var(--text-muted)"], [1, "text-xl", "font-bold"], [1, "absolute", "inset-0", "bg-gradient-to-t", "from-cyan-500/10", "to-transparent"], [1, "text-xl", "font-bold", "flex", "items-center", "justify-center", "gap-2"], [1, "w-2.5", "h-2.5", "rounded-full", "bg-emerald-400", "animate-pulse"], [1, "absolute", "inset-0", "bg-gradient-to-t", "from-purple-500/10", "to-transparent"], [1, "absolute", "inset-0", "bg-gradient-to-t", "from-orange-500/10", "to-transparent"], [1, "text-xs", "text-yellow-400", "mt-1", "cursor-pointer", "hover:underline"], [1, "bg-slate-800/50", "rounded-lg", "p-4", "mb-4", "border", "border-cyan-500/30"], [1, "flex", "gap-4"], [1, "flex-1", "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "hover:from-cyan-600", "hover:to-purple-600", "disabled:opacity-50", "disabled:cursor-not-allowed", "text-white", "font-bold", "py-3", "px-6", "rounded-lg", "transition", "duration-200", "shadow-lg", "flex", "items-center", "justify-center", "gap-2", 3, "disabled"], [1, "flex-1", "bg-gradient-to-r", "from-red-500", "to-orange-500", "hover:from-red-600", "hover:to-orange-600", "text-white", "font-bold", "py-3", "px-6", "rounded-lg", "transition", "duration-200", "shadow-lg", "flex", "items-center", "justify-center", "gap-2"], [1, "grid", "grid-cols-1", "lg:grid-cols-2", "gap-6", "mb-8"], [1, "rounded-xl", "p-6", 2, "background-color", "var(--bg-card)", "border", "1px solid var(--border-color)"], [1, "text-2xl"], [1, "text-lg", "font-bold", 2, "color", "var(--text-primary)"], [1, "text-sm", "mb-4", 2, "color", "var(--text-muted)"], [1, "p-4", "rounded-lg", "mb-3", 2, "background-color", "var(--bg-secondary)"], [1, "text-xs", "p-3", "rounded-lg", 2, "background-color", "var(--bg-tertiary)", "color", "var(--text-muted)"], [1, "flex", "items-center", "gap-3", "mb-4"], [1, "grid", "grid-cols-2", "gap-3"], [1, "p-4", "rounded-lg", "text-left", "transition-colors", "hover:bg-purple-500/10", "border", "border-transparent", "hover:border-purple-500/30", 2, "background-color", "var(--bg-secondary)", 3, "click"], [1, "text-xl", "mb-1"], [1, "font-medium", "text-sm", 2, "color", "var(--text-primary)"], [1, "text-xs", 2, "color", "var(--text-muted)"], [1, "p-4", "rounded-lg", "text-left", "transition-colors", "hover:bg-cyan-500/10", "border", "border-transparent", "hover:border-cyan-500/30", 2, "background-color", "var(--bg-secondary)", 3, "click"], [1, "p-4", "rounded-lg", "text-left", "transition-colors", "hover:bg-amber-500/10", "border", "border-transparent", "hover:border-amber-500/30", 2, "background-color", "var(--bg-secondary)", 3, "click"], [1, "p-4", "rounded-lg", "text-left", "transition-colors", "hover:bg-emerald-500/10", "border", "border-transparent", "hover:border-emerald-500/30", 2, "background-color", "var(--bg-secondary)", 3, "click"], [3, "navigateTo", "startMonitoring", "stopMonitoring", "systemStatus", "isMonitoring"], [1, "text-xs", "text-yellow-400", "mt-1", "cursor-pointer", "hover:underline", 3, "click"], [1, "flex", "items-center", "justify-between", "mb-3"], [1, "animate-spin", "h-5", "w-5", "border-2", "border-cyan-500", "border-t-transparent", "rounded-full"], [1, "text-cyan-300", "font-medium"], ["title", "\u53D6\u6D88\u4E26\u5237\u65B0\u72C0\u614B", 1, "px-3", "py-1", "text-xs", "bg-slate-700", "hover:bg-slate-600", "text-slate-300", "rounded-lg", "transition-colors", "flex", "items-center", "gap-1", 3, "click"], [1, "w-full", "bg-slate-700", "rounded-full", "h-2.5", "mb-3"], [1, "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "h-2.5", "rounded-full", "transition-all", "duration-300"], [1, "flex", "justify-between", "text-xs"], [1, "flex", "items-center", "gap-1"], [1, "flex-1", "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "hover:from-cyan-600", "hover:to-purple-600", "disabled:opacity-50", "disabled:cursor-not-allowed", "text-white", "font-bold", "py-3", "px-6", "rounded-lg", "transition", "duration-200", "shadow-lg", "flex", "items-center", "justify-center", "gap-2", 3, "click", "disabled"], [1, "text-xl"], [1, "flex-1", "bg-gradient-to-r", "from-red-500", "to-orange-500", "hover:from-red-600", "hover:to-orange-600", "text-white", "font-bold", "py-3", "px-6", "rounded-lg", "transition", "duration-200", "shadow-lg", "flex", "items-center", "justify-center", "gap-2", 3, "click"], [1, "flex", "items-center", "justify-between", "mb-2"], [1, "flex", "items-center", "gap-2"], [1, "font-medium", 2, "color", "var(--text-primary)"], [1, "px-3", "py-1", "rounded-lg", "text-sm", "font-medium", "transition-colors", 3, "click"], [1, "flex", "items-center", "gap-4", "text-xs", 2, "color", "var(--text-muted)"], [1, "flex", "items-center", "gap-1", "mt-3", "overflow-x-auto", "pb-1"], [1, "flex", "items-center"], [1, "px-2", "py-1", "text-xs", "rounded", "whitespace-nowrap", 2, "background-color", "var(--bg-tertiary)", "color", "var(--text-secondary)"], [1, "mx-1", 2, "color", "var(--text-muted)"]], template: function DashboardViewComponent_Template(rf, ctx) {
+    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _DashboardViewComponent, selectors: [["app-dashboard-view"]], decls: 12, vars: 22, consts: [[1, "page-content"], [1, "flex", "items-center", "justify-between", "mb-6"], [1, "text-4xl", "font-bold", 2, "color", "var(--text-primary)"], [1, "flex", "items-center", "gap-2", "bg-slate-800/50", "rounded-xl", "p-1"], [1, "px-4", "py-2", "rounded-lg", "text-sm", "font-medium", "transition-all", "flex", "items-center", "gap-1", 3, "click", "title"], [1, "text-xs"], [1, "px-4", "py-2", "rounded-lg", "text-sm", "font-medium", "transition-all", 3, "click"], [1, "block", "-mx-8", "-mb-8", 2, "height", "calc(100vh - 140px)"], [1, "block", "-mx-8", "-mb-8", 2, "height", "calc(100vh - 140px)", 3, "navigateTo"], [1, "mb-6", 3, "startMarketing", "navigateTo", "viewAlerts"], [1, "rounded-xl", "p-6", "mb-8", 2, "background", "linear-gradient(to right, var(--primary-bg), rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1))", "border", "1px solid var(--primary)", "box-shadow", "var(--shadow-lg)"], [1, "flex", "items-center", "justify-between", "mb-4"], [1, "flex", "items-center", "gap-3"], [1, "text-3xl"], [1, "text-xl", "font-bold", 2, "color", "var(--text-primary)"], ["title", "\u5237\u65B0\u72C0\u614B", 1, "transition-colors", 2, "color", "var(--text-muted)", 3, "click"], ["fill", "none", "viewBox", "0 0 24 24", "stroke", "currentColor", 1, "h-5", "w-5"], ["stroke-linecap", "round", "stroke-linejoin", "round", "stroke-width", "2", "d", "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"], [1, "grid", "grid-cols-2", "md:grid-cols-4", "gap-4", "mb-6"], [1, "rounded-lg", "p-4", "text-center", "relative", "overflow-hidden", 2, "background-color", "var(--bg-card)"], [1, "absolute", "inset-0", "bg-gradient-to-t", "from-emerald-500/10", "to-transparent"], [1, "relative"], [1, "text-2xl", "mb-1"], [1, "text-sm", 2, "color", "var(--text-muted)"], [1, "text-xl", "font-bold"], [1, "absolute", "inset-0", "bg-gradient-to-t", "from-cyan-500/10", "to-transparent"], [1, "text-xl", "font-bold", "flex", "items-center", "justify-center", "gap-2"], [1, "w-2.5", "h-2.5", "rounded-full", "bg-emerald-400", "animate-pulse"], [1, "absolute", "inset-0", "bg-gradient-to-t", "from-purple-500/10", "to-transparent"], [1, "absolute", "inset-0", "bg-gradient-to-t", "from-orange-500/10", "to-transparent"], [1, "text-xs", "text-yellow-400", "mt-1", "cursor-pointer", "hover:underline"], [1, "bg-slate-800/50", "rounded-lg", "p-4", "mb-4", "border", "border-cyan-500/30"], [1, "flex", "gap-4"], [1, "flex-1", "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "hover:from-cyan-600", "hover:to-purple-600", "disabled:opacity-50", "disabled:cursor-not-allowed", "text-white", "font-bold", "py-3", "px-6", "rounded-lg", "transition", "duration-200", "shadow-lg", "flex", "items-center", "justify-center", "gap-2", 3, "disabled"], [1, "flex-1", "bg-gradient-to-r", "from-red-500", "to-orange-500", "hover:from-red-600", "hover:to-orange-600", "text-white", "font-bold", "py-3", "px-6", "rounded-lg", "transition", "duration-200", "shadow-lg", "flex", "items-center", "justify-center", "gap-2"], [1, "grid", "grid-cols-1", "lg:grid-cols-2", "gap-6", "mb-8"], [1, "rounded-xl", "p-6", 2, "background-color", "var(--bg-card)", "border", "1px solid var(--border-color)"], [1, "text-2xl"], [1, "text-lg", "font-bold", 2, "color", "var(--text-primary)"], [1, "text-sm", "mb-4", 2, "color", "var(--text-muted)"], [1, "p-4", "rounded-lg", "mb-3", 2, "background-color", "var(--bg-secondary)"], [1, "text-xs", "p-3", "rounded-lg", 2, "background-color", "var(--bg-tertiary)", "color", "var(--text-muted)"], [1, "flex", "items-center", "gap-3", "mb-4"], [1, "grid", "grid-cols-2", "gap-3"], [1, "p-4", "rounded-lg", "text-left", "transition-colors", "hover:bg-purple-500/10", "border", "border-transparent", "hover:border-purple-500/30", 2, "background-color", "var(--bg-secondary)", 3, "click"], [1, "text-xl", "mb-1"], [1, "font-medium", "text-sm", 2, "color", "var(--text-primary)"], [1, "text-xs", 2, "color", "var(--text-muted)"], [1, "p-4", "rounded-lg", "text-left", "transition-colors", "hover:bg-cyan-500/10", "border", "border-transparent", "hover:border-cyan-500/30", 2, "background-color", "var(--bg-secondary)", 3, "click"], [1, "p-4", "rounded-lg", "text-left", "transition-colors", "hover:bg-amber-500/10", "border", "border-transparent", "hover:border-amber-500/30", 2, "background-color", "var(--bg-secondary)", 3, "click"], [1, "p-4", "rounded-lg", "text-left", "transition-colors", "hover:bg-emerald-500/10", "border", "border-transparent", "hover:border-emerald-500/30", 2, "background-color", "var(--bg-secondary)", 3, "click"], [3, "navigateTo", "startMonitoring", "stopMonitoring", "systemStatus", "isMonitoring"], [1, "text-xs", "text-yellow-400", "mt-1", "cursor-pointer", "hover:underline", 3, "click"], [1, "flex", "items-center", "justify-between", "mb-3"], [1, "animate-spin", "h-5", "w-5", "border-2", "border-cyan-500", "border-t-transparent", "rounded-full"], [1, "text-cyan-300", "font-medium"], ["title", "\u53D6\u6D88\u4E26\u5237\u65B0\u72C0\u614B", 1, "px-3", "py-1", "text-xs", "bg-slate-700", "hover:bg-slate-600", "text-slate-300", "rounded-lg", "transition-colors", "flex", "items-center", "gap-1", 3, "click"], [1, "w-full", "bg-slate-700", "rounded-full", "h-2.5", "mb-3"], [1, "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "h-2.5", "rounded-full", "transition-all", "duration-300"], [1, "flex", "justify-between", "text-xs"], [1, "flex", "items-center", "gap-1"], [1, "flex-1", "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "hover:from-cyan-600", "hover:to-purple-600", "disabled:opacity-50", "disabled:cursor-not-allowed", "text-white", "font-bold", "py-3", "px-6", "rounded-lg", "transition", "duration-200", "shadow-lg", "flex", "items-center", "justify-center", "gap-2", 3, "click", "disabled"], [1, "text-xl"], [1, "flex-1", "bg-gradient-to-r", "from-red-500", "to-orange-500", "hover:from-red-600", "hover:to-orange-600", "text-white", "font-bold", "py-3", "px-6", "rounded-lg", "transition", "duration-200", "shadow-lg", "flex", "items-center", "justify-center", "gap-2", 3, "click"], [1, "flex", "items-center", "justify-between", "mb-2"], [1, "flex", "items-center", "gap-2"], [1, "font-medium", 2, "color", "var(--text-primary)"], [1, "px-3", "py-1", "rounded-lg", "text-sm", "font-medium", "transition-colors", 3, "click"], [1, "flex", "items-center", "gap-4", "text-xs", 2, "color", "var(--text-muted)"], [1, "flex", "items-center", "gap-1", "mt-3", "overflow-x-auto", "pb-1"], [1, "flex", "items-center"], [1, "px-2", "py-1", "text-xs", "rounded", "whitespace-nowrap", 2, "background-color", "var(--bg-tertiary)", "color", "var(--text-secondary)"], [1, "mx-1", 2, "color", "var(--text-muted)"]], template: function DashboardViewComponent_Template(rf, ctx) {
       if (rf & 1) {
-        \u0275\u0275elementStart(0, "div", 0)(1, "div", 1);
-        \u0275\u0275text(2, " \u2705 Dashboard \u8DEF\u7531\u5DF2\u52A0\u8F09\uFF01\u5982\u679C\u60A8\u770B\u5230\u9019\u500B\uFF0C\u8AAA\u660E\u8DEF\u7531\u6B63\u5E38\u5DE5\u4F5C\u3002 ");
+        \u0275\u0275elementStart(0, "div", 0)(1, "div", 1)(2, "h2", 2);
+        \u0275\u0275text(3);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(3, "div", 2)(4, "h2", 3);
-        \u0275\u0275text(5);
-        \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(6, "div", 4)(7, "button", 5);
-        \u0275\u0275listener("click", function DashboardViewComponent_Template_button_click_7_listener() {
+        \u0275\u0275elementStart(4, "div", 3)(5, "button", 4);
+        \u0275\u0275listener("click", function DashboardViewComponent_Template_button_click_5_listener() {
           return ctx.switchMode("smart");
         });
-        \u0275\u0275text(8, " \u{1F916} \u667A\u80FD\u6A21\u5F0F ");
-        \u0275\u0275conditionalCreate(9, DashboardViewComponent_Conditional_9_Template, 2, 0, "span", 6);
+        \u0275\u0275text(6, " \u{1F916} \u667A\u80FD\u6A21\u5F0F ");
+        \u0275\u0275conditionalCreate(7, DashboardViewComponent_Conditional_7_Template, 2, 0, "span", 5);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(10, "button", 7);
-        \u0275\u0275listener("click", function DashboardViewComponent_Template_button_click_10_listener() {
+        \u0275\u0275elementStart(8, "button", 6);
+        \u0275\u0275listener("click", function DashboardViewComponent_Template_button_click_8_listener() {
           return ctx.switchMode("classic");
         });
-        \u0275\u0275text(11, " \u{1F4CA} \u7D93\u5178\u6A21\u5F0F ");
+        \u0275\u0275text(9, " \u{1F4CA} \u7D93\u5178\u6A21\u5F0F ");
         \u0275\u0275elementEnd()()();
-        \u0275\u0275conditionalCreate(12, DashboardViewComponent_Conditional_12_Template, 1, 0, "app-smart-dashboard", 8)(13, DashboardViewComponent_Conditional_13_Template, 104, 24);
+        \u0275\u0275conditionalCreate(10, DashboardViewComponent_Conditional_10_Template, 1, 0, "app-smart-dashboard", 7)(11, DashboardViewComponent_Conditional_11_Template, 104, 24);
         \u0275\u0275elementEnd();
       }
       if (rf & 2) {
-        \u0275\u0275advance(5);
+        \u0275\u0275advance(3);
         \u0275\u0275textInterpolate(ctx.t("dashboard"));
         \u0275\u0275advance(2);
         \u0275\u0275classProp("bg-gradient-to-r", ctx.mode() === "smart")("from-cyan-500", ctx.mode() === "smart")("to-blue-500", ctx.mode() === "smart")("text-white", ctx.mode() === "smart")("text-slate-400", ctx.mode() !== "smart")("opacity-60", !ctx.membershipService.hasFeature("smartMode"));
         \u0275\u0275property("title", !ctx.membershipService.hasFeature("smartMode") ? "\u9700\u8981 \u9EC3\u91D1\u5927\u5E2B \u6216\u4EE5\u4E0A\u6703\u54E1" : "");
         \u0275\u0275advance(2);
-        \u0275\u0275conditional(!ctx.membershipService.hasFeature("smartMode") ? 9 : -1);
+        \u0275\u0275conditional(!ctx.membershipService.hasFeature("smartMode") ? 7 : -1);
         \u0275\u0275advance();
         \u0275\u0275classProp("bg-slate-700", ctx.mode() === "classic")("text-white", ctx.mode() === "classic")("text-slate-400", ctx.mode() !== "classic");
         \u0275\u0275advance(2);
-        \u0275\u0275conditional(ctx.mode() === "smart" ? 12 : 13);
+        \u0275\u0275conditional(ctx.mode() === "smart" ? 10 : 11);
       }
     }, dependencies: [
       CommonModule,
@@ -4226,10 +4223,6 @@ var DashboardViewComponent = class _DashboardViewComponent {
       ],
       template: `
     <div class="page-content">
-      <!-- \u{1F50D} \u8DEF\u7531\u6E2C\u8A66\u6A19\u8A18 -->
-      <div class="bg-green-500 text-white p-4 rounded-lg mb-4 text-center font-bold">
-        \u2705 Dashboard \u8DEF\u7531\u5DF2\u52A0\u8F09\uFF01\u5982\u679C\u60A8\u770B\u5230\u9019\u500B\uFF0C\u8AAA\u660E\u8DEF\u7531\u6B63\u5E38\u5DE5\u4F5C\u3002
-      </div>
       <!-- \u5100\u8868\u677F\u6A21\u5F0F\u5207\u63DB -->
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-4xl font-bold" style="color: var(--text-primary);">{{ t('dashboard') }}</h2>
@@ -4546,10 +4539,10 @@ var DashboardViewComponent = class _DashboardViewComponent {
   }], null, null);
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(DashboardViewComponent, { className: "DashboardViewComponent", filePath: "src/views/dashboard-view.component.ts", lineNumber: 363 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(DashboardViewComponent, { className: "DashboardViewComponent", filePath: "src/views/dashboard-view.component.ts", lineNumber: 359 });
 })();
 
 export {
   DashboardViewComponent
 };
-//# sourceMappingURL=chunk-SPQ2ONI4.js.map
+//# sourceMappingURL=chunk-SGK3XT22.js.map

@@ -2813,6 +2813,94 @@ host:port"></textarea>
             </div>
         </div>
         
+        <!-- ==================== 調賬確認彈窗 ==================== -->
+        <div v-if="showAdjustModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div class="bg-gray-800 rounded-xl p-6 w-[500px] border border-gray-700">
+                <h3 class="text-xl font-bold mb-6 flex items-center">
+                    <span class="text-2xl mr-2">💵</span>
+                    餘額調賬
+                </h3>
+                
+                <div class="space-y-4">
+                    <!-- 用戶信息 -->
+                    <div class="bg-gray-700/50 rounded-lg p-4">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">目標用戶</span>
+                            <span class="font-medium">{{ adjustForm.userDisplay }}</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-gray-400">當前餘額</span>
+                            <span class="font-bold text-green-400">{{ adjustForm.currentBalance }}</span>
+                        </div>
+                        <div v-if="adjustForm.walletStatus === 'frozen'" class="mt-2 text-yellow-400 text-sm">
+                            ⚠️ 該錢包已凍結，調賬仍可進行
+                        </div>
+                    </div>
+                    
+                    <!-- 調賬金額 -->
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">調賬金額（美元）</label>
+                        <div class="flex gap-2">
+                            <button @click="adjustForm.amount = 10" class="px-3 py-2 bg-green-600/20 text-green-400 rounded-lg hover:bg-green-600/30">+$10</button>
+                            <button @click="adjustForm.amount = 50" class="px-3 py-2 bg-green-600/20 text-green-400 rounded-lg hover:bg-green-600/30">+$50</button>
+                            <button @click="adjustForm.amount = 100" class="px-3 py-2 bg-green-600/20 text-green-400 rounded-lg hover:bg-green-600/30">+$100</button>
+                            <button @click="adjustForm.amount = -10" class="px-3 py-2 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30">-$10</button>
+                            <button @click="adjustForm.amount = -50" class="px-3 py-2 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30">-$50</button>
+                        </div>
+                        <input type="number" v-model.number="adjustForm.amount" 
+                               class="w-full mt-2 bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500"
+                               placeholder="輸入金額（正數加款，負數扣款）">
+                        <p v-if="adjustForm.amount" class="mt-1 text-sm" 
+                           :class="adjustForm.amount > 0 ? 'text-green-400' : 'text-red-400'">
+                            {{ adjustForm.amount > 0 ? '加款' : '扣款' }}: ${{ Math.abs(adjustForm.amount).toFixed(2) }}
+                        </p>
+                    </div>
+                    
+                    <!-- 調賬原因 -->
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">調賬原因（必填）</label>
+                        <div class="flex gap-2 mb-2 flex-wrap">
+                            <button @click="adjustForm.reason = '系統補償'" class="px-3 py-1 bg-gray-700 rounded-lg text-sm hover:bg-gray-600">系統補償</button>
+                            <button @click="adjustForm.reason = '活動獎勵'" class="px-3 py-1 bg-gray-700 rounded-lg text-sm hover:bg-gray-600">活動獎勵</button>
+                            <button @click="adjustForm.reason = '客服處理'" class="px-3 py-1 bg-gray-700 rounded-lg text-sm hover:bg-gray-600">客服處理</button>
+                            <button @click="adjustForm.reason = '錯誤修正'" class="px-3 py-1 bg-gray-700 rounded-lg text-sm hover:bg-gray-600">錯誤修正</button>
+                            <button @click="adjustForm.reason = '退款補償'" class="px-3 py-1 bg-gray-700 rounded-lg text-sm hover:bg-gray-600">退款補償</button>
+                        </div>
+                        <input type="text" v-model="adjustForm.reason" 
+                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500"
+                               placeholder="請輸入調賬原因">
+                    </div>
+                    
+                    <!-- 預覽結果 -->
+                    <div v-if="adjustForm.amount && adjustForm.amount !== 0" class="bg-blue-900/30 border border-blue-600/30 rounded-lg p-4">
+                        <div class="text-sm text-gray-400 mb-2">調賬後餘額預覽</div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">{{ adjustForm.currentBalance }}</span>
+                            <span class="text-gray-400">→</span>
+                            <span class="text-xl font-bold" :class="getNewBalanceClass()">
+                                ${{ calculateNewBalance().toFixed(2) }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end gap-3 mt-6">
+                    <button @click="showAdjustModal = false" 
+                            class="px-6 py-2 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors">
+                        取消
+                    </button>
+                    <button @click="submitAdjustBalance" 
+                            :disabled="!adjustForm.amount || !adjustForm.reason || adjustForm.amount === 0"
+                            :class="['px-6 py-2 rounded-lg font-medium transition-colors',
+                                     adjustForm.amount && adjustForm.reason && adjustForm.amount !== 0
+                                     ? 'bg-blue-600 hover:bg-blue-700' 
+                                     : 'bg-gray-600 cursor-not-allowed']">
+                        確認調賬
+                    </button>
+                </div>
+            </div>
+        </div>
+        
         <!-- ==================== 發布公告彈窗 ==================== -->
         <div v-if="showAnnouncementModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
             <div class="bg-gray-800 rounded-xl p-6 w-[600px] border border-gray-700">

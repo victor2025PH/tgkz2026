@@ -637,6 +637,178 @@ class WalletService:
         finally:
             conn.close()
     
+    # ==================== 管理員調賬（繞過狀態檢查） ====================
+    
+    def admin_adjust_balance(
+        self,
+        user_id: str,
+        amount: int,
+        reason: str,
+        admin_id: str,
+        allow_negative: bool = False,
+        ip_address: str = ""
+    ) -> Tuple[bool, str, Optional[Transaction]]:
+        """
+        管理員調賬（繞過錢包狀態檢查）
+        
+        專用於後台管理員調整用戶餘額，支持：
+        1. 自動創建不存在的錢包
+        2. 允許對凍結狀態錢包操作
+        3. 支持正數（加款）和負數（扣款）
+        4. 完整的審計日誌
+        
+        Args:
+            user_id: 用戶ID
+            amount: 調賬金額（正數加款，負數扣款）
+            reason: 調賬原因
+            admin_id: 管理員ID
+            allow_negative: 是否允許餘額為負
+            ip_address: 操作IP
+            
+        Returns:
+            (success, message, transaction)
+        """
+        if amount == 0:
+            return False, "調賬金額不能為0", None
+        
+        # 獲取或創建錢包（確保錢包存在）
+        wallet = self.get_or_create_wallet(user_id)
+        
+        # 檢查錢包狀態（只有已關閉的錢包不能操作）
+        if wallet.status == WalletStatus.CLOSED.value:
+            return False, "錢包已關閉，無法調賬（請先重新激活錢包）", None
+        
+        # 凍結狀態給出警告但允許繼續
+        is_frozen = wallet.status == WalletStatus.FROZEN.value
+        
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('BEGIN IMMEDIATE')
+            
+            # 生成唯一訂單號
+            order_id = f"ADJ_{datetime.now().strftime('%Y%m%d%H%M%S')}_{user_id[:8]}"
+            
+            # 獲取當前錢包狀態
+            cursor.execute('''
+                SELECT * FROM user_wallets 
+                WHERE id = ?
+            ''', (wallet.id,))
+            
+            current = cursor.fetchone()
+            if not current:
+                conn.rollback()
+                return False, "錢包不存在", None
+            
+            current = dict(current)
+            balance_before = current['balance'] + current['bonus_balance']
+            
+            # 處理加款或扣款
+            if amount > 0:
+                # 加款
+                new_balance = current['balance'] + amount
+                new_bonus = current['bonus_balance']
+                new_total_recharged = current['total_recharged'] + amount
+                tx_type = TransactionType.ADJUST.value
+            else:
+                # 扣款
+                deduct_amount = abs(amount)
+                
+                # 檢查餘額是否足夠
+                if not allow_negative and balance_before < deduct_amount:
+                    conn.rollback()
+                    return False, f"餘額不足（當前 ${balance_before/100:.2f}，需扣 ${deduct_amount/100:.2f}）", None
+                
+                # 優先扣贈送餘額
+                bonus_deduct = min(current['bonus_balance'], deduct_amount)
+                main_deduct = deduct_amount - bonus_deduct
+                
+                new_balance = current['balance'] - main_deduct
+                new_bonus = current['bonus_balance'] - bonus_deduct
+                new_total_recharged = current['total_recharged']
+                tx_type = TransactionType.ADJUST.value
+            
+            new_version = current['version'] + 1
+            now = datetime.now().isoformat()
+            
+            # 更新錢包
+            cursor.execute('''
+                UPDATE user_wallets SET
+                    balance = ?,
+                    bonus_balance = ?,
+                    total_recharged = ?,
+                    version = ?,
+                    updated_at = ?
+                WHERE id = ?
+            ''', (
+                new_balance, new_bonus, new_total_recharged,
+                new_version, now, wallet.id
+            ))
+            
+            if cursor.rowcount == 0:
+                conn.rollback()
+                return False, "更新錢包失敗", None
+            
+            # 創建交易記錄
+            transaction = Transaction(
+                wallet_id=wallet.id,
+                user_id=user_id,
+                order_id=order_id,
+                type=tx_type,
+                amount=amount,
+                bonus_amount=0,
+                balance_before=balance_before,
+                balance_after=new_balance + new_bonus,
+                category="admin_adjust",
+                description=f"管理員調賬: {reason}",
+                reference_id=admin_id,
+                reference_type="admin_adjust",
+                status=TransactionStatus.SUCCESS.value,
+                ip_address=ip_address,
+                completed_at=now
+            )
+            
+            cursor.execute('''
+                INSERT INTO wallet_transactions
+                (id, wallet_id, user_id, order_id, type, amount, bonus_amount,
+                 balance_before, balance_after, category, description,
+                 reference_id, reference_type, status, ip_address,
+                 created_at, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                transaction.id, transaction.wallet_id, transaction.user_id,
+                transaction.order_id, transaction.type, transaction.amount,
+                transaction.bonus_amount, transaction.balance_before,
+                transaction.balance_after, transaction.category, transaction.description,
+                transaction.reference_id, transaction.reference_type,
+                transaction.status, transaction.ip_address,
+                transaction.created_at, transaction.completed_at
+            ))
+            
+            conn.commit()
+            
+            # 日誌記錄
+            status_note = "（錢包已凍結）" if is_frozen else ""
+            action = "加款" if amount > 0 else "扣款"
+            logger.info(
+                f"[AdminAdjust] {admin_id} {action} {user_id}: "
+                f"${abs(amount)/100:.2f}, 原因: {reason}{status_note}"
+            )
+            
+            message = f"調賬成功（{action} ${abs(amount)/100:.2f}）"
+            if is_frozen:
+                message += "（注意：該錢包處於凍結狀態）"
+            
+            return True, message, transaction
+            
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Admin adjust error: {e}")
+            return False, f"調賬失敗: {str(e)}", None
+        finally:
+            conn.close()
+    
     def refund(
         self,
         user_id: str,

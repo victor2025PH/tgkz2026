@@ -214,6 +214,15 @@ class WalletService:
             )
         ''')
         
+        # 🔧 數據庫遷移：確保 wallet_transactions 表有 bonus_amount 欄位
+        try:
+            cursor.execute("SELECT bonus_amount FROM wallet_transactions LIMIT 1")
+        except sqlite3.OperationalError:
+            # 欄位不存在，添加它
+            logger.info("Adding bonus_amount column to wallet_transactions table...")
+            cursor.execute("ALTER TABLE wallet_transactions ADD COLUMN bonus_amount INTEGER DEFAULT 0")
+            logger.info("✓ bonus_amount column added successfully")
+        
         # 創建索引
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_wallet_user ON user_wallets(user_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_trans_wallet ON wallet_transactions(wallet_id, created_at DESC)')

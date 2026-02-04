@@ -19,8 +19,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# JWT 配置
-JWT_SECRET = os.environ.get('JWT_SECRET', secrets.token_hex(32))
+# JWT 配置 - 使用統一的默認密鑰確保所有模塊一致
+JWT_SECRET = os.environ.get('JWT_SECRET', 'tgmatrix-jwt-secret-2026')
 JWT_ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_MINUTES = 60  # 1 小時
 REFRESH_TOKEN_EXPIRE_DAYS = 30    # 30 天

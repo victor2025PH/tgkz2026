@@ -21,7 +21,7 @@ import {
 } from "./chunk-ZZLJQCGC.js";
 import {
   WalletViewComponent
-} from "./chunk-LZVGK4P7.js";
+} from "./chunk-SQEPL4K5.js";
 import {
   WalletService
 } from "./chunk-2RAHAZHZ.js";
@@ -73306,7 +73306,7 @@ var routes = [
   // 🆕 Phase 0: 錢包系統
   {
     path: "wallet",
-    loadComponent: () => import("./chunk-3PGBHSQF.js").then((m) => m.WalletViewComponent),
+    loadComponent: () => import("./chunk-TOFOMMYJ.js").then((m) => m.WalletViewComponent),
     title: "\u6211\u7684\u9322\u5305",
     canActivate: [authGuard]
   },

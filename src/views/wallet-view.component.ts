@@ -11,6 +11,7 @@
 
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { 
   WalletService, 
@@ -19,11 +20,12 @@ import {
   ConsumeAnalysis,
   MonthlySummary 
 } from '../services/wallet.service';
+import { ApiService } from '../core/api.service';
 
 @Component({
   selector: 'app-wallet-view',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="wallet-view">
       <!-- 頂部導航 -->
@@ -178,6 +180,58 @@ import {
         <div class="loading-spinner"></div>
         <span>加載中...</span>
       </div>
+
+      <!-- 兌換碼彈窗 -->
+      @if (showRedeemModal()) {
+        <div class="modal-overlay" (click)="closeRedeemModal()">
+          <div class="modal-content redeem-modal" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h3>🎁 兌換碼</h3>
+              <button class="close-btn" (click)="closeRedeemModal()">✕</button>
+            </div>
+            <div class="modal-body">
+              <p class="modal-desc">輸入兌換碼以獲得餘額或優惠</p>
+              <div class="input-group">
+                <input 
+                  type="text" 
+                  class="redeem-input"
+                  [(ngModel)]="redeemCode"
+                  placeholder="請輸入兌換碼"
+                  [disabled]="isRedeeming()"
+                  (keyup.enter)="submitRedeemCode()"
+                  maxlength="32"
+                />
+              </div>
+              @if (redeemError()) {
+                <div class="error-message">{{ redeemError() }}</div>
+              }
+              @if (redeemSuccess()) {
+                <div class="success-message">{{ redeemSuccess() }}</div>
+              }
+            </div>
+            <div class="modal-footer">
+              <button 
+                class="cancel-btn" 
+                (click)="closeRedeemModal()"
+                [disabled]="isRedeeming()"
+              >
+                取消
+              </button>
+              <button 
+                class="submit-btn" 
+                (click)="submitRedeemCode()"
+                [disabled]="!redeemCode.trim() || isRedeeming()"
+              >
+                @if (isRedeeming()) {
+                  <span class="btn-spinner"></span> 兌換中...
+                } @else {
+                  確認兌換
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -250,6 +304,7 @@ import {
       position: absolute;
       inset: 0;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      pointer-events: none; /* 讓點擊事件穿透到下層按鈕 */
     }
 
     .balance-content {
@@ -322,20 +377,57 @@ import {
     .recharge-btn {
       background: #fff;
       color: #764ba2;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .recharge-btn:hover {
+      background: #f8f8ff;
+      box-shadow: 0 6px 16px rgba(102, 126, 234, 0.3);
+    }
+
+    .recharge-btn:active {
+      transform: scale(0.98);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
 
     .withdraw-btn {
       background: rgba(255, 255, 255, 0.2);
       color: #fff;
+      backdrop-filter: blur(4px);
+    }
+
+    .withdraw-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .withdraw-btn:active {
+      transform: scale(0.98);
+      background: rgba(255, 255, 255, 0.25);
     }
 
     .redeem-btn {
       background: rgba(255, 255, 255, 0.2);
       color: #fff;
+      backdrop-filter: blur(4px);
+    }
+
+    .redeem-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .redeem-btn:active {
+      transform: scale(0.98);
+      background: rgba(255, 255, 255, 0.25);
     }
 
     .balance-actions button:hover {
       transform: translateY(-2px);
+    }
+
+    .balance-actions button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
     }
 
     /* 區塊通用樣式 */
@@ -582,6 +674,188 @@ import {
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    /* 兌換碼彈窗樣式 */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .modal-content {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-radius: 20px;
+      width: 90%;
+      max-width: 400px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .modal-header h3 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .close-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    .modal-body {
+      padding: 24px;
+    }
+
+    .modal-desc {
+      color: #94a3b8;
+      font-size: 14px;
+      margin: 0 0 16px 0;
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+    }
+
+    .redeem-input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      font-size: 16px;
+      text-align: center;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    .redeem-input:focus {
+      outline: none;
+      border-color: #667eea;
+      background: rgba(102, 126, 234, 0.1);
+    }
+
+    .redeem-input:disabled {
+      opacity: 0.5;
+    }
+
+    .redeem-input::placeholder {
+      color: #64748b;
+      letter-spacing: normal;
+      text-transform: none;
+    }
+
+    .error-message {
+      padding: 12px 16px;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 10px;
+      color: #fca5a5;
+      font-size: 14px;
+      margin-top: 12px;
+    }
+
+    .success-message {
+      padding: 12px 16px;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      border-radius: 10px;
+      color: #86efac;
+      font-size: 14px;
+      margin-top: 12px;
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 12px;
+      padding: 20px 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .modal-footer button {
+      flex: 1;
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+    }
+
+    .cancel-btn {
+      background: rgba(255, 255, 255, 0.1);
+      color: #94a3b8;
+    }
+
+    .cancel-btn:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    .submit-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .submit-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
   `]
 })
 export class WalletViewComponent implements OnInit {
@@ -591,6 +865,13 @@ export class WalletViewComponent implements OnInit {
   monthlySummary = signal<MonthlySummary[]>([]);
   loading = signal(false);
   
+  // 兌換碼狀態
+  showRedeemModal = signal(false);
+  redeemCode = '';
+  isRedeeming = signal(false);
+  redeemError = signal('');
+  redeemSuccess = signal('');
+  
   balanceDisplay = computed(() => {
     const w = this.wallet();
     if (!w) return '0.00';
@@ -599,7 +880,8 @@ export class WalletViewComponent implements OnInit {
   
   constructor(
     private walletService: WalletService,
-    private router: Router
+    private router: Router,
+    private apiService: ApiService
   ) {}
   
   ngOnInit() {
@@ -642,8 +924,70 @@ export class WalletViewComponent implements OnInit {
   }
   
   showRedeemCode() {
-    // TODO: 實現兌換碼彈窗
-    alert('兌換碼功能即將上線');
+    this.redeemCode = '';
+    this.redeemError.set('');
+    this.redeemSuccess.set('');
+    this.showRedeemModal.set(true);
+  }
+  
+  closeRedeemModal() {
+    if (this.isRedeeming()) return; // 兌換中不允許關閉
+    this.showRedeemModal.set(false);
+    this.redeemCode = '';
+    this.redeemError.set('');
+    this.redeemSuccess.set('');
+  }
+  
+  async submitRedeemCode() {
+    const code = this.redeemCode.trim().toUpperCase();
+    if (!code) {
+      this.redeemError.set('請輸入兌換碼');
+      return;
+    }
+    
+    this.isRedeeming.set(true);
+    this.redeemError.set('');
+    this.redeemSuccess.set('');
+    
+    try {
+      const response = await this.apiService.post<any>('/api/wallet/redeem', { code });
+      
+      if (response.success) {
+        const amount = response.data?.amount || 0;
+        const bonusAmount = response.data?.bonus_amount || 0;
+        const totalAmount = amount + bonusAmount;
+        
+        this.redeemSuccess.set(
+          `🎉 兌換成功！獲得 $${(totalAmount / 100).toFixed(2)}` +
+          (bonusAmount > 0 ? ` (含贈送 $${(bonusAmount / 100).toFixed(2)})` : '')
+        );
+        
+        // 重新載入錢包數據
+        await this.loadData();
+        
+        // 2秒後自動關閉彈窗
+        setTimeout(() => {
+          this.closeRedeemModal();
+        }, 2000);
+      } else {
+        // 根據錯誤碼顯示友好提示
+        const errorMessages: Record<string, string> = {
+          'CODE_NOT_FOUND': '兌換碼不存在',
+          'CODE_USED': '此兌換碼已被使用',
+          'CODE_EXPIRED': '此兌換碼已過期',
+          'CODE_DISABLED': '此兌換碼已被禁用',
+          'ALREADY_REDEEMED': '您已使用過此兌換碼',
+          'LIMIT_EXCEEDED': '超出兌換次數限制'
+        };
+        const errorCode = (response as any).code || '';
+        this.redeemError.set(errorMessages[errorCode] || response.error || '兌換失敗，請稍後再試');
+      }
+    } catch (error: any) {
+      console.error('Redeem code error:', error);
+      this.redeemError.set('網絡錯誤，請稍後再試');
+    } finally {
+      this.isRedeeming.set(false);
+    }
   }
   
   showTransactions() {

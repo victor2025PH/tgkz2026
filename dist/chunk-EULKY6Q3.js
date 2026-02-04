@@ -3,6 +3,8 @@ import {
 } from "./chunk-HOUP2MV6.js";
 import {
   Injectable,
+  __spreadProps,
+  __spreadValues,
   computed,
   setClassMetadata,
   signal,
@@ -24,19 +26,67 @@ var WalletService = class _WalletService {
     this.statistics = this._statistics.asReadonly();
     this._loading = signal(false, ...ngDevMode ? [{ debugName: "_loading" }] : []);
     this.loading = this._loading.asReadonly();
+    this._lastUpdated = signal(null, ...ngDevMode ? [{ debugName: "_lastUpdated" }] : []);
+    this.lastUpdated = this._lastUpdated.asReadonly();
+    this.STALE_TIME = 3e4;
+    this.AUTO_REFRESH_INTERVAL = 6e4;
+    this.autoRefreshTimer = null;
     this.balance = computed(() => this._wallet()?.available_balance ?? 0, ...ngDevMode ? [{ debugName: "balance" }] : []);
     this.balanceDisplay = computed(() => this._wallet()?.total_display ?? "$0.00", ...ngDevMode ? [{ debugName: "balanceDisplay" }] : []);
     this.hasBalance = computed(() => this.balance() > 0, ...ngDevMode ? [{ debugName: "hasBalance" }] : []);
+    this.isStale = computed(() => {
+      const lastUpdate = this._lastUpdated();
+      if (!lastUpdate)
+        return true;
+      return Date.now() - lastUpdate.getTime() > this.STALE_TIME;
+    }, ...ngDevMode ? [{ debugName: "isStale" }] : []);
+    this.isFrozen = computed(() => this._wallet()?.status === "frozen", ...ngDevMode ? [{ debugName: "isFrozen" }] : []);
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && this.isStale()) {
+          this.loadWallet();
+        }
+      });
+    }
+  }
+  // P2: 啟動自動刷新
+  startAutoRefresh() {
+    if (this.autoRefreshTimer)
+      return;
+    this.autoRefreshTimer = setInterval(() => {
+      if (!document.hidden) {
+        this.loadWallet();
+      }
+    }, this.AUTO_REFRESH_INTERVAL);
+  }
+  // P2: 停止自動刷新
+  stopAutoRefresh() {
+    if (this.autoRefreshTimer) {
+      clearInterval(this.autoRefreshTimer);
+      this.autoRefreshTimer = null;
+    }
+  }
+  // P2: 強制刷新
+  async forceRefresh() {
+    return this.loadWallet(true);
   }
   /**
    * 獲取錢包信息
+   * @param forceRefresh 強制刷新，忽略緩存
    */
-  async loadWallet() {
+  async loadWallet(forceRefresh = false) {
+    if (!forceRefresh && !this.isStale() && this._wallet()) {
+      return this._wallet();
+    }
     this._loading.set(true);
     try {
-      const response = await this.api.get("/api/wallet");
+      const response = await this.api.get("/api/wallet", {
+        cache: false
+        // 確保獲取最新數據
+      });
       if (response?.success && response?.data) {
         this._wallet.set(response.data);
+        this._lastUpdated.set(/* @__PURE__ */ new Date());
         return response.data;
       }
       return null;
@@ -46,6 +96,33 @@ var WalletService = class _WalletService {
     } finally {
       this._loading.set(false);
     }
+  }
+  /**
+   * P2: 樂觀更新餘額（用於兌換碼等操作後的即時反饋）
+   * @param amountChange 餘額變化量（分）
+   * @param bonusChange 贈送餘額變化量（分）
+   */
+  optimisticUpdateBalance(amountChange, bonusChange = 0) {
+    const current = this._wallet();
+    if (!current)
+      return;
+    const updated = __spreadProps(__spreadValues({}, current), {
+      balance: current.balance + amountChange,
+      bonus_balance: current.bonus_balance + bonusChange,
+      available_balance: current.available_balance + amountChange + bonusChange,
+      balance_display: `$${((current.balance + amountChange) / 100).toFixed(2)}`,
+      bonus_display: `$${((current.bonus_balance + bonusChange) / 100).toFixed(2)}`,
+      total_display: `$${((current.available_balance + amountChange + bonusChange) / 100).toFixed(2)}`,
+      total_recharged: current.total_recharged + (amountChange > 0 ? amountChange : 0)
+    });
+    this._wallet.set(updated);
+    this._lastUpdated.set(/* @__PURE__ */ new Date());
+  }
+  /**
+   * P2: 標記數據為過期，下次訪問時強制刷新
+   */
+  invalidateCache() {
+    this._lastUpdated.set(null);
   }
   /**
    * 獲取餘額
@@ -607,4 +684,4 @@ var WalletService = class _WalletService {
 export {
   WalletService
 };
-//# sourceMappingURL=chunk-2RAHAZHZ.js.map
+//# sourceMappingURL=chunk-EULKY6Q3.js.map

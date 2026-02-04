@@ -21,10 +21,10 @@ import {
 } from "./chunk-ZZLJQCGC.js";
 import {
   WalletViewComponent
-} from "./chunk-SQEPL4K5.js";
+} from "./chunk-FJFTEVR5.js";
 import {
   WalletService
-} from "./chunk-2RAHAZHZ.js";
+} from "./chunk-EULKY6Q3.js";
 import {
   AuthEventsService,
   AuthService
@@ -73306,39 +73306,39 @@ var routes = [
   // 🆕 Phase 0: 錢包系統
   {
     path: "wallet",
-    loadComponent: () => import("./chunk-TOFOMMYJ.js").then((m) => m.WalletViewComponent),
+    loadComponent: () => import("./chunk-MQBW64OL.js").then((m) => m.WalletViewComponent),
     title: "\u6211\u7684\u9322\u5305",
     canActivate: [authGuard]
   },
   {
     path: "wallet/transactions",
-    loadComponent: () => import("./chunk-AEHAXNJ2.js").then((m) => m.WalletTransactionsComponent),
+    loadComponent: () => import("./chunk-HS6ZQUDV.js").then((m) => m.WalletTransactionsComponent),
     title: "\u4EA4\u6613\u8A18\u9304",
     canActivate: [authGuard]
   },
   {
     path: "wallet/recharge",
-    loadComponent: () => import("./chunk-CGAGAHOF.js").then((m) => m.WalletRechargeComponent),
+    loadComponent: () => import("./chunk-XHVPHUVH.js").then((m) => m.WalletRechargeComponent),
     title: "\u5145\u503C\u4E2D\u5FC3",
     canActivate: [authGuard]
   },
   // 🆕 Phase 3: 錢包高級功能
   {
     path: "wallet/orders",
-    loadComponent: () => import("./chunk-6KFBTQIS.js").then((m) => m.WalletOrdersComponent),
+    loadComponent: () => import("./chunk-UIUXT5GK.js").then((m) => m.WalletOrdersComponent),
     title: "\u5145\u503C\u8A02\u55AE",
     canActivate: [authGuard]
   },
   {
     path: "wallet/analytics",
-    loadComponent: () => import("./chunk-XSVIHDNO.js").then((m) => m.WalletAnalyticsComponent),
+    loadComponent: () => import("./chunk-WT5NPJNS.js").then((m) => m.WalletAnalyticsComponent),
     title: "\u6D88\u8CBB\u5206\u6790",
     canActivate: [authGuard]
   },
   // 🆕 Phase 4: 提現功能
   {
     path: "wallet/withdraw",
-    loadComponent: () => import("./chunk-K6HEGIKH.js").then((m) => m.WalletWithdrawComponent),
+    loadComponent: () => import("./chunk-C5XUP5QL.js").then((m) => m.WalletWithdrawComponent),
     title: "\u63D0\u73FE",
     canActivate: [authGuard]
   },

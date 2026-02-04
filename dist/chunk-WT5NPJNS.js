@@ -1,6 +1,6 @@
 import {
   WalletService
-} from "./chunk-2RAHAZHZ.js";
+} from "./chunk-EULKY6Q3.js";
 import "./chunk-HOUP2MV6.js";
 import {
   Router
@@ -622,4 +622,4 @@ var WalletAnalyticsComponent = class _WalletAnalyticsComponent {
 export {
   WalletAnalyticsComponent
 };
-//# sourceMappingURL=chunk-XSVIHDNO.js.map
+//# sourceMappingURL=chunk-WT5NPJNS.js.map

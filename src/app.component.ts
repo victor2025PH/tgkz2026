@@ -6166,13 +6166,22 @@ export class AppComponent implements OnDestroy, OnInit {
     // Request initial state from the backend once the app is ready
     this.ipcService.send('get-initial-state');
     
-    // 🆕 刷新用戶數據以確保會員等級同步
+    // 🆕 刷新用戶數據以確保會員等級和顯示名稱同步
     if (this.isAuthenticated()) {
-      this.authService.fetchCurrentUser().then(user => {
-        if (user) {
-          console.log('[App] User data refreshed, membership:', this.authService.membershipLevel());
-        }
-      }).catch(err => console.warn('[App] Failed to refresh user data:', err));
+      // 延遲執行以確保其他組件初始化完成
+      setTimeout(() => {
+        this.authService.fetchCurrentUser().then(user => {
+          if (user) {
+            console.log('[App] User data refreshed:', {
+              displayName: (user as any).displayName || (user as any).display_name,
+              telegramId: (user as any).telegramId || (user as any).telegram_id,
+              membership: this.authService.membershipLevel()
+            });
+            // 強制變更檢測
+            this.cdr.detectChanges();
+          }
+        }).catch(err => console.warn('[App] Failed to refresh user data:', err));
+      }, 500);
     }
     
     // Refresh queue status periodically (every 60 seconds to reduce load)

@@ -50,6 +50,11 @@ class User:
     auth_provider: AuthProvider = AuthProvider.LOCAL
     oauth_id: str = ""
     
+    # 🆕 Telegram 信息
+    telegram_id: str = ""
+    telegram_username: str = ""
+    telegram_first_name: str = ""
+    
     # 角色和權限
     role: UserRole = UserRole.FREE
     permissions: List[str] = field(default_factory=list)
@@ -93,6 +98,9 @@ class User:
             'two_factor_enabled': self.two_factor_enabled,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login_at': self.last_login_at.isoformat() if self.last_login_at else None,
+            # 🆕 Telegram 信息
+            'telegram_id': self.telegram_id,
+            'telegram_username': self.telegram_username,
         }
         
         if include_sensitive:

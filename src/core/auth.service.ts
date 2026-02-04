@@ -20,6 +20,7 @@ export interface User {
   email: string;
   username: string;
   display_name: string;
+  displayName?: string;  // 🆕 兼容別名
   avatar_url: string;
   role: string;
   subscription_tier: string;
@@ -29,6 +30,10 @@ export interface User {
   two_factor_enabled: boolean;
   created_at: string;
   last_login_at: string;
+  // 🆕 Telegram 相關字段
+  telegram_id?: string;
+  telegramId?: string;  // 🆕 兼容別名
+  telegram_username?: string;
   // 🆕 邀請相關字段
   invite_code?: string;
   inviteCode?: string;

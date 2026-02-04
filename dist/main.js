@@ -1,6 +1,6 @@
 import {
   authGuard
-} from "./chunk-NBA6WUCF.js";
+} from "./chunk-UE6ET2M5.js";
 import {
   WalletOrdersComponent
 } from "./chunk-MEWYCPNB.js";
@@ -10,7 +10,7 @@ import {
 import {
   AuthEventsService,
   AuthService
-} from "./chunk-SW4QBT65.js";
+} from "./chunk-EY2QFFJA.js";
 import {
   AiCenterViewComponent
 } from "./chunk-AIZRAQX3.js";
@@ -42689,6 +42689,7 @@ function ProfileComponent_Conditional_33_Template(rf, ctx) {
 var ProfileComponent = class _ProfileComponent {
   constructor() {
     this.authService = inject(AuthService2);
+    this.authEvents = inject(AuthEventsService);
     this.deviceService = inject(DeviceService);
     this.i18n = inject(I18nService);
     this.toast = inject(ToastService);
@@ -42754,6 +42755,7 @@ var ProfileComponent = class _ProfileComponent {
   async ensureUserLoaded() {
     if (this.user()?.username) {
       console.log("[Profile] User already loaded:", this.user()?.username);
+      this.authEvents.emitUserUpdate(this.user());
       return;
     }
     this.isLoadingUser.set(true);
@@ -42763,6 +42765,7 @@ var ProfileComponent = class _ProfileComponent {
       const user = await this.authService.fetchCurrentUser();
       if (user) {
         console.log("[Profile] User loaded successfully:", user.username);
+        this.authEvents.emitUserUpdate(user);
       } else {
         console.warn("[Profile] No user returned from API");
         this.userLoadError.set("\u7121\u6CD5\u7372\u53D6\u7528\u6236\u4FE1\u606F");
@@ -43636,7 +43639,7 @@ var ProfileComponent = class _ProfileComponent {
   }], null, null);
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(ProfileComponent, { className: "ProfileComponent", filePath: "src/profile.component.ts", lineNumber: 1275 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(ProfileComponent, { className: "ProfileComponent", filePath: "src/profile.component.ts", lineNumber: 1276 });
 })();
 
 // src/manual-mode/resource-center.component.ts
@@ -73812,7 +73815,7 @@ var routes = [
   // 認證路由（公開）
   {
     path: "auth",
-    loadChildren: () => import("./chunk-4BSZFPUL.js").then((m) => m.AUTH_ROUTES)
+    loadChildren: () => import("./chunk-RJSAITN2.js").then((m) => m.AUTH_ROUTES)
   },
   // 簡化路由
   {
@@ -73852,21 +73855,21 @@ var routes = [
   // 用戶設置頁面
   {
     path: "user-settings",
-    loadComponent: () => import("./chunk-K5FXM5K4.js").then((m) => m.UserSettingsViewComponent),
+    loadComponent: () => import("./chunk-4K7EPQLZ.js").then((m) => m.UserSettingsViewComponent),
     title: "\u7528\u6236\u8A2D\u7F6E",
     canActivate: [authGuard]
   },
   // 訂閱升級頁面
   {
     path: "upgrade",
-    loadComponent: () => import("./chunk-4J3DUVC5.js").then((m) => m.UpgradeViewComponent),
+    loadComponent: () => import("./chunk-NGY4UN6V.js").then((m) => m.UpgradeViewComponent),
     title: "\u5347\u7D1A\u65B9\u6848",
     canActivate: [authGuard]
   },
   // 配額管理儀表板
   {
     path: "quota",
-    loadComponent: () => import("./chunk-AP64V2TF.js").then((m) => m.QuotaDashboardViewComponent),
+    loadComponent: () => import("./chunk-ZZ5TJKBM.js").then((m) => m.QuotaDashboardViewComponent),
     title: "\u914D\u984D\u7BA1\u7406",
     canActivate: [authGuard]
   },

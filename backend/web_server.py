@@ -70,6 +70,15 @@ async def main():
         
         logger.info(f"✅ HTTP API Server running on port {port}")
         
+        # 🆕 Phase 2: 啟動錢包調度器（USDT 監聽 + 訂單過期處理）
+        try:
+            from wallet.scheduler import get_scheduler
+            wallet_scheduler = get_scheduler()
+            await wallet_scheduler.start()
+            logger.info("✅ Wallet scheduler started (USDT watcher + order expiry)")
+        except Exception as e:
+            logger.warning(f"⚠️ Wallet scheduler start failed: {e}")
+        
         # 保持運行
         while True:
             await asyncio.sleep(3600)

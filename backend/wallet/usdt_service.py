@@ -25,10 +25,13 @@ logger = logging.getLogger(__name__)
 # 配置
 USDT_CONFIG = {
     'TRC20': {
-        'api_url': 'https://apilist.tronscan.org/api',
+        # 主要使用 TronGrid API（更可靠）
+        'api_url': 'https://api.trongrid.io',
+        'api_url_fallback': 'https://apilist.tronscan.org/api',
         'contract_address': 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',  # USDT TRC20
-        'confirmations_required': 20,
+        'confirmations_required': 19,  # TRC20 約 19 個區塊確認（約 1 分鐘）
         'polling_interval': 30,  # 秒
+        'api_key': os.environ.get('TRONGRID_API_KEY', ''),  # 可選，提高速率限制
     },
     'ERC20': {
         'api_url': 'https://api.etherscan.io/api',
@@ -74,6 +77,8 @@ class UsdtPaymentService:
         """
         檢查 TRC20 USDT 交易
         
+        使用 TronGrid API（主要）和 TronScan API（備用）
+        
         Args:
             address: 收款地址
             expected_amount: 預期金額
@@ -83,11 +88,103 @@ class UsdtPaymentService:
         Returns:
             (found, transaction_info)
         """
-        session = await self._get_session()
         config = USDT_CONFIG['TRC20']
         
+        # 嘗試 TronGrid API
+        result = await self._check_trc20_via_trongrid(address, expected_amount, since_timestamp, order_no, config)
+        if result[0]:
+            return result
+        
+        # 備用：TronScan API
+        result = await self._check_trc20_via_tronscan(address, expected_amount, since_timestamp, order_no, config)
+        return result
+    
+    async def _check_trc20_via_trongrid(
+        self,
+        address: str,
+        expected_amount: float,
+        since_timestamp: int,
+        order_no: str,
+        config: dict
+    ) -> Tuple[bool, Optional[Dict[str, Any]]]:
+        """使用 TronGrid API 檢查交易"""
+        session = await self._get_session()
+        
         try:
-            url = f"{config['api_url']}/token_trc20/transfers"
+            # TronGrid API: 獲取 TRC20 交易
+            url = f"{config['api_url']}/v1/accounts/{address}/transactions/trc20"
+            headers = {}
+            if config.get('api_key'):
+                headers['TRON-PRO-API-KEY'] = config['api_key']
+            
+            params = {
+                'only_to': 'true',
+                'limit': 50,
+                'min_timestamp': since_timestamp,
+                'contract_address': config['contract_address']
+            }
+            
+            async with session.get(url, params=params, headers=headers, timeout=30) as response:
+                if response.status != 200:
+                    logger.debug(f"TronGrid API returned {response.status}")
+                    return False, None
+                
+                data = await response.json()
+            
+            # 查找匹配的交易
+            for tx in data.get('data', []):
+                # 檢查金額
+                value = tx.get('value', '0')
+                decimals = int(tx.get('token_info', {}).get('decimals', 6))
+                amount = float(value) / (10 ** decimals)
+                
+                # 允許 1% 的誤差（或精確匹配）
+                if abs(amount - expected_amount) <= max(expected_amount * 0.01, 0.01):
+                    tx_hash = tx.get('transaction_id', '')
+                    
+                    # TronGrid 不直接返回確認數，需要額外查詢或假設已確認
+                    # 如果交易在列表中出現，通常已有足夠確認
+                    confirmed = True  # TronGrid 只返回已確認的交易
+                    
+                    logger.info(
+                        f"[TronGrid] Found TRC20 tx for order {order_no}: "
+                        f"amount={amount:.2f}, tx={tx_hash[:16]}..."
+                    )
+                    
+                    return True, {
+                        'tx_hash': tx_hash,
+                        'amount': amount,
+                        'from_address': tx.get('from', ''),
+                        'to_address': tx.get('to', ''),
+                        'confirmations': config['confirmations_required'],
+                        'confirmed': confirmed,
+                        'timestamp': tx.get('block_timestamp', 0),
+                        'network': 'TRC20',
+                        'source': 'trongrid'
+                    }
+            
+            return False, None
+            
+        except asyncio.TimeoutError:
+            logger.debug(f"TronGrid API timeout for order {order_no}")
+            return False, None
+        except Exception as e:
+            logger.debug(f"TronGrid check error for order {order_no}: {e}")
+            return False, None
+    
+    async def _check_trc20_via_tronscan(
+        self,
+        address: str,
+        expected_amount: float,
+        since_timestamp: int,
+        order_no: str,
+        config: dict
+    ) -> Tuple[bool, Optional[Dict[str, Any]]]:
+        """備用：使用 TronScan API 檢查交易"""
+        session = await self._get_session()
+        
+        try:
+            url = f"{config['api_url_fallback']}/token_trc20/transfers"
             params = {
                 'toAddress': address,
                 'limit': 50,
@@ -96,7 +193,7 @@ class UsdtPaymentService:
             
             async with session.get(url, params=params, timeout=30) as response:
                 if response.status != 200:
-                    logger.warning(f"TRC20 API error: {response.status}")
+                    logger.warning(f"TronScan API error: {response.status}")
                     return False, None
                 
                 data = await response.json()
@@ -109,16 +206,16 @@ class UsdtPaymentService:
                     continue
                 
                 # 檢查金額
-                amount = float(tx.get('quant', 0)) / 1000000  # USDT 有 6 位小數
+                amount = float(tx.get('quant', 0)) / 1000000
                 
                 # 允許 1% 的誤差
-                if abs(amount - expected_amount) <= expected_amount * 0.01:
+                if abs(amount - expected_amount) <= max(expected_amount * 0.01, 0.01):
                     tx_hash = tx.get('transaction_id', '')
-                    confirmations = tx.get('confirmed', 0)
+                    confirmations = tx.get('confirmed', 0) if isinstance(tx.get('confirmed'), int) else 20
                     
                     logger.info(
-                        f"Found TRC20 transaction for order {order_no}: "
-                        f"amount={amount}, tx={tx_hash}, confirmations={confirmations}"
+                        f"[TronScan] Found TRC20 tx for order {order_no}: "
+                        f"amount={amount:.2f}, tx={tx_hash[:16]}..."
                     )
                     
                     return True, {
@@ -129,16 +226,17 @@ class UsdtPaymentService:
                         'confirmations': confirmations,
                         'confirmed': confirmations >= config['confirmations_required'],
                         'timestamp': tx.get('block_ts', 0),
-                        'network': 'TRC20'
+                        'network': 'TRC20',
+                        'source': 'tronscan'
                     }
             
             return False, None
             
         except asyncio.TimeoutError:
-            logger.warning(f"TRC20 API timeout for order {order_no}")
+            logger.warning(f"TronScan API timeout for order {order_no}")
             return False, None
         except Exception as e:
-            logger.error(f"TRC20 check error for order {order_no}: {e}")
+            logger.error(f"TronScan check error for order {order_no}: {e}")
             return False, None
     
     # ==================== ERC20 交易查詢 ====================

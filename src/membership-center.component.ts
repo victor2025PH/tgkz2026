@@ -58,25 +58,6 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
         </div>
       </div>
       
-      <!-- 錢包餘額卡片 -->
-      <div class="wallet-card" (click)="goToWallet()">
-        <div class="wallet-left">
-          <div class="wallet-icon">💰</div>
-          <div class="wallet-info">
-            <div class="wallet-label">賬戶餘額</div>
-            <div class="wallet-amount">{{ walletBalanceDisplay() }}</div>
-          </div>
-        </div>
-        <div class="wallet-right">
-          <div class="wallet-bonus" *ngIf="walletBonusDisplay() !== '$0.00'">
-            贈送: {{ walletBonusDisplay() }}
-          </div>
-          <button class="wallet-recharge-btn" (click)="goToRecharge(); $event.stopPropagation()">
-            💳 充值
-          </button>
-        </div>
-      </div>
-      
       <!-- 快速統計 -->
       <div class="quick-stats">
         <div class="stat-card">

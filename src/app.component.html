@@ -372,7 +372,7 @@
                      [class.avatar-diamond]="userMembershipLevel() === 'diamond'"
                      [class.avatar-star]="userMembershipLevel() === 'star'"
                      [class.avatar-king]="userMembershipLevel() === 'king'">
-                  {{ currentUser()?.username?.charAt(0).toUpperCase() || '?' }}
+                  {{ (currentUser()?.displayName || currentUser()?.username)?.charAt(0).toUpperCase() || '?' }}
                 </div>
               </div>
               <!-- 會員徽章（右下角） -->
@@ -397,7 +397,7 @@
             <!-- 用戶信息 -->
             <div class="flex-1 min-w-0">
               <div class="text-sm font-semibold truncate" style="color: var(--text-primary);">
-                {{ currentUser()?.username || '用戶' }}
+                {{ currentUser()?.displayName || currentUser()?.username || '用戶' }}
               </div>
               <div class="flex items-center gap-1.5 mt-0.5">
                 <!-- 會員標籤（王者榮耀風格） -->

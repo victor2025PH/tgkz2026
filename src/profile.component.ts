@@ -42,10 +42,10 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
       <div class="profile-header">
         <div class="avatar-section">
           <div class="avatar">
-            {{ user()?.username?.charAt(0).toUpperCase() || user()?.display_name?.charAt(0).toUpperCase() || '?' }}
+            {{ (user()?.displayName || user()?.username)?.charAt(0).toUpperCase() || '?' }}
           </div>
           <div class="user-info">
-            <h2 class="username">{{ user()?.display_name || user()?.username || (isLoadingUser() ? '載入中...' : '未登入') }}</h2>
+            <h2 class="username">{{ user()?.displayName || user()?.username || (isLoadingUser() ? '載入中...' : '未登入') }}</h2>
             <p class="email">{{ user()?.email || '未設置郵箱' }}</p>
             <div class="membership-badge" [class]="'level-' + membershipLevel()">
               {{ getMembershipIcon() }} {{ getMembershipName() }}

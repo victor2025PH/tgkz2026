@@ -1,6 +1,6 @@
 import {
   WalletService
-} from "./chunk-EULKY6Q3.js";
+} from "./chunk-SHLIDGEQ.js";
 import {
   Router
 } from "./chunk-T45T4QAG.js";
@@ -564,4 +564,4 @@ var WalletTransactionsComponent = class _WalletTransactionsComponent {
 export {
   WalletTransactionsComponent
 };
-//# sourceMappingURL=chunk-XNTA42SR.js.map
+//# sourceMappingURL=chunk-UIVMVHZW.js.map

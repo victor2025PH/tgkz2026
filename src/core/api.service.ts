@@ -419,6 +419,13 @@ export class ApiService {
       });
       
       if (!response.ok) {
+        // 處理 401 未授權錯誤 - 清除認證並重定向到登錄頁
+        if (response.status === 401) {
+          console.warn('[ApiService] 401 Unauthorized - clearing auth and redirecting');
+          this.handleUnauthorized();
+          return { success: false, error: '登錄已過期，請重新登錄' };
+        }
+        
         const errorData = await response.json().catch(() => ({}));
         return { 
           success: false, 
@@ -438,6 +445,29 @@ export class ApiService {
       console.error(`[ApiService] GET ${endpoint} error:`, error);
       return { success: false, error: error.message || 'Network error' };
     }
+  }
+  
+  /**
+   * 處理 401 未授權錯誤
+   */
+  private handleUnauthorized() {
+    // 清除認證存儲
+    localStorage.removeItem('tgm_access_token');
+    localStorage.removeItem('tgm_refresh_token');
+    localStorage.removeItem('tgm_user');
+    
+    // 發送登出事件
+    window.dispatchEvent(new CustomEvent('auth:logout'));
+    
+    // 跳轉到登錄頁
+    window.dispatchEvent(new CustomEvent('changeView', { detail: 'login' }));
+    
+    // 也嘗試使用 location（作為備用）
+    setTimeout(() => {
+      if (window.location.pathname !== '/auth/login') {
+        window.location.href = '/auth/login';
+      }
+    }, 100);
   }
   
   /**
@@ -463,6 +493,13 @@ export class ApiService {
       });
       
       if (!response.ok) {
+        // 處理 401 未授權錯誤 - 清除認證並重定向到登錄頁
+        if (response.status === 401) {
+          console.warn('[ApiService] 401 Unauthorized on POST - clearing auth and redirecting');
+          this.handleUnauthorized();
+          return { success: false, error: '登錄已過期，請重新登錄' };
+        }
+        
         const errorData = await response.json().catch(() => ({}));
         return { 
           success: false, 

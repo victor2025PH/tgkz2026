@@ -307,6 +307,11 @@ var ApiService = class _ApiService {
         headers
       });
       if (!response.ok) {
+        if (response.status === 401) {
+          console.warn("[ApiService] 401 Unauthorized - clearing auth and redirecting");
+          this.handleUnauthorized();
+          return { success: false, error: "\u767B\u9304\u5DF2\u904E\u671F\uFF0C\u8ACB\u91CD\u65B0\u767B\u9304" };
+        }
         const errorData = await response.json().catch(() => ({}));
         return {
           success: false,
@@ -322,6 +327,21 @@ var ApiService = class _ApiService {
       console.error(`[ApiService] GET ${endpoint} error:`, error);
       return { success: false, error: error.message || "Network error" };
     }
+  }
+  /**
+   * 處理 401 未授權錯誤
+   */
+  handleUnauthorized() {
+    localStorage.removeItem("tgm_access_token");
+    localStorage.removeItem("tgm_refresh_token");
+    localStorage.removeItem("tgm_user");
+    window.dispatchEvent(new CustomEvent("auth:logout"));
+    window.dispatchEvent(new CustomEvent("changeView", { detail: "login" }));
+    setTimeout(() => {
+      if (window.location.pathname !== "/auth/login") {
+        window.location.href = "/auth/login";
+      }
+    }, 100);
   }
   /**
    * HTTP POST 請求
@@ -343,6 +363,11 @@ var ApiService = class _ApiService {
         body: JSON.stringify(body)
       });
       if (!response.ok) {
+        if (response.status === 401) {
+          console.warn("[ApiService] 401 Unauthorized on POST - clearing auth and redirecting");
+          this.handleUnauthorized();
+          return { success: false, error: "\u767B\u9304\u5DF2\u904E\u671F\uFF0C\u8ACB\u91CD\u65B0\u767B\u9304" };
+        }
         const errorData = await response.json().catch(() => ({}));
         return {
           success: false,
@@ -430,4 +455,4 @@ var ApiService = class _ApiService {
 export {
   ApiService
 };
-//# sourceMappingURL=chunk-HOUP2MV6.js.map
+//# sourceMappingURL=chunk-ZLNZFOTQ.js.map

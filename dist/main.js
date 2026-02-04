@@ -34,7 +34,7 @@ import {
 } from "./chunk-2CNBI7M4.js";
 import {
   WalletRechargeComponent
-} from "./chunk-6LB5UYME.js";
+} from "./chunk-HRMAMD72.js";
 import {
   WalletWithdrawComponent
 } from "./chunk-4S5TZOBC.js";
@@ -73371,7 +73371,7 @@ var routes = [
   // 🆕 Phase 0: 錢包系統 - 具體路由必須在通用路由之前
   {
     path: "wallet/recharge",
-    loadComponent: () => import("./chunk-YZEEJE7L.js").then((m) => m.WalletRechargeComponent),
+    loadComponent: () => import("./chunk-VTF2FX55.js").then((m) => m.WalletRechargeComponent),
     title: "\u5145\u503C\u4E2D\u5FC3",
     canActivate: [authGuard]
   },

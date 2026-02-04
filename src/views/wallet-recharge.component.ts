@@ -178,9 +178,14 @@ type PaymentMethod = 'usdt_trc20' | 'alipay' | 'wechat' | 'bank';
             <div class="usdt-info">
               <p>請轉賬 <strong>{{ usdtAmount() }} USDT</strong> 到以下地址：</p>
               
-              <div class="qr-placeholder">
-                <!-- TODO: 添加二維碼 -->
-                <span>掃碼支付</span>
+              <div class="qr-code-container">
+                @if (qrCodeUrl()) {
+                  <img [src]="qrCodeUrl()" alt="USDT Address QR Code" class="qr-code-img" />
+                } @else {
+                  <div class="qr-loading">
+                    <span>生成中...</span>
+                  </div>
+                }
               </div>
               
               <div class="address-box">
@@ -556,12 +561,27 @@ type PaymentMethod = 'usdt_trc20' | 'alipay' | 'wechat' | 'bank';
       margin-bottom: 16px;
     }
 
-    .qr-placeholder {
+    .qr-code-container {
       width: 180px;
       height: 180px;
       margin: 0 auto 20px;
       background: #fff;
       border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    
+    .qr-code-img {
+      width: 160px;
+      height: 160px;
+      object-fit: contain;
+    }
+    
+    .qr-loading {
+      color: #666;
+      font-size: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -723,6 +743,18 @@ export class WalletRechargeComponent implements OnInit {
   
   usdtNetwork = computed(() => {
     return this.paymentInfo()?.usdt_network || 'TRC20';
+  });
+  
+  // QR 碼 URL（使用 QR Server API 生成）
+  qrCodeUrl = computed(() => {
+    const address = this.usdtAddress();
+    if (!address || address === 'TYourTRC20WalletAddressHere') {
+      return '';
+    }
+    // 使用 QR Server API 生成 QR 碼
+    // 格式：tron 協議 URI 或純地址
+    const data = encodeURIComponent(address);
+    return `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${data}&bgcolor=ffffff&color=000000&margin=10`;
   });
   
   canProceed = computed(() => {

@@ -260,6 +260,15 @@ class AdminWalletHandlers:
                 # 獲取更新後的錢包信息
                 wallet = self.wallet_service.get_wallet(user_id)
                 
+                # 處理 wallet.status（可能是枚舉或字符串）
+                wallet_status = "unknown"
+                if wallet:
+                    status = wallet.status
+                    if hasattr(status, 'value'):
+                        wallet_status = status.value  # 枚舉類型
+                    else:
+                        wallet_status = str(status)   # 字符串類型
+                
                 return self._success_response({
                     "transaction_id": transaction.id if transaction else None,
                     "amount": amount,
@@ -267,7 +276,7 @@ class AdminWalletHandlers:
                     "balance_after": transaction.balance_after if transaction else 0,
                     "new_balance": wallet.available_balance if wallet else 0,
                     "new_balance_display": wallet.total_display if wallet else "$0.00",
-                    "wallet_status": wallet.status if wallet else "unknown"
+                    "wallet_status": wallet_status
                 }, message)
             else:
                 # 返回具體的錯誤原因

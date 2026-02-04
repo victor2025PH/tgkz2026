@@ -422,6 +422,16 @@
     "inviteFriends": "Invite Friends",
     "earnRewards": "Earn Rewards"
   },
+  "membershipLevels": {
+    "bronze": "Bronze Warrior",
+    "silver": "Silver Elite",
+    "gold": "Gold Master",
+    "diamond": "Diamond Ace",
+    "star": "Star Legend",
+    "king": "Glory King",
+    "permanent": "Permanent",
+    "daysLeft": "{{days}} days left"
+  },
   "payment": {
     "title": "Payment",
     "selectPlan": "Select Plan",

@@ -40838,6 +40838,7 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
   constructor() {
     this.authService = inject(AuthService2);
     this.membershipService = inject(MembershipService);
+    this.i18n = inject(I18nService);
     this.toast = inject(ToastService);
     this.licenseClient = inject(LicenseClientService);
     this.cdr = inject(ChangeDetectorRef);
@@ -40931,15 +40932,8 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
     return icons[this.membershipLevel()] || "\u2694\uFE0F";
   }
   getMembershipName() {
-    const names = {
-      bronze: "\u9752\u9285\u6230\u58EB",
-      silver: "\u767D\u9280\u7CBE\u82F1",
-      gold: "\u9EC3\u91D1\u5927\u5E2B",
-      diamond: "\u947D\u77F3\u738B\u724C",
-      star: "\u661F\u8000\u50B3\u8AAA",
-      king: "\u69AE\u8000\u738B\u8005"
-    };
-    return names[this.membershipLevel()] || "\u9752\u9285\u6230\u58EB";
+    const level = this.membershipLevel();
+    return this.i18n.t(`membershipLevels.${level}`) || this.i18n.t("membershipLevels.bronze");
   }
   formatDate(dateString) {
     if (!dateString)
@@ -42479,15 +42473,8 @@ var ProfileComponent = class _ProfileComponent {
     return icons[this.membershipLevel()] || "\u2694\uFE0F";
   }
   getMembershipName() {
-    const names = {
-      bronze: "\u9752\u9285\u6230\u58EB",
-      silver: "\u767D\u9280\u7CBE\u82F1",
-      gold: "\u9EC3\u91D1\u5927\u5E2B",
-      diamond: "\u947D\u77F3\u738B\u724C",
-      star: "\u661F\u8000\u50B3\u8AAA",
-      king: "\u69AE\u8000\u738B\u8005"
-    };
-    return names[this.membershipLevel()] || "\u9752\u9285\u6230\u58EB";
+    const level = this.membershipLevel();
+    return this.i18n.t(`membershipLevels.${level}`) || this.i18n.t("membershipLevels.bronze");
   }
   getMaxDevices() {
     const limits = {
@@ -56627,8 +56614,13 @@ function AppComponent_Conditional_15_Case_40_Template(rf, ctx) {
     \u0275\u0275text(2, "\u{1F948}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(3, "span", 157);
-    \u0275\u0275text(4, "\u767D\u9280\u7CBE\u82F1");
+    \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
+  }
+  if (rf & 2) {
+    const ctx_r0 = \u0275\u0275nextContext(2);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("membershipLevels.silver"));
   }
 }
 function AppComponent_Conditional_15_Case_41_Template(rf, ctx) {
@@ -56637,8 +56629,13 @@ function AppComponent_Conditional_15_Case_41_Template(rf, ctx) {
     \u0275\u0275text(2, "\u{1F947}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(3, "span", 157);
-    \u0275\u0275text(4, "\u9EC3\u91D1\u5927\u5E2B");
+    \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
+  }
+  if (rf & 2) {
+    const ctx_r0 = \u0275\u0275nextContext(2);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("membershipLevels.gold"));
   }
 }
 function AppComponent_Conditional_15_Case_42_Template(rf, ctx) {
@@ -56647,8 +56644,13 @@ function AppComponent_Conditional_15_Case_42_Template(rf, ctx) {
     \u0275\u0275text(2, "\u{1F48E}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(3, "span", 157);
-    \u0275\u0275text(4, "\u947D\u77F3\u738B\u724C");
+    \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
+  }
+  if (rf & 2) {
+    const ctx_r0 = \u0275\u0275nextContext(2);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("membershipLevels.diamond"));
   }
 }
 function AppComponent_Conditional_15_Case_43_Template(rf, ctx) {
@@ -56657,8 +56659,13 @@ function AppComponent_Conditional_15_Case_43_Template(rf, ctx) {
     \u0275\u0275text(2, "\u{1F31F}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(3, "span", 157);
-    \u0275\u0275text(4, "\u661F\u8000\u50B3\u8AAA");
+    \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
+  }
+  if (rf & 2) {
+    const ctx_r0 = \u0275\u0275nextContext(2);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("membershipLevels.star"));
   }
 }
 function AppComponent_Conditional_15_Case_44_Template(rf, ctx) {
@@ -56667,8 +56674,13 @@ function AppComponent_Conditional_15_Case_44_Template(rf, ctx) {
     \u0275\u0275text(2, "\u{1F451}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(3, "span", 157);
-    \u0275\u0275text(4, "\u69AE\u8000\u738B\u8005");
+    \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
+  }
+  if (rf & 2) {
+    const ctx_r0 = \u0275\u0275nextContext(2);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("membershipLevels.king"));
   }
 }
 function AppComponent_Conditional_15_Case_45_Template(rf, ctx) {
@@ -56677,8 +56689,13 @@ function AppComponent_Conditional_15_Case_45_Template(rf, ctx) {
     \u0275\u0275text(2, "\u2694\uFE0F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(3, "span", 157);
-    \u0275\u0275text(4, "\u9752\u9285\u6230\u58EB");
+    \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
+  }
+  if (rf & 2) {
+    const ctx_r0 = \u0275\u0275nextContext(2);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("membershipLevels.bronze"));
   }
 }
 function AppComponent_Conditional_15_Conditional_76_Template(rf, ctx) {
@@ -59389,7 +59406,7 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275text(38);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(39, "div", 72);
-    \u0275\u0275conditionalCreate(40, AppComponent_Conditional_15_Case_40_Template, 5, 0, "span", 73)(41, AppComponent_Conditional_15_Case_41_Template, 5, 0, "span", 74)(42, AppComponent_Conditional_15_Case_42_Template, 5, 0, "span", 75)(43, AppComponent_Conditional_15_Case_43_Template, 5, 0, "span", 76)(44, AppComponent_Conditional_15_Case_44_Template, 5, 0, "span", 77)(45, AppComponent_Conditional_15_Case_45_Template, 5, 0, "span", 78);
+    \u0275\u0275conditionalCreate(40, AppComponent_Conditional_15_Case_40_Template, 5, 1, "span", 73)(41, AppComponent_Conditional_15_Case_41_Template, 5, 1, "span", 74)(42, AppComponent_Conditional_15_Case_42_Template, 5, 1, "span", 75)(43, AppComponent_Conditional_15_Case_43_Template, 5, 1, "span", 76)(44, AppComponent_Conditional_15_Case_44_Template, 5, 1, "span", 77)(45, AppComponent_Conditional_15_Case_45_Template, 5, 1, "span", 78);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(46, "div", 79);
     \u0275\u0275namespaceSVG();
@@ -71487,37 +71504,37 @@ ${details}`, 12e3);
                   @case ('silver') {
                     <span class="vip-tag vip-tag-silver">
                       <span class="vip-icon">\u{1F948}</span>
-                      <span class="vip-text">\u767D\u9280\u7CBE\u82F1</span>
+                      <span class="vip-text">{{ t('membershipLevels.silver') }}</span>
                     </span>
                   }
                   @case ('gold') {
                     <span class="vip-tag vip-tag-gold">
                       <span class="vip-icon">\u{1F947}</span>
-                      <span class="vip-text">\u9EC3\u91D1\u5927\u5E2B</span>
+                      <span class="vip-text">{{ t('membershipLevels.gold') }}</span>
                     </span>
                   }
                   @case ('diamond') {
                     <span class="vip-tag vip-tag-diamond">
                       <span class="vip-icon">\u{1F48E}</span>
-                      <span class="vip-text">\u947D\u77F3\u738B\u724C</span>
+                      <span class="vip-text">{{ t('membershipLevels.diamond') }}</span>
                     </span>
                   }
                   @case ('star') {
                     <span class="vip-tag vip-tag-star">
                       <span class="vip-icon">\u{1F31F}</span>
-                      <span class="vip-text">\u661F\u8000\u50B3\u8AAA</span>
+                      <span class="vip-text">{{ t('membershipLevels.star') }}</span>
                     </span>
                   }
                   @case ('king') {
                     <span class="vip-tag vip-tag-king">
                       <span class="vip-icon">\u{1F451}</span>
-                      <span class="vip-text">\u69AE\u8000\u738B\u8005</span>
+                      <span class="vip-text">{{ t('membershipLevels.king') }}</span>
                     </span>
                   }
                   @default {
                     <span class="vip-tag vip-tag-bronze">
                       <span class="vip-icon">\u2694\uFE0F</span>
-                      <span class="vip-text">\u9752\u9285\u6230\u58EB</span>
+                      <span class="vip-text">{{ t('membershipLevels.bronze') }}</span>
                     </span>
                   }
                 }

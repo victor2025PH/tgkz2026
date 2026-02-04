@@ -422,6 +422,16 @@
     "inviteFriends": "邀請好友",
     "earnRewards": "賺取獎勵"
   },
+  "membershipLevels": {
+    "bronze": "青銅戰士",
+    "silver": "白銀精英",
+    "gold": "黃金大師",
+    "diamond": "鑽石王牌",
+    "star": "星耀傳說",
+    "king": "榮耀王者",
+    "permanent": "永久",
+    "daysLeft": "剩餘 {{days}} 天"
+  },
   "payment": {
     "title": "付款",
     "selectPlan": "選擇方案",

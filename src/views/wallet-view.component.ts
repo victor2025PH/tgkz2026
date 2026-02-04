@@ -1124,7 +1124,8 @@ export class WalletViewComponent implements OnInit, OnDestroy {
   }
   
   goBack() {
-    this.router.navigate(['/']);
+    // 使用全局事件返回儀表板
+    window.dispatchEvent(new CustomEvent('changeView', { detail: 'dashboard' }));
   }
   
   goToRecharge() {
@@ -1134,11 +1135,9 @@ export class WalletViewComponent implements OnInit, OnDestroy {
       this.globalError.set('錢包已凍結，無法進行充值操作');
       return;
     }
-    console.log('[Wallet] Navigating to /wallet/recharge');
-    this.router.navigate(['/wallet/recharge']).then(
-      (success) => console.log('[Wallet] Navigation result:', success),
-      (error) => console.error('[Wallet] Navigation error:', error)
-    );
+    // 使用全局事件切換視圖（適配 app.component 的 @switch 模式）
+    console.log('[Wallet] Dispatching changeView event to wallet-recharge');
+    window.dispatchEvent(new CustomEvent('changeView', { detail: 'wallet-recharge' }));
   }
   
   goToWithdraw() {
@@ -1148,11 +1147,9 @@ export class WalletViewComponent implements OnInit, OnDestroy {
       this.globalError.set('錢包已凍結，無法進行提現操作');
       return;
     }
-    console.log('[Wallet] Navigating to /wallet/withdraw');
-    this.router.navigate(['/wallet/withdraw']).then(
-      (success) => console.log('[Wallet] Navigation result:', success),
-      (error) => console.error('[Wallet] Navigation error:', error)
-    );
+    // 使用全局事件切換視圖（適配 app.component 的 @switch 模式）
+    console.log('[Wallet] Dispatching changeView event to wallet-withdraw');
+    window.dispatchEvent(new CustomEvent('changeView', { detail: 'wallet-withdraw' }));
   }
   
   // P2: 重試連接

@@ -15,6 +15,7 @@ import { AuthEventsService, AUTH_STORAGE_KEYS } from './core/auth-events.service
 export interface User {
   id: number;
   username: string;
+  displayName?: string;  // 用戶暱稱/顯示名稱
   email?: string;
   phone?: string;
   avatar?: string;
@@ -216,7 +217,8 @@ export class AuthService implements OnDestroy {
           // 🔧 轉換用戶對象格式（新版 API 返回的格式可能不同）
           const user: User = {
             id: rawUser.id || 0,
-            username: rawUser.username || rawUser.display_name || 'User',
+            username: rawUser.username || 'User',
+            displayName: rawUser.display_name || rawUser.displayName || rawUser.nickname || undefined,
             email: rawUser.email || undefined,
             phone: rawUser.phone || undefined,
             avatar: rawUser.avatar_url || rawUser.avatar || undefined,
@@ -289,7 +291,8 @@ export class AuthService implements OnDestroy {
         const rawUser = result.data;
         const user: User = {
           id: rawUser.id || 0,
-          username: rawUser.username || rawUser.display_name || 'User',
+          username: rawUser.username || 'User',
+          displayName: rawUser.display_name || rawUser.displayName || rawUser.nickname || undefined,
           email: rawUser.email || undefined,
           phone: rawUser.phone || undefined,
           avatar: rawUser.avatar_url || rawUser.avatar || undefined,
@@ -802,7 +805,8 @@ export class AuthService implements OnDestroy {
         // 標準化用戶數據格式
         const user: User = {
           id: storedUser.id || 0,
-          username: storedUser.username || storedUser.display_name || 'User',
+          username: storedUser.username || 'User',
+          displayName: storedUser.display_name || storedUser.displayName || storedUser.nickname || undefined,
           email: storedUser.email || undefined,
           phone: storedUser.phone || undefined,
           avatar: storedUser.avatar_url || storedUser.avatar || undefined,

@@ -97,6 +97,12 @@ from .monitoring_service import (
     WalletMonitoringService, get_monitoring_service,
     Alert, AlertType, AlertSeverity
 )
+from .payment_address_service import (
+    PaymentAddressService, get_payment_address_service
+)
+from .payment_config_handlers import (
+    setup_payment_config_routes, payment_config_handlers
+)
 
 __all__ = [
     # 枚舉
@@ -136,4 +142,7 @@ __all__ = [
     'BatchOperation', 'BatchOperationType',
     'WalletMonitoringService', 'get_monitoring_service',
     'Alert', 'AlertType', 'AlertSeverity',
+    # Phase 1.1: 支付地址管理
+    'PaymentAddressService', 'get_payment_address_service',
+    'setup_payment_config_routes', 'payment_config_handlers',
 ]

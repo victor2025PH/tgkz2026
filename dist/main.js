@@ -50,7 +50,7 @@ import {
 } from "./chunk-SDTPNQBR.js";
 import {
   DashboardViewComponent
-} from "./chunk-SPQ2ONI4.js";
+} from "./chunk-SGK3XT22.js";
 import {
   MarketingAnalyticsService
 } from "./chunk-UNP75L76.js";
@@ -73317,7 +73317,7 @@ var routes = [
   // 核心功能 - SaaS 模式需要登入
   {
     path: "dashboard",
-    loadComponent: () => import("./chunk-O5KIONO7.js").then((m) => m.DashboardViewComponent),
+    loadComponent: () => import("./chunk-E3MS3FXS.js").then((m) => m.DashboardViewComponent),
     title: "\u5100\u8868\u677F",
     canActivate: [authGuard]
   },

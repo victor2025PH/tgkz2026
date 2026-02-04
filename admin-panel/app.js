@@ -1699,34 +1699,89 @@ createApp({
         
         // ============ 錢包操作 ============
         
+        // 調賬彈窗狀態
+        const showAdjustModal = ref(false);
+        const adjustForm = ref({
+            userId: '',
+            userDisplay: '',
+            currentBalance: '$0.00',
+            currentBalanceNum: 0,
+            walletStatus: 'active',
+            amount: 0,
+            reason: ''
+        });
+        
+        // 打開調賬彈窗
         const adjustUserBalance = async (detail) => {
             const userId = detail.userId || detail.user?.userId || detail.user?.id;
-            const amount = prompt('請輸入調賬金額（正數為加款，負數為扣款，單位：美元）：');
-            if (amount === null) return;
+            const wallet = detail.wallet || {};
             
-            const amountNum = parseFloat(amount);
-            if (isNaN(amountNum) || amountNum === 0) {
+            // 設置表單數據
+            adjustForm.value = {
+                userId: userId,
+                userDisplay: detail.user?.email || detail.email || userId,
+                currentBalance: wallet.total_display || `$${((wallet.balance || 0) + (wallet.bonus_balance || 0)) / 100}`,
+                currentBalanceNum: ((wallet.balance || 0) + (wallet.bonus_balance || 0)) / 100,
+                walletStatus: wallet.status || 'active',
+                amount: 0,
+                reason: ''
+            };
+            
+            showAdjustModal.value = true;
+        };
+        
+        // 計算新餘額
+        const calculateNewBalance = () => {
+            return adjustForm.value.currentBalanceNum + (adjustForm.value.amount || 0);
+        };
+        
+        // 獲取新餘額樣式
+        const getNewBalanceClass = () => {
+            const newBal = calculateNewBalance();
+            if (newBal < 0) return 'text-red-400';
+            if (adjustForm.value.amount > 0) return 'text-green-400';
+            return 'text-yellow-400';
+        };
+        
+        // 提交調賬
+        const submitAdjustBalance = async () => {
+            const { userId, amount, reason } = adjustForm.value;
+            
+            if (!amount || amount === 0) {
                 showToast('請輸入有效的金額', 'error');
                 return;
             }
             
-            const reason = prompt('請輸入調賬原因：');
             if (!reason) {
                 showToast('請輸入調賬原因', 'error');
                 return;
             }
             
+            isLoading.value = true;
+            
             const result = await apiRequest(`/admin/wallets/${userId}/adjust`, {
                 method: 'POST',
                 body: JSON.stringify({
-                    amount: Math.round(amountNum * 100), // 轉換為分
+                    amount: Math.round(amount * 100), // 轉換為分
                     reason: reason
                 })
             });
             
+            isLoading.value = false;
+            
             if (result.success) {
-                showToast(`調賬成功: ${amountNum > 0 ? '+' : ''}$${amountNum.toFixed(2)}`, 'success');
-                await viewUser(detail.user || detail);
+                const data = result.data || result;
+                showToast(result.message || `調賬成功: ${amount > 0 ? '+' : ''}$${Math.abs(amount).toFixed(2)}`, 'success');
+                showAdjustModal.value = false;
+                
+                // 更新用戶詳情
+                if (userDetail.value && userDetail.value.userId === userId) {
+                    // 刷新用戶詳情
+                    const userResult = await apiRequest(`/admin/users/${userId}`);
+                    if (userResult.success) {
+                        userDetail.value = userResult.data;
+                    }
+                }
             } else {
                 showToast('調賬失敗: ' + (result.error || result.message), 'error');
             }
@@ -2526,6 +2581,11 @@ createApp({
             
             // 錢包操作
             adjustUserBalance,
+            showAdjustModal,
+            adjustForm,
+            calculateNewBalance,
+            getNewBalanceClass,
+            submitAdjustBalance,
             freezeUserWallet,
             unfreezeUserWallet,
             

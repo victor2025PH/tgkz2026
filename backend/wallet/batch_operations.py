@@ -118,38 +118,14 @@ class BatchOperationService:
         
         for user_id in user_ids:
             try:
-                if amount > 0:
-                    # 加款
-                    if is_bonus:
-                        success, msg, tx = self.wallet_service.add_balance(
-                            user_id=user_id,
-                            amount=0,
-                            bonus_amount=amount,
-                            order_id=f"BATCH_{operation.id}_{user_id}",
-                            description=f"批量操作: {reason}",
-                            reference_id=operation.id,
-                            reference_type='batch_adjust'
-                        )
-                    else:
-                        success, msg, tx = self.wallet_service.add_balance(
-                            user_id=user_id,
-                            amount=amount,
-                            order_id=f"BATCH_{operation.id}_{user_id}",
-                            description=f"批量操作: {reason}",
-                            reference_id=operation.id,
-                            reference_type='batch_adjust'
-                        )
-                else:
-                    # 扣款
-                    success, msg, tx = self.wallet_service.consume(
-                        user_id=user_id,
-                        amount=abs(amount),
-                        category='batch_adjust',
-                        description=f"批量操作: {reason}",
-                        order_id=f"BATCH_{operation.id}_{user_id}",
-                        reference_id=operation.id,
-                        reference_type='batch_adjust'
-                    )
+                # 使用專用的管理員調賬方法（繞過狀態檢查，支持自動創建錢包）
+                success, msg, tx = self.wallet_service.admin_adjust_balance(
+                    user_id=user_id,
+                    amount=amount,
+                    reason=f"批量操作: {reason}",
+                    admin_id=operator_id,
+                    allow_negative=False
+                )
                 
                 if success:
                     operation.success_count += 1

@@ -43,10 +43,6 @@ export interface SystemStatus {
   ],
   template: `
     <div class="page-content">
-      <!-- 🔍 路由測試標記 -->
-      <div class="bg-green-500 text-white p-4 rounded-lg mb-4 text-center font-bold">
-        ✅ Dashboard 路由已加載！如果您看到這個，說明路由正常工作。
-      </div>
       <!-- 儀表板模式切換 -->
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-4xl font-bold" style="color: var(--text-primary);">{{ t('dashboard') }}</h2>

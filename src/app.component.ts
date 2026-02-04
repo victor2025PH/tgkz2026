@@ -124,9 +124,14 @@ import { RAGBrainService } from './services/rag-brain.service';
 import { MarketingReportComponent } from './components/marketing-report.component';
 // 🆕 錢包視圖組件
 import { WalletViewComponent } from './views/wallet-view.component';
+import { WalletRechargeComponent } from './views/wallet-recharge.component';
+import { WalletWithdrawComponent } from './views/wallet-withdraw.component';
+import { WalletTransactionsComponent } from './views/wallet-transactions.component';
+import { WalletOrdersComponent } from './views/wallet-orders.component';
+import { WalletAnalyticsComponent } from './views/wallet-analytics.component';
 
 // 視圖類型定義
-type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'resource-discovery' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps' | 'settings' | 'analytics' | 'analytics-center' | 'marketing-report' | 'profile' | 'membership-center' | 'wallet' | 'monitoring' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules' | 'collected-users';
+type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'resource-discovery' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps' | 'settings' | 'analytics' | 'analytics-center' | 'marketing-report' | 'profile' | 'membership-center' | 'wallet' | 'wallet-recharge' | 'wallet-withdraw' | 'wallet-transactions' | 'wallet-orders' | 'wallet-analytics' | 'monitoring' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules' | 'collected-users';
 type LeadDetailView = 'sendMessage' | 'history';
 type LeadsViewMode = 'kanban' | 'list';
 
@@ -158,7 +163,8 @@ interface SuccessOverlayConfig {
     SearchDiscoveryComponent, AiMarketingAssistantComponent, AiTeamHubComponent,
     MemberDatabaseComponent, ApiCredentialsViewComponent,
     // 🆕 錢包視圖
-    WalletViewComponent,
+    WalletViewComponent, WalletRechargeComponent, WalletWithdrawComponent,
+    WalletTransactionsComponent, WalletOrdersComponent, WalletAnalyticsComponent,
     // 🆕 知識大腦獨立組件
     AIBrainComponent, KnowledgeGapsComponent, KnowledgeManageComponent, KnowledgeManageComponent,
     // 🆕 P2: 營銷報表

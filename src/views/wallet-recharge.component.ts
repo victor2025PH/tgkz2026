@@ -770,7 +770,8 @@ export class WalletRechargeComponent implements OnInit {
   }
   
   goBack() {
-    this.router.navigate(['/wallet']);
+    // 使用全局事件返回錢包頁
+    window.dispatchEvent(new CustomEvent('changeView', { detail: 'wallet' }));
   }
   
   async proceed() {
@@ -848,7 +849,7 @@ export class WalletRechargeComponent implements OnInit {
       this.pollOrderStatus(order.order_no);
       
       // 先返回錢包頁
-      this.router.navigate(['/wallet']);
+      window.dispatchEvent(new CustomEvent('changeView', { detail: 'wallet' }));
       
     } catch (error) {
       console.error('Confirm payment error:', error);

@@ -2,60 +2,75 @@ import {
   authGuard
 } from "./chunk-NO5LBIL7.js";
 import {
+  WalletOrdersComponent
+} from "./chunk-OO3OKJAP.js";
+import {
+  WalletAnalyticsComponent
+} from "./chunk-5UN3WYRC.js";
+import {
+  AuthEventsService,
+  AuthService
+} from "./chunk-PBTZGQFB.js";
+import {
   AiCenterViewComponent
-} from "./chunk-5CO7DVEZ.js";
+} from "./chunk-AIZRAQX3.js";
 import {
   AutoGroupService,
   MultiRoleViewComponent
-} from "./chunk-TLIZDMVS.js";
+} from "./chunk-STMAXXHJ.js";
 import {
   AIProviderService,
   DynamicScriptEngineService
 } from "./chunk-UU2EWNBQ.js";
 import {
   AnalyticsViewComponent
-} from "./chunk-3RTE2EOW.js";
+} from "./chunk-5F6KNM7V.js";
 import {
   ConfirmDialogService,
   MonitoringViewComponent
-} from "./chunk-ZZLJQCGC.js";
+} from "./chunk-BKUHQXQW.js";
 import {
   WalletViewComponent
-} from "./chunk-PE2R2LMV.js";
+} from "./chunk-MGDT2LSN.js";
+import {
+  WalletRechargeComponent
+} from "./chunk-JXYNRSN2.js";
+import {
+  WalletWithdrawComponent
+} from "./chunk-O4PWW7BP.js";
+import {
+  WalletTransactionsComponent
+} from "./chunk-XNTA42SR.js";
 import {
   WalletService
 } from "./chunk-EULKY6Q3.js";
-import {
-  AuthEventsService,
-  AuthService
-} from "./chunk-PBTZGQFB.js";
 import "./chunk-HOUP2MV6.js";
 import {
   LicenseClientService
 } from "./chunk-SDTPNQBR.js";
 import {
   DashboardViewComponent
-} from "./chunk-YVYGB633.js";
+} from "./chunk-SPQ2ONI4.js";
 import {
   MarketingAnalyticsService
 } from "./chunk-UNP75L76.js";
 import {
   AccountsViewComponent
-} from "./chunk-EWS75HUW.js";
+} from "./chunk-MVMHNEHY.js";
 import {
   SettingsViewComponent
-} from "./chunk-EJYUK2AX.js";
+} from "./chunk-NHFFOREU.js";
 import {
   LeadsViewComponent
-} from "./chunk-PJPQGSWD.js";
+} from "./chunk-VI3GGFK2.js";
 import {
   AutomationViewComponent
-} from "./chunk-ROVTI3H2.js";
+} from "./chunk-32DEPZ5T.js";
 import "./chunk-XBRFXE36.js";
 import {
   ResourceDiscoveryViewComponent,
   SearchDiscoveryComponent
-} from "./chunk-DHKB3XNK.js";
+} from "./chunk-5UEKEXAW.js";
 import {
   AUTO_STYLE,
   AiChatService,
@@ -112,6 +127,10 @@ import {
   ElectronIpcService
 } from "./chunk-RRYKY32A.js";
 import {
+  I18nService,
+  SUPPORTED_LOCALES
+} from "./chunk-ZTUGHWSQ.js";
+import {
   CheckboxControlValueAccessor,
   DefaultValueAccessor,
   FormsModule,
@@ -131,10 +150,6 @@ import {
   ɵNgNoValidate,
   ɵNgSelectMultipleOption
 } from "./chunk-AF6KAQ3H.js";
-import {
-  I18nService,
-  SUPPORTED_LOCALES
-} from "./chunk-ZTUGHWSQ.js";
 import {
   CommonModule,
   DatePipe,
@@ -57425,90 +57440,115 @@ function AppComponent_Conditional_15_Case_161_Template(rf, ctx) {
 }
 function AppComponent_Conditional_15_Case_162_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-profile");
+    \u0275\u0275element(0, "app-wallet-recharge");
   }
 }
 function AppComponent_Conditional_15_Case_163_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-resource-center");
+    \u0275\u0275element(0, "app-wallet-withdraw");
   }
 }
 function AppComponent_Conditional_15_Case_164_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-search-discovery");
+    \u0275\u0275element(0, "app-wallet-transactions");
   }
 }
 function AppComponent_Conditional_15_Case_165_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-ai-marketing-assistant");
+    \u0275\u0275element(0, "app-wallet-orders");
   }
 }
 function AppComponent_Conditional_15_Case_166_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-ai-team-hub");
+    \u0275\u0275element(0, "app-wallet-analytics");
   }
 }
 function AppComponent_Conditional_15_Case_167_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-member-database");
+    \u0275\u0275element(0, "app-profile");
   }
 }
 function AppComponent_Conditional_15_Case_168_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-leads-view");
+    \u0275\u0275element(0, "app-resource-center");
   }
 }
 function AppComponent_Conditional_15_Case_169_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-analytics-view");
+    \u0275\u0275element(0, "app-search-discovery");
   }
 }
 function AppComponent_Conditional_15_Case_170_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-analytics-view");
+    \u0275\u0275element(0, "app-ai-marketing-assistant");
   }
 }
 function AppComponent_Conditional_15_Case_171_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-automation-view");
+    \u0275\u0275element(0, "app-ai-team-hub");
   }
 }
 function AppComponent_Conditional_15_Case_172_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-automation-view");
+    \u0275\u0275element(0, "app-member-database");
   }
 }
 function AppComponent_Conditional_15_Case_173_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-analytics-view");
+    \u0275\u0275element(0, "app-leads-view");
   }
 }
 function AppComponent_Conditional_15_Case_174_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-marketing-report");
+    \u0275\u0275element(0, "app-analytics-view");
   }
 }
 function AppComponent_Conditional_15_Case_175_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-runtime-logs-view");
+    \u0275\u0275element(0, "app-analytics-view");
   }
 }
 function AppComponent_Conditional_15_Case_176_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-runtime-logs-view");
+    \u0275\u0275element(0, "app-automation-view");
   }
 }
 function AppComponent_Conditional_15_Case_177_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-runtime-logs-view");
+    \u0275\u0275element(0, "app-automation-view");
   }
 }
 function AppComponent_Conditional_15_Case_178_Template(rf, ctx) {
   if (rf & 1) {
+    \u0275\u0275element(0, "app-analytics-view");
+  }
+}
+function AppComponent_Conditional_15_Case_179_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-marketing-report");
+  }
+}
+function AppComponent_Conditional_15_Case_180_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-runtime-logs-view");
+  }
+}
+function AppComponent_Conditional_15_Case_181_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-runtime-logs-view");
+  }
+}
+function AppComponent_Conditional_15_Case_182_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-runtime-logs-view");
+  }
+}
+function AppComponent_Conditional_15_Case_183_Template(rf, ctx) {
+  if (rf & 1) {
     \u0275\u0275element(0, "app-dashboard-view");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_10_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_10_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
   }
@@ -57517,7 +57557,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_10_Template(rf,
     \u0275\u0275textInterpolate1(" @", lead_r21.username, " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_11_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
   }
@@ -57526,7 +57566,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_11_Template(rf,
     \u0275\u0275textInterpolate2(" ", lead_r21.firstName, " ", lead_r21.lastName || "", " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_12_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_12_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
     \u0275\u0275pipe(1, "slice");
@@ -57536,7 +57576,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_12_Template(rf,
     \u0275\u0275textInterpolate1(" ID: ", \u0275\u0275pipeBind3(1, 1, lead_r21.userId, 0, 12), " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_14_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "p", 216);
     \u0275\u0275text(1);
@@ -57548,7 +57588,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_14_Template(rf,
     \u0275\u0275textInterpolate1("\u{1F4F1} ", lead_r21.phone);
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_16_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 218);
     \u0275\u0275text(1);
@@ -57561,7 +57601,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_16_Template(rf,
     \u0275\u0275textInterpolate1("\u{1F4CD} ", \u0275\u0275pipeBind3(2, 1, lead_r21.sourceGroup, 0, 20));
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_17_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_17_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 219);
     \u0275\u0275text(1);
@@ -57574,7 +57614,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_17_Template(rf,
     \u0275\u0275textInterpolate1("\u{1F511} ", \u0275\u0275pipeBind3(2, 1, lead_r21.triggeredKeyword, 0, 15));
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_18_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_18_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 228);
     \u0275\u0275text(1);
@@ -57588,7 +57628,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_18_Template(rf,
     \u0275\u0275textInterpolate2("", ctx_r0.getIntentLevelEmoji(lead_r21.intentLevel), " ", ctx_r0.t(lead_r21.intentLevel));
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_5_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "option", 232);
     \u0275\u0275text(1);
@@ -57600,7 +57640,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("noSenderAccounts"));
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_6_For_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_6_For_3_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "option", 253);
     \u0275\u0275text(1);
@@ -57614,12 +57654,12 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275textInterpolate2("", account_r23.phone, " (", account_r23.username || ctx_r0.t(account_r23.status), ")");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_6_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "option", 232);
     \u0275\u0275text(1, "\u9078\u64C7\u767C\u9001\u5E33\u865F...");
     \u0275\u0275elementEnd();
-    \u0275\u0275repeaterCreate(2, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_6_For_3_Template, 2, 3, "option", 253, _forTrack024);
+    \u0275\u0275repeaterCreate(2, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_6_For_3_Template, 2, 3, "option", 253, _forTrack024);
   }
   if (rf & 2) {
     const ctx_r0 = \u0275\u0275nextContext(4);
@@ -57627,14 +57667,14 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275repeater(ctx_r0.senderAccounts());
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
     const _r24 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 233)(1, "p", 20);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(3, "a", 254);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_7_Template_a_click_3_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_7_Template_a_click_3_listener() {
       \u0275\u0275restoreView(_r24);
       const ctx_r0 = \u0275\u0275nextContext(4);
       ctx_r0.currentView.set("accounts");
@@ -57649,21 +57689,21 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1("\u26A0\uFE0F ", ctx_r0.t("noSenderAccountsHint"));
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 256);
     \u0275\u0275text(1, "\u2713 \u5DF2\u9023\u63A5");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_8_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_8_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 257);
     \u0275\u0275text(1, "\u{1F4DA} RAG \u5DF2\u555F\u7528");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_9_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
   }
@@ -57672,7 +57712,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1(" | \u4F86\u6E90: ", ctx_r0.generationState().lead.sourceGroup, " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Conditional_5_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_9_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
   }
@@ -57681,14 +57721,14 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1(" | \u89F8\u767C\u8A5E: ", ctx_r0.generationState().lead.triggerKeyword, " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_9_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 258)(1, "strong", 267);
     \u0275\u0275text(2, "\u5BA2\u6236\u8CC7\u8A0A\uFF1A");
     \u0275\u0275elementEnd();
     \u0275\u0275text(3);
-    \u0275\u0275conditionalCreate(4, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Conditional_4_Template, 1, 1);
-    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Conditional_5_Template, 1, 1);
+    \u0275\u0275conditionalCreate(4, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_9_Conditional_4_Template, 1, 1);
+    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_9_Conditional_5_Template, 1, 1);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -57701,7 +57741,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275conditional(ctx_r0.generationState().lead.triggerKeyword ? 5 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_17_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_17_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 268);
     \u0275\u0275text(1, "\u27F3");
@@ -57716,7 +57756,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("generating"));
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_18_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_18_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span");
     \u0275\u0275text(1, "\u2728");
@@ -57731,11 +57771,11 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("generateWithAi"));
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_19_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_19_Template(rf, ctx) {
   if (rf & 1) {
     const _r26 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 269);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_19_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_19_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r26);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.generateMessage());
@@ -57744,13 +57784,13 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_20_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_20_Template(rf, ctx) {
   if (rf & 1) {
     const _r27 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 264);
     \u0275\u0275text(1);
     \u0275\u0275elementStart(2, "a", 270);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_20_Template_a_click_2_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_20_Template_a_click_2_listener() {
       \u0275\u0275restoreView(_r27);
       const ctx_r0 = \u0275\u0275nextContext(5);
       ctx_r0.currentView.set("settings");
@@ -57767,7 +57807,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("goToSettings"));
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_21_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_21_Template(rf, ctx) {
   if (rf & 1) {
     const _r28 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 265)(1, "strong");
@@ -57775,7 +57815,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275elementEnd();
     \u0275\u0275text(3);
     \u0275\u0275elementStart(4, "button", 271);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_21_Template_button_click_4_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_21_Template_button_click_4_listener() {
       \u0275\u0275restoreView(_r28);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.generateMessage());
@@ -57791,14 +57831,14 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1(" ", ctx_r0.generationState().error, " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_22_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_22_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 266)(1, "p", 272);
     \u0275\u0275text(2, "\u2713 AI \u5DF2\u751F\u6210\u6D88\u606F\uFF0C\u60A8\u53EF\u4EE5\u5728\u4E0B\u65B9\u7DE8\u8F2F\u5F8C\u767C\u9001");
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Template(rf, ctx) {
   if (rf & 1) {
     const _r25 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 238)(1, "div", 255)(2, "div", 213)(3, "span", 175);
@@ -57807,16 +57847,16 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275elementStart(5, "span", 32);
     \u0275\u0275text(6);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_7_Template, 2, 0, "span", 256);
+    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_7_Template, 2, 0, "span", 256);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(8, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_8_Template, 2, 0, "span", 257);
+    \u0275\u0275conditionalCreate(8, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_8_Template, 2, 0, "span", 257);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(9, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Template, 6, 3, "div", 258);
+    \u0275\u0275conditionalCreate(9, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_9_Template, 6, 3, "div", 258);
     \u0275\u0275elementStart(10, "div")(11, "label", 259);
     \u0275\u0275text(12);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(13, "textarea", 260);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Template_textarea_ngModelChange_13_listener($event) {
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Template_textarea_ngModelChange_13_listener($event) {
       \u0275\u0275restoreView(_r25);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.updateCustomPrompt($event));
@@ -57824,18 +57864,18 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275text(14, "                        ");
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(15, "div", 261)(16, "button", 262);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Template_button_click_16_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Template_button_click_16_listener() {
       \u0275\u0275restoreView(_r25);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.generateMessage());
     });
-    \u0275\u0275conditionalCreate(17, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_17_Template, 4, 1)(18, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_18_Template, 4, 1);
+    \u0275\u0275conditionalCreate(17, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_17_Template, 4, 1)(18, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_18_Template, 4, 1);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_19_Template, 2, 0, "button", 263);
+    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_19_Template, 2, 0, "button", 263);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_20_Template, 4, 2, "div", 264);
-    \u0275\u0275conditionalCreate(21, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_21_Template, 6, 2, "div", 265);
-    \u0275\u0275conditionalCreate(22, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_22_Template, 3, 0, "div", 266);
+    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_20_Template, 4, 2, "div", 264);
+    \u0275\u0275conditionalCreate(21, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_21_Template, 6, 2, "div", 265);
+    \u0275\u0275conditionalCreate(22, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Conditional_22_Template, 3, 0, "div", 266);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -57866,7 +57906,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275conditional(ctx_r0.generationState().status === "success" && ctx_r0.generationState().generatedMessage ? 22 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_For_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_25_For_7_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "option", 253);
     \u0275\u0275text(1);
@@ -57879,14 +57919,14 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(template_r30.name);
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_25_Template(rf, ctx) {
   if (rf & 1) {
     const _r29 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 229)(1, "label", 230);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(3, "select", 273);
-    \u0275\u0275listener("change", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_Template_select_change_3_listener($event) {
+    \u0275\u0275listener("change", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_25_Template_select_change_3_listener($event) {
       \u0275\u0275restoreView(_r29);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.applyTemplate($event));
@@ -57894,7 +57934,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275elementStart(4, "option", 232);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd();
-    \u0275\u0275repeaterCreate(6, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_For_7_Template, 2, 2, "option", 253, _forTrack024);
+    \u0275\u0275repeaterCreate(6, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_25_For_7_Template, 2, 2, "option", 253, _forTrack024);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -57907,11 +57947,11 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275repeater(ctx_r0.messageTemplates());
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_40_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_40_Template(rf, ctx) {
   if (rf & 1) {
     const _r31 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 274);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_40_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_40_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r31);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.addMoreAttachments("file"));
@@ -57919,7 +57959,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275text(1, " \u2795 \u6DFB\u52A0\u66F4\u591A ");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(2, "button", 275);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_40_Template_button_click_2_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_40_Template_button_click_2_listener() {
       \u0275\u0275restoreView(_r31);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.clearAllAttachments());
@@ -57928,21 +57968,21 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_2_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 280);
     \u0275\u0275text(1, "\u{1F5BC}\uFE0F");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 281);
     \u0275\u0275text(1, "\u{1F4C4}");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_6_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 283);
     \u0275\u0275text(1);
@@ -57954,29 +57994,29 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1(" (", (attachment_r33.fileSize / 1024 / 1024).toFixed(2), " MB) ");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 284);
     \u0275\u0275text(1, "\u2713");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Template(rf, ctx) {
   if (rf & 1) {
     const _r32 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 278)(1, "div", 279);
-    \u0275\u0275conditionalCreate(2, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_2_Template, 2, 0, "span", 280)(3, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_3_Template, 2, 0, "span", 281);
+    \u0275\u0275conditionalCreate(2, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_2_Template, 2, 0, "span", 280)(3, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_3_Template, 2, 0, "span", 281);
     \u0275\u0275elementStart(4, "span", 282);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(6, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_6_Template, 2, 1, "span", 283);
-    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_7_Template, 2, 0, "span", 284);
+    \u0275\u0275conditionalCreate(6, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_6_Template, 2, 1, "span", 283);
+    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Conditional_7_Template, 2, 0, "span", 284);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(8, "button", 285);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Template_button_click_8_listener() {
-      const \u0275$index_1260_r34 = \u0275\u0275restoreView(_r32).$index;
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Template_button_click_8_listener() {
+      const \u0275$index_1275_r34 = \u0275\u0275restoreView(_r32).$index;
       const ctx_r0 = \u0275\u0275nextContext(5);
-      return \u0275\u0275resetView(ctx_r0.removeAttachmentByIndex(\u0275$index_1260_r34));
+      return \u0275\u0275resetView(ctx_r0.removeAttachmentByIndex(\u0275$index_1275_r34));
     });
     \u0275\u0275text(9, "\xD7");
     \u0275\u0275elementEnd()();
@@ -57993,7 +58033,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275conditional(attachment_r33.filePath ? 7 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 245)(1, "div", 239)(2, "span", 276);
     \u0275\u0275text(3);
@@ -58002,7 +58042,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275text(5);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(6, "div", 277);
-    \u0275\u0275repeaterCreate(7, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Template, 10, 4, "div", 278, _forTrack19);
+    \u0275\u0275repeaterCreate(7, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_For_8_Template, 10, 4, "div", 278, _forTrack19);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -58015,25 +58055,25 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275repeater(ctx_r0.generationState().attachments);
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Conditional_2_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0, " \u26A0\uFE0F \u7121\u53EF\u7528\u767C\u9001\u5E33\u865F ");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0, " \u26A0\uFE0F \u8ACB\u9078\u64C7\u767C\u9001\u5E33\u865F ");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0, " \u26A0\uFE0F \u8ACB\u8F38\u5165\u8A0A\u606F\u5167\u5BB9\u6216\u6DFB\u52A0\u9644\u4EF6 ");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 246)(1, "p", 286);
-    \u0275\u0275conditionalCreate(2, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_2_Template, 1, 0)(3, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_3_Template, 1, 0)(4, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_4_Template, 1, 0);
+    \u0275\u0275conditionalCreate(2, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Conditional_2_Template, 1, 0)(3, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Conditional_3_Template, 1, 0)(4, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Conditional_4_Template, 1, 0);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -58042,31 +58082,31 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_
     \u0275\u0275conditional(ctx_r0.senderAccounts().length === 0 ? 2 : !ctx_r0.selectedSenderId() ? 3 : ctx_r0.editableMessage().trim().length === 0 && !ctx_r0.generationState().attachment && ctx_r0.generationState().attachments.length === 0 ? 4 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_43_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_43_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 247)(1, "p", 287);
     \u0275\u0275text(2, "\u{1F6AB} \u6B64\u5BA2\u6236\u5DF2\u52A0\u5165\u9ED1\u540D\u55AE\uFF0C\u7121\u6CD5\u767C\u9001\u8A0A\u606F");
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template(rf, ctx) {
   if (rf & 1) {
     const _r22 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 226)(1, "div", 229)(2, "label", 230);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(4, "select", 231);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_select_ngModelChange_4_listener($event) {
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_select_ngModelChange_4_listener($event) {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.selectedSenderId.set($event));
     });
-    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_5_Template, 2, 1, "option", 232)(6, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_6_Template, 4, 0);
+    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_5_Template, 2, 1, "option", 232)(6, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_6_Template, 4, 0);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_7_Template, 5, 1, "div", 233);
+    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_7_Template, 5, 1, "div", 233);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(8, "div", 234)(9, "label", 235);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_label_click_9_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_label_click_9_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.messageMode.set("manual"));
@@ -58078,7 +58118,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template(rf,
     \u0275\u0275text(13);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(14, "label", 235);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_label_click_14_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_label_click_14_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.messageMode.set("ai"));
@@ -58090,7 +58130,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template(rf,
     \u0275\u0275text(18);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(19, "label", 235);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_label_click_19_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_label_click_19_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.messageMode.set("template"));
@@ -58101,8 +58141,8 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template(rf,
     \u0275\u0275elementStart(22, "span", 237);
     \u0275\u0275text(23);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275conditionalCreate(24, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Template, 23, 13, "div", 238);
-    \u0275\u0275conditionalCreate(25, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_Template, 8, 2, "div", 229);
+    \u0275\u0275conditionalCreate(24, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_24_Template, 23, 13, "div", 238);
+    \u0275\u0275conditionalCreate(25, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_25_Template, 8, 2, "div", 229);
     \u0275\u0275elementStart(26, "div", 229)(27, "div", 239)(28, "label", 240);
     \u0275\u0275text(29);
     \u0275\u0275elementEnd();
@@ -58110,7 +58150,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template(rf,
     \u0275\u0275text(31);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(32, "textarea", 242);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_textarea_ngModelChange_32_listener($event) {
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_textarea_ngModelChange_32_listener($event) {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.editableMessage.set($event));
@@ -58118,7 +58158,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template(rf,
     \u0275\u0275text(33, "                ");
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(34, "div", 238)(35, "div", 243)(36, "button", 244);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_36_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_button_click_36_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.selectAttachment("image", true));
@@ -58126,21 +58166,21 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template(rf,
     \u0275\u0275text(37);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(38, "button", 244);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_38_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_button_click_38_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.selectAttachment("file", true));
     });
     \u0275\u0275text(39);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(40, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_40_Template, 4, 0);
+    \u0275\u0275conditionalCreate(40, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_40_Template, 4, 0);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(41, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_Template, 9, 2, "div", 245);
+    \u0275\u0275conditionalCreate(41, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_41_Template, 9, 2, "div", 245);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(42, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Template, 5, 1, "div", 246);
-    \u0275\u0275conditionalCreate(43, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_43_Template, 3, 0, "div", 247);
+    \u0275\u0275conditionalCreate(42, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_42_Template, 5, 1, "div", 246);
+    \u0275\u0275conditionalCreate(43, AppComponent_Conditional_15_Conditional_184_Conditional_28_Conditional_43_Template, 3, 0, "div", 247);
     \u0275\u0275elementStart(44, "div", 248)(45, "button", 249);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_45_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_button_click_45_listener() {
       \u0275\u0275restoreView(_r22);
       const lead_r21 = \u0275\u0275nextContext();
       const ctx_r0 = \u0275\u0275nextContext(2);
@@ -58149,7 +58189,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template(rf,
     \u0275\u0275text(46);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(47, "div", 250)(48, "button", 251);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_48_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_button_click_48_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.closeLeadDetailModal());
@@ -58157,7 +58197,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template(rf,
     \u0275\u0275text(49);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(50, "button", 252);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_50_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_28_Template_button_click_50_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.sendMessageToLead());
@@ -58222,7 +58262,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template(rf,
     \u0275\u0275textInterpolate1(" \u2708\uFE0F ", ctx_r0.t("sendMessage"), " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 268);
     \u0275\u0275text(1, "\u27F3");
@@ -58232,7 +58272,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span");
     \u0275\u0275text(1, "\u{1F4AC}");
@@ -58242,7 +58282,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_5_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 149);
     \u0275\u0275text(1);
@@ -58254,7 +58294,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_
     \u0275\u0275textInterpolate1("\u5171 ", ctx_r0.chatHistory().length, " \u689D\u6D88\u606F");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Conditional_0_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_For_2_Conditional_0_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 298)(1, "div", 300)(2, "div", 301)(3, "p", 302);
     \u0275\u0275text(4);
@@ -58272,7 +58312,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.formatTimestamp(message_r37.timestamp));
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Conditional_1_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_For_2_Conditional_1_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 299)(1, "div", 300)(2, "div", 303)(3, "p", 302);
     \u0275\u0275text(4);
@@ -58293,16 +58333,16 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.formatTimestamp(message_r37.timestamp));
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_For_2_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275conditionalCreate(0, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Conditional_0_Template, 7, 2, "div", 298)(1, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Conditional_1_Template, 10, 2, "div", 299);
+    \u0275\u0275conditionalCreate(0, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_For_2_Conditional_0_Template, 7, 2, "div", 298)(1, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_For_2_Conditional_1_Template, 10, 2, "div", 299);
   }
   if (rf & 2) {
     const message_r37 = ctx.$implicit;
     \u0275\u0275conditional(message_r37.role === "user" ? 0 : message_r37.role === "assistant" ? 1 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 296)(1, "span", 306);
     \u0275\u0275text(2, "\u27F3");
@@ -58312,11 +58352,11 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     const _r38 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 297)(1, "button", 308);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_4_Template_button_click_1_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Conditional_4_Template_button_click_1_listener() {
       \u0275\u0275restoreView(_r38);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.loadMoreChatHistory());
@@ -58325,18 +58365,18 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
     const _r36 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 295);
-    \u0275\u0275listener("scroll", function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Template_div_scroll_0_listener($event) {
+    \u0275\u0275listener("scroll", function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Template_div_scroll_0_listener($event) {
       \u0275\u0275restoreView(_r36);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.onChatHistoryScroll($event));
     });
-    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Template, 2, 1, null, null, \u0275\u0275componentInstance().trackByChatMessageId, true);
-    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_3_Template, 5, 0, "div", 296);
-    \u0275\u0275conditionalCreate(4, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_4_Template, 3, 0, "div", 297);
+    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_For_2_Template, 2, 1, null, null, \u0275\u0275componentInstance().trackByChatMessageId, true);
+    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Conditional_3_Template, 5, 0, "div", 296);
+    \u0275\u0275conditionalCreate(4, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Conditional_4_Template, 3, 0, "div", 297);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58349,14 +58389,14 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_
     \u0275\u0275conditional(ctx_r0.chatHistoryHasMore() && !ctx_r0.chatHistoryLoadingMore() ? 4 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_0_Conditional_8_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_0_Conditional_8_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 305);
     \u0275\u0275text(1, "\u{1F916} AI");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_0_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_0_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 299)(1, "div", 300)(2, "div", 303)(3, "p", 302);
     \u0275\u0275text(4);
@@ -58364,7 +58404,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Condi
     \u0275\u0275elementStart(5, "div", 304)(6, "span", 149);
     \u0275\u0275text(7);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(8, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_0_Conditional_8_Template, 2, 0, "span", 305);
+    \u0275\u0275conditionalCreate(8, AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_0_Conditional_8_Template, 2, 0, "span", 305);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -58378,7 +58418,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Condi
     \u0275\u0275conditional(item_r39.type.includes("AI") ? 8 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_1_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_1_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 298)(1, "div", 300)(2, "div", 301)(3, "p", 302);
     \u0275\u0275text(4);
@@ -58396,7 +58436,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Condi
     \u0275\u0275textInterpolate(ctx_r0.formatTimestamp(item_r39.timestamp));
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_2_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 309)(1, "div", 310);
     \u0275\u0275text(2);
@@ -58409,16 +58449,16 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Condi
     \u0275\u0275textInterpolate3(" ", item_r39.type, ": ", item_r39.content, " \xB7 ", ctx_r0.formatTimestamp(item_r39.timestamp), " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275conditionalCreate(0, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_0_Template, 9, 3, "div", 299)(1, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_1_Template, 7, 2, "div", 298)(2, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_2_Template, 3, 3, "div", 309);
+    \u0275\u0275conditionalCreate(0, AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_0_Template, 9, 3, "div", 299)(1, AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_1_Template, 7, 2, "div", 298)(2, AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Conditional_2_Template, 3, 3, "div", 309);
   }
   if (rf & 2) {
     const item_r39 = ctx.$implicit;
     \u0275\u0275conditional(item_r39.type.includes("Sent") || item_r39.type.includes("Message") ? 0 : item_r39.type.includes("Reply") || item_r39.type.includes("Received") ? 1 : 2);
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_11_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 293)(1, "div", 311);
     \u0275\u0275text(2, "\u{1F4AC}");
@@ -58436,7 +58476,7 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("noHistoryFound"));
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_12_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_12_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 294)(1, "h4", 314)(2, "span");
     \u0275\u0275text(3, "\u{1F4CA}");
@@ -58470,26 +58510,26 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_
     \u0275\u0275textInterpolate(lead_r21.status || "\u521D\u6B21\u63A5\u89F8");
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Conditional_29_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Conditional_29_Template(rf, ctx) {
   if (rf & 1) {
     const _r35 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 227)(1, "div", 288)(2, "button", 289);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_29_Template_button_click_2_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Conditional_29_Template_button_click_2_listener() {
       \u0275\u0275restoreView(_r35);
       const lead_r21 = \u0275\u0275nextContext();
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.loadChatHistory(lead_r21.userId));
     });
-    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_3_Template, 4, 0)(4, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_4_Template, 4, 0);
+    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_3_Template, 4, 0)(4, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_4_Template, 4, 0);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_5_Template, 2, 1, "span", 149);
+    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_5_Template, 2, 1, "span", 149);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(6, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Template, 5, 2, "div", 290);
+    \u0275\u0275conditionalCreate(6, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_6_Template, 5, 2, "div", 290);
     \u0275\u0275elementStart(7, "div", 291)(8, "div", 292);
-    \u0275\u0275repeaterCreate(9, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Template, 3, 1, null, null, \u0275\u0275componentInstance().trackByChatMessageId, true);
+    \u0275\u0275repeaterCreate(9, AppComponent_Conditional_15_Conditional_184_Conditional_29_For_10_Template, 3, 1, null, null, \u0275\u0275componentInstance().trackByChatMessageId, true);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(11, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_11_Template, 7, 1, "div", 293);
-    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_12_Template, 21, 2, "div", 294);
+    \u0275\u0275conditionalCreate(11, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_11_Template, 7, 1, "div", 293);
+    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_184_Conditional_29_Conditional_12_Template, 21, 2, "div", 294);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58511,17 +58551,17 @@ function AppComponent_Conditional_15_Conditional_179_Conditional_29_Template(rf,
     \u0275\u0275conditional(lead_r21.interactionHistory.length > 0 ? 12 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_179_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Template(rf, ctx) {
   if (rf & 1) {
     const _r20 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 207);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_div_click_0_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r20);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.closeLeadDetailModal());
     });
     \u0275\u0275elementStart(1, "div", 208);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_div_click_1_listener($event) {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r20);
       return \u0275\u0275resetView($event.stopPropagation());
     });
@@ -58529,18 +58569,18 @@ function AppComponent_Conditional_15_Conditional_179_Template(rf, ctx) {
     \u0275\u0275text(6);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(7, "div")(8, "div", 213)(9, "h3", 214);
-    \u0275\u0275conditionalCreate(10, AppComponent_Conditional_15_Conditional_179_Conditional_10_Template, 1, 1)(11, AppComponent_Conditional_15_Conditional_179_Conditional_11_Template, 1, 2)(12, AppComponent_Conditional_15_Conditional_179_Conditional_12_Template, 2, 5);
+    \u0275\u0275conditionalCreate(10, AppComponent_Conditional_15_Conditional_184_Conditional_10_Template, 1, 1)(11, AppComponent_Conditional_15_Conditional_184_Conditional_11_Template, 1, 2)(12, AppComponent_Conditional_15_Conditional_184_Conditional_12_Template, 2, 5);
     \u0275\u0275elementEnd();
     \u0275\u0275element(13, "span", 215);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_179_Conditional_14_Template, 2, 1, "p", 216);
+    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_184_Conditional_14_Template, 2, 1, "p", 216);
     \u0275\u0275elementStart(15, "div", 217);
-    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_179_Conditional_16_Template, 3, 5, "span", 218);
-    \u0275\u0275conditionalCreate(17, AppComponent_Conditional_15_Conditional_179_Conditional_17_Template, 3, 5, "span", 219);
-    \u0275\u0275conditionalCreate(18, AppComponent_Conditional_15_Conditional_179_Conditional_18_Template, 2, 4, "span", 220);
+    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_184_Conditional_16_Template, 3, 5, "span", 218);
+    \u0275\u0275conditionalCreate(17, AppComponent_Conditional_15_Conditional_184_Conditional_17_Template, 3, 5, "span", 219);
+    \u0275\u0275conditionalCreate(18, AppComponent_Conditional_15_Conditional_184_Conditional_18_Template, 2, 4, "span", 220);
     \u0275\u0275elementEnd()()();
     \u0275\u0275elementStart(19, "button", 221);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_button_click_19_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Template_button_click_19_listener() {
       \u0275\u0275restoreView(_r20);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.closeLeadDetailModal());
@@ -58548,7 +58588,7 @@ function AppComponent_Conditional_15_Conditional_179_Template(rf, ctx) {
     \u0275\u0275text(20, "\u2715");
     \u0275\u0275elementEnd()()();
     \u0275\u0275elementStart(21, "div", 222)(22, "nav", 223)(23, "a", 224);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_a_click_23_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Template_a_click_23_listener() {
       \u0275\u0275restoreView(_r20);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.leadDetailView.set("sendMessage"));
@@ -58556,7 +58596,7 @@ function AppComponent_Conditional_15_Conditional_179_Template(rf, ctx) {
     \u0275\u0275text(24);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(25, "a", 224);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_a_click_25_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Template_a_click_25_listener() {
       \u0275\u0275restoreView(_r20);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.leadDetailView.set("history"));
@@ -58564,8 +58604,8 @@ function AppComponent_Conditional_15_Conditional_179_Template(rf, ctx) {
     \u0275\u0275text(26);
     \u0275\u0275elementEnd()()();
     \u0275\u0275elementStart(27, "div", 225);
-    \u0275\u0275conditionalCreate(28, AppComponent_Conditional_15_Conditional_179_Conditional_28_Template, 52, 31, "div", 226);
-    \u0275\u0275conditionalCreate(29, AppComponent_Conditional_15_Conditional_179_Conditional_29_Template, 13, 6, "div", 227);
+    \u0275\u0275conditionalCreate(28, AppComponent_Conditional_15_Conditional_184_Conditional_28_Template, 52, 31, "div", 226);
+    \u0275\u0275conditionalCreate(29, AppComponent_Conditional_15_Conditional_184_Conditional_29_Template, 13, 6, "div", 227);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -58599,7 +58639,7 @@ function AppComponent_Conditional_15_Conditional_179_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.leadDetailView() === "history" ? 29 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_180_Conditional_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_185_Conditional_14_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 332);
     \u0275\u0275namespaceSVG();
@@ -58612,14 +58652,14 @@ function AppComponent_Conditional_15_Conditional_180_Conditional_14_Template(rf,
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Conditional_14_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 342);
     \u0275\u0275text(1, "\uFF08\u5DF2\u64A4\u92B7\uFF09");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_19_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Conditional_19_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 343);
     \u0275\u0275text(1);
@@ -58631,11 +58671,11 @@ function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Condit
     \u0275\u0275textInterpolate1("", op_r41.failureCount, " \u5931\u6557");
   }
 }
-function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_20_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Conditional_20_Template(rf, ctx) {
   if (rf & 1) {
     const _r42 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 345);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_20_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Conditional_20_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r42);
       const op_r41 = \u0275\u0275nextContext().$implicit;
       const ctx_r0 = \u0275\u0275nextContext(4);
@@ -58645,7 +58685,7 @@ function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Condit
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 339)(1, "div", 147)(2, "div", 64)(3, "div", 340);
     \u0275\u0275namespaceSVG();
@@ -58658,14 +58698,14 @@ function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Templa
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(12, "p", 149);
     \u0275\u0275text(13);
-    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_14_Template, 2, 0, "span", 342);
+    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Conditional_14_Template, 2, 0, "span", 342);
     \u0275\u0275elementEnd()()();
     \u0275\u0275elementStart(15, "div", 64)(16, "div", 302)(17, "span", 280);
     \u0275\u0275text(18);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_19_Template, 2, 1, "span", 343);
+    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Conditional_19_Template, 2, 1, "span", 343);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_20_Template, 2, 0, "button", 344);
+    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Conditional_20_Template, 2, 0, "button", 344);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -58690,10 +58730,10 @@ function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Templa
     \u0275\u0275conditional(op_r41.isReversible && !op_r41.reversed ? 20 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_180_Conditional_15_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_185_Conditional_15_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 238);
-    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Template, 21, 21, "div", 338, _forTrack024);
+    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_185_Conditional_15_For_2_Template, 21, 21, "div", 338, _forTrack024);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58702,17 +58742,17 @@ function AppComponent_Conditional_15_Conditional_180_Conditional_15_Template(rf,
     \u0275\u0275repeater(ctx_r0.batchOperationHistory());
   }
 }
-function AppComponent_Conditional_15_Conditional_180_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_185_Template(rf, ctx) {
   if (rf & 1) {
     const _r40 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 319);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Template_div_click_0_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r40);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBatchOperationHistory.set(false));
     });
     \u0275\u0275elementStart(1, "div", 320);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Template_div_click_1_listener($event) {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r40);
       return \u0275\u0275resetView($event.stopPropagation());
     });
@@ -58725,7 +58765,7 @@ function AppComponent_Conditional_15_Conditional_180_Template(rf, ctx) {
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(9, "button", 327);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Template_button_click_9_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_button_click_9_listener() {
       \u0275\u0275restoreView(_r40);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBatchOperationHistory.set(false));
@@ -58736,10 +58776,10 @@ function AppComponent_Conditional_15_Conditional_180_Template(rf, ctx) {
     \u0275\u0275elementEnd()()();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(13, "div", 331);
-    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_180_Conditional_14_Template, 6, 0, "div", 332)(15, AppComponent_Conditional_15_Conditional_180_Conditional_15_Template, 3, 0, "div", 238);
+    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_185_Conditional_14_Template, 6, 0, "div", 332)(15, AppComponent_Conditional_15_Conditional_185_Conditional_15_Template, 3, 0, "div", 238);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(16, "div", 333)(17, "button", 334);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Template_button_click_17_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_button_click_17_listener() {
       \u0275\u0275restoreView(_r40);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBatchOperationHistory.set(false));
@@ -58753,7 +58793,7 @@ function AppComponent_Conditional_15_Conditional_180_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.batchOperationHistory().length === 0 ? 14 : 15);
   }
 }
-function AppComponent_Conditional_15_Conditional_181_Case_12_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_186_Case_12_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 353)(1, "div", 359)(2, "div", 360)(3, "div", 361);
     \u0275\u0275text(4, "\u{1F916}");
@@ -58789,7 +58829,7 @@ function AppComponent_Conditional_15_Conditional_181_Case_12_Template(rf, ctx) {
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_For_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_3_For_2_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "option", 253);
     \u0275\u0275text(1);
@@ -58802,16 +58842,16 @@ function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Cond
     \u0275\u0275textInterpolate(model_r46);
   }
 }
-function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
     const _r45 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "select", 372);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_Template_select_ngModelChange_0_listener($event) {
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_3_Template_select_ngModelChange_0_listener($event) {
       \u0275\u0275restoreView(_r45);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.localAiModel.set($event));
     });
-    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_For_2_Template, 2, 2, "option", 253, \u0275\u0275repeaterTrackByIdentity);
+    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_3_For_2_Template, 2, 2, "option", 253, \u0275\u0275repeaterTrackByIdentity);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58821,11 +58861,11 @@ function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Cond
     \u0275\u0275repeater(ctx_r0.detectedOllamaModels());
   }
 }
-function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     const _r47 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "input", 373);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_4_Template_input_ngModelChange_0_listener($event) {
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_4_Template_input_ngModelChange_0_listener($event) {
       \u0275\u0275restoreView(_r47);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.localAiModel.set($event));
@@ -58837,12 +58877,12 @@ function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Cond
     \u0275\u0275property("ngModel", ctx_r0.localAiModel());
   }
 }
-function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 360)(1, "label", 369);
     \u0275\u0275text(2, "\u9078\u64C7 AI \u6A21\u578B");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_Template, 3, 1, "select", 370)(4, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_4_Template, 1, 1, "input", 371);
+    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_3_Template, 3, 1, "select", 370)(4, AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Conditional_4_Template, 1, 1, "input", 371);
     \u0275\u0275elementStart(5, "p", 15);
     \u0275\u0275text(6, "\u63A8\u85A6\uFF1Aqwen2:7b\uFF08\u4E2D\u82F1\u6587\u901A\u7528\uFF09");
     \u0275\u0275elementEnd()();
@@ -58853,11 +58893,11 @@ function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Temp
     \u0275\u0275conditional(ctx_r0.detectedOllamaModels().length > 0 ? 3 : 4);
   }
 }
-function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Conditional_16_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_16_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
     const _r49 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 379)(1, "select", 380);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Conditional_16_Template_select_ngModelChange_1_listener($event) {
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_16_Conditional_16_Template_select_ngModelChange_1_listener($event) {
       \u0275\u0275restoreView(_r49);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.aiBackupProvider.set($event));
@@ -58875,7 +58915,7 @@ function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Cond
     \u0275\u0275property("ngModel", ctx_r0.aiBackupProvider());
   }
 }
-function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
     const _r48 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 360)(1, "div", 374)(2, "p", 177);
@@ -58892,7 +58932,7 @@ function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Temp
     \u0275\u0275text(10, " \u4E0B\u8F09\u6A21\u578B ");
     \u0275\u0275elementEnd()()();
     \u0275\u0275elementStart(11, "div", 360)(12, "label", 376)(13, "input", 377);
-    \u0275\u0275listener("change", function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Template_input_change_13_listener() {
+    \u0275\u0275listener("change", function AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_16_Template_input_change_13_listener() {
       \u0275\u0275restoreView(_r48);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.aiAutoFallback.set(!ctx_r0.aiAutoFallback()));
@@ -58901,7 +58941,7 @@ function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Temp
     \u0275\u0275elementStart(14, "span", 378);
     \u0275\u0275text(15, "\u4F7F\u7528\u96F2\u7AEF AI \u4F5C\u70BA\u5099\u9078");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Conditional_16_Template, 6, 1, "div", 379);
+    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_16_Conditional_16_Template, 6, 1, "div", 379);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58912,7 +58952,7 @@ function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Temp
     \u0275\u0275conditional(ctx_r0.aiAutoFallback() ? 16 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_181_Case_13_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_186_Case_13_Template(rf, ctx) {
   if (rf & 1) {
     const _r44 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 226)(1, "h3", 364);
@@ -58928,14 +58968,14 @@ function AppComponent_Conditional_15_Conditional_181_Case_13_Template(rf, ctx) {
     \u0275\u0275text(12);
     \u0275\u0275elementEnd()()();
     \u0275\u0275elementStart(13, "button", 368);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Case_13_Template_button_click_13_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_186_Case_13_Template_button_click_13_listener() {
       \u0275\u0275restoreView(_r44);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.detectOllama());
     });
     \u0275\u0275text(14);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275conditionalCreate(15, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Template, 7, 1, "div", 360)(16, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Template, 17, 2);
+    \u0275\u0275conditionalCreate(15, AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_15_Template, 7, 1, "div", 360)(16, AppComponent_Conditional_15_Conditional_186_Case_13_Conditional_16_Template, 17, 2);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58956,7 +58996,7 @@ function AppComponent_Conditional_15_Conditional_181_Case_13_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.ollamaDetected() ? 15 : 16);
   }
 }
-function AppComponent_Conditional_15_Conditional_181_Case_14_Conditional_13_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_186_Case_14_Conditional_13_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "p");
     \u0275\u0275text(1);
@@ -58968,7 +59008,7 @@ function AppComponent_Conditional_15_Conditional_181_Case_14_Conditional_13_Temp
     \u0275\u0275textInterpolate1("\u2705 \u6A21\u578B\uFF1A", ctx_r0.localAiModel());
   }
 }
-function AppComponent_Conditional_15_Conditional_181_Case_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_186_Case_14_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 353)(1, "div", 383);
     \u0275\u0275text(2, "\u{1F389}");
@@ -58984,7 +59024,7 @@ function AppComponent_Conditional_15_Conditional_181_Case_14_Template(rf, ctx) {
     \u0275\u0275elementStart(9, "div", 385)(10, "div", 386)(11, "p");
     \u0275\u0275text(12);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(13, AppComponent_Conditional_15_Conditional_181_Case_14_Conditional_13_Template, 2, 1, "p");
+    \u0275\u0275conditionalCreate(13, AppComponent_Conditional_15_Conditional_186_Case_14_Conditional_13_Template, 2, 1, "p");
     \u0275\u0275elementStart(14, "p");
     \u0275\u0275text(15);
     \u0275\u0275elementEnd()()()();
@@ -58999,11 +59039,11 @@ function AppComponent_Conditional_15_Conditional_181_Case_14_Template(rf, ctx) {
     \u0275\u0275textInterpolate1("\u2705 \u81EA\u52D5\u964D\u7D1A\uFF1A", ctx_r0.aiAutoFallback() ? "\u5DF2\u555F\u7528" : "\u5DF2\u7981\u7528");
   }
 }
-function AppComponent_Conditional_15_Conditional_181_Conditional_19_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_186_Conditional_19_Template(rf, ctx) {
   if (rf & 1) {
     const _r50 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 387);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Conditional_19_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_186_Conditional_19_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r50);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.welcomeStep.set(ctx_r0.welcomeStep() - 1));
@@ -59012,11 +59052,11 @@ function AppComponent_Conditional_15_Conditional_181_Conditional_19_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_181_Conditional_20_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_186_Conditional_20_Template(rf, ctx) {
   if (rf & 1) {
     const _r51 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 388);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Conditional_20_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_186_Conditional_20_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r51);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.welcomeStep.set(ctx_r0.welcomeStep() + 1));
@@ -59025,11 +59065,11 @@ function AppComponent_Conditional_15_Conditional_181_Conditional_20_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_181_Conditional_21_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_186_Conditional_21_Template(rf, ctx) {
   if (rf & 1) {
     const _r52 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 389);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Conditional_21_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_186_Conditional_21_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r52);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.completeFirstRunSetup());
@@ -59038,7 +59078,7 @@ function AppComponent_Conditional_15_Conditional_181_Conditional_21_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_181_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_186_Template(rf, ctx) {
   if (rf & 1) {
     const _r43 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 115)(1, "div", 346)(2, "div", 347)(3, "h1", 348);
@@ -59051,10 +59091,10 @@ function AppComponent_Conditional_15_Conditional_181_Template(rf, ctx) {
     \u0275\u0275element(8, "div", 351)(9, "div", 351)(10, "div", 351);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(11, "div", 352);
-    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_181_Case_12_Template, 27, 0, "div", 353)(13, AppComponent_Conditional_15_Conditional_181_Case_13_Template, 17, 8, "div", 226)(14, AppComponent_Conditional_15_Conditional_181_Case_14_Template, 16, 3, "div", 353);
+    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_186_Case_12_Template, 27, 0, "div", 353)(13, AppComponent_Conditional_15_Conditional_186_Case_13_Template, 17, 8, "div", 226)(14, AppComponent_Conditional_15_Conditional_186_Case_14_Template, 16, 3, "div", 353);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(15, "div", 354)(16, "button", 355);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Template_button_click_16_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_186_Template_button_click_16_listener() {
       \u0275\u0275restoreView(_r43);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.skipFirstRunSetup());
@@ -59062,8 +59102,8 @@ function AppComponent_Conditional_15_Conditional_181_Template(rf, ctx) {
     \u0275\u0275text(17, " \u8DF3\u904E\u8A2D\u7F6E ");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(18, "div", 250);
-    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_181_Conditional_19_Template, 2, 0, "button", 356);
-    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_181_Conditional_20_Template, 2, 0, "button", 357)(21, AppComponent_Conditional_15_Conditional_181_Conditional_21_Template, 2, 0, "button", 358);
+    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_186_Conditional_19_Template, 2, 0, "button", 356);
+    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_186_Conditional_20_Template, 2, 0, "button", 357)(21, AppComponent_Conditional_15_Conditional_186_Conditional_21_Template, 2, 0, "button", 358);
     \u0275\u0275elementEnd()()()();
   }
   if (rf & 2) {
@@ -59083,7 +59123,7 @@ function AppComponent_Conditional_15_Conditional_181_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.welcomeStep() < 3 ? 20 : 21);
   }
 }
-function AppComponent_Conditional_15_Conditional_182_For_14_Conditional_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_187_For_14_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "p", 405);
     \u0275\u0275text(1);
@@ -59095,14 +59135,14 @@ function AppComponent_Conditional_15_Conditional_182_For_14_Conditional_7_Templa
     \u0275\u0275textInterpolate2(" \u2713 \u6709\u5143\u6578\u64DA: ", session_r54.metadata.firstName || "", " ", session_r54.metadata.username ? "@" + session_r54.metadata.username : "", " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_182_For_14_Conditional_8_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_187_For_14_Conditional_8_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "p", 406);
     \u0275\u0275text(1, "\u26A0 \u7121\u5143\u6578\u64DA\uFF0C\u9700\u8981\u91CD\u65B0\u767B\u9304\u9A57\u8B49");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_182_For_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_187_For_14_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 398)(1, "div", 64)(2, "span", 366);
     \u0275\u0275text(3, "\u{1F4F1}");
@@ -59110,7 +59150,7 @@ function AppComponent_Conditional_15_Conditional_182_For_14_Template(rf, ctx) {
     \u0275\u0275elementStart(4, "div")(5, "p", 404);
     \u0275\u0275text(6);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_182_For_14_Conditional_7_Template, 2, 2, "p", 405)(8, AppComponent_Conditional_15_Conditional_182_For_14_Conditional_8_Template, 2, 0, "p", 406);
+    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_187_For_14_Conditional_7_Template, 2, 2, "p", 405)(8, AppComponent_Conditional_15_Conditional_187_For_14_Conditional_8_Template, 2, 0, "p", 406);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -59121,7 +59161,7 @@ function AppComponent_Conditional_15_Conditional_182_For_14_Template(rf, ctx) {
     \u0275\u0275conditional(session_r54.hasMetadata && session_r54.metadata ? 7 : 8);
   }
 }
-function AppComponent_Conditional_15_Conditional_182_Conditional_25_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_187_Conditional_25_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 268);
     \u0275\u0275text(1, "\u23F3");
@@ -59131,7 +59171,7 @@ function AppComponent_Conditional_15_Conditional_182_Conditional_25_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_182_Conditional_26_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_187_Conditional_26_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span");
     \u0275\u0275text(1, "\u{1F504}");
@@ -59141,7 +59181,7 @@ function AppComponent_Conditional_15_Conditional_182_Conditional_26_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_182_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_187_Template(rf, ctx) {
   if (rf & 1) {
     const _r53 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 115)(1, "div", 390)(2, "div", 391)(3, "div", 392);
@@ -59157,7 +59197,7 @@ function AppComponent_Conditional_15_Conditional_182_Template(rf, ctx) {
     \u0275\u0275text(11, " \u9019\u4E9B Session \u6587\u4EF6\u5B58\u5728\u65BC\u7CFB\u7D71\u4E2D\uFF0C\u4F46\u672A\u5728\u6578\u64DA\u5EAB\u4E2D\u627E\u5230\u5C0D\u61C9\u7684\u5E33\u865F\u8A18\u9304\u3002 \u60A8\u53EF\u4EE5\u5617\u8A66\u6062\u5FA9\u9019\u4E9B\u5E33\u865F\uFF0C\u6216\u9078\u64C7\u5FFD\u7565\u3002 ");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(12, "div", 397);
-    \u0275\u0275repeaterCreate(13, AppComponent_Conditional_15_Conditional_182_For_14_Template, 9, 2, "div", 398, _forTrack25);
+    \u0275\u0275repeaterCreate(13, AppComponent_Conditional_15_Conditional_187_For_14_Template, 9, 2, "div", 398, _forTrack25);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(15, "div", 399)(16, "p", 400);
     \u0275\u0275text(17, " \u{1F4A1} ");
@@ -59167,7 +59207,7 @@ function AppComponent_Conditional_15_Conditional_182_Template(rf, ctx) {
     \u0275\u0275text(20, " \u6062\u5FA9\u5F8C\uFF0C\u5E33\u865F\u5C07\u4EE5\u300C\u96E2\u7DDA\u300D\u72C0\u614B\u6DFB\u52A0\u5230\u5217\u8868\u4E2D\u3002 \u60A8\u9700\u8981\u9EDE\u64CA\u300C\u767B\u9304\u300D\u4F86\u91CD\u65B0\u9023\u63A5\u5E33\u865F\u3002 ");
     \u0275\u0275elementEnd()()();
     \u0275\u0275elementStart(21, "div", 401)(22, "button", 402);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_182_Template_button_click_22_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_187_Template_button_click_22_listener() {
       \u0275\u0275restoreView(_r53);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.dismissOrphanSessionDialog());
@@ -59175,12 +59215,12 @@ function AppComponent_Conditional_15_Conditional_182_Template(rf, ctx) {
     \u0275\u0275text(23, " \u7A0D\u5F8C\u8655\u7406 ");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(24, "button", 403);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_182_Template_button_click_24_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_187_Template_button_click_24_listener() {
       \u0275\u0275restoreView(_r53);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.recoverOrphanSessions());
     });
-    \u0275\u0275conditionalCreate(25, AppComponent_Conditional_15_Conditional_182_Conditional_25_Template, 4, 0)(26, AppComponent_Conditional_15_Conditional_182_Conditional_26_Template, 4, 0);
+    \u0275\u0275conditionalCreate(25, AppComponent_Conditional_15_Conditional_187_Conditional_25_Template, 4, 0)(26, AppComponent_Conditional_15_Conditional_187_Conditional_26_Template, 4, 0);
     \u0275\u0275elementEnd()()()();
   }
   if (rf & 2) {
@@ -59195,7 +59235,7 @@ function AppComponent_Conditional_15_Conditional_182_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.isRecoveringOrphanSessions() ? 25 : 26);
   }
 }
-function AppComponent_Conditional_15_Conditional_183_Conditional_41_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_188_Conditional_41_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 415)(1, "p", 416)(2, "span", 177);
     \u0275\u0275text(3, "\u932F\u8AA4\u8A73\u60C5\uFF1A");
@@ -59209,7 +59249,7 @@ function AppComponent_Conditional_15_Conditional_183_Conditional_41_Template(rf,
     \u0275\u0275textInterpolate1(" ", ctx_r0.backendError(), " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_183_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_188_Template(rf, ctx) {
   if (rf & 1) {
     const _r55 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 115)(1, "div", 407)(2, "div", 408)(3, "div", 392);
@@ -59254,10 +59294,10 @@ function AppComponent_Conditional_15_Conditional_183_Template(rf, ctx) {
     \u0275\u0275elementStart(38, "div")(39, "p", 404);
     \u0275\u0275text(40, "\u91CD\u65B0\u555F\u52D5\u7A0B\u5E8F");
     \u0275\u0275elementEnd()()()();
-    \u0275\u0275conditionalCreate(41, AppComponent_Conditional_15_Conditional_183_Conditional_41_Template, 5, 1, "div", 415);
+    \u0275\u0275conditionalCreate(41, AppComponent_Conditional_15_Conditional_188_Conditional_41_Template, 5, 1, "div", 415);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(42, "div", 401)(43, "button", 402);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_183_Template_button_click_43_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_188_Template_button_click_43_listener() {
       \u0275\u0275restoreView(_r55);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBackendErrorDialog.set(false));
@@ -59271,11 +59311,11 @@ function AppComponent_Conditional_15_Conditional_183_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.backendError() ? 41 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_184_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_189_Template(rf, ctx) {
   if (rf & 1) {
     const _r56 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 417);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Template_div_click_0_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_189_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r56);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBackendErrorDialog.set(true));
@@ -59288,17 +59328,17 @@ function AppComponent_Conditional_15_Conditional_184_Template(rf, ctx) {
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_185_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_190_Template(rf, ctx) {
   if (rf & 1) {
     const _r57 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 418);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_div_click_0_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_190_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.cancelNewKeywordSet());
     });
     \u0275\u0275elementStart(1, "div", 419);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_div_click_1_listener($event) {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_190_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r57);
       return \u0275\u0275resetView($event.stopPropagation());
     });
@@ -59311,11 +59351,11 @@ function AppComponent_Conditional_15_Conditional_185_Template(rf, ctx) {
     \u0275\u0275text(9, "\u95DC\u9375\u8A5E\u96C6\u540D\u7A31");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(10, "input", 423);
-    \u0275\u0275listener("input", function AppComponent_Conditional_15_Conditional_185_Template_input_input_10_listener($event) {
+    \u0275\u0275listener("input", function AppComponent_Conditional_15_Conditional_190_Template_input_input_10_listener($event) {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.newKeywordSet.set({ name: $event.target.value }));
-    })("keyup.enter", function AppComponent_Conditional_15_Conditional_185_Template_input_keyup_enter_10_listener() {
+    })("keyup.enter", function AppComponent_Conditional_15_Conditional_190_Template_input_keyup_enter_10_listener() {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.submitNewKeywordSet());
@@ -59325,7 +59365,7 @@ function AppComponent_Conditional_15_Conditional_185_Template(rf, ctx) {
     \u0275\u0275text(12, " \u{1F4A1} \u5275\u5EFA\u5F8C\u53EF\u5728\u8A5E\u96C6\u4E2D\u6DFB\u52A0\u591A\u500B\u95DC\u9375\u8A5E ");
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(13, "div", 401)(14, "button", 402);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_button_click_14_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_190_Template_button_click_14_listener() {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.cancelNewKeywordSet());
@@ -59333,7 +59373,7 @@ function AppComponent_Conditional_15_Conditional_185_Template(rf, ctx) {
     \u0275\u0275text(15, " \u53D6\u6D88 ");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(16, "button", 424);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_button_click_16_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_190_Template_button_click_16_listener() {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.submitNewKeywordSet());
@@ -59597,15 +59637,15 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275elementEnd()()()()()();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(136, "main", 110);
-    \u0275\u0275conditionalCreate(137, AppComponent_Conditional_15_Case_137_Template, 1, 0, "app-dashboard-view")(138, AppComponent_Conditional_15_Case_138_Template, 1, 0, "app-accounts-view")(139, AppComponent_Conditional_15_Case_139_Template, 1, 0, "app-add-account-page")(140, AppComponent_Conditional_15_Case_140_Template, 1, 0, "app-api-credentials-view")(141, AppComponent_Conditional_15_Case_141_Template, 1, 0, "app-settings-view")(142, AppComponent_Conditional_15_Case_142_Template, 1, 0, "app-leads-view")(143, AppComponent_Conditional_15_Case_143_Template, 1, 0, "app-automation-view")(144, AppComponent_Conditional_15_Case_144_Template, 1, 0, "app-resource-discovery-view")(145, AppComponent_Conditional_15_Case_145_Template, 1, 0, "app-resource-discovery-view")(146, AppComponent_Conditional_15_Case_146_Template, 1, 0, "app-ai-center-view")(147, AppComponent_Conditional_15_Case_147_Template, 2, 0, "div", 111)(148, AppComponent_Conditional_15_Case_148_Template, 2, 0, "div", 112)(149, AppComponent_Conditional_15_Case_149_Template, 2, 0, "div", 112)(150, AppComponent_Conditional_15_Case_150_Template, 1, 0, "app-multi-role-view")(151, AppComponent_Conditional_15_Case_151_Template, 1, 0, "app-analytics-view")(152, AppComponent_Conditional_15_Case_152_Template, 1, 0, "app-monitoring-view")(153, AppComponent_Conditional_15_Case_153_Template, 1, 0, "app-monitoring-view")(154, AppComponent_Conditional_15_Case_154_Template, 1, 0, "app-monitoring-view")(155, AppComponent_Conditional_15_Case_155_Template, 1, 0, "app-monitoring-view")(156, AppComponent_Conditional_15_Case_156_Template, 1, 0, "app-monitoring-view")(157, AppComponent_Conditional_15_Case_157_Template, 1, 0, "app-monitoring-view")(158, AppComponent_Conditional_15_Case_158_Template, 1, 0, "app-monitoring-view")(159, AppComponent_Conditional_15_Case_159_Template, 1, 0, "app-runtime-logs-view")(160, AppComponent_Conditional_15_Case_160_Template, 1, 0, "app-membership-center")(161, AppComponent_Conditional_15_Case_161_Template, 1, 0, "app-wallet-view")(162, AppComponent_Conditional_15_Case_162_Template, 1, 0, "app-profile")(163, AppComponent_Conditional_15_Case_163_Template, 1, 0, "app-resource-center")(164, AppComponent_Conditional_15_Case_164_Template, 1, 0, "app-search-discovery")(165, AppComponent_Conditional_15_Case_165_Template, 1, 0, "app-ai-marketing-assistant")(166, AppComponent_Conditional_15_Case_166_Template, 1, 0, "app-ai-team-hub")(167, AppComponent_Conditional_15_Case_167_Template, 1, 0, "app-member-database")(168, AppComponent_Conditional_15_Case_168_Template, 1, 0, "app-leads-view")(169, AppComponent_Conditional_15_Case_169_Template, 1, 0, "app-analytics-view")(170, AppComponent_Conditional_15_Case_170_Template, 1, 0, "app-analytics-view")(171, AppComponent_Conditional_15_Case_171_Template, 1, 0, "app-automation-view")(172, AppComponent_Conditional_15_Case_172_Template, 1, 0, "app-automation-view")(173, AppComponent_Conditional_15_Case_173_Template, 1, 0, "app-analytics-view")(174, AppComponent_Conditional_15_Case_174_Template, 1, 0, "app-marketing-report")(175, AppComponent_Conditional_15_Case_175_Template, 1, 0, "app-runtime-logs-view")(176, AppComponent_Conditional_15_Case_176_Template, 1, 0, "app-runtime-logs-view")(177, AppComponent_Conditional_15_Case_177_Template, 1, 0, "app-runtime-logs-view")(178, AppComponent_Conditional_15_Case_178_Template, 1, 0, "app-dashboard-view");
+    \u0275\u0275conditionalCreate(137, AppComponent_Conditional_15_Case_137_Template, 1, 0, "app-dashboard-view")(138, AppComponent_Conditional_15_Case_138_Template, 1, 0, "app-accounts-view")(139, AppComponent_Conditional_15_Case_139_Template, 1, 0, "app-add-account-page")(140, AppComponent_Conditional_15_Case_140_Template, 1, 0, "app-api-credentials-view")(141, AppComponent_Conditional_15_Case_141_Template, 1, 0, "app-settings-view")(142, AppComponent_Conditional_15_Case_142_Template, 1, 0, "app-leads-view")(143, AppComponent_Conditional_15_Case_143_Template, 1, 0, "app-automation-view")(144, AppComponent_Conditional_15_Case_144_Template, 1, 0, "app-resource-discovery-view")(145, AppComponent_Conditional_15_Case_145_Template, 1, 0, "app-resource-discovery-view")(146, AppComponent_Conditional_15_Case_146_Template, 1, 0, "app-ai-center-view")(147, AppComponent_Conditional_15_Case_147_Template, 2, 0, "div", 111)(148, AppComponent_Conditional_15_Case_148_Template, 2, 0, "div", 112)(149, AppComponent_Conditional_15_Case_149_Template, 2, 0, "div", 112)(150, AppComponent_Conditional_15_Case_150_Template, 1, 0, "app-multi-role-view")(151, AppComponent_Conditional_15_Case_151_Template, 1, 0, "app-analytics-view")(152, AppComponent_Conditional_15_Case_152_Template, 1, 0, "app-monitoring-view")(153, AppComponent_Conditional_15_Case_153_Template, 1, 0, "app-monitoring-view")(154, AppComponent_Conditional_15_Case_154_Template, 1, 0, "app-monitoring-view")(155, AppComponent_Conditional_15_Case_155_Template, 1, 0, "app-monitoring-view")(156, AppComponent_Conditional_15_Case_156_Template, 1, 0, "app-monitoring-view")(157, AppComponent_Conditional_15_Case_157_Template, 1, 0, "app-monitoring-view")(158, AppComponent_Conditional_15_Case_158_Template, 1, 0, "app-monitoring-view")(159, AppComponent_Conditional_15_Case_159_Template, 1, 0, "app-runtime-logs-view")(160, AppComponent_Conditional_15_Case_160_Template, 1, 0, "app-membership-center")(161, AppComponent_Conditional_15_Case_161_Template, 1, 0, "app-wallet-view")(162, AppComponent_Conditional_15_Case_162_Template, 1, 0, "app-wallet-recharge")(163, AppComponent_Conditional_15_Case_163_Template, 1, 0, "app-wallet-withdraw")(164, AppComponent_Conditional_15_Case_164_Template, 1, 0, "app-wallet-transactions")(165, AppComponent_Conditional_15_Case_165_Template, 1, 0, "app-wallet-orders")(166, AppComponent_Conditional_15_Case_166_Template, 1, 0, "app-wallet-analytics")(167, AppComponent_Conditional_15_Case_167_Template, 1, 0, "app-profile")(168, AppComponent_Conditional_15_Case_168_Template, 1, 0, "app-resource-center")(169, AppComponent_Conditional_15_Case_169_Template, 1, 0, "app-search-discovery")(170, AppComponent_Conditional_15_Case_170_Template, 1, 0, "app-ai-marketing-assistant")(171, AppComponent_Conditional_15_Case_171_Template, 1, 0, "app-ai-team-hub")(172, AppComponent_Conditional_15_Case_172_Template, 1, 0, "app-member-database")(173, AppComponent_Conditional_15_Case_173_Template, 1, 0, "app-leads-view")(174, AppComponent_Conditional_15_Case_174_Template, 1, 0, "app-analytics-view")(175, AppComponent_Conditional_15_Case_175_Template, 1, 0, "app-analytics-view")(176, AppComponent_Conditional_15_Case_176_Template, 1, 0, "app-automation-view")(177, AppComponent_Conditional_15_Case_177_Template, 1, 0, "app-automation-view")(178, AppComponent_Conditional_15_Case_178_Template, 1, 0, "app-analytics-view")(179, AppComponent_Conditional_15_Case_179_Template, 1, 0, "app-marketing-report")(180, AppComponent_Conditional_15_Case_180_Template, 1, 0, "app-runtime-logs-view")(181, AppComponent_Conditional_15_Case_181_Template, 1, 0, "app-runtime-logs-view")(182, AppComponent_Conditional_15_Case_182_Template, 1, 0, "app-runtime-logs-view")(183, AppComponent_Conditional_15_Case_183_Template, 1, 0, "app-dashboard-view");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(179, AppComponent_Conditional_15_Conditional_179_Template, 30, 24, "div", 113);
-    \u0275\u0275conditionalCreate(180, AppComponent_Conditional_15_Conditional_180_Template, 19, 1, "div", 114);
-    \u0275\u0275conditionalCreate(181, AppComponent_Conditional_15_Conditional_181_Template, 22, 9, "div", 115);
-    \u0275\u0275conditionalCreate(182, AppComponent_Conditional_15_Conditional_182_Template, 27, 3, "div", 115);
-    \u0275\u0275conditionalCreate(183, AppComponent_Conditional_15_Conditional_183_Template, 45, 1, "div", 115);
-    \u0275\u0275conditionalCreate(184, AppComponent_Conditional_15_Conditional_184_Template, 5, 0, "div", 116);
-    \u0275\u0275conditionalCreate(185, AppComponent_Conditional_15_Conditional_185_Template, 18, 1, "div", 117);
+    \u0275\u0275conditionalCreate(184, AppComponent_Conditional_15_Conditional_184_Template, 30, 24, "div", 113);
+    \u0275\u0275conditionalCreate(185, AppComponent_Conditional_15_Conditional_185_Template, 19, 1, "div", 114);
+    \u0275\u0275conditionalCreate(186, AppComponent_Conditional_15_Conditional_186_Template, 22, 9, "div", 115);
+    \u0275\u0275conditionalCreate(187, AppComponent_Conditional_15_Conditional_187_Template, 27, 3, "div", 115);
+    \u0275\u0275conditionalCreate(188, AppComponent_Conditional_15_Conditional_188_Template, 45, 1, "div", 115);
+    \u0275\u0275conditionalCreate(189, AppComponent_Conditional_15_Conditional_189_Template, 5, 0, "div", 116);
+    \u0275\u0275conditionalCreate(190, AppComponent_Conditional_15_Conditional_190_Template, 18, 1, "div", 117);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -59697,21 +59737,21 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275advance(3);
     \u0275\u0275styleProp("background-color", ctx_r0.theme() === "dark" ? "var(--primary-bg)" : "transparent")("color", ctx_r0.theme() === "dark" ? "var(--primary)" : "var(--text-muted)")("box-shadow", ctx_r0.theme() === "dark" ? "var(--shadow-sm)" : "none");
     \u0275\u0275advance(4);
-    \u0275\u0275conditional((tmp_75_0 = ctx_r0.currentView()) === "dashboard" ? 137 : tmp_75_0 === "accounts" ? 138 : tmp_75_0 === "add-account" ? 139 : tmp_75_0 === "api-credentials" ? 140 : tmp_75_0 === "settings" ? 141 : tmp_75_0 === "leads" ? 142 : tmp_75_0 === "automation" ? 143 : tmp_75_0 === "resource-discovery" ? 144 : tmp_75_0 === "resources" ? 145 : tmp_75_0 === "ai-center" ? 146 : tmp_75_0 === "knowledge-brain" ? 147 : tmp_75_0 === "knowledge-gaps" ? 148 : tmp_75_0 === "knowledge-manage" ? 149 : tmp_75_0 === "multi-role" ? 150 : tmp_75_0 === "analytics" ? 151 : tmp_75_0 === "monitoring" ? 152 : tmp_75_0 === "monitoring-accounts" ? 153 : tmp_75_0 === "monitoring-groups" ? 154 : tmp_75_0 === "keyword-sets" ? 155 : tmp_75_0 === "chat-templates" ? 156 : tmp_75_0 === "trigger-rules" ? 157 : tmp_75_0 === "collected-users" ? 158 : tmp_75_0 === "runtime-logs" ? 159 : tmp_75_0 === "membership-center" ? 160 : tmp_75_0 === "wallet" ? 161 : tmp_75_0 === "profile" ? 162 : tmp_75_0 === "resource-center" ? 163 : tmp_75_0 === "search-discovery" ? 164 : tmp_75_0 === "ai-assistant" ? 165 : tmp_75_0 === "ai-team" ? 166 : tmp_75_0 === "member-database" ? 167 : tmp_75_0 === "lead-nurturing" ? 168 : tmp_75_0 === "nurturing-analytics" ? 169 : tmp_75_0 === "user-tracking" ? 170 : tmp_75_0 === "ads" ? 171 : tmp_75_0 === "campaigns" ? 172 : tmp_75_0 === "analytics-center" ? 173 : tmp_75_0 === "marketing-report" ? 174 : tmp_75_0 === "performance" ? 175 : tmp_75_0 === "alerts" ? 176 : tmp_75_0 === "logs" ? 177 : 178);
-    \u0275\u0275advance(42);
-    \u0275\u0275conditional((tmp_76_0 = ctx_r0.generationState().lead) ? 179 : -1, tmp_76_0);
+    \u0275\u0275conditional((tmp_75_0 = ctx_r0.currentView()) === "dashboard" ? 137 : tmp_75_0 === "accounts" ? 138 : tmp_75_0 === "add-account" ? 139 : tmp_75_0 === "api-credentials" ? 140 : tmp_75_0 === "settings" ? 141 : tmp_75_0 === "leads" ? 142 : tmp_75_0 === "automation" ? 143 : tmp_75_0 === "resource-discovery" ? 144 : tmp_75_0 === "resources" ? 145 : tmp_75_0 === "ai-center" ? 146 : tmp_75_0 === "knowledge-brain" ? 147 : tmp_75_0 === "knowledge-gaps" ? 148 : tmp_75_0 === "knowledge-manage" ? 149 : tmp_75_0 === "multi-role" ? 150 : tmp_75_0 === "analytics" ? 151 : tmp_75_0 === "monitoring" ? 152 : tmp_75_0 === "monitoring-accounts" ? 153 : tmp_75_0 === "monitoring-groups" ? 154 : tmp_75_0 === "keyword-sets" ? 155 : tmp_75_0 === "chat-templates" ? 156 : tmp_75_0 === "trigger-rules" ? 157 : tmp_75_0 === "collected-users" ? 158 : tmp_75_0 === "runtime-logs" ? 159 : tmp_75_0 === "membership-center" ? 160 : tmp_75_0 === "wallet" ? 161 : tmp_75_0 === "wallet-recharge" ? 162 : tmp_75_0 === "wallet-withdraw" ? 163 : tmp_75_0 === "wallet-transactions" ? 164 : tmp_75_0 === "wallet-orders" ? 165 : tmp_75_0 === "wallet-analytics" ? 166 : tmp_75_0 === "profile" ? 167 : tmp_75_0 === "resource-center" ? 168 : tmp_75_0 === "search-discovery" ? 169 : tmp_75_0 === "ai-assistant" ? 170 : tmp_75_0 === "ai-team" ? 171 : tmp_75_0 === "member-database" ? 172 : tmp_75_0 === "lead-nurturing" ? 173 : tmp_75_0 === "nurturing-analytics" ? 174 : tmp_75_0 === "user-tracking" ? 175 : tmp_75_0 === "ads" ? 176 : tmp_75_0 === "campaigns" ? 177 : tmp_75_0 === "analytics-center" ? 178 : tmp_75_0 === "marketing-report" ? 179 : tmp_75_0 === "performance" ? 180 : tmp_75_0 === "alerts" ? 181 : tmp_75_0 === "logs" ? 182 : 183);
+    \u0275\u0275advance(47);
+    \u0275\u0275conditional((tmp_76_0 = ctx_r0.generationState().lead) ? 184 : -1, tmp_76_0);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showBatchOperationHistory() ? 180 : -1);
+    \u0275\u0275conditional(ctx_r0.showBatchOperationHistory() ? 185 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showWelcomeDialog() ? 181 : -1);
+    \u0275\u0275conditional(ctx_r0.showWelcomeDialog() ? 186 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showOrphanSessionDialog() ? 182 : -1);
+    \u0275\u0275conditional(ctx_r0.showOrphanSessionDialog() ? 187 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showBackendErrorDialog() ? 183 : -1);
+    \u0275\u0275conditional(ctx_r0.showBackendErrorDialog() ? 188 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(!ctx_r0.backendRunning() ? 184 : -1);
+    \u0275\u0275conditional(!ctx_r0.backendRunning() ? 189 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showKeywordSetCreator() ? 185 : -1);
+    \u0275\u0275conditional(ctx_r0.showKeywordSetCreator() ? 190 : -1);
   }
 }
 function AppComponent_Conditional_16_Template(rf, ctx) {
@@ -70933,7 +70973,7 @@ ${details}`, 12e3);
         \u0275\u0275elementEnd();
         \u0275\u0275element(11, "app-membership-dialog")(12, "app-payment")(13, "app-upgrade-prompt");
         \u0275\u0275conditionalCreate(14, AppComponent_Conditional_14_Template, 4, 0, "div", 7);
-        \u0275\u0275conditionalCreate(15, AppComponent_Conditional_15_Template, 186, 130, "div", 8)(16, AppComponent_Conditional_16_Template, 2, 0, "div", 9);
+        \u0275\u0275conditionalCreate(15, AppComponent_Conditional_15_Template, 191, 130, "div", 8)(16, AppComponent_Conditional_16_Template, 2, 0, "div", 9);
       }
       if (rf & 2) {
         \u0275\u0275advance(5);
@@ -70986,6 +71026,11 @@ ${details}`, 12e3);
       ApiCredentialsViewComponent,
       // 🆕 錢包視圖
       WalletViewComponent,
+      WalletRechargeComponent,
+      WalletWithdrawComponent,
+      WalletTransactionsComponent,
+      WalletOrdersComponent,
+      WalletAnalyticsComponent,
       // 🆕 知識大腦獨立組件
       AIBrainComponent,
       KnowledgeGapsComponent,
@@ -71051,6 +71096,11 @@ ${details}`, 12e3);
       ApiCredentialsViewComponent,
       // 🆕 錢包視圖
       WalletViewComponent,
+      WalletRechargeComponent,
+      WalletWithdrawComponent,
+      WalletTransactionsComponent,
+      WalletOrdersComponent,
+      WalletAnalyticsComponent,
       // 🆕 知識大腦獨立組件
       AIBrainComponent,
       KnowledgeGapsComponent,
@@ -72132,6 +72182,21 @@ ${details}`, 12e3);
       @case ('wallet') {
         <app-wallet-view></app-wallet-view>
       }
+      @case ('wallet-recharge') {
+        <app-wallet-recharge></app-wallet-recharge>
+      }
+      @case ('wallet-withdraw') {
+        <app-wallet-withdraw></app-wallet-withdraw>
+      }
+      @case ('wallet-transactions') {
+        <app-wallet-transactions></app-wallet-transactions>
+      }
+      @case ('wallet-orders') {
+        <app-wallet-orders></app-wallet-orders>
+      }
+      @case ('wallet-analytics') {
+        <app-wallet-analytics></app-wallet-analytics>
+      }
       @case ('profile') {
         <app-profile></app-profile>
       }
@@ -73135,7 +73200,7 @@ ${details}`, 12e3);
   }] });
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(AppComponent, { className: "AppComponent", filePath: "src/app.component.ts", lineNumber: 326 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(AppComponent, { className: "AppComponent", filePath: "src/app.component.ts", lineNumber: 332 });
 })();
 
 // src/guards/auth.guard.ts
@@ -73231,7 +73296,7 @@ var routes = [
   // 認證路由（公開）
   {
     path: "auth",
-    loadChildren: () => import("./chunk-AV65AVMD.js").then((m) => m.AUTH_ROUTES)
+    loadChildren: () => import("./chunk-LT4HX64S.js").then((m) => m.AUTH_ROUTES)
   },
   // 簡化路由
   {
@@ -73252,26 +73317,26 @@ var routes = [
   // 核心功能 - SaaS 模式需要登入
   {
     path: "dashboard",
-    loadComponent: () => import("./chunk-SCVERDCC.js").then((m) => m.DashboardViewComponent),
+    loadComponent: () => import("./chunk-O5KIONO7.js").then((m) => m.DashboardViewComponent),
     title: "\u5100\u8868\u677F",
     canActivate: [authGuard]
   },
   {
     path: "accounts",
-    loadComponent: () => import("./chunk-MNOUWP3H.js").then((m) => m.AccountsViewComponent),
+    loadComponent: () => import("./chunk-SUCRCJ3C.js").then((m) => m.AccountsViewComponent),
     title: "\u5E33\u865F\u7BA1\u7406",
     canActivate: [authGuard]
   },
   {
     path: "settings",
-    loadComponent: () => import("./chunk-CUMVDTBZ.js").then((m) => m.SettingsViewComponent),
+    loadComponent: () => import("./chunk-EKNLXUNE.js").then((m) => m.SettingsViewComponent),
     title: "\u8A2D\u5B9A",
     canActivate: [authGuard]
   },
   // 用戶設置頁面
   {
     path: "user-settings",
-    loadComponent: () => import("./chunk-2Y7VKGTH.js").then((m) => m.UserSettingsViewComponent),
+    loadComponent: () => import("./chunk-T5WLAWVZ.js").then((m) => m.UserSettingsViewComponent),
     title: "\u7528\u6236\u8A2D\u7F6E",
     canActivate: [authGuard]
   },
@@ -73306,31 +73371,31 @@ var routes = [
   // 🆕 Phase 0: 錢包系統 - 具體路由必須在通用路由之前
   {
     path: "wallet/recharge",
-    loadComponent: () => import("./chunk-XHVPHUVH.js").then((m) => m.WalletRechargeComponent),
+    loadComponent: () => import("./chunk-PQVIWI3X.js").then((m) => m.WalletRechargeComponent),
     title: "\u5145\u503C\u4E2D\u5FC3",
     canActivate: [authGuard]
   },
   {
     path: "wallet/withdraw",
-    loadComponent: () => import("./chunk-C5XUP5QL.js").then((m) => m.WalletWithdrawComponent),
+    loadComponent: () => import("./chunk-2RXUWTRV.js").then((m) => m.WalletWithdrawComponent),
     title: "\u63D0\u73FE",
     canActivate: [authGuard]
   },
   {
     path: "wallet/transactions",
-    loadComponent: () => import("./chunk-HS6ZQUDV.js").then((m) => m.WalletTransactionsComponent),
+    loadComponent: () => import("./chunk-G5JKGZJR.js").then((m) => m.WalletTransactionsComponent),
     title: "\u4EA4\u6613\u8A18\u9304",
     canActivate: [authGuard]
   },
   {
     path: "wallet/orders",
-    loadComponent: () => import("./chunk-UIUXT5GK.js").then((m) => m.WalletOrdersComponent),
+    loadComponent: () => import("./chunk-I6KDY4FP.js").then((m) => m.WalletOrdersComponent),
     title: "\u5145\u503C\u8A02\u55AE",
     canActivate: [authGuard]
   },
   {
     path: "wallet/analytics",
-    loadComponent: () => import("./chunk-WT5NPJNS.js").then((m) => m.WalletAnalyticsComponent),
+    loadComponent: () => import("./chunk-PIBHNFTA.js").then((m) => m.WalletAnalyticsComponent),
     title: "\u6D88\u8CBB\u5206\u6790",
     canActivate: [authGuard]
   },
@@ -73338,26 +73403,26 @@ var routes = [
   {
     path: "wallet",
     pathMatch: "full",
-    loadComponent: () => import("./chunk-YFQK2ZWN.js").then((m) => m.WalletViewComponent),
+    loadComponent: () => import("./chunk-SMQUEGCF.js").then((m) => m.WalletViewComponent),
     title: "\u6211\u7684\u9322\u5305",
     canActivate: [authGuard]
   },
   // 營銷功能 - 需要會員權限
   {
     path: "leads",
-    loadComponent: () => import("./chunk-2HE35X3R.js").then((m) => m.LeadsViewComponent),
+    loadComponent: () => import("./chunk-VILAJUIX.js").then((m) => m.LeadsViewComponent),
     title: "\u6F5B\u5728\u5BA2\u6236",
     canActivate: [membershipGuard]
   },
   {
     path: "automation",
-    loadComponent: () => import("./chunk-AXQ2RNLY.js").then((m) => m.AutomationViewComponent),
+    loadComponent: () => import("./chunk-SY7H7ZZ3.js").then((m) => m.AutomationViewComponent),
     title: "\u81EA\u52D5\u5316\u4E2D\u5FC3",
     canActivate: [membershipGuard]
   },
   {
     path: "resource-discovery",
-    loadComponent: () => import("./chunk-XMIBLV5E.js").then((m) => m.ResourceDiscoveryViewComponent),
+    loadComponent: () => import("./chunk-KFP6RLVL.js").then((m) => m.ResourceDiscoveryViewComponent),
     title: "\u8CC7\u6E90\u767C\u73FE",
     canActivate: [membershipGuard]
   },
@@ -73365,21 +73430,21 @@ var routes = [
   // 營銷任務中心（核心入口）
   {
     path: "marketing-hub",
-    loadComponent: () => import("./chunk-4S7TKFLO.js").then((m) => m.SmartMarketingViewComponent),
+    loadComponent: () => import("./chunk-V5PTZIL2.js").then((m) => m.SmartMarketingViewComponent),
     title: "\u71DF\u92B7\u4EFB\u52D9\u4E2D\u5FC3",
     canActivate: [membershipGuard]
   },
   // 角色資源庫（原多角色協作的資產部分）
   {
     path: "role-library",
-    loadComponent: () => import("./chunk-UXFDWNWG.js").then((m) => m.MultiRoleViewComponent),
+    loadComponent: () => import("./chunk-C6OUJJP7.js").then((m) => m.MultiRoleViewComponent),
     title: "\u89D2\u8272\u8CC7\u6E90\u5EAB",
     canActivate: [membershipGuard]
   },
   // 智能引擎（原 AI 中心的配置部分）
   {
     path: "ai-engine",
-    loadComponent: () => import("./chunk-6LK3M3PG.js").then((m) => m.AiCenterViewComponent),
+    loadComponent: () => import("./chunk-VDWXJIUC.js").then((m) => m.AiCenterViewComponent),
     title: "\u667A\u80FD\u5F15\u64CE",
     canActivate: [membershipGuard]
   },
@@ -73402,14 +73467,14 @@ var routes = [
   // 數據分析 - 需要高級會員
   {
     path: "analytics",
-    loadComponent: () => import("./chunk-FL74WIPM.js").then((m) => m.AnalyticsViewComponent),
+    loadComponent: () => import("./chunk-IS6VYSYW.js").then((m) => m.AnalyticsViewComponent),
     title: "\u6578\u64DA\u5206\u6790",
     canActivate: [membershipGuard]
   },
   // 系統功能 - 無權限限制
   {
     path: "monitoring",
-    loadComponent: () => import("./chunk-JOPGMT5L.js").then((m) => m.MonitoringViewComponent),
+    loadComponent: () => import("./chunk-XHNWZCGE.js").then((m) => m.MonitoringViewComponent),
     title: "\u76E3\u63A7\u4E2D\u5FC3"
   },
   // 向下兼容舊路由（重定向到設置頁）

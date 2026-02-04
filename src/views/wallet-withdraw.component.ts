@@ -781,7 +781,8 @@ export class WalletWithdrawComponent implements OnInit {
       if (response?.success) {
         alert('提現申請已提交，請等待審核');
         await this.walletService.loadWallet();
-        this.router.navigate(['/wallet']);
+        // 使用全局事件返回錢包頁
+        window.dispatchEvent(new CustomEvent('changeView', { detail: 'wallet' }));
       } else {
         alert(response?.error || '提現失敗');
       }
@@ -811,6 +812,7 @@ export class WalletWithdrawComponent implements OnInit {
   }
   
   goBack() {
-    this.router.navigate(['/wallet']);
+    // 使用全局事件返回錢包頁
+    window.dispatchEvent(new CustomEvent('changeView', { detail: 'wallet' }));
   }
 }

@@ -25,11 +25,21 @@ class CouponHandlers:
         self.coupon_service = get_coupon_service()
     
     def _verify_token(self, request: web.Request) -> Optional[Dict]:
+        """驗證 JWT Token - 使用與 auth 模塊相同的驗證邏輯"""
         auth_header = request.headers.get('Authorization', '')
         if not auth_header.startswith('Bearer '):
             return None
         
         token = auth_header[7:]
+        
+        # 優先使用 auth 模塊的驗證函數（確保格式兼容）
+        try:
+            from auth.utils import verify_token as auth_verify_token
+            return auth_verify_token(token)
+        except ImportError:
+            pass
+        
+        # 備用：使用 PyJWT
         try:
             return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         except:

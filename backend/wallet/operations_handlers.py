@@ -538,6 +538,8 @@ class OperationsHandlers:
                         WHERE type = 'consume' AND created_at >= ?
                         GROUP BY category
                         ORDER BY amount DESC
+                    ''', (since,))
+                    category_distribution = [dict(row) for row in cursor.fetchall()]
                 
                 # 用戶活躍度（有交易的用戶數）
                 cursor.execute('''

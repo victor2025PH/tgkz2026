@@ -6,8 +6,8 @@
  * 🆕 Phase 25: 添加智能預加載策略
  */
 
-import { ApplicationConfig, importProvidersFrom } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { ApplicationConfig, importProvidersFrom, isDevMode } from '@angular/core';
+import { provideRouter, withDebugTracing } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { routes } from './app.routes';
@@ -19,8 +19,8 @@ import { authInterceptor } from './core/auth.interceptor';
  */
 export const appConfig: ApplicationConfig = {
   providers: [
-    // 路由配置 - 簡化版
-    provideRouter(routes),
+    // 路由配置 - 添加調試追蹤以診斷導航問題
+    provideRouter(routes, withDebugTracing()),
     
     // 🆕 HTTP 客戶端 + 認證攔截器
     provideHttpClient(withInterceptors([authInterceptor])),

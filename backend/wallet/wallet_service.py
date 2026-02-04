@@ -690,26 +690,39 @@ class WalletService:
             # 生成唯一訂單號
             order_id = f"ADJ_{datetime.now().strftime('%Y%m%d%H%M%S')}_{user_id[:8]}"
             
-            # 獲取當前錢包狀態
-            cursor.execute('''
-                SELECT * FROM user_wallets 
-                WHERE id = ?
-            ''', (wallet.id,))
+            # 獲取當前錢包狀態（使用正確的表名和 ID 欄位）
+            table_name = self._wallet_table
+            balance_col = self._balance_column
+            
+            # 根據表結構使用不同的查詢方式
+            if self._use_legacy_table:
+                cursor.execute(f'SELECT * FROM {table_name} WHERE id = ?', (wallet.id,))
+            else:
+                # 新表使用 user_id 查詢
+                cursor.execute(f'SELECT * FROM {table_name} WHERE user_id = ?', (user_id,))
             
             current = cursor.fetchone()
             if not current:
                 conn.rollback()
-                return False, "錢包不存在", None
+                return False, f"錢包不存在（user_id: {user_id}）", None
             
             current = dict(current)
-            balance_before = current['balance'] + current['bonus_balance']
+            
+            # 適配不同的欄位名稱
+            current_balance = current.get('balance', current.get('main_balance', 0))
+            current_bonus = current.get('bonus_balance', 0)
+            current_recharged = current.get('total_recharged', 0)
+            current_version = current.get('version', 0)
+            wallet_id_col = current.get('id', current.get('user_id'))
+            
+            balance_before = current_balance + current_bonus
             
             # 處理加款或扣款
             if amount > 0:
                 # 加款
-                new_balance = current['balance'] + amount
-                new_bonus = current['bonus_balance']
-                new_total_recharged = current['total_recharged'] + amount
+                new_balance = current_balance + amount
+                new_bonus = current_bonus
+                new_total_recharged = current_recharged + amount
                 tx_type = TransactionType.ADJUST.value
             else:
                 # 扣款
@@ -721,30 +734,43 @@ class WalletService:
                     return False, f"餘額不足（當前 ${balance_before/100:.2f}，需扣 ${deduct_amount/100:.2f}）", None
                 
                 # 優先扣贈送餘額
-                bonus_deduct = min(current['bonus_balance'], deduct_amount)
+                bonus_deduct = min(current_bonus, deduct_amount)
                 main_deduct = deduct_amount - bonus_deduct
                 
-                new_balance = current['balance'] - main_deduct
-                new_bonus = current['bonus_balance'] - bonus_deduct
-                new_total_recharged = current['total_recharged']
+                new_balance = current_balance - main_deduct
+                new_bonus = current_bonus - bonus_deduct
+                new_total_recharged = current_recharged
                 tx_type = TransactionType.ADJUST.value
             
-            new_version = current['version'] + 1
+            new_version = current_version + 1
             now = datetime.now().isoformat()
             
-            # 更新錢包
-            cursor.execute('''
-                UPDATE user_wallets SET
-                    balance = ?,
-                    bonus_balance = ?,
-                    total_recharged = ?,
-                    version = ?,
-                    updated_at = ?
-                WHERE id = ?
-            ''', (
-                new_balance, new_bonus, new_total_recharged,
-                new_version, now, wallet.id
-            ))
+            # 更新錢包（使用正確的表名和欄位名）
+            if self._use_legacy_table:
+                cursor.execute(f'''
+                    UPDATE {table_name} SET
+                        balance = ?,
+                        bonus_balance = ?,
+                        total_recharged = ?,
+                        version = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                ''', (
+                    new_balance, new_bonus, new_total_recharged,
+                    new_version, now, wallet.id
+                ))
+            else:
+                cursor.execute(f'''
+                    UPDATE {table_name} SET
+                        main_balance = ?,
+                        bonus_balance = ?,
+                        total_recharged = ?,
+                        version = ?
+                    WHERE user_id = ?
+                ''', (
+                    new_balance, new_bonus, new_total_recharged,
+                    new_version, user_id
+                ))
             
             if cursor.rowcount == 0:
                 conn.rollback()

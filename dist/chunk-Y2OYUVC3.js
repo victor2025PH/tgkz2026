@@ -1,6 +1,6 @@
 import {
   WalletService
-} from "./chunk-EULKY6Q3.js";
+} from "./chunk-SHLIDGEQ.js";
 import {
   Router
 } from "./chunk-T45T4QAG.js";
@@ -743,4 +743,4 @@ var WalletRechargeComponent = class _WalletRechargeComponent {
 export {
   WalletRechargeComponent
 };
-//# sourceMappingURL=chunk-JXYNRSN2.js.map
+//# sourceMappingURL=chunk-Y2OYUVC3.js.map

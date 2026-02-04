@@ -1,16 +1,16 @@
 import {
   authGuard
-} from "./chunk-NO5LBIL7.js";
+} from "./chunk-VQR5VYK7.js";
 import {
   WalletOrdersComponent
-} from "./chunk-OO3OKJAP.js";
+} from "./chunk-NHZFJLXI.js";
 import {
   WalletAnalyticsComponent
-} from "./chunk-5UN3WYRC.js";
+} from "./chunk-NQL4W4QD.js";
 import {
   AuthEventsService,
   AuthService
-} from "./chunk-PBTZGQFB.js";
+} from "./chunk-423OWQPI.js";
 import {
   AiCenterViewComponent
 } from "./chunk-AIZRAQX3.js";
@@ -31,20 +31,20 @@ import {
 } from "./chunk-BKUHQXQW.js";
 import {
   WalletViewComponent
-} from "./chunk-MGDT2LSN.js";
+} from "./chunk-PU7FE73R.js";
 import {
   WalletRechargeComponent
-} from "./chunk-JXYNRSN2.js";
+} from "./chunk-Y2OYUVC3.js";
 import {
   WalletWithdrawComponent
-} from "./chunk-O4PWW7BP.js";
+} from "./chunk-4RVBPDFN.js";
 import {
   WalletTransactionsComponent
-} from "./chunk-XNTA42SR.js";
+} from "./chunk-UIVMVHZW.js";
 import {
   WalletService
-} from "./chunk-EULKY6Q3.js";
-import "./chunk-HOUP2MV6.js";
+} from "./chunk-SHLIDGEQ.js";
+import "./chunk-ZLNZFOTQ.js";
 import {
   LicenseClientService
 } from "./chunk-SDTPNQBR.js";
@@ -73296,7 +73296,7 @@ var routes = [
   // 認證路由（公開）
   {
     path: "auth",
-    loadChildren: () => import("./chunk-LT4HX64S.js").then((m) => m.AUTH_ROUTES)
+    loadChildren: () => import("./chunk-ZSEBFUIG.js").then((m) => m.AUTH_ROUTES)
   },
   // 簡化路由
   {
@@ -73336,21 +73336,21 @@ var routes = [
   // 用戶設置頁面
   {
     path: "user-settings",
-    loadComponent: () => import("./chunk-T5WLAWVZ.js").then((m) => m.UserSettingsViewComponent),
+    loadComponent: () => import("./chunk-JWAKXODX.js").then((m) => m.UserSettingsViewComponent),
     title: "\u7528\u6236\u8A2D\u7F6E",
     canActivate: [authGuard]
   },
   // 訂閱升級頁面
   {
     path: "upgrade",
-    loadComponent: () => import("./chunk-46GAQ4U7.js").then((m) => m.UpgradeViewComponent),
+    loadComponent: () => import("./chunk-IETHU27B.js").then((m) => m.UpgradeViewComponent),
     title: "\u5347\u7D1A\u65B9\u6848",
     canActivate: [authGuard]
   },
   // 配額管理儀表板
   {
     path: "quota",
-    loadComponent: () => import("./chunk-6TB3IBLJ.js").then((m) => m.QuotaDashboardViewComponent),
+    loadComponent: () => import("./chunk-UHWYC3RF.js").then((m) => m.QuotaDashboardViewComponent),
     title: "\u914D\u984D\u7BA1\u7406",
     canActivate: [authGuard]
   },
@@ -73371,31 +73371,31 @@ var routes = [
   // 🆕 Phase 0: 錢包系統 - 具體路由必須在通用路由之前
   {
     path: "wallet/recharge",
-    loadComponent: () => import("./chunk-PQVIWI3X.js").then((m) => m.WalletRechargeComponent),
+    loadComponent: () => import("./chunk-3ZUAAXLE.js").then((m) => m.WalletRechargeComponent),
     title: "\u5145\u503C\u4E2D\u5FC3",
     canActivate: [authGuard]
   },
   {
     path: "wallet/withdraw",
-    loadComponent: () => import("./chunk-2RXUWTRV.js").then((m) => m.WalletWithdrawComponent),
+    loadComponent: () => import("./chunk-NJORXZB7.js").then((m) => m.WalletWithdrawComponent),
     title: "\u63D0\u73FE",
     canActivate: [authGuard]
   },
   {
     path: "wallet/transactions",
-    loadComponent: () => import("./chunk-G5JKGZJR.js").then((m) => m.WalletTransactionsComponent),
+    loadComponent: () => import("./chunk-MRMXKPQI.js").then((m) => m.WalletTransactionsComponent),
     title: "\u4EA4\u6613\u8A18\u9304",
     canActivate: [authGuard]
   },
   {
     path: "wallet/orders",
-    loadComponent: () => import("./chunk-I6KDY4FP.js").then((m) => m.WalletOrdersComponent),
+    loadComponent: () => import("./chunk-M22OLPNL.js").then((m) => m.WalletOrdersComponent),
     title: "\u5145\u503C\u8A02\u55AE",
     canActivate: [authGuard]
   },
   {
     path: "wallet/analytics",
-    loadComponent: () => import("./chunk-PIBHNFTA.js").then((m) => m.WalletAnalyticsComponent),
+    loadComponent: () => import("./chunk-GXFMYXKX.js").then((m) => m.WalletAnalyticsComponent),
     title: "\u6D88\u8CBB\u5206\u6790",
     canActivate: [authGuard]
   },
@@ -73403,7 +73403,7 @@ var routes = [
   {
     path: "wallet",
     pathMatch: "full",
-    loadComponent: () => import("./chunk-SMQUEGCF.js").then((m) => m.WalletViewComponent),
+    loadComponent: () => import("./chunk-ZA3GSVIY.js").then((m) => m.WalletViewComponent),
     title: "\u6211\u7684\u9322\u5305",
     canActivate: [authGuard]
   },

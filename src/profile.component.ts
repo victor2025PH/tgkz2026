@@ -7,6 +7,7 @@ import { Component, signal, computed, inject, OnInit, OnDestroy, ChangeDetectorR
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, DeviceInfo, UsageStats } from './auth.service';
+import { AuthEventsService } from './core/auth-events.service';  // 🆕 用於廣播用戶更新
 import { Router } from '@angular/router';
 import { DeviceService } from './device.service';
 import { I18nService } from './i18n.service';
@@ -1274,6 +1275,7 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
 })
 export class ProfileComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
+  private authEvents = inject(AuthEventsService);  // 🆕 用於廣播用戶更新
   private deviceService = inject(DeviceService);
   private i18n = inject(I18nService);
   private toast = inject(ToastService);
@@ -1367,6 +1369,8 @@ export class ProfileComponent implements OnInit, OnDestroy {
     // 如果已有用戶信息，直接返回
     if (this.user()?.username) {
       console.log('[Profile] User already loaded:', this.user()?.username);
+      // 🆕 廣播用戶數據，確保其他服務也同步
+      this.authEvents.emitUserUpdate(this.user());
       return;
     }
     
@@ -1379,6 +1383,8 @@ export class ProfileComponent implements OnInit, OnDestroy {
       
       if (user) {
         console.log('[Profile] User loaded successfully:', user.username);
+        // 🆕 廣播用戶更新事件，通知其他服務同步
+        this.authEvents.emitUserUpdate(user);
       } else {
         console.warn('[Profile] No user returned from API');
         this.userLoadError.set('無法獲取用戶信息');

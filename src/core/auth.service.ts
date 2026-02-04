@@ -121,11 +121,16 @@ export class AuthService implements OnDestroy {
     this.restoreSession();
     this._initialized = true;
     
-    // 🆕 訂閱認證事件（處理來自其他服務的登出通知）
+    // 🆕 訂閱認證事件（處理來自其他服務的登出通知和用戶更新）
     this.eventSubscription = this.authEvents.authEvents$.subscribe(event => {
       if (event.type === 'logout') {
         console.log('[CoreAuthService] Received logout event, clearing state');
         this.clearAuthStateInternal();
+      } else if (event.type === 'user_update' && event.payload?.user) {
+        console.log('[CoreAuthService] Received user_update event, syncing user data');
+        this._user.set(event.payload.user);
+        // 同步更新 localStorage
+        localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(event.payload.user));
       }
     });
     

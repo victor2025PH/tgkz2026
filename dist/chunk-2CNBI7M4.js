@@ -1,9 +1,9 @@
 import {
   WalletService
-} from "./chunk-SHLIDGEQ.js";
+} from "./chunk-YAIK3ALD.js";
 import {
   ApiService
-} from "./chunk-ZLNZFOTQ.js";
+} from "./chunk-LRT2RG6V.js";
 import {
   Router
 } from "./chunk-T45T4QAG.js";
@@ -1019,4 +1019,4 @@ var WalletViewComponent = class _WalletViewComponent {
 export {
   WalletViewComponent
 };
-//# sourceMappingURL=chunk-PU7FE73R.js.map
+//# sourceMappingURL=chunk-2CNBI7M4.js.map

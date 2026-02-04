@@ -1,7 +1,7 @@
 import {
   AuthService
-} from "./chunk-423OWQPI.js";
-import "./chunk-ZLNZFOTQ.js";
+} from "./chunk-AHTF6AO6.js";
+import "./chunk-LRT2RG6V.js";
 import {
   ActivatedRoute,
   Router
@@ -204,4 +204,4 @@ var TelegramCallbackComponent = class _TelegramCallbackComponent {
 export {
   TelegramCallbackComponent
 };
-//# sourceMappingURL=chunk-JWEKUNB7.js.map
+//# sourceMappingURL=chunk-WTBMG5QQ.js.map

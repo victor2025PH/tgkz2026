@@ -330,18 +330,15 @@ var ApiService = class _ApiService {
   }
   /**
    * 處理 401 未授權錯誤
+   * 注意：不再自動清除認證或重定向，只記錄日誌
+   * 讓用戶手動重新登錄以避免意外登出
    */
   handleUnauthorized() {
-    localStorage.removeItem("tgm_access_token");
-    localStorage.removeItem("tgm_refresh_token");
-    localStorage.removeItem("tgm_user");
-    window.dispatchEvent(new CustomEvent("auth:logout"));
-    window.dispatchEvent(new CustomEvent("changeView", { detail: "login" }));
-    setTimeout(() => {
-      if (window.location.pathname !== "/auth/login") {
-        window.location.href = "/auth/login";
-      }
-    }, 100);
+    console.warn("[ApiService] 401 Unauthorized - Token may be expired or invalid");
+    console.warn("[ApiService] Please try logging out and logging back in");
+    window.dispatchEvent(new CustomEvent("auth:unauthorized", {
+      detail: { message: "\u767B\u9304\u5DF2\u904E\u671F\uFF0C\u8ACB\u91CD\u65B0\u767B\u9304" }
+    }));
   }
   /**
    * HTTP POST 請求
@@ -455,4 +452,4 @@ var ApiService = class _ApiService {
 export {
   ApiService
 };
-//# sourceMappingURL=chunk-ZLNZFOTQ.js.map
+//# sourceMappingURL=chunk-LRT2RG6V.js.map

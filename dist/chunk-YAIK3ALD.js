@@ -1,6 +1,6 @@
 import {
   ApiService
-} from "./chunk-ZLNZFOTQ.js";
+} from "./chunk-LRT2RG6V.js";
 import {
   Injectable,
   __spreadProps,
@@ -684,4 +684,4 @@ var WalletService = class _WalletService {
 export {
   WalletService
 };
-//# sourceMappingURL=chunk-SHLIDGEQ.js.map
+//# sourceMappingURL=chunk-YAIK3ALD.js.map

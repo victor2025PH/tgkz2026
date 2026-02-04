@@ -56727,7 +56727,7 @@ function AppComponent_Conditional_15_Conditional_76_Template(rf, ctx) {
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(13, "span");
-    \u0275\u0275text(14, "\u641C\u7D22\u767C\u73FE");
+    \u0275\u0275text(14);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(15, "span", 166);
     \u0275\u0275text(16, "NEW");
@@ -56744,7 +56744,7 @@ function AppComponent_Conditional_15_Conditional_76_Template(rf, ctx) {
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(22, "span");
-    \u0275\u0275text(23, "\u8CC7\u6E90\u4E2D\u5FC3");
+    \u0275\u0275text(23);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(24, "a", 83);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_76_Template_a_click_24_listener() {
@@ -56758,7 +56758,7 @@ function AppComponent_Conditional_15_Conditional_76_Template(rf, ctx) {
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(28, "span");
-    \u0275\u0275text(29, "\u767C\u9001\u63A7\u5236\u53F0");
+    \u0275\u0275text(29);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -56773,12 +56773,18 @@ function AppComponent_Conditional_15_Conditional_76_Template(rf, ctx) {
     \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "search-discovery" ? "rgba(6, 182, 212, 0.2)" : "transparent")("color", view_r12 === "search-discovery" ? "#22d3ee" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r12 === "search-discovery");
-    \u0275\u0275advance(8);
+    \u0275\u0275advance(5);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.searchDiscovery"));
+    \u0275\u0275advance(3);
     \u0275\u0275styleProp("background-color", view_r12 === "resource-center" || view_r12 === "resources" ? "rgba(6, 182, 212, 0.2)" : "transparent")("color", view_r12 === "resource-center" || view_r12 === "resources" ? "#22d3ee" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r12 === "resource-center" || view_r12 === "resources");
-    \u0275\u0275advance(7);
+    \u0275\u0275advance(6);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.resourceCenter"));
+    \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "leads" ? "var(--sidebar-item-active)" : "transparent")("color", view_r12 === "leads" ? "var(--sidebar-text-active)" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r12 === "leads");
+    \u0275\u0275advance(5);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.sendConsole"));
   }
 }
 function AppComponent_Conditional_15_Conditional_85_Template(rf, ctx) {
@@ -56794,10 +56800,10 @@ function AppComponent_Conditional_15_Conditional_85_Template(rf, ctx) {
     \u0275\u0275text(4, "\u{1F4CA}");
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(5, "div", 176)(6, "span", 177);
-    \u0275\u0275text(7, "\u81EA\u52D5\u5316\u7E3D\u89BD");
+    \u0275\u0275text(7);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(8, "span", 178);
-    \u0275\u0275text(9, "\u914D\u7F6E\u8207\u76E3\u63A7\u72C0\u614B");
+    \u0275\u0275text(9);
     \u0275\u0275elementEnd()()();
     \u0275\u0275elementStart(10, "a", 179);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_10_listener() {
@@ -56809,7 +56815,7 @@ function AppComponent_Conditional_15_Conditional_85_Template(rf, ctx) {
     \u0275\u0275text(12, "\u{1F4F1}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(13, "span");
-    \u0275\u0275text(14, "\u76E3\u63A7\u5E33\u865F");
+    \u0275\u0275text(14);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(15, "a", 179);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_15_listener() {
@@ -56821,7 +56827,7 @@ function AppComponent_Conditional_15_Conditional_85_Template(rf, ctx) {
     \u0275\u0275text(17, "\u{1F4AC}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(18, "span");
-    \u0275\u0275text(19, "\u76E3\u63A7\u7FA4\u7D44");
+    \u0275\u0275text(19);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(20, "a", 179);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_20_listener() {
@@ -56833,7 +56839,7 @@ function AppComponent_Conditional_15_Conditional_85_Template(rf, ctx) {
     \u0275\u0275text(22, "\u{1F511}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(23, "span");
-    \u0275\u0275text(24, "\u95DC\u9375\u8A5E\u96C6");
+    \u0275\u0275text(24);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(25, "a", 179);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_25_listener() {
@@ -56845,7 +56851,7 @@ function AppComponent_Conditional_15_Conditional_85_Template(rf, ctx) {
     \u0275\u0275text(27, "\u{1F4DD}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(28, "span");
-    \u0275\u0275text(29, "\u804A\u5929\u6A21\u677F");
+    \u0275\u0275text(29);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(30, "a", 179);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_30_listener() {
@@ -56857,7 +56863,7 @@ function AppComponent_Conditional_15_Conditional_85_Template(rf, ctx) {
     \u0275\u0275text(32, "\u26A1");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(33, "span");
-    \u0275\u0275text(34, "\u89F8\u767C\u898F\u5247");
+    \u0275\u0275text(34);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(35, "a", 179);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_35_listener() {
@@ -56869,7 +56875,7 @@ function AppComponent_Conditional_15_Conditional_85_Template(rf, ctx) {
     \u0275\u0275text(37, "\u{1F465}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(38, "span");
-    \u0275\u0275text(39, "\u6536\u96C6\u7528\u6236");
+    \u0275\u0275text(39);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(40, "span", 181);
     \u0275\u0275text(41, "NEW");
@@ -56878,29 +56884,46 @@ function AppComponent_Conditional_15_Conditional_85_Template(rf, ctx) {
   if (rf & 2) {
     \u0275\u0275nextContext();
     const view_r12 = \u0275\u0275readContextLet(50);
+    const ctx_r0 = \u0275\u0275nextContext();
     \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "automation" ? "rgba(6, 182, 212, 0.15)" : "transparent")("color", view_r12 === "automation" ? "#22d3ee" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r12 === "automation");
     \u0275\u0275advance();
     \u0275\u0275classProp("bg-gradient-to-br", view_r12 === "automation")("from-cyan-500", view_r12 === "automation")("to-blue-500", view_r12 === "automation")("bg-slate-700/50", view_r12 !== "automation")("group-hover:bg-slate-700", view_r12 !== "automation");
-    \u0275\u0275advance(8);
+    \u0275\u0275advance(5);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.automationOverview"));
+    \u0275\u0275advance(2);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.configAndStatus"));
+    \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "monitoring-accounts" ? "rgba(6, 182, 212, 0.1)" : "transparent")("color", view_r12 === "monitoring-accounts" ? "#22d3ee" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r12 === "monitoring-accounts");
-    \u0275\u0275advance(5);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.monitorAccounts"));
+    \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "monitoring-groups" ? "rgba(16, 185, 129, 0.1)" : "transparent")("color", view_r12 === "monitoring-groups" ? "#34d399" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r12 === "monitoring-groups");
-    \u0275\u0275advance(5);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.monitorGroups"));
+    \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "keyword-sets" ? "rgba(139, 92, 246, 0.1)" : "transparent")("color", view_r12 === "keyword-sets" ? "#a78bfa" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r12 === "keyword-sets");
-    \u0275\u0275advance(5);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.keywordSets"));
+    \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "chat-templates" ? "rgba(236, 72, 153, 0.1)" : "transparent")("color", view_r12 === "chat-templates" ? "#f472b6" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r12 === "chat-templates");
-    \u0275\u0275advance(5);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.chatTemplates"));
+    \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "trigger-rules" ? "rgba(251, 146, 60, 0.1)" : "transparent")("color", view_r12 === "trigger-rules" ? "#fb923c" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r12 === "trigger-rules");
-    \u0275\u0275advance(5);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.triggerRules"));
+    \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "collected-users" ? "rgba(139, 92, 246, 0.1)" : "transparent")("color", view_r12 === "collected-users" ? "#a78bfa" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r12 === "collected-users");
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.collectedUsers"));
   }
 }
 function AppComponent_Conditional_15_Conditional_94_Conditional_10_Template(rf, ctx) {
@@ -57132,7 +57155,7 @@ function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template(rf, 
     \u0275\u0275text(3, "\u{1F4CA}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(4, "span");
-    \u0275\u0275text(5, "\u7E3D\u89BD");
+    \u0275\u0275text(5);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(6, "a", 201);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template_a_click_6_listener() {
@@ -57144,7 +57167,7 @@ function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template(rf, 
     \u0275\u0275text(8, "\u{1F4DD}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(9, "span");
-    \u0275\u0275text(10, "\u77E5\u8B58\u7BA1\u7406");
+    \u0275\u0275text(10);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(11, "a", 202);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template_a_click_11_listener() {
@@ -57156,7 +57179,7 @@ function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template(rf, 
     \u0275\u0275text(13, "\u2753");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(14, "span");
-    \u0275\u0275text(15, "\u77E5\u8B58\u7F3A\u53E3");
+    \u0275\u0275text(15);
     \u0275\u0275elementEnd();
     \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_108_Conditional_9_Conditional_16_Template, 2, 1, "span", 203);
     \u0275\u0275elementEnd()();
@@ -57168,13 +57191,19 @@ function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template(rf, 
     \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "knowledge-brain" ? "rgba(236, 72, 153, 0.1)" : "transparent")("color", view_r12 === "knowledge-brain" ? "#f472b6" : "var(--sidebar-text-muted)");
     \u0275\u0275classProp("active", view_r12 === "knowledge-brain");
-    \u0275\u0275advance(5);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.overview"));
+    \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "knowledge-manage" ? "rgba(236, 72, 153, 0.1)" : "transparent")("color", view_r12 === "knowledge-manage" ? "#f472b6" : "var(--sidebar-text-muted)");
     \u0275\u0275classProp("active", view_r12 === "knowledge-manage");
-    \u0275\u0275advance(5);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.knowledgeManagement"));
+    \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r12 === "knowledge-gaps" ? "rgba(236, 72, 153, 0.1)" : "transparent")("color", view_r12 === "knowledge-gaps" ? "#f472b6" : "var(--sidebar-text-muted)");
     \u0275\u0275classProp("active", view_r12 === "knowledge-gaps");
-    \u0275\u0275advance(5);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.knowledgeGaps"));
+    \u0275\u0275advance();
     \u0275\u0275conditional(ctx_r0.ragBrainService.gapsCount() > 0 ? 16 : -1);
   }
 }
@@ -57191,12 +57220,12 @@ function AppComponent_Conditional_15_Conditional_108_Template(rf, ctx) {
     \u0275\u0275text(4, "\u{1F9E0}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(5, "span", 197);
-    \u0275\u0275text(6, "\u77E5\u8B58\u5927\u8166");
+    \u0275\u0275text(6);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(7, "span", 198);
     \u0275\u0275text(8, "\u25BC");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(9, AppComponent_Conditional_15_Conditional_108_Conditional_9_Template, 17, 19, "div", 199);
+    \u0275\u0275conditionalCreate(9, AppComponent_Conditional_15_Conditional_108_Conditional_9_Template, 17, 22, "div", 199);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(10, "a", 83);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_108_Template_a_click_10_listener() {
@@ -57220,7 +57249,9 @@ function AppComponent_Conditional_15_Conditional_108_Template(rf, ctx) {
     \u0275\u0275advance(2);
     \u0275\u0275styleProp("background-color", ctx_r0.isKnowledgeView() ? "rgba(236, 72, 153, 0.15)" : "transparent")("color", ctx_r0.isKnowledgeView() ? "#f472b6" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", ctx_r0.isKnowledgeView());
-    \u0275\u0275advance(5);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.knowledgeBrain"));
+    \u0275\u0275advance();
     \u0275\u0275classProp("rotate-180", ctx_r0.knowledgeMenuExpanded());
     \u0275\u0275advance(2);
     \u0275\u0275conditional(ctx_r0.knowledgeMenuExpanded() ? 9 : -1);
@@ -59428,7 +59459,7 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(54, "span");
-    \u0275\u0275text(55, "\u6703\u54E1\u4E2D\u5FC3");
+    \u0275\u0275text(55);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(56, "a", 83);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_a_click_56_listener() {
@@ -59442,7 +59473,7 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(60, "span");
-    \u0275\u0275text(61, "\u6211\u7684\u9322\u5305");
+    \u0275\u0275text(61);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(62, "a", 83);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_a_click_62_listener() {
@@ -59465,13 +59496,13 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
       return \u0275\u0275resetView(ctx_r0.toggleSidebarGroup("manual"));
     });
     \u0275\u0275elementStart(72, "span", 94);
-    \u0275\u0275text(73, " \u{1F527} \u624B\u52D5\u64CD\u4F5C ");
+    \u0275\u0275text(73);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
     \u0275\u0275elementStart(74, "svg", 95);
     \u0275\u0275element(75, "polyline", 96);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(76, AppComponent_Conditional_15_Conditional_76_Template, 30, 25, "div", 97);
+    \u0275\u0275conditionalCreate(76, AppComponent_Conditional_15_Conditional_76_Template, 30, 28, "div", 97);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(77, "div", 92)(78, "button", 93);
@@ -59483,13 +59514,13 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275elementStart(79, "span", 98)(80, "span", 99);
     \u0275\u0275text(81, "\u{1F4E1}");
     \u0275\u0275elementEnd();
-    \u0275\u0275text(82, " \u76E3\u63A7\u4E2D\u5FC3 ");
+    \u0275\u0275text(82);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
     \u0275\u0275elementStart(83, "svg", 95);
     \u0275\u0275element(84, "polyline", 96);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(85, AppComponent_Conditional_15_Conditional_85_Template, 42, 52, "div", 97);
+    \u0275\u0275conditionalCreate(85, AppComponent_Conditional_15_Conditional_85_Template, 42, 60, "div", 97);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(86, "div", 92)(87, "button", 93);
@@ -59501,7 +59532,7 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275elementStart(88, "span", 98)(89, "span", 100);
     \u0275\u0275text(90, "AI");
     \u0275\u0275elementEnd();
-    \u0275\u0275text(91, " \u667A\u80FD\u71DF\u92B7 ");
+    \u0275\u0275text(91);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
     \u0275\u0275elementStart(92, "svg", 95);
@@ -59539,7 +59570,7 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275elementStart(106, "svg", 95);
     \u0275\u0275element(107, "polyline", 96);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(108, AppComponent_Conditional_15_Conditional_108_Template, 15, 16, "div", 97);
+    \u0275\u0275conditionalCreate(108, AppComponent_Conditional_15_Conditional_108_Template, 15, 17, "div", 97);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(109, "div", 92)(110, "button", 93);
@@ -59568,7 +59599,7 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275text(119, "\u2753");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(120, "span");
-    \u0275\u0275text(121, "\u4F7F\u7528\u5E2E\u52A9");
+    \u0275\u0275text(121);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(122, "div")(123, "label", 104);
     \u0275\u0275text(124);
@@ -59617,8 +59648,8 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     let tmp_38_1;
     let tmp_40_0;
     let tmp_41_0;
-    let tmp_75_0;
-    let tmp_76_0;
+    let tmp_81_0;
+    let tmp_82_0;
     const ctx_r0 = \u0275\u0275nextContext();
     \u0275\u0275advance(3);
     \u0275\u0275property("show", ctx_r0.progressDialog().show)("title", ctx_r0.progressDialog().title)("progress", ctx_r0.progressDialog().progress)("cancellable", ctx_r0.progressDialog().cancellable);
@@ -59657,23 +59688,33 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r58 === "membership-center" ? "var(--sidebar-item-active)" : "transparent")("color", view_r58 === "membership-center" ? "var(--sidebar-text-active)" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r58 === "membership-center");
-    \u0275\u0275advance(5);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.membershipCenter"));
+    \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r58 === "wallet" ? "var(--sidebar-item-active)" : "transparent")("color", view_r58 === "wallet" ? "var(--sidebar-text-active)" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r58 === "wallet");
-    \u0275\u0275advance(6);
+    \u0275\u0275advance(5);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.myWallet"));
+    \u0275\u0275advance();
     \u0275\u0275styleProp("background-color", view_r58 === "dashboard" ? "var(--sidebar-item-active)" : "transparent")("color", view_r58 === "dashboard" ? "var(--sidebar-text-active)" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r58 === "dashboard");
     \u0275\u0275advance(7);
     \u0275\u0275textInterpolate(ctx_r0.t("dashboard"));
-    \u0275\u0275advance(5);
+    \u0275\u0275advance(4);
+    \u0275\u0275textInterpolate1(" \u{1F527} ", ctx_r0.t("menu.manualOperations"), " ");
+    \u0275\u0275advance();
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("manual"));
     \u0275\u0275advance(2);
     \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("manual") ? 76 : -1);
-    \u0275\u0275advance(7);
+    \u0275\u0275advance(6);
+    \u0275\u0275textInterpolate1(" ", ctx_r0.t("menu.monitoringCenter"), " ");
+    \u0275\u0275advance();
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("monitoring"));
     \u0275\u0275advance(2);
     \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("monitoring") ? 85 : -1);
-    \u0275\u0275advance(7);
+    \u0275\u0275advance(6);
+    \u0275\u0275textInterpolate1(" ", ctx_r0.t("menu.aiMarketing"), " ");
+    \u0275\u0275advance();
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("marketing"));
     \u0275\u0275advance(2);
     \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("marketing") ? 94 : -1);
@@ -59693,7 +59734,9 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("system"));
     \u0275\u0275advance(2);
     \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("system") ? 115 : -1);
-    \u0275\u0275advance(9);
+    \u0275\u0275advance(6);
+    \u0275\u0275textInterpolate(ctx_r0.t("menu.help"));
+    \u0275\u0275advance(3);
     \u0275\u0275textInterpolate(ctx_r0.t("language"));
     \u0275\u0275advance(4);
     \u0275\u0275textInterpolate(ctx_r0.t("appearance"));
@@ -59702,9 +59745,9 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275advance(3);
     \u0275\u0275styleProp("background-color", ctx_r0.theme() === "dark" ? "var(--primary-bg)" : "transparent")("color", ctx_r0.theme() === "dark" ? "var(--primary)" : "var(--text-muted)")("box-shadow", ctx_r0.theme() === "dark" ? "var(--shadow-sm)" : "none");
     \u0275\u0275advance(4);
-    \u0275\u0275conditional((tmp_75_0 = ctx_r0.currentView()) === "dashboard" ? 137 : tmp_75_0 === "accounts" ? 138 : tmp_75_0 === "add-account" ? 139 : tmp_75_0 === "api-credentials" ? 140 : tmp_75_0 === "settings" ? 141 : tmp_75_0 === "leads" ? 142 : tmp_75_0 === "automation" ? 143 : tmp_75_0 === "resource-discovery" ? 144 : tmp_75_0 === "resources" ? 145 : tmp_75_0 === "ai-center" ? 146 : tmp_75_0 === "knowledge-brain" ? 147 : tmp_75_0 === "knowledge-gaps" ? 148 : tmp_75_0 === "knowledge-manage" ? 149 : tmp_75_0 === "multi-role" ? 150 : tmp_75_0 === "analytics" ? 151 : tmp_75_0 === "monitoring" ? 152 : tmp_75_0 === "monitoring-accounts" ? 153 : tmp_75_0 === "monitoring-groups" ? 154 : tmp_75_0 === "keyword-sets" ? 155 : tmp_75_0 === "chat-templates" ? 156 : tmp_75_0 === "trigger-rules" ? 157 : tmp_75_0 === "collected-users" ? 158 : tmp_75_0 === "runtime-logs" ? 159 : tmp_75_0 === "membership-center" ? 160 : tmp_75_0 === "wallet" ? 161 : tmp_75_0 === "wallet-recharge" ? 162 : tmp_75_0 === "wallet-withdraw" ? 163 : tmp_75_0 === "wallet-transactions" ? 164 : tmp_75_0 === "wallet-orders" ? 165 : tmp_75_0 === "wallet-analytics" ? 166 : tmp_75_0 === "profile" ? 167 : tmp_75_0 === "resource-center" ? 168 : tmp_75_0 === "search-discovery" ? 169 : tmp_75_0 === "ai-assistant" ? 170 : tmp_75_0 === "ai-team" ? 171 : tmp_75_0 === "member-database" ? 172 : tmp_75_0 === "lead-nurturing" ? 173 : tmp_75_0 === "nurturing-analytics" ? 174 : tmp_75_0 === "user-tracking" ? 175 : tmp_75_0 === "ads" ? 176 : tmp_75_0 === "campaigns" ? 177 : tmp_75_0 === "analytics-center" ? 178 : tmp_75_0 === "marketing-report" ? 179 : tmp_75_0 === "performance" ? 180 : tmp_75_0 === "alerts" ? 181 : tmp_75_0 === "logs" ? 182 : 183);
+    \u0275\u0275conditional((tmp_81_0 = ctx_r0.currentView()) === "dashboard" ? 137 : tmp_81_0 === "accounts" ? 138 : tmp_81_0 === "add-account" ? 139 : tmp_81_0 === "api-credentials" ? 140 : tmp_81_0 === "settings" ? 141 : tmp_81_0 === "leads" ? 142 : tmp_81_0 === "automation" ? 143 : tmp_81_0 === "resource-discovery" ? 144 : tmp_81_0 === "resources" ? 145 : tmp_81_0 === "ai-center" ? 146 : tmp_81_0 === "knowledge-brain" ? 147 : tmp_81_0 === "knowledge-gaps" ? 148 : tmp_81_0 === "knowledge-manage" ? 149 : tmp_81_0 === "multi-role" ? 150 : tmp_81_0 === "analytics" ? 151 : tmp_81_0 === "monitoring" ? 152 : tmp_81_0 === "monitoring-accounts" ? 153 : tmp_81_0 === "monitoring-groups" ? 154 : tmp_81_0 === "keyword-sets" ? 155 : tmp_81_0 === "chat-templates" ? 156 : tmp_81_0 === "trigger-rules" ? 157 : tmp_81_0 === "collected-users" ? 158 : tmp_81_0 === "runtime-logs" ? 159 : tmp_81_0 === "membership-center" ? 160 : tmp_81_0 === "wallet" ? 161 : tmp_81_0 === "wallet-recharge" ? 162 : tmp_81_0 === "wallet-withdraw" ? 163 : tmp_81_0 === "wallet-transactions" ? 164 : tmp_81_0 === "wallet-orders" ? 165 : tmp_81_0 === "wallet-analytics" ? 166 : tmp_81_0 === "profile" ? 167 : tmp_81_0 === "resource-center" ? 168 : tmp_81_0 === "search-discovery" ? 169 : tmp_81_0 === "ai-assistant" ? 170 : tmp_81_0 === "ai-team" ? 171 : tmp_81_0 === "member-database" ? 172 : tmp_81_0 === "lead-nurturing" ? 173 : tmp_81_0 === "nurturing-analytics" ? 174 : tmp_81_0 === "user-tracking" ? 175 : tmp_81_0 === "ads" ? 176 : tmp_81_0 === "campaigns" ? 177 : tmp_81_0 === "analytics-center" ? 178 : tmp_81_0 === "marketing-report" ? 179 : tmp_81_0 === "performance" ? 180 : tmp_81_0 === "alerts" ? 181 : tmp_81_0 === "logs" ? 182 : 183);
     \u0275\u0275advance(47);
-    \u0275\u0275conditional((tmp_76_0 = ctx_r0.generationState().lead) ? 184 : -1, tmp_76_0);
+    \u0275\u0275conditional((tmp_82_0 = ctx_r0.generationState().lead) ? 184 : -1, tmp_82_0);
     \u0275\u0275advance();
     \u0275\u0275conditional(ctx_r0.showBatchOperationHistory() ? 185 : -1);
     \u0275\u0275advance();
@@ -70938,7 +70981,7 @@ ${details}`, 12e3);
         \u0275\u0275elementEnd();
         \u0275\u0275element(11, "app-membership-dialog")(12, "app-payment")(13, "app-upgrade-prompt");
         \u0275\u0275conditionalCreate(14, AppComponent_Conditional_14_Template, 4, 0, "div", 7);
-        \u0275\u0275conditionalCreate(15, AppComponent_Conditional_15_Template, 191, 130, "div", 8)(16, AppComponent_Conditional_16_Template, 2, 0, "div", 9);
+        \u0275\u0275conditionalCreate(15, AppComponent_Conditional_15_Template, 191, 136, "div", 8)(16, AppComponent_Conditional_16_Template, 2, 0, "div", 9);
       }
       if (rf & 2) {
         \u0275\u0275advance(5);
@@ -71562,7 +71605,7 @@ ${details}`, 12e3);
            [style.background-color]="view === 'membership-center' ? 'var(--sidebar-item-active)' : 'transparent'"
            [style.color]="view === 'membership-center' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
            <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-           <span>\u6703\u54E1\u4E2D\u5FC3</span>
+           <span>{{ t('menu.membershipCenter') }}</span>
         </a>
         
         <!-- \u6211\u7684\u9322\u5305 -->
@@ -71572,7 +71615,7 @@ ${details}`, 12e3);
            [style.background-color]="view === 'wallet' ? 'var(--sidebar-item-active)' : 'transparent'"
            [style.color]="view === 'wallet' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
            <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-           <span>\u6211\u7684\u9322\u5305</span>
+           <span>{{ t('menu.myWallet') }}</span>
         </a>
         
         <!-- \u5100\u8868\u76E4 -->
@@ -71590,7 +71633,7 @@ ${details}`, 12e3);
           <button (click)="toggleSidebarGroup('manual')" 
                   class="w-full flex items-center justify-between px-3 py-2 mt-2 rounded-md hover:bg-white/5 transition-colors cursor-pointer group">
             <span class="sidebar-group-title text-xs uppercase tracking-wider flex items-center gap-1" style="color: var(--sidebar-group-title);">
-              \u{1F527} \u624B\u52D5\u64CD\u4F5C
+              \u{1F527} {{ t('menu.manualOperations') }}
             </span>
             <svg class="w-3.5 h-3.5 transition-transform duration-200" 
                  [class.rotate-180]="!isSidebarGroupExpanded('manual')"
@@ -71621,7 +71664,7 @@ ${details}`, 12e3);
                  [style.background-color]="view === 'search-discovery' ? 'rgba(6, 182, 212, 0.2)' : 'transparent'"
                  [style.color]="view === 'search-discovery' ? '#22d3ee' : 'var(--sidebar-text)'">
                  <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-                 <span>\u641C\u7D22\u767C\u73FE</span>
+                 <span>{{ t('menu.searchDiscovery') }}</span>
                  <span class="absolute right-2 px-1.5 py-0.5 text-[10px] bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-full font-bold">NEW</span>
               </a>
               
@@ -71632,7 +71675,7 @@ ${details}`, 12e3);
                  [style.background-color]="(view === 'resource-center' || view === 'resources') ? 'rgba(6, 182, 212, 0.2)' : 'transparent'"
                  [style.color]="(view === 'resource-center' || view === 'resources') ? '#22d3ee' : 'var(--sidebar-text)'">
                  <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-                 <span>\u8CC7\u6E90\u4E2D\u5FC3</span>
+                 <span>{{ t('menu.resourceCenter') }}</span>
               </a>
               
               <!-- \u{1F4E4} \u767C\u9001\u63A7\u5236\u53F0 -->
@@ -71642,7 +71685,7 @@ ${details}`, 12e3);
                  [style.background-color]="view === 'leads' ? 'var(--sidebar-item-active)' : 'transparent'"
                  [style.color]="view === 'leads' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
                  <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
-                 <span>\u767C\u9001\u63A7\u5236\u53F0</span>
+                 <span>{{ t('menu.sendConsole') }}</span>
               </a>
             </div>
           }
@@ -71654,7 +71697,7 @@ ${details}`, 12e3);
                   class="w-full flex items-center justify-between px-3 py-2 mt-2 rounded-md hover:bg-white/5 transition-colors cursor-pointer group">
             <span class="sidebar-group-title text-xs uppercase tracking-wider font-semibold flex items-center gap-1" style="color: var(--sidebar-group-title);">
               <span class="inline-block w-5 h-5 rounded bg-gradient-to-br from-cyan-500 to-blue-500 text-center leading-5 text-[10px]">\u{1F4E1}</span>
-              \u76E3\u63A7\u4E2D\u5FC3
+              {{ t('menu.monitoringCenter') }}
             </span>
             <svg class="w-3.5 h-3.5 transition-transform duration-200" 
                  [class.rotate-180]="!isSidebarGroupExpanded('monitoring')"
@@ -71681,8 +71724,8 @@ ${details}`, 12e3);
                      <span class="text-lg">\u{1F4CA}</span>
                   </div>
                   <div class="flex flex-col">
-                     <span class="font-medium">\u81EA\u52D5\u5316\u7E3D\u89BD</span>
-                     <span class="text-[10px] opacity-60">\u914D\u7F6E\u8207\u76E3\u63A7\u72C0\u614B</span>
+                     <span class="font-medium">{{ t('menu.automationOverview') }}</span>
+                     <span class="text-[10px] opacity-60">{{ t('menu.configAndStatus') }}</span>
                   </div>
               </a>
               
@@ -71693,7 +71736,7 @@ ${details}`, 12e3);
                  [style.background-color]="view === 'monitoring-accounts' ? 'rgba(6, 182, 212, 0.1)' : 'transparent'"
                  [style.color]="view === 'monitoring-accounts' ? '#22d3ee' : 'var(--sidebar-text)'">
                  <span class="text-lg ml-1">\u{1F4F1}</span>
-                 <span>\u76E3\u63A7\u5E33\u865F</span>
+                 <span>{{ t('menu.monitorAccounts') }}</span>
               </a>
               
               <!-- \u{1F4AC} \u76E3\u63A7\u7FA4\u7D44 -->
@@ -71703,7 +71746,7 @@ ${details}`, 12e3);
                  [style.background-color]="view === 'monitoring-groups' ? 'rgba(16, 185, 129, 0.1)' : 'transparent'"
                  [style.color]="view === 'monitoring-groups' ? '#34d399' : 'var(--sidebar-text)'">
                  <span class="text-lg ml-1">\u{1F4AC}</span>
-                 <span>\u76E3\u63A7\u7FA4\u7D44</span>
+                 <span>{{ t('menu.monitorGroups') }}</span>
               </a>
               
               <!-- \u{1F511} \u95DC\u9375\u8A5E\u96C6 -->
@@ -71713,7 +71756,7 @@ ${details}`, 12e3);
                  [style.background-color]="view === 'keyword-sets' ? 'rgba(139, 92, 246, 0.1)' : 'transparent'"
                  [style.color]="view === 'keyword-sets' ? '#a78bfa' : 'var(--sidebar-text)'">
                  <span class="text-lg ml-1">\u{1F511}</span>
-                 <span>\u95DC\u9375\u8A5E\u96C6</span>
+                 <span>{{ t('menu.keywordSets') }}</span>
               </a>
               
               <!-- \u{1F4DD} \u804A\u5929\u6A21\u677F -->
@@ -71723,7 +71766,7 @@ ${details}`, 12e3);
                  [style.background-color]="view === 'chat-templates' ? 'rgba(236, 72, 153, 0.1)' : 'transparent'"
                  [style.color]="view === 'chat-templates' ? '#f472b6' : 'var(--sidebar-text)'">
                  <span class="text-lg ml-1">\u{1F4DD}</span>
-                 <span>\u804A\u5929\u6A21\u677F</span>
+                 <span>{{ t('menu.chatTemplates') }}</span>
               </a>
               
               <!-- \u26A1 \u89F8\u767C\u898F\u5247 -->
@@ -71733,7 +71776,7 @@ ${details}`, 12e3);
                  [style.background-color]="view === 'trigger-rules' ? 'rgba(251, 146, 60, 0.1)' : 'transparent'"
                  [style.color]="view === 'trigger-rules' ? '#fb923c' : 'var(--sidebar-text)'">
                  <span class="text-lg ml-1">\u26A1</span>
-                 <span>\u89F8\u767C\u898F\u5247</span>
+                 <span>{{ t('menu.triggerRules') }}</span>
               </a>
               
               <!-- \u{1F465} \u6536\u96C6\u7528\u6236\uFF08\u5EE3\u544A\u8B58\u5225\uFF09 -->
@@ -71743,7 +71786,7 @@ ${details}`, 12e3);
                  [style.background-color]="view === 'collected-users' ? 'rgba(139, 92, 246, 0.1)' : 'transparent'"
                  [style.color]="view === 'collected-users' ? '#a78bfa' : 'var(--sidebar-text)'">
                  <span class="text-lg ml-1">\u{1F465}</span>
-                 <span>\u6536\u96C6\u7528\u6236</span>
+                 <span>{{ t('menu.collectedUsers') }}</span>
                  <span class="ml-auto text-xs px-1.5 py-0.5 bg-violet-500/20 text-violet-400 rounded">NEW</span>
               </a>
             </div>
@@ -71756,7 +71799,7 @@ ${details}`, 12e3);
                   class="w-full flex items-center justify-between px-3 py-2 mt-2 rounded-md hover:bg-white/5 transition-colors cursor-pointer group">
             <span class="sidebar-group-title text-xs uppercase tracking-wider font-semibold flex items-center gap-1" style="color: var(--sidebar-group-title);">
               <span class="inline-block w-5 h-5 rounded bg-gradient-to-br from-violet-500 to-fuchsia-500 text-center leading-5 text-[10px]">AI</span>
-              \u667A\u80FD\u71DF\u92B7
+              {{ t('menu.aiMarketing') }}
             </span>
             <svg class="w-3.5 h-3.5 transition-transform duration-200" 
                  [class.rotate-180]="!isSidebarGroupExpanded('marketing')"
@@ -71937,7 +71980,7 @@ ${details}`, 12e3);
              [style.background-color]="isKnowledgeView() ? 'rgba(236, 72, 153, 0.15)' : 'transparent'"
              [style.color]="isKnowledgeView() ? '#f472b6' : 'var(--sidebar-text)'">
              <span class="text-lg">\u{1F9E0}</span>
-             <span class="flex-1">\u77E5\u8B58\u5927\u8166</span>
+             <span class="flex-1">{{ t('menu.knowledgeBrain') }}</span>
              <span class="text-xs transition-transform duration-200" [class.rotate-180]="knowledgeMenuExpanded()">\u25BC</span>
           </a>
           
@@ -71950,7 +71993,7 @@ ${details}`, 12e3);
                  [style.background-color]="view === 'knowledge-brain' ? 'rgba(236, 72, 153, 0.1)' : 'transparent'"
                  [style.color]="view === 'knowledge-brain' ? '#f472b6' : 'var(--sidebar-text-muted)'">
                  <span>\u{1F4CA}</span>
-                 <span>\u7E3D\u89BD</span>
+                 <span>{{ t('menu.overview') }}</span>
               </a>
               <a (click)="changeView('knowledge-manage')" 
                  class="sidebar-item flex items-center gap-2 px-3 py-2 rounded-md transition-all duration-200 cursor-pointer text-sm"
@@ -71958,7 +72001,7 @@ ${details}`, 12e3);
                  [style.background-color]="view === 'knowledge-manage' ? 'rgba(236, 72, 153, 0.1)' : 'transparent'"
                  [style.color]="view === 'knowledge-manage' ? '#f472b6' : 'var(--sidebar-text-muted)'">
                  <span>\u{1F4DD}</span>
-                 <span>\u77E5\u8B58\u7BA1\u7406</span>
+                 <span>{{ t('menu.knowledgeManagement') }}</span>
               </a>
               <a (click)="changeView('knowledge-gaps')" 
                  class="sidebar-item flex items-center gap-2 px-3 py-2 rounded-md transition-all duration-200 cursor-pointer text-sm relative"
@@ -71966,7 +72009,7 @@ ${details}`, 12e3);
                  [style.background-color]="view === 'knowledge-gaps' ? 'rgba(236, 72, 153, 0.1)' : 'transparent'"
                  [style.color]="view === 'knowledge-gaps' ? '#f472b6' : 'var(--sidebar-text-muted)'">
                  <span>\u2753</span>
-                 <span>\u77E5\u8B58\u7F3A\u53E3</span>
+                 <span>{{ t('menu.knowledgeGaps') }}</span>
                  @if (ragBrainService.gapsCount() > 0) {
                    <span class="ml-auto text-xs font-bold rounded-full px-1.5 py-0.5" style="background-color: rgba(239, 68, 68, 0.2); color: #f87171;">{{ ragBrainService.gapsCount() }}</span>
                  }
@@ -72025,7 +72068,7 @@ ${details}`, 12e3);
         <button (click)="openOnboarding()"
                 class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 border border-cyan-500/30 hover:border-cyan-500/50 text-cyan-400 rounded-xl transition-all text-sm font-medium group">
           <span class="text-lg group-hover:animate-bounce">\u2753</span>
-          <span>\u4F7F\u7528\u5E2E\u52A9</span>
+          <span>{{ t('menu.help') }}</span>
         </button>
         
         <div>

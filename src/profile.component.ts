@@ -1175,15 +1175,8 @@ export class ProfileComponent implements OnInit, OnDestroy {
   }
   
   getMembershipName(): string {
-    const names: Record<string, string> = {
-      bronze: '青銅戰士',
-      silver: '白銀精英',
-      gold: '黃金大師',
-      diamond: '鑽石王牌',
-      star: '星耀傳說',
-      king: '榮耀王者'
-    };
-    return names[this.membershipLevel()] || '青銅戰士';
+    const level = this.membershipLevel();
+    return this.i18n.t(`membershipLevels.${level}`) || this.i18n.t('membershipLevels.bronze');
   }
   
   getMaxDevices(): number {

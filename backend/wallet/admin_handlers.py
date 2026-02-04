@@ -25,8 +25,8 @@ from .models import WalletStatus, TransactionType
 
 logger = logging.getLogger(__name__)
 
-# JWT 配置（管理員使用不同的 secret）
-ADMIN_JWT_SECRET = os.environ.get('ADMIN_JWT_SECRET', 'tgmatrix-admin-jwt-secret')
+# JWT 配置（與主 Admin 系統使用相同的 secret）
+JWT_SECRET = os.environ.get('JWT_SECRET', 'tgmatrix-jwt-secret-2026')
 JWT_ALGORITHM = 'HS256'
 
 
@@ -39,17 +39,26 @@ class AdminWalletHandlers:
         self.transaction_service = get_transaction_service()
     
     def _verify_admin(self, request: web.Request) -> Optional[Dict]:
-        """驗證管理員身份"""
+        """驗證管理員身份（兼容主 Admin 系統的 token 格式）"""
         auth_header = request.headers.get('Authorization', '')
         if not auth_header.startswith('Bearer '):
             return None
         
         token = auth_header[7:]
         try:
-            payload = jwt.decode(token, ADMIN_JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
             
-            # 檢查是否是管理員
-            if not payload.get('is_admin', False):
+            # 檢查是否是管理員（支持多種格式）
+            # 格式1: is_admin = True
+            # 格式2: type = "admin"
+            # 格式3: admin_id 存在
+            is_admin = (
+                payload.get('is_admin', False) or 
+                payload.get('type') == 'admin' or
+                payload.get('admin_id') is not None
+            )
+            
+            if not is_admin:
                 return None
             
             return payload

@@ -15,7 +15,6 @@ from .payment_password_service import get_pay_password_service
 logger = logging.getLogger(__name__)
 
 JWT_SECRET = os.environ.get('JWT_SECRET', 'tgmatrix-jwt-secret-2026')
-ADMIN_JWT_SECRET = os.environ.get('ADMIN_JWT_SECRET', 'tgmatrix-admin-jwt-secret')
 JWT_ALGORITHM = 'HS256'
 
 
@@ -43,14 +42,20 @@ class PayPasswordHandlers:
             return None
     
     def _verify_admin(self, request: web.Request) -> Optional[Dict]:
+        """驗證管理員身份（兼容主 Admin 系統）"""
         auth_header = request.headers.get('Authorization', '')
         if not auth_header.startswith('Bearer '):
             return None
         
         token = auth_header[7:]
         try:
-            payload = jwt.decode(token, ADMIN_JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            if not payload.get('is_admin', False):
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            is_admin = (
+                payload.get('is_admin', False) or 
+                payload.get('type') == 'admin' or
+                payload.get('admin_id') is not None
+            )
+            if not is_admin:
                 return None
             return payload
         except:

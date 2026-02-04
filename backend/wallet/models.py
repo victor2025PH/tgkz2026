@@ -125,6 +125,8 @@ class Wallet:
     
     def to_dict(self) -> Dict[str, Any]:
         """轉換為字典（前端顯示用）"""
+        # 處理 status 可能是枚舉的情況
+        status_value = self.status.value if hasattr(self.status, 'value') else str(self.status)
         return {
             "id": self.id,
             "user_id": self.user_id,
@@ -139,7 +141,7 @@ class Wallet:
             "total_consumed": self.total_consumed,
             "total_withdrawn": self.total_withdrawn,
             "currency": self.currency,
-            "status": self.status,
+            "status": status_value,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }

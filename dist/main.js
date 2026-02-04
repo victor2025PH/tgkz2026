@@ -1,6 +1,6 @@
 import {
   authGuard
-} from "./chunk-O5UPUXC4.js";
+} from "./chunk-NO5LBIL7.js";
 import {
   AiCenterViewComponent
 } from "./chunk-5CO7DVEZ.js";
@@ -20,9 +20,16 @@ import {
   MonitoringViewComponent
 } from "./chunk-ZZLJQCGC.js";
 import {
+  WalletViewComponent
+} from "./chunk-LZVGK4P7.js";
+import {
+  WalletService
+} from "./chunk-2RAHAZHZ.js";
+import {
   AuthEventsService,
   AuthService
-} from "./chunk-LSAEK5E6.js";
+} from "./chunk-PBTZGQFB.js";
+import "./chunk-HOUP2MV6.js";
 import {
   LicenseClientService
 } from "./chunk-SDTPNQBR.js";
@@ -30927,13 +30934,30 @@ function AddAccountPageComponent_Conditional_26_Conditional_5_Conditional_9_Temp
     \u0275\u0275elementEnd();
   }
 }
-function AddAccountPageComponent_Conditional_26_Conditional_5_Conditional_22_Template(rf, ctx) {
+function AddAccountPageComponent_Conditional_26_Conditional_5_Conditional_44_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "span", 37);
+    const _r5 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "input", 45);
+    \u0275\u0275twoWayListener("ngModelChange", function AddAccountPageComponent_Conditional_26_Conditional_5_Conditional_44_Template_input_ngModelChange_0_listener($event) {
+      \u0275\u0275restoreView(_r5);
+      const ctx_r1 = \u0275\u0275nextContext(3);
+      \u0275\u0275twoWayBindingSet(ctx_r1.proxyAddress, $event) || (ctx_r1.proxyAddress = $event);
+      return \u0275\u0275resetView($event);
+    });
+    \u0275\u0275elementEnd();
+  }
+  if (rf & 2) {
+    const ctx_r1 = \u0275\u0275nextContext(3);
+    \u0275\u0275twoWayProperty("ngModel", ctx_r1.proxyAddress);
+  }
+}
+function AddAccountPageComponent_Conditional_26_Conditional_5_Conditional_53_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "span", 46);
     \u0275\u0275text(1, " \u767C\u9001\u4E2D... ");
   }
 }
-function AddAccountPageComponent_Conditional_26_Conditional_5_Conditional_23_Template(rf, ctx) {
+function AddAccountPageComponent_Conditional_26_Conditional_5_Conditional_54_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0, " \u767C\u9001\u9A57\u8B49\u78BC \u2192 ");
   }
@@ -30958,42 +30982,87 @@ function AddAccountPageComponent_Conditional_26_Conditional_5_Template(rf, ctx) 
     \u0275\u0275conditionalCreate(8, AddAccountPageComponent_Conditional_26_Conditional_5_Conditional_8_Template, 2, 1, "span", 33)(9, AddAccountPageComponent_Conditional_26_Conditional_5_Conditional_9_Template, 2, 0, "span", 34);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(10, "div", 28)(11, "label");
-    \u0275\u0275text(12, "\u4EE3\u7406\u8A2D\u7F6E\uFF08\u53EF\u9078\uFF09");
+    \u0275\u0275text(12, "\u4EE3\u7406\u8A2D\u7F6E");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(13, "input", 35);
-    \u0275\u0275twoWayListener("ngModelChange", function AddAccountPageComponent_Conditional_26_Conditional_5_Template_input_ngModelChange_13_listener($event) {
+    \u0275\u0275elementStart(13, "div", 35)(14, "label", 36)(15, "input", 37);
+    \u0275\u0275twoWayListener("ngModelChange", function AddAccountPageComponent_Conditional_26_Conditional_5_Template_input_ngModelChange_15_listener($event) {
       \u0275\u0275restoreView(_r4);
       const ctx_r1 = \u0275\u0275nextContext(2);
-      \u0275\u0275twoWayBindingSet(ctx_r1.proxyAddress, $event) || (ctx_r1.proxyAddress = $event);
+      \u0275\u0275twoWayBindingSet(ctx_r1.proxyMode, $event) || (ctx_r1.proxyMode = $event);
       return \u0275\u0275resetView($event);
     });
-    \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(14, "div", 28)(15, "label");
-    \u0275\u0275text(16, "\u4E8C\u6B65\u9A57\u8B49\u5BC6\u78BC\uFF08\u5982\u6709\uFF09");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "input", 36);
-    \u0275\u0275twoWayListener("ngModelChange", function AddAccountPageComponent_Conditional_26_Conditional_5_Template_input_ngModelChange_17_listener($event) {
+    \u0275\u0275elementStart(16, "span", 38)(17, "span", 39);
+    \u0275\u0275text(18, "\u{1F310}");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(19, "span", 40)(20, "strong");
+    \u0275\u0275text(21, "\u81EA\u52D5\u5206\u914D\u975C\u614B\u4EE3\u7406");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(22, "small");
+    \u0275\u0275text(23, "\u5F9E\u4EE3\u7406\u6C60\u81EA\u52D5\u5206\u914D\uFF0C\u9632\u5C01\u63A8\u85A6");
+    \u0275\u0275elementEnd()()()();
+    \u0275\u0275elementStart(24, "label", 36)(25, "input", 41);
+    \u0275\u0275twoWayListener("ngModelChange", function AddAccountPageComponent_Conditional_26_Conditional_5_Template_input_ngModelChange_25_listener($event) {
+      \u0275\u0275restoreView(_r4);
+      const ctx_r1 = \u0275\u0275nextContext(2);
+      \u0275\u0275twoWayBindingSet(ctx_r1.proxyMode, $event) || (ctx_r1.proxyMode = $event);
+      return \u0275\u0275resetView($event);
+    });
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(26, "span", 38)(27, "span", 39);
+    \u0275\u0275text(28, "\u270F\uFE0F");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(29, "span", 40)(30, "strong");
+    \u0275\u0275text(31, "\u624B\u52D5\u8F38\u5165\u4EE3\u7406");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(32, "small");
+    \u0275\u0275text(33, "\u4F7F\u7528\u81EA\u5DF1\u7684\u4EE3\u7406\u5730\u5740");
+    \u0275\u0275elementEnd()()()();
+    \u0275\u0275elementStart(34, "label", 36)(35, "input", 42);
+    \u0275\u0275twoWayListener("ngModelChange", function AddAccountPageComponent_Conditional_26_Conditional_5_Template_input_ngModelChange_35_listener($event) {
+      \u0275\u0275restoreView(_r4);
+      const ctx_r1 = \u0275\u0275nextContext(2);
+      \u0275\u0275twoWayBindingSet(ctx_r1.proxyMode, $event) || (ctx_r1.proxyMode = $event);
+      return \u0275\u0275resetView($event);
+    });
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(36, "span", 38)(37, "span", 39);
+    \u0275\u0275text(38, "\u{1F6AB}");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(39, "span", 40)(40, "strong");
+    \u0275\u0275text(41, "\u4E0D\u4F7F\u7528\u4EE3\u7406");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(42, "small");
+    \u0275\u0275text(43, "\u76F4\u63A5\u9023\u63A5\uFF0C\u6709\u5C01\u865F\u98A8\u96AA");
+    \u0275\u0275elementEnd()()()()();
+    \u0275\u0275conditionalCreate(44, AddAccountPageComponent_Conditional_26_Conditional_5_Conditional_44_Template, 1, 1, "input", 43);
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(45, "div", 28)(46, "label");
+    \u0275\u0275text(47, "\u4E8C\u6B65\u9A57\u8B49\u5BC6\u78BC\uFF08\u5982\u6709\uFF09");
+    \u0275\u0275elementEnd();
+    \u0275\u0275elementStart(48, "input", 44);
+    \u0275\u0275twoWayListener("ngModelChange", function AddAccountPageComponent_Conditional_26_Conditional_5_Template_input_ngModelChange_48_listener($event) {
       \u0275\u0275restoreView(_r4);
       const ctx_r1 = \u0275\u0275nextContext(2);
       \u0275\u0275twoWayBindingSet(ctx_r1.twoFactorPassword, $event) || (ctx_r1.twoFactorPassword = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(18, "div", 15)(19, "button", 16);
-    \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_26_Conditional_5_Template_button_click_19_listener() {
+    \u0275\u0275elementStart(49, "div", 15)(50, "button", 16);
+    \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_26_Conditional_5_Template_button_click_50_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.currentLoginMethod.set("select"));
     });
-    \u0275\u0275text(20, "\u2190 \u8FD4\u56DE");
+    \u0275\u0275text(51, "\u2190 \u8FD4\u56DE");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(21, "button", 17);
-    \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_26_Conditional_5_Template_button_click_21_listener() {
+    \u0275\u0275elementStart(52, "button", 17);
+    \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_26_Conditional_5_Template_button_click_52_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.sendVerificationCode());
     });
-    \u0275\u0275conditionalCreate(22, AddAccountPageComponent_Conditional_26_Conditional_5_Conditional_22_Template, 2, 0)(23, AddAccountPageComponent_Conditional_26_Conditional_5_Conditional_23_Template, 1, 0);
+    \u0275\u0275conditionalCreate(53, AddAccountPageComponent_Conditional_26_Conditional_5_Conditional_53_Template, 2, 0)(54, AddAccountPageComponent_Conditional_26_Conditional_5_Conditional_54_Template, 1, 0);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -31005,27 +31074,33 @@ function AddAccountPageComponent_Conditional_26_Conditional_5_Template(rf, ctx) 
     \u0275\u0275conditional(ctx_r1.phoneValid() ? 7 : -1);
     \u0275\u0275advance();
     \u0275\u0275conditional(ctx_r1.phoneError() ? 8 : 9);
-    \u0275\u0275advance(5);
-    \u0275\u0275twoWayProperty("ngModel", ctx_r1.proxyAddress);
+    \u0275\u0275advance(7);
+    \u0275\u0275twoWayProperty("ngModel", ctx_r1.proxyMode);
+    \u0275\u0275advance(10);
+    \u0275\u0275twoWayProperty("ngModel", ctx_r1.proxyMode);
+    \u0275\u0275advance(10);
+    \u0275\u0275twoWayProperty("ngModel", ctx_r1.proxyMode);
+    \u0275\u0275advance(9);
+    \u0275\u0275conditional(ctx_r1.proxyMode === "manual" ? 44 : -1);
     \u0275\u0275advance(4);
     \u0275\u0275twoWayProperty("ngModel", ctx_r1.twoFactorPassword);
     \u0275\u0275advance(4);
     \u0275\u0275property("disabled", !ctx_r1.phoneValid() || ctx_r1.isSending());
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r1.isSending() ? 22 : 23);
+    \u0275\u0275conditional(ctx_r1.isSending() ? 53 : 54);
   }
 }
 function AddAccountPageComponent_Conditional_26_Conditional_6_Conditional_10_Template(rf, ctx) {
   if (rf & 1) {
-    const _r6 = \u0275\u0275getCurrentView();
+    const _r7 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 28)(1, "label");
     \u0275\u0275text(2, "\u4E8C\u6B65\u9A57\u8B49\u5BC6\u78BC ");
     \u0275\u0275elementStart(3, "span", 29);
     \u0275\u0275text(4, "*");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(5, "input", 43);
+    \u0275\u0275elementStart(5, "input", 52);
     \u0275\u0275twoWayListener("ngModelChange", function AddAccountPageComponent_Conditional_26_Conditional_6_Conditional_10_Template_input_ngModelChange_5_listener($event) {
-      \u0275\u0275restoreView(_r6);
+      \u0275\u0275restoreView(_r7);
       const ctx_r1 = \u0275\u0275nextContext(3);
       \u0275\u0275twoWayBindingSet(ctx_r1.twoFactorPassword, $event) || (ctx_r1.twoFactorPassword = $event);
       return \u0275\u0275resetView($event);
@@ -31054,7 +31129,7 @@ function AddAccountPageComponent_Conditional_26_Conditional_6_Conditional_14_Tem
 }
 function AddAccountPageComponent_Conditional_26_Conditional_6_Conditional_19_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "span", 37);
+    \u0275\u0275element(0, "span", 46);
     \u0275\u0275text(1, " \u9A57\u8B49\u4E2D... ");
   }
 }
@@ -31065,8 +31140,8 @@ function AddAccountPageComponent_Conditional_26_Conditional_6_Conditional_20_Tem
 }
 function AddAccountPageComponent_Conditional_26_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
-    const _r5 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 38)(1, "span", 39);
+    const _r6 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "div", 47)(1, "span", 48);
     \u0275\u0275text(2, "\u{1F4F1}");
     \u0275\u0275elementEnd();
     \u0275\u0275text(3);
@@ -31076,18 +31151,18 @@ function AddAccountPageComponent_Conditional_26_Conditional_6_Template(rf, ctx) 
     \u0275\u0275elementStart(7, "span", 29);
     \u0275\u0275text(8, "*");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(9, "input", 40);
+    \u0275\u0275elementStart(9, "input", 49);
     \u0275\u0275twoWayListener("ngModelChange", function AddAccountPageComponent_Conditional_26_Conditional_6_Template_input_ngModelChange_9_listener($event) {
-      \u0275\u0275restoreView(_r5);
+      \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       \u0275\u0275twoWayBindingSet(ctx_r1.verificationCode, $event) || (ctx_r1.verificationCode = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd()();
     \u0275\u0275conditionalCreate(10, AddAccountPageComponent_Conditional_26_Conditional_6_Conditional_10_Template, 6, 1, "div", 28);
-    \u0275\u0275elementStart(11, "div", 41)(12, "button", 42);
+    \u0275\u0275elementStart(11, "div", 50)(12, "button", 51);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_26_Conditional_6_Template_button_click_12_listener() {
-      \u0275\u0275restoreView(_r5);
+      \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.resendCode());
     });
@@ -31095,7 +31170,7 @@ function AddAccountPageComponent_Conditional_26_Conditional_6_Template(rf, ctx) 
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(15, "div", 15)(16, "button", 16);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_26_Conditional_6_Template_button_click_16_listener() {
-      \u0275\u0275restoreView(_r5);
+      \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.codeStep.set(false));
     });
@@ -31103,7 +31178,7 @@ function AddAccountPageComponent_Conditional_26_Conditional_6_Template(rf, ctx) 
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(18, "button", 17);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_26_Conditional_6_Template_button_click_18_listener() {
-      \u0275\u0275restoreView(_r5);
+      \u0275\u0275restoreView(_r6);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.submitVerificationCode());
     });
@@ -31134,7 +31209,7 @@ function AddAccountPageComponent_Conditional_26_Template(rf, ctx) {
     \u0275\u0275text(3, "\u{1F4AC} \u9A57\u8B49\u78BC\u767B\u5165");
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(4, "div", 27);
-    \u0275\u0275conditionalCreate(5, AddAccountPageComponent_Conditional_26_Conditional_5_Template, 24, 11)(6, AddAccountPageComponent_Conditional_26_Conditional_6_Template, 21, 7);
+    \u0275\u0275conditionalCreate(5, AddAccountPageComponent_Conditional_26_Conditional_5_Template, 55, 14)(6, AddAccountPageComponent_Conditional_26_Conditional_6_Template, 21, 7);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -31145,66 +31220,66 @@ function AddAccountPageComponent_Conditional_26_Template(rf, ctx) {
 }
 function AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_0_For_5_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 69);
+    \u0275\u0275elementStart(0, "span", 78);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
-    const account_r10 = \u0275\u0275nextContext().$implicit;
+    const account_r11 = \u0275\u0275nextContext().$implicit;
     \u0275\u0275advance();
-    \u0275\u0275textInterpolate(account_r10.first_name || account_r10.username);
+    \u0275\u0275textInterpolate(account_r11.first_name || account_r11.username);
   }
 }
 function AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_0_For_5_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 70);
+    \u0275\u0275elementStart(0, "span", 79);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
-    const account_r10 = \u0275\u0275nextContext().$implicit;
+    const account_r11 = \u0275\u0275nextContext().$implicit;
     \u0275\u0275advance();
-    \u0275\u0275textInterpolate(account_r10.error || "\u7121\u6CD5\u5C0E\u5165");
+    \u0275\u0275textInterpolate(account_r11.error || "\u7121\u6CD5\u5C0E\u5165");
   }
 }
 function AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_0_For_5_Template(rf, ctx) {
   if (rf & 1) {
-    const _r9 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "label", 65)(1, "input", 66);
+    const _r10 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "label", 74)(1, "input", 75);
     \u0275\u0275listener("change", function AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_0_For_5_Template_input_change_1_listener() {
-      const account_r10 = \u0275\u0275restoreView(_r9).$implicit;
+      const account_r11 = \u0275\u0275restoreView(_r10).$implicit;
       const ctx_r1 = \u0275\u0275nextContext(5);
-      return \u0275\u0275resetView(ctx_r1.toggleTdataAccount(account_r10.index));
+      return \u0275\u0275resetView(ctx_r1.toggleTdataAccount(account_r11.index));
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(2, "div", 67)(3, "span", 68);
+    \u0275\u0275elementStart(2, "div", 76)(3, "span", 77);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(5, AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_0_For_5_Conditional_5_Template, 2, 1, "span", 69);
-    \u0275\u0275conditionalCreate(6, AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_0_For_5_Conditional_6_Template, 2, 1, "span", 70);
+    \u0275\u0275conditionalCreate(5, AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_0_For_5_Conditional_5_Template, 2, 1, "span", 78);
+    \u0275\u0275conditionalCreate(6, AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_0_For_5_Conditional_6_Template, 2, 1, "span", 79);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
-    const account_r10 = ctx.$implicit;
+    const account_r11 = ctx.$implicit;
     const ctx_r1 = \u0275\u0275nextContext(5);
-    \u0275\u0275classProp("disabled", !account_r10.can_import);
+    \u0275\u0275classProp("disabled", !account_r11.can_import);
     \u0275\u0275advance();
-    \u0275\u0275property("checked", ctx_r1.selectedTdataAccounts().includes(account_r10.index))("disabled", !account_r10.can_import);
+    \u0275\u0275property("checked", ctx_r1.selectedTdataAccounts().includes(account_r11.index))("disabled", !account_r11.can_import);
     \u0275\u0275advance(3);
-    \u0275\u0275textInterpolate(account_r10.phone);
+    \u0275\u0275textInterpolate(account_r11.phone);
     \u0275\u0275advance();
-    \u0275\u0275conditional(account_r10.first_name || account_r10.username ? 5 : -1);
+    \u0275\u0275conditional(account_r11.first_name || account_r11.username ? 5 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(!account_r10.can_import ? 6 : -1);
+    \u0275\u0275conditional(!account_r11.can_import ? 6 : -1);
   }
 }
 function AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_0_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 61)(1, "h4");
+    \u0275\u0275elementStart(0, "div", 70)(1, "h4");
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "div", 63);
-    \u0275\u0275repeaterCreate(4, AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_0_For_5_Template, 7, 7, "label", 64, _forTrack08);
+    \u0275\u0275elementStart(3, "div", 72);
+    \u0275\u0275repeaterCreate(4, AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_0_For_5_Template, 7, 7, "label", 73, _forTrack08);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -31218,7 +31293,7 @@ function AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Co
 }
 function AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_1_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 62)(1, "span", 71);
+    \u0275\u0275elementStart(0, "div", 71)(1, "span", 80);
     \u0275\u0275text(2, "\u274C");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(3, "span");
@@ -31233,7 +31308,7 @@ function AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Co
 }
 function AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275conditionalCreate(0, AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_0_Template, 6, 2, "div", 61)(1, AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_1_Template, 5, 1, "div", 62);
+    \u0275\u0275conditionalCreate(0, AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_0_Template, 6, 2, "div", 70)(1, AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Conditional_1_Template, 5, 1, "div", 71);
   }
   if (rf & 2) {
     const ctx_r1 = \u0275\u0275nextContext(3);
@@ -31242,8 +31317,8 @@ function AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Te
 }
 function AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_24_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 60);
-    \u0275\u0275element(1, "span", 37);
+    \u0275\u0275elementStart(0, "div", 69);
+    \u0275\u0275element(1, "span", 46);
     \u0275\u0275elementStart(2, "span");
     \u0275\u0275text(3, "\u6B63\u5728\u6383\u63CF TData...");
     \u0275\u0275elementEnd()();
@@ -31251,70 +31326,70 @@ function AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_24_Te
 }
 function AddAccountPageComponent_Conditional_27_Conditional_12_Template(rf, ctx) {
   if (rf & 1) {
-    const _r8 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 48)(1, "h4");
+    const _r9 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "div", 57)(1, "h4");
     \u0275\u0275text(2, "\u{1F4CD} TData \u4F4D\u7F6E");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "div", 49)(4, "code");
+    \u0275\u0275elementStart(3, "div", 58)(4, "code");
     \u0275\u0275text(5);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "div", 50)(7, "button", 51);
+    \u0275\u0275elementStart(6, "div", 59)(7, "button", 60);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_27_Conditional_12_Template_button_click_7_listener() {
-      \u0275\u0275restoreView(_r8);
+      \u0275\u0275restoreView(_r9);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.copyTdataPath());
     });
     \u0275\u0275text(8, "\u{1F4CB}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "button", 52);
+    \u0275\u0275elementStart(9, "button", 61);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_27_Conditional_12_Template_button_click_9_listener() {
-      \u0275\u0275restoreView(_r8);
+      \u0275\u0275restoreView(_r9);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.openTdataFolder());
     });
     \u0275\u0275text(10, "\u{1F4C2}");
     \u0275\u0275elementEnd()()()();
-    \u0275\u0275elementStart(11, "div", 53);
+    \u0275\u0275elementStart(11, "div", 62);
     \u0275\u0275listener("dragover", function AddAccountPageComponent_Conditional_27_Conditional_12_Template_div_dragover_11_listener($event) {
-      \u0275\u0275restoreView(_r8);
+      \u0275\u0275restoreView(_r9);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.onDragOver($event));
     })("dragleave", function AddAccountPageComponent_Conditional_27_Conditional_12_Template_div_dragleave_11_listener($event) {
-      \u0275\u0275restoreView(_r8);
+      \u0275\u0275restoreView(_r9);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.onDragLeave($event));
     })("drop", function AddAccountPageComponent_Conditional_27_Conditional_12_Template_div_drop_11_listener($event) {
-      \u0275\u0275restoreView(_r8);
+      \u0275\u0275restoreView(_r9);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.onDropTdata($event));
     });
-    \u0275\u0275elementStart(12, "div", 54);
+    \u0275\u0275elementStart(12, "div", 63);
     \u0275\u0275text(13, "\u{1F4C1}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "p", 55);
+    \u0275\u0275elementStart(14, "p", 64);
     \u0275\u0275text(15, "\u62D6\u653E tdata \u6587\u4EF6\u593E\u5230\u9019\u88E1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(16, "p", 56);
+    \u0275\u0275elementStart(16, "p", 65);
     \u0275\u0275text(17, "\u652F\u6301\uFF1A\u6574\u500B\u6587\u4EF6\u593E / ZIP \u58D3\u7E2E\u5305");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(18, "div", 57)(19, "button", 58);
+    \u0275\u0275elementStart(18, "div", 66)(19, "button", 67);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_27_Conditional_12_Template_button_click_19_listener() {
-      \u0275\u0275restoreView(_r8);
+      \u0275\u0275restoreView(_r9);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.selectTdataFolder());
     });
     \u0275\u0275text(20, "\u9078\u64C7\u6587\u4EF6\u593E");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(21, "button", 59);
+    \u0275\u0275elementStart(21, "button", 68);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_27_Conditional_12_Template_button_click_21_listener() {
-      \u0275\u0275restoreView(_r8);
+      \u0275\u0275restoreView(_r9);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.selectTdataZip());
     });
     \u0275\u0275text(22, "\u9078\u64C7 ZIP");
     \u0275\u0275elementEnd()()();
     \u0275\u0275conditionalCreate(23, AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_23_Template, 2, 1);
-    \u0275\u0275conditionalCreate(24, AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_24_Template, 4, 0, "div", 60);
+    \u0275\u0275conditionalCreate(24, AddAccountPageComponent_Conditional_27_Conditional_12_Conditional_24_Template, 4, 0, "div", 69);
   }
   if (rf & 2) {
     const ctx_r1 = \u0275\u0275nextContext(2);
@@ -31330,16 +31405,16 @@ function AddAccountPageComponent_Conditional_27_Conditional_12_Template(rf, ctx)
 }
 function AddAccountPageComponent_Conditional_27_Conditional_13_Conditional_23_Template(rf, ctx) {
   if (rf & 1) {
-    const _r12 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 74)(1, "span", 75);
+    const _r13 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "div", 83)(1, "span", 84);
     \u0275\u0275text(2, "\u{1F4C4}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 76);
+    \u0275\u0275elementStart(3, "span", 85);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "button", 77);
+    \u0275\u0275elementStart(5, "button", 86);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_27_Conditional_13_Conditional_23_Template_button_click_5_listener() {
-      \u0275\u0275restoreView(_r12);
+      \u0275\u0275restoreView(_r13);
       const ctx_r1 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r1.clearSelectedFile());
     });
@@ -31354,8 +31429,8 @@ function AddAccountPageComponent_Conditional_27_Conditional_13_Conditional_23_Te
 }
 function AddAccountPageComponent_Conditional_27_Conditional_13_Template(rf, ctx) {
   if (rf & 1) {
-    const _r11 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 72)(1, "h4");
+    const _r12 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "div", 81)(1, "h4");
     \u0275\u0275text(2, "\u652F\u6301\u7684\u683C\u5F0F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(3, "ul")(4, "li")(5, "strong");
@@ -31373,34 +31448,34 @@ function AddAccountPageComponent_Conditional_27_Conditional_13_Template(rf, ctx)
     \u0275\u0275elementEnd();
     \u0275\u0275text(15, " - Telethon Session \u6587\u4EF6");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(16, "div", 73);
+    \u0275\u0275elementStart(16, "div", 82);
     \u0275\u0275listener("dragover", function AddAccountPageComponent_Conditional_27_Conditional_13_Template_div_dragover_16_listener($event) {
-      \u0275\u0275restoreView(_r11);
+      \u0275\u0275restoreView(_r12);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.onDragOver($event));
     })("dragleave", function AddAccountPageComponent_Conditional_27_Conditional_13_Template_div_dragleave_16_listener($event) {
-      \u0275\u0275restoreView(_r11);
+      \u0275\u0275restoreView(_r12);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.onDragLeave($event));
     })("drop", function AddAccountPageComponent_Conditional_27_Conditional_13_Template_div_drop_16_listener($event) {
-      \u0275\u0275restoreView(_r11);
+      \u0275\u0275restoreView(_r12);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.onDrop($event));
     })("click", function AddAccountPageComponent_Conditional_27_Conditional_13_Template_div_click_16_listener() {
-      \u0275\u0275restoreView(_r11);
+      \u0275\u0275restoreView(_r12);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.selectSessionFile());
     });
-    \u0275\u0275elementStart(17, "div", 54);
+    \u0275\u0275elementStart(17, "div", 63);
     \u0275\u0275text(18, "\u{1F4C4}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(19, "p", 55);
+    \u0275\u0275elementStart(19, "p", 64);
     \u0275\u0275text(20, "\u62D6\u653E Session \u6587\u4EF6\u5230\u9019\u88E1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(21, "p", 56);
+    \u0275\u0275elementStart(21, "p", 65);
     \u0275\u0275text(22, "\u6216\u9EDE\u64CA\u9078\u64C7\u6587\u4EF6");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(23, AddAccountPageComponent_Conditional_27_Conditional_13_Conditional_23_Template, 7, 1, "div", 74);
+    \u0275\u0275conditionalCreate(23, AddAccountPageComponent_Conditional_27_Conditional_13_Conditional_23_Template, 7, 1, "div", 83);
   }
   if (rf & 2) {
     const ctx_r1 = \u0275\u0275nextContext(2);
@@ -31412,7 +31487,7 @@ function AddAccountPageComponent_Conditional_27_Conditional_13_Template(rf, ctx)
 }
 function AddAccountPageComponent_Conditional_27_Conditional_17_Conditional_1_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "span", 37);
+    \u0275\u0275element(0, "span", 46);
     \u0275\u0275text(1, " \u5C0E\u5165\u4E2D... ");
   }
 }
@@ -31427,10 +31502,10 @@ function AddAccountPageComponent_Conditional_27_Conditional_17_Conditional_2_Tem
 }
 function AddAccountPageComponent_Conditional_27_Conditional_17_Template(rf, ctx) {
   if (rf & 1) {
-    const _r13 = \u0275\u0275getCurrentView();
+    const _r14 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 17);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_27_Conditional_17_Template_button_click_0_listener() {
-      \u0275\u0275restoreView(_r13);
+      \u0275\u0275restoreView(_r14);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.importTdataAccounts());
     });
@@ -31446,7 +31521,7 @@ function AddAccountPageComponent_Conditional_27_Conditional_17_Template(rf, ctx)
 }
 function AddAccountPageComponent_Conditional_27_Conditional_18_Conditional_1_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "span", 37);
+    \u0275\u0275element(0, "span", 46);
     \u0275\u0275text(1, " \u5C0E\u5165\u4E2D... ");
   }
 }
@@ -31457,10 +31532,10 @@ function AddAccountPageComponent_Conditional_27_Conditional_18_Conditional_2_Tem
 }
 function AddAccountPageComponent_Conditional_27_Conditional_18_Template(rf, ctx) {
   if (rf & 1) {
-    const _r14 = \u0275\u0275getCurrentView();
+    const _r15 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 17);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_27_Conditional_18_Template_button_click_0_listener() {
-      \u0275\u0275restoreView(_r14);
+      \u0275\u0275restoreView(_r15);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.importSession());
     });
@@ -31476,23 +31551,23 @@ function AddAccountPageComponent_Conditional_27_Conditional_18_Template(rf, ctx)
 }
 function AddAccountPageComponent_Conditional_27_Template(rf, ctx) {
   if (rf & 1) {
-    const _r7 = \u0275\u0275getCurrentView();
+    const _r8 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 11)(1, "div", 13)(2, "h2");
     \u0275\u0275text(3, "\u{1F4C2} TData / Session \u5C0E\u5165");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(4, "div", 27)(5, "div", 44)(6, "button", 45);
+    \u0275\u0275elementStart(4, "div", 27)(5, "div", 53)(6, "button", 54);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_27_Template_button_click_6_listener() {
-      \u0275\u0275restoreView(_r7);
+      \u0275\u0275restoreView(_r8);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.tdataImportMode.set("tdata"));
     });
     \u0275\u0275text(7, " \u{1F4C2} TData \u6587\u4EF6\u593E ");
-    \u0275\u0275elementStart(8, "span", 46);
+    \u0275\u0275elementStart(8, "span", 55);
     \u0275\u0275text(9, "\u63A8\u85A6");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(10, "button", 45);
+    \u0275\u0275elementStart(10, "button", 54);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_27_Template_button_click_10_listener() {
-      \u0275\u0275restoreView(_r7);
+      \u0275\u0275restoreView(_r8);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.tdataImportMode.set("session"));
     });
@@ -31502,13 +31577,13 @@ function AddAccountPageComponent_Conditional_27_Template(rf, ctx) {
     \u0275\u0275conditionalCreate(13, AddAccountPageComponent_Conditional_27_Conditional_13_Template, 24, 3);
     \u0275\u0275elementStart(14, "div", 15)(15, "button", 16);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_27_Template_button_click_15_listener() {
-      \u0275\u0275restoreView(_r7);
+      \u0275\u0275restoreView(_r8);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.currentLoginMethod.set("select"));
     });
     \u0275\u0275text(16, "\u2190 \u8FD4\u56DE");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(17, AddAccountPageComponent_Conditional_27_Conditional_17_Template, 3, 2, "button", 47)(18, AddAccountPageComponent_Conditional_27_Conditional_18_Template, 3, 2, "button", 47);
+    \u0275\u0275conditionalCreate(17, AddAccountPageComponent_Conditional_27_Conditional_17_Template, 3, 2, "button", 56)(18, AddAccountPageComponent_Conditional_27_Conditional_18_Template, 3, 2, "button", 56);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -31527,18 +31602,18 @@ function AddAccountPageComponent_Conditional_27_Template(rf, ctx) {
 }
 function AddAccountPageComponent_Conditional_28_Conditional_19_Template(rf, ctx) {
   if (rf & 1) {
-    const _r16 = \u0275\u0275getCurrentView();
+    const _r17 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 15)(1, "button", 16);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_28_Conditional_19_Template_button_click_1_listener() {
-      \u0275\u0275restoreView(_r16);
+      \u0275\u0275restoreView(_r17);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.currentLoginMethod.set("select"));
     });
     \u0275\u0275text(2, "\u2190 \u8FD4\u56DE");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "button", 81);
+    \u0275\u0275elementStart(3, "button", 90);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_28_Conditional_19_Template_button_click_3_listener() {
-      \u0275\u0275restoreView(_r16);
+      \u0275\u0275restoreView(_r17);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.generateQRCode());
     });
@@ -31548,14 +31623,14 @@ function AddAccountPageComponent_Conditional_28_Conditional_19_Template(rf, ctx)
 }
 function AddAccountPageComponent_Conditional_28_Conditional_20_Template(rf, ctx) {
   if (rf & 1) {
-    const _r17 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 82)(1, "div", 83);
-    \u0275\u0275element(2, "img", 84);
+    const _r18 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "div", 91)(1, "div", 92);
+    \u0275\u0275element(2, "img", 93);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "div", 85);
+    \u0275\u0275elementStart(3, "div", 94);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "div", 86)(6, "p");
+    \u0275\u0275elementStart(5, "div", 95)(6, "p");
     \u0275\u0275text(7, "1. \u6253\u958B\u624B\u6A5F Telegram APP");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(8, "p");
@@ -31566,15 +31641,15 @@ function AddAccountPageComponent_Conditional_28_Conditional_20_Template(rf, ctx)
     \u0275\u0275elementEnd()()();
     \u0275\u0275elementStart(12, "div", 15)(13, "button", 16);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_28_Conditional_20_Template_button_click_13_listener() {
-      \u0275\u0275restoreView(_r17);
+      \u0275\u0275restoreView(_r18);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.currentLoginMethod.set("select"));
     });
     \u0275\u0275text(14, "\u2190 \u8FD4\u56DE");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(15, "button", 81);
+    \u0275\u0275elementStart(15, "button", 90);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_28_Conditional_20_Template_button_click_15_listener() {
-      \u0275\u0275restoreView(_r17);
+      \u0275\u0275restoreView(_r18);
       const ctx_r1 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r1.refreshQRCode());
     });
@@ -31593,32 +31668,32 @@ function AddAccountPageComponent_Conditional_28_Conditional_20_Template(rf, ctx)
 }
 function AddAccountPageComponent_Conditional_28_Template(rf, ctx) {
   if (rf & 1) {
-    const _r15 = \u0275\u0275getCurrentView();
+    const _r16 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 11)(1, "div", 13)(2, "h2");
     \u0275\u0275text(3, "\u{1F4F1} \u6383\u78BC\u767B\u5165");
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(4, "div", 27)(5, "div", 28)(6, "label");
     \u0275\u0275text(7, "\u8A2D\u5099\u6A21\u64EC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "div", 78)(9, "button", 79);
+    \u0275\u0275elementStart(8, "div", 87)(9, "button", 88);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_28_Template_button_click_9_listener() {
-      \u0275\u0275restoreView(_r15);
+      \u0275\u0275restoreView(_r16);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.deviceType.set("random"));
     });
     \u0275\u0275text(10, "\u{1F3B2} \u96A8\u6A5F");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "button", 79);
+    \u0275\u0275elementStart(11, "button", 88);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_28_Template_button_click_11_listener() {
-      \u0275\u0275restoreView(_r15);
+      \u0275\u0275restoreView(_r16);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.deviceType.set("ios"));
     });
     \u0275\u0275text(12, "\u{1F4F1} iOS");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(13, "button", 79);
+    \u0275\u0275elementStart(13, "button", 88);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_28_Template_button_click_13_listener() {
-      \u0275\u0275restoreView(_r15);
+      \u0275\u0275restoreView(_r16);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.deviceType.set("android"));
     });
@@ -31627,9 +31702,9 @@ function AddAccountPageComponent_Conditional_28_Template(rf, ctx) {
     \u0275\u0275elementStart(15, "div", 28)(16, "label");
     \u0275\u0275text(17, "\u4EE3\u7406\u8A2D\u7F6E\uFF08\u53EF\u9078\uFF09");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(18, "input", 80);
+    \u0275\u0275elementStart(18, "input", 89);
     \u0275\u0275twoWayListener("ngModelChange", function AddAccountPageComponent_Conditional_28_Template_input_ngModelChange_18_listener($event) {
-      \u0275\u0275restoreView(_r15);
+      \u0275\u0275restoreView(_r16);
       const ctx_r1 = \u0275\u0275nextContext();
       \u0275\u0275twoWayBindingSet(ctx_r1.proxyAddress, $event) || (ctx_r1.proxyAddress = $event);
       return \u0275\u0275resetView($event);
@@ -31654,7 +31729,7 @@ function AddAccountPageComponent_Conditional_28_Template(rf, ctx) {
 }
 function AddAccountPageComponent_Conditional_29_Conditional_5_Conditional_8_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 92);
+    \u0275\u0275elementStart(0, "div", 101);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -31666,7 +31741,7 @@ function AddAccountPageComponent_Conditional_29_Conditional_5_Conditional_8_Temp
 }
 function AddAccountPageComponent_Conditional_29_Conditional_5_Conditional_9_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 93)(1, "span", 94);
+    \u0275\u0275elementStart(0, "div", 102)(1, "span", 103);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd()();
   }
@@ -31678,18 +31753,18 @@ function AddAccountPageComponent_Conditional_29_Conditional_5_Conditional_9_Temp
 }
 function AddAccountPageComponent_Conditional_29_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 89)(1, "div", 90);
+    \u0275\u0275elementStart(0, "div", 98)(1, "div", 99);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "div", 91)(4, "div", 69);
+    \u0275\u0275elementStart(3, "div", 100)(4, "div", 78);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "div", 68);
+    \u0275\u0275elementStart(6, "div", 77);
     \u0275\u0275text(7);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(8, AddAccountPageComponent_Conditional_29_Conditional_5_Conditional_8_Template, 2, 1, "div", 92);
+    \u0275\u0275conditionalCreate(8, AddAccountPageComponent_Conditional_29_Conditional_5_Conditional_8_Template, 2, 1, "div", 101);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(9, AddAccountPageComponent_Conditional_29_Conditional_5_Conditional_9_Template, 3, 1, "div", 93);
+    \u0275\u0275conditionalCreate(9, AddAccountPageComponent_Conditional_29_Conditional_5_Conditional_9_Template, 3, 1, "div", 102);
   }
   if (rf & 2) {
     const ctx_r1 = \u0275\u0275nextContext(2);
@@ -31707,25 +31782,25 @@ function AddAccountPageComponent_Conditional_29_Conditional_5_Template(rf, ctx) 
 }
 function AddAccountPageComponent_Conditional_29_Template(rf, ctx) {
   if (rf & 1) {
-    const _r18 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 12)(1, "div", 87);
+    const _r19 = \u0275\u0275getCurrentView();
+    \u0275\u0275elementStart(0, "div", 12)(1, "div", 96);
     \u0275\u0275text(2, "\u2705");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(3, "h2");
     \u0275\u0275text(4, "\u5E33\u6236\u6DFB\u52A0\u6210\u529F\uFF01");
     \u0275\u0275elementEnd();
     \u0275\u0275conditionalCreate(5, AddAccountPageComponent_Conditional_29_Conditional_5_Template, 10, 6);
-    \u0275\u0275elementStart(6, "div", 88)(7, "button", 16);
+    \u0275\u0275elementStart(6, "div", 97)(7, "button", 16);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_29_Template_button_click_7_listener() {
-      \u0275\u0275restoreView(_r18);
+      \u0275\u0275restoreView(_r19);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.addAnother());
     });
     \u0275\u0275text(8, "\u2795 \u7E7C\u7E8C\u6DFB\u52A0");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "button", 81);
+    \u0275\u0275elementStart(9, "button", 90);
     \u0275\u0275listener("click", function AddAccountPageComponent_Conditional_29_Template_button_click_9_listener() {
-      \u0275\u0275restoreView(_r18);
+      \u0275\u0275restoreView(_r19);
       const ctx_r1 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r1.goBack());
     });
@@ -31754,6 +31829,7 @@ var AddAccountPageComponent = class _AddAccountPageComponent {
     this.verificationCode = "";
     this.twoFactorPassword = "";
     this.proxyAddress = "";
+    this.proxyMode = "auto";
     this.codeStep = signal(false, ...ngDevMode ? [{ debugName: "codeStep" }] : []);
     this.isSending = signal(false, ...ngDevMode ? [{ debugName: "isSending" }] : []);
     this.isVerifying = signal(false, ...ngDevMode ? [{ debugName: "isVerifying" }] : []);
@@ -31975,6 +32051,7 @@ var AddAccountPageComponent = class _AddAccountPageComponent {
     this.verificationCode = "";
     this.twoFactorPassword = "";
     this.proxyAddress = "";
+    this.proxyMode = "auto";
     this.phoneCodeHash = "";
     this.loginAccountId = "";
     this.codeStep.set(false);
@@ -32034,11 +32111,12 @@ var AddAccountPageComponent = class _AddAccountPageComponent {
     }
     this.isSending.set(true);
     this.phoneError.set("");
+    const proxyValue = this.getProxyValue();
     this.ipcService.send("add-account", {
       phone: this.phoneNumber,
       apiId: selectedApi.api_id,
       apiHash: selectedApi.api_hash,
-      proxy: this.proxyAddress || null,
+      proxy: proxyValue,
       twoFactorPassword: this.twoFactorPassword || null
     });
     setTimeout(() => {
@@ -32046,7 +32124,7 @@ var AddAccountPageComponent = class _AddAccountPageComponent {
         phone: this.phoneNumber,
         apiId: selectedApi.api_id,
         apiHash: selectedApi.api_hash,
-        proxy: this.proxyAddress || null,
+        proxy: proxyValue,
         twoFactorPassword: this.twoFactorPassword || null
       });
     }, 500);
@@ -32087,6 +32165,24 @@ var AddAccountPageComponent = class _AddAccountPageComponent {
         this.toast.error("\u9A57\u8B49\u8D85\u6642\uFF0C\u8ACB\u6AA2\u67E5\u7DB2\u7D61\u9023\u63A5\u5F8C\u91CD\u8A66");
       }
     }, 3e4);
+  }
+  /**
+   * 根據代理模式獲取代理值
+   * - 'auto': 返回 'auto'，後端自動從代理池分配
+   * - 'manual': 返回用戶輸入的代理地址
+   * - 'none': 返回 null，不使用代理
+   */
+  getProxyValue() {
+    switch (this.proxyMode) {
+      case "auto":
+        return "auto";
+      // 後端會識別這個特殊值並自動分配
+      case "manual":
+        return this.proxyAddress || null;
+      case "none":
+      default:
+        return null;
+    }
   }
   resendCode() {
     this.sendVerificationCode();
@@ -32138,7 +32234,7 @@ var AddAccountPageComponent = class _AddAccountPageComponent {
       return;
     }
     this.ipcService.send("qr-login-create", {
-      proxy: this.proxyAddress || null,
+      proxy: this.getProxyValue(),
       deviceType: this.deviceType() === "random" ? null : this.deviceType(),
       customApiId: selectedApi.api_id,
       customApiHash: selectedApi.api_hash
@@ -32294,7 +32390,7 @@ var AddAccountPageComponent = class _AddAccountPageComponent {
     };
   }
   static {
-    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _AddAccountPageComponent, selectors: [["app-add-account-page"]], outputs: { back: "back", accountAdded: "accountAdded" }, decls: 30, vars: 20, consts: [[1, "add-account-page"], [1, "page-header"], [1, "back-btn", 3, "click"], [1, "page-title"], [1, "step-indicator"], [1, "step"], [1, "step-number"], [1, "step-label"], [1, "step-line"], [1, "config-section"], [1, "login-selection"], [1, "login-form"], [1, "success-section"], [1, "section-header"], [3, "apiSelected", "selectionCleared", "showSelected"], [1, "form-actions"], [1, "btn-secondary", 3, "click"], [1, "btn-primary", 3, "click", "disabled"], [1, "login-cards"], [1, "login-card", "recommended", 3, "click"], [1, "login-badge"], [1, "login-icon"], [1, "login-risk", "low"], [1, "login-card", "safe", 3, "click"], [1, "login-risk", "lowest"], [1, "login-card", "warning", 3, "click"], [1, "login-risk", "high"], [1, "form-card"], [1, "form-group"], [1, "required"], [1, "input-with-prefix"], ["type", "tel", "placeholder", "+639952947692", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "input-status", "valid"], [1, "error-text"], [1, "hint"], ["type", "text", "placeholder", "socks5://host:port \u6216\u7559\u7A7A", 1, "form-input", 3, "ngModelChange", "ngModel"], ["type", "password", "placeholder", "\u5982\u679C\u5E33\u865F\u958B\u555F\u4E86\u4E8C\u6B65\u9A57\u8B49", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "spinner"], [1, "code-sent-info"], [1, "info-icon"], ["type", "text", "placeholder", "\u8F38\u5165\u6536\u5230\u7684\u9A57\u8B49\u78BC", "maxlength", "6", 1, "form-input", "code-input", 3, "ngModelChange", "ngModel"], [1, "resend-section"], [1, "resend-btn", 3, "click", "disabled"], ["type", "password", "placeholder", "\u8ACB\u8F38\u5165\u4E8C\u6B65\u9A57\u8B49\u5BC6\u78BC", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "import-mode-tabs"], [1, "mode-tab", 3, "click"], [1, "badge-recommend"], [1, "btn-primary", 3, "disabled"], [1, "tdata-path-hint"], [1, "path-box"], [1, "path-actions"], ["title", "\u8907\u88FD\u8DEF\u5F91", 1, "icon-btn", 3, "click"], ["title", "\u6253\u958B\u6587\u4EF6\u593E", 1, "icon-btn", 3, "click"], [1, "drop-zone", "large", 3, "dragover", "dragleave", "drop"], [1, "drop-icon"], [1, "drop-text"], [1, "drop-hint"], [1, "drop-buttons"], [1, "select-btn", 3, "click"], [1, "select-btn", "secondary", 3, "click"], [1, "scanning-indicator"], [1, "scan-result", "success"], [1, "scan-result", "error"], [1, "accounts-list"], [1, "account-item", 3, "disabled"], [1, "account-item"], ["type", "checkbox", 3, "change", "checked", "disabled"], [1, "account-info"], [1, "account-phone"], [1, "account-name"], [1, "account-error"], [1, "error-icon"], [1, "tdata-info"], [1, "drop-zone", 3, "dragover", "dragleave", "drop", "click"], [1, "selected-file"], [1, "file-icon"], [1, "file-path"], [1, "clear-btn", 3, "click"], [1, "device-options"], [1, "device-btn", 3, "click"], ["type", "text", "placeholder", "socks5://host:port", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "btn-primary", 3, "click"], [1, "qr-section"], [1, "qr-container"], ["alt", "QR Code", 1, "qr-image", 3, "src"], [1, "qr-countdown"], [1, "qr-instructions"], [1, "success-icon"], [1, "form-actions", "center"], [1, "account-card"], [1, "account-avatar"], [1, "account-details"], [1, "account-username"], [1, "api-info"], [1, "api-badge", "expert"]], template: function AddAccountPageComponent_Template(rf, ctx) {
+    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _AddAccountPageComponent, selectors: [["app-add-account-page"]], outputs: { back: "back", accountAdded: "accountAdded" }, decls: 30, vars: 20, consts: [[1, "add-account-page"], [1, "page-header"], [1, "back-btn", 3, "click"], [1, "page-title"], [1, "step-indicator"], [1, "step"], [1, "step-number"], [1, "step-label"], [1, "step-line"], [1, "config-section"], [1, "login-selection"], [1, "login-form"], [1, "success-section"], [1, "section-header"], [3, "apiSelected", "selectionCleared", "showSelected"], [1, "form-actions"], [1, "btn-secondary", 3, "click"], [1, "btn-primary", 3, "click", "disabled"], [1, "login-cards"], [1, "login-card", "recommended", 3, "click"], [1, "login-badge"], [1, "login-icon"], [1, "login-risk", "low"], [1, "login-card", "safe", 3, "click"], [1, "login-risk", "lowest"], [1, "login-card", "warning", 3, "click"], [1, "login-risk", "high"], [1, "form-card"], [1, "form-group"], [1, "required"], [1, "input-with-prefix"], ["type", "tel", "placeholder", "+639952947692", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "input-status", "valid"], [1, "error-text"], [1, "hint"], [1, "proxy-options"], [1, "proxy-option"], ["type", "radio", "name", "proxyMode", "value", "auto", 3, "ngModelChange", "ngModel"], [1, "option-content"], [1, "option-icon"], [1, "option-text"], ["type", "radio", "name", "proxyMode", "value", "manual", 3, "ngModelChange", "ngModel"], ["type", "radio", "name", "proxyMode", "value", "none", 3, "ngModelChange", "ngModel"], ["type", "text", "placeholder", "socks5://user:pass@host:port", 1, "form-input", "mt-2", 3, "ngModel"], ["type", "password", "placeholder", "\u5982\u679C\u5E33\u865F\u958B\u555F\u4E86\u4E8C\u6B65\u9A57\u8B49", 1, "form-input", 3, "ngModelChange", "ngModel"], ["type", "text", "placeholder", "socks5://user:pass@host:port", 1, "form-input", "mt-2", 3, "ngModelChange", "ngModel"], [1, "spinner"], [1, "code-sent-info"], [1, "info-icon"], ["type", "text", "placeholder", "\u8F38\u5165\u6536\u5230\u7684\u9A57\u8B49\u78BC", "maxlength", "6", 1, "form-input", "code-input", 3, "ngModelChange", "ngModel"], [1, "resend-section"], [1, "resend-btn", 3, "click", "disabled"], ["type", "password", "placeholder", "\u8ACB\u8F38\u5165\u4E8C\u6B65\u9A57\u8B49\u5BC6\u78BC", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "import-mode-tabs"], [1, "mode-tab", 3, "click"], [1, "badge-recommend"], [1, "btn-primary", 3, "disabled"], [1, "tdata-path-hint"], [1, "path-box"], [1, "path-actions"], ["title", "\u8907\u88FD\u8DEF\u5F91", 1, "icon-btn", 3, "click"], ["title", "\u6253\u958B\u6587\u4EF6\u593E", 1, "icon-btn", 3, "click"], [1, "drop-zone", "large", 3, "dragover", "dragleave", "drop"], [1, "drop-icon"], [1, "drop-text"], [1, "drop-hint"], [1, "drop-buttons"], [1, "select-btn", 3, "click"], [1, "select-btn", "secondary", 3, "click"], [1, "scanning-indicator"], [1, "scan-result", "success"], [1, "scan-result", "error"], [1, "accounts-list"], [1, "account-item", 3, "disabled"], [1, "account-item"], ["type", "checkbox", 3, "change", "checked", "disabled"], [1, "account-info"], [1, "account-phone"], [1, "account-name"], [1, "account-error"], [1, "error-icon"], [1, "tdata-info"], [1, "drop-zone", 3, "dragover", "dragleave", "drop", "click"], [1, "selected-file"], [1, "file-icon"], [1, "file-path"], [1, "clear-btn", 3, "click"], [1, "device-options"], [1, "device-btn", 3, "click"], ["type", "text", "placeholder", "socks5://host:port", 1, "form-input", 3, "ngModelChange", "ngModel"], [1, "btn-primary", 3, "click"], [1, "qr-section"], [1, "qr-container"], ["alt", "QR Code", 1, "qr-image", 3, "src"], [1, "qr-countdown"], [1, "qr-instructions"], [1, "success-icon"], [1, "form-actions", "center"], [1, "account-card"], [1, "account-avatar"], [1, "account-details"], [1, "account-username"], [1, "api-info"], [1, "api-badge", "expert"]], template: function AddAccountPageComponent_Template(rf, ctx) {
       if (rf & 1) {
         \u0275\u0275elementStart(0, "div", 0)(1, "div", 1)(2, "button", 2);
         \u0275\u0275listener("click", function AddAccountPageComponent_Template_button_click_2_listener() {
@@ -32357,7 +32453,7 @@ var AddAccountPageComponent = class _AddAccountPageComponent {
         \u0275\u0275advance();
         \u0275\u0275conditional(ctx.currentStep() === 3 ? 29 : -1);
       }
-    }, dependencies: [CommonModule, FormsModule, DefaultValueAccessor, NgControlStatus, MaxLengthValidator, NgModel, ApiSelectorComponent], styles: ["\n\n.add-account-page[_ngcontent-%COMP%] {\n  max-width: 900px;\n  margin: 0 auto;\n  padding: 2rem;\n}\n.page-header[_ngcontent-%COMP%] {\n  margin-bottom: 2rem;\n}\n.back-btn[_ngcontent-%COMP%] {\n  background: none;\n  border: none;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n  padding: 0;\n}\n.back-btn[_ngcontent-%COMP%]:hover {\n  text-decoration: underline;\n}\n.page-title[_ngcontent-%COMP%] {\n  margin: 0;\n  font-size: 2rem;\n  color: var(--text-primary, white);\n}\n.step-indicator[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  margin-bottom: 2rem;\n  flex-wrap: wrap;\n  gap: 0.5rem;\n}\n.step[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.step-number[_ngcontent-%COMP%] {\n  width: 28px;\n  height: 28px;\n  border-radius: 50%;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 0.875rem;\n  font-weight: 600;\n  color: var(--text-muted, #94a3b8);\n}\n.step.active[_ngcontent-%COMP%]   .step-number[_ngcontent-%COMP%] {\n  background: var(--primary, #06b6d4);\n  color: white;\n}\n.step.completed[_ngcontent-%COMP%]   .step-number[_ngcontent-%COMP%] {\n  background: #22c55e;\n  color: white;\n}\n.step-label[_ngcontent-%COMP%] {\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.step.active[_ngcontent-%COMP%]   .step-label[_ngcontent-%COMP%] {\n  color: var(--text-primary, white);\n}\n.step-line[_ngcontent-%COMP%] {\n  width: 40px;\n  height: 2px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n}\n.step-line.active[_ngcontent-%COMP%] {\n  background: var(--primary, #06b6d4);\n}\n.mode-selection[_ngcontent-%COMP%], \n.login-selection[_ngcontent-%COMP%] {\n  text-align: center;\n}\n.section-header[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%], \n.selection-header[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%] {\n  margin: 0 0 0.5rem 0;\n  color: var(--text-primary, white);\n  font-size: 1.5rem;\n}\n.section-header[_ngcontent-%COMP%]   p[_ngcontent-%COMP%], \n.selection-header[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  margin: 0 0 2rem 0;\n  color: var(--text-muted, #94a3b8);\n}\n.mode-cards[_ngcontent-%COMP%], \n.login-cards[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(2, 1fr);\n  gap: 1.5rem;\n  margin-bottom: 2rem;\n}\n@media (max-width: 700px) {\n  .mode-cards[_ngcontent-%COMP%], \n   .login-cards[_ngcontent-%COMP%] {\n    grid-template-columns: 1fr;\n  }\n}\n.login-cards[_ngcontent-%COMP%] {\n  grid-template-columns: repeat(3, 1fr);\n}\n@media (max-width: 800px) {\n  .login-cards[_ngcontent-%COMP%] {\n    grid-template-columns: 1fr;\n  }\n}\n.mode-card[_ngcontent-%COMP%], \n.login-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 2px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  cursor: pointer;\n  transition: all 0.2s;\n  position: relative;\n  text-align: left;\n}\n.mode-card[_ngcontent-%COMP%]:hover, \n.login-card[_ngcontent-%COMP%]:hover {\n  transform: translateY(-4px);\n  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);\n}\n.mode-card.expert[_ngcontent-%COMP%]:hover {\n  border-color: #22c55e;\n}\n.mode-card.platform[_ngcontent-%COMP%]:hover {\n  border-color: #06b6d4;\n}\n.mode-card.disabled[_ngcontent-%COMP%] {\n  opacity: 0.6;\n  cursor: not-allowed;\n}\n.mode-card.disabled[_ngcontent-%COMP%]:hover {\n  transform: none;\n}\n.login-card.recommended[_ngcontent-%COMP%]:hover {\n  border-color: #22c55e;\n}\n.login-card.safe[_ngcontent-%COMP%]:hover {\n  border-color: #06b6d4;\n}\n.login-card.warning[_ngcontent-%COMP%]:hover {\n  border-color: #f59e0b;\n}\n.mode-badge[_ngcontent-%COMP%], \n.login-badge[_ngcontent-%COMP%] {\n  position: absolute;\n  top: -10px;\n  right: 1rem;\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n  font-size: 0.7rem;\n  font-weight: 600;\n}\n.mode-card.expert[_ngcontent-%COMP%]   .mode-badge[_ngcontent-%COMP%] {\n  background: #22c55e;\n  color: white;\n}\n.mode-card.platform[_ngcontent-%COMP%]   .mode-badge[_ngcontent-%COMP%] {\n  background: #06b6d4;\n  color: white;\n}\n.login-card.recommended[_ngcontent-%COMP%]   .login-badge[_ngcontent-%COMP%] {\n  background: #22c55e;\n  color: white;\n}\n.login-card.safe[_ngcontent-%COMP%]   .login-badge[_ngcontent-%COMP%] {\n  background: #06b6d4;\n  color: white;\n}\n.login-card.warning[_ngcontent-%COMP%]   .login-badge[_ngcontent-%COMP%] {\n  background: #f59e0b;\n  color: black;\n}\n.mode-icon[_ngcontent-%COMP%], \n.login-icon[_ngcontent-%COMP%] {\n  font-size: 2.5rem;\n  margin-bottom: 0.75rem;\n}\n.mode-title[_ngcontent-%COMP%], \n.login-card[_ngcontent-%COMP%]   h3[_ngcontent-%COMP%] {\n  margin: 0 0 0.25rem 0;\n  color: var(--text-primary, white);\n  font-size: 1.25rem;\n}\n.mode-subtitle[_ngcontent-%COMP%], \n.login-card[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  margin: 0 0 1rem 0;\n  font-size: 0.875rem;\n  color: var(--text-muted, #94a3b8);\n}\n.mode-features[_ngcontent-%COMP%], \n.login-card[_ngcontent-%COMP%]   ul[_ngcontent-%COMP%] {\n  list-style: none;\n  padding: 0;\n  margin: 0 0 1rem 0;\n  font-size: 0.8rem;\n}\n.mode-features[_ngcontent-%COMP%]   li[_ngcontent-%COMP%], \n.login-card[_ngcontent-%COMP%]   li[_ngcontent-%COMP%] {\n  margin-bottom: 0.375rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.mode-suitable[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n  margin-bottom: 1rem;\n}\n.mode-risk[_ngcontent-%COMP%], \n.login-risk[_ngcontent-%COMP%] {\n  padding: 0.375rem 0.75rem;\n  border-radius: 0.5rem;\n  font-size: 0.7rem;\n  font-weight: 500;\n  display: inline-block;\n  margin-bottom: 1rem;\n}\n.mode-risk.safe[_ngcontent-%COMP%], \n.login-risk.lowest[_ngcontent-%COMP%] {\n  background: rgba(6, 182, 212, 0.2);\n  color: #67e8f9;\n}\n.mode-risk.medium[_ngcontent-%COMP%], \n.login-risk.low[_ngcontent-%COMP%] {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.login-risk.high[_ngcontent-%COMP%] {\n  background: rgba(245, 158, 11, 0.2);\n  color: #fcd34d;\n}\n.quota-info[_ngcontent-%COMP%] {\n  margin-bottom: 1rem;\n}\n.quota-bar[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 0.75rem;\n  border-radius: 0.5rem;\n}\n.quota-label[_ngcontent-%COMP%] {\n  font-size: 0.7rem;\n  color: var(--text-muted, #94a3b8);\n  margin-bottom: 0.375rem;\n}\n.quota-progress[_ngcontent-%COMP%] {\n  height: 6px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.8));\n  border-radius: 3px;\n  overflow: hidden;\n  margin-bottom: 0.375rem;\n}\n.quota-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #22c55e);\n  border-radius: 3px;\n}\n.quota-text[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.quota-locked[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem;\n  background: rgba(245, 158, 11, 0.1);\n  border-radius: 0.5rem;\n  font-size: 0.75rem;\n  color: #fcd34d;\n}\n.mode-btn[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 0.75rem;\n  border: none;\n  border-radius: 0.5rem;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.mode-card.expert[_ngcontent-%COMP%]   .mode-btn[_ngcontent-%COMP%] {\n  background: #22c55e;\n  color: white;\n}\n.mode-card.platform[_ngcontent-%COMP%]   .mode-btn[_ngcontent-%COMP%] {\n  background: #06b6d4;\n  color: white;\n}\n.mode-btn.upgrade[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #f59e0b,\n      #ef4444);\n}\n.help-section[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(2, 1fr);\n  gap: 1rem;\n  text-align: left;\n}\n@media (max-width: 600px) {\n  .help-section[_ngcontent-%COMP%] {\n    grid-template-columns: 1fr;\n  }\n}\n.help-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.5));\n  padding: 1rem;\n  border-radius: 0.75rem;\n}\n.help-card[_ngcontent-%COMP%]   h4[_ngcontent-%COMP%] {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.help-card[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.config-section[_ngcontent-%COMP%] {\n  max-width: 600px;\n  margin: 0 auto;\n}\n.form-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.form-group[_ngcontent-%COMP%] {\n  margin-bottom: 1.25rem;\n}\n.form-group[_ngcontent-%COMP%]   label[_ngcontent-%COMP%] {\n  display: block;\n  margin-bottom: 0.5rem;\n  font-size: 0.875rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.required[_ngcontent-%COMP%] {\n  color: #ef4444;\n}\n.form-input[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 0.75rem 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-size: 0.875rem;\n  box-sizing: border-box;\n}\n.form-input[_ngcontent-%COMP%]:focus {\n  outline: none;\n  border-color: var(--primary, #06b6d4);\n}\n.form-input.error[_ngcontent-%COMP%] {\n  border-color: #ef4444;\n  background: rgba(239, 68, 68, 0.05);\n}\n.form-input.valid[_ngcontent-%COMP%] {\n  border-color: #22c55e;\n}\n.input-with-prefix[_ngcontent-%COMP%] {\n  position: relative;\n  display: flex;\n  align-items: center;\n}\n.input-with-prefix[_ngcontent-%COMP%]   .form-input[_ngcontent-%COMP%] {\n  flex: 1;\n  padding-right: 2.5rem;\n}\n.input-status[_ngcontent-%COMP%] {\n  position: absolute;\n  right: 0.75rem;\n  font-size: 1rem;\n}\n.input-status.valid[_ngcontent-%COMP%] {\n  color: #22c55e;\n}\n.form-input.code-input[_ngcontent-%COMP%] {\n  text-align: center;\n  font-size: 1.5rem;\n  letter-spacing: 0.5rem;\n}\n.hint[_ngcontent-%COMP%] {\n  display: block;\n  margin-top: 0.375rem;\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n}\n.error-text[_ngcontent-%COMP%] {\n  display: block;\n  margin-top: 0.375rem;\n  font-size: 0.75rem;\n  color: #ef4444;\n}\n.guide-box[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 1rem;\n  border-radius: 0.5rem;\n  margin-bottom: 1rem;\n}\n.guide-box[_ngcontent-%COMP%]   h4[_ngcontent-%COMP%] {\n  margin: 0 0 0.75rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.guide-box[_ngcontent-%COMP%]   ol[_ngcontent-%COMP%] {\n  margin: 0;\n  padding-left: 1.25rem;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.guide-box[_ngcontent-%COMP%]   li[_ngcontent-%COMP%] {\n  margin-bottom: 0.375rem;\n}\n.guide-box[_ngcontent-%COMP%]   a[_ngcontent-%COMP%] {\n  color: var(--primary, #06b6d4);\n}\n.warning-box[_ngcontent-%COMP%], \n.risk-warning[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.75rem;\n  padding: 1rem;\n  background: rgba(245, 158, 11, 0.1);\n  border: 1px solid rgba(245, 158, 11, 0.3);\n  border-radius: 0.5rem;\n}\n.warning-icon[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n}\n.warning-content[_ngcontent-%COMP%]   strong[_ngcontent-%COMP%] {\n  display: block;\n  color: #fcd34d;\n  margin-bottom: 0.375rem;\n  font-size: 0.875rem;\n}\n.warning-content[_ngcontent-%COMP%]   ul[_ngcontent-%COMP%], \n.warning-content[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  margin: 0;\n  padding-left: 1rem;\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.warning-content[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  padding-left: 0;\n}\n.quota-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.membership-info[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  margin-bottom: 1.5rem;\n  padding-bottom: 1rem;\n  border-bottom: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.level-icon[_ngcontent-%COMP%] {\n  font-size: 2rem;\n}\n.level-details[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n}\n.level-name[_ngcontent-%COMP%] {\n  font-size: 1.125rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.level-label[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.quota-item[_ngcontent-%COMP%] {\n  margin-bottom: 1rem;\n}\n.quota-header[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  margin-bottom: 0.5rem;\n}\n.quota-title[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.quota-value[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.quota-bar-large[_ngcontent-%COMP%] {\n  height: 8px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 4px;\n  overflow: hidden;\n}\n.quota-bar-large[_ngcontent-%COMP%]   .quota-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #22c55e);\n}\n.quota-summary[_ngcontent-%COMP%] {\n  margin-top: 1rem;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n  text-align: center;\n}\n.summary-good[_ngcontent-%COMP%] {\n  color: #22c55e;\n}\n.summary-bad[_ngcontent-%COMP%] {\n  color: #ef4444;\n}\n.upgrade-prompt[_ngcontent-%COMP%] {\n  margin-top: 1rem;\n  text-align: center;\n  padding: 1rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(245, 158, 11, 0.1),\n      rgba(239, 68, 68, 0.1));\n  border-radius: 0.5rem;\n}\n.upgrade-prompt[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  margin: 0 0 0.75rem 0;\n  color: #fcd34d;\n}\n.btn-upgrade[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #f59e0b,\n      #ef4444);\n  color: white;\n  border: none;\n  padding: 0.5rem 1.5rem;\n  border-radius: 0.5rem;\n  cursor: pointer;\n}\n.form-actions[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: flex-end;\n  gap: 0.75rem;\n  margin-top: 1.5rem;\n}\n.form-actions.center[_ngcontent-%COMP%] {\n  justify-content: center;\n}\n.btn-primary[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.btn-primary[_ngcontent-%COMP%]:hover:not(:disabled) {\n  transform: translateY(-1px);\n}\n.btn-primary[_ngcontent-%COMP%]:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.btn-secondary[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background: transparent;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.3));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n}\n.device-options[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(3, 1fr);\n  gap: 0.5rem;\n}\n.device-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.device-btn[_ngcontent-%COMP%]:hover, \n.device-btn.active[_ngcontent-%COMP%] {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n}\n.drop-zone[_ngcontent-%COMP%] {\n  border: 2px dashed var(--border-default, rgba(148, 163, 184, 0.3));\n  border-radius: 0.75rem;\n  padding: 3rem;\n  text-align: center;\n  cursor: pointer;\n  transition: all 0.2s;\n  margin-bottom: 1rem;\n}\n.drop-zone[_ngcontent-%COMP%]:hover, \n.drop-zone.dragging[_ngcontent-%COMP%] {\n  border-color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.05);\n}\n.drop-icon[_ngcontent-%COMP%] {\n  font-size: 2.5rem;\n  margin-bottom: 0.75rem;\n}\n.drop-text[_ngcontent-%COMP%] {\n  margin: 0;\n  color: var(--text-primary, white);\n}\n.drop-hint[_ngcontent-%COMP%] {\n  margin: 0.5rem 0 0 0;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.selected-file[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n}\n.file-path[_ngcontent-%COMP%] {\n  flex: 1;\n  color: var(--text-primary, white);\n  font-size: 0.875rem;\n  word-break: break-all;\n}\n.clear-btn[_ngcontent-%COMP%] {\n  background: none;\n  border: none;\n  color: var(--text-muted, #94a3b8);\n  cursor: pointer;\n  font-size: 1.25rem;\n}\n.qr-section[_ngcontent-%COMP%] {\n  text-align: center;\n  margin: 1rem 0;\n}\n.qr-container[_ngcontent-%COMP%] {\n  padding: 1rem;\n  background: white;\n  border-radius: 0.75rem;\n  display: inline-block;\n  margin-bottom: 0.75rem;\n}\n.qr-image[_ngcontent-%COMP%] {\n  width: 180px;\n  height: 180px;\n  display: block;\n}\n.qr-countdown[_ngcontent-%COMP%] {\n  font-size: 1rem;\n  color: var(--primary, #06b6d4);\n  margin-bottom: 0.75rem;\n}\n.qr-countdown.warning[_ngcontent-%COMP%] {\n  color: #f59e0b;\n  animation: _ngcontent-%COMP%_pulse 1s infinite;\n}\n@keyframes _ngcontent-%COMP%_pulse {\n  0%, 100% {\n    opacity: 1;\n  }\n  50% {\n    opacity: 0.5;\n  }\n}\n.qr-instructions[_ngcontent-%COMP%] {\n  text-align: left;\n  display: inline-block;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 0.75rem 1.25rem;\n  border-radius: 0.5rem;\n}\n.qr-instructions[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  margin: 0.25rem 0;\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.8rem;\n}\n.code-sent-info[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem 1rem;\n  background: rgba(34, 197, 94, 0.1);\n  border-radius: 0.5rem;\n  margin-bottom: 1rem;\n  color: #86efac;\n}\n.resend-section[_ngcontent-%COMP%] {\n  text-align: center;\n  margin: 1rem 0;\n}\n.resend-btn[_ngcontent-%COMP%] {\n  background: none;\n  border: none;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n  font-size: 0.875rem;\n}\n.resend-btn[_ngcontent-%COMP%]:disabled {\n  color: var(--text-muted, #94a3b8);\n  cursor: not-allowed;\n}\n.tdata-info[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 1rem;\n  border-radius: 0.5rem;\n  margin-bottom: 1rem;\n}\n.tdata-info[_ngcontent-%COMP%]   h4[_ngcontent-%COMP%] {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.tdata-info[_ngcontent-%COMP%]   ul[_ngcontent-%COMP%] {\n  margin: 0;\n  padding-left: 1rem;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.import-mode-tabs[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1rem;\n}\n.mode-tab[_ngcontent-%COMP%] {\n  flex: 1;\n  padding: 0.75rem 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 2px solid transparent;\n  border-radius: 0.5rem;\n  color: var(--text-muted, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n  position: relative;\n}\n.mode-tab[_ngcontent-%COMP%]:hover {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n  color: var(--text-primary, white);\n}\n.mode-tab.active[_ngcontent-%COMP%] {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n  border-color: var(--primary, #06b6d4);\n  color: var(--text-primary, white);\n}\n.badge-recommend[_ngcontent-%COMP%] {\n  position: absolute;\n  top: -8px;\n  right: -8px;\n  background:\n    linear-gradient(\n      135deg,\n      #10b981,\n      #059669);\n  color: white;\n  font-size: 0.65rem;\n  padding: 2px 6px;\n  border-radius: 4px;\n}\n.tdata-path-hint[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border, rgba(100, 116, 139, 0.3));\n  border-radius: 0.5rem;\n  padding: 1rem;\n  margin-bottom: 1rem;\n}\n.tdata-path-hint[_ngcontent-%COMP%]   h4[_ngcontent-%COMP%] {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.path-box[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  background: var(--bg-primary, rgba(2, 6, 23, 0.8));\n  padding: 0.5rem 1rem;\n  border-radius: 0.375rem;\n}\n.path-box[_ngcontent-%COMP%]   code[_ngcontent-%COMP%] {\n  font-size: 0.8rem;\n  color: var(--primary, #06b6d4);\n  word-break: break-all;\n}\n.path-actions[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.25rem;\n}\n.icon-btn[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  background: transparent;\n  border: none;\n  cursor: pointer;\n  opacity: 0.7;\n  transition: opacity 0.2s;\n}\n.icon-btn[_ngcontent-%COMP%]:hover {\n  opacity: 1;\n}\n.drop-zone.large[_ngcontent-%COMP%] {\n  padding: 2rem;\n  min-height: 180px;\n}\n.drop-buttons[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-top: 1rem;\n}\n.select-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--primary, #06b6d4);\n  color: white;\n  border: none;\n  border-radius: 0.375rem;\n  cursor: pointer;\n  transition: background 0.2s;\n}\n.select-btn[_ngcontent-%COMP%]:hover {\n  background: var(--primary-dark, #0891b2);\n}\n.select-btn.secondary[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border, rgba(100, 116, 139, 0.3));\n}\n.select-btn.secondary[_ngcontent-%COMP%]:hover {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n}\n.scan-result[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n  padding: 1rem;\n  margin: 1rem 0;\n}\n.scan-result.success[_ngcontent-%COMP%] {\n  border: 1px solid rgba(16, 185, 129, 0.3);\n}\n.scan-result.error[_ngcontent-%COMP%] {\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  color: #f87171;\n}\n.scan-result[_ngcontent-%COMP%]   h4[_ngcontent-%COMP%] {\n  margin: 0 0 0.75rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.accounts-list[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.5rem;\n  max-height: 200px;\n  overflow-y: auto;\n}\n.account-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.75rem;\n  padding: 0.5rem;\n  background: var(--bg-primary, rgba(2, 6, 23, 0.8));\n  border-radius: 0.375rem;\n  cursor: pointer;\n  transition: background 0.2s;\n}\n.account-item[_ngcontent-%COMP%]:hover {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n}\n.account-item.disabled[_ngcontent-%COMP%] {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.account-item[_ngcontent-%COMP%]   input[type=checkbox][_ngcontent-%COMP%] {\n  width: 1rem;\n  height: 1rem;\n}\n.account-info[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.125rem;\n}\n.account-phone[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.account-name[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.account-error[_ngcontent-%COMP%] {\n  font-size: 0.7rem;\n  color: #f87171;\n}\n.scanning-indicator[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.5rem;\n  padding: 1rem;\n  color: var(--text-muted, #94a3b8);\n}\n.success-section[_ngcontent-%COMP%] {\n  text-align: center;\n  padding: 2rem;\n}\n.success-icon[_ngcontent-%COMP%] {\n  font-size: 4rem;\n  margin-bottom: 1rem;\n}\n.success-section[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%] {\n  margin: 0 0 1.5rem 0;\n  color: var(--text-primary, white);\n}\n.account-card[_ngcontent-%COMP%] {\n  display: inline-flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem 2rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.account-avatar[_ngcontent-%COMP%] {\n  width: 56px;\n  height: 56px;\n  border-radius: 50%;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: white;\n}\n.account-name[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.account-phone[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n}\n.account-username[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: var(--primary, #06b6d4);\n}\n.api-info[_ngcontent-%COMP%] {\n  margin: 1rem 0;\n}\n.api-badge[_ngcontent-%COMP%] {\n  display: inline-block;\n  padding: 0.5rem 1rem;\n  border-radius: 2rem;\n  font-size: 0.8rem;\n}\n.api-badge.expert[_ngcontent-%COMP%] {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.api-badge.platform[_ngcontent-%COMP%] {\n  background: rgba(6, 182, 212, 0.2);\n  color: #67e8f9;\n}\n.spinner[_ngcontent-%COMP%] {\n  width: 16px;\n  height: 16px;\n  border: 2px solid rgba(255, 255, 255, 0.3);\n  border-top-color: white;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 0.8s linear infinite;\n}\n@keyframes _ngcontent-%COMP%_spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n/*# sourceMappingURL=add-account-page.component.css.map */"] });
+    }, dependencies: [CommonModule, FormsModule, DefaultValueAccessor, RadioControlValueAccessor, NgControlStatus, MaxLengthValidator, NgModel, ApiSelectorComponent], styles: ["\n\n.add-account-page[_ngcontent-%COMP%] {\n  max-width: 900px;\n  margin: 0 auto;\n  padding: 2rem;\n}\n.page-header[_ngcontent-%COMP%] {\n  margin-bottom: 2rem;\n}\n.back-btn[_ngcontent-%COMP%] {\n  background: none;\n  border: none;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n  padding: 0;\n}\n.back-btn[_ngcontent-%COMP%]:hover {\n  text-decoration: underline;\n}\n.page-title[_ngcontent-%COMP%] {\n  margin: 0;\n  font-size: 2rem;\n  color: var(--text-primary, white);\n}\n.step-indicator[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  margin-bottom: 2rem;\n  flex-wrap: wrap;\n  gap: 0.5rem;\n}\n.step[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.step-number[_ngcontent-%COMP%] {\n  width: 28px;\n  height: 28px;\n  border-radius: 50%;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 0.875rem;\n  font-weight: 600;\n  color: var(--text-muted, #94a3b8);\n}\n.step.active[_ngcontent-%COMP%]   .step-number[_ngcontent-%COMP%] {\n  background: var(--primary, #06b6d4);\n  color: white;\n}\n.step.completed[_ngcontent-%COMP%]   .step-number[_ngcontent-%COMP%] {\n  background: #22c55e;\n  color: white;\n}\n.step-label[_ngcontent-%COMP%] {\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.step.active[_ngcontent-%COMP%]   .step-label[_ngcontent-%COMP%] {\n  color: var(--text-primary, white);\n}\n.step-line[_ngcontent-%COMP%] {\n  width: 40px;\n  height: 2px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n}\n.step-line.active[_ngcontent-%COMP%] {\n  background: var(--primary, #06b6d4);\n}\n.mode-selection[_ngcontent-%COMP%], \n.login-selection[_ngcontent-%COMP%] {\n  text-align: center;\n}\n.section-header[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%], \n.selection-header[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%] {\n  margin: 0 0 0.5rem 0;\n  color: var(--text-primary, white);\n  font-size: 1.5rem;\n}\n.section-header[_ngcontent-%COMP%]   p[_ngcontent-%COMP%], \n.selection-header[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  margin: 0 0 2rem 0;\n  color: var(--text-muted, #94a3b8);\n}\n.mode-cards[_ngcontent-%COMP%], \n.login-cards[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(2, 1fr);\n  gap: 1.5rem;\n  margin-bottom: 2rem;\n}\n@media (max-width: 700px) {\n  .mode-cards[_ngcontent-%COMP%], \n   .login-cards[_ngcontent-%COMP%] {\n    grid-template-columns: 1fr;\n  }\n}\n.login-cards[_ngcontent-%COMP%] {\n  grid-template-columns: repeat(3, 1fr);\n}\n@media (max-width: 800px) {\n  .login-cards[_ngcontent-%COMP%] {\n    grid-template-columns: 1fr;\n  }\n}\n.mode-card[_ngcontent-%COMP%], \n.login-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 2px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  cursor: pointer;\n  transition: all 0.2s;\n  position: relative;\n  text-align: left;\n}\n.mode-card[_ngcontent-%COMP%]:hover, \n.login-card[_ngcontent-%COMP%]:hover {\n  transform: translateY(-4px);\n  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);\n}\n.mode-card.expert[_ngcontent-%COMP%]:hover {\n  border-color: #22c55e;\n}\n.mode-card.platform[_ngcontent-%COMP%]:hover {\n  border-color: #06b6d4;\n}\n.mode-card.disabled[_ngcontent-%COMP%] {\n  opacity: 0.6;\n  cursor: not-allowed;\n}\n.mode-card.disabled[_ngcontent-%COMP%]:hover {\n  transform: none;\n}\n.login-card.recommended[_ngcontent-%COMP%]:hover {\n  border-color: #22c55e;\n}\n.login-card.safe[_ngcontent-%COMP%]:hover {\n  border-color: #06b6d4;\n}\n.login-card.warning[_ngcontent-%COMP%]:hover {\n  border-color: #f59e0b;\n}\n.mode-badge[_ngcontent-%COMP%], \n.login-badge[_ngcontent-%COMP%] {\n  position: absolute;\n  top: -10px;\n  right: 1rem;\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n  font-size: 0.7rem;\n  font-weight: 600;\n}\n.mode-card.expert[_ngcontent-%COMP%]   .mode-badge[_ngcontent-%COMP%] {\n  background: #22c55e;\n  color: white;\n}\n.mode-card.platform[_ngcontent-%COMP%]   .mode-badge[_ngcontent-%COMP%] {\n  background: #06b6d4;\n  color: white;\n}\n.login-card.recommended[_ngcontent-%COMP%]   .login-badge[_ngcontent-%COMP%] {\n  background: #22c55e;\n  color: white;\n}\n.login-card.safe[_ngcontent-%COMP%]   .login-badge[_ngcontent-%COMP%] {\n  background: #06b6d4;\n  color: white;\n}\n.login-card.warning[_ngcontent-%COMP%]   .login-badge[_ngcontent-%COMP%] {\n  background: #f59e0b;\n  color: black;\n}\n.mode-icon[_ngcontent-%COMP%], \n.login-icon[_ngcontent-%COMP%] {\n  font-size: 2.5rem;\n  margin-bottom: 0.75rem;\n}\n.mode-title[_ngcontent-%COMP%], \n.login-card[_ngcontent-%COMP%]   h3[_ngcontent-%COMP%] {\n  margin: 0 0 0.25rem 0;\n  color: var(--text-primary, white);\n  font-size: 1.25rem;\n}\n.mode-subtitle[_ngcontent-%COMP%], \n.login-card[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  margin: 0 0 1rem 0;\n  font-size: 0.875rem;\n  color: var(--text-muted, #94a3b8);\n}\n.mode-features[_ngcontent-%COMP%], \n.login-card[_ngcontent-%COMP%]   ul[_ngcontent-%COMP%] {\n  list-style: none;\n  padding: 0;\n  margin: 0 0 1rem 0;\n  font-size: 0.8rem;\n}\n.mode-features[_ngcontent-%COMP%]   li[_ngcontent-%COMP%], \n.login-card[_ngcontent-%COMP%]   li[_ngcontent-%COMP%] {\n  margin-bottom: 0.375rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.mode-suitable[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n  margin-bottom: 1rem;\n}\n.mode-risk[_ngcontent-%COMP%], \n.login-risk[_ngcontent-%COMP%] {\n  padding: 0.375rem 0.75rem;\n  border-radius: 0.5rem;\n  font-size: 0.7rem;\n  font-weight: 500;\n  display: inline-block;\n  margin-bottom: 1rem;\n}\n.mode-risk.safe[_ngcontent-%COMP%], \n.login-risk.lowest[_ngcontent-%COMP%] {\n  background: rgba(6, 182, 212, 0.2);\n  color: #67e8f9;\n}\n.mode-risk.medium[_ngcontent-%COMP%], \n.login-risk.low[_ngcontent-%COMP%] {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.login-risk.high[_ngcontent-%COMP%] {\n  background: rgba(245, 158, 11, 0.2);\n  color: #fcd34d;\n}\n.quota-info[_ngcontent-%COMP%] {\n  margin-bottom: 1rem;\n}\n.quota-bar[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 0.75rem;\n  border-radius: 0.5rem;\n}\n.quota-label[_ngcontent-%COMP%] {\n  font-size: 0.7rem;\n  color: var(--text-muted, #94a3b8);\n  margin-bottom: 0.375rem;\n}\n.quota-progress[_ngcontent-%COMP%] {\n  height: 6px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.8));\n  border-radius: 3px;\n  overflow: hidden;\n  margin-bottom: 0.375rem;\n}\n.quota-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #22c55e);\n  border-radius: 3px;\n}\n.quota-text[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.quota-locked[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem;\n  background: rgba(245, 158, 11, 0.1);\n  border-radius: 0.5rem;\n  font-size: 0.75rem;\n  color: #fcd34d;\n}\n.mode-btn[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 0.75rem;\n  border: none;\n  border-radius: 0.5rem;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.mode-card.expert[_ngcontent-%COMP%]   .mode-btn[_ngcontent-%COMP%] {\n  background: #22c55e;\n  color: white;\n}\n.mode-card.platform[_ngcontent-%COMP%]   .mode-btn[_ngcontent-%COMP%] {\n  background: #06b6d4;\n  color: white;\n}\n.mode-btn.upgrade[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #f59e0b,\n      #ef4444);\n}\n.help-section[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(2, 1fr);\n  gap: 1rem;\n  text-align: left;\n}\n@media (max-width: 600px) {\n  .help-section[_ngcontent-%COMP%] {\n    grid-template-columns: 1fr;\n  }\n}\n.help-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.5));\n  padding: 1rem;\n  border-radius: 0.75rem;\n}\n.help-card[_ngcontent-%COMP%]   h4[_ngcontent-%COMP%] {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.help-card[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.config-section[_ngcontent-%COMP%] {\n  max-width: 600px;\n  margin: 0 auto;\n}\n.form-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.form-group[_ngcontent-%COMP%] {\n  margin-bottom: 1.25rem;\n}\n.form-group[_ngcontent-%COMP%]   label[_ngcontent-%COMP%] {\n  display: block;\n  margin-bottom: 0.5rem;\n  font-size: 0.875rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.required[_ngcontent-%COMP%] {\n  color: #ef4444;\n}\n.proxy-options[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.5rem;\n  margin-top: 0.5rem;\n}\n.proxy-option[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  padding: 0.75rem 1rem;\n  background: var(--bg-secondary, #1e293b);\n  border: 2px solid transparent;\n  border-radius: 0.5rem;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.proxy-option[_ngcontent-%COMP%]:hover {\n  background: var(--bg-tertiary, #334155);\n}\n.proxy-option[_ngcontent-%COMP%]:has(input:checked) {\n  border-color: var(--accent-color, #8b5cf6);\n  background: rgba(139, 92, 246, 0.1);\n}\n.proxy-option[_ngcontent-%COMP%]   input[type=radio][_ngcontent-%COMP%] {\n  display: none;\n}\n.proxy-option[_ngcontent-%COMP%]   .option-content[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.75rem;\n}\n.proxy-option[_ngcontent-%COMP%]   .option-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.proxy-option[_ngcontent-%COMP%]   .option-text[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n}\n.proxy-option[_ngcontent-%COMP%]   .option-text[_ngcontent-%COMP%]   strong[_ngcontent-%COMP%] {\n  font-size: 0.9rem;\n  color: var(--text-primary, #f1f5f9);\n}\n.proxy-option[_ngcontent-%COMP%]   .option-text[_ngcontent-%COMP%]   small[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-secondary, #94a3b8);\n}\n.mt-2[_ngcontent-%COMP%] {\n  margin-top: 0.5rem;\n}\n.form-input[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 0.75rem 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-size: 0.875rem;\n  box-sizing: border-box;\n}\n.form-input[_ngcontent-%COMP%]:focus {\n  outline: none;\n  border-color: var(--primary, #06b6d4);\n}\n.form-input.error[_ngcontent-%COMP%] {\n  border-color: #ef4444;\n  background: rgba(239, 68, 68, 0.05);\n}\n.form-input.valid[_ngcontent-%COMP%] {\n  border-color: #22c55e;\n}\n.input-with-prefix[_ngcontent-%COMP%] {\n  position: relative;\n  display: flex;\n  align-items: center;\n}\n.input-with-prefix[_ngcontent-%COMP%]   .form-input[_ngcontent-%COMP%] {\n  flex: 1;\n  padding-right: 2.5rem;\n}\n.input-status[_ngcontent-%COMP%] {\n  position: absolute;\n  right: 0.75rem;\n  font-size: 1rem;\n}\n.input-status.valid[_ngcontent-%COMP%] {\n  color: #22c55e;\n}\n.form-input.code-input[_ngcontent-%COMP%] {\n  text-align: center;\n  font-size: 1.5rem;\n  letter-spacing: 0.5rem;\n}\n.hint[_ngcontent-%COMP%] {\n  display: block;\n  margin-top: 0.375rem;\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n}\n.error-text[_ngcontent-%COMP%] {\n  display: block;\n  margin-top: 0.375rem;\n  font-size: 0.75rem;\n  color: #ef4444;\n}\n.guide-box[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 1rem;\n  border-radius: 0.5rem;\n  margin-bottom: 1rem;\n}\n.guide-box[_ngcontent-%COMP%]   h4[_ngcontent-%COMP%] {\n  margin: 0 0 0.75rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.guide-box[_ngcontent-%COMP%]   ol[_ngcontent-%COMP%] {\n  margin: 0;\n  padding-left: 1.25rem;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.guide-box[_ngcontent-%COMP%]   li[_ngcontent-%COMP%] {\n  margin-bottom: 0.375rem;\n}\n.guide-box[_ngcontent-%COMP%]   a[_ngcontent-%COMP%] {\n  color: var(--primary, #06b6d4);\n}\n.warning-box[_ngcontent-%COMP%], \n.risk-warning[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.75rem;\n  padding: 1rem;\n  background: rgba(245, 158, 11, 0.1);\n  border: 1px solid rgba(245, 158, 11, 0.3);\n  border-radius: 0.5rem;\n}\n.warning-icon[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n}\n.warning-content[_ngcontent-%COMP%]   strong[_ngcontent-%COMP%] {\n  display: block;\n  color: #fcd34d;\n  margin-bottom: 0.375rem;\n  font-size: 0.875rem;\n}\n.warning-content[_ngcontent-%COMP%]   ul[_ngcontent-%COMP%], \n.warning-content[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  margin: 0;\n  padding-left: 1rem;\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.warning-content[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  padding-left: 0;\n}\n.quota-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.membership-info[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  margin-bottom: 1.5rem;\n  padding-bottom: 1rem;\n  border-bottom: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.level-icon[_ngcontent-%COMP%] {\n  font-size: 2rem;\n}\n.level-details[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n}\n.level-name[_ngcontent-%COMP%] {\n  font-size: 1.125rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.level-label[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.quota-item[_ngcontent-%COMP%] {\n  margin-bottom: 1rem;\n}\n.quota-header[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  margin-bottom: 0.5rem;\n}\n.quota-title[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.quota-value[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.quota-bar-large[_ngcontent-%COMP%] {\n  height: 8px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 4px;\n  overflow: hidden;\n}\n.quota-bar-large[_ngcontent-%COMP%]   .quota-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #22c55e);\n}\n.quota-summary[_ngcontent-%COMP%] {\n  margin-top: 1rem;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n  text-align: center;\n}\n.summary-good[_ngcontent-%COMP%] {\n  color: #22c55e;\n}\n.summary-bad[_ngcontent-%COMP%] {\n  color: #ef4444;\n}\n.upgrade-prompt[_ngcontent-%COMP%] {\n  margin-top: 1rem;\n  text-align: center;\n  padding: 1rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(245, 158, 11, 0.1),\n      rgba(239, 68, 68, 0.1));\n  border-radius: 0.5rem;\n}\n.upgrade-prompt[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  margin: 0 0 0.75rem 0;\n  color: #fcd34d;\n}\n.btn-upgrade[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #f59e0b,\n      #ef4444);\n  color: white;\n  border: none;\n  padding: 0.5rem 1.5rem;\n  border-radius: 0.5rem;\n  cursor: pointer;\n}\n.form-actions[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: flex-end;\n  gap: 0.75rem;\n  margin-top: 1.5rem;\n}\n.form-actions.center[_ngcontent-%COMP%] {\n  justify-content: center;\n}\n.btn-primary[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.btn-primary[_ngcontent-%COMP%]:hover:not(:disabled) {\n  transform: translateY(-1px);\n}\n.btn-primary[_ngcontent-%COMP%]:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.btn-secondary[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background: transparent;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.3));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n}\n.device-options[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(3, 1fr);\n  gap: 0.5rem;\n}\n.device-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.device-btn[_ngcontent-%COMP%]:hover, \n.device-btn.active[_ngcontent-%COMP%] {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n}\n.drop-zone[_ngcontent-%COMP%] {\n  border: 2px dashed var(--border-default, rgba(148, 163, 184, 0.3));\n  border-radius: 0.75rem;\n  padding: 3rem;\n  text-align: center;\n  cursor: pointer;\n  transition: all 0.2s;\n  margin-bottom: 1rem;\n}\n.drop-zone[_ngcontent-%COMP%]:hover, \n.drop-zone.dragging[_ngcontent-%COMP%] {\n  border-color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.05);\n}\n.drop-icon[_ngcontent-%COMP%] {\n  font-size: 2.5rem;\n  margin-bottom: 0.75rem;\n}\n.drop-text[_ngcontent-%COMP%] {\n  margin: 0;\n  color: var(--text-primary, white);\n}\n.drop-hint[_ngcontent-%COMP%] {\n  margin: 0.5rem 0 0 0;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.selected-file[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n}\n.file-path[_ngcontent-%COMP%] {\n  flex: 1;\n  color: var(--text-primary, white);\n  font-size: 0.875rem;\n  word-break: break-all;\n}\n.clear-btn[_ngcontent-%COMP%] {\n  background: none;\n  border: none;\n  color: var(--text-muted, #94a3b8);\n  cursor: pointer;\n  font-size: 1.25rem;\n}\n.qr-section[_ngcontent-%COMP%] {\n  text-align: center;\n  margin: 1rem 0;\n}\n.qr-container[_ngcontent-%COMP%] {\n  padding: 1rem;\n  background: white;\n  border-radius: 0.75rem;\n  display: inline-block;\n  margin-bottom: 0.75rem;\n}\n.qr-image[_ngcontent-%COMP%] {\n  width: 180px;\n  height: 180px;\n  display: block;\n}\n.qr-countdown[_ngcontent-%COMP%] {\n  font-size: 1rem;\n  color: var(--primary, #06b6d4);\n  margin-bottom: 0.75rem;\n}\n.qr-countdown.warning[_ngcontent-%COMP%] {\n  color: #f59e0b;\n  animation: _ngcontent-%COMP%_pulse 1s infinite;\n}\n@keyframes _ngcontent-%COMP%_pulse {\n  0%, 100% {\n    opacity: 1;\n  }\n  50% {\n    opacity: 0.5;\n  }\n}\n.qr-instructions[_ngcontent-%COMP%] {\n  text-align: left;\n  display: inline-block;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 0.75rem 1.25rem;\n  border-radius: 0.5rem;\n}\n.qr-instructions[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  margin: 0.25rem 0;\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.8rem;\n}\n.code-sent-info[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem 1rem;\n  background: rgba(34, 197, 94, 0.1);\n  border-radius: 0.5rem;\n  margin-bottom: 1rem;\n  color: #86efac;\n}\n.resend-section[_ngcontent-%COMP%] {\n  text-align: center;\n  margin: 1rem 0;\n}\n.resend-btn[_ngcontent-%COMP%] {\n  background: none;\n  border: none;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n  font-size: 0.875rem;\n}\n.resend-btn[_ngcontent-%COMP%]:disabled {\n  color: var(--text-muted, #94a3b8);\n  cursor: not-allowed;\n}\n.tdata-info[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 1rem;\n  border-radius: 0.5rem;\n  margin-bottom: 1rem;\n}\n.tdata-info[_ngcontent-%COMP%]   h4[_ngcontent-%COMP%] {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.tdata-info[_ngcontent-%COMP%]   ul[_ngcontent-%COMP%] {\n  margin: 0;\n  padding-left: 1rem;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.import-mode-tabs[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1rem;\n}\n.mode-tab[_ngcontent-%COMP%] {\n  flex: 1;\n  padding: 0.75rem 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 2px solid transparent;\n  border-radius: 0.5rem;\n  color: var(--text-muted, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n  position: relative;\n}\n.mode-tab[_ngcontent-%COMP%]:hover {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n  color: var(--text-primary, white);\n}\n.mode-tab.active[_ngcontent-%COMP%] {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n  border-color: var(--primary, #06b6d4);\n  color: var(--text-primary, white);\n}\n.badge-recommend[_ngcontent-%COMP%] {\n  position: absolute;\n  top: -8px;\n  right: -8px;\n  background:\n    linear-gradient(\n      135deg,\n      #10b981,\n      #059669);\n  color: white;\n  font-size: 0.65rem;\n  padding: 2px 6px;\n  border-radius: 4px;\n}\n.tdata-path-hint[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border, rgba(100, 116, 139, 0.3));\n  border-radius: 0.5rem;\n  padding: 1rem;\n  margin-bottom: 1rem;\n}\n.tdata-path-hint[_ngcontent-%COMP%]   h4[_ngcontent-%COMP%] {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.path-box[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  background: var(--bg-primary, rgba(2, 6, 23, 0.8));\n  padding: 0.5rem 1rem;\n  border-radius: 0.375rem;\n}\n.path-box[_ngcontent-%COMP%]   code[_ngcontent-%COMP%] {\n  font-size: 0.8rem;\n  color: var(--primary, #06b6d4);\n  word-break: break-all;\n}\n.path-actions[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.25rem;\n}\n.icon-btn[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  background: transparent;\n  border: none;\n  cursor: pointer;\n  opacity: 0.7;\n  transition: opacity 0.2s;\n}\n.icon-btn[_ngcontent-%COMP%]:hover {\n  opacity: 1;\n}\n.drop-zone.large[_ngcontent-%COMP%] {\n  padding: 2rem;\n  min-height: 180px;\n}\n.drop-buttons[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-top: 1rem;\n}\n.select-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--primary, #06b6d4);\n  color: white;\n  border: none;\n  border-radius: 0.375rem;\n  cursor: pointer;\n  transition: background 0.2s;\n}\n.select-btn[_ngcontent-%COMP%]:hover {\n  background: var(--primary-dark, #0891b2);\n}\n.select-btn.secondary[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border, rgba(100, 116, 139, 0.3));\n}\n.select-btn.secondary[_ngcontent-%COMP%]:hover {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n}\n.scan-result[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n  padding: 1rem;\n  margin: 1rem 0;\n}\n.scan-result.success[_ngcontent-%COMP%] {\n  border: 1px solid rgba(16, 185, 129, 0.3);\n}\n.scan-result.error[_ngcontent-%COMP%] {\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  color: #f87171;\n}\n.scan-result[_ngcontent-%COMP%]   h4[_ngcontent-%COMP%] {\n  margin: 0 0 0.75rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.accounts-list[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.5rem;\n  max-height: 200px;\n  overflow-y: auto;\n}\n.account-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 0.75rem;\n  padding: 0.5rem;\n  background: var(--bg-primary, rgba(2, 6, 23, 0.8));\n  border-radius: 0.375rem;\n  cursor: pointer;\n  transition: background 0.2s;\n}\n.account-item[_ngcontent-%COMP%]:hover {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n}\n.account-item.disabled[_ngcontent-%COMP%] {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.account-item[_ngcontent-%COMP%]   input[type=checkbox][_ngcontent-%COMP%] {\n  width: 1rem;\n  height: 1rem;\n}\n.account-info[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.125rem;\n}\n.account-phone[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.account-name[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.account-error[_ngcontent-%COMP%] {\n  font-size: 0.7rem;\n  color: #f87171;\n}\n.scanning-indicator[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.5rem;\n  padding: 1rem;\n  color: var(--text-muted, #94a3b8);\n}\n.success-section[_ngcontent-%COMP%] {\n  text-align: center;\n  padding: 2rem;\n}\n.success-icon[_ngcontent-%COMP%] {\n  font-size: 4rem;\n  margin-bottom: 1rem;\n}\n.success-section[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%] {\n  margin: 0 0 1.5rem 0;\n  color: var(--text-primary, white);\n}\n.account-card[_ngcontent-%COMP%] {\n  display: inline-flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem 2rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.account-avatar[_ngcontent-%COMP%] {\n  width: 56px;\n  height: 56px;\n  border-radius: 50%;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: white;\n}\n.account-name[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.account-phone[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n}\n.account-username[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: var(--primary, #06b6d4);\n}\n.api-info[_ngcontent-%COMP%] {\n  margin: 1rem 0;\n}\n.api-badge[_ngcontent-%COMP%] {\n  display: inline-block;\n  padding: 0.5rem 1rem;\n  border-radius: 2rem;\n  font-size: 0.8rem;\n}\n.api-badge.expert[_ngcontent-%COMP%] {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.api-badge.platform[_ngcontent-%COMP%] {\n  background: rgba(6, 182, 212, 0.2);\n  color: #67e8f9;\n}\n.spinner[_ngcontent-%COMP%] {\n  width: 16px;\n  height: 16px;\n  border: 2px solid rgba(255, 255, 255, 0.3);\n  border-top-color: white;\n  border-radius: 50%;\n  animation: _ngcontent-%COMP%_spin 0.8s linear infinite;\n}\n@keyframes _ngcontent-%COMP%_spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n/*# sourceMappingURL=add-account-page.component.css.map */"] });
   }
 };
 (() => {
@@ -32508,12 +32604,46 @@ var AddAccountPageComponent = class _AddAccountPageComponent {
               </div>
 
               <div class="form-group">
-                <label>\u4EE3\u7406\u8A2D\u7F6E\uFF08\u53EF\u9078\uFF09</label>
-                <input 
-                  type="text" 
-                  [(ngModel)]="proxyAddress"
-                  placeholder="socks5://host:port \u6216\u7559\u7A7A"
-                  class="form-input">
+                <label>\u4EE3\u7406\u8A2D\u7F6E</label>
+                <div class="proxy-options">
+                  <label class="proxy-option">
+                    <input type="radio" name="proxyMode" value="auto" [(ngModel)]="proxyMode">
+                    <span class="option-content">
+                      <span class="option-icon">\u{1F310}</span>
+                      <span class="option-text">
+                        <strong>\u81EA\u52D5\u5206\u914D\u975C\u614B\u4EE3\u7406</strong>
+                        <small>\u5F9E\u4EE3\u7406\u6C60\u81EA\u52D5\u5206\u914D\uFF0C\u9632\u5C01\u63A8\u85A6</small>
+                      </span>
+                    </span>
+                  </label>
+                  <label class="proxy-option">
+                    <input type="radio" name="proxyMode" value="manual" [(ngModel)]="proxyMode">
+                    <span class="option-content">
+                      <span class="option-icon">\u270F\uFE0F</span>
+                      <span class="option-text">
+                        <strong>\u624B\u52D5\u8F38\u5165\u4EE3\u7406</strong>
+                        <small>\u4F7F\u7528\u81EA\u5DF1\u7684\u4EE3\u7406\u5730\u5740</small>
+                      </span>
+                    </span>
+                  </label>
+                  <label class="proxy-option">
+                    <input type="radio" name="proxyMode" value="none" [(ngModel)]="proxyMode">
+                    <span class="option-content">
+                      <span class="option-icon">\u{1F6AB}</span>
+                      <span class="option-text">
+                        <strong>\u4E0D\u4F7F\u7528\u4EE3\u7406</strong>
+                        <small>\u76F4\u63A5\u9023\u63A5\uFF0C\u6709\u5C01\u865F\u98A8\u96AA</small>
+                      </span>
+                    </span>
+                  </label>
+                </div>
+                @if (proxyMode === 'manual') {
+                  <input 
+                    type="text" 
+                    [(ngModel)]="proxyAddress"
+                    placeholder="socks5://user:pass@host:port"
+                    class="form-input mt-2">
+                }
               </div>
 
               <div class="form-group">
@@ -32848,7 +32978,7 @@ var AddAccountPageComponent = class _AddAccountPageComponent {
         </div>
       }
     </div>
-  `, styles: ["/* angular:styles/component:css;830bda16d06132319eb182426d6cb2e47071ba9347098397f651a3be6f04b1ee;D:/tgkz2026/src/add-account-page.component.ts */\n.add-account-page {\n  max-width: 900px;\n  margin: 0 auto;\n  padding: 2rem;\n}\n.page-header {\n  margin-bottom: 2rem;\n}\n.back-btn {\n  background: none;\n  border: none;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n  padding: 0;\n}\n.back-btn:hover {\n  text-decoration: underline;\n}\n.page-title {\n  margin: 0;\n  font-size: 2rem;\n  color: var(--text-primary, white);\n}\n.step-indicator {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  margin-bottom: 2rem;\n  flex-wrap: wrap;\n  gap: 0.5rem;\n}\n.step {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.step-number {\n  width: 28px;\n  height: 28px;\n  border-radius: 50%;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 0.875rem;\n  font-weight: 600;\n  color: var(--text-muted, #94a3b8);\n}\n.step.active .step-number {\n  background: var(--primary, #06b6d4);\n  color: white;\n}\n.step.completed .step-number {\n  background: #22c55e;\n  color: white;\n}\n.step-label {\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.step.active .step-label {\n  color: var(--text-primary, white);\n}\n.step-line {\n  width: 40px;\n  height: 2px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n}\n.step-line.active {\n  background: var(--primary, #06b6d4);\n}\n.mode-selection,\n.login-selection {\n  text-align: center;\n}\n.section-header h2,\n.selection-header h2 {\n  margin: 0 0 0.5rem 0;\n  color: var(--text-primary, white);\n  font-size: 1.5rem;\n}\n.section-header p,\n.selection-header p {\n  margin: 0 0 2rem 0;\n  color: var(--text-muted, #94a3b8);\n}\n.mode-cards,\n.login-cards {\n  display: grid;\n  grid-template-columns: repeat(2, 1fr);\n  gap: 1.5rem;\n  margin-bottom: 2rem;\n}\n@media (max-width: 700px) {\n  .mode-cards,\n  .login-cards {\n    grid-template-columns: 1fr;\n  }\n}\n.login-cards {\n  grid-template-columns: repeat(3, 1fr);\n}\n@media (max-width: 800px) {\n  .login-cards {\n    grid-template-columns: 1fr;\n  }\n}\n.mode-card,\n.login-card {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 2px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  cursor: pointer;\n  transition: all 0.2s;\n  position: relative;\n  text-align: left;\n}\n.mode-card:hover,\n.login-card:hover {\n  transform: translateY(-4px);\n  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);\n}\n.mode-card.expert:hover {\n  border-color: #22c55e;\n}\n.mode-card.platform:hover {\n  border-color: #06b6d4;\n}\n.mode-card.disabled {\n  opacity: 0.6;\n  cursor: not-allowed;\n}\n.mode-card.disabled:hover {\n  transform: none;\n}\n.login-card.recommended:hover {\n  border-color: #22c55e;\n}\n.login-card.safe:hover {\n  border-color: #06b6d4;\n}\n.login-card.warning:hover {\n  border-color: #f59e0b;\n}\n.mode-badge,\n.login-badge {\n  position: absolute;\n  top: -10px;\n  right: 1rem;\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n  font-size: 0.7rem;\n  font-weight: 600;\n}\n.mode-card.expert .mode-badge {\n  background: #22c55e;\n  color: white;\n}\n.mode-card.platform .mode-badge {\n  background: #06b6d4;\n  color: white;\n}\n.login-card.recommended .login-badge {\n  background: #22c55e;\n  color: white;\n}\n.login-card.safe .login-badge {\n  background: #06b6d4;\n  color: white;\n}\n.login-card.warning .login-badge {\n  background: #f59e0b;\n  color: black;\n}\n.mode-icon,\n.login-icon {\n  font-size: 2.5rem;\n  margin-bottom: 0.75rem;\n}\n.mode-title,\n.login-card h3 {\n  margin: 0 0 0.25rem 0;\n  color: var(--text-primary, white);\n  font-size: 1.25rem;\n}\n.mode-subtitle,\n.login-card p {\n  margin: 0 0 1rem 0;\n  font-size: 0.875rem;\n  color: var(--text-muted, #94a3b8);\n}\n.mode-features,\n.login-card ul {\n  list-style: none;\n  padding: 0;\n  margin: 0 0 1rem 0;\n  font-size: 0.8rem;\n}\n.mode-features li,\n.login-card li {\n  margin-bottom: 0.375rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.mode-suitable {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n  margin-bottom: 1rem;\n}\n.mode-risk,\n.login-risk {\n  padding: 0.375rem 0.75rem;\n  border-radius: 0.5rem;\n  font-size: 0.7rem;\n  font-weight: 500;\n  display: inline-block;\n  margin-bottom: 1rem;\n}\n.mode-risk.safe,\n.login-risk.lowest {\n  background: rgba(6, 182, 212, 0.2);\n  color: #67e8f9;\n}\n.mode-risk.medium,\n.login-risk.low {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.login-risk.high {\n  background: rgba(245, 158, 11, 0.2);\n  color: #fcd34d;\n}\n.quota-info {\n  margin-bottom: 1rem;\n}\n.quota-bar {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 0.75rem;\n  border-radius: 0.5rem;\n}\n.quota-label {\n  font-size: 0.7rem;\n  color: var(--text-muted, #94a3b8);\n  margin-bottom: 0.375rem;\n}\n.quota-progress {\n  height: 6px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.8));\n  border-radius: 3px;\n  overflow: hidden;\n  margin-bottom: 0.375rem;\n}\n.quota-fill {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #22c55e);\n  border-radius: 3px;\n}\n.quota-text {\n  font-size: 0.75rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.quota-locked {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem;\n  background: rgba(245, 158, 11, 0.1);\n  border-radius: 0.5rem;\n  font-size: 0.75rem;\n  color: #fcd34d;\n}\n.mode-btn {\n  width: 100%;\n  padding: 0.75rem;\n  border: none;\n  border-radius: 0.5rem;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.mode-card.expert .mode-btn {\n  background: #22c55e;\n  color: white;\n}\n.mode-card.platform .mode-btn {\n  background: #06b6d4;\n  color: white;\n}\n.mode-btn.upgrade {\n  background:\n    linear-gradient(\n      135deg,\n      #f59e0b,\n      #ef4444);\n}\n.help-section {\n  display: grid;\n  grid-template-columns: repeat(2, 1fr);\n  gap: 1rem;\n  text-align: left;\n}\n@media (max-width: 600px) {\n  .help-section {\n    grid-template-columns: 1fr;\n  }\n}\n.help-card {\n  background: var(--bg-card, rgba(30, 41, 59, 0.5));\n  padding: 1rem;\n  border-radius: 0.75rem;\n}\n.help-card h4 {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.help-card p {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.config-section {\n  max-width: 600px;\n  margin: 0 auto;\n}\n.form-card {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.form-group {\n  margin-bottom: 1.25rem;\n}\n.form-group label {\n  display: block;\n  margin-bottom: 0.5rem;\n  font-size: 0.875rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.required {\n  color: #ef4444;\n}\n.form-input {\n  width: 100%;\n  padding: 0.75rem 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-size: 0.875rem;\n  box-sizing: border-box;\n}\n.form-input:focus {\n  outline: none;\n  border-color: var(--primary, #06b6d4);\n}\n.form-input.error {\n  border-color: #ef4444;\n  background: rgba(239, 68, 68, 0.05);\n}\n.form-input.valid {\n  border-color: #22c55e;\n}\n.input-with-prefix {\n  position: relative;\n  display: flex;\n  align-items: center;\n}\n.input-with-prefix .form-input {\n  flex: 1;\n  padding-right: 2.5rem;\n}\n.input-status {\n  position: absolute;\n  right: 0.75rem;\n  font-size: 1rem;\n}\n.input-status.valid {\n  color: #22c55e;\n}\n.form-input.code-input {\n  text-align: center;\n  font-size: 1.5rem;\n  letter-spacing: 0.5rem;\n}\n.hint {\n  display: block;\n  margin-top: 0.375rem;\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n}\n.error-text {\n  display: block;\n  margin-top: 0.375rem;\n  font-size: 0.75rem;\n  color: #ef4444;\n}\n.guide-box {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 1rem;\n  border-radius: 0.5rem;\n  margin-bottom: 1rem;\n}\n.guide-box h4 {\n  margin: 0 0 0.75rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.guide-box ol {\n  margin: 0;\n  padding-left: 1.25rem;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.guide-box li {\n  margin-bottom: 0.375rem;\n}\n.guide-box a {\n  color: var(--primary, #06b6d4);\n}\n.warning-box,\n.risk-warning {\n  display: flex;\n  gap: 0.75rem;\n  padding: 1rem;\n  background: rgba(245, 158, 11, 0.1);\n  border: 1px solid rgba(245, 158, 11, 0.3);\n  border-radius: 0.5rem;\n}\n.warning-icon {\n  font-size: 1.25rem;\n}\n.warning-content strong {\n  display: block;\n  color: #fcd34d;\n  margin-bottom: 0.375rem;\n  font-size: 0.875rem;\n}\n.warning-content ul,\n.warning-content p {\n  margin: 0;\n  padding-left: 1rem;\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.warning-content p {\n  padding-left: 0;\n}\n.quota-card {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.membership-info {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  margin-bottom: 1.5rem;\n  padding-bottom: 1rem;\n  border-bottom: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.level-icon {\n  font-size: 2rem;\n}\n.level-details {\n  display: flex;\n  flex-direction: column;\n}\n.level-name {\n  font-size: 1.125rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.level-label {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.quota-item {\n  margin-bottom: 1rem;\n}\n.quota-header {\n  display: flex;\n  justify-content: space-between;\n  margin-bottom: 0.5rem;\n}\n.quota-title {\n  font-size: 0.875rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.quota-value {\n  font-size: 0.875rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.quota-bar-large {\n  height: 8px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 4px;\n  overflow: hidden;\n}\n.quota-bar-large .quota-fill {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #22c55e);\n}\n.quota-summary {\n  margin-top: 1rem;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n  text-align: center;\n}\n.summary-good {\n  color: #22c55e;\n}\n.summary-bad {\n  color: #ef4444;\n}\n.upgrade-prompt {\n  margin-top: 1rem;\n  text-align: center;\n  padding: 1rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(245, 158, 11, 0.1),\n      rgba(239, 68, 68, 0.1));\n  border-radius: 0.5rem;\n}\n.upgrade-prompt p {\n  margin: 0 0 0.75rem 0;\n  color: #fcd34d;\n}\n.btn-upgrade {\n  background:\n    linear-gradient(\n      135deg,\n      #f59e0b,\n      #ef4444);\n  color: white;\n  border: none;\n  padding: 0.5rem 1.5rem;\n  border-radius: 0.5rem;\n  cursor: pointer;\n}\n.form-actions {\n  display: flex;\n  justify-content: flex-end;\n  gap: 0.75rem;\n  margin-top: 1.5rem;\n}\n.form-actions.center {\n  justify-content: center;\n}\n.btn-primary {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.btn-primary:hover:not(:disabled) {\n  transform: translateY(-1px);\n}\n.btn-primary:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.btn-secondary {\n  padding: 0.75rem 1.5rem;\n  background: transparent;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.3));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n}\n.device-options {\n  display: grid;\n  grid-template-columns: repeat(3, 1fr);\n  gap: 0.5rem;\n}\n.device-btn {\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.device-btn:hover,\n.device-btn.active {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n}\n.drop-zone {\n  border: 2px dashed var(--border-default, rgba(148, 163, 184, 0.3));\n  border-radius: 0.75rem;\n  padding: 3rem;\n  text-align: center;\n  cursor: pointer;\n  transition: all 0.2s;\n  margin-bottom: 1rem;\n}\n.drop-zone:hover,\n.drop-zone.dragging {\n  border-color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.05);\n}\n.drop-icon {\n  font-size: 2.5rem;\n  margin-bottom: 0.75rem;\n}\n.drop-text {\n  margin: 0;\n  color: var(--text-primary, white);\n}\n.drop-hint {\n  margin: 0.5rem 0 0 0;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.selected-file {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n}\n.file-path {\n  flex: 1;\n  color: var(--text-primary, white);\n  font-size: 0.875rem;\n  word-break: break-all;\n}\n.clear-btn {\n  background: none;\n  border: none;\n  color: var(--text-muted, #94a3b8);\n  cursor: pointer;\n  font-size: 1.25rem;\n}\n.qr-section {\n  text-align: center;\n  margin: 1rem 0;\n}\n.qr-container {\n  padding: 1rem;\n  background: white;\n  border-radius: 0.75rem;\n  display: inline-block;\n  margin-bottom: 0.75rem;\n}\n.qr-image {\n  width: 180px;\n  height: 180px;\n  display: block;\n}\n.qr-countdown {\n  font-size: 1rem;\n  color: var(--primary, #06b6d4);\n  margin-bottom: 0.75rem;\n}\n.qr-countdown.warning {\n  color: #f59e0b;\n  animation: pulse 1s infinite;\n}\n@keyframes pulse {\n  0%, 100% {\n    opacity: 1;\n  }\n  50% {\n    opacity: 0.5;\n  }\n}\n.qr-instructions {\n  text-align: left;\n  display: inline-block;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 0.75rem 1.25rem;\n  border-radius: 0.5rem;\n}\n.qr-instructions p {\n  margin: 0.25rem 0;\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.8rem;\n}\n.code-sent-info {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem 1rem;\n  background: rgba(34, 197, 94, 0.1);\n  border-radius: 0.5rem;\n  margin-bottom: 1rem;\n  color: #86efac;\n}\n.resend-section {\n  text-align: center;\n  margin: 1rem 0;\n}\n.resend-btn {\n  background: none;\n  border: none;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n  font-size: 0.875rem;\n}\n.resend-btn:disabled {\n  color: var(--text-muted, #94a3b8);\n  cursor: not-allowed;\n}\n.tdata-info {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 1rem;\n  border-radius: 0.5rem;\n  margin-bottom: 1rem;\n}\n.tdata-info h4 {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.tdata-info ul {\n  margin: 0;\n  padding-left: 1rem;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.import-mode-tabs {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1rem;\n}\n.mode-tab {\n  flex: 1;\n  padding: 0.75rem 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 2px solid transparent;\n  border-radius: 0.5rem;\n  color: var(--text-muted, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n  position: relative;\n}\n.mode-tab:hover {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n  color: var(--text-primary, white);\n}\n.mode-tab.active {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n  border-color: var(--primary, #06b6d4);\n  color: var(--text-primary, white);\n}\n.badge-recommend {\n  position: absolute;\n  top: -8px;\n  right: -8px;\n  background:\n    linear-gradient(\n      135deg,\n      #10b981,\n      #059669);\n  color: white;\n  font-size: 0.65rem;\n  padding: 2px 6px;\n  border-radius: 4px;\n}\n.tdata-path-hint {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border, rgba(100, 116, 139, 0.3));\n  border-radius: 0.5rem;\n  padding: 1rem;\n  margin-bottom: 1rem;\n}\n.tdata-path-hint h4 {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.path-box {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  background: var(--bg-primary, rgba(2, 6, 23, 0.8));\n  padding: 0.5rem 1rem;\n  border-radius: 0.375rem;\n}\n.path-box code {\n  font-size: 0.8rem;\n  color: var(--primary, #06b6d4);\n  word-break: break-all;\n}\n.path-actions {\n  display: flex;\n  gap: 0.25rem;\n}\n.icon-btn {\n  padding: 0.25rem 0.5rem;\n  background: transparent;\n  border: none;\n  cursor: pointer;\n  opacity: 0.7;\n  transition: opacity 0.2s;\n}\n.icon-btn:hover {\n  opacity: 1;\n}\n.drop-zone.large {\n  padding: 2rem;\n  min-height: 180px;\n}\n.drop-buttons {\n  display: flex;\n  gap: 0.5rem;\n  margin-top: 1rem;\n}\n.select-btn {\n  padding: 0.5rem 1rem;\n  background: var(--primary, #06b6d4);\n  color: white;\n  border: none;\n  border-radius: 0.375rem;\n  cursor: pointer;\n  transition: background 0.2s;\n}\n.select-btn:hover {\n  background: var(--primary-dark, #0891b2);\n}\n.select-btn.secondary {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border, rgba(100, 116, 139, 0.3));\n}\n.select-btn.secondary:hover {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n}\n.scan-result {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n  padding: 1rem;\n  margin: 1rem 0;\n}\n.scan-result.success {\n  border: 1px solid rgba(16, 185, 129, 0.3);\n}\n.scan-result.error {\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  color: #f87171;\n}\n.scan-result h4 {\n  margin: 0 0 0.75rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.accounts-list {\n  display: flex;\n  flex-direction: column;\n  gap: 0.5rem;\n  max-height: 200px;\n  overflow-y: auto;\n}\n.account-item {\n  display: flex;\n  align-items: center;\n  gap: 0.75rem;\n  padding: 0.5rem;\n  background: var(--bg-primary, rgba(2, 6, 23, 0.8));\n  border-radius: 0.375rem;\n  cursor: pointer;\n  transition: background 0.2s;\n}\n.account-item:hover {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n}\n.account-item.disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.account-item input[type=checkbox] {\n  width: 1rem;\n  height: 1rem;\n}\n.account-info {\n  display: flex;\n  flex-direction: column;\n  gap: 0.125rem;\n}\n.account-phone {\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.account-name {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.account-error {\n  font-size: 0.7rem;\n  color: #f87171;\n}\n.scanning-indicator {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.5rem;\n  padding: 1rem;\n  color: var(--text-muted, #94a3b8);\n}\n.success-section {\n  text-align: center;\n  padding: 2rem;\n}\n.success-icon {\n  font-size: 4rem;\n  margin-bottom: 1rem;\n}\n.success-section h2 {\n  margin: 0 0 1.5rem 0;\n  color: var(--text-primary, white);\n}\n.account-card {\n  display: inline-flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem 2rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.account-avatar {\n  width: 56px;\n  height: 56px;\n  border-radius: 50%;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: white;\n}\n.account-name {\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.account-phone {\n  color: var(--text-secondary, #cbd5e1);\n}\n.account-username {\n  font-size: 0.875rem;\n  color: var(--primary, #06b6d4);\n}\n.api-info {\n  margin: 1rem 0;\n}\n.api-badge {\n  display: inline-block;\n  padding: 0.5rem 1rem;\n  border-radius: 2rem;\n  font-size: 0.8rem;\n}\n.api-badge.expert {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.api-badge.platform {\n  background: rgba(6, 182, 212, 0.2);\n  color: #67e8f9;\n}\n.spinner {\n  width: 16px;\n  height: 16px;\n  border: 2px solid rgba(255, 255, 255, 0.3);\n  border-top-color: white;\n  border-radius: 50%;\n  animation: spin 0.8s linear infinite;\n}\n@keyframes spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n/*# sourceMappingURL=add-account-page.component.css.map */\n"] }]
+  `, styles: ["/* angular:styles/component:css;318728f95a326ef191c2266bbc24aa533fd366dd5698267ab6753a3197a46d15;D:/tgkz2026/src/add-account-page.component.ts */\n.add-account-page {\n  max-width: 900px;\n  margin: 0 auto;\n  padding: 2rem;\n}\n.page-header {\n  margin-bottom: 2rem;\n}\n.back-btn {\n  background: none;\n  border: none;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n  font-size: 0.875rem;\n  margin-bottom: 0.5rem;\n  padding: 0;\n}\n.back-btn:hover {\n  text-decoration: underline;\n}\n.page-title {\n  margin: 0;\n  font-size: 2rem;\n  color: var(--text-primary, white);\n}\n.step-indicator {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  margin-bottom: 2rem;\n  flex-wrap: wrap;\n  gap: 0.5rem;\n}\n.step {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.step-number {\n  width: 28px;\n  height: 28px;\n  border-radius: 50%;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 0.875rem;\n  font-weight: 600;\n  color: var(--text-muted, #94a3b8);\n}\n.step.active .step-number {\n  background: var(--primary, #06b6d4);\n  color: white;\n}\n.step.completed .step-number {\n  background: #22c55e;\n  color: white;\n}\n.step-label {\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.step.active .step-label {\n  color: var(--text-primary, white);\n}\n.step-line {\n  width: 40px;\n  height: 2px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n}\n.step-line.active {\n  background: var(--primary, #06b6d4);\n}\n.mode-selection,\n.login-selection {\n  text-align: center;\n}\n.section-header h2,\n.selection-header h2 {\n  margin: 0 0 0.5rem 0;\n  color: var(--text-primary, white);\n  font-size: 1.5rem;\n}\n.section-header p,\n.selection-header p {\n  margin: 0 0 2rem 0;\n  color: var(--text-muted, #94a3b8);\n}\n.mode-cards,\n.login-cards {\n  display: grid;\n  grid-template-columns: repeat(2, 1fr);\n  gap: 1.5rem;\n  margin-bottom: 2rem;\n}\n@media (max-width: 700px) {\n  .mode-cards,\n  .login-cards {\n    grid-template-columns: 1fr;\n  }\n}\n.login-cards {\n  grid-template-columns: repeat(3, 1fr);\n}\n@media (max-width: 800px) {\n  .login-cards {\n    grid-template-columns: 1fr;\n  }\n}\n.mode-card,\n.login-card {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 2px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  cursor: pointer;\n  transition: all 0.2s;\n  position: relative;\n  text-align: left;\n}\n.mode-card:hover,\n.login-card:hover {\n  transform: translateY(-4px);\n  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);\n}\n.mode-card.expert:hover {\n  border-color: #22c55e;\n}\n.mode-card.platform:hover {\n  border-color: #06b6d4;\n}\n.mode-card.disabled {\n  opacity: 0.6;\n  cursor: not-allowed;\n}\n.mode-card.disabled:hover {\n  transform: none;\n}\n.login-card.recommended:hover {\n  border-color: #22c55e;\n}\n.login-card.safe:hover {\n  border-color: #06b6d4;\n}\n.login-card.warning:hover {\n  border-color: #f59e0b;\n}\n.mode-badge,\n.login-badge {\n  position: absolute;\n  top: -10px;\n  right: 1rem;\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n  font-size: 0.7rem;\n  font-weight: 600;\n}\n.mode-card.expert .mode-badge {\n  background: #22c55e;\n  color: white;\n}\n.mode-card.platform .mode-badge {\n  background: #06b6d4;\n  color: white;\n}\n.login-card.recommended .login-badge {\n  background: #22c55e;\n  color: white;\n}\n.login-card.safe .login-badge {\n  background: #06b6d4;\n  color: white;\n}\n.login-card.warning .login-badge {\n  background: #f59e0b;\n  color: black;\n}\n.mode-icon,\n.login-icon {\n  font-size: 2.5rem;\n  margin-bottom: 0.75rem;\n}\n.mode-title,\n.login-card h3 {\n  margin: 0 0 0.25rem 0;\n  color: var(--text-primary, white);\n  font-size: 1.25rem;\n}\n.mode-subtitle,\n.login-card p {\n  margin: 0 0 1rem 0;\n  font-size: 0.875rem;\n  color: var(--text-muted, #94a3b8);\n}\n.mode-features,\n.login-card ul {\n  list-style: none;\n  padding: 0;\n  margin: 0 0 1rem 0;\n  font-size: 0.8rem;\n}\n.mode-features li,\n.login-card li {\n  margin-bottom: 0.375rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.mode-suitable {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n  margin-bottom: 1rem;\n}\n.mode-risk,\n.login-risk {\n  padding: 0.375rem 0.75rem;\n  border-radius: 0.5rem;\n  font-size: 0.7rem;\n  font-weight: 500;\n  display: inline-block;\n  margin-bottom: 1rem;\n}\n.mode-risk.safe,\n.login-risk.lowest {\n  background: rgba(6, 182, 212, 0.2);\n  color: #67e8f9;\n}\n.mode-risk.medium,\n.login-risk.low {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.login-risk.high {\n  background: rgba(245, 158, 11, 0.2);\n  color: #fcd34d;\n}\n.quota-info {\n  margin-bottom: 1rem;\n}\n.quota-bar {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 0.75rem;\n  border-radius: 0.5rem;\n}\n.quota-label {\n  font-size: 0.7rem;\n  color: var(--text-muted, #94a3b8);\n  margin-bottom: 0.375rem;\n}\n.quota-progress {\n  height: 6px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.8));\n  border-radius: 3px;\n  overflow: hidden;\n  margin-bottom: 0.375rem;\n}\n.quota-fill {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #22c55e);\n  border-radius: 3px;\n}\n.quota-text {\n  font-size: 0.75rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.quota-locked {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem;\n  background: rgba(245, 158, 11, 0.1);\n  border-radius: 0.5rem;\n  font-size: 0.75rem;\n  color: #fcd34d;\n}\n.mode-btn {\n  width: 100%;\n  padding: 0.75rem;\n  border: none;\n  border-radius: 0.5rem;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.mode-card.expert .mode-btn {\n  background: #22c55e;\n  color: white;\n}\n.mode-card.platform .mode-btn {\n  background: #06b6d4;\n  color: white;\n}\n.mode-btn.upgrade {\n  background:\n    linear-gradient(\n      135deg,\n      #f59e0b,\n      #ef4444);\n}\n.help-section {\n  display: grid;\n  grid-template-columns: repeat(2, 1fr);\n  gap: 1rem;\n  text-align: left;\n}\n@media (max-width: 600px) {\n  .help-section {\n    grid-template-columns: 1fr;\n  }\n}\n.help-card {\n  background: var(--bg-card, rgba(30, 41, 59, 0.5));\n  padding: 1rem;\n  border-radius: 0.75rem;\n}\n.help-card h4 {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.help-card p {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.config-section {\n  max-width: 600px;\n  margin: 0 auto;\n}\n.form-card {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.form-group {\n  margin-bottom: 1.25rem;\n}\n.form-group label {\n  display: block;\n  margin-bottom: 0.5rem;\n  font-size: 0.875rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.required {\n  color: #ef4444;\n}\n.proxy-options {\n  display: flex;\n  flex-direction: column;\n  gap: 0.5rem;\n  margin-top: 0.5rem;\n}\n.proxy-option {\n  display: flex;\n  align-items: center;\n  padding: 0.75rem 1rem;\n  background: var(--bg-secondary, #1e293b);\n  border: 2px solid transparent;\n  border-radius: 0.5rem;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.proxy-option:hover {\n  background: var(--bg-tertiary, #334155);\n}\n.proxy-option:has(input:checked) {\n  border-color: var(--accent-color, #8b5cf6);\n  background: rgba(139, 92, 246, 0.1);\n}\n.proxy-option input[type=radio] {\n  display: none;\n}\n.proxy-option .option-content {\n  display: flex;\n  align-items: center;\n  gap: 0.75rem;\n}\n.proxy-option .option-icon {\n  font-size: 1.5rem;\n}\n.proxy-option .option-text {\n  display: flex;\n  flex-direction: column;\n}\n.proxy-option .option-text strong {\n  font-size: 0.9rem;\n  color: var(--text-primary, #f1f5f9);\n}\n.proxy-option .option-text small {\n  font-size: 0.75rem;\n  color: var(--text-secondary, #94a3b8);\n}\n.mt-2 {\n  margin-top: 0.5rem;\n}\n.form-input {\n  width: 100%;\n  padding: 0.75rem 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-size: 0.875rem;\n  box-sizing: border-box;\n}\n.form-input:focus {\n  outline: none;\n  border-color: var(--primary, #06b6d4);\n}\n.form-input.error {\n  border-color: #ef4444;\n  background: rgba(239, 68, 68, 0.05);\n}\n.form-input.valid {\n  border-color: #22c55e;\n}\n.input-with-prefix {\n  position: relative;\n  display: flex;\n  align-items: center;\n}\n.input-with-prefix .form-input {\n  flex: 1;\n  padding-right: 2.5rem;\n}\n.input-status {\n  position: absolute;\n  right: 0.75rem;\n  font-size: 1rem;\n}\n.input-status.valid {\n  color: #22c55e;\n}\n.form-input.code-input {\n  text-align: center;\n  font-size: 1.5rem;\n  letter-spacing: 0.5rem;\n}\n.hint {\n  display: block;\n  margin-top: 0.375rem;\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n}\n.error-text {\n  display: block;\n  margin-top: 0.375rem;\n  font-size: 0.75rem;\n  color: #ef4444;\n}\n.guide-box {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 1rem;\n  border-radius: 0.5rem;\n  margin-bottom: 1rem;\n}\n.guide-box h4 {\n  margin: 0 0 0.75rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.guide-box ol {\n  margin: 0;\n  padding-left: 1.25rem;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.guide-box li {\n  margin-bottom: 0.375rem;\n}\n.guide-box a {\n  color: var(--primary, #06b6d4);\n}\n.warning-box,\n.risk-warning {\n  display: flex;\n  gap: 0.75rem;\n  padding: 1rem;\n  background: rgba(245, 158, 11, 0.1);\n  border: 1px solid rgba(245, 158, 11, 0.3);\n  border-radius: 0.5rem;\n}\n.warning-icon {\n  font-size: 1.25rem;\n}\n.warning-content strong {\n  display: block;\n  color: #fcd34d;\n  margin-bottom: 0.375rem;\n  font-size: 0.875rem;\n}\n.warning-content ul,\n.warning-content p {\n  margin: 0;\n  padding-left: 1rem;\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.warning-content p {\n  padding-left: 0;\n}\n.quota-card {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.membership-info {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  margin-bottom: 1.5rem;\n  padding-bottom: 1rem;\n  border-bottom: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.level-icon {\n  font-size: 2rem;\n}\n.level-details {\n  display: flex;\n  flex-direction: column;\n}\n.level-name {\n  font-size: 1.125rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.level-label {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.quota-item {\n  margin-bottom: 1rem;\n}\n.quota-header {\n  display: flex;\n  justify-content: space-between;\n  margin-bottom: 0.5rem;\n}\n.quota-title {\n  font-size: 0.875rem;\n  color: var(--text-secondary, #cbd5e1);\n}\n.quota-value {\n  font-size: 0.875rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.quota-bar-large {\n  height: 8px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 4px;\n  overflow: hidden;\n}\n.quota-bar-large .quota-fill {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #22c55e);\n}\n.quota-summary {\n  margin-top: 1rem;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n  text-align: center;\n}\n.summary-good {\n  color: #22c55e;\n}\n.summary-bad {\n  color: #ef4444;\n}\n.upgrade-prompt {\n  margin-top: 1rem;\n  text-align: center;\n  padding: 1rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(245, 158, 11, 0.1),\n      rgba(239, 68, 68, 0.1));\n  border-radius: 0.5rem;\n}\n.upgrade-prompt p {\n  margin: 0 0 0.75rem 0;\n  color: #fcd34d;\n}\n.btn-upgrade {\n  background:\n    linear-gradient(\n      135deg,\n      #f59e0b,\n      #ef4444);\n  color: white;\n  border: none;\n  padding: 0.5rem 1.5rem;\n  border-radius: 0.5rem;\n  cursor: pointer;\n}\n.form-actions {\n  display: flex;\n  justify-content: flex-end;\n  gap: 0.75rem;\n  margin-top: 1.5rem;\n}\n.form-actions.center {\n  justify-content: center;\n}\n.btn-primary {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.btn-primary:hover:not(:disabled) {\n  transform: translateY(-1px);\n}\n.btn-primary:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.btn-secondary {\n  padding: 0.75rem 1.5rem;\n  background: transparent;\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.3));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n}\n.device-options {\n  display: grid;\n  grid-template-columns: repeat(3, 1fr);\n  gap: 0.5rem;\n}\n.device-btn {\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.device-btn:hover,\n.device-btn.active {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n}\n.drop-zone {\n  border: 2px dashed var(--border-default, rgba(148, 163, 184, 0.3));\n  border-radius: 0.75rem;\n  padding: 3rem;\n  text-align: center;\n  cursor: pointer;\n  transition: all 0.2s;\n  margin-bottom: 1rem;\n}\n.drop-zone:hover,\n.drop-zone.dragging {\n  border-color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.05);\n}\n.drop-icon {\n  font-size: 2.5rem;\n  margin-bottom: 0.75rem;\n}\n.drop-text {\n  margin: 0;\n  color: var(--text-primary, white);\n}\n.drop-hint {\n  margin: 0.5rem 0 0 0;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.selected-file {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n}\n.file-path {\n  flex: 1;\n  color: var(--text-primary, white);\n  font-size: 0.875rem;\n  word-break: break-all;\n}\n.clear-btn {\n  background: none;\n  border: none;\n  color: var(--text-muted, #94a3b8);\n  cursor: pointer;\n  font-size: 1.25rem;\n}\n.qr-section {\n  text-align: center;\n  margin: 1rem 0;\n}\n.qr-container {\n  padding: 1rem;\n  background: white;\n  border-radius: 0.75rem;\n  display: inline-block;\n  margin-bottom: 0.75rem;\n}\n.qr-image {\n  width: 180px;\n  height: 180px;\n  display: block;\n}\n.qr-countdown {\n  font-size: 1rem;\n  color: var(--primary, #06b6d4);\n  margin-bottom: 0.75rem;\n}\n.qr-countdown.warning {\n  color: #f59e0b;\n  animation: pulse 1s infinite;\n}\n@keyframes pulse {\n  0%, 100% {\n    opacity: 1;\n  }\n  50% {\n    opacity: 0.5;\n  }\n}\n.qr-instructions {\n  text-align: left;\n  display: inline-block;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 0.75rem 1.25rem;\n  border-radius: 0.5rem;\n}\n.qr-instructions p {\n  margin: 0.25rem 0;\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.8rem;\n}\n.code-sent-info {\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  padding: 0.75rem 1rem;\n  background: rgba(34, 197, 94, 0.1);\n  border-radius: 0.5rem;\n  margin-bottom: 1rem;\n  color: #86efac;\n}\n.resend-section {\n  text-align: center;\n  margin: 1rem 0;\n}\n.resend-btn {\n  background: none;\n  border: none;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n  font-size: 0.875rem;\n}\n.resend-btn:disabled {\n  color: var(--text-muted, #94a3b8);\n  cursor: not-allowed;\n}\n.tdata-info {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  padding: 1rem;\n  border-radius: 0.5rem;\n  margin-bottom: 1rem;\n}\n.tdata-info h4 {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.tdata-info ul {\n  margin: 0;\n  padding-left: 1rem;\n  font-size: 0.8rem;\n  color: var(--text-muted, #94a3b8);\n}\n.import-mode-tabs {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1rem;\n}\n.mode-tab {\n  flex: 1;\n  padding: 0.75rem 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 2px solid transparent;\n  border-radius: 0.5rem;\n  color: var(--text-muted, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n  position: relative;\n}\n.mode-tab:hover {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n  color: var(--text-primary, white);\n}\n.mode-tab.active {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n  border-color: var(--primary, #06b6d4);\n  color: var(--text-primary, white);\n}\n.badge-recommend {\n  position: absolute;\n  top: -8px;\n  right: -8px;\n  background:\n    linear-gradient(\n      135deg,\n      #10b981,\n      #059669);\n  color: white;\n  font-size: 0.65rem;\n  padding: 2px 6px;\n  border-radius: 4px;\n}\n.tdata-path-hint {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border, rgba(100, 116, 139, 0.3));\n  border-radius: 0.5rem;\n  padding: 1rem;\n  margin-bottom: 1rem;\n}\n.tdata-path-hint h4 {\n  margin: 0 0 0.5rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.path-box {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  background: var(--bg-primary, rgba(2, 6, 23, 0.8));\n  padding: 0.5rem 1rem;\n  border-radius: 0.375rem;\n}\n.path-box code {\n  font-size: 0.8rem;\n  color: var(--primary, #06b6d4);\n  word-break: break-all;\n}\n.path-actions {\n  display: flex;\n  gap: 0.25rem;\n}\n.icon-btn {\n  padding: 0.25rem 0.5rem;\n  background: transparent;\n  border: none;\n  cursor: pointer;\n  opacity: 0.7;\n  transition: opacity 0.2s;\n}\n.icon-btn:hover {\n  opacity: 1;\n}\n.drop-zone.large {\n  padding: 2rem;\n  min-height: 180px;\n}\n.drop-buttons {\n  display: flex;\n  gap: 0.5rem;\n  margin-top: 1rem;\n}\n.select-btn {\n  padding: 0.5rem 1rem;\n  background: var(--primary, #06b6d4);\n  color: white;\n  border: none;\n  border-radius: 0.375rem;\n  cursor: pointer;\n  transition: background 0.2s;\n}\n.select-btn:hover {\n  background: var(--primary-dark, #0891b2);\n}\n.select-btn.secondary {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border, rgba(100, 116, 139, 0.3));\n}\n.select-btn.secondary:hover {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n}\n.scan-result {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.5rem;\n  padding: 1rem;\n  margin: 1rem 0;\n}\n.scan-result.success {\n  border: 1px solid rgba(16, 185, 129, 0.3);\n}\n.scan-result.error {\n  border: 1px solid rgba(239, 68, 68, 0.3);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  color: #f87171;\n}\n.scan-result h4 {\n  margin: 0 0 0.75rem 0;\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.accounts-list {\n  display: flex;\n  flex-direction: column;\n  gap: 0.5rem;\n  max-height: 200px;\n  overflow-y: auto;\n}\n.account-item {\n  display: flex;\n  align-items: center;\n  gap: 0.75rem;\n  padding: 0.5rem;\n  background: var(--bg-primary, rgba(2, 6, 23, 0.8));\n  border-radius: 0.375rem;\n  cursor: pointer;\n  transition: background 0.2s;\n}\n.account-item:hover {\n  background: var(--bg-secondary, rgba(30, 41, 59, 0.8));\n}\n.account-item.disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.account-item input[type=checkbox] {\n  width: 1rem;\n  height: 1rem;\n}\n.account-info {\n  display: flex;\n  flex-direction: column;\n  gap: 0.125rem;\n}\n.account-phone {\n  font-size: 0.875rem;\n  color: var(--text-primary, white);\n}\n.account-name {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.account-error {\n  font-size: 0.7rem;\n  color: #f87171;\n}\n.scanning-indicator {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.5rem;\n  padding: 1rem;\n  color: var(--text-muted, #94a3b8);\n}\n.success-section {\n  text-align: center;\n  padding: 2rem;\n}\n.success-icon {\n  font-size: 4rem;\n  margin-bottom: 1rem;\n}\n.success-section h2 {\n  margin: 0 0 1.5rem 0;\n  color: var(--text-primary, white);\n}\n.account-card {\n  display: inline-flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem 2rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.account-avatar {\n  width: 56px;\n  height: 56px;\n  border-radius: 50%;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: white;\n}\n.account-name {\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.account-phone {\n  color: var(--text-secondary, #cbd5e1);\n}\n.account-username {\n  font-size: 0.875rem;\n  color: var(--primary, #06b6d4);\n}\n.api-info {\n  margin: 1rem 0;\n}\n.api-badge {\n  display: inline-block;\n  padding: 0.5rem 1rem;\n  border-radius: 2rem;\n  font-size: 0.8rem;\n}\n.api-badge.expert {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.api-badge.platform {\n  background: rgba(6, 182, 212, 0.2);\n  color: #67e8f9;\n}\n.spinner {\n  width: 16px;\n  height: 16px;\n  border: 2px solid rgba(255, 255, 255, 0.3);\n  border-top-color: white;\n  border-radius: 50%;\n  animation: spin 0.8s linear infinite;\n}\n@keyframes spin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n/*# sourceMappingURL=add-account-page.component.css.map */\n"] }]
   }], null, { back: [{
     type: Output
   }], accountAdded: [{
@@ -32856,7 +32986,7 @@ var AddAccountPageComponent = class _AddAccountPageComponent {
   }] });
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(AddAccountPageComponent, { className: "AddAccountPageComponent", filePath: "src/add-account-page.component.ts", lineNumber: 1582 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(AddAccountPageComponent, { className: "AddAccountPageComponent", filePath: "src/add-account-page.component.ts", lineNumber: 1675 });
 })();
 
 // src/dialogs/batch-send-dialog.component.ts
@@ -39761,7 +39891,7 @@ function MembershipCenterComponent_Conditional_15_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "p", 10);
     \u0275\u0275text(1);
-    \u0275\u0275elementStart(2, "span", 25);
+    \u0275\u0275elementStart(2, "span", 34);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd()();
   }
@@ -39783,7 +39913,7 @@ function MembershipCenterComponent_Conditional_16_Template(rf, ctx) {
 function MembershipCenterComponent_Conditional_18_Template(rf, ctx) {
   if (rf & 1) {
     const _r2 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 26);
+    \u0275\u0275elementStart(0, "button", 35);
     \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_18_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r2);
       const ctx_r0 = \u0275\u0275nextContext();
@@ -39793,82 +39923,94 @@ function MembershipCenterComponent_Conditional_18_Template(rf, ctx) {
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_69_Template(rf, ctx) {
+function MembershipCenterComponent_div_29_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275elementStart(0, "div", 36);
+    \u0275\u0275text(1);
+    \u0275\u0275elementEnd();
+  }
+  if (rf & 2) {
+    const ctx_r0 = \u0275\u0275nextContext();
+    \u0275\u0275advance();
+    \u0275\u0275textInterpolate1(" \u8D08\u9001: ", ctx_r0.walletBonusDisplay(), " ");
+  }
+}
+function MembershipCenterComponent_Conditional_82_Template(rf, ctx) {
   if (rf & 1) {
     const _r3 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 24)(1, "div", 27)(2, "h3", 28);
+    \u0275\u0275elementStart(0, "div", 33)(1, "div", 37)(2, "h3", 38);
     \u0275\u0275text(3, "\u{1F4CA} \u672C\u6708\u4F7F\u7528\u8A73\u60C5");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "div", 29)(5, "div", 30)(6, "span", 31);
+    \u0275\u0275elementStart(4, "div", 39)(5, "div", 40)(6, "span", 41);
     \u0275\u0275text(7, "\u{1F916} AI \u8ABF\u7528\u6B21\u6578");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "div", 32)(9, "div", 33);
-    \u0275\u0275element(10, "div", 34);
+    \u0275\u0275elementStart(8, "div", 42)(9, "div", 43);
+    \u0275\u0275element(10, "div", 44);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(11, "span", 35);
+    \u0275\u0275elementStart(11, "span", 45);
     \u0275\u0275text(12);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(13, "div", 30)(14, "span", 31);
+    \u0275\u0275elementStart(13, "div", 40)(14, "span", 41);
     \u0275\u0275text(15, "\u{1F4E8} \u6D88\u606F\u767C\u9001");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(16, "div", 32)(17, "div", 33);
-    \u0275\u0275element(18, "div", 34);
+    \u0275\u0275elementStart(16, "div", 42)(17, "div", 43);
+    \u0275\u0275element(18, "div", 44);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(19, "span", 35);
+    \u0275\u0275elementStart(19, "span", 45);
     \u0275\u0275text(20);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(21, "div", 30)(22, "span", 31);
+    \u0275\u0275elementStart(21, "div", 40)(22, "span", 41);
     \u0275\u0275text(23, "\u{1F465} \u5E33\u865F\u6578\u91CF");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(24, "div", 32)(25, "div", 33);
-    \u0275\u0275element(26, "div", 34);
+    \u0275\u0275elementStart(24, "div", 42)(25, "div", 43);
+    \u0275\u0275element(26, "div", 44);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(27, "span", 35);
+    \u0275\u0275elementStart(27, "span", 45);
     \u0275\u0275text(28);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(29, "div", 30)(30, "span", 31);
+    \u0275\u0275elementStart(29, "div", 40)(30, "span", 41);
     \u0275\u0275text(31, "\u{1F4BE} \u5B58\u5132\u7A7A\u9593");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(32, "div", 32)(33, "div", 33);
-    \u0275\u0275element(34, "div", 34);
+    \u0275\u0275elementStart(32, "div", 42)(33, "div", 43);
+    \u0275\u0275element(34, "div", 44);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(35, "span", 35);
+    \u0275\u0275elementStart(35, "span", 45);
     \u0275\u0275text(36);
     \u0275\u0275elementEnd()()()();
-    \u0275\u0275elementStart(37, "div", 36)(38, "h3", 28);
+    \u0275\u0275elementStart(37, "div", 46)(38, "h3", 38);
     \u0275\u0275text(39, "\u{1F381} \u9080\u8ACB\u597D\u53CB\u5F97\u734E\u52F5");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(40, "p", 37);
+    \u0275\u0275elementStart(40, "p", 47);
     \u0275\u0275text(41, "\u6BCF\u9080\u8ACB 1 \u4F4D\u597D\u53CB\u8A3B\u518A\u4E26\u6FC0\u6D3B\uFF0C\u60A8\u5C07\u7372\u5F97 ");
     \u0275\u0275elementStart(42, "strong");
     \u0275\u0275text(43, "3 \u5929\u767D\u9280\u7CBE\u82F1");
     \u0275\u0275elementEnd();
     \u0275\u0275text(44, " \u734E\u52F5\uFF01");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(45, "div", 38)(46, "span", 39);
+    \u0275\u0275elementStart(45, "div", 48)(46, "span", 49);
     \u0275\u0275text(47, "\u6211\u7684\u9080\u8ACB\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(48, "span", 40);
+    \u0275\u0275elementStart(48, "span", 50);
     \u0275\u0275text(49);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(50, "button", 41);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_69_Template_button_click_50_listener() {
+    \u0275\u0275elementStart(50, "button", 51);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_82_Template_button_click_50_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.copyInviteCode());
     });
     \u0275\u0275text(51, "\u{1F4CB} \u8907\u88FD");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(52, "div", 42)(53, "div", 43)(54, "span", 44);
+    \u0275\u0275elementStart(52, "div", 52)(53, "div", 53)(54, "span", 54);
     \u0275\u0275text(55);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(56, "span", 39);
+    \u0275\u0275elementStart(56, "span", 49);
     \u0275\u0275text(57, "\u5DF2\u9080\u8ACB\u4EBA\u6578");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(58, "div", 43)(59, "span", 44);
+    \u0275\u0275elementStart(58, "div", 53)(59, "span", 54);
     \u0275\u0275text(60);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(61, "span", 39);
+    \u0275\u0275elementStart(61, "span", 49);
     \u0275\u0275text(62, "\u7372\u5F97\u734E\u52F5\u5929\u6578");
     \u0275\u0275elementEnd()()()()();
   }
@@ -39902,30 +40044,30 @@ function MembershipCenterComponent_Conditional_69_Template(rf, ctx) {
     \u0275\u0275textInterpolate(ctx_r0.rewardDays());
   }
 }
-function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_83_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 24)(1, "div", 45)(2, "table", 46)(3, "thead")(4, "tr")(5, "th", 47);
+    \u0275\u0275elementStart(0, "div", 33)(1, "div", 55)(2, "table", 56)(3, "thead")(4, "tr")(5, "th", 57);
     \u0275\u0275text(6, "\u529F\u80FD");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "th", 48);
+    \u0275\u0275elementStart(7, "th", 58);
     \u0275\u0275text(8, "\u2694\uFE0F \u9752\u9285");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "th", 49);
+    \u0275\u0275elementStart(9, "th", 59);
     \u0275\u0275text(10, "\u{1F948} \u767D\u9280");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "th", 50);
+    \u0275\u0275elementStart(11, "th", 60);
     \u0275\u0275text(12, "\u{1F947} \u9EC3\u91D1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(13, "th", 51);
+    \u0275\u0275elementStart(13, "th", 61);
     \u0275\u0275text(14, "\u{1F48E} \u947D\u77F3");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(15, "th", 52);
+    \u0275\u0275elementStart(15, "th", 62);
     \u0275\u0275text(16, "\u{1F31F} \u661F\u8000");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "th", 53);
+    \u0275\u0275elementStart(17, "th", 63);
     \u0275\u0275text(18, "\u{1F451} \u738B\u8005");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(19, "tbody")(20, "tr")(21, "td", 54);
+    \u0275\u0275elementStart(19, "tbody")(20, "tr")(21, "td", 64);
     \u0275\u0275text(22, "\u5E33\u865F\u6578\u91CF");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(23, "td");
@@ -39946,7 +40088,7 @@ function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
     \u0275\u0275elementStart(33, "td");
     \u0275\u0275text(34, "\u7121\u9650");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(35, "tr")(36, "td", 54);
+    \u0275\u0275elementStart(35, "tr")(36, "td", 64);
     \u0275\u0275text(37, "\u6BCF\u65E5\u6D88\u606F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(38, "td");
@@ -39967,7 +40109,7 @@ function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
     \u0275\u0275elementStart(48, "td");
     \u0275\u0275text(49, "\u7121\u9650");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(50, "tr")(51, "td", 54);
+    \u0275\u0275elementStart(50, "tr")(51, "td", 64);
     \u0275\u0275text(52, "\u6BCF\u65E5 AI \u8ABF\u7528");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(53, "td");
@@ -39988,7 +40130,7 @@ function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
     \u0275\u0275elementStart(63, "td");
     \u0275\u0275text(64, "\u7121\u9650");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(65, "tr")(66, "td", 54);
+    \u0275\u0275elementStart(65, "tr")(66, "td", 64);
     \u0275\u0275text(67, "\u7FA4\u7D44\u6578\u91CF");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(68, "td");
@@ -40009,7 +40151,7 @@ function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
     \u0275\u0275elementStart(78, "td");
     \u0275\u0275text(79, "\u7121\u9650");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(80, "tr")(81, "td", 54);
+    \u0275\u0275elementStart(80, "tr")(81, "td", 64);
     \u0275\u0275text(82, "\u5EE3\u544A\u767C\u9001");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(83, "td");
@@ -40030,7 +40172,7 @@ function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
     \u0275\u0275elementStart(93, "td");
     \u0275\u0275text(94, "\u2705");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(95, "tr")(96, "td", 54);
+    \u0275\u0275elementStart(95, "tr")(96, "td", 64);
     \u0275\u0275text(97, "\u6279\u91CF\u64CD\u4F5C");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(98, "td");
@@ -40051,7 +40193,7 @@ function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
     \u0275\u0275elementStart(108, "td");
     \u0275\u0275text(109, "\u2705");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(110, "tr")(111, "td", 54);
+    \u0275\u0275elementStart(110, "tr")(111, "td", 64);
     \u0275\u0275text(112, "AI \u92B7\u552E\u6F0F\u6597");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(113, "td");
@@ -40072,7 +40214,7 @@ function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
     \u0275\u0275elementStart(123, "td");
     \u0275\u0275text(124, "\u2705");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(125, "tr")(126, "td", 54);
+    \u0275\u0275elementStart(125, "tr")(126, "td", 64);
     \u0275\u0275text(127, "\u667A\u80FD\u9632\u5C01");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(128, "td");
@@ -40093,7 +40235,7 @@ function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
     \u0275\u0275elementStart(138, "td");
     \u0275\u0275text(139, "\u2705");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(140, "tr")(141, "td", 54);
+    \u0275\u0275elementStart(140, "tr")(141, "td", 64);
     \u0275\u0275text(142, "API \u63A5\u53E3");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(143, "td");
@@ -40114,7 +40256,7 @@ function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
     \u0275\u0275elementStart(153, "td");
     \u0275\u0275text(154, "\u2705");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(155, "tr")(156, "td", 54);
+    \u0275\u0275elementStart(155, "tr")(156, "td", 64);
     \u0275\u0275text(157, "\u512A\u5148\u652F\u6301");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(158, "td");
@@ -40135,41 +40277,41 @@ function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
     \u0275\u0275elementStart(168, "td");
     \u0275\u0275text(169, "\u2705 \u5C08\u5C6C");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(170, "tr", 55)(171, "td", 54);
+    \u0275\u0275elementStart(170, "tr", 65)(171, "td", 64);
     \u0275\u0275text(172, "\u50F9\u683C");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(173, "td", 56);
+    \u0275\u0275elementStart(173, "td", 66);
     \u0275\u0275text(174, "\u514D\u8CBB");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(175, "td", 56);
+    \u0275\u0275elementStart(175, "td", 66);
     \u0275\u0275text(176, "4.99 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(177, "td", 56);
+    \u0275\u0275elementStart(177, "td", 66);
     \u0275\u0275text(178, "19.9 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(179, "td", 56);
+    \u0275\u0275elementStart(179, "td", 66);
     \u0275\u0275text(180, "59.9 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(181, "td", 56);
+    \u0275\u0275elementStart(181, "td", 66);
     \u0275\u0275text(182, "199 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(183, "td", 56);
+    \u0275\u0275elementStart(183, "td", 66);
     \u0275\u0275text(184, "599 USDT/\u6708");
     \u0275\u0275elementEnd()()()()()();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_3_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 59);
+    \u0275\u0275elementStart(0, "div", 69);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_24_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_24_Template(rf, ctx) {
   if (rf & 1) {
     const _r5 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 80);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_24_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 90);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_24_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("silver", "month"));
@@ -40183,11 +40325,11 @@ function MembershipCenterComponent_Conditional_71_Conditional_24_Template(rf, ct
     \u0275\u0275textInterpolate1(" ", ctx_r0.membershipLevel() === "bronze" ? "\u7ACB\u5373\u958B\u901A" : "\u5207\u63DB\u65B9\u6848", " ");
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_25_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_25_Template(rf, ctx) {
   if (rf & 1) {
     const _r6 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 81);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_25_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 91);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_25_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r6);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("silver", "month"));
@@ -40196,18 +40338,18 @@ function MembershipCenterComponent_Conditional_71_Conditional_25_Template(rf, ct
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_27_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_27_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 59);
+    \u0275\u0275elementStart(0, "div", 69);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_50_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_50_Template(rf, ctx) {
   if (rf & 1) {
     const _r7 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 80);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_50_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 90);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_50_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("gold", "month"));
@@ -40221,11 +40363,11 @@ function MembershipCenterComponent_Conditional_71_Conditional_50_Template(rf, ct
     \u0275\u0275textInterpolate1(" ", \u0275\u0275pureFunction0(1, _c03).includes(ctx_r0.membershipLevel()) ? "\u7ACB\u5373\u5347\u7D1A" : "\u5207\u63DB\u65B9\u6848", " ");
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_51_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_51_Template(rf, ctx) {
   if (rf & 1) {
     const _r8 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 81);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_51_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 91);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_51_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r8);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("gold", "month"));
@@ -40234,18 +40376,18 @@ function MembershipCenterComponent_Conditional_71_Conditional_51_Template(rf, ct
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_55_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_55_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 59);
+    \u0275\u0275elementStart(0, "div", 69);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_78_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_78_Template(rf, ctx) {
   if (rf & 1) {
     const _r9 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 80);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_78_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 90);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_78_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r9);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("diamond", "month"));
@@ -40259,11 +40401,11 @@ function MembershipCenterComponent_Conditional_71_Conditional_78_Template(rf, ct
     \u0275\u0275textInterpolate1(" ", \u0275\u0275pureFunction0(1, _c1).includes(ctx_r0.membershipLevel()) ? "\u7ACB\u5373\u5347\u7D1A" : "\u5207\u63DB\u65B9\u6848", " ");
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_79_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_79_Template(rf, ctx) {
   if (rf & 1) {
     const _r10 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 81);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_79_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 91);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_79_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r10);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("diamond", "month"));
@@ -40272,18 +40414,18 @@ function MembershipCenterComponent_Conditional_71_Conditional_79_Template(rf, ct
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_81_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_81_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 59);
+    \u0275\u0275elementStart(0, "div", 69);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_104_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_104_Template(rf, ctx) {
   if (rf & 1) {
     const _r11 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 80);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_104_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 90);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_104_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r11);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("star", "month"));
@@ -40297,11 +40439,11 @@ function MembershipCenterComponent_Conditional_71_Conditional_104_Template(rf, c
     \u0275\u0275textInterpolate1(" ", ctx_r0.membershipLevel() !== "king" ? "\u7ACB\u5373\u5347\u7D1A" : "\u5207\u63DB\u65B9\u6848", " ");
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_105_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_105_Template(rf, ctx) {
   if (rf & 1) {
     const _r12 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 81);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_105_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 91);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_105_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r12);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("star", "month"));
@@ -40310,18 +40452,18 @@ function MembershipCenterComponent_Conditional_71_Conditional_105_Template(rf, c
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_107_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_107_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 59);
+    \u0275\u0275elementStart(0, "div", 69);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_132_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_132_Template(rf, ctx) {
   if (rf & 1) {
     const _r13 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 80);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_132_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 90);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_132_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("king", "month"));
@@ -40330,11 +40472,11 @@ function MembershipCenterComponent_Conditional_71_Conditional_132_Template(rf, c
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Conditional_133_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Conditional_133_Template(rf, ctx) {
   if (rf & 1) {
     const _r14 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 81);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_133_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 91);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_133_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r14);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("king", "month"));
@@ -40343,24 +40485,24 @@ function MembershipCenterComponent_Conditional_71_Conditional_133_Template(rf, c
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_84_Template(rf, ctx) {
   if (rf & 1) {
     const _r4 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 24)(1, "div", 57)(2, "div", 58);
-    \u0275\u0275conditionalCreate(3, MembershipCenterComponent_Conditional_71_Conditional_3_Template, 2, 0, "div", 59);
-    \u0275\u0275elementStart(4, "div", 60);
+    \u0275\u0275elementStart(0, "div", 33)(1, "div", 67)(2, "div", 68);
+    \u0275\u0275conditionalCreate(3, MembershipCenterComponent_Conditional_84_Conditional_3_Template, 2, 0, "div", 69);
+    \u0275\u0275elementStart(4, "div", 70);
     \u0275\u0275text(5, "\u{1F948}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "h3", 61);
+    \u0275\u0275elementStart(6, "h3", 71);
     \u0275\u0275text(7, "\u767D\u9280\u7CBE\u82F1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "div", 62)(9, "span", 63);
+    \u0275\u0275elementStart(8, "div", 72)(9, "span", 73);
     \u0275\u0275text(10, "4.99 USDT");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "span", 64);
+    \u0275\u0275elementStart(11, "span", 74);
     \u0275\u0275text(12, "/\u6708");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(13, "ul", 65)(14, "li");
+    \u0275\u0275elementStart(13, "ul", 75)(14, "li");
     \u0275\u0275text(15, "\u2705 5 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(16, "li");
@@ -40375,23 +40517,23 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275elementStart(22, "li");
     \u0275\u0275text(23, "\u2705 \u5EE3\u544A\u767C\u9001");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(24, MembershipCenterComponent_Conditional_71_Conditional_24_Template, 2, 1, "button", 66)(25, MembershipCenterComponent_Conditional_71_Conditional_25_Template, 2, 0, "button", 67);
+    \u0275\u0275conditionalCreate(24, MembershipCenterComponent_Conditional_84_Conditional_24_Template, 2, 1, "button", 76)(25, MembershipCenterComponent_Conditional_84_Conditional_25_Template, 2, 0, "button", 77);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(26, "div", 68);
-    \u0275\u0275conditionalCreate(27, MembershipCenterComponent_Conditional_71_Conditional_27_Template, 2, 0, "div", 59);
-    \u0275\u0275elementStart(28, "div", 60);
+    \u0275\u0275elementStart(26, "div", 78);
+    \u0275\u0275conditionalCreate(27, MembershipCenterComponent_Conditional_84_Conditional_27_Template, 2, 0, "div", 69);
+    \u0275\u0275elementStart(28, "div", 70);
     \u0275\u0275text(29, "\u{1F947}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(30, "h3", 61);
+    \u0275\u0275elementStart(30, "h3", 71);
     \u0275\u0275text(31, "\u9EC3\u91D1\u5927\u5E2B");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(32, "div", 62)(33, "span", 63);
+    \u0275\u0275elementStart(32, "div", 72)(33, "span", 73);
     \u0275\u0275text(34, "19.9 USDT");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(35, "span", 64);
+    \u0275\u0275elementStart(35, "span", 74);
     \u0275\u0275text(36, "/\u6708");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(37, "ul", 65)(38, "li");
+    \u0275\u0275elementStart(37, "ul", 75)(38, "li");
     \u0275\u0275text(39, "\u2705 15 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(40, "li");
@@ -40409,25 +40551,25 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275elementStart(48, "li");
     \u0275\u0275text(49, "\u2705 \u6578\u64DA\u5C0E\u51FA");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(50, MembershipCenterComponent_Conditional_71_Conditional_50_Template, 2, 2, "button", 66)(51, MembershipCenterComponent_Conditional_71_Conditional_51_Template, 2, 0, "button", 67);
+    \u0275\u0275conditionalCreate(50, MembershipCenterComponent_Conditional_84_Conditional_50_Template, 2, 2, "button", 76)(51, MembershipCenterComponent_Conditional_84_Conditional_51_Template, 2, 0, "button", 77);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(52, "div", 69)(53, "div", 70);
+    \u0275\u0275elementStart(52, "div", 79)(53, "div", 80);
     \u0275\u0275text(54, "\u63A8\u85A6");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(55, MembershipCenterComponent_Conditional_71_Conditional_55_Template, 2, 0, "div", 59);
-    \u0275\u0275elementStart(56, "div", 60);
+    \u0275\u0275conditionalCreate(55, MembershipCenterComponent_Conditional_84_Conditional_55_Template, 2, 0, "div", 69);
+    \u0275\u0275elementStart(56, "div", 70);
     \u0275\u0275text(57, "\u{1F48E}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(58, "h3", 61);
+    \u0275\u0275elementStart(58, "h3", 71);
     \u0275\u0275text(59, "\u947D\u77F3\u738B\u724C");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(60, "div", 62)(61, "span", 63);
+    \u0275\u0275elementStart(60, "div", 72)(61, "span", 73);
     \u0275\u0275text(62, "59.9 USDT");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(63, "span", 64);
+    \u0275\u0275elementStart(63, "span", 74);
     \u0275\u0275text(64, "/\u6708");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(65, "ul", 65)(66, "li");
+    \u0275\u0275elementStart(65, "ul", 75)(66, "li");
     \u0275\u0275text(67, "\u2705 50 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(68, "li");
@@ -40445,23 +40587,23 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275elementStart(76, "li");
     \u0275\u0275text(77, "\u2705 \u9AD8\u7D1A\u5206\u6790");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(78, MembershipCenterComponent_Conditional_71_Conditional_78_Template, 2, 2, "button", 66)(79, MembershipCenterComponent_Conditional_71_Conditional_79_Template, 2, 0, "button", 67);
+    \u0275\u0275conditionalCreate(78, MembershipCenterComponent_Conditional_84_Conditional_78_Template, 2, 2, "button", 76)(79, MembershipCenterComponent_Conditional_84_Conditional_79_Template, 2, 0, "button", 77);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(80, "div", 71);
-    \u0275\u0275conditionalCreate(81, MembershipCenterComponent_Conditional_71_Conditional_81_Template, 2, 0, "div", 59);
-    \u0275\u0275elementStart(82, "div", 60);
+    \u0275\u0275elementStart(80, "div", 81);
+    \u0275\u0275conditionalCreate(81, MembershipCenterComponent_Conditional_84_Conditional_81_Template, 2, 0, "div", 69);
+    \u0275\u0275elementStart(82, "div", 70);
     \u0275\u0275text(83, "\u{1F31F}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(84, "h3", 61);
+    \u0275\u0275elementStart(84, "h3", 71);
     \u0275\u0275text(85, "\u661F\u8000\u50B3\u8AAA");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(86, "div", 62)(87, "span", 63);
+    \u0275\u0275elementStart(86, "div", 72)(87, "span", 73);
     \u0275\u0275text(88, "199 USDT");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(89, "span", 64);
+    \u0275\u0275elementStart(89, "span", 74);
     \u0275\u0275text(90, "/\u6708");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(91, "ul", 65)(92, "li");
+    \u0275\u0275elementStart(91, "ul", 75)(92, "li");
     \u0275\u0275text(93, "\u2705 100 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(94, "li");
@@ -40479,26 +40621,26 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275elementStart(102, "li");
     \u0275\u0275text(103, "\u2705 \u5718\u968A\u7BA1\u7406");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(104, MembershipCenterComponent_Conditional_71_Conditional_104_Template, 2, 1, "button", 66)(105, MembershipCenterComponent_Conditional_71_Conditional_105_Template, 2, 0, "button", 67);
+    \u0275\u0275conditionalCreate(104, MembershipCenterComponent_Conditional_84_Conditional_104_Template, 2, 1, "button", 76)(105, MembershipCenterComponent_Conditional_84_Conditional_105_Template, 2, 0, "button", 77);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(106, "div", 72);
-    \u0275\u0275conditionalCreate(107, MembershipCenterComponent_Conditional_71_Conditional_107_Template, 2, 0, "div", 59);
-    \u0275\u0275elementStart(108, "div", 60);
+    \u0275\u0275elementStart(106, "div", 82);
+    \u0275\u0275conditionalCreate(107, MembershipCenterComponent_Conditional_84_Conditional_107_Template, 2, 0, "div", 69);
+    \u0275\u0275elementStart(108, "div", 70);
     \u0275\u0275text(109, "\u{1F451}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(110, "h3", 61);
+    \u0275\u0275elementStart(110, "h3", 71);
     \u0275\u0275text(111, "\u69AE\u8000\u738B\u8005");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(112, "div", 62)(113, "span", 63);
+    \u0275\u0275elementStart(112, "div", 72)(113, "span", 73);
     \u0275\u0275text(114, "599 USDT");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(115, "span", 64);
+    \u0275\u0275elementStart(115, "span", 74);
     \u0275\u0275text(116, "/\u6708");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(117, "div", 73);
+    \u0275\u0275elementStart(117, "div", 83);
     \u0275\u0275text(118, "\u5C0A\u4EAB\u7279\u6B0A");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(119, "ul", 65)(120, "li");
+    \u0275\u0275elementStart(119, "ul", 75)(120, "li");
     \u0275\u0275text(121, "\u2705 \u7121\u9650\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(122, "li");
@@ -40516,59 +40658,59 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275elementStart(130, "li");
     \u0275\u0275text(131, "\u2705 \u65B0\u529F\u80FD\u5167\u6E2C");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(132, MembershipCenterComponent_Conditional_71_Conditional_132_Template, 2, 0, "button", 66)(133, MembershipCenterComponent_Conditional_71_Conditional_133_Template, 2, 0, "button", 67);
+    \u0275\u0275conditionalCreate(132, MembershipCenterComponent_Conditional_84_Conditional_132_Template, 2, 0, "button", 76)(133, MembershipCenterComponent_Conditional_84_Conditional_133_Template, 2, 0, "button", 77);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(134, "div", 27)(135, "h3", 28);
+    \u0275\u0275elementStart(134, "div", 37)(135, "h3", 38);
     \u0275\u0275text(136, "\u{1F3AB} \u4F7F\u7528\u5361\u5BC6\u6FC0\u6D3B");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(137, "div", 74)(138, "input", 75);
-    \u0275\u0275twoWayListener("ngModelChange", function MembershipCenterComponent_Conditional_71_Template_input_ngModelChange_138_listener($event) {
+    \u0275\u0275elementStart(137, "div", 84)(138, "input", 85);
+    \u0275\u0275twoWayListener("ngModelChange", function MembershipCenterComponent_Conditional_84_Template_input_ngModelChange_138_listener($event) {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       \u0275\u0275twoWayBindingSet(ctx_r0.licenseKey, $event) || (ctx_r0.licenseKey = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(139, "button", 76);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Template_button_click_139_listener() {
+    \u0275\u0275elementStart(139, "button", 86);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Template_button_click_139_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.onActivateLicense());
     });
     \u0275\u0275text(140, " \u6FC0\u6D3B ");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(141, "div", 27)(142, "h3", 28);
+    \u0275\u0275elementStart(141, "div", 37)(142, "h3", 38);
     \u0275\u0275text(143, "\u{1F4B3} \u652F\u4ED8\u65B9\u5F0F");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(144, "div", 77)(145, "button", 78);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Template_button_click_145_listener() {
+    \u0275\u0275elementStart(144, "div", 87)(145, "button", 88);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Template_button_click_145_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.selectedPayment.set("alipay"));
     });
-    \u0275\u0275elementStart(146, "span", 79);
+    \u0275\u0275elementStart(146, "span", 89);
     \u0275\u0275text(147, "\u{1F499}");
     \u0275\u0275elementEnd();
     \u0275\u0275text(148, " \u652F\u4ED8\u5BF6 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(149, "button", 78);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Template_button_click_149_listener() {
+    \u0275\u0275elementStart(149, "button", 88);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Template_button_click_149_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.selectedPayment.set("wechat"));
     });
-    \u0275\u0275elementStart(150, "span", 79);
+    \u0275\u0275elementStart(150, "span", 89);
     \u0275\u0275text(151, "\u{1F49A}");
     \u0275\u0275elementEnd();
     \u0275\u0275text(152, " \u5FAE\u4FE1\u652F\u4ED8 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(153, "button", 78);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Template_button_click_153_listener() {
+    \u0275\u0275elementStart(153, "button", 88);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Template_button_click_153_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.selectedPayment.set("usdt"));
     });
-    \u0275\u0275elementStart(154, "span", 79);
+    \u0275\u0275elementStart(154, "span", 89);
     \u0275\u0275text(155, "\u{1F48E}");
     \u0275\u0275elementEnd();
     \u0275\u0275text(156, " USDT ");
@@ -40618,32 +40760,32 @@ function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
     \u0275\u0275classProp("active", ctx_r0.selectedPayment() === "usdt");
   }
 }
-function MembershipCenterComponent_Conditional_72_Conditional_5_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_85_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 83);
+    \u0275\u0275elementStart(0, "div", 93);
     \u0275\u0275text(1, "\u8F09\u5165\u4E2D...");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_72_Conditional_6_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_85_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 84);
+    \u0275\u0275elementStart(0, "div", 94);
     \u0275\u0275text(1, "\u66AB\u7121\u8A02\u95B1\u8A18\u9304");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_72_Conditional_7_For_1_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_85_Conditional_7_For_1_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 85)(1, "div", 86);
+    \u0275\u0275elementStart(0, "div", 95)(1, "div", 96);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "div", 87)(4, "div", 88);
+    \u0275\u0275elementStart(3, "div", 97)(4, "div", 98);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "div", 89);
+    \u0275\u0275elementStart(6, "div", 99);
     \u0275\u0275text(7);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(8, "div", 90);
+    \u0275\u0275elementStart(8, "div", 100);
     \u0275\u0275text(9);
     \u0275\u0275elementEnd()();
   }
@@ -40662,22 +40804,22 @@ function MembershipCenterComponent_Conditional_72_Conditional_7_For_1_Template(r
     \u0275\u0275textInterpolate1(" ", record_r15.is_active ? "\u751F\u6548\u4E2D" : "\u5DF2\u904E\u671F", " ");
   }
 }
-function MembershipCenterComponent_Conditional_72_Conditional_7_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_85_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275repeaterCreate(0, MembershipCenterComponent_Conditional_72_Conditional_7_For_1_Template, 10, 9, "div", 85, _forTrack014);
+    \u0275\u0275repeaterCreate(0, MembershipCenterComponent_Conditional_85_Conditional_7_For_1_Template, 10, 9, "div", 95, _forTrack014);
   }
   if (rf & 2) {
     const ctx_r0 = \u0275\u0275nextContext(2);
     \u0275\u0275repeater(ctx_r0.subscriptionHistory());
   }
 }
-function MembershipCenterComponent_Conditional_72_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_85_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 24)(1, "div", 27)(2, "h3", 28);
+    \u0275\u0275elementStart(0, "div", 33)(1, "div", 37)(2, "h3", 38);
     \u0275\u0275text(3, "\u{1F4DC} \u8A02\u95B1\u6B77\u53F2");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "div", 82);
-    \u0275\u0275conditionalCreate(5, MembershipCenterComponent_Conditional_72_Conditional_5_Template, 2, 0, "div", 83)(6, MembershipCenterComponent_Conditional_72_Conditional_6_Template, 2, 0, "div", 84)(7, MembershipCenterComponent_Conditional_72_Conditional_7_Template, 2, 0);
+    \u0275\u0275elementStart(4, "div", 92);
+    \u0275\u0275conditionalCreate(5, MembershipCenterComponent_Conditional_85_Conditional_5_Template, 2, 0, "div", 93)(6, MembershipCenterComponent_Conditional_85_Conditional_6_Template, 2, 0, "div", 94)(7, MembershipCenterComponent_Conditional_85_Conditional_7_Template, 2, 0);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -40693,10 +40835,24 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
     this.toast = inject(ToastService);
     this.licenseClient = inject(LicenseClientService);
     this.cdr = inject(ChangeDetectorRef);
+    this.walletService = inject(WalletService);
     this.membershipUpdateHandler = null;
     this.activeTab = signal("overview", ...ngDevMode ? [{ debugName: "activeTab" }] : []);
     this.selectedPayment = signal("alipay", ...ngDevMode ? [{ debugName: "selectedPayment" }] : []);
     this.licenseKey = "";
+    this.wallet = signal(null, ...ngDevMode ? [{ debugName: "wallet" }] : []);
+    this.walletBalanceDisplay = computed(() => {
+      const w = this.wallet();
+      if (!w)
+        return "$0.00";
+      return "$" + (w.available_balance / 100).toFixed(2);
+    }, ...ngDevMode ? [{ debugName: "walletBalanceDisplay" }] : []);
+    this.walletBonusDisplay = computed(() => {
+      const w = this.wallet();
+      if (!w)
+        return "$0.00";
+      return "$" + ((w.bonus_balance || 0) / 100).toFixed(2);
+    }, ...ngDevMode ? [{ debugName: "walletBonusDisplay" }] : []);
     this.user = computed(() => this.authService.user(), ...ngDevMode ? [{ debugName: "user" }] : []);
     this.membershipLevel = computed(() => this.authService.membershipLevel(), ...ngDevMode ? [{ debugName: "membershipLevel" }] : []);
     this.membershipExpires = computed(() => this.authService.user()?.membershipExpires, ...ngDevMode ? [{ debugName: "membershipExpires" }] : []);
@@ -40713,6 +40869,7 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
     this.inviteCode.set(rewards.inviteCode);
     this.invitedCount.set(rewards.invitedCount);
     this.rewardDays.set(rewards.rewardDays);
+    await this.loadWallet();
     await this.loadSubscriptionHistory();
     this.membershipUpdateHandler = (event) => {
       const customEvent = event;
@@ -40738,6 +40895,22 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
     } finally {
       this.isLoadingHistory.set(false);
     }
+  }
+  async loadWallet() {
+    try {
+      const wallet = await this.walletService.loadWallet();
+      if (wallet) {
+        this.wallet.set(wallet);
+      }
+    } catch (error) {
+      console.error("\u8F09\u5165\u9322\u5305\u5931\u6557:", error);
+    }
+  }
+  goToWallet() {
+    window.dispatchEvent(new CustomEvent("changeView", { detail: "wallet" }));
+  }
+  goToRecharge() {
+    window.dispatchEvent(new CustomEvent("changeView", { detail: "wallet" }));
   }
   getMembershipIcon() {
     const icons = {
@@ -40820,7 +40993,7 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
     };
   }
   static {
-    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _MembershipCenterComponent, selectors: [["app-membership-center"]], decls: 73, vars: 32, consts: [[1, "membership-container"], [1, "page-header"], [1, "page-title"], [1, "title-icon"], [1, "page-desc"], [1, "membership-status-card"], [1, "status-left"], [1, "level-badge"], [1, "level-info"], [1, "level-name"], [1, "expires-info"], [1, "status-right"], [1, "upgrade-btn"], [1, "quick-stats"], [1, "stat-card"], [1, "stat-icon"], [1, "stat-content"], [1, "stat-label"], [1, "stat-value"], [1, "stat-bar"], [1, "stat-fill"], [1, "stat-hint"], [1, "tabs"], [1, "tab-btn", 3, "click"], [1, "tab-content"], [1, "days-left"], [1, "upgrade-btn", 3, "click"], [1, "section-card"], [1, "section-title"], [1, "usage-details"], [1, "usage-row"], [1, "usage-name"], [1, "usage-bar-container"], [1, "usage-bar"], [1, "usage-fill"], [1, "usage-count"], [1, "section-card", "invite-card"], [1, "invite-desc"], [1, "invite-code-display"], [1, "label"], [1, "code"], [1, "copy-btn", 3, "click"], [1, "invite-stats-row"], [1, "invite-stat"], [1, "value"], [1, "benefits-table-container"], [1, "benefits-table"], [1, "feature-col"], [1, "level-col", "bronze"], [1, "level-col", "silver"], [1, "level-col", "gold"], [1, "level-col", "diamond"], [1, "level-col", "star"], [1, "level-col", "king"], [1, "feature-name"], [1, "price-row"], [1, "price"], [1, "pricing-cards"], [1, "pricing-card", "silver"], [1, "current-badge"], [1, "plan-icon"], [1, "plan-name"], [1, "plan-price"], [1, "amount"], [1, "period"], [1, "plan-features"], [1, "buy-btn"], [1, "buy-btn", "renew"], [1, "pricing-card", "gold"], [1, "pricing-card", "diamond", "popular"], [1, "popular-badge"], [1, "pricing-card", "star"], [1, "pricing-card", "king"], [1, "savings"], [1, "license-input-row"], ["type", "text", "placeholder", "\u8F38\u5165\u5361\u5BC6\uFF1AXXXX-XXXX-XXXX-XXXX", 1, "license-input", 3, "ngModelChange", "ngModel"], [1, "activate-btn", 3, "click", "disabled"], [1, "payment-methods"], [1, "payment-btn", 3, "click"], [1, "payment-icon"], [1, "buy-btn", 3, "click"], [1, "buy-btn", "renew", 3, "click"], [1, "history-list"], [1, "loading-state"], [1, "empty-state"], [1, "history-item"], [1, "history-icon"], [1, "history-info"], [1, "history-title"], [1, "history-meta"], [1, "history-status"]], template: function MembershipCenterComponent_Template(rf, ctx) {
+    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _MembershipCenterComponent, selectors: [["app-membership-center"]], decls: 86, vars: 34, consts: [[1, "membership-container"], [1, "page-header"], [1, "page-title"], [1, "title-icon"], [1, "page-desc"], [1, "membership-status-card"], [1, "status-left"], [1, "level-badge"], [1, "level-info"], [1, "level-name"], [1, "expires-info"], [1, "status-right"], [1, "upgrade-btn"], [1, "wallet-card", 3, "click"], [1, "wallet-left"], [1, "wallet-icon"], [1, "wallet-info"], [1, "wallet-label"], [1, "wallet-amount"], [1, "wallet-right"], ["class", "wallet-bonus", 4, "ngIf"], [1, "wallet-recharge-btn", 3, "click"], [1, "quick-stats"], [1, "stat-card"], [1, "stat-icon"], [1, "stat-content"], [1, "stat-label"], [1, "stat-value"], [1, "stat-bar"], [1, "stat-fill"], [1, "stat-hint"], [1, "tabs"], [1, "tab-btn", 3, "click"], [1, "tab-content"], [1, "days-left"], [1, "upgrade-btn", 3, "click"], [1, "wallet-bonus"], [1, "section-card"], [1, "section-title"], [1, "usage-details"], [1, "usage-row"], [1, "usage-name"], [1, "usage-bar-container"], [1, "usage-bar"], [1, "usage-fill"], [1, "usage-count"], [1, "section-card", "invite-card"], [1, "invite-desc"], [1, "invite-code-display"], [1, "label"], [1, "code"], [1, "copy-btn", 3, "click"], [1, "invite-stats-row"], [1, "invite-stat"], [1, "value"], [1, "benefits-table-container"], [1, "benefits-table"], [1, "feature-col"], [1, "level-col", "bronze"], [1, "level-col", "silver"], [1, "level-col", "gold"], [1, "level-col", "diamond"], [1, "level-col", "star"], [1, "level-col", "king"], [1, "feature-name"], [1, "price-row"], [1, "price"], [1, "pricing-cards"], [1, "pricing-card", "silver"], [1, "current-badge"], [1, "plan-icon"], [1, "plan-name"], [1, "plan-price"], [1, "amount"], [1, "period"], [1, "plan-features"], [1, "buy-btn"], [1, "buy-btn", "renew"], [1, "pricing-card", "gold"], [1, "pricing-card", "diamond", "popular"], [1, "popular-badge"], [1, "pricing-card", "star"], [1, "pricing-card", "king"], [1, "savings"], [1, "license-input-row"], ["type", "text", "placeholder", "\u8F38\u5165\u5361\u5BC6\uFF1AXXXX-XXXX-XXXX-XXXX", 1, "license-input", 3, "ngModelChange", "ngModel"], [1, "activate-btn", 3, "click", "disabled"], [1, "payment-methods"], [1, "payment-btn", 3, "click"], [1, "payment-icon"], [1, "buy-btn", 3, "click"], [1, "buy-btn", "renew", 3, "click"], [1, "history-list"], [1, "loading-state"], [1, "empty-state"], [1, "history-item"], [1, "history-icon"], [1, "history-info"], [1, "history-title"], [1, "history-meta"], [1, "history-status"]], template: function MembershipCenterComponent_Template(rf, ctx) {
       if (rf & 1) {
         \u0275\u0275elementStart(0, "div", 0)(1, "div", 1)(2, "h1", 2)(3, "span", 3);
         \u0275\u0275text(4, "\u2B50");
@@ -40841,88 +41014,110 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
         \u0275\u0275elementStart(17, "div", 11);
         \u0275\u0275conditionalCreate(18, MembershipCenterComponent_Conditional_18_Template, 2, 0, "button", 12);
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(19, "div", 13)(20, "div", 14)(21, "div", 15);
-        \u0275\u0275text(22, "\u{1F916}");
+        \u0275\u0275elementStart(19, "div", 13);
+        \u0275\u0275listener("click", function MembershipCenterComponent_Template_div_click_19_listener() {
+          return ctx.goToWallet();
+        });
+        \u0275\u0275elementStart(20, "div", 14)(21, "div", 15);
+        \u0275\u0275text(22, "\u{1F4B0}");
         \u0275\u0275elementEnd();
         \u0275\u0275elementStart(23, "div", 16)(24, "div", 17);
-        \u0275\u0275text(25, "AI \u8ABF\u7528");
+        \u0275\u0275text(25, "\u8CEC\u6236\u9918\u984D");
         \u0275\u0275elementEnd();
         \u0275\u0275elementStart(26, "div", 18);
         \u0275\u0275text(27);
-        \u0275\u0275elementEnd();
+        \u0275\u0275elementEnd()()();
         \u0275\u0275elementStart(28, "div", 19);
-        \u0275\u0275element(29, "div", 20);
+        \u0275\u0275template(29, MembershipCenterComponent_div_29_Template, 2, 1, "div", 20);
+        \u0275\u0275elementStart(30, "button", 21);
+        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_30_listener($event) {
+          ctx.goToRecharge();
+          return $event.stopPropagation();
+        });
+        \u0275\u0275text(31, " \u{1F4B3} \u5145\u503C ");
         \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(30, "div", 14)(31, "div", 15);
-        \u0275\u0275text(32, "\u{1F4E8}");
+        \u0275\u0275elementStart(32, "div", 22)(33, "div", 23)(34, "div", 24);
+        \u0275\u0275text(35, "\u{1F916}");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(33, "div", 16)(34, "div", 17);
-        \u0275\u0275text(35, "\u6D88\u606F\u767C\u9001");
+        \u0275\u0275elementStart(36, "div", 25)(37, "div", 26);
+        \u0275\u0275text(38, "AI \u8ABF\u7528");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(36, "div", 18);
-        \u0275\u0275text(37);
+        \u0275\u0275elementStart(39, "div", 27);
+        \u0275\u0275text(40);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(38, "div", 19);
-        \u0275\u0275element(39, "div", 20);
+        \u0275\u0275elementStart(41, "div", 28);
+        \u0275\u0275element(42, "div", 29);
         \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(40, "div", 14)(41, "div", 15);
-        \u0275\u0275text(42, "\u{1F465}");
+        \u0275\u0275elementStart(43, "div", 23)(44, "div", 24);
+        \u0275\u0275text(45, "\u{1F4E8}");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(43, "div", 16)(44, "div", 17);
-        \u0275\u0275text(45, "\u5E33\u865F\u6578\u91CF");
+        \u0275\u0275elementStart(46, "div", 25)(47, "div", 26);
+        \u0275\u0275text(48, "\u6D88\u606F\u767C\u9001");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(46, "div", 18);
-        \u0275\u0275text(47);
+        \u0275\u0275elementStart(49, "div", 27);
+        \u0275\u0275text(50);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(48, "div", 19);
-        \u0275\u0275element(49, "div", 20);
+        \u0275\u0275elementStart(51, "div", 28);
+        \u0275\u0275element(52, "div", 29);
         \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(50, "div", 14)(51, "div", 15);
-        \u0275\u0275text(52, "\u{1F381}");
+        \u0275\u0275elementStart(53, "div", 23)(54, "div", 24);
+        \u0275\u0275text(55, "\u{1F465}");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(53, "div", 16)(54, "div", 17);
-        \u0275\u0275text(55, "\u9080\u8ACB\u734E\u52F5");
+        \u0275\u0275elementStart(56, "div", 25)(57, "div", 26);
+        \u0275\u0275text(58, "\u5E33\u865F\u6578\u91CF");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(56, "div", 18);
-        \u0275\u0275text(57);
+        \u0275\u0275elementStart(59, "div", 27);
+        \u0275\u0275text(60);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(58, "div", 21);
-        \u0275\u0275text(59);
+        \u0275\u0275elementStart(61, "div", 28);
+        \u0275\u0275element(62, "div", 29);
+        \u0275\u0275elementEnd()()();
+        \u0275\u0275elementStart(63, "div", 23)(64, "div", 24);
+        \u0275\u0275text(65, "\u{1F381}");
+        \u0275\u0275elementEnd();
+        \u0275\u0275elementStart(66, "div", 25)(67, "div", 26);
+        \u0275\u0275text(68, "\u9080\u8ACB\u734E\u52F5");
+        \u0275\u0275elementEnd();
+        \u0275\u0275elementStart(69, "div", 27);
+        \u0275\u0275text(70);
+        \u0275\u0275elementEnd();
+        \u0275\u0275elementStart(71, "div", 30);
+        \u0275\u0275text(72);
         \u0275\u0275elementEnd()()()();
-        \u0275\u0275elementStart(60, "div", 22)(61, "button", 23);
-        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_61_listener() {
+        \u0275\u0275elementStart(73, "div", 31)(74, "button", 32);
+        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_74_listener() {
           return ctx.activeTab.set("overview");
         });
-        \u0275\u0275text(62, " \u{1F4CA} \u7E3D\u89BD ");
+        \u0275\u0275text(75, " \u{1F4CA} \u7E3D\u89BD ");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(63, "button", 23);
-        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_63_listener() {
+        \u0275\u0275elementStart(76, "button", 32);
+        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_76_listener() {
           return ctx.activeTab.set("benefits");
         });
-        \u0275\u0275text(64, " \u{1F3AF} \u6B0A\u76CA\u5C0D\u6BD4 ");
+        \u0275\u0275text(77, " \u{1F3AF} \u6B0A\u76CA\u5C0D\u6BD4 ");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(65, "button", 23);
-        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_65_listener() {
+        \u0275\u0275elementStart(78, "button", 32);
+        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_78_listener() {
           return ctx.activeTab.set("upgrade");
         });
-        \u0275\u0275text(66, " \u{1F680} \u5347\u7D1A\u8CFC\u8CB7 ");
+        \u0275\u0275text(79, " \u{1F680} \u5347\u7D1A\u8CFC\u8CB7 ");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(67, "button", 23);
-        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_67_listener() {
+        \u0275\u0275elementStart(80, "button", 32);
+        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_80_listener() {
           return ctx.activeTab.set("history");
         });
-        \u0275\u0275text(68, " \u{1F4DC} \u8A02\u95B1\u8A18\u9304 ");
+        \u0275\u0275text(81, " \u{1F4DC} \u8A02\u95B1\u8A18\u9304 ");
         \u0275\u0275elementEnd()();
-        \u0275\u0275conditionalCreate(69, MembershipCenterComponent_Conditional_69_Template, 63, 19, "div", 24);
-        \u0275\u0275conditionalCreate(70, MembershipCenterComponent_Conditional_70_Template, 185, 0, "div", 24);
-        \u0275\u0275conditionalCreate(71, MembershipCenterComponent_Conditional_71_Template, 157, 28, "div", 24);
-        \u0275\u0275conditionalCreate(72, MembershipCenterComponent_Conditional_72_Template, 8, 1, "div", 24);
+        \u0275\u0275conditionalCreate(82, MembershipCenterComponent_Conditional_82_Template, 63, 19, "div", 33);
+        \u0275\u0275conditionalCreate(83, MembershipCenterComponent_Conditional_83_Template, 185, 0, "div", 33);
+        \u0275\u0275conditionalCreate(84, MembershipCenterComponent_Conditional_84_Template, 157, 28, "div", 33);
+        \u0275\u0275conditionalCreate(85, MembershipCenterComponent_Conditional_85_Template, 8, 1, "div", 33);
         \u0275\u0275elementEnd();
       }
       if (rf & 2) {
-        let tmp_5_0;
         let tmp_7_0;
         let tmp_9_0;
+        let tmp_11_0;
         \u0275\u0275advance(8);
         \u0275\u0275classMap("level-" + ctx.membershipLevel());
         \u0275\u0275advance(3);
@@ -40934,15 +41129,19 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
         \u0275\u0275advance(3);
         \u0275\u0275conditional(ctx.membershipLevel() !== "king" ? 18 : -1);
         \u0275\u0275advance(9);
-        \u0275\u0275textInterpolate2(" ", ((tmp_5_0 = ctx.usageStats()) == null ? null : tmp_5_0.aiCalls == null ? null : tmp_5_0.aiCalls.used) || 0, " / ", ((tmp_5_0 = ctx.usageStats()) == null ? null : tmp_5_0.aiCalls == null ? null : tmp_5_0.aiCalls.limit) || 50, " ");
+        \u0275\u0275textInterpolate(ctx.walletBalanceDisplay());
+        \u0275\u0275advance(2);
+        \u0275\u0275property("ngIf", ctx.walletBonusDisplay() !== "$0.00");
+        \u0275\u0275advance(11);
+        \u0275\u0275textInterpolate2(" ", ((tmp_7_0 = ctx.usageStats()) == null ? null : tmp_7_0.aiCalls == null ? null : tmp_7_0.aiCalls.used) || 0, " / ", ((tmp_7_0 = ctx.usageStats()) == null ? null : tmp_7_0.aiCalls == null ? null : tmp_7_0.aiCalls.limit) || 50, " ");
         \u0275\u0275advance(2);
         \u0275\u0275styleProp("width", ctx.getAiUsagePercent(), "%");
         \u0275\u0275advance(8);
-        \u0275\u0275textInterpolate2(" ", ((tmp_7_0 = ctx.usageStats()) == null ? null : tmp_7_0.messagesSent == null ? null : tmp_7_0.messagesSent.used) || 0, " / ", ((tmp_7_0 = ctx.usageStats()) == null ? null : tmp_7_0.messagesSent == null ? null : tmp_7_0.messagesSent.limit) || 100, " ");
+        \u0275\u0275textInterpolate2(" ", ((tmp_9_0 = ctx.usageStats()) == null ? null : tmp_9_0.messagesSent == null ? null : tmp_9_0.messagesSent.used) || 0, " / ", ((tmp_9_0 = ctx.usageStats()) == null ? null : tmp_9_0.messagesSent == null ? null : tmp_9_0.messagesSent.limit) || 100, " ");
         \u0275\u0275advance(2);
         \u0275\u0275styleProp("width", ctx.getMessageUsagePercent(), "%");
         \u0275\u0275advance(8);
-        \u0275\u0275textInterpolate2(" ", ((tmp_9_0 = ctx.usageStats()) == null ? null : tmp_9_0.accounts == null ? null : tmp_9_0.accounts.used) || 0, " / ", ((tmp_9_0 = ctx.usageStats()) == null ? null : tmp_9_0.accounts == null ? null : tmp_9_0.accounts.limit) || 2, " ");
+        \u0275\u0275textInterpolate2(" ", ((tmp_11_0 = ctx.usageStats()) == null ? null : tmp_11_0.accounts == null ? null : tmp_11_0.accounts.used) || 0, " / ", ((tmp_11_0 = ctx.usageStats()) == null ? null : tmp_11_0.accounts == null ? null : tmp_11_0.accounts.limit) || 2, " ");
         \u0275\u0275advance(2);
         \u0275\u0275styleProp("width", ctx.getAccountUsagePercent(), "%");
         \u0275\u0275advance(8);
@@ -40958,15 +41157,15 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
         \u0275\u0275advance(2);
         \u0275\u0275classProp("active", ctx.activeTab() === "history");
         \u0275\u0275advance(2);
-        \u0275\u0275conditional(ctx.activeTab() === "overview" ? 69 : -1);
+        \u0275\u0275conditional(ctx.activeTab() === "overview" ? 82 : -1);
         \u0275\u0275advance();
-        \u0275\u0275conditional(ctx.activeTab() === "benefits" ? 70 : -1);
+        \u0275\u0275conditional(ctx.activeTab() === "benefits" ? 83 : -1);
         \u0275\u0275advance();
-        \u0275\u0275conditional(ctx.activeTab() === "upgrade" ? 71 : -1);
+        \u0275\u0275conditional(ctx.activeTab() === "upgrade" ? 84 : -1);
         \u0275\u0275advance();
-        \u0275\u0275conditional(ctx.activeTab() === "history" ? 72 : -1);
+        \u0275\u0275conditional(ctx.activeTab() === "history" ? 85 : -1);
       }
-    }, dependencies: [CommonModule, FormsModule, DefaultValueAccessor, NgControlStatus, NgModel], styles: ["\n\n.membership-container[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n  max-width: 1200px;\n  margin: 0 auto;\n}\n.page-header[_ngcontent-%COMP%] {\n  margin-bottom: 1.5rem;\n}\n.page-title[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  margin: 0;\n}\n.title-icon[_ngcontent-%COMP%] {\n  font-size: 1.75rem;\n}\n.page-desc[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  margin: 0.5rem 0 0 0;\n}\n.membership-status-card[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1.5rem;\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n  border: 1px solid;\n}\n.membership-status-card.level-free[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(71, 85, 105, 0.3),\n      rgba(51, 65, 85, 0.3));\n  border-color: rgba(71, 85, 105, 0.5);\n}\n.membership-status-card.level-vip[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(245, 158, 11, 0.2),\n      rgba(217, 119, 6, 0.2));\n  border-color: rgba(245, 158, 11, 0.5);\n}\n.membership-status-card.level-svip[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(139, 92, 246, 0.2),\n      rgba(124, 58, 237, 0.2));\n  border-color: rgba(139, 92, 246, 0.5);\n}\n.membership-status-card.level-mvp[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(236, 72, 153, 0.2),\n      rgba(219, 39, 119, 0.2));\n  border-color: rgba(236, 72, 153, 0.5);\n}\n.status-left[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.level-badge[_ngcontent-%COMP%] {\n  width: 64px;\n  height: 64px;\n  border-radius: 50%;\n  background: rgba(255, 255, 255, 0.1);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 2rem;\n}\n.level-name[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0;\n}\n.expires-info[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  margin: 0.25rem 0 0 0;\n}\n.days-left[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.upgrade-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.75rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.upgrade-btn[_ngcontent-%COMP%]:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 10px 20px -10px rgba(6, 182, 212, 0.5);\n}\n.quick-stats[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 1rem;\n  margin-bottom: 1.5rem;\n}\n.stat-card[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.75rem;\n}\n.stat-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.stat-content[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.stat-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.75rem;\n}\n.stat-value[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.stat-bar[_ngcontent-%COMP%] {\n  height: 4px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 2px;\n  margin-top: 0.5rem;\n  overflow: hidden;\n}\n.stat-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 2px;\n}\n.stat-hint[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n}\n.tabs[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1.5rem;\n  flex-wrap: wrap;\n}\n.tab-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.tab-btn[_ngcontent-%COMP%]:hover {\n  border-color: var(--primary, #06b6d4);\n}\n.tab-btn.active[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border-color: transparent;\n  color: white;\n}\n.section-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.section-title[_ngcontent-%COMP%] {\n  font-size: 1rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 1rem 0;\n}\n.usage-details[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 1rem;\n}\n.usage-row[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.usage-name[_ngcontent-%COMP%] {\n  width: 150px;\n  color: var(--text-secondary, #cbd5e1);\n}\n.usage-bar-container[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.usage-bar[_ngcontent-%COMP%] {\n  height: 8px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 4px;\n  overflow: hidden;\n}\n.usage-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 4px;\n}\n.usage-count[_ngcontent-%COMP%] {\n  width: 100px;\n  text-align: right;\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.invite-card[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border-color: rgba(6, 182, 212, 0.3);\n}\n.invite-desc[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  margin-bottom: 1rem;\n}\n.invite-code-display[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.invite-code-display[_ngcontent-%COMP%]   .label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.invite-code-display[_ngcontent-%COMP%]   .code[_ngcontent-%COMP%] {\n  flex: 1;\n  font-family: monospace;\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.copy-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--primary-bg, rgba(6, 182, 212, 0.1));\n  border: 1px solid var(--primary, #06b6d4);\n  border-radius: 0.5rem;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n}\n.invite-stats-row[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 2rem;\n}\n.invite-stat[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n}\n.invite-stat[_ngcontent-%COMP%]   .value[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.invite-stat[_ngcontent-%COMP%]   .label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.benefits-table-container[_ngcontent-%COMP%] {\n  overflow-x: auto;\n}\n.benefits-table[_ngcontent-%COMP%] {\n  width: 100%;\n  border-collapse: collapse;\n  font-size: 0.875rem;\n}\n.benefits-table[_ngcontent-%COMP%]   th[_ngcontent-%COMP%], \n.benefits-table[_ngcontent-%COMP%]   td[_ngcontent-%COMP%] {\n  padding: 0.75rem 1rem;\n  text-align: center;\n  border-bottom: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.benefits-table[_ngcontent-%COMP%]   th[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  color: var(--text-primary, white);\n  font-weight: 600;\n}\n.benefits-table[_ngcontent-%COMP%]   .feature-col[_ngcontent-%COMP%] {\n  text-align: left;\n  min-width: 150px;\n}\n.benefits-table[_ngcontent-%COMP%]   .feature-name[_ngcontent-%COMP%] {\n  text-align: left;\n  color: var(--text-secondary, #cbd5e1);\n}\n.benefits-table[_ngcontent-%COMP%]   td[_ngcontent-%COMP%] {\n  color: var(--text-primary, white);\n}\n.benefits-table[_ngcontent-%COMP%]   .price[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.pricing-cards[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));\n  gap: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.pricing-card[_ngcontent-%COMP%] {\n  position: relative;\n  padding: 2rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 2px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  text-align: center;\n}\n.pricing-card.vip[_ngcontent-%COMP%] {\n  border-color: rgba(245, 158, 11, 0.3);\n}\n.pricing-card.svip[_ngcontent-%COMP%] {\n  border-color: rgba(139, 92, 246, 0.3);\n}\n.pricing-card.mvp[_ngcontent-%COMP%] {\n  border-color: rgba(236, 72, 153, 0.3);\n}\n.pricing-card.popular[_ngcontent-%COMP%] {\n  transform: scale(1.02);\n  box-shadow: 0 20px 40px -20px rgba(139, 92, 246, 0.3);\n}\n.pricing-card.current[_ngcontent-%COMP%] {\n  border-width: 3px;\n}\n.popular-badge[_ngcontent-%COMP%] {\n  position: absolute;\n  top: -12px;\n  left: 50%;\n  transform: translateX(-50%);\n  padding: 0.25rem 1rem;\n  background:\n    linear-gradient(\n      135deg,\n      #8b5cf6,\n      #7c3aed);\n  border-radius: 1rem;\n  color: white;\n  font-size: 0.75rem;\n  font-weight: 600;\n}\n.current-badge[_ngcontent-%COMP%] {\n  position: absolute;\n  top: 1rem;\n  right: 1rem;\n  padding: 0.25rem 0.5rem;\n  background: var(--success, #22c55e);\n  border-radius: 0.25rem;\n  color: white;\n  font-size: 0.625rem;\n  font-weight: 600;\n}\n.plan-icon[_ngcontent-%COMP%] {\n  font-size: 3rem;\n  margin-bottom: 1rem;\n}\n.plan-name[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 0.5rem 0;\n}\n.plan-price[_ngcontent-%COMP%] {\n  margin-bottom: 0.5rem;\n}\n.plan-price[_ngcontent-%COMP%]   .amount[_ngcontent-%COMP%] {\n  font-size: 2rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.plan-price[_ngcontent-%COMP%]   .period[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.savings[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--success, #22c55e);\n  margin-bottom: 1rem;\n}\n.plan-features[_ngcontent-%COMP%] {\n  list-style: none;\n  padding: 0;\n  margin: 1rem 0;\n  text-align: left;\n}\n.plan-features[_ngcontent-%COMP%]   li[_ngcontent-%COMP%] {\n  padding: 0.5rem 0;\n  color: var(--text-secondary, #cbd5e1);\n}\n.buy-btn[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 0.75rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.buy-btn.renew[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n}\n.license-input-row[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n}\n.license-input[_ngcontent-%COMP%] {\n  flex: 1;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-family: monospace;\n}\n.activate-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.activate-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.payment-methods[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 1rem;\n  flex-wrap: wrap;\n}\n.payment-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.payment-btn.active[_ngcontent-%COMP%] {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.1);\n}\n.history-list[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.75rem;\n}\n.history-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n}\n.history-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.history-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.history-title[_ngcontent-%COMP%] {\n  font-weight: 500;\n  color: var(--text-primary, white);\n}\n.history-meta[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.history-status[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  border-radius: 0.25rem;\n  font-size: 0.75rem;\n}\n.history-status.active[_ngcontent-%COMP%] {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.history-status.used[_ngcontent-%COMP%] {\n  background: rgba(148, 163, 184, 0.2);\n  color: #94a3b8;\n}\n/*# sourceMappingURL=membership-center.component.css.map */"] });
+    }, dependencies: [CommonModule, NgIf, FormsModule, DefaultValueAccessor, NgControlStatus, NgModel], styles: ["\n\n.membership-container[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n  max-width: 1200px;\n  margin: 0 auto;\n}\n.page-header[_ngcontent-%COMP%] {\n  margin-bottom: 1.5rem;\n}\n.page-title[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  margin: 0;\n}\n.title-icon[_ngcontent-%COMP%] {\n  font-size: 1.75rem;\n}\n.page-desc[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  margin: 0.5rem 0 0 0;\n}\n.membership-status-card[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1.5rem;\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n  border: 1px solid;\n}\n.membership-status-card.level-free[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(71, 85, 105, 0.3),\n      rgba(51, 65, 85, 0.3));\n  border-color: rgba(71, 85, 105, 0.5);\n}\n.membership-status-card.level-vip[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(245, 158, 11, 0.2),\n      rgba(217, 119, 6, 0.2));\n  border-color: rgba(245, 158, 11, 0.5);\n}\n.membership-status-card.level-svip[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(139, 92, 246, 0.2),\n      rgba(124, 58, 237, 0.2));\n  border-color: rgba(139, 92, 246, 0.5);\n}\n.membership-status-card.level-mvp[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(236, 72, 153, 0.2),\n      rgba(219, 39, 119, 0.2));\n  border-color: rgba(236, 72, 153, 0.5);\n}\n.wallet-card[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1rem 1.5rem;\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(102, 126, 234, 0.2),\n      rgba(118, 75, 162, 0.2));\n  border: 1px solid rgba(102, 126, 234, 0.5);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.wallet-card[_ngcontent-%COMP%]:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);\n}\n.wallet-left[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.wallet-icon[_ngcontent-%COMP%] {\n  font-size: 2rem;\n}\n.wallet-label[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: var(--text-muted, #94a3b8);\n}\n.wallet-amount[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: 700;\n  color: #22c55e;\n}\n.wallet-right[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.wallet-bonus[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: #f59e0b;\n  background: rgba(245, 158, 11, 0.1);\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n}\n.wallet-recharge-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  border-radius: 0.5rem;\n  border: none;\n  background:\n    linear-gradient(\n      135deg,\n      #667eea,\n      #764ba2);\n  color: white;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.wallet-recharge-btn[_ngcontent-%COMP%]:hover {\n  transform: scale(1.05);\n}\n.status-left[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.level-badge[_ngcontent-%COMP%] {\n  width: 64px;\n  height: 64px;\n  border-radius: 50%;\n  background: rgba(255, 255, 255, 0.1);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 2rem;\n}\n.level-name[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0;\n}\n.expires-info[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  margin: 0.25rem 0 0 0;\n}\n.days-left[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.upgrade-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.75rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.upgrade-btn[_ngcontent-%COMP%]:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 10px 20px -10px rgba(6, 182, 212, 0.5);\n}\n.quick-stats[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 1rem;\n  margin-bottom: 1.5rem;\n}\n.stat-card[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.75rem;\n}\n.stat-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.stat-content[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.stat-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.75rem;\n}\n.stat-value[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.stat-bar[_ngcontent-%COMP%] {\n  height: 4px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 2px;\n  margin-top: 0.5rem;\n  overflow: hidden;\n}\n.stat-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 2px;\n}\n.stat-hint[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n}\n.tabs[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1.5rem;\n  flex-wrap: wrap;\n}\n.tab-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.tab-btn[_ngcontent-%COMP%]:hover {\n  border-color: var(--primary, #06b6d4);\n}\n.tab-btn.active[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border-color: transparent;\n  color: white;\n}\n.section-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.section-title[_ngcontent-%COMP%] {\n  font-size: 1rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 1rem 0;\n}\n.usage-details[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 1rem;\n}\n.usage-row[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.usage-name[_ngcontent-%COMP%] {\n  width: 150px;\n  color: var(--text-secondary, #cbd5e1);\n}\n.usage-bar-container[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.usage-bar[_ngcontent-%COMP%] {\n  height: 8px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 4px;\n  overflow: hidden;\n}\n.usage-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 4px;\n}\n.usage-count[_ngcontent-%COMP%] {\n  width: 100px;\n  text-align: right;\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.invite-card[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border-color: rgba(6, 182, 212, 0.3);\n}\n.invite-desc[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  margin-bottom: 1rem;\n}\n.invite-code-display[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.invite-code-display[_ngcontent-%COMP%]   .label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.invite-code-display[_ngcontent-%COMP%]   .code[_ngcontent-%COMP%] {\n  flex: 1;\n  font-family: monospace;\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.copy-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--primary-bg, rgba(6, 182, 212, 0.1));\n  border: 1px solid var(--primary, #06b6d4);\n  border-radius: 0.5rem;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n}\n.invite-stats-row[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 2rem;\n}\n.invite-stat[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n}\n.invite-stat[_ngcontent-%COMP%]   .value[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.invite-stat[_ngcontent-%COMP%]   .label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.benefits-table-container[_ngcontent-%COMP%] {\n  overflow-x: auto;\n}\n.benefits-table[_ngcontent-%COMP%] {\n  width: 100%;\n  border-collapse: collapse;\n  font-size: 0.875rem;\n}\n.benefits-table[_ngcontent-%COMP%]   th[_ngcontent-%COMP%], \n.benefits-table[_ngcontent-%COMP%]   td[_ngcontent-%COMP%] {\n  padding: 0.75rem 1rem;\n  text-align: center;\n  border-bottom: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.benefits-table[_ngcontent-%COMP%]   th[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  color: var(--text-primary, white);\n  font-weight: 600;\n}\n.benefits-table[_ngcontent-%COMP%]   .feature-col[_ngcontent-%COMP%] {\n  text-align: left;\n  min-width: 150px;\n}\n.benefits-table[_ngcontent-%COMP%]   .feature-name[_ngcontent-%COMP%] {\n  text-align: left;\n  color: var(--text-secondary, #cbd5e1);\n}\n.benefits-table[_ngcontent-%COMP%]   td[_ngcontent-%COMP%] {\n  color: var(--text-primary, white);\n}\n.benefits-table[_ngcontent-%COMP%]   .price[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.pricing-cards[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));\n  gap: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.pricing-card[_ngcontent-%COMP%] {\n  position: relative;\n  padding: 2rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 2px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  text-align: center;\n}\n.pricing-card.vip[_ngcontent-%COMP%] {\n  border-color: rgba(245, 158, 11, 0.3);\n}\n.pricing-card.svip[_ngcontent-%COMP%] {\n  border-color: rgba(139, 92, 246, 0.3);\n}\n.pricing-card.mvp[_ngcontent-%COMP%] {\n  border-color: rgba(236, 72, 153, 0.3);\n}\n.pricing-card.popular[_ngcontent-%COMP%] {\n  transform: scale(1.02);\n  box-shadow: 0 20px 40px -20px rgba(139, 92, 246, 0.3);\n}\n.pricing-card.current[_ngcontent-%COMP%] {\n  border-width: 3px;\n}\n.popular-badge[_ngcontent-%COMP%] {\n  position: absolute;\n  top: -12px;\n  left: 50%;\n  transform: translateX(-50%);\n  padding: 0.25rem 1rem;\n  background:\n    linear-gradient(\n      135deg,\n      #8b5cf6,\n      #7c3aed);\n  border-radius: 1rem;\n  color: white;\n  font-size: 0.75rem;\n  font-weight: 600;\n}\n.current-badge[_ngcontent-%COMP%] {\n  position: absolute;\n  top: 1rem;\n  right: 1rem;\n  padding: 0.25rem 0.5rem;\n  background: var(--success, #22c55e);\n  border-radius: 0.25rem;\n  color: white;\n  font-size: 0.625rem;\n  font-weight: 600;\n}\n.plan-icon[_ngcontent-%COMP%] {\n  font-size: 3rem;\n  margin-bottom: 1rem;\n}\n.plan-name[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 0.5rem 0;\n}\n.plan-price[_ngcontent-%COMP%] {\n  margin-bottom: 0.5rem;\n}\n.plan-price[_ngcontent-%COMP%]   .amount[_ngcontent-%COMP%] {\n  font-size: 2rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.plan-price[_ngcontent-%COMP%]   .period[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.savings[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--success, #22c55e);\n  margin-bottom: 1rem;\n}\n.plan-features[_ngcontent-%COMP%] {\n  list-style: none;\n  padding: 0;\n  margin: 1rem 0;\n  text-align: left;\n}\n.plan-features[_ngcontent-%COMP%]   li[_ngcontent-%COMP%] {\n  padding: 0.5rem 0;\n  color: var(--text-secondary, #cbd5e1);\n}\n.buy-btn[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 0.75rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.buy-btn.renew[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n}\n.license-input-row[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n}\n.license-input[_ngcontent-%COMP%] {\n  flex: 1;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-family: monospace;\n}\n.activate-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.activate-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.payment-methods[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 1rem;\n  flex-wrap: wrap;\n}\n.payment-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.payment-btn.active[_ngcontent-%COMP%] {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.1);\n}\n.history-list[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.75rem;\n}\n.history-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n}\n.history-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.history-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.history-title[_ngcontent-%COMP%] {\n  font-weight: 500;\n  color: var(--text-primary, white);\n}\n.history-meta[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.history-status[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  border-radius: 0.25rem;\n  font-size: 0.75rem;\n}\n.history-status.active[_ngcontent-%COMP%] {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.history-status.used[_ngcontent-%COMP%] {\n  background: rgba(148, 163, 184, 0.2);\n  color: #94a3b8;\n}\n/*# sourceMappingURL=membership-center.component.css.map */"] });
   }
 };
 (() => {
@@ -41007,6 +41206,25 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
               \u{1F680} \u7ACB\u5373\u5347\u7D1A
             </button>
           }
+        </div>
+      </div>
+      
+      <!-- \u9322\u5305\u9918\u984D\u5361\u7247 -->
+      <div class="wallet-card" (click)="goToWallet()">
+        <div class="wallet-left">
+          <div class="wallet-icon">\u{1F4B0}</div>
+          <div class="wallet-info">
+            <div class="wallet-label">\u8CEC\u6236\u9918\u984D</div>
+            <div class="wallet-amount">{{ walletBalanceDisplay() }}</div>
+          </div>
+        </div>
+        <div class="wallet-right">
+          <div class="wallet-bonus" *ngIf="walletBonusDisplay() !== '$0.00'">
+            \u8D08\u9001: {{ walletBonusDisplay() }}
+          </div>
+          <button class="wallet-recharge-btn" (click)="goToRecharge(); $event.stopPropagation()">
+            \u{1F4B3} \u5145\u503C
+          </button>
         </div>
       </div>
       
@@ -41508,11 +41726,11 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
         </div>
       }
     </div>
-  `, styles: ["/* angular:styles/component:css;f47b9a6ffa27798171cc02034b739d0e2d07dfa4fee0c755e6f75a98f89aed43;D:/tgkz2026/src/membership-center.component.ts */\n.membership-container {\n  padding: 1.5rem;\n  max-width: 1200px;\n  margin: 0 auto;\n}\n.page-header {\n  margin-bottom: 1.5rem;\n}\n.page-title {\n  font-size: 1.5rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  margin: 0;\n}\n.title-icon {\n  font-size: 1.75rem;\n}\n.page-desc {\n  color: var(--text-muted, #94a3b8);\n  margin: 0.5rem 0 0 0;\n}\n.membership-status-card {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1.5rem;\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n  border: 1px solid;\n}\n.membership-status-card.level-free {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(71, 85, 105, 0.3),\n      rgba(51, 65, 85, 0.3));\n  border-color: rgba(71, 85, 105, 0.5);\n}\n.membership-status-card.level-vip {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(245, 158, 11, 0.2),\n      rgba(217, 119, 6, 0.2));\n  border-color: rgba(245, 158, 11, 0.5);\n}\n.membership-status-card.level-svip {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(139, 92, 246, 0.2),\n      rgba(124, 58, 237, 0.2));\n  border-color: rgba(139, 92, 246, 0.5);\n}\n.membership-status-card.level-mvp {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(236, 72, 153, 0.2),\n      rgba(219, 39, 119, 0.2));\n  border-color: rgba(236, 72, 153, 0.5);\n}\n.status-left {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.level-badge {\n  width: 64px;\n  height: 64px;\n  border-radius: 50%;\n  background: rgba(255, 255, 255, 0.1);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 2rem;\n}\n.level-name {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0;\n}\n.expires-info {\n  color: var(--text-secondary, #cbd5e1);\n  margin: 0.25rem 0 0 0;\n}\n.days-left {\n  color: var(--text-muted, #94a3b8);\n}\n.upgrade-btn {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.75rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.upgrade-btn:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 10px 20px -10px rgba(6, 182, 212, 0.5);\n}\n.quick-stats {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 1rem;\n  margin-bottom: 1.5rem;\n}\n.stat-card {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.75rem;\n}\n.stat-icon {\n  font-size: 1.5rem;\n}\n.stat-content {\n  flex: 1;\n}\n.stat-label {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.75rem;\n}\n.stat-value {\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.stat-bar {\n  height: 4px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 2px;\n  margin-top: 0.5rem;\n  overflow: hidden;\n}\n.stat-fill {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 2px;\n}\n.stat-hint {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n}\n.tabs {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1.5rem;\n  flex-wrap: wrap;\n}\n.tab-btn {\n  padding: 0.5rem 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.tab-btn:hover {\n  border-color: var(--primary, #06b6d4);\n}\n.tab-btn.active {\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border-color: transparent;\n  color: white;\n}\n.section-card {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.section-title {\n  font-size: 1rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 1rem 0;\n}\n.usage-details {\n  display: flex;\n  flex-direction: column;\n  gap: 1rem;\n}\n.usage-row {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.usage-name {\n  width: 150px;\n  color: var(--text-secondary, #cbd5e1);\n}\n.usage-bar-container {\n  flex: 1;\n}\n.usage-bar {\n  height: 8px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 4px;\n  overflow: hidden;\n}\n.usage-fill {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 4px;\n}\n.usage-count {\n  width: 100px;\n  text-align: right;\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.invite-card {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border-color: rgba(6, 182, 212, 0.3);\n}\n.invite-desc {\n  color: var(--text-secondary, #cbd5e1);\n  margin-bottom: 1rem;\n}\n.invite-code-display {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.invite-code-display .label {\n  color: var(--text-muted, #94a3b8);\n}\n.invite-code-display .code {\n  flex: 1;\n  font-family: monospace;\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.copy-btn {\n  padding: 0.5rem 1rem;\n  background: var(--primary-bg, rgba(6, 182, 212, 0.1));\n  border: 1px solid var(--primary, #06b6d4);\n  border-radius: 0.5rem;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n}\n.invite-stats-row {\n  display: flex;\n  gap: 2rem;\n}\n.invite-stat {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n}\n.invite-stat .value {\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.invite-stat .label {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.benefits-table-container {\n  overflow-x: auto;\n}\n.benefits-table {\n  width: 100%;\n  border-collapse: collapse;\n  font-size: 0.875rem;\n}\n.benefits-table th,\n.benefits-table td {\n  padding: 0.75rem 1rem;\n  text-align: center;\n  border-bottom: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.benefits-table th {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  color: var(--text-primary, white);\n  font-weight: 600;\n}\n.benefits-table .feature-col {\n  text-align: left;\n  min-width: 150px;\n}\n.benefits-table .feature-name {\n  text-align: left;\n  color: var(--text-secondary, #cbd5e1);\n}\n.benefits-table td {\n  color: var(--text-primary, white);\n}\n.benefits-table .price {\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.pricing-cards {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));\n  gap: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.pricing-card {\n  position: relative;\n  padding: 2rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 2px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  text-align: center;\n}\n.pricing-card.vip {\n  border-color: rgba(245, 158, 11, 0.3);\n}\n.pricing-card.svip {\n  border-color: rgba(139, 92, 246, 0.3);\n}\n.pricing-card.mvp {\n  border-color: rgba(236, 72, 153, 0.3);\n}\n.pricing-card.popular {\n  transform: scale(1.02);\n  box-shadow: 0 20px 40px -20px rgba(139, 92, 246, 0.3);\n}\n.pricing-card.current {\n  border-width: 3px;\n}\n.popular-badge {\n  position: absolute;\n  top: -12px;\n  left: 50%;\n  transform: translateX(-50%);\n  padding: 0.25rem 1rem;\n  background:\n    linear-gradient(\n      135deg,\n      #8b5cf6,\n      #7c3aed);\n  border-radius: 1rem;\n  color: white;\n  font-size: 0.75rem;\n  font-weight: 600;\n}\n.current-badge {\n  position: absolute;\n  top: 1rem;\n  right: 1rem;\n  padding: 0.25rem 0.5rem;\n  background: var(--success, #22c55e);\n  border-radius: 0.25rem;\n  color: white;\n  font-size: 0.625rem;\n  font-weight: 600;\n}\n.plan-icon {\n  font-size: 3rem;\n  margin-bottom: 1rem;\n}\n.plan-name {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 0.5rem 0;\n}\n.plan-price {\n  margin-bottom: 0.5rem;\n}\n.plan-price .amount {\n  font-size: 2rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.plan-price .period {\n  color: var(--text-muted, #94a3b8);\n}\n.savings {\n  font-size: 0.75rem;\n  color: var(--success, #22c55e);\n  margin-bottom: 1rem;\n}\n.plan-features {\n  list-style: none;\n  padding: 0;\n  margin: 1rem 0;\n  text-align: left;\n}\n.plan-features li {\n  padding: 0.5rem 0;\n  color: var(--text-secondary, #cbd5e1);\n}\n.buy-btn {\n  width: 100%;\n  padding: 0.75rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.buy-btn.renew {\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n}\n.license-input-row {\n  display: flex;\n  gap: 0.5rem;\n}\n.license-input {\n  flex: 1;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-family: monospace;\n}\n.activate-btn {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.activate-btn:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.payment-methods {\n  display: flex;\n  gap: 1rem;\n  flex-wrap: wrap;\n}\n.payment-btn {\n  padding: 0.75rem 1.5rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.payment-btn.active {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.1);\n}\n.history-list {\n  display: flex;\n  flex-direction: column;\n  gap: 0.75rem;\n}\n.history-item {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n}\n.history-icon {\n  font-size: 1.5rem;\n}\n.history-info {\n  flex: 1;\n}\n.history-title {\n  font-weight: 500;\n  color: var(--text-primary, white);\n}\n.history-meta {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.history-status {\n  padding: 0.25rem 0.5rem;\n  border-radius: 0.25rem;\n  font-size: 0.75rem;\n}\n.history-status.active {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.history-status.used {\n  background: rgba(148, 163, 184, 0.2);\n  color: #94a3b8;\n}\n/*# sourceMappingURL=membership-center.component.css.map */\n"] }]
+  `, styles: ["/* angular:styles/component:css;4ef958dfba314b75bfa7c84b13dab07bddb20bddf009b45725f0a040cc9a4882;D:/tgkz2026/src/membership-center.component.ts */\n.membership-container {\n  padding: 1.5rem;\n  max-width: 1200px;\n  margin: 0 auto;\n}\n.page-header {\n  margin-bottom: 1.5rem;\n}\n.page-title {\n  font-size: 1.5rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  margin: 0;\n}\n.title-icon {\n  font-size: 1.75rem;\n}\n.page-desc {\n  color: var(--text-muted, #94a3b8);\n  margin: 0.5rem 0 0 0;\n}\n.membership-status-card {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1.5rem;\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n  border: 1px solid;\n}\n.membership-status-card.level-free {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(71, 85, 105, 0.3),\n      rgba(51, 65, 85, 0.3));\n  border-color: rgba(71, 85, 105, 0.5);\n}\n.membership-status-card.level-vip {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(245, 158, 11, 0.2),\n      rgba(217, 119, 6, 0.2));\n  border-color: rgba(245, 158, 11, 0.5);\n}\n.membership-status-card.level-svip {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(139, 92, 246, 0.2),\n      rgba(124, 58, 237, 0.2));\n  border-color: rgba(139, 92, 246, 0.5);\n}\n.membership-status-card.level-mvp {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(236, 72, 153, 0.2),\n      rgba(219, 39, 119, 0.2));\n  border-color: rgba(236, 72, 153, 0.5);\n}\n.wallet-card {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1rem 1.5rem;\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(102, 126, 234, 0.2),\n      rgba(118, 75, 162, 0.2));\n  border: 1px solid rgba(102, 126, 234, 0.5);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.wallet-card:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);\n}\n.wallet-left {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.wallet-icon {\n  font-size: 2rem;\n}\n.wallet-label {\n  font-size: 0.875rem;\n  color: var(--text-muted, #94a3b8);\n}\n.wallet-amount {\n  font-size: 1.5rem;\n  font-weight: 700;\n  color: #22c55e;\n}\n.wallet-right {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.wallet-bonus {\n  font-size: 0.875rem;\n  color: #f59e0b;\n  background: rgba(245, 158, 11, 0.1);\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n}\n.wallet-recharge-btn {\n  padding: 0.5rem 1rem;\n  border-radius: 0.5rem;\n  border: none;\n  background:\n    linear-gradient(\n      135deg,\n      #667eea,\n      #764ba2);\n  color: white;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.wallet-recharge-btn:hover {\n  transform: scale(1.05);\n}\n.status-left {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.level-badge {\n  width: 64px;\n  height: 64px;\n  border-radius: 50%;\n  background: rgba(255, 255, 255, 0.1);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 2rem;\n}\n.level-name {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0;\n}\n.expires-info {\n  color: var(--text-secondary, #cbd5e1);\n  margin: 0.25rem 0 0 0;\n}\n.days-left {\n  color: var(--text-muted, #94a3b8);\n}\n.upgrade-btn {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.75rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.upgrade-btn:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 10px 20px -10px rgba(6, 182, 212, 0.5);\n}\n.quick-stats {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 1rem;\n  margin-bottom: 1.5rem;\n}\n.stat-card {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.75rem;\n}\n.stat-icon {\n  font-size: 1.5rem;\n}\n.stat-content {\n  flex: 1;\n}\n.stat-label {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.75rem;\n}\n.stat-value {\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.stat-bar {\n  height: 4px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 2px;\n  margin-top: 0.5rem;\n  overflow: hidden;\n}\n.stat-fill {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 2px;\n}\n.stat-hint {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n}\n.tabs {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1.5rem;\n  flex-wrap: wrap;\n}\n.tab-btn {\n  padding: 0.5rem 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.tab-btn:hover {\n  border-color: var(--primary, #06b6d4);\n}\n.tab-btn.active {\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border-color: transparent;\n  color: white;\n}\n.section-card {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.section-title {\n  font-size: 1rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 1rem 0;\n}\n.usage-details {\n  display: flex;\n  flex-direction: column;\n  gap: 1rem;\n}\n.usage-row {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.usage-name {\n  width: 150px;\n  color: var(--text-secondary, #cbd5e1);\n}\n.usage-bar-container {\n  flex: 1;\n}\n.usage-bar {\n  height: 8px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 4px;\n  overflow: hidden;\n}\n.usage-fill {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 4px;\n}\n.usage-count {\n  width: 100px;\n  text-align: right;\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.invite-card {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border-color: rgba(6, 182, 212, 0.3);\n}\n.invite-desc {\n  color: var(--text-secondary, #cbd5e1);\n  margin-bottom: 1rem;\n}\n.invite-code-display {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.invite-code-display .label {\n  color: var(--text-muted, #94a3b8);\n}\n.invite-code-display .code {\n  flex: 1;\n  font-family: monospace;\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.copy-btn {\n  padding: 0.5rem 1rem;\n  background: var(--primary-bg, rgba(6, 182, 212, 0.1));\n  border: 1px solid var(--primary, #06b6d4);\n  border-radius: 0.5rem;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n}\n.invite-stats-row {\n  display: flex;\n  gap: 2rem;\n}\n.invite-stat {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n}\n.invite-stat .value {\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.invite-stat .label {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.benefits-table-container {\n  overflow-x: auto;\n}\n.benefits-table {\n  width: 100%;\n  border-collapse: collapse;\n  font-size: 0.875rem;\n}\n.benefits-table th,\n.benefits-table td {\n  padding: 0.75rem 1rem;\n  text-align: center;\n  border-bottom: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.benefits-table th {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  color: var(--text-primary, white);\n  font-weight: 600;\n}\n.benefits-table .feature-col {\n  text-align: left;\n  min-width: 150px;\n}\n.benefits-table .feature-name {\n  text-align: left;\n  color: var(--text-secondary, #cbd5e1);\n}\n.benefits-table td {\n  color: var(--text-primary, white);\n}\n.benefits-table .price {\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.pricing-cards {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));\n  gap: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.pricing-card {\n  position: relative;\n  padding: 2rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 2px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  text-align: center;\n}\n.pricing-card.vip {\n  border-color: rgba(245, 158, 11, 0.3);\n}\n.pricing-card.svip {\n  border-color: rgba(139, 92, 246, 0.3);\n}\n.pricing-card.mvp {\n  border-color: rgba(236, 72, 153, 0.3);\n}\n.pricing-card.popular {\n  transform: scale(1.02);\n  box-shadow: 0 20px 40px -20px rgba(139, 92, 246, 0.3);\n}\n.pricing-card.current {\n  border-width: 3px;\n}\n.popular-badge {\n  position: absolute;\n  top: -12px;\n  left: 50%;\n  transform: translateX(-50%);\n  padding: 0.25rem 1rem;\n  background:\n    linear-gradient(\n      135deg,\n      #8b5cf6,\n      #7c3aed);\n  border-radius: 1rem;\n  color: white;\n  font-size: 0.75rem;\n  font-weight: 600;\n}\n.current-badge {\n  position: absolute;\n  top: 1rem;\n  right: 1rem;\n  padding: 0.25rem 0.5rem;\n  background: var(--success, #22c55e);\n  border-radius: 0.25rem;\n  color: white;\n  font-size: 0.625rem;\n  font-weight: 600;\n}\n.plan-icon {\n  font-size: 3rem;\n  margin-bottom: 1rem;\n}\n.plan-name {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 0.5rem 0;\n}\n.plan-price {\n  margin-bottom: 0.5rem;\n}\n.plan-price .amount {\n  font-size: 2rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.plan-price .period {\n  color: var(--text-muted, #94a3b8);\n}\n.savings {\n  font-size: 0.75rem;\n  color: var(--success, #22c55e);\n  margin-bottom: 1rem;\n}\n.plan-features {\n  list-style: none;\n  padding: 0;\n  margin: 1rem 0;\n  text-align: left;\n}\n.plan-features li {\n  padding: 0.5rem 0;\n  color: var(--text-secondary, #cbd5e1);\n}\n.buy-btn {\n  width: 100%;\n  padding: 0.75rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.buy-btn.renew {\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n}\n.license-input-row {\n  display: flex;\n  gap: 0.5rem;\n}\n.license-input {\n  flex: 1;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-family: monospace;\n}\n.activate-btn {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.activate-btn:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.payment-methods {\n  display: flex;\n  gap: 1rem;\n  flex-wrap: wrap;\n}\n.payment-btn {\n  padding: 0.75rem 1.5rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.payment-btn.active {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.1);\n}\n.history-list {\n  display: flex;\n  flex-direction: column;\n  gap: 0.75rem;\n}\n.history-item {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n}\n.history-icon {\n  font-size: 1.5rem;\n}\n.history-info {\n  flex: 1;\n}\n.history-title {\n  font-weight: 500;\n  color: var(--text-primary, white);\n}\n.history-meta {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.history-status {\n  padding: 0.25rem 0.5rem;\n  border-radius: 0.25rem;\n  font-size: 0.75rem;\n}\n.history-status.active {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.history-status.used {\n  background: rgba(148, 163, 184, 0.2);\n  color: #94a3b8;\n}\n/*# sourceMappingURL=membership-center.component.css.map */\n"] }]
   }], null, null);
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(MembershipCenterComponent, { className: "MembershipCenterComponent", filePath: "src/membership-center.component.ts", lineNumber: 1127 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(MembershipCenterComponent, { className: "MembershipCenterComponent", filePath: "src/membership-center.component.ts", lineNumber: 1216 });
 })();
 
 // src/profile.component.ts
@@ -56191,9 +56409,9 @@ function AppComponent_Conditional_14_Template(rf, ctx) {
 }
 function AppComponent_Conditional_15_Conditional_4_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "p", 126);
+    \u0275\u0275elementStart(0, "p", 128);
     \u0275\u0275text(1, " \u78BA\u5B9A\u8981\u522A\u9664\u5BA2\u6236 ");
-    \u0275\u0275elementStart(2, "span", 132);
+    \u0275\u0275elementStart(2, "span", 134);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd();
     \u0275\u0275text(4, " \u55CE\uFF1F ");
@@ -56208,9 +56426,9 @@ function AppComponent_Conditional_15_Conditional_4_Conditional_11_Template(rf, c
 }
 function AppComponent_Conditional_15_Conditional_4_Conditional_12_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "p", 126);
+    \u0275\u0275elementStart(0, "p", 128);
     \u0275\u0275text(1, " \u78BA\u5B9A\u8981\u522A\u9664 ");
-    \u0275\u0275elementStart(2, "span", 133);
+    \u0275\u0275elementStart(2, "span", 135);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd();
     \u0275\u0275text(4, " \u500B\u9078\u4E2D\u7684\u5BA2\u6236\u55CE\uFF1F ");
@@ -56225,32 +56443,32 @@ function AppComponent_Conditional_15_Conditional_4_Conditional_12_Template(rf, c
 function AppComponent_Conditional_15_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     const _r6 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 116);
+    \u0275\u0275elementStart(0, "div", 118);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_4_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r6);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.cancelDeleteLeads());
     });
-    \u0275\u0275elementStart(1, "div", 117);
+    \u0275\u0275elementStart(1, "div", 119);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_4_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r6);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 118)(3, "div", 119);
+    \u0275\u0275elementStart(2, "div", 120)(3, "div", 121);
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(4, "svg", 120);
-    \u0275\u0275element(5, "path", 121)(6, "line", 122)(7, "line", 123);
+    \u0275\u0275elementStart(4, "svg", 122);
+    \u0275\u0275element(5, "path", 123)(6, "line", 124)(7, "line", 125);
     \u0275\u0275elementEnd()();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(8, "h3", 124);
+    \u0275\u0275elementStart(8, "h3", 126);
     \u0275\u0275text(9, "\u78BA\u8A8D\u522A\u9664");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(10, "div", 125);
-    \u0275\u0275conditionalCreate(11, AppComponent_Conditional_15_Conditional_4_Conditional_11_Template, 5, 1, "p", 126)(12, AppComponent_Conditional_15_Conditional_4_Conditional_12_Template, 5, 1, "p", 126);
-    \u0275\u0275elementStart(13, "div", 127);
+    \u0275\u0275elementStart(10, "div", 127);
+    \u0275\u0275conditionalCreate(11, AppComponent_Conditional_15_Conditional_4_Conditional_11_Template, 5, 1, "p", 128)(12, AppComponent_Conditional_15_Conditional_4_Conditional_12_Template, 5, 1, "p", 128);
+    \u0275\u0275elementStart(13, "div", 129);
     \u0275\u0275text(14, " \u26A0\uFE0F \u6B64\u64CD\u4F5C\u7121\u6CD5\u64A4\u92B7\uFF0C\u6240\u6709\u76F8\u95DC\u8A18\u9304\u5C07\u88AB\u6C38\u4E45\u522A\u9664\u3002 ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(15, "div", 128)(16, "button", 129);
+    \u0275\u0275elementStart(15, "div", 130)(16, "button", 131);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_4_Template_button_click_16_listener() {
       \u0275\u0275restoreView(_r6);
       const ctx_r0 = \u0275\u0275nextContext(2);
@@ -56258,15 +56476,15 @@ function AppComponent_Conditional_15_Conditional_4_Template(rf, ctx) {
     });
     \u0275\u0275text(17, " \u53D6\u6D88 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(18, "button", 130);
+    \u0275\u0275elementStart(18, "button", 132);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_4_Template_button_click_18_listener() {
       \u0275\u0275restoreView(_r6);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.executeDeleteLeads());
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(19, "svg", 131);
-    \u0275\u0275element(20, "path", 121);
+    \u0275\u0275elementStart(19, "svg", 133);
+    \u0275\u0275element(20, "path", 123);
     \u0275\u0275elementEnd();
     \u0275\u0275text(21, " \u78BA\u8A8D\u522A\u9664 ");
     \u0275\u0275elementEnd()()()();
@@ -56280,10 +56498,10 @@ function AppComponent_Conditional_15_Conditional_4_Template(rf, ctx) {
 function AppComponent_Conditional_15_Conditional_5_Conditional_12_Template(rf, ctx) {
   if (rf & 1) {
     const _r8 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 137)(1, "p", 141);
+    \u0275\u0275elementStart(0, "div", 139)(1, "p", 143);
     \u0275\u0275text(2, "\u66AB\u7121\u5354\u4F5C\u7FA4\u7D44");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "button", 142);
+    \u0275\u0275elementStart(3, "button", 144);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_5_Conditional_12_Template_button_click_3_listener() {
       \u0275\u0275restoreView(_r8);
       const ctx_r0 = \u0275\u0275nextContext(3);
@@ -56297,19 +56515,19 @@ function AppComponent_Conditional_15_Conditional_5_Conditional_12_Template(rf, c
 function AppComponent_Conditional_15_Conditional_5_Conditional_13_For_2_Template(rf, ctx) {
   if (rf & 1) {
     const _r9 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 144);
+    \u0275\u0275elementStart(0, "button", 146);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_5_Conditional_13_For_2_Template_button_click_0_listener() {
       const group_r10 = \u0275\u0275restoreView(_r9).$implicit;
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.executeInviteToGroup(group_r10.id));
     });
-    \u0275\u0275elementStart(1, "div", 145)(2, "div")(3, "p", 146);
+    \u0275\u0275elementStart(1, "div", 147)(2, "div")(3, "p", 148);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "p", 147);
+    \u0275\u0275elementStart(5, "p", 149);
     \u0275\u0275text(6);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "span", 148);
+    \u0275\u0275elementStart(7, "span", 150);
     \u0275\u0275text(8, "\u2192");
     \u0275\u0275elementEnd()()();
   }
@@ -56323,8 +56541,8 @@ function AppComponent_Conditional_15_Conditional_5_Conditional_13_For_2_Template
 }
 function AppComponent_Conditional_15_Conditional_5_Conditional_13_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 138);
-    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_5_Conditional_13_For_2_Template, 9, 2, "button", 143, _forTrack024);
+    \u0275\u0275elementStart(0, "div", 140);
+    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_5_Conditional_13_For_2_Template, 9, 2, "button", 145, _forTrack024);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -56336,30 +56554,30 @@ function AppComponent_Conditional_15_Conditional_5_Conditional_13_Template(rf, c
 function AppComponent_Conditional_15_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
     const _r7 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 116);
+    \u0275\u0275elementStart(0, "div", 118);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_5_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showInviteGroupDialog.set(false));
     });
-    \u0275\u0275elementStart(1, "div", 117);
+    \u0275\u0275elementStart(1, "div", 119);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_5_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r7);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 118)(3, "div", 134)(4, "span", 135);
+    \u0275\u0275elementStart(2, "div", 120)(3, "div", 136)(4, "span", 137);
     \u0275\u0275text(5, "\u{1F465}");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(6, "div")(7, "h3", 124);
+    \u0275\u0275elementStart(6, "div")(7, "h3", 126);
     \u0275\u0275text(8, "\u9080\u8ACB\u9032\u7FA4");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(9, "p", 32);
     \u0275\u0275text(10, "\u9078\u64C7\u5354\u4F5C\u7FA4\u7D44");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(11, "div", 136);
-    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_5_Conditional_12_Template, 5, 0, "div", 137)(13, AppComponent_Conditional_15_Conditional_5_Conditional_13_Template, 3, 0, "div", 138);
+    \u0275\u0275elementStart(11, "div", 138);
+    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_5_Conditional_12_Template, 5, 0, "div", 139)(13, AppComponent_Conditional_15_Conditional_5_Conditional_13_Template, 3, 0, "div", 140);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "div", 139)(15, "button", 140);
+    \u0275\u0275elementStart(14, "div", 141)(15, "button", 142);
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_5_Template_button_click_15_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r0 = \u0275\u0275nextContext(2);
@@ -56376,10 +56594,10 @@ function AppComponent_Conditional_15_Conditional_5_Template(rf, ctx) {
 }
 function AppComponent_Conditional_15_Conditional_27_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div")(1, "h1", 149);
+    \u0275\u0275elementStart(0, "div")(1, "h1", 151);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "p", 150);
+    \u0275\u0275elementStart(3, "p", 152);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
   }
@@ -56393,43 +56611,43 @@ function AppComponent_Conditional_15_Conditional_27_Template(rf, ctx) {
 }
 function AppComponent_Conditional_15_Conditional_35_Case_1_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 152);
+    \u0275\u0275elementStart(0, "span", 154);
     \u0275\u0275text(1, "\u{1F948}");
     \u0275\u0275elementEnd();
   }
 }
 function AppComponent_Conditional_15_Conditional_35_Case_2_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 152);
+    \u0275\u0275elementStart(0, "span", 154);
     \u0275\u0275text(1, "\u{1F947}");
     \u0275\u0275elementEnd();
   }
 }
 function AppComponent_Conditional_15_Conditional_35_Case_3_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 152);
+    \u0275\u0275elementStart(0, "span", 154);
     \u0275\u0275text(1, "\u{1F48E}");
     \u0275\u0275elementEnd();
   }
 }
 function AppComponent_Conditional_15_Conditional_35_Case_4_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 152);
+    \u0275\u0275elementStart(0, "span", 154);
     \u0275\u0275text(1, "\u{1F31F}");
     \u0275\u0275elementEnd();
   }
 }
 function AppComponent_Conditional_15_Conditional_35_Case_5_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 153);
+    \u0275\u0275elementStart(0, "span", 155);
     \u0275\u0275text(1, "\u{1F451}");
     \u0275\u0275elementEnd();
   }
 }
 function AppComponent_Conditional_15_Conditional_35_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 151);
-    \u0275\u0275conditionalCreate(1, AppComponent_Conditional_15_Conditional_35_Case_1_Template, 2, 0, "span", 152)(2, AppComponent_Conditional_15_Conditional_35_Case_2_Template, 2, 0, "span", 152)(3, AppComponent_Conditional_15_Conditional_35_Case_3_Template, 2, 0, "span", 152)(4, AppComponent_Conditional_15_Conditional_35_Case_4_Template, 2, 0, "span", 152)(5, AppComponent_Conditional_15_Conditional_35_Case_5_Template, 2, 0, "span", 153);
+    \u0275\u0275elementStart(0, "div", 153);
+    \u0275\u0275conditionalCreate(1, AppComponent_Conditional_15_Conditional_35_Case_1_Template, 2, 0, "span", 154)(2, AppComponent_Conditional_15_Conditional_35_Case_2_Template, 2, 0, "span", 154)(3, AppComponent_Conditional_15_Conditional_35_Case_3_Template, 2, 0, "span", 154)(4, AppComponent_Conditional_15_Conditional_35_Case_4_Template, 2, 0, "span", 154)(5, AppComponent_Conditional_15_Conditional_35_Case_5_Template, 2, 0, "span", 155);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -56442,121 +56660,121 @@ function AppComponent_Conditional_15_Conditional_35_Template(rf, ctx) {
 }
 function AppComponent_Conditional_15_Case_40_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 73)(1, "span", 154);
+    \u0275\u0275elementStart(0, "span", 73)(1, "span", 156);
     \u0275\u0275text(2, "\u{1F948}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 155);
+    \u0275\u0275elementStart(3, "span", 157);
     \u0275\u0275text(4, "\u767D\u9280\u7CBE\u82F1");
     \u0275\u0275elementEnd()();
   }
 }
 function AppComponent_Conditional_15_Case_41_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 74)(1, "span", 154);
+    \u0275\u0275elementStart(0, "span", 74)(1, "span", 156);
     \u0275\u0275text(2, "\u{1F947}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 155);
+    \u0275\u0275elementStart(3, "span", 157);
     \u0275\u0275text(4, "\u9EC3\u91D1\u5927\u5E2B");
     \u0275\u0275elementEnd()();
   }
 }
 function AppComponent_Conditional_15_Case_42_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 75)(1, "span", 154);
+    \u0275\u0275elementStart(0, "span", 75)(1, "span", 156);
     \u0275\u0275text(2, "\u{1F48E}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 155);
+    \u0275\u0275elementStart(3, "span", 157);
     \u0275\u0275text(4, "\u947D\u77F3\u738B\u724C");
     \u0275\u0275elementEnd()();
   }
 }
 function AppComponent_Conditional_15_Case_43_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 76)(1, "span", 154);
+    \u0275\u0275elementStart(0, "span", 76)(1, "span", 156);
     \u0275\u0275text(2, "\u{1F31F}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 155);
+    \u0275\u0275elementStart(3, "span", 157);
     \u0275\u0275text(4, "\u661F\u8000\u50B3\u8AAA");
     \u0275\u0275elementEnd()();
   }
 }
 function AppComponent_Conditional_15_Case_44_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 77)(1, "span", 154);
+    \u0275\u0275elementStart(0, "span", 77)(1, "span", 156);
     \u0275\u0275text(2, "\u{1F451}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 155);
+    \u0275\u0275elementStart(3, "span", 157);
     \u0275\u0275text(4, "\u69AE\u8000\u738B\u8005");
     \u0275\u0275elementEnd()();
   }
 }
 function AppComponent_Conditional_15_Case_45_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 78)(1, "span", 154);
+    \u0275\u0275elementStart(0, "span", 78)(1, "span", 156);
     \u0275\u0275text(2, "\u2694\uFE0F");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 155);
+    \u0275\u0275elementStart(3, "span", 157);
     \u0275\u0275text(4, "\u9752\u9285\u6230\u58EB");
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_70_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_76_Template(rf, ctx) {
   if (rf & 1) {
     const _r11 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 95)(1, "a", 156);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_70_Template_a_click_1_listener() {
+    \u0275\u0275elementStart(0, "div", 97)(1, "a", 158);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_76_Template_a_click_1_listener() {
       \u0275\u0275restoreView(_r11);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("accounts"));
     });
     \u0275\u0275namespaceSVG();
     \u0275\u0275elementStart(2, "svg", 84);
-    \u0275\u0275element(3, "path", 157)(4, "circle", 158)(5, "path", 159)(6, "path", 160);
+    \u0275\u0275element(3, "path", 159)(4, "circle", 160)(5, "path", 161)(6, "path", 162);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(7, "span");
     \u0275\u0275text(8);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(9, "a", 161);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_70_Template_a_click_9_listener() {
+    \u0275\u0275elementStart(9, "a", 163);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_76_Template_a_click_9_listener() {
       \u0275\u0275restoreView(_r11);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("search-discovery"));
     });
     \u0275\u0275namespaceSVG();
     \u0275\u0275elementStart(10, "svg", 84);
-    \u0275\u0275element(11, "circle", 162)(12, "path", 163);
+    \u0275\u0275element(11, "circle", 164)(12, "path", 165);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(13, "span");
     \u0275\u0275text(14, "\u641C\u7D22\u767C\u73FE");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(15, "span", 164);
+    \u0275\u0275elementStart(15, "span", 166);
     \u0275\u0275text(16, "NEW");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(17, "a", 165);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_70_Template_a_click_17_listener() {
+    \u0275\u0275elementStart(17, "a", 167);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_76_Template_a_click_17_listener() {
       \u0275\u0275restoreView(_r11);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("resource-center"));
     });
     \u0275\u0275namespaceSVG();
     \u0275\u0275elementStart(18, "svg", 84);
-    \u0275\u0275element(19, "ellipse", 166)(20, "path", 167)(21, "path", 168);
+    \u0275\u0275element(19, "ellipse", 168)(20, "path", 169)(21, "path", 170);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(22, "span");
     \u0275\u0275text(23, "\u8CC7\u6E90\u4E2D\u5FC3");
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(24, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_70_Template_a_click_24_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_76_Template_a_click_24_listener() {
       \u0275\u0275restoreView(_r11);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("leads"));
     });
     \u0275\u0275namespaceSVG();
     \u0275\u0275elementStart(25, "svg", 84);
-    \u0275\u0275element(26, "path", 169)(27, "path", 170);
+    \u0275\u0275element(26, "path", 171)(27, "path", 172);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(28, "span");
@@ -56583,97 +56801,97 @@ function AppComponent_Conditional_15_Conditional_70_Template(rf, ctx) {
     \u0275\u0275classProp("active", view_r12 === "leads");
   }
 }
-function AppComponent_Conditional_15_Conditional_79_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_85_Template(rf, ctx) {
   if (rf & 1) {
     const _r13 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 95)(1, "a", 171);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_79_Template_a_click_1_listener() {
+    \u0275\u0275elementStart(0, "div", 97)(1, "a", 173);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_1_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("automation"));
     });
-    \u0275\u0275elementStart(2, "div", 172)(3, "span", 173);
+    \u0275\u0275elementStart(2, "div", 174)(3, "span", 175);
     \u0275\u0275text(4, "\u{1F4CA}");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(5, "div", 174)(6, "span", 175);
+    \u0275\u0275elementStart(5, "div", 176)(6, "span", 177);
     \u0275\u0275text(7, "\u81EA\u52D5\u5316\u7E3D\u89BD");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "span", 176);
+    \u0275\u0275elementStart(8, "span", 178);
     \u0275\u0275text(9, "\u914D\u7F6E\u8207\u76E3\u63A7\u72C0\u614B");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(10, "a", 177);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_79_Template_a_click_10_listener() {
+    \u0275\u0275elementStart(10, "a", 179);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_10_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("monitoring-accounts"));
     });
-    \u0275\u0275elementStart(11, "span", 178);
+    \u0275\u0275elementStart(11, "span", 180);
     \u0275\u0275text(12, "\u{1F4F1}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(13, "span");
     \u0275\u0275text(14, "\u76E3\u63A7\u5E33\u865F");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(15, "a", 177);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_79_Template_a_click_15_listener() {
+    \u0275\u0275elementStart(15, "a", 179);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_15_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("monitoring-groups"));
     });
-    \u0275\u0275elementStart(16, "span", 178);
+    \u0275\u0275elementStart(16, "span", 180);
     \u0275\u0275text(17, "\u{1F4AC}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(18, "span");
     \u0275\u0275text(19, "\u76E3\u63A7\u7FA4\u7D44");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(20, "a", 177);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_79_Template_a_click_20_listener() {
+    \u0275\u0275elementStart(20, "a", 179);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_20_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("keyword-sets"));
     });
-    \u0275\u0275elementStart(21, "span", 178);
+    \u0275\u0275elementStart(21, "span", 180);
     \u0275\u0275text(22, "\u{1F511}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(23, "span");
     \u0275\u0275text(24, "\u95DC\u9375\u8A5E\u96C6");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(25, "a", 177);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_79_Template_a_click_25_listener() {
+    \u0275\u0275elementStart(25, "a", 179);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_25_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("chat-templates"));
     });
-    \u0275\u0275elementStart(26, "span", 178);
+    \u0275\u0275elementStart(26, "span", 180);
     \u0275\u0275text(27, "\u{1F4DD}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(28, "span");
     \u0275\u0275text(29, "\u804A\u5929\u6A21\u677F");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(30, "a", 177);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_79_Template_a_click_30_listener() {
+    \u0275\u0275elementStart(30, "a", 179);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_30_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("trigger-rules"));
     });
-    \u0275\u0275elementStart(31, "span", 178);
+    \u0275\u0275elementStart(31, "span", 180);
     \u0275\u0275text(32, "\u26A1");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(33, "span");
     \u0275\u0275text(34, "\u89F8\u767C\u898F\u5247");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(35, "a", 177);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_79_Template_a_click_35_listener() {
+    \u0275\u0275elementStart(35, "a", 179);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_85_Template_a_click_35_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("collected-users"));
     });
-    \u0275\u0275elementStart(36, "span", 178);
+    \u0275\u0275elementStart(36, "span", 180);
     \u0275\u0275text(37, "\u{1F465}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(38, "span");
     \u0275\u0275text(39, "\u6536\u96C6\u7528\u6236");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(40, "span", 179);
+    \u0275\u0275elementStart(40, "span", 181);
     \u0275\u0275text(41, "NEW");
     \u0275\u0275elementEnd()()();
   }
@@ -56705,101 +56923,101 @@ function AppComponent_Conditional_15_Conditional_79_Template(rf, ctx) {
     \u0275\u0275classProp("active", view_r12 === "collected-users");
   }
 }
-function AppComponent_Conditional_15_Conditional_88_Conditional_10_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_94_Conditional_10_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 181);
+    \u0275\u0275elementStart(0, "span", 183);
     \u0275\u0275text(1, "1");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_88_Conditional_11_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_94_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 182);
+    \u0275\u0275elementStart(0, "span", 184);
     \u0275\u0275text(1, "\u{1F48E}");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_88_Conditional_21_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_94_Conditional_21_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 184);
+    \u0275\u0275elementStart(0, "span", 186);
     \u0275\u0275text(1, "2");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_88_Conditional_22_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_94_Conditional_22_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 182);
+    \u0275\u0275elementStart(0, "span", 184);
     \u0275\u0275text(1, "\u{1F48E}");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_88_Conditional_32_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_94_Conditional_32_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 185);
+    \u0275\u0275elementStart(0, "span", 187);
     \u0275\u0275text(1, "3");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_88_Conditional_33_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_94_Conditional_33_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 182);
+    \u0275\u0275elementStart(0, "span", 184);
     \u0275\u0275text(1, "\u{1F947}");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_88_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_94_Template(rf, ctx) {
   if (rf & 1) {
     const _r14 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 95)(1, "a", 180);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_88_Template_a_click_1_listener() {
+    \u0275\u0275elementStart(0, "div", 97)(1, "a", 182);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_94_Template_a_click_1_listener() {
       \u0275\u0275restoreView(_r14);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("ai-assistant"));
     });
-    \u0275\u0275elementStart(2, "div", 172)(3, "span", 173);
+    \u0275\u0275elementStart(2, "div", 174)(3, "span", 175);
     \u0275\u0275text(4, "\u{1F3AF}");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(5, "div", 174)(6, "span", 175);
+    \u0275\u0275elementStart(5, "div", 176)(6, "span", 177);
     \u0275\u0275text(7, "\u7B56\u7565\u898F\u5283");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "span", 176);
+    \u0275\u0275elementStart(8, "span", 178);
     \u0275\u0275text(9, "AI \u71DF\u92B7\u52A9\u624B");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(10, AppComponent_Conditional_15_Conditional_88_Conditional_10_Template, 2, 0, "span", 181)(11, AppComponent_Conditional_15_Conditional_88_Conditional_11_Template, 2, 0, "span", 182);
+    \u0275\u0275conditionalCreate(10, AppComponent_Conditional_15_Conditional_94_Conditional_10_Template, 2, 0, "span", 183)(11, AppComponent_Conditional_15_Conditional_94_Conditional_11_Template, 2, 0, "span", 184);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "a", 183);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_88_Template_a_click_12_listener() {
+    \u0275\u0275elementStart(12, "a", 185);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_94_Template_a_click_12_listener() {
       \u0275\u0275restoreView(_r14);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("ai-team"));
     });
-    \u0275\u0275elementStart(13, "div", 172)(14, "span", 173);
+    \u0275\u0275elementStart(13, "div", 174)(14, "span", 175);
     \u0275\u0275text(15, "\u{1F916}");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(16, "div", 174)(17, "span", 175);
+    \u0275\u0275elementStart(16, "div", 176)(17, "span", 177);
     \u0275\u0275text(18, "\u81EA\u52D5\u57F7\u884C");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(19, "span", 176);
+    \u0275\u0275elementStart(19, "span", 178);
     \u0275\u0275text(20, "AI \u5718\u968A\u92B7\u552E");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(21, AppComponent_Conditional_15_Conditional_88_Conditional_21_Template, 2, 0, "span", 184)(22, AppComponent_Conditional_15_Conditional_88_Conditional_22_Template, 2, 0, "span", 182);
+    \u0275\u0275conditionalCreate(21, AppComponent_Conditional_15_Conditional_94_Conditional_21_Template, 2, 0, "span", 186)(22, AppComponent_Conditional_15_Conditional_94_Conditional_22_Template, 2, 0, "span", 184);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(23, "a", 183);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_88_Template_a_click_23_listener() {
+    \u0275\u0275elementStart(23, "a", 185);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_94_Template_a_click_23_listener() {
       \u0275\u0275restoreView(_r14);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("analytics"));
     });
-    \u0275\u0275elementStart(24, "div", 172)(25, "span", 173);
+    \u0275\u0275elementStart(24, "div", 174)(25, "span", 175);
     \u0275\u0275text(26, "\u{1F4CA}");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(27, "div", 174)(28, "span", 175);
+    \u0275\u0275elementStart(27, "div", 176)(28, "span", 177);
     \u0275\u0275text(29, "\u6578\u64DA\u6D1E\u5BDF");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(30, "span", 176);
+    \u0275\u0275elementStart(30, "span", 178);
     \u0275\u0275text(31, "\u667A\u80FD\u5206\u6790\u5831\u544A");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(32, AppComponent_Conditional_15_Conditional_88_Conditional_32_Template, 2, 0, "span", 185)(33, AppComponent_Conditional_15_Conditional_88_Conditional_33_Template, 2, 0, "span", 182);
+    \u0275\u0275conditionalCreate(32, AppComponent_Conditional_15_Conditional_94_Conditional_32_Template, 2, 0, "span", 187)(33, AppComponent_Conditional_15_Conditional_94_Conditional_33_Template, 2, 0, "span", 184);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -56832,49 +57050,49 @@ function AppComponent_Conditional_15_Conditional_88_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.membershipService.hasFeature("dataInsightsBasic") ? 32 : 33);
   }
 }
-function AppComponent_Conditional_15_Conditional_95_Conditional_24_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_101_Conditional_24_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 193);
+    \u0275\u0275elementStart(0, "span", 195);
     \u0275\u0275text(1, "\u{1F48E}");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_95_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_101_Template(rf, ctx) {
   if (rf & 1) {
     const _r15 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 95)(1, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_95_Template_a_click_1_listener() {
+    \u0275\u0275elementStart(0, "div", 97)(1, "a", 83);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_101_Template_a_click_1_listener() {
       \u0275\u0275restoreView(_r15);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("analytics-center"));
     });
     \u0275\u0275namespaceSVG();
     \u0275\u0275elementStart(2, "svg", 84);
-    \u0275\u0275element(3, "path", 186)(4, "path", 187)(5, "path", 188);
+    \u0275\u0275element(3, "path", 188)(4, "path", 189)(5, "path", 190);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(6, "span");
     \u0275\u0275text(7, "\u5206\u6790\u4E2D\u5FC3");
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(8, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_95_Template_a_click_8_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_101_Template_a_click_8_listener() {
       \u0275\u0275restoreView(_r15);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("lead-nurturing"));
     });
     \u0275\u0275namespaceSVG();
     \u0275\u0275elementStart(9, "svg", 84);
-    \u0275\u0275element(10, "path", 189)(11, "circle", 190);
+    \u0275\u0275element(10, "path", 191)(11, "circle", 192);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(12, "span");
     \u0275\u0275text(13, "\u5BA2\u6236\u57F9\u80B2");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "span", 191);
+    \u0275\u0275elementStart(14, "span", 193);
     \u0275\u0275text(15, "AI");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(16, "a", 192);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_95_Template_a_click_16_listener() {
+    \u0275\u0275elementStart(16, "a", 194);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_101_Template_a_click_16_listener() {
       \u0275\u0275restoreView(_r15);
       const ctx_r0 = \u0275\u0275nextContext(2);
       ctx_r0.changeView("multi-role");
@@ -56882,13 +57100,13 @@ function AppComponent_Conditional_15_Conditional_95_Template(rf, ctx) {
     });
     \u0275\u0275namespaceSVG();
     \u0275\u0275elementStart(17, "svg", 84);
-    \u0275\u0275element(18, "path", 157)(19, "circle", 158)(20, "path", 159)(21, "path", 160);
+    \u0275\u0275element(18, "path", 159)(19, "circle", 160)(20, "path", 161)(21, "path", 162);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(22, "span");
     \u0275\u0275text(23, "\u591A\u89D2\u8272\u5354\u4F5C");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(24, AppComponent_Conditional_15_Conditional_95_Conditional_24_Template, 2, 0, "span", 193);
+    \u0275\u0275conditionalCreate(24, AppComponent_Conditional_15_Conditional_101_Conditional_24_Template, 2, 0, "span", 195);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -56909,9 +57127,9 @@ function AppComponent_Conditional_15_Conditional_95_Template(rf, ctx) {
     \u0275\u0275conditional(!ctx_r0.membershipService.hasFeature("multiRole") ? 24 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_102_Conditional_9_Conditional_16_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_108_Conditional_9_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 201);
+    \u0275\u0275elementStart(0, "span", 203);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -56921,11 +57139,11 @@ function AppComponent_Conditional_15_Conditional_102_Conditional_9_Conditional_1
     \u0275\u0275textInterpolate(ctx_r0.ragBrainService.gapsCount());
   }
 }
-function AppComponent_Conditional_15_Conditional_102_Conditional_9_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template(rf, ctx) {
   if (rf & 1) {
     const _r17 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 197)(1, "a", 199);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_102_Conditional_9_Template_a_click_1_listener() {
+    \u0275\u0275elementStart(0, "div", 199)(1, "a", 201);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template_a_click_1_listener() {
       \u0275\u0275restoreView(_r17);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.changeView("knowledge-brain"));
@@ -56936,8 +57154,8 @@ function AppComponent_Conditional_15_Conditional_102_Conditional_9_Template(rf, 
     \u0275\u0275elementStart(4, "span");
     \u0275\u0275text(5, "\u7E3D\u89BD");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(6, "a", 199);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_102_Conditional_9_Template_a_click_6_listener() {
+    \u0275\u0275elementStart(6, "a", 201);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template_a_click_6_listener() {
       \u0275\u0275restoreView(_r17);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.changeView("knowledge-manage"));
@@ -56948,8 +57166,8 @@ function AppComponent_Conditional_15_Conditional_102_Conditional_9_Template(rf, 
     \u0275\u0275elementStart(9, "span");
     \u0275\u0275text(10, "\u77E5\u8B58\u7BA1\u7406");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(11, "a", 200);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_102_Conditional_9_Template_a_click_11_listener() {
+    \u0275\u0275elementStart(11, "a", 202);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_108_Conditional_9_Template_a_click_11_listener() {
       \u0275\u0275restoreView(_r17);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.changeView("knowledge-gaps"));
@@ -56960,7 +57178,7 @@ function AppComponent_Conditional_15_Conditional_102_Conditional_9_Template(rf, 
     \u0275\u0275elementStart(14, "span");
     \u0275\u0275text(15, "\u77E5\u8B58\u7F3A\u53E3");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_102_Conditional_9_Conditional_16_Template, 2, 1, "span", 201);
+    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_108_Conditional_9_Conditional_16_Template, 2, 1, "span", 203);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -56980,35 +57198,35 @@ function AppComponent_Conditional_15_Conditional_102_Conditional_9_Template(rf, 
     \u0275\u0275conditional(ctx_r0.ragBrainService.gapsCount() > 0 ? 16 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_102_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_108_Template(rf, ctx) {
   if (rf & 1) {
     const _r16 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 95)(1, "div", 194)(2, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_102_Template_a_click_2_listener() {
+    \u0275\u0275elementStart(0, "div", 97)(1, "div", 196)(2, "a", 83);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_108_Template_a_click_2_listener() {
       \u0275\u0275restoreView(_r16);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.toggleKnowledgeMenu());
     });
-    \u0275\u0275elementStart(3, "span", 173);
+    \u0275\u0275elementStart(3, "span", 175);
     \u0275\u0275text(4, "\u{1F9E0}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "span", 195);
+    \u0275\u0275elementStart(5, "span", 197);
     \u0275\u0275text(6, "\u77E5\u8B58\u5927\u8166");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "span", 196);
+    \u0275\u0275elementStart(7, "span", 198);
     \u0275\u0275text(8, "\u25BC");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(9, AppComponent_Conditional_15_Conditional_102_Conditional_9_Template, 17, 19, "div", 197);
+    \u0275\u0275conditionalCreate(9, AppComponent_Conditional_15_Conditional_108_Conditional_9_Template, 17, 19, "div", 199);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(10, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_102_Template_a_click_10_listener() {
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_108_Template_a_click_10_listener() {
       \u0275\u0275restoreView(_r16);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("ai-center"));
     });
     \u0275\u0275namespaceSVG();
     \u0275\u0275elementStart(11, "svg", 84);
-    \u0275\u0275element(12, "path", 198);
+    \u0275\u0275element(12, "path", 200);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(13, "span");
@@ -57033,18 +57251,18 @@ function AppComponent_Conditional_15_Conditional_102_Template(rf, ctx) {
     \u0275\u0275textInterpolate(ctx_r0.t("aiCenter"));
   }
 }
-function AppComponent_Conditional_15_Conditional_109_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_115_Template(rf, ctx) {
   if (rf & 1) {
     const _r18 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 95)(1, "a", 83);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_109_Template_a_click_1_listener() {
+    \u0275\u0275elementStart(0, "div", 97)(1, "a", 83);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_115_Template_a_click_1_listener() {
       \u0275\u0275restoreView(_r18);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("settings"));
     });
     \u0275\u0275namespaceSVG();
     \u0275\u0275elementStart(2, "svg", 84);
-    \u0275\u0275element(3, "circle", 202)(4, "path", 203);
+    \u0275\u0275element(3, "circle", 204)(4, "path", 205);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(5, "span");
@@ -57062,25 +57280,25 @@ function AppComponent_Conditional_15_Conditional_109_Template(rf, ctx) {
     \u0275\u0275textInterpolate(ctx_r0.t("settings"));
   }
 }
-function AppComponent_Conditional_15_Case_131_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_137_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-dashboard-view");
   }
 }
-function AppComponent_Conditional_15_Case_132_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_138_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-accounts-view");
   }
 }
-function AppComponent_Conditional_15_Case_133_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_139_Template(rf, ctx) {
   if (rf & 1) {
     const _r19 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "app-add-account-page", 204);
-    \u0275\u0275listener("accountAdded", function AppComponent_Conditional_15_Case_133_Template_app_add_account_page_accountAdded_0_listener($event) {
+    \u0275\u0275elementStart(0, "app-add-account-page", 206);
+    \u0275\u0275listener("accountAdded", function AppComponent_Conditional_15_Case_139_Template_app_add_account_page_accountAdded_0_listener($event) {
       \u0275\u0275restoreView(_r19);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onAccountAdded($event));
-    })("back", function AppComponent_Conditional_15_Case_133_Template_app_add_account_page_back_0_listener() {
+    })("back", function AppComponent_Conditional_15_Case_139_Template_app_add_account_page_back_0_listener() {
       \u0275\u0275restoreView(_r19);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.changeView("accounts"));
@@ -57088,100 +57306,70 @@ function AppComponent_Conditional_15_Case_133_Template(rf, ctx) {
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Case_134_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_140_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-api-credentials-view");
   }
 }
-function AppComponent_Conditional_15_Case_135_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_141_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-settings-view");
   }
 }
-function AppComponent_Conditional_15_Case_136_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_142_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-leads-view");
   }
 }
-function AppComponent_Conditional_15_Case_137_Template(rf, ctx) {
+function AppComponent_Conditional_15_Case_143_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275element(0, "app-automation-view");
   }
 }
-function AppComponent_Conditional_15_Case_138_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275element(0, "app-resource-discovery-view");
-  }
-}
-function AppComponent_Conditional_15_Case_139_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275element(0, "app-resource-discovery-view");
-  }
-}
-function AppComponent_Conditional_15_Case_140_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275element(0, "app-ai-center-view");
-  }
-}
-function AppComponent_Conditional_15_Case_141_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 109);
-    \u0275\u0275element(1, "app-ai-brain");
-    \u0275\u0275elementEnd();
-  }
-}
-function AppComponent_Conditional_15_Case_142_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 110);
-    \u0275\u0275element(1, "app-knowledge-gaps");
-    \u0275\u0275elementEnd();
-  }
-}
-function AppComponent_Conditional_15_Case_143_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 110);
-    \u0275\u0275element(1, "app-knowledge-manage");
-    \u0275\u0275elementEnd();
-  }
-}
 function AppComponent_Conditional_15_Case_144_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-multi-role-view");
+    \u0275\u0275element(0, "app-resource-discovery-view");
   }
 }
 function AppComponent_Conditional_15_Case_145_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-analytics-view");
+    \u0275\u0275element(0, "app-resource-discovery-view");
   }
 }
 function AppComponent_Conditional_15_Case_146_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-monitoring-view");
+    \u0275\u0275element(0, "app-ai-center-view");
   }
 }
 function AppComponent_Conditional_15_Case_147_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-monitoring-view");
+    \u0275\u0275elementStart(0, "div", 111);
+    \u0275\u0275element(1, "app-ai-brain");
+    \u0275\u0275elementEnd();
   }
 }
 function AppComponent_Conditional_15_Case_148_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-monitoring-view");
+    \u0275\u0275elementStart(0, "div", 112);
+    \u0275\u0275element(1, "app-knowledge-gaps");
+    \u0275\u0275elementEnd();
   }
 }
 function AppComponent_Conditional_15_Case_149_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-monitoring-view");
+    \u0275\u0275elementStart(0, "div", 112);
+    \u0275\u0275element(1, "app-knowledge-manage");
+    \u0275\u0275elementEnd();
   }
 }
 function AppComponent_Conditional_15_Case_150_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-monitoring-view");
+    \u0275\u0275element(0, "app-multi-role-view");
   }
 }
 function AppComponent_Conditional_15_Case_151_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-monitoring-view");
+    \u0275\u0275element(0, "app-analytics-view");
   }
 }
 function AppComponent_Conditional_15_Case_152_Template(rf, ctx) {
@@ -57191,100 +57379,135 @@ function AppComponent_Conditional_15_Case_152_Template(rf, ctx) {
 }
 function AppComponent_Conditional_15_Case_153_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-runtime-logs-view");
+    \u0275\u0275element(0, "app-monitoring-view");
   }
 }
 function AppComponent_Conditional_15_Case_154_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-membership-center");
+    \u0275\u0275element(0, "app-monitoring-view");
   }
 }
 function AppComponent_Conditional_15_Case_155_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-profile");
+    \u0275\u0275element(0, "app-monitoring-view");
   }
 }
 function AppComponent_Conditional_15_Case_156_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-resource-center");
+    \u0275\u0275element(0, "app-monitoring-view");
   }
 }
 function AppComponent_Conditional_15_Case_157_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-search-discovery");
+    \u0275\u0275element(0, "app-monitoring-view");
   }
 }
 function AppComponent_Conditional_15_Case_158_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-ai-marketing-assistant");
+    \u0275\u0275element(0, "app-monitoring-view");
   }
 }
 function AppComponent_Conditional_15_Case_159_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-ai-team-hub");
+    \u0275\u0275element(0, "app-runtime-logs-view");
   }
 }
 function AppComponent_Conditional_15_Case_160_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-member-database");
+    \u0275\u0275element(0, "app-membership-center");
   }
 }
 function AppComponent_Conditional_15_Case_161_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-leads-view");
+    \u0275\u0275element(0, "app-wallet-view");
   }
 }
 function AppComponent_Conditional_15_Case_162_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-analytics-view");
+    \u0275\u0275element(0, "app-profile");
   }
 }
 function AppComponent_Conditional_15_Case_163_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-analytics-view");
+    \u0275\u0275element(0, "app-resource-center");
   }
 }
 function AppComponent_Conditional_15_Case_164_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-automation-view");
+    \u0275\u0275element(0, "app-search-discovery");
   }
 }
 function AppComponent_Conditional_15_Case_165_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-automation-view");
+    \u0275\u0275element(0, "app-ai-marketing-assistant");
   }
 }
 function AppComponent_Conditional_15_Case_166_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-analytics-view");
+    \u0275\u0275element(0, "app-ai-team-hub");
   }
 }
 function AppComponent_Conditional_15_Case_167_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-marketing-report");
+    \u0275\u0275element(0, "app-member-database");
   }
 }
 function AppComponent_Conditional_15_Case_168_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-runtime-logs-view");
+    \u0275\u0275element(0, "app-leads-view");
   }
 }
 function AppComponent_Conditional_15_Case_169_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-runtime-logs-view");
+    \u0275\u0275element(0, "app-analytics-view");
   }
 }
 function AppComponent_Conditional_15_Case_170_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275element(0, "app-runtime-logs-view");
+    \u0275\u0275element(0, "app-analytics-view");
   }
 }
 function AppComponent_Conditional_15_Case_171_Template(rf, ctx) {
   if (rf & 1) {
+    \u0275\u0275element(0, "app-automation-view");
+  }
+}
+function AppComponent_Conditional_15_Case_172_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-automation-view");
+  }
+}
+function AppComponent_Conditional_15_Case_173_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-analytics-view");
+  }
+}
+function AppComponent_Conditional_15_Case_174_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-marketing-report");
+  }
+}
+function AppComponent_Conditional_15_Case_175_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-runtime-logs-view");
+  }
+}
+function AppComponent_Conditional_15_Case_176_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-runtime-logs-view");
+  }
+}
+function AppComponent_Conditional_15_Case_177_Template(rf, ctx) {
+  if (rf & 1) {
+    \u0275\u0275element(0, "app-runtime-logs-view");
+  }
+}
+function AppComponent_Conditional_15_Case_178_Template(rf, ctx) {
+  if (rf & 1) {
     \u0275\u0275element(0, "app-dashboard-view");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_10_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_10_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
   }
@@ -57293,7 +57516,7 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_10_Template(rf,
     \u0275\u0275textInterpolate1(" @", lead_r21.username, " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_11_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
   }
@@ -57302,7 +57525,7 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_11_Template(rf,
     \u0275\u0275textInterpolate2(" ", lead_r21.firstName, " ", lead_r21.lastName || "", " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_12_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_12_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
     \u0275\u0275pipe(1, "slice");
@@ -57312,9 +57535,9 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_12_Template(rf,
     \u0275\u0275textInterpolate1(" ID: ", \u0275\u0275pipeBind3(1, 1, lead_r21.userId, 0, 12), " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_14_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "p", 214);
+    \u0275\u0275elementStart(0, "p", 216);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -57324,9 +57547,9 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_14_Template(rf,
     \u0275\u0275textInterpolate1("\u{1F4F1} ", lead_r21.phone);
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_16_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 216);
+    \u0275\u0275elementStart(0, "span", 218);
     \u0275\u0275text(1);
     \u0275\u0275pipe(2, "slice");
     \u0275\u0275elementEnd();
@@ -57337,9 +57560,9 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_16_Template(rf,
     \u0275\u0275textInterpolate1("\u{1F4CD} ", \u0275\u0275pipeBind3(2, 1, lead_r21.sourceGroup, 0, 20));
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_17_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_17_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 217);
+    \u0275\u0275elementStart(0, "span", 219);
     \u0275\u0275text(1);
     \u0275\u0275pipe(2, "slice");
     \u0275\u0275elementEnd();
@@ -57350,9 +57573,9 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_17_Template(rf,
     \u0275\u0275textInterpolate1("\u{1F511} ", \u0275\u0275pipeBind3(2, 1, lead_r21.triggeredKeyword, 0, 15));
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_18_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_18_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 226);
+    \u0275\u0275elementStart(0, "span", 228);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -57364,9 +57587,9 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_18_Template(rf,
     \u0275\u0275textInterpolate2("", ctx_r0.getIntentLevelEmoji(lead_r21.intentLevel), " ", ctx_r0.t(lead_r21.intentLevel));
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_5_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "option", 230);
+    \u0275\u0275elementStart(0, "option", 232);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -57376,9 +57599,9 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("noSenderAccounts"));
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_6_For_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_6_For_3_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "option", 251);
+    \u0275\u0275elementStart(0, "option", 253);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -57390,12 +57613,12 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275textInterpolate2("", account_r23.phone, " (", account_r23.username || ctx_r0.t(account_r23.status), ")");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_6_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "option", 230);
+    \u0275\u0275elementStart(0, "option", 232);
     \u0275\u0275text(1, "\u9078\u64C7\u767C\u9001\u5E33\u865F...");
     \u0275\u0275elementEnd();
-    \u0275\u0275repeaterCreate(2, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_6_For_3_Template, 2, 3, "option", 251, _forTrack024);
+    \u0275\u0275repeaterCreate(2, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_6_For_3_Template, 2, 3, "option", 253, _forTrack024);
   }
   if (rf & 2) {
     const ctx_r0 = \u0275\u0275nextContext(4);
@@ -57403,14 +57626,14 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275repeater(ctx_r0.senderAccounts());
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
     const _r24 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 231)(1, "p", 20);
+    \u0275\u0275elementStart(0, "div", 233)(1, "p", 20);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "a", 252);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_7_Template_a_click_3_listener() {
+    \u0275\u0275elementStart(3, "a", 254);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_7_Template_a_click_3_listener() {
       \u0275\u0275restoreView(_r24);
       const ctx_r0 = \u0275\u0275nextContext(4);
       ctx_r0.currentView.set("accounts");
@@ -57425,21 +57648,21 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1("\u26A0\uFE0F ", ctx_r0.t("noSenderAccountsHint"));
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 254);
+    \u0275\u0275elementStart(0, "span", 256);
     \u0275\u0275text(1, "\u2713 \u5DF2\u9023\u63A5");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_8_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_8_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 255);
+    \u0275\u0275elementStart(0, "span", 257);
     \u0275\u0275text(1, "\u{1F4DA} RAG \u5DF2\u555F\u7528");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_9_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
   }
@@ -57448,7 +57671,7 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1(" | \u4F86\u6E90: ", ctx_r0.generationState().lead.sourceGroup, " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_9_Conditional_5_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0);
   }
@@ -57457,14 +57680,14 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1(" | \u89F8\u767C\u8A5E: ", ctx_r0.generationState().lead.triggerKeyword, " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_9_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 256)(1, "strong", 265);
+    \u0275\u0275elementStart(0, "div", 258)(1, "strong", 267);
     \u0275\u0275text(2, "\u5BA2\u6236\u8CC7\u8A0A\uFF1A");
     \u0275\u0275elementEnd();
     \u0275\u0275text(3);
-    \u0275\u0275conditionalCreate(4, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_9_Conditional_4_Template, 1, 1);
-    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_9_Conditional_5_Template, 1, 1);
+    \u0275\u0275conditionalCreate(4, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Conditional_4_Template, 1, 1);
+    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Conditional_5_Template, 1, 1);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -57477,9 +57700,9 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275conditional(ctx_r0.generationState().lead.triggerKeyword ? 5 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_17_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_17_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 266);
+    \u0275\u0275elementStart(0, "span", 268);
     \u0275\u0275text(1, "\u27F3");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(2, "span");
@@ -57492,7 +57715,7 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("generating"));
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_18_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_18_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span");
     \u0275\u0275text(1, "\u2728");
@@ -57507,11 +57730,11 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("generateWithAi"));
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_19_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_19_Template(rf, ctx) {
   if (rf & 1) {
     const _r26 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 267);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_19_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 269);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_19_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r26);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.generateMessage());
@@ -57520,13 +57743,13 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_20_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_20_Template(rf, ctx) {
   if (rf & 1) {
     const _r27 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 262);
+    \u0275\u0275elementStart(0, "div", 264);
     \u0275\u0275text(1);
-    \u0275\u0275elementStart(2, "a", 268);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_20_Template_a_click_2_listener() {
+    \u0275\u0275elementStart(2, "a", 270);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_20_Template_a_click_2_listener() {
       \u0275\u0275restoreView(_r27);
       const ctx_r0 = \u0275\u0275nextContext(5);
       ctx_r0.currentView.set("settings");
@@ -57543,15 +57766,15 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("goToSettings"));
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_21_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_21_Template(rf, ctx) {
   if (rf & 1) {
     const _r28 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 263)(1, "strong");
+    \u0275\u0275elementStart(0, "div", 265)(1, "strong");
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
     \u0275\u0275text(3);
-    \u0275\u0275elementStart(4, "button", 269);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_21_Template_button_click_4_listener() {
+    \u0275\u0275elementStart(4, "button", 271);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_21_Template_button_click_4_listener() {
       \u0275\u0275restoreView(_r28);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.generateMessage());
@@ -57567,51 +57790,51 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1(" ", ctx_r0.generationState().error, " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_22_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_22_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 264)(1, "p", 270);
+    \u0275\u0275elementStart(0, "div", 266)(1, "p", 272);
     \u0275\u0275text(2, "\u2713 AI \u5DF2\u751F\u6210\u6D88\u606F\uFF0C\u60A8\u53EF\u4EE5\u5728\u4E0B\u65B9\u7DE8\u8F2F\u5F8C\u767C\u9001");
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Template(rf, ctx) {
   if (rf & 1) {
     const _r25 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 236)(1, "div", 253)(2, "div", 211)(3, "span", 173);
+    \u0275\u0275elementStart(0, "div", 238)(1, "div", 255)(2, "div", 213)(3, "span", 175);
     \u0275\u0275text(4, "\u{1F916}");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(5, "span", 32);
     \u0275\u0275text(6);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_7_Template, 2, 0, "span", 254);
+    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_7_Template, 2, 0, "span", 256);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(8, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_8_Template, 2, 0, "span", 255);
+    \u0275\u0275conditionalCreate(8, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_8_Template, 2, 0, "span", 257);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(9, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_9_Template, 6, 3, "div", 256);
-    \u0275\u0275elementStart(10, "div")(11, "label", 257);
+    \u0275\u0275conditionalCreate(9, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_9_Template, 6, 3, "div", 258);
+    \u0275\u0275elementStart(10, "div")(11, "label", 259);
     \u0275\u0275text(12);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(13, "textarea", 258);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Template_textarea_ngModelChange_13_listener($event) {
+    \u0275\u0275elementStart(13, "textarea", 260);
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Template_textarea_ngModelChange_13_listener($event) {
       \u0275\u0275restoreView(_r25);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.updateCustomPrompt($event));
     });
     \u0275\u0275text(14, "                        ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(15, "div", 259)(16, "button", 260);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Template_button_click_16_listener() {
+    \u0275\u0275elementStart(15, "div", 261)(16, "button", 262);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Template_button_click_16_listener() {
       \u0275\u0275restoreView(_r25);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.generateMessage());
     });
-    \u0275\u0275conditionalCreate(17, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_17_Template, 4, 1)(18, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_18_Template, 4, 1);
+    \u0275\u0275conditionalCreate(17, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_17_Template, 4, 1)(18, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_18_Template, 4, 1);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_19_Template, 2, 0, "button", 261);
+    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_19_Template, 2, 0, "button", 263);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_20_Template, 4, 2, "div", 262);
-    \u0275\u0275conditionalCreate(21, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_21_Template, 6, 2, "div", 263);
-    \u0275\u0275conditionalCreate(22, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Conditional_22_Template, 3, 0, "div", 264);
+    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_20_Template, 4, 2, "div", 264);
+    \u0275\u0275conditionalCreate(21, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_21_Template, 6, 2, "div", 265);
+    \u0275\u0275conditionalCreate(22, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Conditional_22_Template, 3, 0, "div", 266);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -57642,9 +57865,9 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275conditional(ctx_r0.generationState().status === "success" && ctx_r0.generationState().generatedMessage ? 22 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_25_For_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_For_7_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "option", 251);
+    \u0275\u0275elementStart(0, "option", 253);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -57655,22 +57878,22 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275textInterpolate(template_r30.name);
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_25_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_Template(rf, ctx) {
   if (rf & 1) {
     const _r29 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 227)(1, "label", 228);
+    \u0275\u0275elementStart(0, "div", 229)(1, "label", 230);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "select", 271);
-    \u0275\u0275listener("change", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_25_Template_select_change_3_listener($event) {
+    \u0275\u0275elementStart(3, "select", 273);
+    \u0275\u0275listener("change", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_Template_select_change_3_listener($event) {
       \u0275\u0275restoreView(_r29);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.applyTemplate($event));
     });
-    \u0275\u0275elementStart(4, "option", 230);
+    \u0275\u0275elementStart(4, "option", 232);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd();
-    \u0275\u0275repeaterCreate(6, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_25_For_7_Template, 2, 2, "option", 251, _forTrack024);
+    \u0275\u0275repeaterCreate(6, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_For_7_Template, 2, 2, "option", 253, _forTrack024);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -57683,19 +57906,19 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275repeater(ctx_r0.messageTemplates());
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_40_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_40_Template(rf, ctx) {
   if (rf & 1) {
     const _r31 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 272);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_40_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 274);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_40_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r31);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.addMoreAttachments("file"));
     });
     \u0275\u0275text(1, " \u2795 \u6DFB\u52A0\u66F4\u591A ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(2, "button", 273);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_40_Template_button_click_2_listener() {
+    \u0275\u0275elementStart(2, "button", 275);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_40_Template_button_click_2_listener() {
       \u0275\u0275restoreView(_r31);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.clearAllAttachments());
@@ -57704,23 +57927,23 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_41_For_8_Conditional_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_2_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 278);
+    \u0275\u0275elementStart(0, "span", 280);
     \u0275\u0275text(1, "\u{1F5BC}\uFE0F");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_41_For_8_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 279);
+    \u0275\u0275elementStart(0, "span", 281);
     \u0275\u0275text(1, "\u{1F4C4}");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_41_For_8_Conditional_6_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 281);
+    \u0275\u0275elementStart(0, "span", 283);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -57730,29 +57953,29 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275textInterpolate1(" (", (attachment_r33.fileSize / 1024 / 1024).toFixed(2), " MB) ");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_41_For_8_Conditional_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 282);
+    \u0275\u0275elementStart(0, "span", 284);
     \u0275\u0275text(1, "\u2713");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_41_For_8_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Template(rf, ctx) {
   if (rf & 1) {
     const _r32 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 276)(1, "div", 277);
-    \u0275\u0275conditionalCreate(2, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_41_For_8_Conditional_2_Template, 2, 0, "span", 278)(3, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_41_For_8_Conditional_3_Template, 2, 0, "span", 279);
-    \u0275\u0275elementStart(4, "span", 280);
+    \u0275\u0275elementStart(0, "div", 278)(1, "div", 279);
+    \u0275\u0275conditionalCreate(2, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_2_Template, 2, 0, "span", 280)(3, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_3_Template, 2, 0, "span", 281);
+    \u0275\u0275elementStart(4, "span", 282);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(6, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_41_For_8_Conditional_6_Template, 2, 1, "span", 281);
-    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_41_For_8_Conditional_7_Template, 2, 0, "span", 282);
+    \u0275\u0275conditionalCreate(6, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_6_Template, 2, 1, "span", 283);
+    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Conditional_7_Template, 2, 0, "span", 284);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "button", 283);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_41_For_8_Template_button_click_8_listener() {
-      const \u0275$index_1246_r34 = \u0275\u0275restoreView(_r32).$index;
+    \u0275\u0275elementStart(8, "button", 285);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Template_button_click_8_listener() {
+      const \u0275$index_1260_r34 = \u0275\u0275restoreView(_r32).$index;
       const ctx_r0 = \u0275\u0275nextContext(5);
-      return \u0275\u0275resetView(ctx_r0.removeAttachmentByIndex(\u0275$index_1246_r34));
+      return \u0275\u0275resetView(ctx_r0.removeAttachmentByIndex(\u0275$index_1260_r34));
     });
     \u0275\u0275text(9, "\xD7");
     \u0275\u0275elementEnd()();
@@ -57769,16 +57992,16 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275conditional(attachment_r33.filePath ? 7 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_41_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 243)(1, "div", 237)(2, "span", 274);
+    \u0275\u0275elementStart(0, "div", 245)(1, "div", 239)(2, "span", 276);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "span", 147);
+    \u0275\u0275elementStart(4, "span", 149);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(6, "div", 275);
-    \u0275\u0275repeaterCreate(7, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_41_For_8_Template, 10, 4, "div", 276, _forTrack19);
+    \u0275\u0275elementStart(6, "div", 277);
+    \u0275\u0275repeaterCreate(7, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_For_8_Template, 10, 4, "div", 278, _forTrack19);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -57791,25 +58014,25 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275repeater(ctx_r0.generationState().attachments);
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_42_Conditional_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_2_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0, " \u26A0\uFE0F \u7121\u53EF\u7528\u767C\u9001\u5E33\u865F ");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_42_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0, " \u26A0\uFE0F \u8ACB\u9078\u64C7\u767C\u9001\u5E33\u865F ");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_42_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275text(0, " \u26A0\uFE0F \u8ACB\u8F38\u5165\u8A0A\u606F\u5167\u5BB9\u6216\u6DFB\u52A0\u9644\u4EF6 ");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_42_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 244)(1, "p", 284);
-    \u0275\u0275conditionalCreate(2, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_42_Conditional_2_Template, 1, 0)(3, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_42_Conditional_3_Template, 1, 0)(4, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_42_Conditional_4_Template, 1, 0);
+    \u0275\u0275elementStart(0, "div", 246)(1, "p", 286);
+    \u0275\u0275conditionalCreate(2, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_2_Template, 1, 0)(3, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_3_Template, 1, 0)(4, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Conditional_4_Template, 1, 0);
     \u0275\u0275elementEnd()();
   }
   if (rf & 2) {
@@ -57818,105 +58041,105 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_
     \u0275\u0275conditional(ctx_r0.senderAccounts().length === 0 ? 2 : !ctx_r0.selectedSenderId() ? 3 : ctx_r0.editableMessage().trim().length === 0 && !ctx_r0.generationState().attachment && ctx_r0.generationState().attachments.length === 0 ? 4 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_43_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_43_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 245)(1, "p", 285);
+    \u0275\u0275elementStart(0, "div", 247)(1, "p", 287);
     \u0275\u0275text(2, "\u{1F6AB} \u6B64\u5BA2\u6236\u5DF2\u52A0\u5165\u9ED1\u540D\u55AE\uFF0C\u7121\u6CD5\u767C\u9001\u8A0A\u606F");
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_28_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template(rf, ctx) {
   if (rf & 1) {
     const _r22 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 224)(1, "div", 227)(2, "label", 228);
+    \u0275\u0275elementStart(0, "div", 226)(1, "div", 229)(2, "label", 230);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "select", 229);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Template_select_ngModelChange_4_listener($event) {
+    \u0275\u0275elementStart(4, "select", 231);
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_select_ngModelChange_4_listener($event) {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.selectedSenderId.set($event));
     });
-    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_5_Template, 2, 1, "option", 230)(6, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_6_Template, 4, 0);
+    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_5_Template, 2, 1, "option", 232)(6, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_6_Template, 4, 0);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_7_Template, 5, 1, "div", 231);
+    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_7_Template, 5, 1, "div", 233);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "div", 232)(9, "label", 233);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Template_label_click_9_listener() {
+    \u0275\u0275elementStart(8, "div", 234)(9, "label", 235);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_label_click_9_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.messageMode.set("manual"));
     });
-    \u0275\u0275elementStart(10, "div", 234);
+    \u0275\u0275elementStart(10, "div", 236);
     \u0275\u0275text(11, "\u{1F4DD}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "span", 235);
+    \u0275\u0275elementStart(12, "span", 237);
     \u0275\u0275text(13);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(14, "label", 233);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Template_label_click_14_listener() {
+    \u0275\u0275elementStart(14, "label", 235);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_label_click_14_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.messageMode.set("ai"));
     });
-    \u0275\u0275elementStart(15, "div", 234);
+    \u0275\u0275elementStart(15, "div", 236);
     \u0275\u0275text(16, "\u{1F916}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "span", 235);
+    \u0275\u0275elementStart(17, "span", 237);
     \u0275\u0275text(18);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(19, "label", 233);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Template_label_click_19_listener() {
+    \u0275\u0275elementStart(19, "label", 235);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_label_click_19_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.messageMode.set("template"));
     });
-    \u0275\u0275elementStart(20, "div", 234);
+    \u0275\u0275elementStart(20, "div", 236);
     \u0275\u0275text(21, "\u{1F4CB}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(22, "span", 235);
+    \u0275\u0275elementStart(22, "span", 237);
     \u0275\u0275text(23);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275conditionalCreate(24, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_24_Template, 23, 13, "div", 236);
-    \u0275\u0275conditionalCreate(25, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_25_Template, 8, 2, "div", 227);
-    \u0275\u0275elementStart(26, "div", 227)(27, "div", 237)(28, "label", 238);
+    \u0275\u0275conditionalCreate(24, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_24_Template, 23, 13, "div", 238);
+    \u0275\u0275conditionalCreate(25, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_25_Template, 8, 2, "div", 229);
+    \u0275\u0275elementStart(26, "div", 229)(27, "div", 239)(28, "label", 240);
     \u0275\u0275text(29);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(30, "span", 239);
+    \u0275\u0275elementStart(30, "span", 241);
     \u0275\u0275text(31);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(32, "textarea", 240);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Template_textarea_ngModelChange_32_listener($event) {
+    \u0275\u0275elementStart(32, "textarea", 242);
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_textarea_ngModelChange_32_listener($event) {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.editableMessage.set($event));
     });
     \u0275\u0275text(33, "                ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(34, "div", 236)(35, "div", 241)(36, "button", 242);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Template_button_click_36_listener() {
+    \u0275\u0275elementStart(34, "div", 238)(35, "div", 243)(36, "button", 244);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_36_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.selectAttachment("image", true));
     });
     \u0275\u0275text(37);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(38, "button", 242);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Template_button_click_38_listener() {
+    \u0275\u0275elementStart(38, "button", 244);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_38_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.selectAttachment("file", true));
     });
     \u0275\u0275text(39);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(40, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_40_Template, 4, 0);
+    \u0275\u0275conditionalCreate(40, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_40_Template, 4, 0);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(41, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_41_Template, 9, 2, "div", 243);
+    \u0275\u0275conditionalCreate(41, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_41_Template, 9, 2, "div", 245);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(42, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_42_Template, 5, 1, "div", 244);
-    \u0275\u0275conditionalCreate(43, AppComponent_Conditional_15_Conditional_172_Conditional_28_Conditional_43_Template, 3, 0, "div", 245);
-    \u0275\u0275elementStart(44, "div", 246)(45, "button", 247);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Template_button_click_45_listener() {
+    \u0275\u0275conditionalCreate(42, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_42_Template, 5, 1, "div", 246);
+    \u0275\u0275conditionalCreate(43, AppComponent_Conditional_15_Conditional_179_Conditional_28_Conditional_43_Template, 3, 0, "div", 247);
+    \u0275\u0275elementStart(44, "div", 248)(45, "button", 249);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_45_listener() {
       \u0275\u0275restoreView(_r22);
       const lead_r21 = \u0275\u0275nextContext();
       const ctx_r0 = \u0275\u0275nextContext(2);
@@ -57924,16 +58147,16 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Template(rf,
     });
     \u0275\u0275text(46);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(47, "div", 248)(48, "button", 249);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Template_button_click_48_listener() {
+    \u0275\u0275elementStart(47, "div", 250)(48, "button", 251);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_48_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.closeLeadDetailModal());
     });
     \u0275\u0275text(49);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(50, "button", 250);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_28_Template_button_click_50_listener() {
+    \u0275\u0275elementStart(50, "button", 252);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_28_Template_button_click_50_listener() {
       \u0275\u0275restoreView(_r22);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.sendMessageToLead());
@@ -57998,9 +58221,9 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_28_Template(rf,
     \u0275\u0275textInterpolate1(" \u2708\uFE0F ", ctx_r0.t("sendMessage"), " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 266);
+    \u0275\u0275elementStart(0, "span", 268);
     \u0275\u0275text(1, "\u27F3");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(2, "span");
@@ -58008,7 +58231,7 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span");
     \u0275\u0275text(1, "\u{1F4AC}");
@@ -58018,9 +58241,9 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_5_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 147);
+    \u0275\u0275elementStart(0, "span", 149);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -58030,9 +58253,9 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_
     \u0275\u0275textInterpolate1("\u5171 ", ctx_r0.chatHistory().length, " \u689D\u6D88\u606F");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_6_For_2_Conditional_0_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Conditional_0_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 296)(1, "div", 298)(2, "div", 299)(3, "p", 300);
+    \u0275\u0275elementStart(0, "div", 298)(1, "div", 300)(2, "div", 301)(3, "p", 302);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(5, "p", 15);
@@ -58048,15 +58271,15 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.formatTimestamp(message_r37.timestamp));
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_6_For_2_Conditional_1_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Conditional_1_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 297)(1, "div", 298)(2, "div", 301)(3, "p", 300);
+    \u0275\u0275elementStart(0, "div", 299)(1, "div", 300)(2, "div", 303)(3, "p", 302);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(5, "div", 302)(6, "span", 147);
+    \u0275\u0275elementStart(5, "div", 304)(6, "span", 149);
     \u0275\u0275text(7);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "span", 303);
+    \u0275\u0275elementStart(8, "span", 305);
     \u0275\u0275text(9, "\u{1F916} AI");
     \u0275\u0275elementEnd()()()();
   }
@@ -58069,30 +58292,30 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.formatTimestamp(message_r37.timestamp));
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_6_For_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275conditionalCreate(0, AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_6_For_2_Conditional_0_Template, 7, 2, "div", 296)(1, AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_6_For_2_Conditional_1_Template, 10, 2, "div", 297);
+    \u0275\u0275conditionalCreate(0, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Conditional_0_Template, 7, 2, "div", 298)(1, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Conditional_1_Template, 10, 2, "div", 299);
   }
   if (rf & 2) {
     const message_r37 = ctx.$implicit;
     \u0275\u0275conditional(message_r37.role === "user" ? 0 : message_r37.role === "assistant" ? 1 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_6_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 294)(1, "span", 304);
+    \u0275\u0275elementStart(0, "div", 296)(1, "span", 306);
     \u0275\u0275text(2, "\u27F3");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 305);
+    \u0275\u0275elementStart(3, "span", 307);
     \u0275\u0275text(4, "\u52A0\u8F09\u4E2D...");
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_6_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     const _r38 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 295)(1, "button", 306);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_6_Conditional_4_Template_button_click_1_listener() {
+    \u0275\u0275elementStart(0, "div", 297)(1, "button", 308);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_4_Template_button_click_1_listener() {
       \u0275\u0275restoreView(_r38);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.loadMoreChatHistory());
@@ -58101,18 +58324,18 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_6_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
     const _r36 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 293);
-    \u0275\u0275listener("scroll", function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_6_Template_div_scroll_0_listener($event) {
+    \u0275\u0275elementStart(0, "div", 295);
+    \u0275\u0275listener("scroll", function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Template_div_scroll_0_listener($event) {
       \u0275\u0275restoreView(_r36);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.onChatHistoryScroll($event));
     });
-    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_6_For_2_Template, 2, 1, null, null, \u0275\u0275componentInstance().trackByChatMessageId, true);
-    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_6_Conditional_3_Template, 5, 0, "div", 294);
-    \u0275\u0275conditionalCreate(4, AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_6_Conditional_4_Template, 3, 0, "div", 295);
+    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_For_2_Template, 2, 1, null, null, \u0275\u0275componentInstance().trackByChatMessageId, true);
+    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_3_Template, 5, 0, "div", 296);
+    \u0275\u0275conditionalCreate(4, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Conditional_4_Template, 3, 0, "div", 297);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58125,22 +58348,22 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_
     \u0275\u0275conditional(ctx_r0.chatHistoryHasMore() && !ctx_r0.chatHistoryLoadingMore() ? 4 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_For_10_Conditional_0_Conditional_8_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_0_Conditional_8_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 303);
+    \u0275\u0275elementStart(0, "span", 305);
     \u0275\u0275text(1, "\u{1F916} AI");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_For_10_Conditional_0_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_0_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 297)(1, "div", 298)(2, "div", 301)(3, "p", 300);
+    \u0275\u0275elementStart(0, "div", 299)(1, "div", 300)(2, "div", 303)(3, "p", 302);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(5, "div", 302)(6, "span", 147);
+    \u0275\u0275elementStart(5, "div", 304)(6, "span", 149);
     \u0275\u0275text(7);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(8, AppComponent_Conditional_15_Conditional_172_Conditional_29_For_10_Conditional_0_Conditional_8_Template, 2, 0, "span", 303);
+    \u0275\u0275conditionalCreate(8, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_0_Conditional_8_Template, 2, 0, "span", 305);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -58154,9 +58377,9 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_29_For_10_Condi
     \u0275\u0275conditional(item_r39.type.includes("AI") ? 8 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_For_10_Conditional_1_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_1_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 296)(1, "div", 298)(2, "div", 299)(3, "p", 300);
+    \u0275\u0275elementStart(0, "div", 298)(1, "div", 300)(2, "div", 301)(3, "p", 302);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd()();
     \u0275\u0275elementStart(5, "p", 15);
@@ -58172,9 +58395,9 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_29_For_10_Condi
     \u0275\u0275textInterpolate(ctx_r0.formatTimestamp(item_r39.timestamp));
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_For_10_Conditional_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_2_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 307)(1, "div", 308);
+    \u0275\u0275elementStart(0, "div", 309)(1, "div", 310);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd()();
   }
@@ -58185,24 +58408,24 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_29_For_10_Condi
     \u0275\u0275textInterpolate3(" ", item_r39.type, ": ", item_r39.content, " \xB7 ", ctx_r0.formatTimestamp(item_r39.timestamp), " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_For_10_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275conditionalCreate(0, AppComponent_Conditional_15_Conditional_172_Conditional_29_For_10_Conditional_0_Template, 9, 3, "div", 297)(1, AppComponent_Conditional_15_Conditional_172_Conditional_29_For_10_Conditional_1_Template, 7, 2, "div", 296)(2, AppComponent_Conditional_15_Conditional_172_Conditional_29_For_10_Conditional_2_Template, 3, 3, "div", 307);
+    \u0275\u0275conditionalCreate(0, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_0_Template, 9, 3, "div", 299)(1, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_1_Template, 7, 2, "div", 298)(2, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Conditional_2_Template, 3, 3, "div", 309);
   }
   if (rf & 2) {
     const item_r39 = ctx.$implicit;
     \u0275\u0275conditional(item_r39.type.includes("Sent") || item_r39.type.includes("Message") ? 0 : item_r39.type.includes("Reply") || item_r39.type.includes("Received") ? 1 : 2);
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_11_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_11_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 291)(1, "div", 309);
+    \u0275\u0275elementStart(0, "div", 293)(1, "div", 311);
     \u0275\u0275text(2, "\u{1F4AC}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "p", 310);
+    \u0275\u0275elementStart(3, "p", 312);
     \u0275\u0275text(4);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "p", 311);
+    \u0275\u0275elementStart(5, "p", 313);
     \u0275\u0275text(6, "\u9EDE\u64CA\u300C\u52A0\u8F09\u5B8C\u6574\u804A\u5929\u8A18\u9304\u300D\u67E5\u770B\u6240\u6709\u5C0D\u8A71");
     \u0275\u0275elementEnd()();
   }
@@ -58212,29 +58435,29 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_
     \u0275\u0275textInterpolate(ctx_r0.t("noHistoryFound"));
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_12_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_12_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 292)(1, "h4", 312)(2, "span");
+    \u0275\u0275elementStart(0, "div", 294)(1, "h4", 314)(2, "span");
     \u0275\u0275text(3, "\u{1F4CA}");
     \u0275\u0275elementEnd();
     \u0275\u0275text(4, " AI \u5C0D\u8A71\u5206\u6790 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "div", 313)(6, "div", 314)(7, "p", 315);
+    \u0275\u0275elementStart(5, "div", 315)(6, "div", 316)(7, "p", 317);
     \u0275\u0275text(8, "\u7E3D\u4E92\u52D5");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "p", 124);
+    \u0275\u0275elementStart(9, "p", 126);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(11, "div", 314)(12, "p", 315);
+    \u0275\u0275elementStart(11, "div", 316)(12, "p", 317);
     \u0275\u0275text(13, "\u5C0D\u8A71\u968E\u6BB5");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "p", 316);
+    \u0275\u0275elementStart(14, "p", 318);
     \u0275\u0275text(15);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(16, "div", 314)(17, "p", 315);
+    \u0275\u0275elementStart(16, "div", 316)(17, "p", 317);
     \u0275\u0275text(18, "\u8208\u8DA3\u7A0B\u5EA6");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(19, "p", 173);
+    \u0275\u0275elementStart(19, "p", 175);
     \u0275\u0275text(20, "\u2B50\u2B50\u2B50");
     \u0275\u0275elementEnd()()()();
   }
@@ -58246,26 +58469,26 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_
     \u0275\u0275textInterpolate(lead_r21.status || "\u521D\u6B21\u63A5\u89F8");
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Conditional_29_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Conditional_29_Template(rf, ctx) {
   if (rf & 1) {
     const _r35 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 225)(1, "div", 286)(2, "button", 287);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Conditional_29_Template_button_click_2_listener() {
+    \u0275\u0275elementStart(0, "div", 227)(1, "div", 288)(2, "button", 289);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Conditional_29_Template_button_click_2_listener() {
       \u0275\u0275restoreView(_r35);
       const lead_r21 = \u0275\u0275nextContext();
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.loadChatHistory(lead_r21.userId));
     });
-    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_3_Template, 4, 0)(4, AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_4_Template, 4, 0);
+    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_3_Template, 4, 0)(4, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_4_Template, 4, 0);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_5_Template, 2, 1, "span", 147);
+    \u0275\u0275conditionalCreate(5, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_5_Template, 2, 1, "span", 149);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(6, AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_6_Template, 5, 2, "div", 288);
-    \u0275\u0275elementStart(7, "div", 289)(8, "div", 290);
-    \u0275\u0275repeaterCreate(9, AppComponent_Conditional_15_Conditional_172_Conditional_29_For_10_Template, 3, 1, null, null, \u0275\u0275componentInstance().trackByChatMessageId, true);
+    \u0275\u0275conditionalCreate(6, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_6_Template, 5, 2, "div", 290);
+    \u0275\u0275elementStart(7, "div", 291)(8, "div", 292);
+    \u0275\u0275repeaterCreate(9, AppComponent_Conditional_15_Conditional_179_Conditional_29_For_10_Template, 3, 1, null, null, \u0275\u0275componentInstance().trackByChatMessageId, true);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(11, AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_11_Template, 7, 1, "div", 291);
-    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_172_Conditional_29_Conditional_12_Template, 21, 2, "div", 292);
+    \u0275\u0275conditionalCreate(11, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_11_Template, 7, 1, "div", 293);
+    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_179_Conditional_29_Conditional_12_Template, 21, 2, "div", 294);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58287,61 +58510,61 @@ function AppComponent_Conditional_15_Conditional_172_Conditional_29_Template(rf,
     \u0275\u0275conditional(lead_r21.interactionHistory.length > 0 ? 12 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_172_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_179_Template(rf, ctx) {
   if (rf & 1) {
     const _r20 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 205);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Template_div_click_0_listener() {
+    \u0275\u0275elementStart(0, "div", 207);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r20);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.closeLeadDetailModal());
     });
-    \u0275\u0275elementStart(1, "div", 206);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Template_div_click_1_listener($event) {
+    \u0275\u0275elementStart(1, "div", 208);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r20);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 207)(3, "div", 208)(4, "div", 209)(5, "div", 210);
+    \u0275\u0275elementStart(2, "div", 209)(3, "div", 210)(4, "div", 211)(5, "div", 212);
     \u0275\u0275text(6);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "div")(8, "div", 211)(9, "h3", 212);
-    \u0275\u0275conditionalCreate(10, AppComponent_Conditional_15_Conditional_172_Conditional_10_Template, 1, 1)(11, AppComponent_Conditional_15_Conditional_172_Conditional_11_Template, 1, 2)(12, AppComponent_Conditional_15_Conditional_172_Conditional_12_Template, 2, 5);
+    \u0275\u0275elementStart(7, "div")(8, "div", 213)(9, "h3", 214);
+    \u0275\u0275conditionalCreate(10, AppComponent_Conditional_15_Conditional_179_Conditional_10_Template, 1, 1)(11, AppComponent_Conditional_15_Conditional_179_Conditional_11_Template, 1, 2)(12, AppComponent_Conditional_15_Conditional_179_Conditional_12_Template, 2, 5);
     \u0275\u0275elementEnd();
-    \u0275\u0275element(13, "span", 213);
+    \u0275\u0275element(13, "span", 215);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_172_Conditional_14_Template, 2, 1, "p", 214);
-    \u0275\u0275elementStart(15, "div", 215);
-    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_172_Conditional_16_Template, 3, 5, "span", 216);
-    \u0275\u0275conditionalCreate(17, AppComponent_Conditional_15_Conditional_172_Conditional_17_Template, 3, 5, "span", 217);
-    \u0275\u0275conditionalCreate(18, AppComponent_Conditional_15_Conditional_172_Conditional_18_Template, 2, 4, "span", 218);
+    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_179_Conditional_14_Template, 2, 1, "p", 216);
+    \u0275\u0275elementStart(15, "div", 217);
+    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_179_Conditional_16_Template, 3, 5, "span", 218);
+    \u0275\u0275conditionalCreate(17, AppComponent_Conditional_15_Conditional_179_Conditional_17_Template, 3, 5, "span", 219);
+    \u0275\u0275conditionalCreate(18, AppComponent_Conditional_15_Conditional_179_Conditional_18_Template, 2, 4, "span", 220);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(19, "button", 219);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Template_button_click_19_listener() {
+    \u0275\u0275elementStart(19, "button", 221);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_button_click_19_listener() {
       \u0275\u0275restoreView(_r20);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.closeLeadDetailModal());
     });
     \u0275\u0275text(20, "\u2715");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(21, "div", 220)(22, "nav", 221)(23, "a", 222);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Template_a_click_23_listener() {
+    \u0275\u0275elementStart(21, "div", 222)(22, "nav", 223)(23, "a", 224);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_a_click_23_listener() {
       \u0275\u0275restoreView(_r20);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.leadDetailView.set("sendMessage"));
     });
     \u0275\u0275text(24);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(25, "a", 222);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_172_Template_a_click_25_listener() {
+    \u0275\u0275elementStart(25, "a", 224);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_179_Template_a_click_25_listener() {
       \u0275\u0275restoreView(_r20);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.leadDetailView.set("history"));
     });
     \u0275\u0275text(26);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(27, "div", 223);
-    \u0275\u0275conditionalCreate(28, AppComponent_Conditional_15_Conditional_172_Conditional_28_Template, 52, 31, "div", 224);
-    \u0275\u0275conditionalCreate(29, AppComponent_Conditional_15_Conditional_172_Conditional_29_Template, 13, 6, "div", 225);
+    \u0275\u0275elementStart(27, "div", 225);
+    \u0275\u0275conditionalCreate(28, AppComponent_Conditional_15_Conditional_179_Conditional_28_Template, 52, 31, "div", 226);
+    \u0275\u0275conditionalCreate(29, AppComponent_Conditional_15_Conditional_179_Conditional_29_Template, 13, 6, "div", 227);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -58375,12 +58598,12 @@ function AppComponent_Conditional_15_Conditional_172_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.leadDetailView() === "history" ? 29 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_173_Conditional_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_180_Conditional_14_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 330);
+    \u0275\u0275elementStart(0, "div", 332);
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(1, "svg", 333);
-    \u0275\u0275element(2, "circle", 334)(3, "path", 335);
+    \u0275\u0275elementStart(1, "svg", 335);
+    \u0275\u0275element(2, "circle", 336)(3, "path", 337);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
     \u0275\u0275elementStart(4, "p");
@@ -58388,16 +58611,16 @@ function AppComponent_Conditional_15_Conditional_173_Conditional_14_Template(rf,
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_173_Conditional_15_For_2_Conditional_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_14_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 340);
+    \u0275\u0275elementStart(0, "span", 342);
     \u0275\u0275text(1, "\uFF08\u5DF2\u64A4\u92B7\uFF09");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_173_Conditional_15_For_2_Conditional_19_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_19_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 341);
+    \u0275\u0275elementStart(0, "span", 343);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -58407,11 +58630,11 @@ function AppComponent_Conditional_15_Conditional_173_Conditional_15_For_2_Condit
     \u0275\u0275textInterpolate1("", op_r41.failureCount, " \u5931\u6557");
   }
 }
-function AppComponent_Conditional_15_Conditional_173_Conditional_15_For_2_Conditional_20_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_20_Template(rf, ctx) {
   if (rf & 1) {
     const _r42 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 343);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_173_Conditional_15_For_2_Conditional_20_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 345);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_20_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r42);
       const op_r41 = \u0275\u0275nextContext().$implicit;
       const ctx_r0 = \u0275\u0275nextContext(4);
@@ -58421,27 +58644,27 @@ function AppComponent_Conditional_15_Conditional_173_Conditional_15_For_2_Condit
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_173_Conditional_15_For_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 337)(1, "div", 145)(2, "div", 64)(3, "div", 338);
+    \u0275\u0275elementStart(0, "div", 339)(1, "div", 147)(2, "div", 64)(3, "div", 340);
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(4, "svg", 131);
-    \u0275\u0275element(5, "rect", 86)(6, "rect", 87)(7, "rect", 88)(8, "rect", 89);
+    \u0275\u0275elementStart(4, "svg", 133);
+    \u0275\u0275element(5, "rect", 88)(6, "rect", 89)(7, "rect", 90)(8, "rect", 91);
     \u0275\u0275elementEnd()();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(9, "div")(10, "p", 339);
+    \u0275\u0275elementStart(9, "div")(10, "p", 341);
     \u0275\u0275text(11);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "p", 147);
+    \u0275\u0275elementStart(12, "p", 149);
     \u0275\u0275text(13);
-    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_173_Conditional_15_For_2_Conditional_14_Template, 2, 0, "span", 340);
+    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_14_Template, 2, 0, "span", 342);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(15, "div", 64)(16, "div", 300)(17, "span", 278);
+    \u0275\u0275elementStart(15, "div", 64)(16, "div", 302)(17, "span", 280);
     \u0275\u0275text(18);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_173_Conditional_15_For_2_Conditional_19_Template, 2, 1, "span", 341);
+    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_19_Template, 2, 1, "span", 343);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_173_Conditional_15_For_2_Conditional_20_Template, 2, 0, "button", 342);
+    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Conditional_20_Template, 2, 0, "button", 344);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -58466,10 +58689,10 @@ function AppComponent_Conditional_15_Conditional_173_Conditional_15_For_2_Templa
     \u0275\u0275conditional(op_r41.isReversible && !op_r41.reversed ? 20 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_173_Conditional_15_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_180_Conditional_15_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 236);
-    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_173_Conditional_15_For_2_Template, 21, 21, "div", 336, _forTrack024);
+    \u0275\u0275elementStart(0, "div", 238);
+    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_180_Conditional_15_For_2_Template, 21, 21, "div", 338, _forTrack024);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58478,44 +58701,44 @@ function AppComponent_Conditional_15_Conditional_173_Conditional_15_Template(rf,
     \u0275\u0275repeater(ctx_r0.batchOperationHistory());
   }
 }
-function AppComponent_Conditional_15_Conditional_173_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_180_Template(rf, ctx) {
   if (rf & 1) {
     const _r40 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 317);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_173_Template_div_click_0_listener() {
+    \u0275\u0275elementStart(0, "div", 319);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r40);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBatchOperationHistory.set(false));
     });
-    \u0275\u0275elementStart(1, "div", 318);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_173_Template_div_click_1_listener($event) {
+    \u0275\u0275elementStart(1, "div", 320);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r40);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 319)(3, "h3", 320);
+    \u0275\u0275elementStart(2, "div", 321)(3, "h3", 322);
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(4, "svg", 321);
-    \u0275\u0275element(5, "path", 322)(6, "path", 323)(7, "path", 324);
+    \u0275\u0275elementStart(4, "svg", 323);
+    \u0275\u0275element(5, "path", 324)(6, "path", 325)(7, "path", 326);
     \u0275\u0275elementEnd();
     \u0275\u0275text(8, " \u6279\u91CF\u64CD\u4F5C\u6B77\u53F2 ");
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(9, "button", 325);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_173_Template_button_click_9_listener() {
+    \u0275\u0275elementStart(9, "button", 327);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Template_button_click_9_listener() {
       \u0275\u0275restoreView(_r40);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBatchOperationHistory.set(false));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(10, "svg", 326);
-    \u0275\u0275element(11, "line", 327)(12, "line", 328);
+    \u0275\u0275elementStart(10, "svg", 328);
+    \u0275\u0275element(11, "line", 329)(12, "line", 330);
     \u0275\u0275elementEnd()()();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(13, "div", 329);
-    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_173_Conditional_14_Template, 6, 0, "div", 330)(15, AppComponent_Conditional_15_Conditional_173_Conditional_15_Template, 3, 0, "div", 236);
+    \u0275\u0275elementStart(13, "div", 331);
+    \u0275\u0275conditionalCreate(14, AppComponent_Conditional_15_Conditional_180_Conditional_14_Template, 6, 0, "div", 332)(15, AppComponent_Conditional_15_Conditional_180_Conditional_15_Template, 3, 0, "div", 238);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(16, "div", 331)(17, "button", 332);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_173_Template_button_click_17_listener() {
+    \u0275\u0275elementStart(16, "div", 333)(17, "button", 334);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_180_Template_button_click_17_listener() {
       \u0275\u0275restoreView(_r40);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBatchOperationHistory.set(false));
@@ -58529,45 +58752,45 @@ function AppComponent_Conditional_15_Conditional_173_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.batchOperationHistory().length === 0 ? 14 : 15);
   }
 }
-function AppComponent_Conditional_15_Conditional_174_Case_12_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_12_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 351)(1, "div", 357)(2, "div", 358)(3, "div", 359);
+    \u0275\u0275elementStart(0, "div", 353)(1, "div", 359)(2, "div", 360)(3, "div", 361);
     \u0275\u0275text(4, "\u{1F916}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "div", 360);
+    \u0275\u0275elementStart(5, "div", 362);
     \u0275\u0275text(6, "AI \u81EA\u52D5\u56DE\u8986");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(7, "div", 14);
     \u0275\u0275text(8, "\u667A\u80FD\u5BA2\u670D\u52A9\u624B");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(9, "div", 358)(10, "div", 359);
+    \u0275\u0275elementStart(9, "div", 360)(10, "div", 361);
     \u0275\u0275text(11, "\u{1F50D}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "div", 360);
+    \u0275\u0275elementStart(12, "div", 362);
     \u0275\u0275text(13, "\u8CC7\u6E90\u767C\u73FE");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(14, "div", 14);
     \u0275\u0275text(15, "\u81EA\u52D5\u641C\u7D22\u7FA4\u7D44");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(16, "div", 358)(17, "div", 359);
+    \u0275\u0275elementStart(16, "div", 360)(17, "div", 361);
     \u0275\u0275text(18, "\u{1F4CA}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(19, "div", 360);
+    \u0275\u0275elementStart(19, "div", 362);
     \u0275\u0275text(20, "\u6578\u64DA\u5206\u6790");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(21, "div", 14);
     \u0275\u0275text(22, "\u8F49\u5316\u8FFD\u8E64\u5831\u8868");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(23, "p", 361);
+    \u0275\u0275elementStart(23, "p", 363);
     \u0275\u0275text(24, " TG-AI\u667A\u63A7\u738B \u5C07\u5E6B\u52A9\u60A8\u81EA\u52D5\u5316 Telegram \u71DF\u92B7\u6D41\u7A0B\uFF0C");
     \u0275\u0275element(25, "br");
     \u0275\u0275text(26, " \u8B93\u60A8\u5C08\u6CE8\u65BC\u696D\u52D9\u589E\u9577\u800C\u975E\u91CD\u8907\u64CD\u4F5C\u3002 ");
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_15_Conditional_3_For_2_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_For_2_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "option", 251);
+    \u0275\u0275elementStart(0, "option", 253);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -58578,16 +58801,16 @@ function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_15_Cond
     \u0275\u0275textInterpolate(model_r46);
   }
 }
-function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_15_Conditional_3_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
     const _r45 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "select", 370);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_15_Conditional_3_Template_select_ngModelChange_0_listener($event) {
+    \u0275\u0275elementStart(0, "select", 372);
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_Template_select_ngModelChange_0_listener($event) {
       \u0275\u0275restoreView(_r45);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.localAiModel.set($event));
     });
-    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_15_Conditional_3_For_2_Template, 2, 2, "option", 251, \u0275\u0275repeaterTrackByIdentity);
+    \u0275\u0275repeaterCreate(1, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_For_2_Template, 2, 2, "option", 253, \u0275\u0275repeaterTrackByIdentity);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58597,11 +58820,11 @@ function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_15_Cond
     \u0275\u0275repeater(ctx_r0.detectedOllamaModels());
   }
 }
-function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_15_Conditional_4_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_4_Template(rf, ctx) {
   if (rf & 1) {
     const _r47 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "input", 371);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_15_Conditional_4_Template_input_ngModelChange_0_listener($event) {
+    \u0275\u0275elementStart(0, "input", 373);
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_4_Template_input_ngModelChange_0_listener($event) {
       \u0275\u0275restoreView(_r47);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.localAiModel.set($event));
@@ -58613,12 +58836,12 @@ function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_15_Cond
     \u0275\u0275property("ngModel", ctx_r0.localAiModel());
   }
 }
-function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_15_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 358)(1, "label", 367);
+    \u0275\u0275elementStart(0, "div", 360)(1, "label", 369);
     \u0275\u0275text(2, "\u9078\u64C7 AI \u6A21\u578B");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_15_Conditional_3_Template, 3, 1, "select", 368)(4, AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_15_Conditional_4_Template, 1, 1, "input", 369);
+    \u0275\u0275conditionalCreate(3, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_3_Template, 3, 1, "select", 370)(4, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Conditional_4_Template, 1, 1, "input", 371);
     \u0275\u0275elementStart(5, "p", 15);
     \u0275\u0275text(6, "\u63A8\u85A6\uFF1Aqwen2:7b\uFF08\u4E2D\u82F1\u6587\u901A\u7528\uFF09");
     \u0275\u0275elementEnd()();
@@ -58629,19 +58852,19 @@ function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_15_Temp
     \u0275\u0275conditional(ctx_r0.detectedOllamaModels().length > 0 ? 3 : 4);
   }
 }
-function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_16_Conditional_16_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
     const _r49 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 377)(1, "select", 378);
-    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_16_Conditional_16_Template_select_ngModelChange_1_listener($event) {
+    \u0275\u0275elementStart(0, "div", 379)(1, "select", 380);
+    \u0275\u0275listener("ngModelChange", function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Conditional_16_Template_select_ngModelChange_1_listener($event) {
       \u0275\u0275restoreView(_r49);
       const ctx_r0 = \u0275\u0275nextContext(5);
       return \u0275\u0275resetView(ctx_r0.aiBackupProvider.set($event));
     });
-    \u0275\u0275elementStart(2, "option", 379);
+    \u0275\u0275elementStart(2, "option", 381);
     \u0275\u0275text(3, "Google Gemini\uFF08\u514D\u8CBB\u984D\u5EA6\uFF09");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "option", 380);
+    \u0275\u0275elementStart(4, "option", 382);
     \u0275\u0275text(5, "OpenAI GPT");
     \u0275\u0275elementEnd()()();
   }
@@ -58651,33 +58874,33 @@ function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_16_Cond
     \u0275\u0275property("ngModel", ctx_r0.aiBackupProvider());
   }
 }
-function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_16_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Template(rf, ctx) {
   if (rf & 1) {
     const _r48 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 358)(1, "div", 372)(2, "p", 175);
+    \u0275\u0275elementStart(0, "div", 360)(1, "div", 374)(2, "p", 177);
     \u0275\u0275text(3, "\u{1F4E6} \u5B89\u88DD Ollama\uFF08\u514D\u8CBB\uFF09\uFF1A");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "code", 373);
+    \u0275\u0275elementStart(4, "code", 375);
     \u0275\u0275text(5, " curl -fsSL https://ollama.com/install.sh | sh ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "p", 147);
+    \u0275\u0275elementStart(6, "p", 149);
     \u0275\u0275text(7, " \u5B89\u88DD\u5F8C\u904B\u884C ");
-    \u0275\u0275elementStart(8, "code", 265);
+    \u0275\u0275elementStart(8, "code", 267);
     \u0275\u0275text(9, "ollama pull qwen2:7b");
     \u0275\u0275elementEnd();
     \u0275\u0275text(10, " \u4E0B\u8F09\u6A21\u578B ");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(11, "div", 358)(12, "label", 374)(13, "input", 375);
-    \u0275\u0275listener("change", function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_16_Template_input_change_13_listener() {
+    \u0275\u0275elementStart(11, "div", 360)(12, "label", 376)(13, "input", 377);
+    \u0275\u0275listener("change", function AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Template_input_change_13_listener() {
       \u0275\u0275restoreView(_r48);
       const ctx_r0 = \u0275\u0275nextContext(4);
       return \u0275\u0275resetView(ctx_r0.aiAutoFallback.set(!ctx_r0.aiAutoFallback()));
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "span", 376);
+    \u0275\u0275elementStart(14, "span", 378);
     \u0275\u0275text(15, "\u4F7F\u7528\u96F2\u7AEF AI \u4F5C\u70BA\u5099\u9078");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_16_Conditional_16_Template, 6, 1, "div", 377);
+    \u0275\u0275conditionalCreate(16, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Conditional_16_Template, 6, 1, "div", 379);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58688,30 +58911,30 @@ function AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_16_Temp
     \u0275\u0275conditional(ctx_r0.aiAutoFallback() ? 16 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_174_Case_13_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_13_Template(rf, ctx) {
   if (rf & 1) {
     const _r44 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 224)(1, "h3", 362);
+    \u0275\u0275elementStart(0, "div", 226)(1, "h3", 364);
     \u0275\u0275text(2, "\u{1F999} AI \u670D\u52D9\u914D\u7F6E");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "div", 363)(4, "div", 145)(5, "div", 64)(6, "span", 364);
+    \u0275\u0275elementStart(3, "div", 365)(4, "div", 147)(5, "div", 64)(6, "span", 366);
     \u0275\u0275text(7);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "div")(9, "div", 365);
+    \u0275\u0275elementStart(8, "div")(9, "div", 367);
     \u0275\u0275text(10);
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(11, "div", 32);
     \u0275\u0275text(12);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(13, "button", 366);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_174_Case_13_Template_button_click_13_listener() {
+    \u0275\u0275elementStart(13, "button", 368);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Case_13_Template_button_click_13_listener() {
       \u0275\u0275restoreView(_r44);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.detectOllama());
     });
     \u0275\u0275text(14);
     \u0275\u0275elementEnd()()();
-    \u0275\u0275conditionalCreate(15, AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_15_Template, 7, 1, "div", 358)(16, AppComponent_Conditional_15_Conditional_174_Case_13_Conditional_16_Template, 17, 2);
+    \u0275\u0275conditionalCreate(15, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_15_Template, 7, 1, "div", 360)(16, AppComponent_Conditional_15_Conditional_181_Case_13_Conditional_16_Template, 17, 2);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -58732,7 +58955,7 @@ function AppComponent_Conditional_15_Conditional_174_Case_13_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.ollamaDetected() ? 15 : 16);
   }
 }
-function AppComponent_Conditional_15_Conditional_174_Case_14_Conditional_13_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_14_Conditional_13_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "p");
     \u0275\u0275text(1);
@@ -58744,23 +58967,23 @@ function AppComponent_Conditional_15_Conditional_174_Case_14_Conditional_13_Temp
     \u0275\u0275textInterpolate1("\u2705 \u6A21\u578B\uFF1A", ctx_r0.localAiModel());
   }
 }
-function AppComponent_Conditional_15_Conditional_174_Case_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Case_14_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 351)(1, "div", 381);
+    \u0275\u0275elementStart(0, "div", 353)(1, "div", 383);
     \u0275\u0275text(2, "\u{1F389}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "h3", 382);
+    \u0275\u0275elementStart(3, "h3", 384);
     \u0275\u0275text(4, "\u8A2D\u7F6E\u5B8C\u6210\uFF01");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "p", 361);
+    \u0275\u0275elementStart(5, "p", 363);
     \u0275\u0275text(6, " \u60A8\u5DF2\u6E96\u5099\u597D\u958B\u59CB\u4F7F\u7528 TG-AI\u667A\u63A7\u738B\u3002");
     \u0275\u0275element(7, "br");
     \u0275\u0275text(8, " \u63A5\u4E0B\u4F86\u8ACB\u6DFB\u52A0\u60A8\u7684\u7B2C\u4E00\u500B Telegram \u5E33\u865F\u3002 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "div", 383)(10, "div", 384)(11, "p");
+    \u0275\u0275elementStart(9, "div", 385)(10, "div", 386)(11, "p");
     \u0275\u0275text(12);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(13, AppComponent_Conditional_15_Conditional_174_Case_14_Conditional_13_Template, 2, 1, "p");
+    \u0275\u0275conditionalCreate(13, AppComponent_Conditional_15_Conditional_181_Case_14_Conditional_13_Template, 2, 1, "p");
     \u0275\u0275elementStart(14, "p");
     \u0275\u0275text(15);
     \u0275\u0275elementEnd()()()();
@@ -58775,11 +58998,11 @@ function AppComponent_Conditional_15_Conditional_174_Case_14_Template(rf, ctx) {
     \u0275\u0275textInterpolate1("\u2705 \u81EA\u52D5\u964D\u7D1A\uFF1A", ctx_r0.aiAutoFallback() ? "\u5DF2\u555F\u7528" : "\u5DF2\u7981\u7528");
   }
 }
-function AppComponent_Conditional_15_Conditional_174_Conditional_19_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Conditional_19_Template(rf, ctx) {
   if (rf & 1) {
     const _r50 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 385);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_174_Conditional_19_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 387);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Conditional_19_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r50);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.welcomeStep.set(ctx_r0.welcomeStep() - 1));
@@ -58788,11 +59011,11 @@ function AppComponent_Conditional_15_Conditional_174_Conditional_19_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_174_Conditional_20_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Conditional_20_Template(rf, ctx) {
   if (rf & 1) {
     const _r51 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 386);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_174_Conditional_20_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 388);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Conditional_20_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r51);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.welcomeStep.set(ctx_r0.welcomeStep() + 1));
@@ -58801,11 +59024,11 @@ function AppComponent_Conditional_15_Conditional_174_Conditional_20_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_174_Conditional_21_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Conditional_21_Template(rf, ctx) {
   if (rf & 1) {
     const _r52 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 387);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_174_Conditional_21_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 389);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Conditional_21_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r52);
       const ctx_r0 = \u0275\u0275nextContext(3);
       return \u0275\u0275resetView(ctx_r0.completeFirstRunSetup());
@@ -58814,32 +59037,32 @@ function AppComponent_Conditional_15_Conditional_174_Conditional_21_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_174_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_181_Template(rf, ctx) {
   if (rf & 1) {
     const _r43 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 113)(1, "div", 344)(2, "div", 345)(3, "h1", 346);
+    \u0275\u0275elementStart(0, "div", 115)(1, "div", 346)(2, "div", 347)(3, "h1", 348);
     \u0275\u0275text(4, "\u{1F680} \u6B61\u8FCE\u4F7F\u7528 TG-AI\u667A\u63A7\u738B");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "p", 347);
+    \u0275\u0275elementStart(5, "p", 349);
     \u0275\u0275text(6, "AI \u9A45\u52D5\u7684 Telegram \u71DF\u92B7\u81EA\u52D5\u5316\u5E73\u53F0");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "div", 348);
-    \u0275\u0275element(8, "div", 349)(9, "div", 349)(10, "div", 349);
+    \u0275\u0275elementStart(7, "div", 350);
+    \u0275\u0275element(8, "div", 351)(9, "div", 351)(10, "div", 351);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "div", 350);
-    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_174_Case_12_Template, 27, 0, "div", 351)(13, AppComponent_Conditional_15_Conditional_174_Case_13_Template, 17, 8, "div", 224)(14, AppComponent_Conditional_15_Conditional_174_Case_14_Template, 16, 3, "div", 351);
+    \u0275\u0275elementStart(11, "div", 352);
+    \u0275\u0275conditionalCreate(12, AppComponent_Conditional_15_Conditional_181_Case_12_Template, 27, 0, "div", 353)(13, AppComponent_Conditional_15_Conditional_181_Case_13_Template, 17, 8, "div", 226)(14, AppComponent_Conditional_15_Conditional_181_Case_14_Template, 16, 3, "div", 353);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(15, "div", 352)(16, "button", 353);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_174_Template_button_click_16_listener() {
+    \u0275\u0275elementStart(15, "div", 354)(16, "button", 355);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_181_Template_button_click_16_listener() {
       \u0275\u0275restoreView(_r43);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.skipFirstRunSetup());
     });
     \u0275\u0275text(17, " \u8DF3\u904E\u8A2D\u7F6E ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(18, "div", 248);
-    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_174_Conditional_19_Template, 2, 0, "button", 354);
-    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_174_Conditional_20_Template, 2, 0, "button", 355)(21, AppComponent_Conditional_15_Conditional_174_Conditional_21_Template, 2, 0, "button", 356);
+    \u0275\u0275elementStart(18, "div", 250);
+    \u0275\u0275conditionalCreate(19, AppComponent_Conditional_15_Conditional_181_Conditional_19_Template, 2, 0, "button", 356);
+    \u0275\u0275conditionalCreate(20, AppComponent_Conditional_15_Conditional_181_Conditional_20_Template, 2, 0, "button", 357)(21, AppComponent_Conditional_15_Conditional_181_Conditional_21_Template, 2, 0, "button", 358);
     \u0275\u0275elementEnd()()()();
   }
   if (rf & 2) {
@@ -58859,9 +59082,9 @@ function AppComponent_Conditional_15_Conditional_174_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.welcomeStep() < 3 ? 20 : 21);
   }
 }
-function AppComponent_Conditional_15_Conditional_175_For_14_Conditional_7_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_182_For_14_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "p", 403);
+    \u0275\u0275elementStart(0, "p", 405);
     \u0275\u0275text(1);
     \u0275\u0275elementEnd();
   }
@@ -58871,22 +59094,22 @@ function AppComponent_Conditional_15_Conditional_175_For_14_Conditional_7_Templa
     \u0275\u0275textInterpolate2(" \u2713 \u6709\u5143\u6578\u64DA: ", session_r54.metadata.firstName || "", " ", session_r54.metadata.username ? "@" + session_r54.metadata.username : "", " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_175_For_14_Conditional_8_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_182_For_14_Conditional_8_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "p", 404);
+    \u0275\u0275elementStart(0, "p", 406);
     \u0275\u0275text(1, "\u26A0 \u7121\u5143\u6578\u64DA\uFF0C\u9700\u8981\u91CD\u65B0\u767B\u9304\u9A57\u8B49");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_175_For_14_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_182_For_14_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 396)(1, "div", 64)(2, "span", 364);
+    \u0275\u0275elementStart(0, "div", 398)(1, "div", 64)(2, "span", 366);
     \u0275\u0275text(3, "\u{1F4F1}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "div")(5, "p", 402);
+    \u0275\u0275elementStart(4, "div")(5, "p", 404);
     \u0275\u0275text(6);
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_175_For_14_Conditional_7_Template, 2, 2, "p", 403)(8, AppComponent_Conditional_15_Conditional_175_For_14_Conditional_8_Template, 2, 0, "p", 404);
+    \u0275\u0275conditionalCreate(7, AppComponent_Conditional_15_Conditional_182_For_14_Conditional_7_Template, 2, 2, "p", 405)(8, AppComponent_Conditional_15_Conditional_182_For_14_Conditional_8_Template, 2, 0, "p", 406);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -58897,9 +59120,9 @@ function AppComponent_Conditional_15_Conditional_175_For_14_Template(rf, ctx) {
     \u0275\u0275conditional(session_r54.hasMetadata && session_r54.metadata ? 7 : 8);
   }
 }
-function AppComponent_Conditional_15_Conditional_175_Conditional_25_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_182_Conditional_25_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 266);
+    \u0275\u0275elementStart(0, "span", 268);
     \u0275\u0275text(1, "\u23F3");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(2, "span");
@@ -58907,7 +59130,7 @@ function AppComponent_Conditional_15_Conditional_175_Conditional_25_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_175_Conditional_26_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_182_Conditional_26_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span");
     \u0275\u0275text(1, "\u{1F504}");
@@ -58917,46 +59140,46 @@ function AppComponent_Conditional_15_Conditional_175_Conditional_26_Template(rf,
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_Conditional_15_Conditional_175_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_182_Template(rf, ctx) {
   if (rf & 1) {
     const _r53 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 113)(1, "div", 388)(2, "div", 389)(3, "div", 390);
+    \u0275\u0275elementStart(0, "div", 115)(1, "div", 390)(2, "div", 391)(3, "div", 392);
     \u0275\u0275text(4, "\u{1F504}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "h2", 391);
+    \u0275\u0275elementStart(5, "h2", 393);
     \u0275\u0275text(6, "\u767C\u73FE\u53EF\u6062\u5FA9\u7684\u5E33\u865F");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "p", 392);
+    \u0275\u0275elementStart(7, "p", 394);
     \u0275\u0275text(8);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(9, "div", 393)(10, "p", 394);
+    \u0275\u0275elementStart(9, "div", 395)(10, "p", 396);
     \u0275\u0275text(11, " \u9019\u4E9B Session \u6587\u4EF6\u5B58\u5728\u65BC\u7CFB\u7D71\u4E2D\uFF0C\u4F46\u672A\u5728\u6578\u64DA\u5EAB\u4E2D\u627E\u5230\u5C0D\u61C9\u7684\u5E33\u865F\u8A18\u9304\u3002 \u60A8\u53EF\u4EE5\u5617\u8A66\u6062\u5FA9\u9019\u4E9B\u5E33\u865F\uFF0C\u6216\u9078\u64C7\u5FFD\u7565\u3002 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(12, "div", 395);
-    \u0275\u0275repeaterCreate(13, AppComponent_Conditional_15_Conditional_175_For_14_Template, 9, 2, "div", 396, _forTrack25);
+    \u0275\u0275elementStart(12, "div", 397);
+    \u0275\u0275repeaterCreate(13, AppComponent_Conditional_15_Conditional_182_For_14_Template, 9, 2, "div", 398, _forTrack25);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(15, "div", 397)(16, "p", 398);
+    \u0275\u0275elementStart(15, "div", 399)(16, "p", 400);
     \u0275\u0275text(17, " \u{1F4A1} ");
     \u0275\u0275elementStart(18, "strong");
     \u0275\u0275text(19, "\u63D0\u793A\uFF1A");
     \u0275\u0275elementEnd();
     \u0275\u0275text(20, " \u6062\u5FA9\u5F8C\uFF0C\u5E33\u865F\u5C07\u4EE5\u300C\u96E2\u7DDA\u300D\u72C0\u614B\u6DFB\u52A0\u5230\u5217\u8868\u4E2D\u3002 \u60A8\u9700\u8981\u9EDE\u64CA\u300C\u767B\u9304\u300D\u4F86\u91CD\u65B0\u9023\u63A5\u5E33\u865F\u3002 ");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(21, "div", 399)(22, "button", 400);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_175_Template_button_click_22_listener() {
+    \u0275\u0275elementStart(21, "div", 401)(22, "button", 402);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_182_Template_button_click_22_listener() {
       \u0275\u0275restoreView(_r53);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.dismissOrphanSessionDialog());
     });
     \u0275\u0275text(23, " \u7A0D\u5F8C\u8655\u7406 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(24, "button", 401);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_175_Template_button_click_24_listener() {
+    \u0275\u0275elementStart(24, "button", 403);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_182_Template_button_click_24_listener() {
       \u0275\u0275restoreView(_r53);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.recoverOrphanSessions());
     });
-    \u0275\u0275conditionalCreate(25, AppComponent_Conditional_15_Conditional_175_Conditional_25_Template, 4, 0)(26, AppComponent_Conditional_15_Conditional_175_Conditional_26_Template, 4, 0);
+    \u0275\u0275conditionalCreate(25, AppComponent_Conditional_15_Conditional_182_Conditional_25_Template, 4, 0)(26, AppComponent_Conditional_15_Conditional_182_Conditional_26_Template, 4, 0);
     \u0275\u0275elementEnd()()()();
   }
   if (rf & 2) {
@@ -58971,9 +59194,9 @@ function AppComponent_Conditional_15_Conditional_175_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.isRecoveringOrphanSessions() ? 25 : 26);
   }
 }
-function AppComponent_Conditional_15_Conditional_176_Conditional_41_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_183_Conditional_41_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 413)(1, "p", 414)(2, "span", 175);
+    \u0275\u0275elementStart(0, "div", 415)(1, "p", 416)(2, "span", 177);
     \u0275\u0275text(3, "\u932F\u8AA4\u8A73\u60C5\uFF1A");
     \u0275\u0275elementEnd();
     \u0275\u0275text(4);
@@ -58985,55 +59208,55 @@ function AppComponent_Conditional_15_Conditional_176_Conditional_41_Template(rf,
     \u0275\u0275textInterpolate1(" ", ctx_r0.backendError(), " ");
   }
 }
-function AppComponent_Conditional_15_Conditional_176_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_183_Template(rf, ctx) {
   if (rf & 1) {
     const _r55 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 113)(1, "div", 405)(2, "div", 406)(3, "div", 390);
+    \u0275\u0275elementStart(0, "div", 115)(1, "div", 407)(2, "div", 408)(3, "div", 392);
     \u0275\u0275text(4, "\u26A0\uFE0F");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(5, "h2", 407);
+    \u0275\u0275elementStart(5, "h2", 409);
     \u0275\u0275text(6, "Python \u5F8C\u7AEF\u672A\u904B\u884C");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "div", 393)(8, "p", 361);
+    \u0275\u0275elementStart(7, "div", 395)(8, "p", 363);
     \u0275\u0275text(9, " \u7A0B\u5E8F\u9700\u8981 Python \u74B0\u5883\u624D\u80FD\u6B63\u5E38\u904B\u884C\u3002\u8ACB\u78BA\u4FDD\uFF1A ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(10, "div", 408)(11, "div", 409)(12, "span", 265);
+    \u0275\u0275elementStart(10, "div", 410)(11, "div", 411)(12, "span", 267);
     \u0275\u0275text(13, "1.");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(14, "div")(15, "p", 402);
+    \u0275\u0275elementStart(14, "div")(15, "p", 404);
     \u0275\u0275text(16, "\u5B89\u88DD Python 3.9+");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "a", 410);
+    \u0275\u0275elementStart(17, "a", 412);
     \u0275\u0275text(18, " https://www.python.org/downloads/ ");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(19, "div", 409)(20, "span", 265);
+    \u0275\u0275elementStart(19, "div", 411)(20, "span", 267);
     \u0275\u0275text(21, "2.");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(22, "div")(23, "p", 402);
+    \u0275\u0275elementStart(22, "div")(23, "p", 404);
     \u0275\u0275text(24, '\u5B89\u88DD\u6642\u52FE\u9078 "Add Python to PATH"');
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(25, "p", 411);
+    \u0275\u0275elementStart(25, "p", 413);
     \u0275\u0275text(26, "\u78BA\u4FDD Python \u6DFB\u52A0\u5230\u7CFB\u7D71\u74B0\u5883\u8B8A\u91CF");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(27, "div", 409)(28, "span", 265);
+    \u0275\u0275elementStart(27, "div", 411)(28, "span", 267);
     \u0275\u0275text(29, "3.");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(30, "div")(31, "p", 402);
+    \u0275\u0275elementStart(30, "div")(31, "p", 404);
     \u0275\u0275text(32, "\u5B89\u88DD\u4F9D\u8CF4");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(33, "code", 412);
+    \u0275\u0275elementStart(33, "code", 414);
     \u0275\u0275text(34, " pip install pyrogram tgcrypto aiosqlite ");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(35, "div", 409)(36, "span", 265);
+    \u0275\u0275elementStart(35, "div", 411)(36, "span", 267);
     \u0275\u0275text(37, "4.");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(38, "div")(39, "p", 402);
+    \u0275\u0275elementStart(38, "div")(39, "p", 404);
     \u0275\u0275text(40, "\u91CD\u65B0\u555F\u52D5\u7A0B\u5E8F");
     \u0275\u0275elementEnd()()()();
-    \u0275\u0275conditionalCreate(41, AppComponent_Conditional_15_Conditional_176_Conditional_41_Template, 5, 1, "div", 413);
+    \u0275\u0275conditionalCreate(41, AppComponent_Conditional_15_Conditional_183_Conditional_41_Template, 5, 1, "div", 415);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(42, "div", 399)(43, "button", 400);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_176_Template_button_click_43_listener() {
+    \u0275\u0275elementStart(42, "div", 401)(43, "button", 402);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_183_Template_button_click_43_listener() {
       \u0275\u0275restoreView(_r55);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBackendErrorDialog.set(false));
@@ -59047,69 +59270,69 @@ function AppComponent_Conditional_15_Conditional_176_Template(rf, ctx) {
     \u0275\u0275conditional(ctx_r0.backendError() ? 41 : -1);
   }
 }
-function AppComponent_Conditional_15_Conditional_177_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_184_Template(rf, ctx) {
   if (rf & 1) {
     const _r56 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 415);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_177_Template_div_click_0_listener() {
+    \u0275\u0275elementStart(0, "div", 417);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_184_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r56);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.showBackendErrorDialog.set(true));
     });
-    \u0275\u0275elementStart(1, "span", 152);
+    \u0275\u0275elementStart(1, "span", 154);
     \u0275\u0275text(2, "\u26A0\uFE0F");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "span", 235);
+    \u0275\u0275elementStart(3, "span", 237);
     \u0275\u0275text(4, "Python \u5F8C\u7AEF\u672A\u904B\u884C");
     \u0275\u0275elementEnd()();
   }
 }
-function AppComponent_Conditional_15_Conditional_178_Template(rf, ctx) {
+function AppComponent_Conditional_15_Conditional_185_Template(rf, ctx) {
   if (rf & 1) {
     const _r57 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 416);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_178_Template_div_click_0_listener() {
+    \u0275\u0275elementStart(0, "div", 418);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_div_click_0_listener() {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.cancelNewKeywordSet());
     });
-    \u0275\u0275elementStart(1, "div", 417);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_178_Template_div_click_1_listener($event) {
+    \u0275\u0275elementStart(1, "div", 419);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_div_click_1_listener($event) {
       \u0275\u0275restoreView(_r57);
       return \u0275\u0275resetView($event.stopPropagation());
     });
-    \u0275\u0275elementStart(2, "div", 418)(3, "h2", 419)(4, "span");
+    \u0275\u0275elementStart(2, "div", 420)(3, "h2", 421)(4, "span");
     \u0275\u0275text(5, "\u{1F511}");
     \u0275\u0275elementEnd();
     \u0275\u0275text(6, " \u5275\u5EFA\u95DC\u9375\u8A5E\u96C6 ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(7, "div", 350)(8, "label", 420);
+    \u0275\u0275elementStart(7, "div", 352)(8, "label", 422);
     \u0275\u0275text(9, "\u95DC\u9375\u8A5E\u96C6\u540D\u7A31");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(10, "input", 421);
-    \u0275\u0275listener("input", function AppComponent_Conditional_15_Conditional_178_Template_input_input_10_listener($event) {
+    \u0275\u0275elementStart(10, "input", 423);
+    \u0275\u0275listener("input", function AppComponent_Conditional_15_Conditional_185_Template_input_input_10_listener($event) {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.newKeywordSet.set({ name: $event.target.value }));
-    })("keyup.enter", function AppComponent_Conditional_15_Conditional_178_Template_input_keyup_enter_10_listener() {
+    })("keyup.enter", function AppComponent_Conditional_15_Conditional_185_Template_input_keyup_enter_10_listener() {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.submitNewKeywordSet());
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "p", 311);
+    \u0275\u0275elementStart(11, "p", 313);
     \u0275\u0275text(12, " \u{1F4A1} \u5275\u5EFA\u5F8C\u53EF\u5728\u8A5E\u96C6\u4E2D\u6DFB\u52A0\u591A\u500B\u95DC\u9375\u8A5E ");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(13, "div", 399)(14, "button", 400);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_178_Template_button_click_14_listener() {
+    \u0275\u0275elementStart(13, "div", 401)(14, "button", 402);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_button_click_14_listener() {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.cancelNewKeywordSet());
     });
     \u0275\u0275text(15, " \u53D6\u6D88 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(16, "button", 422);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_178_Template_button_click_16_listener() {
+    \u0275\u0275elementStart(16, "button", 424);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Conditional_185_Template_button_click_16_listener() {
       \u0275\u0275restoreView(_r57);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.submitNewKeywordSet());
@@ -59206,176 +59429,190 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_a_click_56_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
-      return \u0275\u0275resetView(ctx_r0.changeView("dashboard"));
+      return \u0275\u0275resetView(ctx_r0.changeView("wallet"));
     });
     \u0275\u0275namespaceSVG();
     \u0275\u0275elementStart(57, "svg", 84);
-    \u0275\u0275element(58, "rect", 86)(59, "rect", 87)(60, "rect", 88)(61, "rect", 89);
+    \u0275\u0275element(58, "rect", 86)(59, "line", 87);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(62, "span");
-    \u0275\u0275text(63);
+    \u0275\u0275elementStart(60, "span");
+    \u0275\u0275text(61, "\u6211\u7684\u9322\u5305");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(64, "div", 90)(65, "button", 91);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_65_listener() {
+    \u0275\u0275elementStart(62, "a", 83);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_a_click_62_listener() {
+      \u0275\u0275restoreView(_r5);
+      const ctx_r0 = \u0275\u0275nextContext();
+      return \u0275\u0275resetView(ctx_r0.changeView("dashboard"));
+    });
+    \u0275\u0275namespaceSVG();
+    \u0275\u0275elementStart(63, "svg", 84);
+    \u0275\u0275element(64, "rect", 88)(65, "rect", 89)(66, "rect", 90)(67, "rect", 91);
+    \u0275\u0275elementEnd();
+    \u0275\u0275namespaceHTML();
+    \u0275\u0275elementStart(68, "span");
+    \u0275\u0275text(69);
+    \u0275\u0275elementEnd()();
+    \u0275\u0275elementStart(70, "div", 92)(71, "button", 93);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_71_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.toggleSidebarGroup("manual"));
     });
-    \u0275\u0275elementStart(66, "span", 92);
-    \u0275\u0275text(67, " \u{1F527} \u624B\u52D5\u64CD\u4F5C ");
+    \u0275\u0275elementStart(72, "span", 94);
+    \u0275\u0275text(73, " \u{1F527} \u624B\u52D5\u64CD\u4F5C ");
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(68, "svg", 93);
-    \u0275\u0275element(69, "polyline", 94);
+    \u0275\u0275elementStart(74, "svg", 95);
+    \u0275\u0275element(75, "polyline", 96);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(70, AppComponent_Conditional_15_Conditional_70_Template, 30, 25, "div", 95);
+    \u0275\u0275conditionalCreate(76, AppComponent_Conditional_15_Conditional_76_Template, 30, 25, "div", 97);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(71, "div", 90)(72, "button", 91);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_72_listener() {
+    \u0275\u0275elementStart(77, "div", 92)(78, "button", 93);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_78_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.toggleSidebarGroup("monitoring"));
     });
-    \u0275\u0275elementStart(73, "span", 96)(74, "span", 97);
-    \u0275\u0275text(75, "\u{1F4E1}");
+    \u0275\u0275elementStart(79, "span", 98)(80, "span", 99);
+    \u0275\u0275text(81, "\u{1F4E1}");
     \u0275\u0275elementEnd();
-    \u0275\u0275text(76, " \u76E3\u63A7\u4E2D\u5FC3 ");
+    \u0275\u0275text(82, " \u76E3\u63A7\u4E2D\u5FC3 ");
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(77, "svg", 93);
-    \u0275\u0275element(78, "polyline", 94);
+    \u0275\u0275elementStart(83, "svg", 95);
+    \u0275\u0275element(84, "polyline", 96);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(79, AppComponent_Conditional_15_Conditional_79_Template, 42, 52, "div", 95);
+    \u0275\u0275conditionalCreate(85, AppComponent_Conditional_15_Conditional_85_Template, 42, 52, "div", 97);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(80, "div", 90)(81, "button", 91);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_81_listener() {
+    \u0275\u0275elementStart(86, "div", 92)(87, "button", 93);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_87_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.toggleSidebarGroup("marketing"));
     });
-    \u0275\u0275elementStart(82, "span", 96)(83, "span", 98);
-    \u0275\u0275text(84, "AI");
+    \u0275\u0275elementStart(88, "span", 98)(89, "span", 100);
+    \u0275\u0275text(90, "AI");
     \u0275\u0275elementEnd();
-    \u0275\u0275text(85, " \u667A\u80FD\u71DF\u92B7 ");
+    \u0275\u0275text(91, " \u667A\u80FD\u71DF\u92B7 ");
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(86, "svg", 93);
-    \u0275\u0275element(87, "polyline", 94);
+    \u0275\u0275elementStart(92, "svg", 95);
+    \u0275\u0275element(93, "polyline", 96);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(88, AppComponent_Conditional_15_Conditional_88_Template, 34, 60, "div", 95);
+    \u0275\u0275conditionalCreate(94, AppComponent_Conditional_15_Conditional_94_Template, 34, 60, "div", 97);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(89, "div", 90)(90, "button", 91);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_90_listener() {
+    \u0275\u0275elementStart(95, "div", 92)(96, "button", 93);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_96_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.toggleSidebarGroup("analytics"));
     });
-    \u0275\u0275elementStart(91, "span", 92);
-    \u0275\u0275text(92, " \u{1F4CA} \u6578\u64DA\u5206\u6790 ");
+    \u0275\u0275elementStart(97, "span", 94);
+    \u0275\u0275text(98, " \u{1F4CA} \u6578\u64DA\u5206\u6790 ");
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(93, "svg", 93);
-    \u0275\u0275element(94, "polyline", 94);
+    \u0275\u0275elementStart(99, "svg", 95);
+    \u0275\u0275element(100, "polyline", 96);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(95, AppComponent_Conditional_15_Conditional_95_Template, 25, 24, "div", 95);
+    \u0275\u0275conditionalCreate(101, AppComponent_Conditional_15_Conditional_101_Template, 25, 24, "div", 97);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(96, "div", 90)(97, "button", 91);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_97_listener() {
+    \u0275\u0275elementStart(102, "div", 92)(103, "button", 93);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_103_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.toggleSidebarGroup("ai"));
     });
-    \u0275\u0275elementStart(98, "span", 92);
-    \u0275\u0275text(99);
+    \u0275\u0275elementStart(104, "span", 94);
+    \u0275\u0275text(105);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(100, "svg", 93);
-    \u0275\u0275element(101, "polyline", 94);
+    \u0275\u0275elementStart(106, "svg", 95);
+    \u0275\u0275element(107, "polyline", 96);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(102, AppComponent_Conditional_15_Conditional_102_Template, 15, 16, "div", 95);
+    \u0275\u0275conditionalCreate(108, AppComponent_Conditional_15_Conditional_108_Template, 15, 16, "div", 97);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(103, "div", 90)(104, "button", 91);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_104_listener() {
+    \u0275\u0275elementStart(109, "div", 92)(110, "button", 93);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_110_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.toggleSidebarGroup("system"));
     });
-    \u0275\u0275elementStart(105, "span", 92);
-    \u0275\u0275text(106);
+    \u0275\u0275elementStart(111, "span", 94);
+    \u0275\u0275text(112);
     \u0275\u0275elementEnd();
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(107, "svg", 93);
-    \u0275\u0275element(108, "polyline", 94);
+    \u0275\u0275elementStart(113, "svg", 95);
+    \u0275\u0275element(114, "polyline", 96);
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(109, AppComponent_Conditional_15_Conditional_109_Template, 7, 7, "div", 95);
+    \u0275\u0275conditionalCreate(115, AppComponent_Conditional_15_Conditional_115_Template, 7, 7, "div", 97);
     \u0275\u0275elementEnd()();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(110, "div", 99)(111, "button", 100);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_111_listener() {
+    \u0275\u0275elementStart(116, "div", 101)(117, "button", 102);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_117_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.openOnboarding());
     });
-    \u0275\u0275elementStart(112, "span", 101);
-    \u0275\u0275text(113, "\u2753");
+    \u0275\u0275elementStart(118, "span", 103);
+    \u0275\u0275text(119, "\u2753");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(114, "span");
-    \u0275\u0275text(115, "\u4F7F\u7528\u5E2E\u52A9");
+    \u0275\u0275elementStart(120, "span");
+    \u0275\u0275text(121, "\u4F7F\u7528\u5E2E\u52A9");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(116, "div")(117, "label", 102);
-    \u0275\u0275text(118);
+    \u0275\u0275elementStart(122, "div")(123, "label", 104);
+    \u0275\u0275text(124);
     \u0275\u0275elementEnd();
-    \u0275\u0275element(119, "app-language-switcher-compact");
+    \u0275\u0275element(125, "app-language-switcher-compact");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(120, "div")(121, "label", 102);
-    \u0275\u0275text(122);
+    \u0275\u0275elementStart(126, "div")(127, "label", 104);
+    \u0275\u0275text(128);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(123, "div", 103)(124, "button", 104);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_124_listener() {
+    \u0275\u0275elementStart(129, "div", 105)(130, "button", 106);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_130_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.theme.set("light"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(125, "svg", 105);
-    \u0275\u0275element(126, "path", 106);
+    \u0275\u0275elementStart(131, "svg", 107);
+    \u0275\u0275element(132, "path", 108);
     \u0275\u0275elementEnd()();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(127, "button", 104);
-    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_127_listener() {
+    \u0275\u0275elementStart(133, "button", 106);
+    \u0275\u0275listener("click", function AppComponent_Conditional_15_Template_button_click_133_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.theme.set("dark"));
     });
     \u0275\u0275namespaceSVG();
-    \u0275\u0275elementStart(128, "svg", 105);
-    \u0275\u0275element(129, "path", 107);
+    \u0275\u0275elementStart(134, "svg", 107);
+    \u0275\u0275element(135, "path", 109);
     \u0275\u0275elementEnd()()()()()();
     \u0275\u0275namespaceHTML();
-    \u0275\u0275elementStart(130, "main", 108);
-    \u0275\u0275conditionalCreate(131, AppComponent_Conditional_15_Case_131_Template, 1, 0, "app-dashboard-view")(132, AppComponent_Conditional_15_Case_132_Template, 1, 0, "app-accounts-view")(133, AppComponent_Conditional_15_Case_133_Template, 1, 0, "app-add-account-page")(134, AppComponent_Conditional_15_Case_134_Template, 1, 0, "app-api-credentials-view")(135, AppComponent_Conditional_15_Case_135_Template, 1, 0, "app-settings-view")(136, AppComponent_Conditional_15_Case_136_Template, 1, 0, "app-leads-view")(137, AppComponent_Conditional_15_Case_137_Template, 1, 0, "app-automation-view")(138, AppComponent_Conditional_15_Case_138_Template, 1, 0, "app-resource-discovery-view")(139, AppComponent_Conditional_15_Case_139_Template, 1, 0, "app-resource-discovery-view")(140, AppComponent_Conditional_15_Case_140_Template, 1, 0, "app-ai-center-view")(141, AppComponent_Conditional_15_Case_141_Template, 2, 0, "div", 109)(142, AppComponent_Conditional_15_Case_142_Template, 2, 0, "div", 110)(143, AppComponent_Conditional_15_Case_143_Template, 2, 0, "div", 110)(144, AppComponent_Conditional_15_Case_144_Template, 1, 0, "app-multi-role-view")(145, AppComponent_Conditional_15_Case_145_Template, 1, 0, "app-analytics-view")(146, AppComponent_Conditional_15_Case_146_Template, 1, 0, "app-monitoring-view")(147, AppComponent_Conditional_15_Case_147_Template, 1, 0, "app-monitoring-view")(148, AppComponent_Conditional_15_Case_148_Template, 1, 0, "app-monitoring-view")(149, AppComponent_Conditional_15_Case_149_Template, 1, 0, "app-monitoring-view")(150, AppComponent_Conditional_15_Case_150_Template, 1, 0, "app-monitoring-view")(151, AppComponent_Conditional_15_Case_151_Template, 1, 0, "app-monitoring-view")(152, AppComponent_Conditional_15_Case_152_Template, 1, 0, "app-monitoring-view")(153, AppComponent_Conditional_15_Case_153_Template, 1, 0, "app-runtime-logs-view")(154, AppComponent_Conditional_15_Case_154_Template, 1, 0, "app-membership-center")(155, AppComponent_Conditional_15_Case_155_Template, 1, 0, "app-profile")(156, AppComponent_Conditional_15_Case_156_Template, 1, 0, "app-resource-center")(157, AppComponent_Conditional_15_Case_157_Template, 1, 0, "app-search-discovery")(158, AppComponent_Conditional_15_Case_158_Template, 1, 0, "app-ai-marketing-assistant")(159, AppComponent_Conditional_15_Case_159_Template, 1, 0, "app-ai-team-hub")(160, AppComponent_Conditional_15_Case_160_Template, 1, 0, "app-member-database")(161, AppComponent_Conditional_15_Case_161_Template, 1, 0, "app-leads-view")(162, AppComponent_Conditional_15_Case_162_Template, 1, 0, "app-analytics-view")(163, AppComponent_Conditional_15_Case_163_Template, 1, 0, "app-analytics-view")(164, AppComponent_Conditional_15_Case_164_Template, 1, 0, "app-automation-view")(165, AppComponent_Conditional_15_Case_165_Template, 1, 0, "app-automation-view")(166, AppComponent_Conditional_15_Case_166_Template, 1, 0, "app-analytics-view")(167, AppComponent_Conditional_15_Case_167_Template, 1, 0, "app-marketing-report")(168, AppComponent_Conditional_15_Case_168_Template, 1, 0, "app-runtime-logs-view")(169, AppComponent_Conditional_15_Case_169_Template, 1, 0, "app-runtime-logs-view")(170, AppComponent_Conditional_15_Case_170_Template, 1, 0, "app-runtime-logs-view")(171, AppComponent_Conditional_15_Case_171_Template, 1, 0, "app-dashboard-view");
+    \u0275\u0275elementStart(136, "main", 110);
+    \u0275\u0275conditionalCreate(137, AppComponent_Conditional_15_Case_137_Template, 1, 0, "app-dashboard-view")(138, AppComponent_Conditional_15_Case_138_Template, 1, 0, "app-accounts-view")(139, AppComponent_Conditional_15_Case_139_Template, 1, 0, "app-add-account-page")(140, AppComponent_Conditional_15_Case_140_Template, 1, 0, "app-api-credentials-view")(141, AppComponent_Conditional_15_Case_141_Template, 1, 0, "app-settings-view")(142, AppComponent_Conditional_15_Case_142_Template, 1, 0, "app-leads-view")(143, AppComponent_Conditional_15_Case_143_Template, 1, 0, "app-automation-view")(144, AppComponent_Conditional_15_Case_144_Template, 1, 0, "app-resource-discovery-view")(145, AppComponent_Conditional_15_Case_145_Template, 1, 0, "app-resource-discovery-view")(146, AppComponent_Conditional_15_Case_146_Template, 1, 0, "app-ai-center-view")(147, AppComponent_Conditional_15_Case_147_Template, 2, 0, "div", 111)(148, AppComponent_Conditional_15_Case_148_Template, 2, 0, "div", 112)(149, AppComponent_Conditional_15_Case_149_Template, 2, 0, "div", 112)(150, AppComponent_Conditional_15_Case_150_Template, 1, 0, "app-multi-role-view")(151, AppComponent_Conditional_15_Case_151_Template, 1, 0, "app-analytics-view")(152, AppComponent_Conditional_15_Case_152_Template, 1, 0, "app-monitoring-view")(153, AppComponent_Conditional_15_Case_153_Template, 1, 0, "app-monitoring-view")(154, AppComponent_Conditional_15_Case_154_Template, 1, 0, "app-monitoring-view")(155, AppComponent_Conditional_15_Case_155_Template, 1, 0, "app-monitoring-view")(156, AppComponent_Conditional_15_Case_156_Template, 1, 0, "app-monitoring-view")(157, AppComponent_Conditional_15_Case_157_Template, 1, 0, "app-monitoring-view")(158, AppComponent_Conditional_15_Case_158_Template, 1, 0, "app-monitoring-view")(159, AppComponent_Conditional_15_Case_159_Template, 1, 0, "app-runtime-logs-view")(160, AppComponent_Conditional_15_Case_160_Template, 1, 0, "app-membership-center")(161, AppComponent_Conditional_15_Case_161_Template, 1, 0, "app-wallet-view")(162, AppComponent_Conditional_15_Case_162_Template, 1, 0, "app-profile")(163, AppComponent_Conditional_15_Case_163_Template, 1, 0, "app-resource-center")(164, AppComponent_Conditional_15_Case_164_Template, 1, 0, "app-search-discovery")(165, AppComponent_Conditional_15_Case_165_Template, 1, 0, "app-ai-marketing-assistant")(166, AppComponent_Conditional_15_Case_166_Template, 1, 0, "app-ai-team-hub")(167, AppComponent_Conditional_15_Case_167_Template, 1, 0, "app-member-database")(168, AppComponent_Conditional_15_Case_168_Template, 1, 0, "app-leads-view")(169, AppComponent_Conditional_15_Case_169_Template, 1, 0, "app-analytics-view")(170, AppComponent_Conditional_15_Case_170_Template, 1, 0, "app-analytics-view")(171, AppComponent_Conditional_15_Case_171_Template, 1, 0, "app-automation-view")(172, AppComponent_Conditional_15_Case_172_Template, 1, 0, "app-automation-view")(173, AppComponent_Conditional_15_Case_173_Template, 1, 0, "app-analytics-view")(174, AppComponent_Conditional_15_Case_174_Template, 1, 0, "app-marketing-report")(175, AppComponent_Conditional_15_Case_175_Template, 1, 0, "app-runtime-logs-view")(176, AppComponent_Conditional_15_Case_176_Template, 1, 0, "app-runtime-logs-view")(177, AppComponent_Conditional_15_Case_177_Template, 1, 0, "app-runtime-logs-view")(178, AppComponent_Conditional_15_Case_178_Template, 1, 0, "app-dashboard-view");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(172, AppComponent_Conditional_15_Conditional_172_Template, 30, 24, "div", 111);
-    \u0275\u0275conditionalCreate(173, AppComponent_Conditional_15_Conditional_173_Template, 19, 1, "div", 112);
-    \u0275\u0275conditionalCreate(174, AppComponent_Conditional_15_Conditional_174_Template, 22, 9, "div", 113);
-    \u0275\u0275conditionalCreate(175, AppComponent_Conditional_15_Conditional_175_Template, 27, 3, "div", 113);
-    \u0275\u0275conditionalCreate(176, AppComponent_Conditional_15_Conditional_176_Template, 45, 1, "div", 113);
-    \u0275\u0275conditionalCreate(177, AppComponent_Conditional_15_Conditional_177_Template, 5, 0, "div", 114);
-    \u0275\u0275conditionalCreate(178, AppComponent_Conditional_15_Conditional_178_Template, 18, 1, "div", 115);
+    \u0275\u0275conditionalCreate(179, AppComponent_Conditional_15_Conditional_179_Template, 30, 24, "div", 113);
+    \u0275\u0275conditionalCreate(180, AppComponent_Conditional_15_Conditional_180_Template, 19, 1, "div", 114);
+    \u0275\u0275conditionalCreate(181, AppComponent_Conditional_15_Conditional_181_Template, 22, 9, "div", 115);
+    \u0275\u0275conditionalCreate(182, AppComponent_Conditional_15_Conditional_182_Template, 27, 3, "div", 115);
+    \u0275\u0275conditionalCreate(183, AppComponent_Conditional_15_Conditional_183_Template, 45, 1, "div", 115);
+    \u0275\u0275conditionalCreate(184, AppComponent_Conditional_15_Conditional_184_Template, 5, 0, "div", 116);
+    \u0275\u0275conditionalCreate(185, AppComponent_Conditional_15_Conditional_185_Template, 18, 1, "div", 117);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
     let tmp_38_0;
     let tmp_40_0;
     let tmp_41_0;
-    let tmp_72_0;
-    let tmp_73_0;
+    let tmp_75_0;
+    let tmp_76_0;
     const ctx_r0 = \u0275\u0275nextContext();
     \u0275\u0275advance(3);
     \u0275\u0275property("show", ctx_r0.progressDialog().show)("title", ctx_r0.progressDialog().title)("progress", ctx_r0.progressDialog().progress)("cancellable", ctx_r0.progressDialog().cancellable);
@@ -59415,6 +59652,9 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275styleProp("background-color", view_r58 === "membership-center" ? "var(--sidebar-item-active)" : "transparent")("color", view_r58 === "membership-center" ? "var(--sidebar-text-active)" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r58 === "membership-center");
     \u0275\u0275advance(5);
+    \u0275\u0275styleProp("background-color", view_r58 === "wallet" ? "var(--sidebar-item-active)" : "transparent")("color", view_r58 === "wallet" ? "var(--sidebar-text-active)" : "var(--sidebar-text)");
+    \u0275\u0275classProp("active", view_r58 === "wallet");
+    \u0275\u0275advance(6);
     \u0275\u0275styleProp("background-color", view_r58 === "dashboard" ? "var(--sidebar-item-active)" : "transparent")("color", view_r58 === "dashboard" ? "var(--sidebar-text-active)" : "var(--sidebar-text)");
     \u0275\u0275classProp("active", view_r58 === "dashboard");
     \u0275\u0275advance(7);
@@ -59422,31 +59662,31 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275advance(5);
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("manual"));
     \u0275\u0275advance(2);
-    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("manual") ? 70 : -1);
+    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("manual") ? 76 : -1);
     \u0275\u0275advance(7);
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("monitoring"));
     \u0275\u0275advance(2);
-    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("monitoring") ? 79 : -1);
+    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("monitoring") ? 85 : -1);
     \u0275\u0275advance(7);
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("marketing"));
     \u0275\u0275advance(2);
-    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("marketing") ? 88 : -1);
+    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("marketing") ? 94 : -1);
     \u0275\u0275advance(5);
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("analytics"));
     \u0275\u0275advance(2);
-    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("analytics") ? 95 : -1);
+    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("analytics") ? 101 : -1);
     \u0275\u0275advance(4);
     \u0275\u0275textInterpolate1(" \u{1F9E0} ", ctx_r0.t("aiIntelligence"), " ");
     \u0275\u0275advance();
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("ai"));
     \u0275\u0275advance(2);
-    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("ai") ? 102 : -1);
+    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("ai") ? 108 : -1);
     \u0275\u0275advance(4);
     \u0275\u0275textInterpolate1(" \u2699\uFE0F ", ctx_r0.t("systemMonitor"), " ");
     \u0275\u0275advance();
     \u0275\u0275classProp("rotate-180", !ctx_r0.isSidebarGroupExpanded("system"));
     \u0275\u0275advance(2);
-    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("system") ? 109 : -1);
+    \u0275\u0275conditional(ctx_r0.isSidebarGroupExpanded("system") ? 115 : -1);
     \u0275\u0275advance(9);
     \u0275\u0275textInterpolate(ctx_r0.t("language"));
     \u0275\u0275advance(4);
@@ -59456,21 +59696,21 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275advance(3);
     \u0275\u0275styleProp("background-color", ctx_r0.theme() === "dark" ? "var(--primary-bg)" : "transparent")("color", ctx_r0.theme() === "dark" ? "var(--primary)" : "var(--text-muted)")("box-shadow", ctx_r0.theme() === "dark" ? "var(--shadow-sm)" : "none");
     \u0275\u0275advance(4);
-    \u0275\u0275conditional((tmp_72_0 = ctx_r0.currentView()) === "dashboard" ? 131 : tmp_72_0 === "accounts" ? 132 : tmp_72_0 === "add-account" ? 133 : tmp_72_0 === "api-credentials" ? 134 : tmp_72_0 === "settings" ? 135 : tmp_72_0 === "leads" ? 136 : tmp_72_0 === "automation" ? 137 : tmp_72_0 === "resource-discovery" ? 138 : tmp_72_0 === "resources" ? 139 : tmp_72_0 === "ai-center" ? 140 : tmp_72_0 === "knowledge-brain" ? 141 : tmp_72_0 === "knowledge-gaps" ? 142 : tmp_72_0 === "knowledge-manage" ? 143 : tmp_72_0 === "multi-role" ? 144 : tmp_72_0 === "analytics" ? 145 : tmp_72_0 === "monitoring" ? 146 : tmp_72_0 === "monitoring-accounts" ? 147 : tmp_72_0 === "monitoring-groups" ? 148 : tmp_72_0 === "keyword-sets" ? 149 : tmp_72_0 === "chat-templates" ? 150 : tmp_72_0 === "trigger-rules" ? 151 : tmp_72_0 === "collected-users" ? 152 : tmp_72_0 === "runtime-logs" ? 153 : tmp_72_0 === "membership-center" ? 154 : tmp_72_0 === "profile" ? 155 : tmp_72_0 === "resource-center" ? 156 : tmp_72_0 === "search-discovery" ? 157 : tmp_72_0 === "ai-assistant" ? 158 : tmp_72_0 === "ai-team" ? 159 : tmp_72_0 === "member-database" ? 160 : tmp_72_0 === "lead-nurturing" ? 161 : tmp_72_0 === "nurturing-analytics" ? 162 : tmp_72_0 === "user-tracking" ? 163 : tmp_72_0 === "ads" ? 164 : tmp_72_0 === "campaigns" ? 165 : tmp_72_0 === "analytics-center" ? 166 : tmp_72_0 === "marketing-report" ? 167 : tmp_72_0 === "performance" ? 168 : tmp_72_0 === "alerts" ? 169 : tmp_72_0 === "logs" ? 170 : 171);
-    \u0275\u0275advance(41);
-    \u0275\u0275conditional((tmp_73_0 = ctx_r0.generationState().lead) ? 172 : -1, tmp_73_0);
+    \u0275\u0275conditional((tmp_75_0 = ctx_r0.currentView()) === "dashboard" ? 137 : tmp_75_0 === "accounts" ? 138 : tmp_75_0 === "add-account" ? 139 : tmp_75_0 === "api-credentials" ? 140 : tmp_75_0 === "settings" ? 141 : tmp_75_0 === "leads" ? 142 : tmp_75_0 === "automation" ? 143 : tmp_75_0 === "resource-discovery" ? 144 : tmp_75_0 === "resources" ? 145 : tmp_75_0 === "ai-center" ? 146 : tmp_75_0 === "knowledge-brain" ? 147 : tmp_75_0 === "knowledge-gaps" ? 148 : tmp_75_0 === "knowledge-manage" ? 149 : tmp_75_0 === "multi-role" ? 150 : tmp_75_0 === "analytics" ? 151 : tmp_75_0 === "monitoring" ? 152 : tmp_75_0 === "monitoring-accounts" ? 153 : tmp_75_0 === "monitoring-groups" ? 154 : tmp_75_0 === "keyword-sets" ? 155 : tmp_75_0 === "chat-templates" ? 156 : tmp_75_0 === "trigger-rules" ? 157 : tmp_75_0 === "collected-users" ? 158 : tmp_75_0 === "runtime-logs" ? 159 : tmp_75_0 === "membership-center" ? 160 : tmp_75_0 === "wallet" ? 161 : tmp_75_0 === "profile" ? 162 : tmp_75_0 === "resource-center" ? 163 : tmp_75_0 === "search-discovery" ? 164 : tmp_75_0 === "ai-assistant" ? 165 : tmp_75_0 === "ai-team" ? 166 : tmp_75_0 === "member-database" ? 167 : tmp_75_0 === "lead-nurturing" ? 168 : tmp_75_0 === "nurturing-analytics" ? 169 : tmp_75_0 === "user-tracking" ? 170 : tmp_75_0 === "ads" ? 171 : tmp_75_0 === "campaigns" ? 172 : tmp_75_0 === "analytics-center" ? 173 : tmp_75_0 === "marketing-report" ? 174 : tmp_75_0 === "performance" ? 175 : tmp_75_0 === "alerts" ? 176 : tmp_75_0 === "logs" ? 177 : 178);
+    \u0275\u0275advance(42);
+    \u0275\u0275conditional((tmp_76_0 = ctx_r0.generationState().lead) ? 179 : -1, tmp_76_0);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showBatchOperationHistory() ? 173 : -1);
+    \u0275\u0275conditional(ctx_r0.showBatchOperationHistory() ? 180 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showWelcomeDialog() ? 174 : -1);
+    \u0275\u0275conditional(ctx_r0.showWelcomeDialog() ? 181 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showOrphanSessionDialog() ? 175 : -1);
+    \u0275\u0275conditional(ctx_r0.showOrphanSessionDialog() ? 182 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showBackendErrorDialog() ? 176 : -1);
+    \u0275\u0275conditional(ctx_r0.showBackendErrorDialog() ? 183 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(!ctx_r0.backendRunning() ? 177 : -1);
+    \u0275\u0275conditional(!ctx_r0.backendRunning() ? 184 : -1);
     \u0275\u0275advance();
-    \u0275\u0275conditional(ctx_r0.showKeywordSetCreator() ? 178 : -1);
+    \u0275\u0275conditional(ctx_r0.showKeywordSetCreator() ? 185 : -1);
   }
 }
 function AppComponent_Conditional_16_Template(rf, ctx) {
@@ -64030,6 +64270,12 @@ ${details.suggestion || "\u8ACB\u5237\u65B0\u8CC7\u6E90\u5217\u8868"}`);
     this.translationService.setLanguage("zh");
     this.loadAiSettings();
     this.loadSidebarGroupsState();
+    window.addEventListener("changeView", (event) => {
+      const customEvent = event;
+      if (customEvent.detail) {
+        this.changeView(customEvent.detail);
+      }
+    });
     this.setupVisibilityListener();
     this.setupIpcListeners();
     this.checkFirstRun();
@@ -70651,7 +70897,7 @@ ${details}`, 12e3);
           return ctx.onDocumentClick($event);
         }, \u0275\u0275resolveDocument);
       }
-    }, features: [\u0275\u0275ProvidersFeature([AccountLoaderService, ToastService])], decls: 17, vars: 11, consts: [["onboardingRef", ""], [1, "fixed", "bottom-4", "right-4", "z-50"], [1, "fixed", "inset-0", "z-[100]", "flex", "items-center", "justify-center", "pointer-events-none"], [3, "navigate"], [3, "closeDialog", "sendComplete", "isOpen", "targets"], [3, "closeDialog", "inviteComplete", "isOpen", "targets", "accounts"], [3, "closeDialog", "startExtractionEvent", "memberCountRefreshed", "isOpen", "group"], [1, "fixed", "inset-0", "z-50", "flex", "items-center", "justify-center"], [1, "flex", "h-screen", 2, "background-color", "var(--bg-primary)", "color", "var(--text-primary)"], [1, "auth-wrapper", 2, "min-height", "100vh", "background", "linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a)"], [1, "group", "relative"], [1, "w-3", "h-3", "rounded-full", "bg-slate-500", "cursor-default"], [1, "absolute", "bottom-full", "right-0", "mb-2", "hidden", "group-hover:block"], [1, "bg-slate-800/95", "backdrop-blur-sm", "rounded-lg", "px-3", "py-2", "shadow-lg", "border", "border-slate-700", "whitespace-nowrap"], [1, "text-xs", "text-slate-400"], [1, "text-xs", "text-slate-500", "mt-1"], [1, "text-xs", "text-amber-400", "mt-1"], [1, "w-3", "h-3", "rounded-full", "bg-cyan-500", "animate-pulse", "cursor-default"], [1, "text-xs", "text-slate-300"], [1, "w-3", "h-3", "rounded-full", "bg-amber-500", "cursor-pointer", 3, "click"], [1, "text-xs", "text-amber-400"], [1, "w-3", "h-3", "rounded-full", "bg-red-500", "cursor-pointer", "animate-pulse", 3, "click"], [1, "text-xs", "text-red-400"], [1, "absolute", "inset-0", "bg-black/40", "animate-fade-in"], [1, "relative", "z-10", "animate-success-pop"], [1, "absolute", "inset-0", "-m-8", "rounded-full", "bg-gradient-to-r", "from-emerald-500/20", "to-cyan-500/20", "blur-xl", "animate-pulse"], [1, "relative", "bg-gradient-to-br", "from-slate-800", "to-slate-900", "rounded-2xl", "p-8", "shadow-2xl", "border", "border-emerald-500/30"], [1, "flex", "justify-center", "mb-4"], [1, "w-20", "h-20", "rounded-full", "bg-gradient-to-r", "from-emerald-500", "to-cyan-500", "flex", "items-center", "justify-center", "shadow-lg", "shadow-emerald-500/30"], [1, "text-4xl", "animate-bounce"], [1, "text-center"], [1, "text-xl", "font-bold", "text-white", "mb-1"], [1, "text-sm", "text-slate-400"], [1, "absolute", "-top-2", "-left-2", "w-4", "h-4", "bg-emerald-400", "rounded-full", "animate-ping"], [1, "absolute", "-top-1", "-right-3", "w-3", "h-3", "bg-cyan-400", "rounded-full", "animate-ping", 2, "animation-delay", "0.1s"], [1, "absolute", "-bottom-2", "-left-1", "w-2", "h-2", "bg-emerald-300", "rounded-full", "animate-ping", 2, "animation-delay", "0.2s"], [1, "absolute", "-bottom-1", "-right-2", "w-3", "h-3", "bg-cyan-300", "rounded-full", "animate-ping", 2, "animation-delay", "0.3s"], [1, "absolute", "inset-0", "bg-black/60", "backdrop-blur-sm", 3, "click"], [1, "relative", "z-10"], [3, "closed", "loginSuccess"], [3, "navigateEvent"], [3, "show", "title", "progress", "cancellable"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "z-[100]", "flex", "items-center", "justify-center"], [1, "backdrop-blur-sm", "flex-shrink-0", "flex", "flex-col", "sidebar", "h-screen", "transition-all", "duration-300", 2, "background-color", "var(--bg-sidebar)", "border-right", "1px solid var(--border-default)"], [1, "flex-shrink-0"], [1, "absolute", "top-3", "-right-3", "z-50", "w-6", "h-6", "rounded-full", "flex", "items-center", "justify-center", "transition-all", "duration-200", "hover:scale-110", 2, "background", "linear-gradient(135deg, #06b6d4, #8b5cf6)", "box-shadow", "0 2px 8px rgba(6, 182, 212, 0.4)", 3, "click", "title"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "w-3.5", "h-3.5", "text-white", "transition-transform", "duration-200"], ["points", "15 18 9 12 15 6"], [1, "flex", "items-center", "gap-3", "p-4"], [1, "relative", "flex-shrink-0"], [1, "absolute", "inset-0", "rounded-xl", "blur-md", "opacity-50", 2, "background", "linear-gradient(135deg, #06b6d4, #8b5cf6)"], ["viewBox", "0 0 64 64", "fill", "none", 1, "h-10", "w-10", "relative", "z-10"], ["d", "M32 8L52 20V44L32 56L12 44V20L32 8Z", "fill", "url(#sidebarLogoGrad)", "stroke", "url(#sidebarLogoStroke)", "stroke-width", "1.5"], ["d", "M22 28L40 22L34 36L28 32L22 28Z", "fill", "white", "opacity", "0.95"], ["d", "M28 32L34 36L32 42L28 32Z", "fill", "white", "opacity", "0.8"], ["d", "M24 12L28 8L32 11L36 8L40 12L38 16H26L24 12Z", "fill", "#fbbf24"], ["cx", "32", "cy", "8", "r", "1.2", "fill", "#fef3c7"], ["id", "sidebarLogoGrad", "x1", "0%", "y1", "0%", "x2", "100%", "y2", "100%"], ["offset", "0%", "stop-color", "#0891b2"], ["offset", "100%", "stop-color", "#7c3aed"], ["id", "sidebarLogoStroke", "x1", "0%", "y1", "0%", "x2", "100%", "y2", "100%"], ["offset", "0%", "stop-color", "#22d3ee"], ["offset", "100%", "stop-color", "#a78bfa"], [1, "user-profile-card", "mx-3", "mb-4", "p-3", "rounded-xl", "cursor-pointer", "transition-all", "duration-300", "hover:scale-[1.02]", "group", 3, "click"], [1, "flex", "items-center", "gap-3"], [1, "avatar-wrapper", "relative"], [1, "avatar-glow", "absolute", "inset-0", "rounded-full", "opacity-0", "group-hover:opacity-100", "transition-opacity", "duration-300"], [1, "avatar-border", "w-12", "h-12", "rounded-full", "p-[2px]"], [1, "w-full", "h-full", "rounded-full", "flex", "items-center", "justify-center", "text-white", "font-bold", "text-lg", "avatar-inner"], [1, "vip-badge", "absolute", "-bottom-1", "-right-1", "w-5", "h-5", "rounded-full", "flex", "items-center", "justify-center", "text-[10px]", "shadow-lg", 3, "badge-silver", "badge-gold", "badge-diamond", "badge-star", "badge-king"], [1, "flex-1", "min-w-0"], [1, "text-sm", "font-semibold", "truncate", 2, "color", "var(--text-primary)"], [1, "flex", "items-center", "gap-1.5", "mt-0.5"], [1, "vip-tag", "vip-tag-silver"], [1, "vip-tag", "vip-tag-gold"], [1, "vip-tag", "vip-tag-diamond"], [1, "vip-tag", "vip-tag-star"], [1, "vip-tag", "vip-tag-king"], [1, "vip-tag", "vip-tag-bronze"], [1, "arrow-icon", "transition-transform", "duration-300", "group-hover:translate-x-1"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "w-4", "h-4", 2, "color", "var(--text-muted)"], ["points", "9 18 15 12 9 6"], [1, "flex-1", "overflow-y-auto", "overflow-x-hidden", "sidebar-nav", "mt-2", "px-2", "pb-2"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", "stroke-linecap", "round", "stroke-linejoin", "round", 1, "h-5", "w-5", "sidebar-icon"], ["points", "12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"], ["x", "3", "y", "3", "width", "7", "height", "7"], ["x", "14", "y", "3", "width", "7", "height", "7"], ["x", "14", "y", "14", "width", "7", "height", "7"], ["x", "3", "y", "14", "width", "7", "height", "7"], [1, "sidebar-group"], [1, "w-full", "flex", "items-center", "justify-between", "px-3", "py-2", "mt-2", "rounded-md", "hover:bg-white/5", "transition-colors", "cursor-pointer", "group", 3, "click"], [1, "sidebar-group-title", "text-xs", "uppercase", "tracking-wider", "flex", "items-center", "gap-1", 2, "color", "var(--sidebar-group-title)"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "w-3.5", "h-3.5", "transition-transform", "duration-200", 2, "color", "var(--sidebar-group-title)"], ["points", "6 9 12 15 18 9"], [1, "sidebar-group-content", "overflow-hidden"], [1, "sidebar-group-title", "text-xs", "uppercase", "tracking-wider", "font-semibold", "flex", "items-center", "gap-1", 2, "color", "var(--sidebar-group-title)"], [1, "inline-block", "w-5", "h-5", "rounded", "bg-gradient-to-br", "from-cyan-500", "to-blue-500", "text-center", "leading-5", "text-[10px]"], [1, "inline-block", "w-5", "h-5", "rounded", "bg-gradient-to-br", "from-violet-500", "to-fuchsia-500", "text-center", "leading-5", "text-[10px]"], [1, "flex-shrink-0", "p-4", "space-y-3", "border-t", 2, "border-color", "var(--border-default)", "background-color", "var(--bg-sidebar)"], [1, "w-full", "flex", "items-center", "justify-center", "gap-2", "px-4", "py-2.5", "bg-gradient-to-r", "from-cyan-500/10", "to-blue-500/10", "hover:from-cyan-500/20", "hover:to-blue-500/20", "border", "border-cyan-500/30", "hover:border-cyan-500/50", "text-cyan-400", "rounded-xl", "transition-all", "text-sm", "font-medium", "group", 3, "click"], [1, "text-lg", "group-hover:animate-bounce"], [1, "block", "text-sm", "font-medium", "mb-2", 2, "color", "var(--sidebar-group-title)"], [1, "flex", "rounded-md", "shadow-sm", "p-1", 2, "background-color", "var(--bg-tertiary)"], [1, "w-full", "text-sm", "py-1.5", "rounded", "transition-colors", "flex", "items-center", "justify-center", "gap-2", 3, "click"], ["xmlns", "http://www.w3.org/2000/svg", "fill", "none", "viewBox", "0 0 24 24", "stroke", "currentColor", 1, "h-4", "w-4"], ["stroke-linecap", "round", "stroke-linejoin", "round", "stroke-width", "2", "d", "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"], ["stroke-linecap", "round", "stroke-linejoin", "round", "stroke-width", "2", "d", "M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"], [1, "flex-1", "p-8", "overflow-y-auto", 2, "background-color", "var(--bg-primary)"], [1, "h-full", "p-6", "overflow-auto"], [1, "h-full", "overflow-auto"], [1, "fixed", "inset-0", "bg-black/70", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-50"], [1, "fixed", "inset-0", "bg-black/70", "flex", "items-center", "justify-center", "z-50", "backdrop-blur-sm"], [1, "fixed", "inset-0", "bg-black/70", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-[100]"], [1, "fixed", "bottom-4", "right-4", "z-50", "bg-red-500/90", "text-white", "px-4", "py-2", "rounded-lg", "shadow-lg", "flex", "items-center", "gap-2", "cursor-pointer", "hover:bg-red-600"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-[100]"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "z-[100]", "flex", "items-center", "justify-center", 3, "click"], [1, "bg-slate-900", "border", "border-slate-700", "rounded-2xl", "shadow-2xl", "w-full", "max-w-md", "mx-4", "overflow-hidden", 3, "click"], [1, "px-6", "py-4", "border-b", "border-slate-700", "flex", "items-center", "gap-3"], [1, "p-2", "bg-red-500/20", "rounded-lg"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-6", "w-6", "text-red-400"], ["d", "M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"], ["x1", "10", "y1", "11", "x2", "10", "y2", "17"], ["x1", "14", "y1", "11", "x2", "14", "y2", "17"], [1, "text-lg", "font-bold", "text-white"], [1, "px-6", "py-6"], [1, "text-slate-300", "mb-4"], [1, "bg-red-500/10", "border", "border-red-500/20", "rounded-lg", "p-3", "text-sm", "text-red-300"], [1, "px-6", "py-4", "border-t", "border-slate-700", "flex", "justify-end", "gap-3"], [1, "px-4", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-slate-300", "rounded-lg", "transition-colors", 3, "click"], [1, "px-4", "py-2", "bg-red-500", "hover:bg-red-600", "text-white", "rounded-lg", "transition-colors", "flex", "items-center", "gap-2", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-4", "w-4"], [1, "font-bold", "text-cyan-400"], [1, "font-bold", "text-red-400"], [1, "p-2", "bg-emerald-500/20", "rounded-lg"], [1, "text-xl"], [1, "px-6", "py-4", "max-h-64", "overflow-y-auto"], [1, "text-center", "py-8", "text-slate-400"], [1, "space-y-2"], [1, "px-6", "py-4", "border-t", "border-slate-700"], [1, "w-full", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-slate-300", "rounded-lg", "transition-colors", 3, "click"], [1, "mb-2"], [1, "text-cyan-400", "hover:underline", "text-sm", 3, "click"], [1, "w-full", "p-3", "bg-slate-800/50", "hover:bg-emerald-500/20", "border", "border-slate-700", "hover:border-emerald-500/50", "rounded-xl", "text-left", "transition-all", "group"], [1, "w-full", "p-3", "bg-slate-800/50", "hover:bg-emerald-500/20", "border", "border-slate-700", "hover:border-emerald-500/50", "rounded-xl", "text-left", "transition-all", "group", 3, "click"], [1, "flex", "items-center", "justify-between"], [1, "font-medium", "text-white", "group-hover:text-emerald-400"], [1, "text-xs", "text-slate-500"], [1, "text-emerald-400", "opacity-0", "group-hover:opacity-100", "transition-opacity"], [1, "text-xl", "font-bold", "bg-gradient-to-r", "from-cyan-400", "to-purple-400", "bg-clip-text", "text-transparent"], [1, "text-xs", 2, "color", "var(--text-muted)"], [1, "vip-badge", "absolute", "-bottom-1", "-right-1", "w-5", "h-5", "rounded-full", "flex", "items-center", "justify-center", "text-[10px]", "shadow-lg"], [1, "animate-pulse"], [1, "animate-bounce"], [1, "vip-icon"], [1, "vip-text"], ["data-tour", "accounts", 1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click"], ["d", "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"], ["cx", "9", "cy", "7", "r", "4"], ["d", "M23 21v-2a4 4 0 0 0-3-3.87"], ["d", "M16 3.13a4 4 0 0 1 0 7.75"], ["data-tour", "search-discovery", 1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", "relative", 3, "click"], ["cx", "11", "cy", "11", "r", "8"], ["d", "M21 21l-4.35-4.35"], [1, "absolute", "right-2", "px-1.5", "py-0.5", "text-[10px]", "bg-gradient-to-r", "from-cyan-500", "to-blue-500", "text-white", "rounded-full", "font-bold"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", "relative", 3, "click"], ["cx", "12", "cy", "5", "rx", "9", "ry", "3"], ["d", "M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"], ["d", "M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"], ["d", "M22 2L11 13"], ["d", "M22 2L15 22L11 13L2 9L22 2Z"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-lg", "transition-all", "duration-200", "cursor-pointer", "mb-1", "relative", "group", 3, "click"], [1, "w-8", "h-8", "rounded-lg", "flex", "items-center", "justify-center", "transition-all"], [1, "text-lg"], [1, "flex", "flex-col"], [1, "font-medium"], [1, "text-[10px]", "opacity-60"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click"], [1, "text-lg", "ml-1"], [1, "ml-auto", "text-xs", "px-1.5", "py-0.5", "bg-violet-500/20", "text-violet-400", "rounded"], ["data-tour", "ai-assistant", 1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-lg", "transition-all", "duration-200", "cursor-pointer", "mb-1.5", "relative", "group", 3, "click", "title"], [1, "absolute", "right-2", "px-2", "py-0.5", "text-[9px]", "bg-gradient-to-r", "from-orange-500", "to-amber-500", "text-white", "rounded-full", "font-bold", "shadow-lg", "shadow-orange-500/20"], [1, "absolute", "right-2", "text-xs"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-lg", "transition-all", "duration-200", "cursor-pointer", "mb-1.5", "relative", "group", 3, "click", "title"], [1, "absolute", "right-2", "px-2", "py-0.5", "text-[9px]", "bg-gradient-to-r", "from-purple-500", "to-pink-500", "text-white", "rounded-full", "font-bold", "shadow-lg", "shadow-purple-500/20"], [1, "absolute", "right-2", "px-2", "py-0.5", "text-[9px]", "bg-gradient-to-r", "from-cyan-500", "to-blue-500", "text-white", "rounded-full", "font-bold", "shadow-lg", "shadow-cyan-500/20"], ["d", "M18 20V10"], ["d", "M12 20V4"], ["d", "M6 20v-6"], ["d", "M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"], ["cx", "12", "cy", "12", "r", "4"], [1, "ml-auto", "px-1.5", "py-0.5", "text-xs", "bg-pink-500/20", "text-pink-400", "rounded"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click", "title"], [1, "ml-auto", "text-xs", "opacity-60"], [1, "knowledge-menu"], [1, "flex-1"], [1, "text-xs", "transition-transform", "duration-200"], [1, "pl-6", "space-y-1"], ["d", "M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3"], [1, "sidebar-item", "flex", "items-center", "gap-2", "px-3", "py-2", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "text-sm", 3, "click"], [1, "sidebar-item", "flex", "items-center", "gap-2", "px-3", "py-2", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "text-sm", "relative", 3, "click"], [1, "ml-auto", "text-xs", "font-bold", "rounded-full", "px-1.5", "py-0.5", 2, "background-color", "rgba(239, 68, 68, 0.2)", "color", "#f87171"], ["cx", "12", "cy", "12", "r", "3"], ["d", "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"], [3, "accountAdded", "back"], [1, "fixed", "inset-0", "bg-black/70", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-50", 3, "click"], [1, "bg-gradient-to-br", "from-slate-900", "via-slate-900", "to-slate-800", "border", "border-cyan-500/30", "rounded-2xl", "shadow-2xl", "shadow-cyan-500/10", "w-full", "max-w-2xl", "max-h-[90vh]", "overflow-hidden", "text-slate-200", 3, "click"], [1, "bg-gradient-to-r", "from-cyan-500/10", "via-blue-500/10", "to-purple-500/10", "border-b", "border-cyan-500/20", "p-5"], [1, "flex", "justify-between", "items-start"], [1, "flex", "items-center", "gap-4"], [1, "w-14", "h-14", "rounded-full", "bg-gradient-to-br", "from-cyan-500", "to-blue-600", "flex", "items-center", "justify-center", "text-white", "font-bold", "text-xl", "shadow-lg", "shadow-cyan-500/30"], [1, "flex", "items-center", "gap-2"], [1, "text-xl", "font-bold", "text-white"], [1, "h-2.5", "w-2.5", "rounded-full", "animate-pulse"], [1, "text-sm", "text-cyan-400"], [1, "flex", "items-center", "gap-2", "mt-1", "flex-wrap"], [1, "text-xs", "px-2", "py-0.5", "rounded-full", "bg-purple-500/20", "text-purple-400", "border", "border-purple-500/30"], [1, "text-xs", "px-2", "py-0.5", "rounded-full", "bg-cyan-500/20", "text-cyan-400", "border", "border-cyan-500/30"], [1, "text-xs", "px-2", "py-0.5", "rounded-full", 3, "class"], [1, "text-slate-400", "hover:text-white", "text-2xl", "leading-none", "transition-colors", "p-2", "hover:bg-white/10", "rounded-lg", 3, "click"], [1, "border-b", "border-cyan-500/20", "bg-slate-900/50"], ["aria-label", "Tabs", 1, "flex", "px-5"], [1, "whitespace-nowrap", "py-3", "px-4", "border-b-2", "border-transparent", "font-medium", "text-sm", "cursor-pointer", "text-slate-400", "hover:text-cyan-400", "hover:bg-cyan-500/5", "transition-all", "rounded-t-lg", "flex", "items-center", "gap-2", 3, "click"], [1, "overflow-y-auto", "max-h-[calc(90vh-220px)]", "p-5"], [1, "space-y-4"], [1, "py-4"], [1, "text-xs", "px-2", "py-0.5", "rounded-full"], [1, "bg-slate-800/50", "rounded-xl", "p-4", "border", "border-slate-700/50"], [1, "block", "text-sm", "font-medium", "text-cyan-400", "mb-2"], [1, "form-select", "w-full", "bg-slate-900/50", "border-cyan-500/30", "rounded-lg", "py-2.5", "px-3", "text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", "focus:border-cyan-500", 3, "ngModelChange", "ngModel"], ["value", ""], [1, "mt-2", "p-2", "bg-amber-500/10", "border", "border-amber-500/30", "rounded-lg"], [1, "grid", "grid-cols-3", "gap-3"], [1, "cursor-pointer", "p-3", "rounded-xl", "border-2", "transition-all", "text-center", 3, "click"], [1, "text-2xl", "mb-1"], [1, "text-sm", "font-medium"], [1, "space-y-3"], [1, "flex", "items-center", "justify-between", "mb-2"], [1, "text-sm", "font-medium", "text-cyan-400"], [1, "text-xs", "text-slate-500", "bg-slate-700/50", "px-2", "py-1", "rounded"], ["rows", "5", 1, "form-textarea", "w-full", "bg-slate-900/50", "border-cyan-500/30", "rounded-lg", "py-3", "px-3", "text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", "resize-none", "placeholder-slate-500", 3, "ngModelChange", "ngModel", "placeholder"], [1, "flex", "items-center", "gap-3", "flex-wrap"], [1, "flex", "items-center", "gap-2", "bg-slate-800/50", "hover:bg-cyan-500/20", "text-slate-300", "hover:text-cyan-400", "text-sm", "font-medium", "py-2", "px-4", "rounded-lg", "transition-all", "border", "border-slate-700/50", "hover:border-cyan-500/30", 3, "click"], [1, "p-3", "rounded-xl", "bg-cyan-500/10", "border", "border-cyan-500/30"], [1, "p-3", "bg-amber-500/10", "border", "border-amber-500/30", "rounded-xl"], [1, "p-3", "bg-red-500/10", "border", "border-red-500/30", "rounded-xl"], [1, "flex", "justify-between", "items-center", "pt-4", "border-t", "border-cyan-500/20"], [1, "text-sm", "text-red-400", "hover:text-red-300", "disabled:text-slate-500", "disabled:cursor-not-allowed", "flex", "items-center", "gap-1.5", "px-3", "py-2", "rounded-lg", "hover:bg-red-500/10", "transition-all", 3, "click", "disabled"], [1, "flex", "gap-3"], [1, "bg-slate-700/80", "hover:bg-slate-600", "text-slate-300", "font-medium", "py-2.5", "px-5", "rounded-xl", "transition-all", "border", "border-slate-600/50", "hover:border-slate-500", 3, "click"], [1, "bg-gradient-to-r", "from-cyan-500", "to-blue-500", "hover:from-cyan-400", "hover:to-blue-400", "text-white", "font-bold", "py-2.5", "px-6", "rounded-xl", "shadow-lg", "shadow-cyan-500/30", "disabled:from-slate-500", "disabled:to-slate-600", "disabled:shadow-none", "disabled:cursor-not-allowed", "flex", "items-center", "gap-2", "transition-all", 3, "click", "disabled"], [3, "value"], [1, "text-xs", "text-cyan-400", "hover:underline", "cursor-pointer", "mt-1", "inline-block", 3, "click"], [1, "flex", "items-center", "justify-between", "p-2", "bg-slate-200/30", "dark:bg-slate-800/30", "rounded-lg"], [1, "text-xs", "text-green-400"], [1, "text-xs", "bg-purple-500/20", "text-purple-400", "px-2", "py-1", "rounded"], [1, "p-2", "bg-cyan-500/10", "border", "border-cyan-500/20", "rounded-lg", "text-xs", "text-slate-400"], [1, "block", "text-sm", "font-medium", "text-slate-500", "dark:text-slate-400", "mb-1"], ["rows", "2", 1, "form-textarea", "w-full", "bg-slate-200/50", "dark:bg-slate-800/50", "border-slate-300", "dark:border-slate-700", "rounded-lg", "py-2", "px-3", "text-slate-800", "dark:text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", 3, "ngModelChange", "ngModel", "placeholder"], [1, "flex", "items-center", "justify-center", "gap-3"], [1, "bg-gradient-to-r", "from-purple-500", "to-cyan-500", "hover:from-purple-600", "hover:to-cyan-600", "text-white", "font-bold", "py-2", "px-6", "rounded-lg", "transition", "duration-200", "shadow-lg", "disabled:from-slate-400", "disabled:to-slate-500", "disabled:shadow-none", "disabled:cursor-not-allowed", "flex", "items-center", "gap-2", 3, "click", "disabled"], ["title", "\u91CD\u65B0\u751F\u6210", 1, "p-2", "bg-slate-600", "hover:bg-slate-500", "text-white", "rounded-lg"], [1, "p-3", "bg-amber-500/10", "border", "border-amber-500/20", "text-amber-400", "rounded-lg", "text-sm", "text-center"], [1, "p-3", "bg-red-500/10", "border", "border-red-500/20", "text-red-400", "rounded-lg", "text-sm"], [1, "p-3", "bg-green-500/10", "border", "border-green-500/20", "rounded-lg"], [1, "text-cyan-400"], [1, "animate-spin"], ["title", "\u91CD\u65B0\u751F\u6210", 1, "p-2", "bg-slate-600", "hover:bg-slate-500", "text-white", "rounded-lg", 3, "click"], [1, "text-cyan-400", "hover:underline", "cursor-pointer", "ml-1", 3, "click"], [1, "ml-2", "text-cyan-400", "hover:underline", 3, "click"], [1, "text-xs", "text-green-400", "mb-2"], [1, "form-select", "w-full", "bg-slate-900/50", "border-cyan-500/30", "rounded-lg", "py-2.5", "px-3", "text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", 3, "change"], [1, "flex", "items-center", "gap-2", "bg-green-500/20", "hover:bg-green-500/30", "text-green-400", "text-sm", "font-medium", "py-2", "px-3", "rounded-lg", "transition-all", "border", "border-green-500/30", 3, "click"], [1, "flex", "items-center", "gap-2", "bg-red-500/20", "hover:bg-red-500/30", "text-red-400", "text-sm", "font-medium", "py-2", "px-3", "rounded-lg", "transition-all", "border", "border-red-500/30", 3, "click"], [1, "text-sm", "text-cyan-400", "font-medium"], [1, "space-y-2", "max-h-40", "overflow-y-auto"], [1, "flex", "items-center", "justify-between", "text-sm", "bg-slate-800/50", "rounded-lg", "px-3", "py-2"], [1, "flex", "items-center", "gap-2", "truncate", "flex-1", "min-w-0"], [1, "text-green-400"], [1, "text-blue-400"], [1, "truncate", "text-white"], [1, "text-slate-500", "text-xs", "whitespace-nowrap"], [1, "text-green-500", "text-xs"], [1, "text-red-400", "hover:text-red-300", "text-lg", "font-bold", "p-1", "hover:bg-red-500/20", "rounded", "ml-2", 3, "click"], [1, "text-sm", "text-amber-400"], [1, "text-sm", "text-red-400"], [1, "mb-4", "flex", "items-center", "justify-between"], [1, "bg-cyan-500", "hover:bg-cyan-600", "text-white", "font-bold", "py-2", "px-4", "rounded-lg", "text-sm", "disabled:bg-slate-500", "disabled:cursor-not-allowed", "flex", "items-center", "gap-2", 3, "click", "disabled"], [1, "h-96", "overflow-y-auto", "space-y-3", "mb-4", "bg-slate-200/30", "dark:bg-slate-800/30", "rounded-lg", "p-4"], [1, "h-96", "overflow-y-auto"], [1, "space-y-3", "mb-4"], [1, "text-center", "py-8"], [1, "mt-4", "p-3", "bg-slate-800/50", "rounded-lg", "border", "border-cyan-500/20"], [1, "h-96", "overflow-y-auto", "space-y-3", "mb-4", "bg-slate-200/30", "dark:bg-slate-800/30", "rounded-lg", "p-4", 3, "scroll"], [1, "text-center", "py-4"], [1, "text-center", "py-2"], [1, "flex", "justify-start"], [1, "flex", "justify-end"], [1, "max-w-[75%]"], [1, "bg-slate-700", "text-white", "rounded-2xl", "rounded-bl-sm", "px-4", "py-2"], [1, "text-sm"], [1, "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "text-white", "rounded-2xl", "rounded-br-sm", "px-4", "py-2", "shadow-lg"], [1, "flex", "items-center", "justify-end", "gap-2", "mt-1"], [1, "text-xs", "bg-purple-500/20", "text-purple-400", "px-1.5", "py-0.5", "rounded"], [1, "animate-spin", "text-cyan-400"], [1, "ml-2", "text-sm", "text-slate-500"], [1, "text-sm", "text-cyan-400", "hover:text-cyan-300", 3, "click"], [1, "flex", "justify-center"], [1, "bg-slate-800/50", "text-slate-400", "text-xs", "px-3", "py-1", "rounded-full"], [1, "text-4xl", "mb-2"], [1, "text-slate-500", "dark:text-slate-400"], [1, "text-xs", "text-slate-500", "mt-2"], [1, "text-sm", "font-medium", "text-cyan-400", "mb-2", "flex", "items-center", "gap-2"], [1, "grid", "grid-cols-3", "gap-2", "text-center", "text-xs"], [1, "p-2", "bg-slate-700/50", "rounded"], [1, "text-slate-400"], [1, "text-sm", "font-bold", "text-cyan-400"], [1, "fixed", "inset-0", "bg-black/70", "flex", "items-center", "justify-center", "z-50", "backdrop-blur-sm", 3, "click"], [1, "bg-slate-100", "dark:bg-slate-900", "rounded-2xl", "shadow-2xl", "border", "border-slate-300", "dark:border-slate-700", "w-full", "max-w-3xl", "max-h-[80vh]", "overflow-hidden", 3, "click"], [1, "p-4", "border-b", "border-slate-300", "dark:border-slate-700", "flex", "items-center", "justify-between", "bg-slate-200/50", "dark:bg-slate-800/50"], [1, "text-lg", "font-bold", "text-slate-900", "dark:text-white", "flex", "items-center", "gap-2"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-5", "w-5", "text-purple-500"], ["d", "M3 3v5h5"], ["d", "M3.05 13A9 9 0 1 0 6 5.3L3 8"], ["d", "M12 7v5l4 2"], [1, "text-slate-500", "hover:text-slate-700", "dark:text-slate-400", "dark:hover:text-white", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-5", "w-5"], ["x1", "18", "y1", "6", "x2", "6", "y2", "18"], ["x1", "6", "y1", "6", "x2", "18", "y2", "18"], [1, "p-4", "overflow-y-auto", "max-h-[60vh]"], [1, "text-center", "py-8", "text-slate-500"], [1, "p-4", "border-t", "border-slate-300", "dark:border-slate-700", "bg-slate-200/50", "dark:bg-slate-800/50", "flex", "justify-end"], [1, "px-4", "py-2", "bg-slate-300", "dark:bg-slate-700", "hover:bg-slate-400", "dark:hover:bg-slate-600", "rounded-lg", "text-sm", "font-medium", "transition-colors", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-12", "w-12", "mx-auto", "mb-3", "text-slate-400"], ["cx", "12", "cy", "12", "r", "10"], ["d", "M12 8v4l3 3"], [1, "bg-slate-200/50", "dark:bg-slate-800/50", "rounded-lg", "p-3", "border", "border-slate-300", "dark:border-slate-700", 3, "opacity-50"], [1, "bg-slate-200/50", "dark:bg-slate-800/50", "rounded-lg", "p-3", "border", "border-slate-300", "dark:border-slate-700"], [1, "p-2", "rounded-lg"], [1, "font-medium", "text-slate-900", "dark:text-white"], [1, "text-yellow-500", "ml-2"], [1, "text-red-400", "ml-2"], [1, "text-xs", "bg-yellow-500/20", "hover:bg-yellow-500/30", "text-yellow-400", "px-2", "py-1", "rounded"], [1, "text-xs", "bg-yellow-500/20", "hover:bg-yellow-500/30", "text-yellow-400", "px-2", "py-1", "rounded", 3, "click"], [1, "bg-gradient-to-br", "from-slate-800", "to-slate-900", "rounded-2xl", "shadow-2xl", "w-full", "max-w-2xl", "mx-4", "overflow-hidden", "border", "border-cyan-500/30"], [1, "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "p-6", "text-center"], [1, "text-3xl", "font-bold", "text-white", "mb-2"], [1, "text-cyan-100"], [1, "flex", "justify-center", "gap-2", "py-4", "bg-slate-800/50"], [1, "w-3", "h-3", "rounded-full", "transition-all"], [1, "p-6"], [1, "text-center", "space-y-6"], [1, "p-6", "bg-slate-800/50", "flex", "justify-between", "items-center"], [1, "text-sm", "text-slate-400", "hover:text-white", "transition-colors", 3, "click"], [1, "px-4", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-white", "rounded-lg", "transition-colors"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "hover:from-cyan-600", "hover:to-purple-600", "text-white", "font-medium", "rounded-lg", "transition-all"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-green-500", "to-emerald-500", "hover:from-green-600", "hover:to-emerald-600", "text-white", "font-medium", "rounded-lg", "transition-all"], [1, "grid", "grid-cols-3", "gap-4", "mb-6"], [1, "p-4", "bg-slate-700/50", "rounded-xl"], [1, "text-3xl", "mb-2"], [1, "text-sm", "font-medium", "text-white"], [1, "text-slate-300"], [1, "text-lg", "font-semibold", "text-white", "text-center", "mb-4"], [1, "p-4", "rounded-xl"], [1, "text-2xl"], [1, "font-medium", "text-white"], [1, "px-3", "py-1", "bg-slate-700", "hover:bg-slate-600", "rounded", "text-sm", "text-white", "disabled:opacity-50", 3, "click", "disabled"], [1, "block", "text-sm", "font-medium", "text-slate-300", "mb-2"], [1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModel"], ["placeholder", "qwen2:7b", 1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModel"], [1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModelChange", "ngModel"], ["placeholder", "qwen2:7b", 1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModelChange", "ngModel"], [1, "text-sm", "text-slate-300", "space-y-2"], [1, "block", "bg-slate-800", "p-2", "rounded", "text-cyan-400", "text-xs"], [1, "flex", "items-center", "gap-2", "cursor-pointer"], ["type", "checkbox", 1, "w-4", "h-4", "text-cyan-500", "rounded", 3, "change", "checked"], [1, "text-sm", "text-slate-300"], [1, "mt-2"], [1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded", "py-1", "px-2", "text-sm", "text-white", 3, "ngModelChange", "ngModel"], ["value", "gemini"], ["value", "openai"], [1, "text-6xl", "mb-4"], [1, "text-2xl", "font-bold", "text-white"], [1, "p-4", "bg-cyan-500/10", "rounded-xl", "border", "border-cyan-500/30"], [1, "text-sm", "text-slate-300", "space-y-1"], [1, "px-4", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-white", "rounded-lg", "transition-colors", 3, "click"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "hover:from-cyan-600", "hover:to-purple-600", "text-white", "font-medium", "rounded-lg", "transition-all", 3, "click"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-green-500", "to-emerald-500", "hover:from-green-600", "hover:to-emerald-600", "text-white", "font-medium", "rounded-lg", "transition-all", 3, "click"], [1, "bg-slate-800", "rounded-2xl", "shadow-2xl", "w-full", "max-w-lg", "mx-4", "overflow-hidden", "border", "border-amber-500/50"], [1, "bg-amber-500/20", "p-6", "text-center", "border-b", "border-amber-500/30"], [1, "text-5xl", "mb-3"], [1, "text-xl", "font-bold", "text-amber-400"], [1, "text-slate-400", "text-sm", "mt-2"], [1, "p-6", "space-y-4"], [1, "text-slate-300", "text-sm"], [1, "bg-slate-700/50", "rounded-lg", "p-3", "max-h-48", "overflow-y-auto", "space-y-2"], [1, "flex", "items-center", "justify-between", "p-2", "bg-slate-600/50", "rounded-lg"], [1, "bg-blue-500/10", "border", "border-blue-500/30", "rounded-lg", "p-3"], [1, "text-blue-400", "text-sm"], [1, "p-4", "bg-slate-700/30", "flex", "justify-end", "gap-3"], [1, "px-4", "py-2", "bg-slate-600", "hover:bg-slate-500", "text-white", "rounded-lg", "transition-colors", 3, "click"], [1, "px-4", "py-2", "bg-amber-500", "hover:bg-amber-600", "disabled:opacity-50", "text-white", "rounded-lg", "transition-colors", "flex", "items-center", "gap-2", 3, "click", "disabled"], [1, "text-white", "font-medium"], [1, "text-green-400", "text-xs"], [1, "text-amber-400", "text-xs"], [1, "bg-slate-800", "rounded-2xl", "shadow-2xl", "w-full", "max-w-lg", "mx-4", "overflow-hidden", "border", "border-red-500/50"], [1, "bg-red-500/20", "p-6", "text-center", "border-b", "border-red-500/30"], [1, "text-xl", "font-bold", "text-red-400"], [1, "bg-slate-700/50", "rounded-lg", "p-4", "space-y-3"], [1, "flex", "items-start", "gap-3"], ["href", "https://www.python.org/downloads/", "target", "_blank", 1, "text-cyan-400", "text-sm", "hover:underline"], [1, "text-slate-400", "text-sm"], [1, "block", "bg-slate-800", "text-green-400", "text-sm", "p-2", "rounded", "mt-1"], [1, "bg-red-500/10", "border", "border-red-500/30", "rounded-lg", "p-3"], [1, "text-red-400", "text-sm"], [1, "fixed", "bottom-4", "right-4", "z-50", "bg-red-500/90", "text-white", "px-4", "py-2", "rounded-lg", "shadow-lg", "flex", "items-center", "gap-2", "cursor-pointer", "hover:bg-red-600", 3, "click"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-[100]", 3, "click"], [1, "bg-slate-800", "rounded-2xl", "shadow-2xl", "w-full", "max-w-md", "mx-4", "overflow-hidden", "border", "border-cyan-500/30", 3, "click"], [1, "bg-gradient-to-r", "from-cyan-500/20", "to-blue-500/20", "p-4", "border-b", "border-slate-700/50"], [1, "text-lg", "font-bold", "text-white", "flex", "items-center", "gap-2"], [1, "block", "text-sm", "text-slate-400", "mb-2"], ["type", "text", "placeholder", "\u4F8B\u5982\uFF1A\u8CB7\u5BB6\u610F\u5411\u3001\u7522\u54C1\u8AEE\u8A62...", "autofocus", "", 1, "w-full", "bg-slate-900/50", "border", "border-slate-600", "rounded-lg", "px-4", "py-3", "text-white", "focus:border-cyan-500", "focus:ring-1", "focus:ring-cyan-500", "transition-colors", 3, "input", "keyup.enter", "value"], [1, "px-4", "py-2", "bg-cyan-500", "hover:bg-cyan-400", "text-white", "rounded-lg", "transition-colors", "font-medium", 3, "click"]], template: function AppComponent_Template(rf, ctx) {
+    }, features: [\u0275\u0275ProvidersFeature([AccountLoaderService, ToastService])], decls: 17, vars: 11, consts: [["onboardingRef", ""], [1, "fixed", "bottom-4", "right-4", "z-50"], [1, "fixed", "inset-0", "z-[100]", "flex", "items-center", "justify-center", "pointer-events-none"], [3, "navigate"], [3, "closeDialog", "sendComplete", "isOpen", "targets"], [3, "closeDialog", "inviteComplete", "isOpen", "targets", "accounts"], [3, "closeDialog", "startExtractionEvent", "memberCountRefreshed", "isOpen", "group"], [1, "fixed", "inset-0", "z-50", "flex", "items-center", "justify-center"], [1, "flex", "h-screen", 2, "background-color", "var(--bg-primary)", "color", "var(--text-primary)"], [1, "auth-wrapper", 2, "min-height", "100vh", "background", "linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a)"], [1, "group", "relative"], [1, "w-3", "h-3", "rounded-full", "bg-slate-500", "cursor-default"], [1, "absolute", "bottom-full", "right-0", "mb-2", "hidden", "group-hover:block"], [1, "bg-slate-800/95", "backdrop-blur-sm", "rounded-lg", "px-3", "py-2", "shadow-lg", "border", "border-slate-700", "whitespace-nowrap"], [1, "text-xs", "text-slate-400"], [1, "text-xs", "text-slate-500", "mt-1"], [1, "text-xs", "text-amber-400", "mt-1"], [1, "w-3", "h-3", "rounded-full", "bg-cyan-500", "animate-pulse", "cursor-default"], [1, "text-xs", "text-slate-300"], [1, "w-3", "h-3", "rounded-full", "bg-amber-500", "cursor-pointer", 3, "click"], [1, "text-xs", "text-amber-400"], [1, "w-3", "h-3", "rounded-full", "bg-red-500", "cursor-pointer", "animate-pulse", 3, "click"], [1, "text-xs", "text-red-400"], [1, "absolute", "inset-0", "bg-black/40", "animate-fade-in"], [1, "relative", "z-10", "animate-success-pop"], [1, "absolute", "inset-0", "-m-8", "rounded-full", "bg-gradient-to-r", "from-emerald-500/20", "to-cyan-500/20", "blur-xl", "animate-pulse"], [1, "relative", "bg-gradient-to-br", "from-slate-800", "to-slate-900", "rounded-2xl", "p-8", "shadow-2xl", "border", "border-emerald-500/30"], [1, "flex", "justify-center", "mb-4"], [1, "w-20", "h-20", "rounded-full", "bg-gradient-to-r", "from-emerald-500", "to-cyan-500", "flex", "items-center", "justify-center", "shadow-lg", "shadow-emerald-500/30"], [1, "text-4xl", "animate-bounce"], [1, "text-center"], [1, "text-xl", "font-bold", "text-white", "mb-1"], [1, "text-sm", "text-slate-400"], [1, "absolute", "-top-2", "-left-2", "w-4", "h-4", "bg-emerald-400", "rounded-full", "animate-ping"], [1, "absolute", "-top-1", "-right-3", "w-3", "h-3", "bg-cyan-400", "rounded-full", "animate-ping", 2, "animation-delay", "0.1s"], [1, "absolute", "-bottom-2", "-left-1", "w-2", "h-2", "bg-emerald-300", "rounded-full", "animate-ping", 2, "animation-delay", "0.2s"], [1, "absolute", "-bottom-1", "-right-2", "w-3", "h-3", "bg-cyan-300", "rounded-full", "animate-ping", 2, "animation-delay", "0.3s"], [1, "absolute", "inset-0", "bg-black/60", "backdrop-blur-sm", 3, "click"], [1, "relative", "z-10"], [3, "closed", "loginSuccess"], [3, "navigateEvent"], [3, "show", "title", "progress", "cancellable"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "z-[100]", "flex", "items-center", "justify-center"], [1, "backdrop-blur-sm", "flex-shrink-0", "flex", "flex-col", "sidebar", "h-screen", "transition-all", "duration-300", 2, "background-color", "var(--bg-sidebar)", "border-right", "1px solid var(--border-default)"], [1, "flex-shrink-0"], [1, "absolute", "top-3", "-right-3", "z-50", "w-6", "h-6", "rounded-full", "flex", "items-center", "justify-center", "transition-all", "duration-200", "hover:scale-110", 2, "background", "linear-gradient(135deg, #06b6d4, #8b5cf6)", "box-shadow", "0 2px 8px rgba(6, 182, 212, 0.4)", 3, "click", "title"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "w-3.5", "h-3.5", "text-white", "transition-transform", "duration-200"], ["points", "15 18 9 12 15 6"], [1, "flex", "items-center", "gap-3", "p-4"], [1, "relative", "flex-shrink-0"], [1, "absolute", "inset-0", "rounded-xl", "blur-md", "opacity-50", 2, "background", "linear-gradient(135deg, #06b6d4, #8b5cf6)"], ["viewBox", "0 0 64 64", "fill", "none", 1, "h-10", "w-10", "relative", "z-10"], ["d", "M32 8L52 20V44L32 56L12 44V20L32 8Z", "fill", "url(#sidebarLogoGrad)", "stroke", "url(#sidebarLogoStroke)", "stroke-width", "1.5"], ["d", "M22 28L40 22L34 36L28 32L22 28Z", "fill", "white", "opacity", "0.95"], ["d", "M28 32L34 36L32 42L28 32Z", "fill", "white", "opacity", "0.8"], ["d", "M24 12L28 8L32 11L36 8L40 12L38 16H26L24 12Z", "fill", "#fbbf24"], ["cx", "32", "cy", "8", "r", "1.2", "fill", "#fef3c7"], ["id", "sidebarLogoGrad", "x1", "0%", "y1", "0%", "x2", "100%", "y2", "100%"], ["offset", "0%", "stop-color", "#0891b2"], ["offset", "100%", "stop-color", "#7c3aed"], ["id", "sidebarLogoStroke", "x1", "0%", "y1", "0%", "x2", "100%", "y2", "100%"], ["offset", "0%", "stop-color", "#22d3ee"], ["offset", "100%", "stop-color", "#a78bfa"], [1, "user-profile-card", "mx-3", "mb-4", "p-3", "rounded-xl", "cursor-pointer", "transition-all", "duration-300", "hover:scale-[1.02]", "group", 3, "click"], [1, "flex", "items-center", "gap-3"], [1, "avatar-wrapper", "relative"], [1, "avatar-glow", "absolute", "inset-0", "rounded-full", "opacity-0", "group-hover:opacity-100", "transition-opacity", "duration-300"], [1, "avatar-border", "w-12", "h-12", "rounded-full", "p-[2px]"], [1, "w-full", "h-full", "rounded-full", "flex", "items-center", "justify-center", "text-white", "font-bold", "text-lg", "avatar-inner"], [1, "vip-badge", "absolute", "-bottom-1", "-right-1", "w-5", "h-5", "rounded-full", "flex", "items-center", "justify-center", "text-[10px]", "shadow-lg", 3, "badge-silver", "badge-gold", "badge-diamond", "badge-star", "badge-king"], [1, "flex-1", "min-w-0"], [1, "text-sm", "font-semibold", "truncate", 2, "color", "var(--text-primary)"], [1, "flex", "items-center", "gap-1.5", "mt-0.5"], [1, "vip-tag", "vip-tag-silver"], [1, "vip-tag", "vip-tag-gold"], [1, "vip-tag", "vip-tag-diamond"], [1, "vip-tag", "vip-tag-star"], [1, "vip-tag", "vip-tag-king"], [1, "vip-tag", "vip-tag-bronze"], [1, "arrow-icon", "transition-transform", "duration-300", "group-hover:translate-x-1"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "w-4", "h-4", 2, "color", "var(--text-muted)"], ["points", "9 18 15 12 9 6"], [1, "flex-1", "overflow-y-auto", "overflow-x-hidden", "sidebar-nav", "mt-2", "px-2", "pb-2"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", "stroke-linecap", "round", "stroke-linejoin", "round", 1, "h-5", "w-5", "sidebar-icon"], ["points", "12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"], ["x", "1", "y", "4", "width", "22", "height", "16", "rx", "2", "ry", "2"], ["x1", "1", "y1", "10", "x2", "23", "y2", "10"], ["x", "3", "y", "3", "width", "7", "height", "7"], ["x", "14", "y", "3", "width", "7", "height", "7"], ["x", "14", "y", "14", "width", "7", "height", "7"], ["x", "3", "y", "14", "width", "7", "height", "7"], [1, "sidebar-group"], [1, "w-full", "flex", "items-center", "justify-between", "px-3", "py-2", "mt-2", "rounded-md", "hover:bg-white/5", "transition-colors", "cursor-pointer", "group", 3, "click"], [1, "sidebar-group-title", "text-xs", "uppercase", "tracking-wider", "flex", "items-center", "gap-1", 2, "color", "var(--sidebar-group-title)"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "w-3.5", "h-3.5", "transition-transform", "duration-200", 2, "color", "var(--sidebar-group-title)"], ["points", "6 9 12 15 18 9"], [1, "sidebar-group-content", "overflow-hidden"], [1, "sidebar-group-title", "text-xs", "uppercase", "tracking-wider", "font-semibold", "flex", "items-center", "gap-1", 2, "color", "var(--sidebar-group-title)"], [1, "inline-block", "w-5", "h-5", "rounded", "bg-gradient-to-br", "from-cyan-500", "to-blue-500", "text-center", "leading-5", "text-[10px]"], [1, "inline-block", "w-5", "h-5", "rounded", "bg-gradient-to-br", "from-violet-500", "to-fuchsia-500", "text-center", "leading-5", "text-[10px]"], [1, "flex-shrink-0", "p-4", "space-y-3", "border-t", 2, "border-color", "var(--border-default)", "background-color", "var(--bg-sidebar)"], [1, "w-full", "flex", "items-center", "justify-center", "gap-2", "px-4", "py-2.5", "bg-gradient-to-r", "from-cyan-500/10", "to-blue-500/10", "hover:from-cyan-500/20", "hover:to-blue-500/20", "border", "border-cyan-500/30", "hover:border-cyan-500/50", "text-cyan-400", "rounded-xl", "transition-all", "text-sm", "font-medium", "group", 3, "click"], [1, "text-lg", "group-hover:animate-bounce"], [1, "block", "text-sm", "font-medium", "mb-2", 2, "color", "var(--sidebar-group-title)"], [1, "flex", "rounded-md", "shadow-sm", "p-1", 2, "background-color", "var(--bg-tertiary)"], [1, "w-full", "text-sm", "py-1.5", "rounded", "transition-colors", "flex", "items-center", "justify-center", "gap-2", 3, "click"], ["xmlns", "http://www.w3.org/2000/svg", "fill", "none", "viewBox", "0 0 24 24", "stroke", "currentColor", 1, "h-4", "w-4"], ["stroke-linecap", "round", "stroke-linejoin", "round", "stroke-width", "2", "d", "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"], ["stroke-linecap", "round", "stroke-linejoin", "round", "stroke-width", "2", "d", "M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"], [1, "flex-1", "p-8", "overflow-y-auto", 2, "background-color", "var(--bg-primary)"], [1, "h-full", "p-6", "overflow-auto"], [1, "h-full", "overflow-auto"], [1, "fixed", "inset-0", "bg-black/70", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-50"], [1, "fixed", "inset-0", "bg-black/70", "flex", "items-center", "justify-center", "z-50", "backdrop-blur-sm"], [1, "fixed", "inset-0", "bg-black/70", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-[100]"], [1, "fixed", "bottom-4", "right-4", "z-50", "bg-red-500/90", "text-white", "px-4", "py-2", "rounded-lg", "shadow-lg", "flex", "items-center", "gap-2", "cursor-pointer", "hover:bg-red-600"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-[100]"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "z-[100]", "flex", "items-center", "justify-center", 3, "click"], [1, "bg-slate-900", "border", "border-slate-700", "rounded-2xl", "shadow-2xl", "w-full", "max-w-md", "mx-4", "overflow-hidden", 3, "click"], [1, "px-6", "py-4", "border-b", "border-slate-700", "flex", "items-center", "gap-3"], [1, "p-2", "bg-red-500/20", "rounded-lg"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-6", "w-6", "text-red-400"], ["d", "M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"], ["x1", "10", "y1", "11", "x2", "10", "y2", "17"], ["x1", "14", "y1", "11", "x2", "14", "y2", "17"], [1, "text-lg", "font-bold", "text-white"], [1, "px-6", "py-6"], [1, "text-slate-300", "mb-4"], [1, "bg-red-500/10", "border", "border-red-500/20", "rounded-lg", "p-3", "text-sm", "text-red-300"], [1, "px-6", "py-4", "border-t", "border-slate-700", "flex", "justify-end", "gap-3"], [1, "px-4", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-slate-300", "rounded-lg", "transition-colors", 3, "click"], [1, "px-4", "py-2", "bg-red-500", "hover:bg-red-600", "text-white", "rounded-lg", "transition-colors", "flex", "items-center", "gap-2", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-4", "w-4"], [1, "font-bold", "text-cyan-400"], [1, "font-bold", "text-red-400"], [1, "p-2", "bg-emerald-500/20", "rounded-lg"], [1, "text-xl"], [1, "px-6", "py-4", "max-h-64", "overflow-y-auto"], [1, "text-center", "py-8", "text-slate-400"], [1, "space-y-2"], [1, "px-6", "py-4", "border-t", "border-slate-700"], [1, "w-full", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-slate-300", "rounded-lg", "transition-colors", 3, "click"], [1, "mb-2"], [1, "text-cyan-400", "hover:underline", "text-sm", 3, "click"], [1, "w-full", "p-3", "bg-slate-800/50", "hover:bg-emerald-500/20", "border", "border-slate-700", "hover:border-emerald-500/50", "rounded-xl", "text-left", "transition-all", "group"], [1, "w-full", "p-3", "bg-slate-800/50", "hover:bg-emerald-500/20", "border", "border-slate-700", "hover:border-emerald-500/50", "rounded-xl", "text-left", "transition-all", "group", 3, "click"], [1, "flex", "items-center", "justify-between"], [1, "font-medium", "text-white", "group-hover:text-emerald-400"], [1, "text-xs", "text-slate-500"], [1, "text-emerald-400", "opacity-0", "group-hover:opacity-100", "transition-opacity"], [1, "text-xl", "font-bold", "bg-gradient-to-r", "from-cyan-400", "to-purple-400", "bg-clip-text", "text-transparent"], [1, "text-xs", 2, "color", "var(--text-muted)"], [1, "vip-badge", "absolute", "-bottom-1", "-right-1", "w-5", "h-5", "rounded-full", "flex", "items-center", "justify-center", "text-[10px]", "shadow-lg"], [1, "animate-pulse"], [1, "animate-bounce"], [1, "vip-icon"], [1, "vip-text"], ["data-tour", "accounts", 1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click"], ["d", "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"], ["cx", "9", "cy", "7", "r", "4"], ["d", "M23 21v-2a4 4 0 0 0-3-3.87"], ["d", "M16 3.13a4 4 0 0 1 0 7.75"], ["data-tour", "search-discovery", 1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", "relative", 3, "click"], ["cx", "11", "cy", "11", "r", "8"], ["d", "M21 21l-4.35-4.35"], [1, "absolute", "right-2", "px-1.5", "py-0.5", "text-[10px]", "bg-gradient-to-r", "from-cyan-500", "to-blue-500", "text-white", "rounded-full", "font-bold"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", "relative", 3, "click"], ["cx", "12", "cy", "5", "rx", "9", "ry", "3"], ["d", "M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"], ["d", "M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"], ["d", "M22 2L11 13"], ["d", "M22 2L15 22L11 13L2 9L22 2Z"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-lg", "transition-all", "duration-200", "cursor-pointer", "mb-1", "relative", "group", 3, "click"], [1, "w-8", "h-8", "rounded-lg", "flex", "items-center", "justify-center", "transition-all"], [1, "text-lg"], [1, "flex", "flex-col"], [1, "font-medium"], [1, "text-[10px]", "opacity-60"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click"], [1, "text-lg", "ml-1"], [1, "ml-auto", "text-xs", "px-1.5", "py-0.5", "bg-violet-500/20", "text-violet-400", "rounded"], ["data-tour", "ai-assistant", 1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-lg", "transition-all", "duration-200", "cursor-pointer", "mb-1.5", "relative", "group", 3, "click", "title"], [1, "absolute", "right-2", "px-2", "py-0.5", "text-[9px]", "bg-gradient-to-r", "from-orange-500", "to-amber-500", "text-white", "rounded-full", "font-bold", "shadow-lg", "shadow-orange-500/20"], [1, "absolute", "right-2", "text-xs"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-lg", "transition-all", "duration-200", "cursor-pointer", "mb-1.5", "relative", "group", 3, "click", "title"], [1, "absolute", "right-2", "px-2", "py-0.5", "text-[9px]", "bg-gradient-to-r", "from-purple-500", "to-pink-500", "text-white", "rounded-full", "font-bold", "shadow-lg", "shadow-purple-500/20"], [1, "absolute", "right-2", "px-2", "py-0.5", "text-[9px]", "bg-gradient-to-r", "from-cyan-500", "to-blue-500", "text-white", "rounded-full", "font-bold", "shadow-lg", "shadow-cyan-500/20"], ["d", "M18 20V10"], ["d", "M12 20V4"], ["d", "M6 20v-6"], ["d", "M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"], ["cx", "12", "cy", "12", "r", "4"], [1, "ml-auto", "px-1.5", "py-0.5", "text-xs", "bg-pink-500/20", "text-pink-400", "rounded"], [1, "sidebar-item", "flex", "items-center", "gap-3", "px-3", "py-2.5", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "mb-1", 3, "click", "title"], [1, "ml-auto", "text-xs", "opacity-60"], [1, "knowledge-menu"], [1, "flex-1"], [1, "text-xs", "transition-transform", "duration-200"], [1, "pl-6", "space-y-1"], ["d", "M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3"], [1, "sidebar-item", "flex", "items-center", "gap-2", "px-3", "py-2", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "text-sm", 3, "click"], [1, "sidebar-item", "flex", "items-center", "gap-2", "px-3", "py-2", "rounded-md", "transition-all", "duration-200", "cursor-pointer", "text-sm", "relative", 3, "click"], [1, "ml-auto", "text-xs", "font-bold", "rounded-full", "px-1.5", "py-0.5", 2, "background-color", "rgba(239, 68, 68, 0.2)", "color", "#f87171"], ["cx", "12", "cy", "12", "r", "3"], ["d", "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"], [3, "accountAdded", "back"], [1, "fixed", "inset-0", "bg-black/70", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-50", 3, "click"], [1, "bg-gradient-to-br", "from-slate-900", "via-slate-900", "to-slate-800", "border", "border-cyan-500/30", "rounded-2xl", "shadow-2xl", "shadow-cyan-500/10", "w-full", "max-w-2xl", "max-h-[90vh]", "overflow-hidden", "text-slate-200", 3, "click"], [1, "bg-gradient-to-r", "from-cyan-500/10", "via-blue-500/10", "to-purple-500/10", "border-b", "border-cyan-500/20", "p-5"], [1, "flex", "justify-between", "items-start"], [1, "flex", "items-center", "gap-4"], [1, "w-14", "h-14", "rounded-full", "bg-gradient-to-br", "from-cyan-500", "to-blue-600", "flex", "items-center", "justify-center", "text-white", "font-bold", "text-xl", "shadow-lg", "shadow-cyan-500/30"], [1, "flex", "items-center", "gap-2"], [1, "text-xl", "font-bold", "text-white"], [1, "h-2.5", "w-2.5", "rounded-full", "animate-pulse"], [1, "text-sm", "text-cyan-400"], [1, "flex", "items-center", "gap-2", "mt-1", "flex-wrap"], [1, "text-xs", "px-2", "py-0.5", "rounded-full", "bg-purple-500/20", "text-purple-400", "border", "border-purple-500/30"], [1, "text-xs", "px-2", "py-0.5", "rounded-full", "bg-cyan-500/20", "text-cyan-400", "border", "border-cyan-500/30"], [1, "text-xs", "px-2", "py-0.5", "rounded-full", 3, "class"], [1, "text-slate-400", "hover:text-white", "text-2xl", "leading-none", "transition-colors", "p-2", "hover:bg-white/10", "rounded-lg", 3, "click"], [1, "border-b", "border-cyan-500/20", "bg-slate-900/50"], ["aria-label", "Tabs", 1, "flex", "px-5"], [1, "whitespace-nowrap", "py-3", "px-4", "border-b-2", "border-transparent", "font-medium", "text-sm", "cursor-pointer", "text-slate-400", "hover:text-cyan-400", "hover:bg-cyan-500/5", "transition-all", "rounded-t-lg", "flex", "items-center", "gap-2", 3, "click"], [1, "overflow-y-auto", "max-h-[calc(90vh-220px)]", "p-5"], [1, "space-y-4"], [1, "py-4"], [1, "text-xs", "px-2", "py-0.5", "rounded-full"], [1, "bg-slate-800/50", "rounded-xl", "p-4", "border", "border-slate-700/50"], [1, "block", "text-sm", "font-medium", "text-cyan-400", "mb-2"], [1, "form-select", "w-full", "bg-slate-900/50", "border-cyan-500/30", "rounded-lg", "py-2.5", "px-3", "text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", "focus:border-cyan-500", 3, "ngModelChange", "ngModel"], ["value", ""], [1, "mt-2", "p-2", "bg-amber-500/10", "border", "border-amber-500/30", "rounded-lg"], [1, "grid", "grid-cols-3", "gap-3"], [1, "cursor-pointer", "p-3", "rounded-xl", "border-2", "transition-all", "text-center", 3, "click"], [1, "text-2xl", "mb-1"], [1, "text-sm", "font-medium"], [1, "space-y-3"], [1, "flex", "items-center", "justify-between", "mb-2"], [1, "text-sm", "font-medium", "text-cyan-400"], [1, "text-xs", "text-slate-500", "bg-slate-700/50", "px-2", "py-1", "rounded"], ["rows", "5", 1, "form-textarea", "w-full", "bg-slate-900/50", "border-cyan-500/30", "rounded-lg", "py-3", "px-3", "text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", "resize-none", "placeholder-slate-500", 3, "ngModelChange", "ngModel", "placeholder"], [1, "flex", "items-center", "gap-3", "flex-wrap"], [1, "flex", "items-center", "gap-2", "bg-slate-800/50", "hover:bg-cyan-500/20", "text-slate-300", "hover:text-cyan-400", "text-sm", "font-medium", "py-2", "px-4", "rounded-lg", "transition-all", "border", "border-slate-700/50", "hover:border-cyan-500/30", 3, "click"], [1, "p-3", "rounded-xl", "bg-cyan-500/10", "border", "border-cyan-500/30"], [1, "p-3", "bg-amber-500/10", "border", "border-amber-500/30", "rounded-xl"], [1, "p-3", "bg-red-500/10", "border", "border-red-500/30", "rounded-xl"], [1, "flex", "justify-between", "items-center", "pt-4", "border-t", "border-cyan-500/20"], [1, "text-sm", "text-red-400", "hover:text-red-300", "disabled:text-slate-500", "disabled:cursor-not-allowed", "flex", "items-center", "gap-1.5", "px-3", "py-2", "rounded-lg", "hover:bg-red-500/10", "transition-all", 3, "click", "disabled"], [1, "flex", "gap-3"], [1, "bg-slate-700/80", "hover:bg-slate-600", "text-slate-300", "font-medium", "py-2.5", "px-5", "rounded-xl", "transition-all", "border", "border-slate-600/50", "hover:border-slate-500", 3, "click"], [1, "bg-gradient-to-r", "from-cyan-500", "to-blue-500", "hover:from-cyan-400", "hover:to-blue-400", "text-white", "font-bold", "py-2.5", "px-6", "rounded-xl", "shadow-lg", "shadow-cyan-500/30", "disabled:from-slate-500", "disabled:to-slate-600", "disabled:shadow-none", "disabled:cursor-not-allowed", "flex", "items-center", "gap-2", "transition-all", 3, "click", "disabled"], [3, "value"], [1, "text-xs", "text-cyan-400", "hover:underline", "cursor-pointer", "mt-1", "inline-block", 3, "click"], [1, "flex", "items-center", "justify-between", "p-2", "bg-slate-200/30", "dark:bg-slate-800/30", "rounded-lg"], [1, "text-xs", "text-green-400"], [1, "text-xs", "bg-purple-500/20", "text-purple-400", "px-2", "py-1", "rounded"], [1, "p-2", "bg-cyan-500/10", "border", "border-cyan-500/20", "rounded-lg", "text-xs", "text-slate-400"], [1, "block", "text-sm", "font-medium", "text-slate-500", "dark:text-slate-400", "mb-1"], ["rows", "2", 1, "form-textarea", "w-full", "bg-slate-200/50", "dark:bg-slate-800/50", "border-slate-300", "dark:border-slate-700", "rounded-lg", "py-2", "px-3", "text-slate-800", "dark:text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", 3, "ngModelChange", "ngModel", "placeholder"], [1, "flex", "items-center", "justify-center", "gap-3"], [1, "bg-gradient-to-r", "from-purple-500", "to-cyan-500", "hover:from-purple-600", "hover:to-cyan-600", "text-white", "font-bold", "py-2", "px-6", "rounded-lg", "transition", "duration-200", "shadow-lg", "disabled:from-slate-400", "disabled:to-slate-500", "disabled:shadow-none", "disabled:cursor-not-allowed", "flex", "items-center", "gap-2", 3, "click", "disabled"], ["title", "\u91CD\u65B0\u751F\u6210", 1, "p-2", "bg-slate-600", "hover:bg-slate-500", "text-white", "rounded-lg"], [1, "p-3", "bg-amber-500/10", "border", "border-amber-500/20", "text-amber-400", "rounded-lg", "text-sm", "text-center"], [1, "p-3", "bg-red-500/10", "border", "border-red-500/20", "text-red-400", "rounded-lg", "text-sm"], [1, "p-3", "bg-green-500/10", "border", "border-green-500/20", "rounded-lg"], [1, "text-cyan-400"], [1, "animate-spin"], ["title", "\u91CD\u65B0\u751F\u6210", 1, "p-2", "bg-slate-600", "hover:bg-slate-500", "text-white", "rounded-lg", 3, "click"], [1, "text-cyan-400", "hover:underline", "cursor-pointer", "ml-1", 3, "click"], [1, "ml-2", "text-cyan-400", "hover:underline", 3, "click"], [1, "text-xs", "text-green-400", "mb-2"], [1, "form-select", "w-full", "bg-slate-900/50", "border-cyan-500/30", "rounded-lg", "py-2.5", "px-3", "text-white", "focus:outline-none", "focus:ring-2", "focus:ring-cyan-500", 3, "change"], [1, "flex", "items-center", "gap-2", "bg-green-500/20", "hover:bg-green-500/30", "text-green-400", "text-sm", "font-medium", "py-2", "px-3", "rounded-lg", "transition-all", "border", "border-green-500/30", 3, "click"], [1, "flex", "items-center", "gap-2", "bg-red-500/20", "hover:bg-red-500/30", "text-red-400", "text-sm", "font-medium", "py-2", "px-3", "rounded-lg", "transition-all", "border", "border-red-500/30", 3, "click"], [1, "text-sm", "text-cyan-400", "font-medium"], [1, "space-y-2", "max-h-40", "overflow-y-auto"], [1, "flex", "items-center", "justify-between", "text-sm", "bg-slate-800/50", "rounded-lg", "px-3", "py-2"], [1, "flex", "items-center", "gap-2", "truncate", "flex-1", "min-w-0"], [1, "text-green-400"], [1, "text-blue-400"], [1, "truncate", "text-white"], [1, "text-slate-500", "text-xs", "whitespace-nowrap"], [1, "text-green-500", "text-xs"], [1, "text-red-400", "hover:text-red-300", "text-lg", "font-bold", "p-1", "hover:bg-red-500/20", "rounded", "ml-2", 3, "click"], [1, "text-sm", "text-amber-400"], [1, "text-sm", "text-red-400"], [1, "mb-4", "flex", "items-center", "justify-between"], [1, "bg-cyan-500", "hover:bg-cyan-600", "text-white", "font-bold", "py-2", "px-4", "rounded-lg", "text-sm", "disabled:bg-slate-500", "disabled:cursor-not-allowed", "flex", "items-center", "gap-2", 3, "click", "disabled"], [1, "h-96", "overflow-y-auto", "space-y-3", "mb-4", "bg-slate-200/30", "dark:bg-slate-800/30", "rounded-lg", "p-4"], [1, "h-96", "overflow-y-auto"], [1, "space-y-3", "mb-4"], [1, "text-center", "py-8"], [1, "mt-4", "p-3", "bg-slate-800/50", "rounded-lg", "border", "border-cyan-500/20"], [1, "h-96", "overflow-y-auto", "space-y-3", "mb-4", "bg-slate-200/30", "dark:bg-slate-800/30", "rounded-lg", "p-4", 3, "scroll"], [1, "text-center", "py-4"], [1, "text-center", "py-2"], [1, "flex", "justify-start"], [1, "flex", "justify-end"], [1, "max-w-[75%]"], [1, "bg-slate-700", "text-white", "rounded-2xl", "rounded-bl-sm", "px-4", "py-2"], [1, "text-sm"], [1, "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "text-white", "rounded-2xl", "rounded-br-sm", "px-4", "py-2", "shadow-lg"], [1, "flex", "items-center", "justify-end", "gap-2", "mt-1"], [1, "text-xs", "bg-purple-500/20", "text-purple-400", "px-1.5", "py-0.5", "rounded"], [1, "animate-spin", "text-cyan-400"], [1, "ml-2", "text-sm", "text-slate-500"], [1, "text-sm", "text-cyan-400", "hover:text-cyan-300", 3, "click"], [1, "flex", "justify-center"], [1, "bg-slate-800/50", "text-slate-400", "text-xs", "px-3", "py-1", "rounded-full"], [1, "text-4xl", "mb-2"], [1, "text-slate-500", "dark:text-slate-400"], [1, "text-xs", "text-slate-500", "mt-2"], [1, "text-sm", "font-medium", "text-cyan-400", "mb-2", "flex", "items-center", "gap-2"], [1, "grid", "grid-cols-3", "gap-2", "text-center", "text-xs"], [1, "p-2", "bg-slate-700/50", "rounded"], [1, "text-slate-400"], [1, "text-sm", "font-bold", "text-cyan-400"], [1, "fixed", "inset-0", "bg-black/70", "flex", "items-center", "justify-center", "z-50", "backdrop-blur-sm", 3, "click"], [1, "bg-slate-100", "dark:bg-slate-900", "rounded-2xl", "shadow-2xl", "border", "border-slate-300", "dark:border-slate-700", "w-full", "max-w-3xl", "max-h-[80vh]", "overflow-hidden", 3, "click"], [1, "p-4", "border-b", "border-slate-300", "dark:border-slate-700", "flex", "items-center", "justify-between", "bg-slate-200/50", "dark:bg-slate-800/50"], [1, "text-lg", "font-bold", "text-slate-900", "dark:text-white", "flex", "items-center", "gap-2"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-5", "w-5", "text-purple-500"], ["d", "M3 3v5h5"], ["d", "M3.05 13A9 9 0 1 0 6 5.3L3 8"], ["d", "M12 7v5l4 2"], [1, "text-slate-500", "hover:text-slate-700", "dark:text-slate-400", "dark:hover:text-white", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-5", "w-5"], ["x1", "18", "y1", "6", "x2", "6", "y2", "18"], ["x1", "6", "y1", "6", "x2", "18", "y2", "18"], [1, "p-4", "overflow-y-auto", "max-h-[60vh]"], [1, "text-center", "py-8", "text-slate-500"], [1, "p-4", "border-t", "border-slate-300", "dark:border-slate-700", "bg-slate-200/50", "dark:bg-slate-800/50", "flex", "justify-end"], [1, "px-4", "py-2", "bg-slate-300", "dark:bg-slate-700", "hover:bg-slate-400", "dark:hover:bg-slate-600", "rounded-lg", "text-sm", "font-medium", "transition-colors", 3, "click"], ["viewBox", "0 0 24 24", "fill", "none", "stroke", "currentColor", "stroke-width", "2", 1, "h-12", "w-12", "mx-auto", "mb-3", "text-slate-400"], ["cx", "12", "cy", "12", "r", "10"], ["d", "M12 8v4l3 3"], [1, "bg-slate-200/50", "dark:bg-slate-800/50", "rounded-lg", "p-3", "border", "border-slate-300", "dark:border-slate-700", 3, "opacity-50"], [1, "bg-slate-200/50", "dark:bg-slate-800/50", "rounded-lg", "p-3", "border", "border-slate-300", "dark:border-slate-700"], [1, "p-2", "rounded-lg"], [1, "font-medium", "text-slate-900", "dark:text-white"], [1, "text-yellow-500", "ml-2"], [1, "text-red-400", "ml-2"], [1, "text-xs", "bg-yellow-500/20", "hover:bg-yellow-500/30", "text-yellow-400", "px-2", "py-1", "rounded"], [1, "text-xs", "bg-yellow-500/20", "hover:bg-yellow-500/30", "text-yellow-400", "px-2", "py-1", "rounded", 3, "click"], [1, "bg-gradient-to-br", "from-slate-800", "to-slate-900", "rounded-2xl", "shadow-2xl", "w-full", "max-w-2xl", "mx-4", "overflow-hidden", "border", "border-cyan-500/30"], [1, "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "p-6", "text-center"], [1, "text-3xl", "font-bold", "text-white", "mb-2"], [1, "text-cyan-100"], [1, "flex", "justify-center", "gap-2", "py-4", "bg-slate-800/50"], [1, "w-3", "h-3", "rounded-full", "transition-all"], [1, "p-6"], [1, "text-center", "space-y-6"], [1, "p-6", "bg-slate-800/50", "flex", "justify-between", "items-center"], [1, "text-sm", "text-slate-400", "hover:text-white", "transition-colors", 3, "click"], [1, "px-4", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-white", "rounded-lg", "transition-colors"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "hover:from-cyan-600", "hover:to-purple-600", "text-white", "font-medium", "rounded-lg", "transition-all"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-green-500", "to-emerald-500", "hover:from-green-600", "hover:to-emerald-600", "text-white", "font-medium", "rounded-lg", "transition-all"], [1, "grid", "grid-cols-3", "gap-4", "mb-6"], [1, "p-4", "bg-slate-700/50", "rounded-xl"], [1, "text-3xl", "mb-2"], [1, "text-sm", "font-medium", "text-white"], [1, "text-slate-300"], [1, "text-lg", "font-semibold", "text-white", "text-center", "mb-4"], [1, "p-4", "rounded-xl"], [1, "text-2xl"], [1, "font-medium", "text-white"], [1, "px-3", "py-1", "bg-slate-700", "hover:bg-slate-600", "rounded", "text-sm", "text-white", "disabled:opacity-50", 3, "click", "disabled"], [1, "block", "text-sm", "font-medium", "text-slate-300", "mb-2"], [1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModel"], ["placeholder", "qwen2:7b", 1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModel"], [1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModelChange", "ngModel"], ["placeholder", "qwen2:7b", 1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded-lg", "py-2", "px-3", "text-white", 3, "ngModelChange", "ngModel"], [1, "text-sm", "text-slate-300", "space-y-2"], [1, "block", "bg-slate-800", "p-2", "rounded", "text-cyan-400", "text-xs"], [1, "flex", "items-center", "gap-2", "cursor-pointer"], ["type", "checkbox", 1, "w-4", "h-4", "text-cyan-500", "rounded", 3, "change", "checked"], [1, "text-sm", "text-slate-300"], [1, "mt-2"], [1, "w-full", "bg-slate-800", "border", "border-slate-600", "rounded", "py-1", "px-2", "text-sm", "text-white", 3, "ngModelChange", "ngModel"], ["value", "gemini"], ["value", "openai"], [1, "text-6xl", "mb-4"], [1, "text-2xl", "font-bold", "text-white"], [1, "p-4", "bg-cyan-500/10", "rounded-xl", "border", "border-cyan-500/30"], [1, "text-sm", "text-slate-300", "space-y-1"], [1, "px-4", "py-2", "bg-slate-700", "hover:bg-slate-600", "text-white", "rounded-lg", "transition-colors", 3, "click"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-cyan-500", "to-purple-500", "hover:from-cyan-600", "hover:to-purple-600", "text-white", "font-medium", "rounded-lg", "transition-all", 3, "click"], [1, "px-6", "py-2", "bg-gradient-to-r", "from-green-500", "to-emerald-500", "hover:from-green-600", "hover:to-emerald-600", "text-white", "font-medium", "rounded-lg", "transition-all", 3, "click"], [1, "bg-slate-800", "rounded-2xl", "shadow-2xl", "w-full", "max-w-lg", "mx-4", "overflow-hidden", "border", "border-amber-500/50"], [1, "bg-amber-500/20", "p-6", "text-center", "border-b", "border-amber-500/30"], [1, "text-5xl", "mb-3"], [1, "text-xl", "font-bold", "text-amber-400"], [1, "text-slate-400", "text-sm", "mt-2"], [1, "p-6", "space-y-4"], [1, "text-slate-300", "text-sm"], [1, "bg-slate-700/50", "rounded-lg", "p-3", "max-h-48", "overflow-y-auto", "space-y-2"], [1, "flex", "items-center", "justify-between", "p-2", "bg-slate-600/50", "rounded-lg"], [1, "bg-blue-500/10", "border", "border-blue-500/30", "rounded-lg", "p-3"], [1, "text-blue-400", "text-sm"], [1, "p-4", "bg-slate-700/30", "flex", "justify-end", "gap-3"], [1, "px-4", "py-2", "bg-slate-600", "hover:bg-slate-500", "text-white", "rounded-lg", "transition-colors", 3, "click"], [1, "px-4", "py-2", "bg-amber-500", "hover:bg-amber-600", "disabled:opacity-50", "text-white", "rounded-lg", "transition-colors", "flex", "items-center", "gap-2", 3, "click", "disabled"], [1, "text-white", "font-medium"], [1, "text-green-400", "text-xs"], [1, "text-amber-400", "text-xs"], [1, "bg-slate-800", "rounded-2xl", "shadow-2xl", "w-full", "max-w-lg", "mx-4", "overflow-hidden", "border", "border-red-500/50"], [1, "bg-red-500/20", "p-6", "text-center", "border-b", "border-red-500/30"], [1, "text-xl", "font-bold", "text-red-400"], [1, "bg-slate-700/50", "rounded-lg", "p-4", "space-y-3"], [1, "flex", "items-start", "gap-3"], ["href", "https://www.python.org/downloads/", "target", "_blank", 1, "text-cyan-400", "text-sm", "hover:underline"], [1, "text-slate-400", "text-sm"], [1, "block", "bg-slate-800", "text-green-400", "text-sm", "p-2", "rounded", "mt-1"], [1, "bg-red-500/10", "border", "border-red-500/30", "rounded-lg", "p-3"], [1, "text-red-400", "text-sm"], [1, "fixed", "bottom-4", "right-4", "z-50", "bg-red-500/90", "text-white", "px-4", "py-2", "rounded-lg", "shadow-lg", "flex", "items-center", "gap-2", "cursor-pointer", "hover:bg-red-600", 3, "click"], [1, "fixed", "inset-0", "bg-black/60", "backdrop-blur-sm", "flex", "items-center", "justify-center", "z-[100]", 3, "click"], [1, "bg-slate-800", "rounded-2xl", "shadow-2xl", "w-full", "max-w-md", "mx-4", "overflow-hidden", "border", "border-cyan-500/30", 3, "click"], [1, "bg-gradient-to-r", "from-cyan-500/20", "to-blue-500/20", "p-4", "border-b", "border-slate-700/50"], [1, "text-lg", "font-bold", "text-white", "flex", "items-center", "gap-2"], [1, "block", "text-sm", "text-slate-400", "mb-2"], ["type", "text", "placeholder", "\u4F8B\u5982\uFF1A\u8CB7\u5BB6\u610F\u5411\u3001\u7522\u54C1\u8AEE\u8A62...", "autofocus", "", 1, "w-full", "bg-slate-900/50", "border", "border-slate-600", "rounded-lg", "px-4", "py-3", "text-white", "focus:border-cyan-500", "focus:ring-1", "focus:ring-cyan-500", "transition-colors", 3, "input", "keyup.enter", "value"], [1, "px-4", "py-2", "bg-cyan-500", "hover:bg-cyan-400", "text-white", "rounded-lg", "transition-colors", "font-medium", 3, "click"]], template: function AppComponent_Template(rf, ctx) {
       if (rf & 1) {
         \u0275\u0275element(0, "app-network-status")(1, "app-auth-transition")(2, "app-toast")(3, "app-global-confirm-dialog")(4, "app-global-input-dialog");
         \u0275\u0275conditionalCreate(5, AppComponent_Conditional_5_Template, 5, 1, "div", 1);
@@ -70686,7 +70932,7 @@ ${details}`, 12e3);
         \u0275\u0275elementEnd();
         \u0275\u0275element(11, "app-membership-dialog")(12, "app-payment")(13, "app-upgrade-prompt");
         \u0275\u0275conditionalCreate(14, AppComponent_Conditional_14_Template, 4, 0, "div", 7);
-        \u0275\u0275conditionalCreate(15, AppComponent_Conditional_15_Template, 179, 124, "div", 8)(16, AppComponent_Conditional_16_Template, 2, 0, "div", 9);
+        \u0275\u0275conditionalCreate(15, AppComponent_Conditional_15_Template, 186, 130, "div", 8)(16, AppComponent_Conditional_16_Template, 2, 0, "div", 9);
       }
       if (rf & 2) {
         \u0275\u0275advance(5);
@@ -70737,6 +70983,8 @@ ${details}`, 12e3);
       AiTeamHubComponent,
       MemberDatabaseComponent,
       ApiCredentialsViewComponent,
+      // 🆕 錢包視圖
+      WalletViewComponent,
       // 🆕 知識大腦獨立組件
       AIBrainComponent,
       KnowledgeGapsComponent,
@@ -70800,6 +71048,8 @@ ${details}`, 12e3);
       AiTeamHubComponent,
       MemberDatabaseComponent,
       ApiCredentialsViewComponent,
+      // 🆕 錢包視圖
+      WalletViewComponent,
       // 🆕 知識大腦獨立組件
       AIBrainComponent,
       KnowledgeGapsComponent,
@@ -71297,6 +71547,16 @@ ${details}`, 12e3);
            [style.color]="view === 'membership-center' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
            <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
            <span>\u6703\u54E1\u4E2D\u5FC3</span>
+        </a>
+        
+        <!-- \u6211\u7684\u9322\u5305 -->
+        <a (click)="changeView('wallet')" 
+           class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1"
+           [class.active]="view === 'wallet'"
+           [style.background-color]="view === 'wallet' ? 'var(--sidebar-item-active)' : 'transparent'"
+           [style.color]="view === 'wallet' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
+           <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+           <span>\u6211\u7684\u9322\u5305</span>
         </a>
         
         <!-- \u5100\u8868\u76E4 -->
@@ -71867,6 +72127,9 @@ ${details}`, 12e3);
       <!-- \u{1F195} Phase P0: \u88DC\u5168\u7F3A\u5931\u7684\u8996\u5716 -->
       @case ('membership-center') {
         <app-membership-center></app-membership-center>
+      }
+      @case ('wallet') {
+        <app-wallet-view></app-wallet-view>
       }
       @case ('profile') {
         <app-profile></app-profile>
@@ -72871,7 +73134,7 @@ ${details}`, 12e3);
   }] });
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(AppComponent, { className: "AppComponent", filePath: "src/app.component.ts", lineNumber: 322 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(AppComponent, { className: "AppComponent", filePath: "src/app.component.ts", lineNumber: 326 });
 })();
 
 // src/guards/auth.guard.ts
@@ -72967,7 +73230,7 @@ var routes = [
   // 認證路由（公開）
   {
     path: "auth",
-    loadChildren: () => import("./chunk-FZE2LFXS.js").then((m) => m.AUTH_ROUTES)
+    loadChildren: () => import("./chunk-AV65AVMD.js").then((m) => m.AUTH_ROUTES)
   },
   // 簡化路由
   {
@@ -73007,21 +73270,21 @@ var routes = [
   // 用戶設置頁面
   {
     path: "user-settings",
-    loadComponent: () => import("./chunk-EGO6JM3J.js").then((m) => m.UserSettingsViewComponent),
+    loadComponent: () => import("./chunk-2Y7VKGTH.js").then((m) => m.UserSettingsViewComponent),
     title: "\u7528\u6236\u8A2D\u7F6E",
     canActivate: [authGuard]
   },
   // 訂閱升級頁面
   {
     path: "upgrade",
-    loadComponent: () => import("./chunk-AIBRAP3F.js").then((m) => m.UpgradeViewComponent),
+    loadComponent: () => import("./chunk-46GAQ4U7.js").then((m) => m.UpgradeViewComponent),
     title: "\u5347\u7D1A\u65B9\u6848",
     canActivate: [authGuard]
   },
   // 配額管理儀表板
   {
     path: "quota",
-    loadComponent: () => import("./chunk-GF5W56NG.js").then((m) => m.QuotaDashboardViewComponent),
+    loadComponent: () => import("./chunk-6TB3IBLJ.js").then((m) => m.QuotaDashboardViewComponent),
     title: "\u914D\u984D\u7BA1\u7406",
     canActivate: [authGuard]
   },
@@ -73037,6 +73300,45 @@ var routes = [
     path: "payment",
     loadComponent: () => import("./chunk-TN2WDBWG.js").then((m) => m.PaymentViewComponent),
     title: "\u652F\u4ED8\u4E2D\u5FC3",
+    canActivate: [authGuard]
+  },
+  // 🆕 Phase 0: 錢包系統
+  {
+    path: "wallet",
+    loadComponent: () => import("./chunk-3PGBHSQF.js").then((m) => m.WalletViewComponent),
+    title: "\u6211\u7684\u9322\u5305",
+    canActivate: [authGuard]
+  },
+  {
+    path: "wallet/transactions",
+    loadComponent: () => import("./chunk-AEHAXNJ2.js").then((m) => m.WalletTransactionsComponent),
+    title: "\u4EA4\u6613\u8A18\u9304",
+    canActivate: [authGuard]
+  },
+  {
+    path: "wallet/recharge",
+    loadComponent: () => import("./chunk-CGAGAHOF.js").then((m) => m.WalletRechargeComponent),
+    title: "\u5145\u503C\u4E2D\u5FC3",
+    canActivate: [authGuard]
+  },
+  // 🆕 Phase 3: 錢包高級功能
+  {
+    path: "wallet/orders",
+    loadComponent: () => import("./chunk-6KFBTQIS.js").then((m) => m.WalletOrdersComponent),
+    title: "\u5145\u503C\u8A02\u55AE",
+    canActivate: [authGuard]
+  },
+  {
+    path: "wallet/analytics",
+    loadComponent: () => import("./chunk-XSVIHDNO.js").then((m) => m.WalletAnalyticsComponent),
+    title: "\u6D88\u8CBB\u5206\u6790",
+    canActivate: [authGuard]
+  },
+  // 🆕 Phase 4: 提現功能
+  {
+    path: "wallet/withdraw",
+    loadComponent: () => import("./chunk-K6HEGIKH.js").then((m) => m.WalletWithdrawComponent),
+    title: "\u63D0\u73FE",
     canActivate: [authGuard]
   },
   // 營銷功能 - 需要會員權限
@@ -73131,6 +73433,13 @@ var VIEW_ROUTE_MAP = {
   "dashboard": "/dashboard",
   "accounts": "/accounts",
   "settings": "/settings",
+  // 🆕 錢包系統
+  "wallet": "/wallet",
+  "wallet-transactions": "/wallet/transactions",
+  "wallet-recharge": "/wallet/recharge",
+  "wallet-orders": "/wallet/orders",
+  "wallet-analytics": "/wallet/analytics",
+  "wallet-withdraw": "/wallet/withdraw",
   // 🆕 營銷任務中心（核心入口）
   "marketing-hub": "/marketing-hub",
   "marketing-tasks": "/marketing-hub",

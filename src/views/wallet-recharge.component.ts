@@ -791,7 +791,7 @@ export class WalletRechargeComponent implements OnInit {
         
         const method = this.selectedMethod();
         
-        if (method === 'usdt_trc20' || method === 'usdt_erc20') {
+        if (method === 'usdt_trc20') {
           this.showUsdtModal.set(true);
         } else {
           // TODO: 其他支付方式

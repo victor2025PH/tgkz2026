@@ -387,6 +387,97 @@ export class ApiService {
     }
   }
   
+  // ==================== RESTful HTTP 方法 ====================
+  
+  /**
+   * HTTP GET 請求
+   */
+  async get<T = any>(endpoint: string, options?: { cache?: boolean; ttl?: number }): Promise<ApiResponse<T>> {
+    const config = this._config();
+    const url = endpoint.startsWith('http') ? endpoint : `${config.baseUrl}${endpoint}`;
+    
+    // 緩存檢查
+    if (options?.cache !== false) {
+      const cached = this.cache.get(url);
+      if (cached && Date.now() - cached.timestamp < (options?.ttl || this.cacheTimeout)) {
+        return { success: true, data: cached.data };
+      }
+    }
+    
+    const token = localStorage.getItem('tgm_access_token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        return { 
+          success: false, 
+          error: errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}` 
+        };
+      }
+      
+      const result = await response.json();
+      
+      // 緩存結果
+      if (options?.cache !== false && result.success !== false) {
+        this.cache.set(url, { data: result.data || result, timestamp: Date.now() });
+      }
+      
+      return this.normalizeResponse(result);
+    } catch (error: any) {
+      console.error(`[ApiService] GET ${endpoint} error:`, error);
+      return { success: false, error: error.message || 'Network error' };
+    }
+  }
+  
+  /**
+   * HTTP POST 請求
+   */
+  async post<T = any>(endpoint: string, body: any = {}): Promise<ApiResponse<T>> {
+    const config = this._config();
+    const url = endpoint.startsWith('http') ? endpoint : `${config.baseUrl}${endpoint}`;
+    
+    const token = localStorage.getItem('tgm_access_token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        return { 
+          success: false, 
+          error: errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}` 
+        };
+      }
+      
+      const result = await response.json();
+      return this.normalizeResponse(result);
+    } catch (error: any) {
+      console.error(`[ApiService] POST ${endpoint} error:`, error);
+      return { success: false, error: error.message || 'Network error' };
+    }
+  }
+  
   // ==================== 常用 API 快捷方法 ====================
   
   // 帳號

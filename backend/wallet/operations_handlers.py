@@ -493,12 +493,19 @@ class OperationsHandlers:
                 # 時間範圍統計
                 since = (datetime.now() - timedelta(days=days)).isoformat()
                 
+                # 檢查 wallet_transactions 表的列結構
+                cursor.execute("PRAGMA table_info(wallet_transactions)")
+                tx_columns = [col[1] for col in cursor.fetchall()]
+                has_bonus = 'bonus_amount' in tx_columns
+                has_category = 'category' in tx_columns
+                
                 # 充值趨勢（按天）
-                cursor.execute('''
+                amount_expr = 'COALESCE(SUM(amount + COALESCE(bonus_amount, 0)), 0)' if has_bonus else 'COALESCE(SUM(amount), 0)'
+                cursor.execute(f'''
                     SELECT 
                         DATE(created_at) as date,
                         COUNT(*) as count,
-                        COALESCE(SUM(amount + bonus_amount), 0) as amount
+                        {amount_expr} as amount
                     FROM wallet_transactions
                     WHERE type = 'recharge' AND created_at >= ?
                     GROUP BY DATE(created_at)
@@ -519,17 +526,18 @@ class OperationsHandlers:
                 ''', (since,))
                 consume_trend = [dict(row) for row in cursor.fetchall()]
                 
-                # 消費類目分布
-                cursor.execute('''
-                    SELECT 
-                        category,
-                        COUNT(*) as count,
-                        COALESCE(SUM(ABS(amount)), 0) as amount
-                    FROM wallet_transactions
-                    WHERE type = 'consume' AND created_at >= ?
-                    GROUP BY category
-                ''', (since,))
-                category_distribution = [dict(row) for row in cursor.fetchall()]
+                # 消費類目分布（如果有 category 列）
+                category_distribution = []
+                if has_category:
+                    cursor.execute('''
+                        SELECT 
+                            category,
+                            COUNT(*) as count,
+                            COALESCE(SUM(ABS(amount)), 0) as amount
+                        FROM wallet_transactions
+                        WHERE type = 'consume' AND created_at >= ?
+                        GROUP BY category
+                        ORDER BY amount DESC
                 
                 # 用戶活躍度（有交易的用戶數）
                 cursor.execute('''

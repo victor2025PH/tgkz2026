@@ -98,6 +98,7 @@ export const routes: Routes = [
   // 🆕 Phase 0: 錢包系統
   {
     path: 'wallet',
+    pathMatch: 'full',  // 確保只匹配精確的 /wallet 路徑
     loadComponent: () => import('./views/wallet-view.component').then(m => m.WalletViewComponent),
     title: '我的錢包',
     canActivate: [authGuard]

@@ -1,6 +1,6 @@
 import {
   WalletViewComponent
-} from "./chunk-X2QY2PRD.js";
+} from "./chunk-PE2R2LMV.js";
 import "./chunk-EULKY6Q3.js";
 import "./chunk-HOUP2MV6.js";
 import "./chunk-T45T4QAG.js";
@@ -10,4 +10,4 @@ import "./chunk-K4KD4A2Z.js";
 export {
   WalletViewComponent
 };
-//# sourceMappingURL=chunk-7XUNBXVA.js.map
+//# sourceMappingURL=chunk-YFQK2ZWN.js.map

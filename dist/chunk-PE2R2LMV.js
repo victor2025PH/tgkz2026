@@ -484,18 +484,22 @@ var WalletViewComponent = class _WalletViewComponent {
     this.router.navigate(["/"]);
   }
   goToRecharge() {
+    console.log("[Wallet] goToRecharge called, isFrozen:", this.isFrozen());
     if (this.isFrozen()) {
       this.globalError.set("\u9322\u5305\u5DF2\u51CD\u7D50\uFF0C\u7121\u6CD5\u9032\u884C\u5145\u503C\u64CD\u4F5C");
       return;
     }
-    this.router.navigate(["/wallet/recharge"]);
+    console.log("[Wallet] Navigating to /wallet/recharge");
+    this.router.navigate(["/wallet/recharge"]).then((success) => console.log("[Wallet] Navigation result:", success), (error) => console.error("[Wallet] Navigation error:", error));
   }
   goToWithdraw() {
+    console.log("[Wallet] goToWithdraw called, isFrozen:", this.isFrozen());
     if (this.isFrozen()) {
       this.globalError.set("\u9322\u5305\u5DF2\u51CD\u7D50\uFF0C\u7121\u6CD5\u9032\u884C\u63D0\u73FE\u64CD\u4F5C");
       return;
     }
-    this.router.navigate(["/wallet/withdraw"]);
+    console.log("[Wallet] Navigating to /wallet/withdraw");
+    this.router.navigate(["/wallet/withdraw"]).then((success) => console.log("[Wallet] Navigation result:", success), (error) => console.error("[Wallet] Navigation error:", error));
   }
   // P2: 重試連接
   retryConnection() {
@@ -1015,4 +1019,4 @@ var WalletViewComponent = class _WalletViewComponent {
 export {
   WalletViewComponent
 };
-//# sourceMappingURL=chunk-X2QY2PRD.js.map
+//# sourceMappingURL=chunk-PE2R2LMV.js.map

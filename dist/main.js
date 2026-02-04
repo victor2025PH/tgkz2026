@@ -27123,7 +27123,8 @@ var AuthService2 = class _AuthService {
           const rawUser = JSON.parse(storedUser);
           const user = {
             id: rawUser.id || 0,
-            username: rawUser.username || rawUser.display_name || "User",
+            username: rawUser.username || "User",
+            displayName: rawUser.display_name || rawUser.displayName || rawUser.nickname || void 0,
             email: rawUser.email || void 0,
             phone: rawUser.phone || void 0,
             avatar: rawUser.avatar_url || rawUser.avatar || void 0,
@@ -27181,7 +27182,8 @@ var AuthService2 = class _AuthService {
         const rawUser = result.data;
         const user = {
           id: rawUser.id || 0,
-          username: rawUser.username || rawUser.display_name || "User",
+          username: rawUser.username || "User",
+          displayName: rawUser.display_name || rawUser.displayName || rawUser.nickname || void 0,
           email: rawUser.email || void 0,
           phone: rawUser.phone || void 0,
           avatar: rawUser.avatar_url || rawUser.avatar || void 0,
@@ -27617,7 +27619,8 @@ var AuthService2 = class _AuthService {
       if (storedToken && storedUser) {
         const user = {
           id: storedUser.id || 0,
-          username: storedUser.username || storedUser.display_name || "User",
+          username: storedUser.username || "User",
+          displayName: storedUser.display_name || storedUser.displayName || storedUser.nickname || void 0,
           email: storedUser.email || void 0,
           phone: storedUser.phone || void 0,
           avatar: storedUser.avatar_url || storedUser.avatar || void 0,
@@ -39906,7 +39909,7 @@ function MembershipCenterComponent_Conditional_15_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "p", 10);
     \u0275\u0275text(1);
-    \u0275\u0275elementStart(2, "span", 34);
+    \u0275\u0275elementStart(2, "span", 25);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd()();
   }
@@ -39928,7 +39931,7 @@ function MembershipCenterComponent_Conditional_16_Template(rf, ctx) {
 function MembershipCenterComponent_Conditional_18_Template(rf, ctx) {
   if (rf & 1) {
     const _r2 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 35);
+    \u0275\u0275elementStart(0, "button", 26);
     \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_18_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r2);
       const ctx_r0 = \u0275\u0275nextContext();
@@ -39938,94 +39941,82 @@ function MembershipCenterComponent_Conditional_18_Template(rf, ctx) {
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_div_29_Template(rf, ctx) {
-  if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 36);
-    \u0275\u0275text(1);
-    \u0275\u0275elementEnd();
-  }
-  if (rf & 2) {
-    const ctx_r0 = \u0275\u0275nextContext();
-    \u0275\u0275advance();
-    \u0275\u0275textInterpolate1(" \u8D08\u9001: ", ctx_r0.walletBonusDisplay(), " ");
-  }
-}
-function MembershipCenterComponent_Conditional_82_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_69_Template(rf, ctx) {
   if (rf & 1) {
     const _r3 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 33)(1, "div", 37)(2, "h3", 38);
+    \u0275\u0275elementStart(0, "div", 24)(1, "div", 27)(2, "h3", 28);
     \u0275\u0275text(3, "\u{1F4CA} \u672C\u6708\u4F7F\u7528\u8A73\u60C5");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "div", 39)(5, "div", 40)(6, "span", 41);
+    \u0275\u0275elementStart(4, "div", 29)(5, "div", 30)(6, "span", 31);
     \u0275\u0275text(7, "\u{1F916} AI \u8ABF\u7528\u6B21\u6578");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "div", 42)(9, "div", 43);
-    \u0275\u0275element(10, "div", 44);
+    \u0275\u0275elementStart(8, "div", 32)(9, "div", 33);
+    \u0275\u0275element(10, "div", 34);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(11, "span", 45);
+    \u0275\u0275elementStart(11, "span", 35);
     \u0275\u0275text(12);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(13, "div", 40)(14, "span", 41);
+    \u0275\u0275elementStart(13, "div", 30)(14, "span", 31);
     \u0275\u0275text(15, "\u{1F4E8} \u6D88\u606F\u767C\u9001");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(16, "div", 42)(17, "div", 43);
-    \u0275\u0275element(18, "div", 44);
+    \u0275\u0275elementStart(16, "div", 32)(17, "div", 33);
+    \u0275\u0275element(18, "div", 34);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(19, "span", 45);
+    \u0275\u0275elementStart(19, "span", 35);
     \u0275\u0275text(20);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(21, "div", 40)(22, "span", 41);
+    \u0275\u0275elementStart(21, "div", 30)(22, "span", 31);
     \u0275\u0275text(23, "\u{1F465} \u5E33\u865F\u6578\u91CF");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(24, "div", 42)(25, "div", 43);
-    \u0275\u0275element(26, "div", 44);
+    \u0275\u0275elementStart(24, "div", 32)(25, "div", 33);
+    \u0275\u0275element(26, "div", 34);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(27, "span", 45);
+    \u0275\u0275elementStart(27, "span", 35);
     \u0275\u0275text(28);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(29, "div", 40)(30, "span", 41);
+    \u0275\u0275elementStart(29, "div", 30)(30, "span", 31);
     \u0275\u0275text(31, "\u{1F4BE} \u5B58\u5132\u7A7A\u9593");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(32, "div", 42)(33, "div", 43);
-    \u0275\u0275element(34, "div", 44);
+    \u0275\u0275elementStart(32, "div", 32)(33, "div", 33);
+    \u0275\u0275element(34, "div", 34);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(35, "span", 45);
+    \u0275\u0275elementStart(35, "span", 35);
     \u0275\u0275text(36);
     \u0275\u0275elementEnd()()()();
-    \u0275\u0275elementStart(37, "div", 46)(38, "h3", 38);
+    \u0275\u0275elementStart(37, "div", 36)(38, "h3", 28);
     \u0275\u0275text(39, "\u{1F381} \u9080\u8ACB\u597D\u53CB\u5F97\u734E\u52F5");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(40, "p", 47);
+    \u0275\u0275elementStart(40, "p", 37);
     \u0275\u0275text(41, "\u6BCF\u9080\u8ACB 1 \u4F4D\u597D\u53CB\u8A3B\u518A\u4E26\u6FC0\u6D3B\uFF0C\u60A8\u5C07\u7372\u5F97 ");
     \u0275\u0275elementStart(42, "strong");
     \u0275\u0275text(43, "3 \u5929\u767D\u9280\u7CBE\u82F1");
     \u0275\u0275elementEnd();
     \u0275\u0275text(44, " \u734E\u52F5\uFF01");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(45, "div", 48)(46, "span", 49);
+    \u0275\u0275elementStart(45, "div", 38)(46, "span", 39);
     \u0275\u0275text(47, "\u6211\u7684\u9080\u8ACB\u78BC");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(48, "span", 50);
+    \u0275\u0275elementStart(48, "span", 40);
     \u0275\u0275text(49);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(50, "button", 51);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_82_Template_button_click_50_listener() {
+    \u0275\u0275elementStart(50, "button", 41);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_69_Template_button_click_50_listener() {
       \u0275\u0275restoreView(_r3);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.copyInviteCode());
     });
     \u0275\u0275text(51, "\u{1F4CB} \u8907\u88FD");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(52, "div", 52)(53, "div", 53)(54, "span", 54);
+    \u0275\u0275elementStart(52, "div", 42)(53, "div", 43)(54, "span", 44);
     \u0275\u0275text(55);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(56, "span", 49);
+    \u0275\u0275elementStart(56, "span", 39);
     \u0275\u0275text(57, "\u5DF2\u9080\u8ACB\u4EBA\u6578");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(58, "div", 53)(59, "span", 54);
+    \u0275\u0275elementStart(58, "div", 43)(59, "span", 44);
     \u0275\u0275text(60);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(61, "span", 49);
+    \u0275\u0275elementStart(61, "span", 39);
     \u0275\u0275text(62, "\u7372\u5F97\u734E\u52F5\u5929\u6578");
     \u0275\u0275elementEnd()()()()();
   }
@@ -40059,30 +40050,30 @@ function MembershipCenterComponent_Conditional_82_Template(rf, ctx) {
     \u0275\u0275textInterpolate(ctx_r0.rewardDays());
   }
 }
-function MembershipCenterComponent_Conditional_83_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_70_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 33)(1, "div", 55)(2, "table", 56)(3, "thead")(4, "tr")(5, "th", 57);
+    \u0275\u0275elementStart(0, "div", 24)(1, "div", 45)(2, "table", 46)(3, "thead")(4, "tr")(5, "th", 47);
     \u0275\u0275text(6, "\u529F\u80FD");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(7, "th", 58);
+    \u0275\u0275elementStart(7, "th", 48);
     \u0275\u0275text(8, "\u2694\uFE0F \u9752\u9285");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(9, "th", 59);
+    \u0275\u0275elementStart(9, "th", 49);
     \u0275\u0275text(10, "\u{1F948} \u767D\u9280");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "th", 60);
+    \u0275\u0275elementStart(11, "th", 50);
     \u0275\u0275text(12, "\u{1F947} \u9EC3\u91D1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(13, "th", 61);
+    \u0275\u0275elementStart(13, "th", 51);
     \u0275\u0275text(14, "\u{1F48E} \u947D\u77F3");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(15, "th", 62);
+    \u0275\u0275elementStart(15, "th", 52);
     \u0275\u0275text(16, "\u{1F31F} \u661F\u8000");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(17, "th", 63);
+    \u0275\u0275elementStart(17, "th", 53);
     \u0275\u0275text(18, "\u{1F451} \u738B\u8005");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(19, "tbody")(20, "tr")(21, "td", 64);
+    \u0275\u0275elementStart(19, "tbody")(20, "tr")(21, "td", 54);
     \u0275\u0275text(22, "\u5E33\u865F\u6578\u91CF");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(23, "td");
@@ -40103,7 +40094,7 @@ function MembershipCenterComponent_Conditional_83_Template(rf, ctx) {
     \u0275\u0275elementStart(33, "td");
     \u0275\u0275text(34, "\u7121\u9650");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(35, "tr")(36, "td", 64);
+    \u0275\u0275elementStart(35, "tr")(36, "td", 54);
     \u0275\u0275text(37, "\u6BCF\u65E5\u6D88\u606F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(38, "td");
@@ -40124,7 +40115,7 @@ function MembershipCenterComponent_Conditional_83_Template(rf, ctx) {
     \u0275\u0275elementStart(48, "td");
     \u0275\u0275text(49, "\u7121\u9650");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(50, "tr")(51, "td", 64);
+    \u0275\u0275elementStart(50, "tr")(51, "td", 54);
     \u0275\u0275text(52, "\u6BCF\u65E5 AI \u8ABF\u7528");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(53, "td");
@@ -40145,7 +40136,7 @@ function MembershipCenterComponent_Conditional_83_Template(rf, ctx) {
     \u0275\u0275elementStart(63, "td");
     \u0275\u0275text(64, "\u7121\u9650");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(65, "tr")(66, "td", 64);
+    \u0275\u0275elementStart(65, "tr")(66, "td", 54);
     \u0275\u0275text(67, "\u7FA4\u7D44\u6578\u91CF");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(68, "td");
@@ -40166,7 +40157,7 @@ function MembershipCenterComponent_Conditional_83_Template(rf, ctx) {
     \u0275\u0275elementStart(78, "td");
     \u0275\u0275text(79, "\u7121\u9650");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(80, "tr")(81, "td", 64);
+    \u0275\u0275elementStart(80, "tr")(81, "td", 54);
     \u0275\u0275text(82, "\u5EE3\u544A\u767C\u9001");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(83, "td");
@@ -40187,7 +40178,7 @@ function MembershipCenterComponent_Conditional_83_Template(rf, ctx) {
     \u0275\u0275elementStart(93, "td");
     \u0275\u0275text(94, "\u2705");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(95, "tr")(96, "td", 64);
+    \u0275\u0275elementStart(95, "tr")(96, "td", 54);
     \u0275\u0275text(97, "\u6279\u91CF\u64CD\u4F5C");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(98, "td");
@@ -40208,7 +40199,7 @@ function MembershipCenterComponent_Conditional_83_Template(rf, ctx) {
     \u0275\u0275elementStart(108, "td");
     \u0275\u0275text(109, "\u2705");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(110, "tr")(111, "td", 64);
+    \u0275\u0275elementStart(110, "tr")(111, "td", 54);
     \u0275\u0275text(112, "AI \u92B7\u552E\u6F0F\u6597");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(113, "td");
@@ -40229,7 +40220,7 @@ function MembershipCenterComponent_Conditional_83_Template(rf, ctx) {
     \u0275\u0275elementStart(123, "td");
     \u0275\u0275text(124, "\u2705");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(125, "tr")(126, "td", 64);
+    \u0275\u0275elementStart(125, "tr")(126, "td", 54);
     \u0275\u0275text(127, "\u667A\u80FD\u9632\u5C01");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(128, "td");
@@ -40250,7 +40241,7 @@ function MembershipCenterComponent_Conditional_83_Template(rf, ctx) {
     \u0275\u0275elementStart(138, "td");
     \u0275\u0275text(139, "\u2705");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(140, "tr")(141, "td", 64);
+    \u0275\u0275elementStart(140, "tr")(141, "td", 54);
     \u0275\u0275text(142, "API \u63A5\u53E3");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(143, "td");
@@ -40271,7 +40262,7 @@ function MembershipCenterComponent_Conditional_83_Template(rf, ctx) {
     \u0275\u0275elementStart(153, "td");
     \u0275\u0275text(154, "\u2705");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(155, "tr")(156, "td", 64);
+    \u0275\u0275elementStart(155, "tr")(156, "td", 54);
     \u0275\u0275text(157, "\u512A\u5148\u652F\u6301");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(158, "td");
@@ -40292,41 +40283,41 @@ function MembershipCenterComponent_Conditional_83_Template(rf, ctx) {
     \u0275\u0275elementStart(168, "td");
     \u0275\u0275text(169, "\u2705 \u5C08\u5C6C");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(170, "tr", 65)(171, "td", 64);
+    \u0275\u0275elementStart(170, "tr", 55)(171, "td", 54);
     \u0275\u0275text(172, "\u50F9\u683C");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(173, "td", 66);
+    \u0275\u0275elementStart(173, "td", 56);
     \u0275\u0275text(174, "\u514D\u8CBB");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(175, "td", 66);
+    \u0275\u0275elementStart(175, "td", 56);
     \u0275\u0275text(176, "4.99 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(177, "td", 66);
+    \u0275\u0275elementStart(177, "td", 56);
     \u0275\u0275text(178, "19.9 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(179, "td", 66);
+    \u0275\u0275elementStart(179, "td", 56);
     \u0275\u0275text(180, "59.9 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(181, "td", 66);
+    \u0275\u0275elementStart(181, "td", 56);
     \u0275\u0275text(182, "199 USDT/\u6708");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(183, "td", 66);
+    \u0275\u0275elementStart(183, "td", 56);
     \u0275\u0275text(184, "599 USDT/\u6708");
     \u0275\u0275elementEnd()()()()()();
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_3_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_3_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 69);
+    \u0275\u0275elementStart(0, "div", 59);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_24_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_24_Template(rf, ctx) {
   if (rf & 1) {
     const _r5 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 90);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_24_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 80);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_24_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r5);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("silver", "month"));
@@ -40340,11 +40331,11 @@ function MembershipCenterComponent_Conditional_84_Conditional_24_Template(rf, ct
     \u0275\u0275textInterpolate1(" ", ctx_r0.membershipLevel() === "bronze" ? "\u7ACB\u5373\u958B\u901A" : "\u5207\u63DB\u65B9\u6848", " ");
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_25_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_25_Template(rf, ctx) {
   if (rf & 1) {
     const _r6 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 91);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_25_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 81);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_25_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r6);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("silver", "month"));
@@ -40353,18 +40344,18 @@ function MembershipCenterComponent_Conditional_84_Conditional_25_Template(rf, ct
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_27_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_27_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 69);
+    \u0275\u0275elementStart(0, "div", 59);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_50_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_50_Template(rf, ctx) {
   if (rf & 1) {
     const _r7 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 90);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_50_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 80);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_50_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r7);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("gold", "month"));
@@ -40378,11 +40369,11 @@ function MembershipCenterComponent_Conditional_84_Conditional_50_Template(rf, ct
     \u0275\u0275textInterpolate1(" ", \u0275\u0275pureFunction0(1, _c03).includes(ctx_r0.membershipLevel()) ? "\u7ACB\u5373\u5347\u7D1A" : "\u5207\u63DB\u65B9\u6848", " ");
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_51_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_51_Template(rf, ctx) {
   if (rf & 1) {
     const _r8 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 91);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_51_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 81);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_51_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r8);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("gold", "month"));
@@ -40391,18 +40382,18 @@ function MembershipCenterComponent_Conditional_84_Conditional_51_Template(rf, ct
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_55_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_55_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 69);
+    \u0275\u0275elementStart(0, "div", 59);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_78_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_78_Template(rf, ctx) {
   if (rf & 1) {
     const _r9 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 90);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_78_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 80);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_78_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r9);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("diamond", "month"));
@@ -40416,11 +40407,11 @@ function MembershipCenterComponent_Conditional_84_Conditional_78_Template(rf, ct
     \u0275\u0275textInterpolate1(" ", \u0275\u0275pureFunction0(1, _c1).includes(ctx_r0.membershipLevel()) ? "\u7ACB\u5373\u5347\u7D1A" : "\u5207\u63DB\u65B9\u6848", " ");
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_79_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_79_Template(rf, ctx) {
   if (rf & 1) {
     const _r10 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 91);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_79_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 81);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_79_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r10);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("diamond", "month"));
@@ -40429,18 +40420,18 @@ function MembershipCenterComponent_Conditional_84_Conditional_79_Template(rf, ct
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_81_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_81_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 69);
+    \u0275\u0275elementStart(0, "div", 59);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_104_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_104_Template(rf, ctx) {
   if (rf & 1) {
     const _r11 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 90);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_104_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 80);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_104_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r11);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("star", "month"));
@@ -40454,11 +40445,11 @@ function MembershipCenterComponent_Conditional_84_Conditional_104_Template(rf, c
     \u0275\u0275textInterpolate1(" ", ctx_r0.membershipLevel() !== "king" ? "\u7ACB\u5373\u5347\u7D1A" : "\u5207\u63DB\u65B9\u6848", " ");
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_105_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_105_Template(rf, ctx) {
   if (rf & 1) {
     const _r12 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 91);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_105_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 81);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_105_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r12);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("star", "month"));
@@ -40467,18 +40458,18 @@ function MembershipCenterComponent_Conditional_84_Conditional_105_Template(rf, c
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_107_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_107_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 69);
+    \u0275\u0275elementStart(0, "div", 59);
     \u0275\u0275text(1, "\u7576\u524D\u65B9\u6848");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_132_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_132_Template(rf, ctx) {
   if (rf & 1) {
     const _r13 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 90);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_132_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 80);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_132_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r13);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("king", "month"));
@@ -40487,11 +40478,11 @@ function MembershipCenterComponent_Conditional_84_Conditional_132_Template(rf, c
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_84_Conditional_133_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Conditional_133_Template(rf, ctx) {
   if (rf & 1) {
     const _r14 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 91);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Conditional_133_Template_button_click_0_listener() {
+    \u0275\u0275elementStart(0, "button", 81);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Conditional_133_Template_button_click_0_listener() {
       \u0275\u0275restoreView(_r14);
       const ctx_r0 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r0.onPurchase("king", "month"));
@@ -40500,24 +40491,24 @@ function MembershipCenterComponent_Conditional_84_Conditional_133_Template(rf, c
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_84_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_71_Template(rf, ctx) {
   if (rf & 1) {
     const _r4 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 33)(1, "div", 67)(2, "div", 68);
-    \u0275\u0275conditionalCreate(3, MembershipCenterComponent_Conditional_84_Conditional_3_Template, 2, 0, "div", 69);
-    \u0275\u0275elementStart(4, "div", 70);
+    \u0275\u0275elementStart(0, "div", 24)(1, "div", 57)(2, "div", 58);
+    \u0275\u0275conditionalCreate(3, MembershipCenterComponent_Conditional_71_Conditional_3_Template, 2, 0, "div", 59);
+    \u0275\u0275elementStart(4, "div", 60);
     \u0275\u0275text(5, "\u{1F948}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "h3", 71);
+    \u0275\u0275elementStart(6, "h3", 61);
     \u0275\u0275text(7, "\u767D\u9280\u7CBE\u82F1");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(8, "div", 72)(9, "span", 73);
+    \u0275\u0275elementStart(8, "div", 62)(9, "span", 63);
     \u0275\u0275text(10, "4.99 USDT");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(11, "span", 74);
+    \u0275\u0275elementStart(11, "span", 64);
     \u0275\u0275text(12, "/\u6708");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(13, "ul", 75)(14, "li");
+    \u0275\u0275elementStart(13, "ul", 65)(14, "li");
     \u0275\u0275text(15, "\u2705 5 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(16, "li");
@@ -40532,23 +40523,23 @@ function MembershipCenterComponent_Conditional_84_Template(rf, ctx) {
     \u0275\u0275elementStart(22, "li");
     \u0275\u0275text(23, "\u2705 \u5EE3\u544A\u767C\u9001");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(24, MembershipCenterComponent_Conditional_84_Conditional_24_Template, 2, 1, "button", 76)(25, MembershipCenterComponent_Conditional_84_Conditional_25_Template, 2, 0, "button", 77);
+    \u0275\u0275conditionalCreate(24, MembershipCenterComponent_Conditional_71_Conditional_24_Template, 2, 1, "button", 66)(25, MembershipCenterComponent_Conditional_71_Conditional_25_Template, 2, 0, "button", 67);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(26, "div", 78);
-    \u0275\u0275conditionalCreate(27, MembershipCenterComponent_Conditional_84_Conditional_27_Template, 2, 0, "div", 69);
-    \u0275\u0275elementStart(28, "div", 70);
+    \u0275\u0275elementStart(26, "div", 68);
+    \u0275\u0275conditionalCreate(27, MembershipCenterComponent_Conditional_71_Conditional_27_Template, 2, 0, "div", 59);
+    \u0275\u0275elementStart(28, "div", 60);
     \u0275\u0275text(29, "\u{1F947}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(30, "h3", 71);
+    \u0275\u0275elementStart(30, "h3", 61);
     \u0275\u0275text(31, "\u9EC3\u91D1\u5927\u5E2B");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(32, "div", 72)(33, "span", 73);
+    \u0275\u0275elementStart(32, "div", 62)(33, "span", 63);
     \u0275\u0275text(34, "19.9 USDT");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(35, "span", 74);
+    \u0275\u0275elementStart(35, "span", 64);
     \u0275\u0275text(36, "/\u6708");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(37, "ul", 75)(38, "li");
+    \u0275\u0275elementStart(37, "ul", 65)(38, "li");
     \u0275\u0275text(39, "\u2705 15 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(40, "li");
@@ -40566,25 +40557,25 @@ function MembershipCenterComponent_Conditional_84_Template(rf, ctx) {
     \u0275\u0275elementStart(48, "li");
     \u0275\u0275text(49, "\u2705 \u6578\u64DA\u5C0E\u51FA");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(50, MembershipCenterComponent_Conditional_84_Conditional_50_Template, 2, 2, "button", 76)(51, MembershipCenterComponent_Conditional_84_Conditional_51_Template, 2, 0, "button", 77);
+    \u0275\u0275conditionalCreate(50, MembershipCenterComponent_Conditional_71_Conditional_50_Template, 2, 2, "button", 66)(51, MembershipCenterComponent_Conditional_71_Conditional_51_Template, 2, 0, "button", 67);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(52, "div", 79)(53, "div", 80);
+    \u0275\u0275elementStart(52, "div", 69)(53, "div", 70);
     \u0275\u0275text(54, "\u63A8\u85A6");
     \u0275\u0275elementEnd();
-    \u0275\u0275conditionalCreate(55, MembershipCenterComponent_Conditional_84_Conditional_55_Template, 2, 0, "div", 69);
-    \u0275\u0275elementStart(56, "div", 70);
+    \u0275\u0275conditionalCreate(55, MembershipCenterComponent_Conditional_71_Conditional_55_Template, 2, 0, "div", 59);
+    \u0275\u0275elementStart(56, "div", 60);
     \u0275\u0275text(57, "\u{1F48E}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(58, "h3", 71);
+    \u0275\u0275elementStart(58, "h3", 61);
     \u0275\u0275text(59, "\u947D\u77F3\u738B\u724C");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(60, "div", 72)(61, "span", 73);
+    \u0275\u0275elementStart(60, "div", 62)(61, "span", 63);
     \u0275\u0275text(62, "59.9 USDT");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(63, "span", 74);
+    \u0275\u0275elementStart(63, "span", 64);
     \u0275\u0275text(64, "/\u6708");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(65, "ul", 75)(66, "li");
+    \u0275\u0275elementStart(65, "ul", 65)(66, "li");
     \u0275\u0275text(67, "\u2705 50 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(68, "li");
@@ -40602,23 +40593,23 @@ function MembershipCenterComponent_Conditional_84_Template(rf, ctx) {
     \u0275\u0275elementStart(76, "li");
     \u0275\u0275text(77, "\u2705 \u9AD8\u7D1A\u5206\u6790");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(78, MembershipCenterComponent_Conditional_84_Conditional_78_Template, 2, 2, "button", 76)(79, MembershipCenterComponent_Conditional_84_Conditional_79_Template, 2, 0, "button", 77);
+    \u0275\u0275conditionalCreate(78, MembershipCenterComponent_Conditional_71_Conditional_78_Template, 2, 2, "button", 66)(79, MembershipCenterComponent_Conditional_71_Conditional_79_Template, 2, 0, "button", 67);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(80, "div", 81);
-    \u0275\u0275conditionalCreate(81, MembershipCenterComponent_Conditional_84_Conditional_81_Template, 2, 0, "div", 69);
-    \u0275\u0275elementStart(82, "div", 70);
+    \u0275\u0275elementStart(80, "div", 71);
+    \u0275\u0275conditionalCreate(81, MembershipCenterComponent_Conditional_71_Conditional_81_Template, 2, 0, "div", 59);
+    \u0275\u0275elementStart(82, "div", 60);
     \u0275\u0275text(83, "\u{1F31F}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(84, "h3", 71);
+    \u0275\u0275elementStart(84, "h3", 61);
     \u0275\u0275text(85, "\u661F\u8000\u50B3\u8AAA");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(86, "div", 72)(87, "span", 73);
+    \u0275\u0275elementStart(86, "div", 62)(87, "span", 63);
     \u0275\u0275text(88, "199 USDT");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(89, "span", 74);
+    \u0275\u0275elementStart(89, "span", 64);
     \u0275\u0275text(90, "/\u6708");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(91, "ul", 75)(92, "li");
+    \u0275\u0275elementStart(91, "ul", 65)(92, "li");
     \u0275\u0275text(93, "\u2705 100 \u500B\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(94, "li");
@@ -40636,26 +40627,26 @@ function MembershipCenterComponent_Conditional_84_Template(rf, ctx) {
     \u0275\u0275elementStart(102, "li");
     \u0275\u0275text(103, "\u2705 \u5718\u968A\u7BA1\u7406");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(104, MembershipCenterComponent_Conditional_84_Conditional_104_Template, 2, 1, "button", 76)(105, MembershipCenterComponent_Conditional_84_Conditional_105_Template, 2, 0, "button", 77);
+    \u0275\u0275conditionalCreate(104, MembershipCenterComponent_Conditional_71_Conditional_104_Template, 2, 1, "button", 66)(105, MembershipCenterComponent_Conditional_71_Conditional_105_Template, 2, 0, "button", 67);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(106, "div", 82);
-    \u0275\u0275conditionalCreate(107, MembershipCenterComponent_Conditional_84_Conditional_107_Template, 2, 0, "div", 69);
-    \u0275\u0275elementStart(108, "div", 70);
+    \u0275\u0275elementStart(106, "div", 72);
+    \u0275\u0275conditionalCreate(107, MembershipCenterComponent_Conditional_71_Conditional_107_Template, 2, 0, "div", 59);
+    \u0275\u0275elementStart(108, "div", 60);
     \u0275\u0275text(109, "\u{1F451}");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(110, "h3", 71);
+    \u0275\u0275elementStart(110, "h3", 61);
     \u0275\u0275text(111, "\u69AE\u8000\u738B\u8005");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(112, "div", 72)(113, "span", 73);
+    \u0275\u0275elementStart(112, "div", 62)(113, "span", 63);
     \u0275\u0275text(114, "599 USDT");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(115, "span", 74);
+    \u0275\u0275elementStart(115, "span", 64);
     \u0275\u0275text(116, "/\u6708");
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(117, "div", 83);
+    \u0275\u0275elementStart(117, "div", 73);
     \u0275\u0275text(118, "\u5C0A\u4EAB\u7279\u6B0A");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(119, "ul", 75)(120, "li");
+    \u0275\u0275elementStart(119, "ul", 65)(120, "li");
     \u0275\u0275text(121, "\u2705 \u7121\u9650\u5E33\u865F");
     \u0275\u0275elementEnd();
     \u0275\u0275elementStart(122, "li");
@@ -40673,59 +40664,59 @@ function MembershipCenterComponent_Conditional_84_Template(rf, ctx) {
     \u0275\u0275elementStart(130, "li");
     \u0275\u0275text(131, "\u2705 \u65B0\u529F\u80FD\u5167\u6E2C");
     \u0275\u0275elementEnd()();
-    \u0275\u0275conditionalCreate(132, MembershipCenterComponent_Conditional_84_Conditional_132_Template, 2, 0, "button", 76)(133, MembershipCenterComponent_Conditional_84_Conditional_133_Template, 2, 0, "button", 77);
+    \u0275\u0275conditionalCreate(132, MembershipCenterComponent_Conditional_71_Conditional_132_Template, 2, 0, "button", 66)(133, MembershipCenterComponent_Conditional_71_Conditional_133_Template, 2, 0, "button", 67);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(134, "div", 37)(135, "h3", 38);
+    \u0275\u0275elementStart(134, "div", 27)(135, "h3", 28);
     \u0275\u0275text(136, "\u{1F3AB} \u4F7F\u7528\u5361\u5BC6\u6FC0\u6D3B");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(137, "div", 84)(138, "input", 85);
-    \u0275\u0275twoWayListener("ngModelChange", function MembershipCenterComponent_Conditional_84_Template_input_ngModelChange_138_listener($event) {
+    \u0275\u0275elementStart(137, "div", 74)(138, "input", 75);
+    \u0275\u0275twoWayListener("ngModelChange", function MembershipCenterComponent_Conditional_71_Template_input_ngModelChange_138_listener($event) {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       \u0275\u0275twoWayBindingSet(ctx_r0.licenseKey, $event) || (ctx_r0.licenseKey = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(139, "button", 86);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Template_button_click_139_listener() {
+    \u0275\u0275elementStart(139, "button", 76);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Template_button_click_139_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.onActivateLicense());
     });
     \u0275\u0275text(140, " \u6FC0\u6D3B ");
     \u0275\u0275elementEnd()()();
-    \u0275\u0275elementStart(141, "div", 37)(142, "h3", 38);
+    \u0275\u0275elementStart(141, "div", 27)(142, "h3", 28);
     \u0275\u0275text(143, "\u{1F4B3} \u652F\u4ED8\u65B9\u5F0F");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(144, "div", 87)(145, "button", 88);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Template_button_click_145_listener() {
+    \u0275\u0275elementStart(144, "div", 77)(145, "button", 78);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Template_button_click_145_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.selectedPayment.set("alipay"));
     });
-    \u0275\u0275elementStart(146, "span", 89);
+    \u0275\u0275elementStart(146, "span", 79);
     \u0275\u0275text(147, "\u{1F499}");
     \u0275\u0275elementEnd();
     \u0275\u0275text(148, " \u652F\u4ED8\u5BF6 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(149, "button", 88);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Template_button_click_149_listener() {
+    \u0275\u0275elementStart(149, "button", 78);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Template_button_click_149_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.selectedPayment.set("wechat"));
     });
-    \u0275\u0275elementStart(150, "span", 89);
+    \u0275\u0275elementStart(150, "span", 79);
     \u0275\u0275text(151, "\u{1F49A}");
     \u0275\u0275elementEnd();
     \u0275\u0275text(152, " \u5FAE\u4FE1\u652F\u4ED8 ");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(153, "button", 88);
-    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_84_Template_button_click_153_listener() {
+    \u0275\u0275elementStart(153, "button", 78);
+    \u0275\u0275listener("click", function MembershipCenterComponent_Conditional_71_Template_button_click_153_listener() {
       \u0275\u0275restoreView(_r4);
       const ctx_r0 = \u0275\u0275nextContext();
       return \u0275\u0275resetView(ctx_r0.selectedPayment.set("usdt"));
     });
-    \u0275\u0275elementStart(154, "span", 89);
+    \u0275\u0275elementStart(154, "span", 79);
     \u0275\u0275text(155, "\u{1F48E}");
     \u0275\u0275elementEnd();
     \u0275\u0275text(156, " USDT ");
@@ -40775,32 +40766,32 @@ function MembershipCenterComponent_Conditional_84_Template(rf, ctx) {
     \u0275\u0275classProp("active", ctx_r0.selectedPayment() === "usdt");
   }
 }
-function MembershipCenterComponent_Conditional_85_Conditional_5_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_72_Conditional_5_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 93);
+    \u0275\u0275elementStart(0, "div", 83);
     \u0275\u0275text(1, "\u8F09\u5165\u4E2D...");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_85_Conditional_6_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_72_Conditional_6_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 94);
+    \u0275\u0275elementStart(0, "div", 84);
     \u0275\u0275text(1, "\u66AB\u7121\u8A02\u95B1\u8A18\u9304");
     \u0275\u0275elementEnd();
   }
 }
-function MembershipCenterComponent_Conditional_85_Conditional_7_For_1_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_72_Conditional_7_For_1_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 95)(1, "div", 96);
+    \u0275\u0275elementStart(0, "div", 85)(1, "div", 86);
     \u0275\u0275text(2);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(3, "div", 97)(4, "div", 98);
+    \u0275\u0275elementStart(3, "div", 87)(4, "div", 88);
     \u0275\u0275text(5);
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(6, "div", 99);
+    \u0275\u0275elementStart(6, "div", 89);
     \u0275\u0275text(7);
     \u0275\u0275elementEnd()();
-    \u0275\u0275elementStart(8, "div", 100);
+    \u0275\u0275elementStart(8, "div", 90);
     \u0275\u0275text(9);
     \u0275\u0275elementEnd()();
   }
@@ -40819,22 +40810,22 @@ function MembershipCenterComponent_Conditional_85_Conditional_7_For_1_Template(r
     \u0275\u0275textInterpolate1(" ", record_r15.is_active ? "\u751F\u6548\u4E2D" : "\u5DF2\u904E\u671F", " ");
   }
 }
-function MembershipCenterComponent_Conditional_85_Conditional_7_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_72_Conditional_7_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275repeaterCreate(0, MembershipCenterComponent_Conditional_85_Conditional_7_For_1_Template, 10, 9, "div", 95, _forTrack014);
+    \u0275\u0275repeaterCreate(0, MembershipCenterComponent_Conditional_72_Conditional_7_For_1_Template, 10, 9, "div", 85, _forTrack014);
   }
   if (rf & 2) {
     const ctx_r0 = \u0275\u0275nextContext(2);
     \u0275\u0275repeater(ctx_r0.subscriptionHistory());
   }
 }
-function MembershipCenterComponent_Conditional_85_Template(rf, ctx) {
+function MembershipCenterComponent_Conditional_72_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 33)(1, "div", 37)(2, "h3", 38);
+    \u0275\u0275elementStart(0, "div", 24)(1, "div", 27)(2, "h3", 28);
     \u0275\u0275text(3, "\u{1F4DC} \u8A02\u95B1\u6B77\u53F2");
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(4, "div", 92);
-    \u0275\u0275conditionalCreate(5, MembershipCenterComponent_Conditional_85_Conditional_5_Template, 2, 0, "div", 93)(6, MembershipCenterComponent_Conditional_85_Conditional_6_Template, 2, 0, "div", 94)(7, MembershipCenterComponent_Conditional_85_Conditional_7_Template, 2, 0);
+    \u0275\u0275elementStart(4, "div", 82);
+    \u0275\u0275conditionalCreate(5, MembershipCenterComponent_Conditional_72_Conditional_5_Template, 2, 0, "div", 83)(6, MembershipCenterComponent_Conditional_72_Conditional_6_Template, 2, 0, "div", 84)(7, MembershipCenterComponent_Conditional_72_Conditional_7_Template, 2, 0);
     \u0275\u0275elementEnd()()();
   }
   if (rf & 2) {
@@ -41009,7 +41000,7 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
     };
   }
   static {
-    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _MembershipCenterComponent, selectors: [["app-membership-center"]], decls: 86, vars: 34, consts: [[1, "membership-container"], [1, "page-header"], [1, "page-title"], [1, "title-icon"], [1, "page-desc"], [1, "membership-status-card"], [1, "status-left"], [1, "level-badge"], [1, "level-info"], [1, "level-name"], [1, "expires-info"], [1, "status-right"], [1, "upgrade-btn"], [1, "wallet-card", 3, "click"], [1, "wallet-left"], [1, "wallet-icon"], [1, "wallet-info"], [1, "wallet-label"], [1, "wallet-amount"], [1, "wallet-right"], ["class", "wallet-bonus", 4, "ngIf"], [1, "wallet-recharge-btn", 3, "click"], [1, "quick-stats"], [1, "stat-card"], [1, "stat-icon"], [1, "stat-content"], [1, "stat-label"], [1, "stat-value"], [1, "stat-bar"], [1, "stat-fill"], [1, "stat-hint"], [1, "tabs"], [1, "tab-btn", 3, "click"], [1, "tab-content"], [1, "days-left"], [1, "upgrade-btn", 3, "click"], [1, "wallet-bonus"], [1, "section-card"], [1, "section-title"], [1, "usage-details"], [1, "usage-row"], [1, "usage-name"], [1, "usage-bar-container"], [1, "usage-bar"], [1, "usage-fill"], [1, "usage-count"], [1, "section-card", "invite-card"], [1, "invite-desc"], [1, "invite-code-display"], [1, "label"], [1, "code"], [1, "copy-btn", 3, "click"], [1, "invite-stats-row"], [1, "invite-stat"], [1, "value"], [1, "benefits-table-container"], [1, "benefits-table"], [1, "feature-col"], [1, "level-col", "bronze"], [1, "level-col", "silver"], [1, "level-col", "gold"], [1, "level-col", "diamond"], [1, "level-col", "star"], [1, "level-col", "king"], [1, "feature-name"], [1, "price-row"], [1, "price"], [1, "pricing-cards"], [1, "pricing-card", "silver"], [1, "current-badge"], [1, "plan-icon"], [1, "plan-name"], [1, "plan-price"], [1, "amount"], [1, "period"], [1, "plan-features"], [1, "buy-btn"], [1, "buy-btn", "renew"], [1, "pricing-card", "gold"], [1, "pricing-card", "diamond", "popular"], [1, "popular-badge"], [1, "pricing-card", "star"], [1, "pricing-card", "king"], [1, "savings"], [1, "license-input-row"], ["type", "text", "placeholder", "\u8F38\u5165\u5361\u5BC6\uFF1AXXXX-XXXX-XXXX-XXXX", 1, "license-input", 3, "ngModelChange", "ngModel"], [1, "activate-btn", 3, "click", "disabled"], [1, "payment-methods"], [1, "payment-btn", 3, "click"], [1, "payment-icon"], [1, "buy-btn", 3, "click"], [1, "buy-btn", "renew", 3, "click"], [1, "history-list"], [1, "loading-state"], [1, "empty-state"], [1, "history-item"], [1, "history-icon"], [1, "history-info"], [1, "history-title"], [1, "history-meta"], [1, "history-status"]], template: function MembershipCenterComponent_Template(rf, ctx) {
+    this.\u0275cmp = /* @__PURE__ */ \u0275\u0275defineComponent({ type: _MembershipCenterComponent, selectors: [["app-membership-center"]], decls: 73, vars: 32, consts: [[1, "membership-container"], [1, "page-header"], [1, "page-title"], [1, "title-icon"], [1, "page-desc"], [1, "membership-status-card"], [1, "status-left"], [1, "level-badge"], [1, "level-info"], [1, "level-name"], [1, "expires-info"], [1, "status-right"], [1, "upgrade-btn"], [1, "quick-stats"], [1, "stat-card"], [1, "stat-icon"], [1, "stat-content"], [1, "stat-label"], [1, "stat-value"], [1, "stat-bar"], [1, "stat-fill"], [1, "stat-hint"], [1, "tabs"], [1, "tab-btn", 3, "click"], [1, "tab-content"], [1, "days-left"], [1, "upgrade-btn", 3, "click"], [1, "section-card"], [1, "section-title"], [1, "usage-details"], [1, "usage-row"], [1, "usage-name"], [1, "usage-bar-container"], [1, "usage-bar"], [1, "usage-fill"], [1, "usage-count"], [1, "section-card", "invite-card"], [1, "invite-desc"], [1, "invite-code-display"], [1, "label"], [1, "code"], [1, "copy-btn", 3, "click"], [1, "invite-stats-row"], [1, "invite-stat"], [1, "value"], [1, "benefits-table-container"], [1, "benefits-table"], [1, "feature-col"], [1, "level-col", "bronze"], [1, "level-col", "silver"], [1, "level-col", "gold"], [1, "level-col", "diamond"], [1, "level-col", "star"], [1, "level-col", "king"], [1, "feature-name"], [1, "price-row"], [1, "price"], [1, "pricing-cards"], [1, "pricing-card", "silver"], [1, "current-badge"], [1, "plan-icon"], [1, "plan-name"], [1, "plan-price"], [1, "amount"], [1, "period"], [1, "plan-features"], [1, "buy-btn"], [1, "buy-btn", "renew"], [1, "pricing-card", "gold"], [1, "pricing-card", "diamond", "popular"], [1, "popular-badge"], [1, "pricing-card", "star"], [1, "pricing-card", "king"], [1, "savings"], [1, "license-input-row"], ["type", "text", "placeholder", "\u8F38\u5165\u5361\u5BC6\uFF1AXXXX-XXXX-XXXX-XXXX", 1, "license-input", 3, "ngModelChange", "ngModel"], [1, "activate-btn", 3, "click", "disabled"], [1, "payment-methods"], [1, "payment-btn", 3, "click"], [1, "payment-icon"], [1, "buy-btn", 3, "click"], [1, "buy-btn", "renew", 3, "click"], [1, "history-list"], [1, "loading-state"], [1, "empty-state"], [1, "history-item"], [1, "history-icon"], [1, "history-info"], [1, "history-title"], [1, "history-meta"], [1, "history-status"]], template: function MembershipCenterComponent_Template(rf, ctx) {
       if (rf & 1) {
         \u0275\u0275elementStart(0, "div", 0)(1, "div", 1)(2, "h1", 2)(3, "span", 3);
         \u0275\u0275text(4, "\u2B50");
@@ -41030,110 +41021,88 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
         \u0275\u0275elementStart(17, "div", 11);
         \u0275\u0275conditionalCreate(18, MembershipCenterComponent_Conditional_18_Template, 2, 0, "button", 12);
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(19, "div", 13);
-        \u0275\u0275listener("click", function MembershipCenterComponent_Template_div_click_19_listener() {
-          return ctx.goToWallet();
-        });
-        \u0275\u0275elementStart(20, "div", 14)(21, "div", 15);
-        \u0275\u0275text(22, "\u{1F4B0}");
+        \u0275\u0275elementStart(19, "div", 13)(20, "div", 14)(21, "div", 15);
+        \u0275\u0275text(22, "\u{1F916}");
         \u0275\u0275elementEnd();
         \u0275\u0275elementStart(23, "div", 16)(24, "div", 17);
-        \u0275\u0275text(25, "\u8CEC\u6236\u9918\u984D");
+        \u0275\u0275text(25, "AI \u8ABF\u7528");
         \u0275\u0275elementEnd();
         \u0275\u0275elementStart(26, "div", 18);
         \u0275\u0275text(27);
-        \u0275\u0275elementEnd()()();
+        \u0275\u0275elementEnd();
         \u0275\u0275elementStart(28, "div", 19);
-        \u0275\u0275template(29, MembershipCenterComponent_div_29_Template, 2, 1, "div", 20);
-        \u0275\u0275elementStart(30, "button", 21);
-        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_30_listener($event) {
-          ctx.goToRecharge();
-          return $event.stopPropagation();
-        });
-        \u0275\u0275text(31, " \u{1F4B3} \u5145\u503C ");
+        \u0275\u0275element(29, "div", 20);
         \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(32, "div", 22)(33, "div", 23)(34, "div", 24);
-        \u0275\u0275text(35, "\u{1F916}");
+        \u0275\u0275elementStart(30, "div", 14)(31, "div", 15);
+        \u0275\u0275text(32, "\u{1F4E8}");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(36, "div", 25)(37, "div", 26);
-        \u0275\u0275text(38, "AI \u8ABF\u7528");
+        \u0275\u0275elementStart(33, "div", 16)(34, "div", 17);
+        \u0275\u0275text(35, "\u6D88\u606F\u767C\u9001");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(39, "div", 27);
-        \u0275\u0275text(40);
+        \u0275\u0275elementStart(36, "div", 18);
+        \u0275\u0275text(37);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(41, "div", 28);
-        \u0275\u0275element(42, "div", 29);
+        \u0275\u0275elementStart(38, "div", 19);
+        \u0275\u0275element(39, "div", 20);
         \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(43, "div", 23)(44, "div", 24);
-        \u0275\u0275text(45, "\u{1F4E8}");
+        \u0275\u0275elementStart(40, "div", 14)(41, "div", 15);
+        \u0275\u0275text(42, "\u{1F465}");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(46, "div", 25)(47, "div", 26);
-        \u0275\u0275text(48, "\u6D88\u606F\u767C\u9001");
+        \u0275\u0275elementStart(43, "div", 16)(44, "div", 17);
+        \u0275\u0275text(45, "\u5E33\u865F\u6578\u91CF");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(49, "div", 27);
-        \u0275\u0275text(50);
+        \u0275\u0275elementStart(46, "div", 18);
+        \u0275\u0275text(47);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(51, "div", 28);
-        \u0275\u0275element(52, "div", 29);
+        \u0275\u0275elementStart(48, "div", 19);
+        \u0275\u0275element(49, "div", 20);
         \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(53, "div", 23)(54, "div", 24);
-        \u0275\u0275text(55, "\u{1F465}");
+        \u0275\u0275elementStart(50, "div", 14)(51, "div", 15);
+        \u0275\u0275text(52, "\u{1F381}");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(56, "div", 25)(57, "div", 26);
-        \u0275\u0275text(58, "\u5E33\u865F\u6578\u91CF");
+        \u0275\u0275elementStart(53, "div", 16)(54, "div", 17);
+        \u0275\u0275text(55, "\u9080\u8ACB\u734E\u52F5");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(59, "div", 27);
-        \u0275\u0275text(60);
+        \u0275\u0275elementStart(56, "div", 18);
+        \u0275\u0275text(57);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(61, "div", 28);
-        \u0275\u0275element(62, "div", 29);
-        \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(63, "div", 23)(64, "div", 24);
-        \u0275\u0275text(65, "\u{1F381}");
-        \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(66, "div", 25)(67, "div", 26);
-        \u0275\u0275text(68, "\u9080\u8ACB\u734E\u52F5");
-        \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(69, "div", 27);
-        \u0275\u0275text(70);
-        \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(71, "div", 30);
-        \u0275\u0275text(72);
+        \u0275\u0275elementStart(58, "div", 21);
+        \u0275\u0275text(59);
         \u0275\u0275elementEnd()()()();
-        \u0275\u0275elementStart(73, "div", 31)(74, "button", 32);
-        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_74_listener() {
+        \u0275\u0275elementStart(60, "div", 22)(61, "button", 23);
+        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_61_listener() {
           return ctx.activeTab.set("overview");
         });
-        \u0275\u0275text(75, " \u{1F4CA} \u7E3D\u89BD ");
+        \u0275\u0275text(62, " \u{1F4CA} \u7E3D\u89BD ");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(76, "button", 32);
-        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_76_listener() {
+        \u0275\u0275elementStart(63, "button", 23);
+        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_63_listener() {
           return ctx.activeTab.set("benefits");
         });
-        \u0275\u0275text(77, " \u{1F3AF} \u6B0A\u76CA\u5C0D\u6BD4 ");
+        \u0275\u0275text(64, " \u{1F3AF} \u6B0A\u76CA\u5C0D\u6BD4 ");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(78, "button", 32);
-        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_78_listener() {
+        \u0275\u0275elementStart(65, "button", 23);
+        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_65_listener() {
           return ctx.activeTab.set("upgrade");
         });
-        \u0275\u0275text(79, " \u{1F680} \u5347\u7D1A\u8CFC\u8CB7 ");
+        \u0275\u0275text(66, " \u{1F680} \u5347\u7D1A\u8CFC\u8CB7 ");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(80, "button", 32);
-        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_80_listener() {
+        \u0275\u0275elementStart(67, "button", 23);
+        \u0275\u0275listener("click", function MembershipCenterComponent_Template_button_click_67_listener() {
           return ctx.activeTab.set("history");
         });
-        \u0275\u0275text(81, " \u{1F4DC} \u8A02\u95B1\u8A18\u9304 ");
+        \u0275\u0275text(68, " \u{1F4DC} \u8A02\u95B1\u8A18\u9304 ");
         \u0275\u0275elementEnd()();
-        \u0275\u0275conditionalCreate(82, MembershipCenterComponent_Conditional_82_Template, 63, 19, "div", 33);
-        \u0275\u0275conditionalCreate(83, MembershipCenterComponent_Conditional_83_Template, 185, 0, "div", 33);
-        \u0275\u0275conditionalCreate(84, MembershipCenterComponent_Conditional_84_Template, 157, 28, "div", 33);
-        \u0275\u0275conditionalCreate(85, MembershipCenterComponent_Conditional_85_Template, 8, 1, "div", 33);
+        \u0275\u0275conditionalCreate(69, MembershipCenterComponent_Conditional_69_Template, 63, 19, "div", 24);
+        \u0275\u0275conditionalCreate(70, MembershipCenterComponent_Conditional_70_Template, 185, 0, "div", 24);
+        \u0275\u0275conditionalCreate(71, MembershipCenterComponent_Conditional_71_Template, 157, 28, "div", 24);
+        \u0275\u0275conditionalCreate(72, MembershipCenterComponent_Conditional_72_Template, 8, 1, "div", 24);
         \u0275\u0275elementEnd();
       }
       if (rf & 2) {
+        let tmp_5_0;
         let tmp_7_0;
         let tmp_9_0;
-        let tmp_11_0;
         \u0275\u0275advance(8);
         \u0275\u0275classMap("level-" + ctx.membershipLevel());
         \u0275\u0275advance(3);
@@ -41145,19 +41114,15 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
         \u0275\u0275advance(3);
         \u0275\u0275conditional(ctx.membershipLevel() !== "king" ? 18 : -1);
         \u0275\u0275advance(9);
-        \u0275\u0275textInterpolate(ctx.walletBalanceDisplay());
-        \u0275\u0275advance(2);
-        \u0275\u0275property("ngIf", ctx.walletBonusDisplay() !== "$0.00");
-        \u0275\u0275advance(11);
-        \u0275\u0275textInterpolate2(" ", ((tmp_7_0 = ctx.usageStats()) == null ? null : tmp_7_0.aiCalls == null ? null : tmp_7_0.aiCalls.used) || 0, " / ", ((tmp_7_0 = ctx.usageStats()) == null ? null : tmp_7_0.aiCalls == null ? null : tmp_7_0.aiCalls.limit) || 50, " ");
+        \u0275\u0275textInterpolate2(" ", ((tmp_5_0 = ctx.usageStats()) == null ? null : tmp_5_0.aiCalls == null ? null : tmp_5_0.aiCalls.used) || 0, " / ", ((tmp_5_0 = ctx.usageStats()) == null ? null : tmp_5_0.aiCalls == null ? null : tmp_5_0.aiCalls.limit) || 50, " ");
         \u0275\u0275advance(2);
         \u0275\u0275styleProp("width", ctx.getAiUsagePercent(), "%");
         \u0275\u0275advance(8);
-        \u0275\u0275textInterpolate2(" ", ((tmp_9_0 = ctx.usageStats()) == null ? null : tmp_9_0.messagesSent == null ? null : tmp_9_0.messagesSent.used) || 0, " / ", ((tmp_9_0 = ctx.usageStats()) == null ? null : tmp_9_0.messagesSent == null ? null : tmp_9_0.messagesSent.limit) || 100, " ");
+        \u0275\u0275textInterpolate2(" ", ((tmp_7_0 = ctx.usageStats()) == null ? null : tmp_7_0.messagesSent == null ? null : tmp_7_0.messagesSent.used) || 0, " / ", ((tmp_7_0 = ctx.usageStats()) == null ? null : tmp_7_0.messagesSent == null ? null : tmp_7_0.messagesSent.limit) || 100, " ");
         \u0275\u0275advance(2);
         \u0275\u0275styleProp("width", ctx.getMessageUsagePercent(), "%");
         \u0275\u0275advance(8);
-        \u0275\u0275textInterpolate2(" ", ((tmp_11_0 = ctx.usageStats()) == null ? null : tmp_11_0.accounts == null ? null : tmp_11_0.accounts.used) || 0, " / ", ((tmp_11_0 = ctx.usageStats()) == null ? null : tmp_11_0.accounts == null ? null : tmp_11_0.accounts.limit) || 2, " ");
+        \u0275\u0275textInterpolate2(" ", ((tmp_9_0 = ctx.usageStats()) == null ? null : tmp_9_0.accounts == null ? null : tmp_9_0.accounts.used) || 0, " / ", ((tmp_9_0 = ctx.usageStats()) == null ? null : tmp_9_0.accounts == null ? null : tmp_9_0.accounts.limit) || 2, " ");
         \u0275\u0275advance(2);
         \u0275\u0275styleProp("width", ctx.getAccountUsagePercent(), "%");
         \u0275\u0275advance(8);
@@ -41173,15 +41138,15 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
         \u0275\u0275advance(2);
         \u0275\u0275classProp("active", ctx.activeTab() === "history");
         \u0275\u0275advance(2);
-        \u0275\u0275conditional(ctx.activeTab() === "overview" ? 82 : -1);
+        \u0275\u0275conditional(ctx.activeTab() === "overview" ? 69 : -1);
         \u0275\u0275advance();
-        \u0275\u0275conditional(ctx.activeTab() === "benefits" ? 83 : -1);
+        \u0275\u0275conditional(ctx.activeTab() === "benefits" ? 70 : -1);
         \u0275\u0275advance();
-        \u0275\u0275conditional(ctx.activeTab() === "upgrade" ? 84 : -1);
+        \u0275\u0275conditional(ctx.activeTab() === "upgrade" ? 71 : -1);
         \u0275\u0275advance();
-        \u0275\u0275conditional(ctx.activeTab() === "history" ? 85 : -1);
+        \u0275\u0275conditional(ctx.activeTab() === "history" ? 72 : -1);
       }
-    }, dependencies: [CommonModule, NgIf, FormsModule, DefaultValueAccessor, NgControlStatus, NgModel], styles: ["\n\n.membership-container[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n  max-width: 1200px;\n  margin: 0 auto;\n}\n.page-header[_ngcontent-%COMP%] {\n  margin-bottom: 1.5rem;\n}\n.page-title[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  margin: 0;\n}\n.title-icon[_ngcontent-%COMP%] {\n  font-size: 1.75rem;\n}\n.page-desc[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  margin: 0.5rem 0 0 0;\n}\n.membership-status-card[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1.5rem;\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n  border: 1px solid;\n}\n.membership-status-card.level-free[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(71, 85, 105, 0.3),\n      rgba(51, 65, 85, 0.3));\n  border-color: rgba(71, 85, 105, 0.5);\n}\n.membership-status-card.level-vip[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(245, 158, 11, 0.2),\n      rgba(217, 119, 6, 0.2));\n  border-color: rgba(245, 158, 11, 0.5);\n}\n.membership-status-card.level-svip[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(139, 92, 246, 0.2),\n      rgba(124, 58, 237, 0.2));\n  border-color: rgba(139, 92, 246, 0.5);\n}\n.membership-status-card.level-mvp[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(236, 72, 153, 0.2),\n      rgba(219, 39, 119, 0.2));\n  border-color: rgba(236, 72, 153, 0.5);\n}\n.wallet-card[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1rem 1.5rem;\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(102, 126, 234, 0.2),\n      rgba(118, 75, 162, 0.2));\n  border: 1px solid rgba(102, 126, 234, 0.5);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.wallet-card[_ngcontent-%COMP%]:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);\n}\n.wallet-left[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.wallet-icon[_ngcontent-%COMP%] {\n  font-size: 2rem;\n}\n.wallet-label[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: var(--text-muted, #94a3b8);\n}\n.wallet-amount[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: 700;\n  color: #22c55e;\n}\n.wallet-right[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.wallet-bonus[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: #f59e0b;\n  background: rgba(245, 158, 11, 0.1);\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n}\n.wallet-recharge-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  border-radius: 0.5rem;\n  border: none;\n  background:\n    linear-gradient(\n      135deg,\n      #667eea,\n      #764ba2);\n  color: white;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.wallet-recharge-btn[_ngcontent-%COMP%]:hover {\n  transform: scale(1.05);\n}\n.status-left[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.level-badge[_ngcontent-%COMP%] {\n  width: 64px;\n  height: 64px;\n  border-radius: 50%;\n  background: rgba(255, 255, 255, 0.1);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 2rem;\n}\n.level-name[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0;\n}\n.expires-info[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  margin: 0.25rem 0 0 0;\n}\n.days-left[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.upgrade-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.75rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.upgrade-btn[_ngcontent-%COMP%]:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 10px 20px -10px rgba(6, 182, 212, 0.5);\n}\n.quick-stats[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 1rem;\n  margin-bottom: 1.5rem;\n}\n.stat-card[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.75rem;\n}\n.stat-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.stat-content[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.stat-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.75rem;\n}\n.stat-value[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.stat-bar[_ngcontent-%COMP%] {\n  height: 4px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 2px;\n  margin-top: 0.5rem;\n  overflow: hidden;\n}\n.stat-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 2px;\n}\n.stat-hint[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n}\n.tabs[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1.5rem;\n  flex-wrap: wrap;\n}\n.tab-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.tab-btn[_ngcontent-%COMP%]:hover {\n  border-color: var(--primary, #06b6d4);\n}\n.tab-btn.active[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border-color: transparent;\n  color: white;\n}\n.section-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.section-title[_ngcontent-%COMP%] {\n  font-size: 1rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 1rem 0;\n}\n.usage-details[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 1rem;\n}\n.usage-row[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.usage-name[_ngcontent-%COMP%] {\n  width: 150px;\n  color: var(--text-secondary, #cbd5e1);\n}\n.usage-bar-container[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.usage-bar[_ngcontent-%COMP%] {\n  height: 8px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 4px;\n  overflow: hidden;\n}\n.usage-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 4px;\n}\n.usage-count[_ngcontent-%COMP%] {\n  width: 100px;\n  text-align: right;\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.invite-card[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border-color: rgba(6, 182, 212, 0.3);\n}\n.invite-desc[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  margin-bottom: 1rem;\n}\n.invite-code-display[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.invite-code-display[_ngcontent-%COMP%]   .label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.invite-code-display[_ngcontent-%COMP%]   .code[_ngcontent-%COMP%] {\n  flex: 1;\n  font-family: monospace;\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.copy-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--primary-bg, rgba(6, 182, 212, 0.1));\n  border: 1px solid var(--primary, #06b6d4);\n  border-radius: 0.5rem;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n}\n.invite-stats-row[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 2rem;\n}\n.invite-stat[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n}\n.invite-stat[_ngcontent-%COMP%]   .value[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.invite-stat[_ngcontent-%COMP%]   .label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.benefits-table-container[_ngcontent-%COMP%] {\n  overflow-x: auto;\n}\n.benefits-table[_ngcontent-%COMP%] {\n  width: 100%;\n  border-collapse: collapse;\n  font-size: 0.875rem;\n}\n.benefits-table[_ngcontent-%COMP%]   th[_ngcontent-%COMP%], \n.benefits-table[_ngcontent-%COMP%]   td[_ngcontent-%COMP%] {\n  padding: 0.75rem 1rem;\n  text-align: center;\n  border-bottom: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.benefits-table[_ngcontent-%COMP%]   th[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  color: var(--text-primary, white);\n  font-weight: 600;\n}\n.benefits-table[_ngcontent-%COMP%]   .feature-col[_ngcontent-%COMP%] {\n  text-align: left;\n  min-width: 150px;\n}\n.benefits-table[_ngcontent-%COMP%]   .feature-name[_ngcontent-%COMP%] {\n  text-align: left;\n  color: var(--text-secondary, #cbd5e1);\n}\n.benefits-table[_ngcontent-%COMP%]   td[_ngcontent-%COMP%] {\n  color: var(--text-primary, white);\n}\n.benefits-table[_ngcontent-%COMP%]   .price[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.pricing-cards[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));\n  gap: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.pricing-card[_ngcontent-%COMP%] {\n  position: relative;\n  padding: 2rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 2px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  text-align: center;\n}\n.pricing-card.vip[_ngcontent-%COMP%] {\n  border-color: rgba(245, 158, 11, 0.3);\n}\n.pricing-card.svip[_ngcontent-%COMP%] {\n  border-color: rgba(139, 92, 246, 0.3);\n}\n.pricing-card.mvp[_ngcontent-%COMP%] {\n  border-color: rgba(236, 72, 153, 0.3);\n}\n.pricing-card.popular[_ngcontent-%COMP%] {\n  transform: scale(1.02);\n  box-shadow: 0 20px 40px -20px rgba(139, 92, 246, 0.3);\n}\n.pricing-card.current[_ngcontent-%COMP%] {\n  border-width: 3px;\n}\n.popular-badge[_ngcontent-%COMP%] {\n  position: absolute;\n  top: -12px;\n  left: 50%;\n  transform: translateX(-50%);\n  padding: 0.25rem 1rem;\n  background:\n    linear-gradient(\n      135deg,\n      #8b5cf6,\n      #7c3aed);\n  border-radius: 1rem;\n  color: white;\n  font-size: 0.75rem;\n  font-weight: 600;\n}\n.current-badge[_ngcontent-%COMP%] {\n  position: absolute;\n  top: 1rem;\n  right: 1rem;\n  padding: 0.25rem 0.5rem;\n  background: var(--success, #22c55e);\n  border-radius: 0.25rem;\n  color: white;\n  font-size: 0.625rem;\n  font-weight: 600;\n}\n.plan-icon[_ngcontent-%COMP%] {\n  font-size: 3rem;\n  margin-bottom: 1rem;\n}\n.plan-name[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 0.5rem 0;\n}\n.plan-price[_ngcontent-%COMP%] {\n  margin-bottom: 0.5rem;\n}\n.plan-price[_ngcontent-%COMP%]   .amount[_ngcontent-%COMP%] {\n  font-size: 2rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.plan-price[_ngcontent-%COMP%]   .period[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.savings[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--success, #22c55e);\n  margin-bottom: 1rem;\n}\n.plan-features[_ngcontent-%COMP%] {\n  list-style: none;\n  padding: 0;\n  margin: 1rem 0;\n  text-align: left;\n}\n.plan-features[_ngcontent-%COMP%]   li[_ngcontent-%COMP%] {\n  padding: 0.5rem 0;\n  color: var(--text-secondary, #cbd5e1);\n}\n.buy-btn[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 0.75rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.buy-btn.renew[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n}\n.license-input-row[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n}\n.license-input[_ngcontent-%COMP%] {\n  flex: 1;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-family: monospace;\n}\n.activate-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.activate-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.payment-methods[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 1rem;\n  flex-wrap: wrap;\n}\n.payment-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.payment-btn.active[_ngcontent-%COMP%] {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.1);\n}\n.history-list[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.75rem;\n}\n.history-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n}\n.history-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.history-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.history-title[_ngcontent-%COMP%] {\n  font-weight: 500;\n  color: var(--text-primary, white);\n}\n.history-meta[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.history-status[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  border-radius: 0.25rem;\n  font-size: 0.75rem;\n}\n.history-status.active[_ngcontent-%COMP%] {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.history-status.used[_ngcontent-%COMP%] {\n  background: rgba(148, 163, 184, 0.2);\n  color: #94a3b8;\n}\n/*# sourceMappingURL=membership-center.component.css.map */"] });
+    }, dependencies: [CommonModule, FormsModule, DefaultValueAccessor, NgControlStatus, NgModel], styles: ["\n\n.membership-container[_ngcontent-%COMP%] {\n  padding: 1.5rem;\n  max-width: 1200px;\n  margin: 0 auto;\n}\n.page-header[_ngcontent-%COMP%] {\n  margin-bottom: 1.5rem;\n}\n.page-title[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n  margin: 0;\n}\n.title-icon[_ngcontent-%COMP%] {\n  font-size: 1.75rem;\n}\n.page-desc[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  margin: 0.5rem 0 0 0;\n}\n.membership-status-card[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1.5rem;\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n  border: 1px solid;\n}\n.membership-status-card.level-free[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(71, 85, 105, 0.3),\n      rgba(51, 65, 85, 0.3));\n  border-color: rgba(71, 85, 105, 0.5);\n}\n.membership-status-card.level-vip[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(245, 158, 11, 0.2),\n      rgba(217, 119, 6, 0.2));\n  border-color: rgba(245, 158, 11, 0.5);\n}\n.membership-status-card.level-svip[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(139, 92, 246, 0.2),\n      rgba(124, 58, 237, 0.2));\n  border-color: rgba(139, 92, 246, 0.5);\n}\n.membership-status-card.level-mvp[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(236, 72, 153, 0.2),\n      rgba(219, 39, 119, 0.2));\n  border-color: rgba(236, 72, 153, 0.5);\n}\n.wallet-card[_ngcontent-%COMP%] {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 1rem 1.5rem;\n  border-radius: 1rem;\n  margin-bottom: 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      rgba(102, 126, 234, 0.2),\n      rgba(118, 75, 162, 0.2));\n  border: 1px solid rgba(102, 126, 234, 0.5);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.wallet-card[_ngcontent-%COMP%]:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);\n}\n.wallet-left[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.wallet-icon[_ngcontent-%COMP%] {\n  font-size: 2rem;\n}\n.wallet-label[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: var(--text-muted, #94a3b8);\n}\n.wallet-amount[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: 700;\n  color: #22c55e;\n}\n.wallet-right[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.wallet-bonus[_ngcontent-%COMP%] {\n  font-size: 0.875rem;\n  color: #f59e0b;\n  background: rgba(245, 158, 11, 0.1);\n  padding: 0.25rem 0.75rem;\n  border-radius: 1rem;\n}\n.wallet-recharge-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  border-radius: 0.5rem;\n  border: none;\n  background:\n    linear-gradient(\n      135deg,\n      #667eea,\n      #764ba2);\n  color: white;\n  font-weight: 500;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.wallet-recharge-btn[_ngcontent-%COMP%]:hover {\n  transform: scale(1.05);\n}\n.status-left[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.level-badge[_ngcontent-%COMP%] {\n  width: 64px;\n  height: 64px;\n  border-radius: 50%;\n  background: rgba(255, 255, 255, 0.1);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 2rem;\n}\n.level-name[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0;\n}\n.expires-info[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  margin: 0.25rem 0 0 0;\n}\n.days-left[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.upgrade-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.75rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.upgrade-btn[_ngcontent-%COMP%]:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 10px 20px -10px rgba(6, 182, 212, 0.5);\n}\n.quick-stats[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 1rem;\n  margin-bottom: 1.5rem;\n}\n.stat-card[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.75rem;\n}\n.stat-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.stat-content[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.stat-label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.75rem;\n}\n.stat-value[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--text-primary, white);\n}\n.stat-bar[_ngcontent-%COMP%] {\n  height: 4px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 2px;\n  margin-top: 0.5rem;\n  overflow: hidden;\n}\n.stat-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 2px;\n}\n.stat-hint[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #64748b);\n}\n.tabs[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n  margin-bottom: 1.5rem;\n  flex-wrap: wrap;\n}\n.tab-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #94a3b8);\n  cursor: pointer;\n  transition: all 0.2s;\n}\n.tab-btn[_ngcontent-%COMP%]:hover {\n  border-color: var(--primary, #06b6d4);\n}\n.tab-btn.active[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border-color: transparent;\n  color: white;\n}\n.section-card[_ngcontent-%COMP%] {\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  padding: 1.5rem;\n  margin-bottom: 1rem;\n}\n.section-title[_ngcontent-%COMP%] {\n  font-size: 1rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 1rem 0;\n}\n.usage-details[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 1rem;\n}\n.usage-row[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n}\n.usage-name[_ngcontent-%COMP%] {\n  width: 150px;\n  color: var(--text-secondary, #cbd5e1);\n}\n.usage-bar-container[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.usage-bar[_ngcontent-%COMP%] {\n  height: 8px;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 4px;\n  overflow: hidden;\n}\n.usage-fill[_ngcontent-%COMP%] {\n  height: 100%;\n  background:\n    linear-gradient(\n      90deg,\n      #06b6d4,\n      #3b82f6);\n  border-radius: 4px;\n}\n.usage-count[_ngcontent-%COMP%] {\n  width: 100px;\n  text-align: right;\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.invite-card[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      rgba(6, 182, 212, 0.1),\n      rgba(59, 130, 246, 0.1));\n  border-color: rgba(6, 182, 212, 0.3);\n}\n.invite-desc[_ngcontent-%COMP%] {\n  color: var(--text-secondary, #cbd5e1);\n  margin-bottom: 1rem;\n}\n.invite-code-display[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n  margin-bottom: 1rem;\n}\n.invite-code-display[_ngcontent-%COMP%]   .label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.invite-code-display[_ngcontent-%COMP%]   .code[_ngcontent-%COMP%] {\n  flex: 1;\n  font-family: monospace;\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.copy-btn[_ngcontent-%COMP%] {\n  padding: 0.5rem 1rem;\n  background: var(--primary-bg, rgba(6, 182, 212, 0.1));\n  border: 1px solid var(--primary, #06b6d4);\n  border-radius: 0.5rem;\n  color: var(--primary, #06b6d4);\n  cursor: pointer;\n}\n.invite-stats-row[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 2rem;\n}\n.invite-stat[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n}\n.invite-stat[_ngcontent-%COMP%]   .value[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.invite-stat[_ngcontent-%COMP%]   .label[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n  font-size: 0.875rem;\n}\n.benefits-table-container[_ngcontent-%COMP%] {\n  overflow-x: auto;\n}\n.benefits-table[_ngcontent-%COMP%] {\n  width: 100%;\n  border-collapse: collapse;\n  font-size: 0.875rem;\n}\n.benefits-table[_ngcontent-%COMP%]   th[_ngcontent-%COMP%], \n.benefits-table[_ngcontent-%COMP%]   td[_ngcontent-%COMP%] {\n  padding: 0.75rem 1rem;\n  text-align: center;\n  border-bottom: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));\n}\n.benefits-table[_ngcontent-%COMP%]   th[_ngcontent-%COMP%] {\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  color: var(--text-primary, white);\n  font-weight: 600;\n}\n.benefits-table[_ngcontent-%COMP%]   .feature-col[_ngcontent-%COMP%] {\n  text-align: left;\n  min-width: 150px;\n}\n.benefits-table[_ngcontent-%COMP%]   .feature-name[_ngcontent-%COMP%] {\n  text-align: left;\n  color: var(--text-secondary, #cbd5e1);\n}\n.benefits-table[_ngcontent-%COMP%]   td[_ngcontent-%COMP%] {\n  color: var(--text-primary, white);\n}\n.benefits-table[_ngcontent-%COMP%]   .price[_ngcontent-%COMP%] {\n  font-weight: 600;\n  color: var(--primary, #06b6d4);\n}\n.pricing-cards[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));\n  gap: 1.5rem;\n  margin-bottom: 1.5rem;\n}\n.pricing-card[_ngcontent-%COMP%] {\n  position: relative;\n  padding: 2rem;\n  background: var(--bg-card, rgba(30, 41, 59, 0.8));\n  border: 2px solid var(--border-default, rgba(148, 163, 184, 0.1));\n  border-radius: 1rem;\n  text-align: center;\n}\n.pricing-card.vip[_ngcontent-%COMP%] {\n  border-color: rgba(245, 158, 11, 0.3);\n}\n.pricing-card.svip[_ngcontent-%COMP%] {\n  border-color: rgba(139, 92, 246, 0.3);\n}\n.pricing-card.mvp[_ngcontent-%COMP%] {\n  border-color: rgba(236, 72, 153, 0.3);\n}\n.pricing-card.popular[_ngcontent-%COMP%] {\n  transform: scale(1.02);\n  box-shadow: 0 20px 40px -20px rgba(139, 92, 246, 0.3);\n}\n.pricing-card.current[_ngcontent-%COMP%] {\n  border-width: 3px;\n}\n.popular-badge[_ngcontent-%COMP%] {\n  position: absolute;\n  top: -12px;\n  left: 50%;\n  transform: translateX(-50%);\n  padding: 0.25rem 1rem;\n  background:\n    linear-gradient(\n      135deg,\n      #8b5cf6,\n      #7c3aed);\n  border-radius: 1rem;\n  color: white;\n  font-size: 0.75rem;\n  font-weight: 600;\n}\n.current-badge[_ngcontent-%COMP%] {\n  position: absolute;\n  top: 1rem;\n  right: 1rem;\n  padding: 0.25rem 0.5rem;\n  background: var(--success, #22c55e);\n  border-radius: 0.25rem;\n  color: white;\n  font-size: 0.625rem;\n  font-weight: 600;\n}\n.plan-icon[_ngcontent-%COMP%] {\n  font-size: 3rem;\n  margin-bottom: 1rem;\n}\n.plan-name[_ngcontent-%COMP%] {\n  font-size: 1.25rem;\n  font-weight: 600;\n  color: var(--text-primary, white);\n  margin: 0 0 0.5rem 0;\n}\n.plan-price[_ngcontent-%COMP%] {\n  margin-bottom: 0.5rem;\n}\n.plan-price[_ngcontent-%COMP%]   .amount[_ngcontent-%COMP%] {\n  font-size: 2rem;\n  font-weight: bold;\n  color: var(--primary, #06b6d4);\n}\n.plan-price[_ngcontent-%COMP%]   .period[_ngcontent-%COMP%] {\n  color: var(--text-muted, #94a3b8);\n}\n.savings[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--success, #22c55e);\n  margin-bottom: 1rem;\n}\n.plan-features[_ngcontent-%COMP%] {\n  list-style: none;\n  padding: 0;\n  margin: 1rem 0;\n  text-align: left;\n}\n.plan-features[_ngcontent-%COMP%]   li[_ngcontent-%COMP%] {\n  padding: 0.5rem 0;\n  color: var(--text-secondary, #cbd5e1);\n}\n.buy-btn[_ngcontent-%COMP%] {\n  width: 100%;\n  padding: 0.75rem;\n  background:\n    linear-gradient(\n      135deg,\n      #06b6d4,\n      #3b82f6);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.buy-btn.renew[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n}\n.license-input-row[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 0.5rem;\n}\n.license-input[_ngcontent-%COMP%] {\n  flex: 1;\n  padding: 0.75rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-primary, white);\n  font-family: monospace;\n}\n.activate-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background:\n    linear-gradient(\n      135deg,\n      #22c55e,\n      #16a34a);\n  border: none;\n  border-radius: 0.5rem;\n  color: white;\n  font-weight: 600;\n  cursor: pointer;\n}\n.activate-btn[_ngcontent-%COMP%]:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.payment-methods[_ngcontent-%COMP%] {\n  display: flex;\n  gap: 1rem;\n  flex-wrap: wrap;\n}\n.payment-btn[_ngcontent-%COMP%] {\n  padding: 0.75rem 1.5rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));\n  border-radius: 0.5rem;\n  color: var(--text-secondary, #cbd5e1);\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 0.5rem;\n}\n.payment-btn.active[_ngcontent-%COMP%] {\n  border-color: var(--primary, #06b6d4);\n  color: var(--primary, #06b6d4);\n  background: rgba(6, 182, 212, 0.1);\n}\n.history-list[_ngcontent-%COMP%] {\n  display: flex;\n  flex-direction: column;\n  gap: 0.75rem;\n}\n.history-item[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  gap: 1rem;\n  padding: 1rem;\n  background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));\n  border-radius: 0.75rem;\n}\n.history-icon[_ngcontent-%COMP%] {\n  font-size: 1.5rem;\n}\n.history-info[_ngcontent-%COMP%] {\n  flex: 1;\n}\n.history-title[_ngcontent-%COMP%] {\n  font-weight: 500;\n  color: var(--text-primary, white);\n}\n.history-meta[_ngcontent-%COMP%] {\n  font-size: 0.75rem;\n  color: var(--text-muted, #94a3b8);\n}\n.history-status[_ngcontent-%COMP%] {\n  padding: 0.25rem 0.5rem;\n  border-radius: 0.25rem;\n  font-size: 0.75rem;\n}\n.history-status.active[_ngcontent-%COMP%] {\n  background: rgba(34, 197, 94, 0.2);\n  color: #86efac;\n}\n.history-status.used[_ngcontent-%COMP%] {\n  background: rgba(148, 163, 184, 0.2);\n  color: #94a3b8;\n}\n/*# sourceMappingURL=membership-center.component.css.map */"] });
   }
 };
 (() => {
@@ -41222,25 +41187,6 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
               \u{1F680} \u7ACB\u5373\u5347\u7D1A
             </button>
           }
-        </div>
-      </div>
-      
-      <!-- \u9322\u5305\u9918\u984D\u5361\u7247 -->
-      <div class="wallet-card" (click)="goToWallet()">
-        <div class="wallet-left">
-          <div class="wallet-icon">\u{1F4B0}</div>
-          <div class="wallet-info">
-            <div class="wallet-label">\u8CEC\u6236\u9918\u984D</div>
-            <div class="wallet-amount">{{ walletBalanceDisplay() }}</div>
-          </div>
-        </div>
-        <div class="wallet-right">
-          <div class="wallet-bonus" *ngIf="walletBonusDisplay() !== '$0.00'">
-            \u8D08\u9001: {{ walletBonusDisplay() }}
-          </div>
-          <button class="wallet-recharge-btn" (click)="goToRecharge(); $event.stopPropagation()">
-            \u{1F4B3} \u5145\u503C
-          </button>
         </div>
       </div>
       
@@ -41746,7 +41692,7 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
   }], null, null);
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(MembershipCenterComponent, { className: "MembershipCenterComponent", filePath: "src/membership-center.component.ts", lineNumber: 1217 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(MembershipCenterComponent, { className: "MembershipCenterComponent", filePath: "src/membership-center.component.ts", lineNumber: 1198 });
 })();
 
 // src/profile.component.ts
@@ -42708,6 +42654,7 @@ var ProfileComponent = class _ProfileComponent {
       }
       if (rf & 2) {
         let tmp_2_0;
+        let tmp_2_1;
         let tmp_3_0;
         let tmp_4_0;
         \u0275\u0275advance();
@@ -42715,9 +42662,9 @@ var ProfileComponent = class _ProfileComponent {
         \u0275\u0275advance();
         \u0275\u0275conditional(ctx.userLoadError() ? 2 : -1);
         \u0275\u0275advance(4);
-        \u0275\u0275textInterpolate1(" ", ((tmp_2_0 = ctx.user()) == null ? null : tmp_2_0.username == null ? null : tmp_2_0.username.charAt(0).toUpperCase()) || ((tmp_2_0 = ctx.user()) == null ? null : tmp_2_0.display_name == null ? null : tmp_2_0.display_name.charAt(0).toUpperCase()) || "?", " ");
+        \u0275\u0275textInterpolate1(" ", ((((tmp_2_0 = ctx.user()) == null ? null : tmp_2_0.displayName) || ((tmp_2_1 = ctx.user()) == null ? null : tmp_2_1.username)) == null ? null : (((tmp_2_0 = tmp_2_0) == null ? null : tmp_2_0.displayName) || ((tmp_2_1 = tmp_2_1) == null ? null : tmp_2_1.username)).charAt(0).toUpperCase()) || "?", " ");
         \u0275\u0275advance(3);
-        \u0275\u0275textInterpolate(((tmp_3_0 = ctx.user()) == null ? null : tmp_3_0.display_name) || ((tmp_3_0 = ctx.user()) == null ? null : tmp_3_0.username) || (ctx.isLoadingUser() ? "\u8F09\u5165\u4E2D..." : "\u672A\u767B\u5165"));
+        \u0275\u0275textInterpolate(((tmp_3_0 = ctx.user()) == null ? null : tmp_3_0.displayName) || ((tmp_3_0 = ctx.user()) == null ? null : tmp_3_0.username) || (ctx.isLoadingUser() ? "\u8F09\u5165\u4E2D..." : "\u672A\u767B\u5165"));
         \u0275\u0275advance(2);
         \u0275\u0275textInterpolate(((tmp_4_0 = ctx.user()) == null ? null : tmp_4_0.email) || "\u672A\u8A2D\u7F6E\u90F5\u7BB1");
         \u0275\u0275advance();
@@ -42780,10 +42727,10 @@ var ProfileComponent = class _ProfileComponent {
       <div class="profile-header">
         <div class="avatar-section">
           <div class="avatar">
-            {{ user()?.username?.charAt(0).toUpperCase() || user()?.display_name?.charAt(0).toUpperCase() || '?' }}
+            {{ (user()?.displayName || user()?.username)?.charAt(0).toUpperCase() || '?' }}
           </div>
           <div class="user-info">
-            <h2 class="username">{{ user()?.display_name || user()?.username || (isLoadingUser() ? '\u8F09\u5165\u4E2D...' : '\u672A\u767B\u5165') }}</h2>
+            <h2 class="username">{{ user()?.displayName || user()?.username || (isLoadingUser() ? '\u8F09\u5165\u4E2D...' : '\u672A\u767B\u5165') }}</h2>
             <p class="email">{{ user()?.email || '\u672A\u8A2D\u7F6E\u90F5\u7BB1' }}</p>
             <div class="membership-badge" [class]="'level-' + membershipLevel()">
               {{ getMembershipIcon() }} {{ getMembershipName() }}
@@ -59650,6 +59597,7 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
   }
   if (rf & 2) {
     let tmp_38_0;
+    let tmp_38_1;
     let tmp_40_0;
     let tmp_41_0;
     let tmp_75_0;
@@ -59680,11 +59628,11 @@ function AppComponent_Conditional_15_Template(rf, ctx) {
     \u0275\u0275advance();
     \u0275\u0275classProp("avatar-bronze", ctx_r0.userMembershipLevel() === "bronze")("avatar-silver", ctx_r0.userMembershipLevel() === "silver")("avatar-gold", ctx_r0.userMembershipLevel() === "gold")("avatar-diamond", ctx_r0.userMembershipLevel() === "diamond")("avatar-star", ctx_r0.userMembershipLevel() === "star")("avatar-king", ctx_r0.userMembershipLevel() === "king");
     \u0275\u0275advance();
-    \u0275\u0275textInterpolate1(" ", ((tmp_38_0 = ctx_r0.currentUser()) == null ? null : tmp_38_0.username == null ? null : tmp_38_0.username.charAt(0).toUpperCase()) || "?", " ");
+    \u0275\u0275textInterpolate1(" ", ((((tmp_38_0 = ctx_r0.currentUser()) == null ? null : tmp_38_0.displayName) || ((tmp_38_1 = ctx_r0.currentUser()) == null ? null : tmp_38_1.username)) == null ? null : (((tmp_38_0 = tmp_38_0) == null ? null : tmp_38_0.displayName) || ((tmp_38_1 = tmp_38_1) == null ? null : tmp_38_1.username)).charAt(0).toUpperCase()) || "?", " ");
     \u0275\u0275advance();
     \u0275\u0275conditional(ctx_r0.userMembershipLevel() !== "bronze" ? 35 : -1);
     \u0275\u0275advance(3);
-    \u0275\u0275textInterpolate1(" ", ((tmp_40_0 = ctx_r0.currentUser()) == null ? null : tmp_40_0.username) || "\u7528\u6236", " ");
+    \u0275\u0275textInterpolate1(" ", ((tmp_40_0 = ctx_r0.currentUser()) == null ? null : tmp_40_0.displayName) || ((tmp_40_0 = ctx_r0.currentUser()) == null ? null : tmp_40_0.username) || "\u7528\u6236", " ");
     \u0275\u0275advance(2);
     \u0275\u0275conditional((tmp_41_0 = ctx_r0.userMembershipLevel()) === "silver" ? 40 : tmp_41_0 === "gold" ? 41 : tmp_41_0 === "diamond" ? 42 : tmp_41_0 === "star" ? 43 : tmp_41_0 === "king" ? 44 : 45);
     \u0275\u0275advance(10);
@@ -71506,7 +71454,7 @@ ${details}`, 12e3);
                      [class.avatar-diamond]="userMembershipLevel() === 'diamond'"
                      [class.avatar-star]="userMembershipLevel() === 'star'"
                      [class.avatar-king]="userMembershipLevel() === 'king'">
-                  {{ currentUser()?.username?.charAt(0).toUpperCase() || '?' }}
+                  {{ (currentUser()?.displayName || currentUser()?.username)?.charAt(0).toUpperCase() || '?' }}
                 </div>
               </div>
               <!-- \u6703\u54E1\u5FBD\u7AE0\uFF08\u53F3\u4E0B\u89D2\uFF09 -->
@@ -71531,7 +71479,7 @@ ${details}`, 12e3);
             <!-- \u7528\u6236\u4FE1\u606F -->
             <div class="flex-1 min-w-0">
               <div class="text-sm font-semibold truncate" style="color: var(--text-primary);">
-                {{ currentUser()?.username || '\u7528\u6236' }}
+                {{ currentUser()?.displayName || currentUser()?.username || '\u7528\u6236' }}
               </div>
               <div class="flex items-center gap-1.5 mt-0.5">
                 <!-- \u6703\u54E1\u6A19\u7C64\uFF08\u738B\u8005\u69AE\u8000\u98A8\u683C\uFF09 -->

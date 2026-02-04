@@ -6,6 +6,7 @@
 import { Component, signal, computed, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { AuthService } from './auth.service';
 import { MembershipService, MembershipLevel } from './membership.service';
 import { I18nService } from './i18n.service';
@@ -1220,6 +1221,7 @@ export class MembershipCenterComponent implements OnInit, OnDestroy {
   private licenseClient = inject(LicenseClientService);
   private cdr = inject(ChangeDetectorRef);
   private walletService = inject(WalletService);
+  private router = inject(Router);
   
   // 用於清理事件監聯
   private membershipUpdateHandler: ((event: Event) => void) | null = null;
@@ -1312,13 +1314,13 @@ export class MembershipCenterComponent implements OnInit, OnDestroy {
   }
   
   goToWallet(): void {
-    // 觸發視圖切換（通過事件或路由）
-    window.dispatchEvent(new CustomEvent('changeView', { detail: 'wallet' }));
+    // 使用 Router 導航到錢包頁面
+    this.router.navigate(['/wallet']);
   }
   
   goToRecharge(): void {
     // 導航到充值頁面
-    window.dispatchEvent(new CustomEvent('changeView', { detail: 'wallet' }));
+    this.router.navigate(['/wallet/recharge']);
   }
   
   getMembershipIcon(): string {

@@ -1,6 +1,6 @@
 import {
   authGuard
-} from "./chunk-4NW3NYHP.js";
+} from "./chunk-4VCODEQU.js";
 import {
   WalletOrdersComponent
 } from "./chunk-MEWYCPNB.js";
@@ -10,7 +10,7 @@ import {
 import {
   AuthEventsService,
   AuthService
-} from "./chunk-2G2ZNYYZ.js";
+} from "./chunk-X53HRSO4.js";
 import {
   AiCenterViewComponent
 } from "./chunk-GLMKOHSV.js";
@@ -43021,22 +43021,17 @@ var ProfileComponent = class _ProfileComponent {
     }
   }
   /**
-   * 🔧 修復：確保用戶信息已加載
-   * 如果沒有用戶信息，主動從後端獲取
+   * 🔧 P0 修復：確保用戶信息已加載且是最新的
+   * 總是從後端刷新，確保數據一致性
    */
   async ensureUserLoaded() {
-    if (this.user()?.username) {
-      console.log("[Profile] User already loaded:", this.user()?.username);
-      this.authEvents.emitUserUpdate(this.user());
-      return;
-    }
     this.isLoadingUser.set(true);
     this.userLoadError.set(null);
     try {
-      console.log("[Profile] Fetching user info...");
+      console.log("[Profile] Fetching fresh user info from backend...");
       const user = await this.authService.fetchCurrentUser();
       if (user) {
-        console.log("[Profile] User loaded successfully:", user.username);
+        console.log("[Profile] User loaded successfully:", user.username, "Level:", user.membershipLevel);
         this.authEvents.emitUserUpdate(user);
       } else {
         console.warn("[Profile] No user returned from API");
@@ -73980,7 +73975,7 @@ var routes = [
   // 認證路由（公開）
   {
     path: "auth",
-    loadChildren: () => import("./chunk-JGJ5MPWL.js").then((m) => m.AUTH_ROUTES)
+    loadChildren: () => import("./chunk-XNT25XYU.js").then((m) => m.AUTH_ROUTES)
   },
   // 簡化路由
   {
@@ -74020,21 +74015,21 @@ var routes = [
   // 用戶設置頁面
   {
     path: "user-settings",
-    loadComponent: () => import("./chunk-4ZMKR3Y7.js").then((m) => m.UserSettingsViewComponent),
+    loadComponent: () => import("./chunk-YCYEYAFR.js").then((m) => m.UserSettingsViewComponent),
     title: "\u7528\u6236\u8A2D\u7F6E",
     canActivate: [authGuard]
   },
   // 訂閱升級頁面
   {
     path: "upgrade",
-    loadComponent: () => import("./chunk-7HNFJRWX.js").then((m) => m.UpgradeViewComponent),
+    loadComponent: () => import("./chunk-GH7DZR4S.js").then((m) => m.UpgradeViewComponent),
     title: "\u5347\u7D1A\u65B9\u6848",
     canActivate: [authGuard]
   },
   // 配額管理儀表板
   {
     path: "quota",
-    loadComponent: () => import("./chunk-RFW7I5VS.js").then((m) => m.QuotaDashboardViewComponent),
+    loadComponent: () => import("./chunk-KEAEXDJY.js").then((m) => m.QuotaDashboardViewComponent),
     title: "\u914D\u984D\u7BA1\u7406",
     canActivate: [authGuard]
   },

@@ -101,14 +101,19 @@ export class AuthService implements OnDestroy {
   readonly accessToken = computed(() => this._accessToken());
   
   // 訂閱信息
-  readonly subscriptionTier = computed(() => this._user()?.subscription_tier || 'free');
+  // 🔧 P0 修復：同時檢查 subscription_tier 和 membershipLevel（兼容兩種數據格式）
+  readonly subscriptionTier = computed(() => 
+    this._user()?.subscription_tier || this._user()?.membershipLevel || 'free'
+  );
   readonly maxAccounts = computed(() => this._user()?.max_accounts || 3);
-  readonly isPro = computed(() => ['pro', 'enterprise'].includes(this.subscriptionTier()));
+  readonly isPro = computed(() => ['pro', 'enterprise', 'gold', 'diamond', 'star', 'king'].includes(this.subscriptionTier()));
   
   // 會員等級（兼容舊接口）
   // 🔧 P0 修復：完整的等級映射，支持 subscription_tier 和直接的等級名稱
   readonly membershipLevel = computed(() => {
-    const tier = this.subscriptionTier();
+    const user = this._user();
+    // 🔧 優先使用 membershipLevel（已轉換的格式），然後是 subscription_tier
+    const tier = user?.membershipLevel || user?.subscription_tier || 'free';
     const tierMap: Record<string, string> = {
       // 從 subscription_tier 轉換
       'free': 'bronze',

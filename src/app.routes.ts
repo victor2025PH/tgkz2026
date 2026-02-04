@@ -95,12 +95,17 @@ export const routes: Routes = [
     title: '支付中心',
     canActivate: [authGuard]
   },
-  // 🆕 Phase 0: 錢包系統
+  // 🆕 Phase 0: 錢包系統 - 具體路由必須在通用路由之前
   {
-    path: 'wallet',
-    pathMatch: 'full',  // 確保只匹配精確的 /wallet 路徑
-    loadComponent: () => import('./views/wallet-view.component').then(m => m.WalletViewComponent),
-    title: '我的錢包',
+    path: 'wallet/recharge',
+    loadComponent: () => import('./views/wallet-recharge.component').then(m => m.WalletRechargeComponent),
+    title: '充值中心',
+    canActivate: [authGuard]
+  },
+  {
+    path: 'wallet/withdraw',
+    loadComponent: () => import('./views/wallet-withdraw.component').then(m => m.WalletWithdrawComponent),
+    title: '提現',
     canActivate: [authGuard]
   },
   {
@@ -109,13 +114,6 @@ export const routes: Routes = [
     title: '交易記錄',
     canActivate: [authGuard]
   },
-  {
-    path: 'wallet/recharge',
-    loadComponent: () => import('./views/wallet-recharge.component').then(m => m.WalletRechargeComponent),
-    title: '充值中心',
-    canActivate: [authGuard]
-  },
-  // 🆕 Phase 3: 錢包高級功能
   {
     path: 'wallet/orders',
     loadComponent: () => import('./views/wallet-orders.component').then(m => m.WalletOrdersComponent),
@@ -128,11 +126,12 @@ export const routes: Routes = [
     title: '消費分析',
     canActivate: [authGuard]
   },
-  // 🆕 Phase 4: 提現功能
+  // 錢包主頁放在所有 wallet/* 路由之後
   {
-    path: 'wallet/withdraw',
-    loadComponent: () => import('./views/wallet-withdraw.component').then(m => m.WalletWithdrawComponent),
-    title: '提現',
+    path: 'wallet',
+    pathMatch: 'full',
+    loadComponent: () => import('./views/wallet-view.component').then(m => m.WalletViewComponent),
+    title: '我的錢包',
     canActivate: [authGuard]
   },
   // 營銷功能 - 需要會員權限

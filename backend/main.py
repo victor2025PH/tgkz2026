@@ -3159,6 +3159,19 @@ class BackendService:
             
             print(f"[Backend] Handling add-account command for phone: {payload.get('phone', 'unknown')}", file=sys.stderr)
             
+            # 當 usePlatformApi 為 true 時，先從 API 池或後備憑據填充 apiId/apiHash
+            if payload.get('usePlatformApi'):
+                try:
+                    from core.api_pool_integration import process_login_payload
+                    process_login_payload(payload)
+                    if payload.get('_api_error'):
+                        err = payload['_api_error']
+                        self.send_log(err, "error")
+                        self.send_event("account-validation-error", {"errors": [err], "account_data": payload})
+                        return {"success": False, "error": err}
+                except Exception as e:
+                    print(f"[Backend] process_login_payload error: {e}", file=sys.stderr)
+            
             # Validate account data
             is_valid, errors = validate_account(payload)
             if not is_valid:

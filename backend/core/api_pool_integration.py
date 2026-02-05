@@ -94,9 +94,12 @@ def get_api_for_login(
             print(f"[ApiPoolIntegration] 從平台池分配 API: {api.api_id} -> {phone}", file=sys.stderr)
             return (api.api_id, api.api_hash, 'platform')
         else:
-            print(f"[ApiPoolIntegration] ⚠️ 平台 API 池為空或已滿", file=sys.stderr)
-            # 返回 None，讓調用者處理
-            return (None, None, 'none')
+            # 池為空時使用 Telegram Desktop 公共 API 作為後備（與前端 usePlatformApi 一致）
+            print(f"[ApiPoolIntegration] 平台池為空，使用 Telegram Desktop 公共 API", file=sys.stderr)
+            fallback_id = '2040'
+            fallback_hash = 'b18441a1ff607e10a989891a5462e627'
+            _phone_api_map[phone] = fallback_id
+            return (fallback_id, fallback_hash, 'fallback')
     
     # 既沒有用戶 API 也不使用平台 API
     print(f"[ApiPoolIntegration] ⚠️ 未指定 API 來源", file=sys.stderr)

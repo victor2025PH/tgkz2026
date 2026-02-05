@@ -147,6 +147,10 @@ class AccountValidator(Validator):
         
         proxy = proxy.strip()
         
+        # 'auto' 表示後端自動分配代理，視為有效
+        if proxy.lower() == 'auto':
+            return True, None
+        
         if not cls.PROXY_REGEX.match(proxy):
             return False, "Proxy must be in format: socks5://host:port or http://host:port or https://host:port"
         

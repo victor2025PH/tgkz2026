@@ -8,6 +8,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, DeviceInfo, UsageStats } from './auth.service';
 import { AuthEventsService } from './core/auth-events.service';  // 🆕 用於廣播用戶更新
+import { MembershipService } from './membership.service';  // 🔧 P0: 使用統一會員服務
 import { Router } from '@angular/router';
 import { DeviceService } from './device.service';
 import { I18nService } from './i18n.service';
@@ -1278,6 +1279,7 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
 export class ProfileComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private authEvents = inject(AuthEventsService);  // 🆕 用於廣播用戶更新
+  private membershipService = inject(MembershipService);  // 🔧 P0: 統一會員服務
   private deviceService = inject(DeviceService);
   private i18n = inject(I18nService);
   private toast = inject(ToastService);
@@ -1305,9 +1307,10 @@ export class ProfileComponent implements OnInit, OnDestroy {
   newLicenseKey = '';
   
   // 計算屬性
+  // 🔧 P0 修復：使用 MembershipService 作為會員等級的單一數據源
   user = computed(() => this.authService.user());
-  membershipLevel = computed(() => this.authService.membershipLevel());
-  membershipDaysLeft = computed(() => this.authService.membershipDaysLeft());
+  membershipLevel = computed(() => this.membershipService.level());
+  membershipDaysLeft = computed(() => this.membershipService.daysRemaining());
   devices = computed(() => this.authService.devices());
   usageStats = computed(() => this.authService.usageStats());
   

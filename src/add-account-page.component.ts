@@ -543,7 +543,11 @@ interface PlatformApiInfo {
 
             @if (selectedApiCredential()) {
               <div class="api-info">
-                <span class="api-badge expert">🔐 {{ selectedApiCredential()!.name || 'API ' + selectedApiCredential()!.api_id }}</span>
+                @if (selectedApiCredential()!.source === 'platform') {
+                  <span class="api-badge platform">🚀 平台公共 API</span>
+                } @else {
+                  <span class="api-badge expert">🔐 {{ selectedApiCredential()!.name || 'API ' + selectedApiCredential()!.api_id }}</span>
+                }
               </div>
             }
           }

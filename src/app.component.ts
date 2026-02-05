@@ -15,6 +15,8 @@ import { ElectronIpcService } from './electron-ipc.service';
 import { ToastService } from './toast.service';
 import { ToastComponent } from './toast.component';
 import { GlobalConfirmDialogComponent } from './global-confirm-dialog.component';
+// 🆕 实时告警通知组件
+import { AlertNotificationComponent } from './components/alert-notification.component';
 import { GlobalInputDialogComponent } from './global-input-dialog.component';
 import { ProgressDialogComponent, ProgressInfo } from './progress-dialog.component';
 import { MembershipService, MembershipLevel } from './membership.service';
@@ -40,6 +42,8 @@ import { QrLoginComponent } from './qr-login.component';
 // AccountCardListComponent, ApiCredentialManagerComponent - 移至路由視圖
 // 🔧 P0: 恢復 AddAccountPageComponent 導入，用於 @switch 視圖切換
 import { AddAccountPageComponent } from './add-account-page.component';
+// 🆕 簡化版添加帳號組件（零配置登錄）
+import { AddAccountSimpleComponent } from './add-account-simple.component';
 import { Account } from './account-card-list.component';
 // 類型導入（用於信號和狀態）
 import { AccountQueueStatus } from './queue-progress.component';
@@ -159,6 +163,8 @@ interface SuccessOverlayConfig {
     MonitoringViewComponent,
     // 🔧 P0: 添加帳號頁面組件
     AddAccountPageComponent,
+    // 🆕 簡化版添加帳號組件（零配置登錄）
+    AddAccountSimpleComponent,
     // 🆕 Phase P0: 補全缺失的視圖組件
     MembershipCenterComponent, ProfileComponent, ResourceCenterComponent,
     SearchDiscoveryComponent, AiMarketingAssistantComponent, AiTeamHubComponent,
@@ -172,6 +178,8 @@ interface SuccessOverlayConfig {
     MarketingReportComponent,
     // 通用組件（模板中使用）
     ToastComponent, GlobalConfirmDialogComponent, GlobalInputDialogComponent, ProgressDialogComponent,
+    // 🆕 实时告警通知
+    AlertNotificationComponent,
     // 🔧 P1-2: 統一會員等級徽章組件
     UserLevelBadgeComponent,
     // 會員相關（模板中使用）

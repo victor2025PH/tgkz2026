@@ -1,6 +1,6 @@
 import {
   authGuard
-} from "./chunk-4VCODEQU.js";
+} from "./chunk-H47UAPCH.js";
 import {
   WalletOrdersComponent
 } from "./chunk-MEWYCPNB.js";
@@ -8,27 +8,26 @@ import {
   WalletAnalyticsComponent
 } from "./chunk-AKUQO5IA.js";
 import {
-  AuthEventsService,
   AuthService
-} from "./chunk-X53HRSO4.js";
+} from "./chunk-FIY3KE23.js";
 import {
   AiCenterViewComponent
-} from "./chunk-GLMKOHSV.js";
+} from "./chunk-E33ER4A4.js";
 import {
   AutoGroupService,
   MultiRoleViewComponent
-} from "./chunk-ICLVZQMQ.js";
+} from "./chunk-4A5A4CR4.js";
 import {
   AIProviderService,
   DynamicScriptEngineService
-} from "./chunk-6MV7RIEN.js";
+} from "./chunk-66OYFE7L.js";
 import {
   AnalyticsViewComponent
-} from "./chunk-SE77KBXW.js";
+} from "./chunk-D7QVFZFC.js";
 import {
   ConfirmDialogService,
   MonitoringViewComponent
-} from "./chunk-JQDGLS5B.js";
+} from "./chunk-JF24ASNL.js";
 import {
   WalletViewComponent
 } from "./chunk-2CNBI7M4.js";
@@ -47,30 +46,30 @@ import {
 import "./chunk-LRT2RG6V.js";
 import {
   LicenseClientService
-} from "./chunk-A2YLVIZU.js";
+} from "./chunk-2N3QNIDN.js";
 import {
   DashboardViewComponent
-} from "./chunk-66E6NV6B.js";
+} from "./chunk-4ZDKLNQP.js";
 import {
   MarketingAnalyticsService
-} from "./chunk-6NMZIGVF.js";
+} from "./chunk-LEAZNM36.js";
 import {
   AccountsViewComponent
-} from "./chunk-TUZCLVJD.js";
+} from "./chunk-SQ3CKLY6.js";
 import {
   SettingsViewComponent
-} from "./chunk-BL56X2KT.js";
+} from "./chunk-FI4HG6IX.js";
 import {
   LeadsViewComponent
-} from "./chunk-MGBRSD7Q.js";
+} from "./chunk-J5X72H7F.js";
 import {
   AutomationViewComponent
-} from "./chunk-MSP4NM5P.js";
+} from "./chunk-AUF37VUC.js";
 import "./chunk-XBRFXE36.js";
 import {
   ResourceDiscoveryViewComponent,
   SearchDiscoveryComponent
-} from "./chunk-5N472RHM.js";
+} from "./chunk-T2EVRWZF.js";
 import {
   AUTO_STYLE,
   AiChatService,
@@ -96,10 +95,10 @@ import {
   sequence,
   style,
   ɵPRE_STYLE
-} from "./chunk-XT45YJ5X.js";
+} from "./chunk-CTKGMQYJ.js";
 import {
   AICenterService
-} from "./chunk-FN2YHCU4.js";
+} from "./chunk-S764FGAZ.js";
 import {
   BrowserModule,
   DomRendererFactory2,
@@ -113,11 +112,11 @@ import {
   DEFAULT_TAGS,
   STATUS_OPTIONS,
   UnifiedContactsService
-} from "./chunk-GRS575IO.js";
-import "./chunk-WJVAD2FT.js";
+} from "./chunk-SRBGSWCK.js";
+import "./chunk-X2TRLAAL.js";
 import {
   MonitoringManagementService
-} from "./chunk-JYDDS6LH.js";
+} from "./chunk-PZQ6N2UA.js";
 import {
   NavBridgeService,
   NavShortcutsService,
@@ -160,7 +159,10 @@ import {
 import {
   MembershipService,
   ToastService
-} from "./chunk-Z2LRLAVM.js";
+} from "./chunk-P26VRYR4.js";
+import {
+  AuthEventsService
+} from "./chunk-VXLC6YHT.js";
 import {
   ANIMATION_MODULE_TYPE,
   ChangeDetectionStrategy,
@@ -27778,7 +27780,7 @@ var AuthService2 = class _AuthService {
   async loadUsageStats() {
     try {
       try {
-        const { LicenseClientService: LicenseClientService2 } = await import("./chunk-VDINMIPG.js");
+        const { LicenseClientService: LicenseClientService2 } = await import("./chunk-TIQWH35M.js");
         const licenseClient = this.injector.get(LicenseClientService2);
         const result = await licenseClient.getUsageStats();
         if (result.success && result.stats) {
@@ -41238,9 +41240,11 @@ var MembershipCenterComponent = class _MembershipCenterComponent {
       return "$" + ((w.bonus_balance || 0) / 100).toFixed(2);
     }, ...ngDevMode ? [{ debugName: "walletBonusDisplay" }] : []);
     this.user = computed(() => this.authService.user(), ...ngDevMode ? [{ debugName: "user" }] : []);
-    this.membershipLevel = computed(() => this.authService.membershipLevel(), ...ngDevMode ? [{ debugName: "membershipLevel" }] : []);
-    this.membershipExpires = computed(() => this.authService.user()?.membershipExpires, ...ngDevMode ? [{ debugName: "membershipExpires" }] : []);
-    this.membershipDaysLeft = computed(() => this.authService.membershipDaysLeft(), ...ngDevMode ? [{ debugName: "membershipDaysLeft" }] : []);
+    this.membershipLevel = computed(() => this.membershipService.level(), ...ngDevMode ? [{ debugName: "membershipLevel" }] : []);
+    this.membershipExpires = computed(() => {
+      return this.authService.user()?.membershipExpires;
+    }, ...ngDevMode ? [{ debugName: "membershipExpires" }] : []);
+    this.membershipDaysLeft = computed(() => this.membershipService.daysRemaining(), ...ngDevMode ? [{ debugName: "membershipDaysLeft" }] : []);
     this.usageStats = computed(() => this.authService.usageStats(), ...ngDevMode ? [{ debugName: "usageStats" }] : []);
     this.inviteCode = signal("", ...ngDevMode ? [{ debugName: "inviteCode" }] : []);
     this.invitedCount = signal(0, ...ngDevMode ? [{ debugName: "invitedCount" }] : []);
@@ -42970,6 +42974,7 @@ var ProfileComponent = class _ProfileComponent {
   constructor() {
     this.authService = inject(AuthService2);
     this.authEvents = inject(AuthEventsService);
+    this.membershipService = inject(MembershipService);
     this.deviceService = inject(DeviceService);
     this.i18n = inject(I18nService);
     this.toast = inject(ToastService);
@@ -42990,8 +42995,8 @@ var ProfileComponent = class _ProfileComponent {
     this.displayNameForm = { newName: "" };
     this.newLicenseKey = "";
     this.user = computed(() => this.authService.user(), ...ngDevMode ? [{ debugName: "user" }] : []);
-    this.membershipLevel = computed(() => this.authService.membershipLevel(), ...ngDevMode ? [{ debugName: "membershipLevel" }] : []);
-    this.membershipDaysLeft = computed(() => this.authService.membershipDaysLeft(), ...ngDevMode ? [{ debugName: "membershipDaysLeft" }] : []);
+    this.membershipLevel = computed(() => this.membershipService.level(), ...ngDevMode ? [{ debugName: "membershipLevel" }] : []);
+    this.membershipDaysLeft = computed(() => this.membershipService.daysRemaining(), ...ngDevMode ? [{ debugName: "membershipDaysLeft" }] : []);
     this.devices = computed(() => this.authService.devices(), ...ngDevMode ? [{ debugName: "devices" }] : []);
     this.usageStats = computed(() => this.authService.usageStats(), ...ngDevMode ? [{ debugName: "usageStats" }] : []);
     this.currentDeviceCode = signal("", ...ngDevMode ? [{ debugName: "currentDeviceCode" }] : []);
@@ -43913,7 +43918,7 @@ var ProfileComponent = class _ProfileComponent {
   }], null, null);
 })();
 (() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(ProfileComponent, { className: "ProfileComponent", filePath: "src/profile.component.ts", lineNumber: 1278 });
+  (typeof ngDevMode === "undefined" || ngDevMode) && \u0275setClassDebugInfo(ProfileComponent, { className: "ProfileComponent", filePath: "src/profile.component.ts", lineNumber: 1279 });
 })();
 
 // src/manual-mode/resource-center.component.ts
@@ -73983,7 +73988,7 @@ var routes = [
   // 認證路由（公開）
   {
     path: "auth",
-    loadChildren: () => import("./chunk-XNT25XYU.js").then((m) => m.AUTH_ROUTES)
+    loadChildren: () => import("./chunk-3QPYFMKT.js").then((m) => m.AUTH_ROUTES)
   },
   // 簡化路由
   {
@@ -74004,40 +74009,40 @@ var routes = [
   // 核心功能 - SaaS 模式需要登入
   {
     path: "dashboard",
-    loadComponent: () => import("./chunk-LK4JPIEC.js").then((m) => m.DashboardViewComponent),
+    loadComponent: () => import("./chunk-MYFUCHH7.js").then((m) => m.DashboardViewComponent),
     title: "\u5100\u8868\u677F",
     canActivate: [authGuard]
   },
   {
     path: "accounts",
-    loadComponent: () => import("./chunk-3NVFVOGE.js").then((m) => m.AccountsViewComponent),
+    loadComponent: () => import("./chunk-JOFAGUA4.js").then((m) => m.AccountsViewComponent),
     title: "\u5E33\u865F\u7BA1\u7406",
     canActivate: [authGuard]
   },
   {
     path: "settings",
-    loadComponent: () => import("./chunk-GBWLGVBG.js").then((m) => m.SettingsViewComponent),
+    loadComponent: () => import("./chunk-E7EGNWBJ.js").then((m) => m.SettingsViewComponent),
     title: "\u8A2D\u5B9A",
     canActivate: [authGuard]
   },
   // 用戶設置頁面
   {
     path: "user-settings",
-    loadComponent: () => import("./chunk-YCYEYAFR.js").then((m) => m.UserSettingsViewComponent),
+    loadComponent: () => import("./chunk-K2NMZLYW.js").then((m) => m.UserSettingsViewComponent),
     title: "\u7528\u6236\u8A2D\u7F6E",
     canActivate: [authGuard]
   },
   // 訂閱升級頁面
   {
     path: "upgrade",
-    loadComponent: () => import("./chunk-GH7DZR4S.js").then((m) => m.UpgradeViewComponent),
+    loadComponent: () => import("./chunk-MJGY3DJV.js").then((m) => m.UpgradeViewComponent),
     title: "\u5347\u7D1A\u65B9\u6848",
     canActivate: [authGuard]
   },
   // 配額管理儀表板
   {
     path: "quota",
-    loadComponent: () => import("./chunk-KEAEXDJY.js").then((m) => m.QuotaDashboardViewComponent),
+    loadComponent: () => import("./chunk-D4MMPXGV.js").then((m) => m.QuotaDashboardViewComponent),
     title: "\u914D\u984D\u7BA1\u7406",
     canActivate: [authGuard]
   },
@@ -74097,19 +74102,19 @@ var routes = [
   // 營銷功能 - 需要會員權限
   {
     path: "leads",
-    loadComponent: () => import("./chunk-TUVP7UHE.js").then((m) => m.LeadsViewComponent),
+    loadComponent: () => import("./chunk-UURNCZZF.js").then((m) => m.LeadsViewComponent),
     title: "\u6F5B\u5728\u5BA2\u6236",
     canActivate: [membershipGuard]
   },
   {
     path: "automation",
-    loadComponent: () => import("./chunk-YQCUBKDK.js").then((m) => m.AutomationViewComponent),
+    loadComponent: () => import("./chunk-ZD3SWLZS.js").then((m) => m.AutomationViewComponent),
     title: "\u81EA\u52D5\u5316\u4E2D\u5FC3",
     canActivate: [membershipGuard]
   },
   {
     path: "resource-discovery",
-    loadComponent: () => import("./chunk-RYUETRTN.js").then((m) => m.ResourceDiscoveryViewComponent),
+    loadComponent: () => import("./chunk-T35HM3MO.js").then((m) => m.ResourceDiscoveryViewComponent),
     title: "\u8CC7\u6E90\u767C\u73FE",
     canActivate: [membershipGuard]
   },
@@ -74117,21 +74122,21 @@ var routes = [
   // 營銷任務中心（核心入口）
   {
     path: "marketing-hub",
-    loadComponent: () => import("./chunk-444JVDBM.js").then((m) => m.SmartMarketingViewComponent),
+    loadComponent: () => import("./chunk-2X3AALIG.js").then((m) => m.SmartMarketingViewComponent),
     title: "\u71DF\u92B7\u4EFB\u52D9\u4E2D\u5FC3",
     canActivate: [membershipGuard]
   },
   // 角色資源庫（原多角色協作的資產部分）
   {
     path: "role-library",
-    loadComponent: () => import("./chunk-KVOIMJ2A.js").then((m) => m.MultiRoleViewComponent),
+    loadComponent: () => import("./chunk-TKREXG63.js").then((m) => m.MultiRoleViewComponent),
     title: "\u89D2\u8272\u8CC7\u6E90\u5EAB",
     canActivate: [membershipGuard]
   },
   // 智能引擎（原 AI 中心的配置部分）
   {
     path: "ai-engine",
-    loadComponent: () => import("./chunk-6WVCCXFF.js").then((m) => m.AiCenterViewComponent),
+    loadComponent: () => import("./chunk-OAD773JX.js").then((m) => m.AiCenterViewComponent),
     title: "\u667A\u80FD\u5F15\u64CE",
     canActivate: [membershipGuard]
   },
@@ -74154,14 +74159,14 @@ var routes = [
   // 數據分析 - 需要高級會員
   {
     path: "analytics",
-    loadComponent: () => import("./chunk-C3M7OM7E.js").then((m) => m.AnalyticsViewComponent),
+    loadComponent: () => import("./chunk-APVRVRVB.js").then((m) => m.AnalyticsViewComponent),
     title: "\u6578\u64DA\u5206\u6790",
     canActivate: [membershipGuard]
   },
   // 系統功能 - 無權限限制
   {
     path: "monitoring",
-    loadComponent: () => import("./chunk-OWACCOCG.js").then((m) => m.MonitoringViewComponent),
+    loadComponent: () => import("./chunk-4HSKRC7O.js").then((m) => m.MonitoringViewComponent),
     title: "\u76E3\u63A7\u4E2D\u5FC3"
   },
   // 向下兼容舊路由（重定向到設置頁）

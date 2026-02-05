@@ -5,7 +5,7 @@ Handles application configuration and environment variables
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 
 # Base directory for the backend (code location)
 BASE_DIR = Path(__file__).parent
@@ -93,6 +93,124 @@ class AIConfig:
     RETRY_DELAY_SECONDS = 1
     # 最大 Token 數
     DEFAULT_MAX_TOKENS = 500
+
+
+# ========== 🔒 沙盒隔離配置 ==========
+class SandboxConfig:
+    """
+    多賬號沙盒隔離配置
+    確保每個 Telegram 賬號完全獨立運行，防止封號
+    """
+    
+    # 🔒 是否啟用嚴格沙盒模式（強制隔離）
+    STRICT_MODE = os.environ.get('TG_SANDBOX_STRICT', '').lower() in ('true', '1', 'yes')
+    
+    # 🔒 是否強制要求代理（無代理則拒絕啟動）
+    REQUIRE_PROXY = os.environ.get('TG_REQUIRE_PROXY', '').lower() in ('true', '1', 'yes')
+    
+    # 🔒 是否使用獨立目錄結構（每賬號單獨目錄）
+    USE_ISOLATED_DIRS = os.environ.get('TG_ISOLATED_DIRS', 'true').lower() in ('true', '1', 'yes')
+    
+    # 🔒 是否持久化設備指紋（存儲到數據庫）
+    PERSIST_FINGERPRINT = os.environ.get('TG_PERSIST_FINGERPRINT', 'true').lower() in ('true', '1', 'yes')
+    
+    # 🔒 同 IP 下最大賬號數（防止關聯）
+    MAX_ACCOUNTS_PER_IP = int(os.environ.get('TG_MAX_ACCOUNTS_PER_IP', '3'))
+    
+    # 🔒 最大並發客戶端數
+    MAX_CONCURRENT_CLIENTS = int(os.environ.get('TG_MAX_CONCURRENT_CLIENTS', '10'))
+    
+    # 🔒 代理失敗重試閾值
+    PROXY_FAILURE_THRESHOLD = int(os.environ.get('TG_PROXY_FAILURE_THRESHOLD', '3'))
+    
+    @classmethod
+    def get_account_dir(cls, phone: str) -> Path:
+        """
+        獲取賬號專屬目錄（包含 session、cache、temp 等）
+        
+        結構：
+        sessions/
+        └── {phone}/
+            ├── session.session    # Pyrogram session 文件
+            ├── cache/             # 賬號專屬緩存
+            ├── temp/              # 臨時文件
+            └── media/             # 媒體緩存
+        """
+        safe_phone = phone.replace("+", "").replace("-", "").replace(" ", "")
+        return SESSIONS_DIR / safe_phone
+    
+    @classmethod
+    def get_session_path(cls, phone: str) -> Path:
+        """獲取賬號的 session 文件路徑"""
+        if cls.USE_ISOLATED_DIRS:
+            account_dir = cls.get_account_dir(phone)
+            return account_dir / "session.session"
+        else:
+            # 兼容舊模式
+            safe_phone = phone.replace("+", "").replace("-", "").replace(" ", "")
+            return SESSIONS_DIR / f"{safe_phone}.session"
+    
+    @classmethod
+    def get_cache_dir(cls, phone: str) -> Path:
+        """獲取賬號的緩存目錄"""
+        return cls.get_account_dir(phone) / "cache"
+    
+    @classmethod
+    def get_temp_dir(cls, phone: str) -> Path:
+        """獲取賬號的臨時文件目錄"""
+        return cls.get_account_dir(phone) / "temp"
+    
+    @classmethod
+    def get_media_dir(cls, phone: str) -> Path:
+        """獲取賬號的媒體緩存目錄"""
+        return cls.get_account_dir(phone) / "media"
+    
+    @classmethod
+    def ensure_account_dirs(cls, phone: str) -> Dict[str, Path]:
+        """
+        確保賬號的所有目錄都存在
+        
+        Returns:
+            包含所有目錄路徑的字典
+        """
+        dirs = {
+            'base': cls.get_account_dir(phone),
+            'cache': cls.get_cache_dir(phone),
+            'temp': cls.get_temp_dir(phone),
+            'media': cls.get_media_dir(phone),
+        }
+        
+        for name, dir_path in dirs.items():
+            try:
+                dir_path.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                print(f"[SandboxConfig] Warning: Could not create {name} directory {dir_path}: {e}", file=sys.stderr)
+        
+        return dirs
+    
+    @classmethod
+    def get_status(cls) -> Dict[str, Any]:
+        """獲取沙盒配置狀態"""
+        return {
+            'strict_mode': cls.STRICT_MODE,
+            'require_proxy': cls.REQUIRE_PROXY,
+            'use_isolated_dirs': cls.USE_ISOLATED_DIRS,
+            'persist_fingerprint': cls.PERSIST_FINGERPRINT,
+            'max_accounts_per_ip': cls.MAX_ACCOUNTS_PER_IP,
+            'max_concurrent_clients': cls.MAX_CONCURRENT_CLIENTS,
+            'proxy_failure_threshold': cls.PROXY_FAILURE_THRESHOLD,
+        }
+
+
+# 輸出沙盒配置狀態
+print(f"[Config] ========== 沙盒隔離配置 ==========", file=sys.stderr)
+print(f"[Config] 嚴格模式: {'啟用' if SandboxConfig.STRICT_MODE else '關閉'}", file=sys.stderr)
+print(f"[Config] 強制代理: {'是' if SandboxConfig.REQUIRE_PROXY else '否'}", file=sys.stderr)
+print(f"[Config] 獨立目錄: {'是' if SandboxConfig.USE_ISOLATED_DIRS else '否'}", file=sys.stderr)
+print(f"[Config] 指紋持久化: {'是' if SandboxConfig.PERSIST_FINGERPRINT else '否'}", file=sys.stderr)
+print(f"[Config] 每IP最大賬號: {SandboxConfig.MAX_ACCOUNTS_PER_IP}", file=sys.stderr)
+print(f"[Config] 最大並發客戶端: {SandboxConfig.MAX_CONCURRENT_CLIENTS}", file=sys.stderr)
+print(f"[Config] ====================================", file=sys.stderr)
 
 
 # ========== 🔧 Phase 3 優化：內存優化配置 ==========
@@ -189,13 +307,22 @@ class Config:
     
     @classmethod
     def get_session_path(cls, phone: str) -> Path:
-        """Get session file path for a phone number"""
-        from config_loader import get_config
-        app_config = get_config()
-        sessions_dir = Path(app_config.telegram.sessions_dir)
-        # Sanitize phone number for filename
-        safe_phone = phone.replace("+", "").replace("-", "").replace(" ", "")
-        return sessions_dir / f"{safe_phone}.session"
+        """
+        Get session file path for a phone number
+        使用 SandboxConfig 的隔離目錄結構
+        """
+        # 使用沙盒配置的隔離路徑
+        return SandboxConfig.get_session_path(phone)
+    
+    @classmethod
+    def get_account_dir(cls, phone: str) -> Path:
+        """Get the isolated directory for an account"""
+        return SandboxConfig.get_account_dir(phone)
+    
+    @classmethod
+    def ensure_account_dirs(cls, phone: str) -> Dict[str, Path]:
+        """Ensure all account directories exist"""
+        return SandboxConfig.ensure_account_dirs(phone)
     
     @classmethod
     def load_from_env(cls):

@@ -6,6 +6,8 @@
 <app-toast></app-toast>
 <app-global-confirm-dialog></app-global-confirm-dialog>
 <app-global-input-dialog></app-global-input-dialog>
+<!-- 🆕 实时告警通知 -->
+<app-alert-notification></app-alert-notification>
 
 <!-- 🆕 P2 優化：智能連接狀態指示器（支持離線模式） -->
 @if (backendConnectionState() !== 'connected' || !offlineCache.isOnline()) {
@@ -933,7 +935,19 @@
         <app-accounts-view></app-accounts-view>
       }
       @case ('add-account') {
-        <app-add-account-page (accountAdded)="onAccountAdded($event)" (back)="changeView('accounts')"></app-add-account-page>
+        <!-- 🆕 默认使用简化版添加账号组件（零配置登录） -->
+        <app-add-account-simple 
+          (accountAdded)="onAccountAdded($event)" 
+          (back)="changeView('accounts')"
+          (switchToAdvanced)="changeView('add-account-advanced')">
+        </app-add-account-simple>
+      }
+      @case ('add-account-advanced') {
+        <!-- 高级版添加账号组件（完整配置） -->
+        <app-add-account-page 
+          (accountAdded)="onAccountAdded($event)" 
+          (back)="changeView('add-account')">
+        </app-add-account-page>
       }
       @case ('api-credentials') {
         <app-api-credentials-view></app-api-credentials-view>

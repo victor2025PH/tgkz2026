@@ -535,7 +535,7 @@ export class SystemAlertsComponent implements OnInit, OnDestroy {
     this.isLoading.set(true);
 
     try {
-      const result = await this.ipcService.send('alerts:get', {});
+      const result = await this.ipcService.invoke('alerts:get', {}) as { success?: boolean; data?: { summary?: any; active?: any[]; recent?: any[] } } | undefined;
 
       if (result?.success) {
         this.summary.set(result.data?.summary || null);

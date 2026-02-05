@@ -441,7 +441,7 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
 
   async loadAlerts(): Promise<void> {
     try {
-      const result = await this.ipcService.send('alerts:get', {});
+      const result = await this.ipcService.invoke('alerts:get', {}) as { success?: boolean; data?: { active?: AlertNotification[] } } | undefined;
 
       if (result?.success) {
         const active = result.data?.active || [];

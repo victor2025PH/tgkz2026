@@ -22,6 +22,45 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class AuditCategory(Enum):
+    """審計分類（與 admin/audit_logger 對齊）"""
+    AUTH = "auth"
+    USER = "user"
+    LICENSE = "license"
+    ORDER = "order"
+    SYSTEM = "system"
+    NOTIFICATION = "notification"
+
+
+class AuditSeverity(Enum):
+    """審計嚴重級別"""
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+
+@dataclass
+class AuditLog:
+    """審計日誌條目（兼容層）"""
+    id: str = ""
+    action: str = ""
+    category: str = ""
+    user_id: str = ""
+    details: str = ""
+    timestamp: float = field(default_factory=time.time)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'id': self.id,
+            'action': self.action,
+            'category': self.category,
+            'user_id': self.user_id,
+            'details': self.details,
+            'timestamp': self.timestamp
+        }
+
+
 class AuditAction(Enum):
     """审计操作类型"""
     # API 池操作
@@ -450,6 +489,56 @@ class AuditService:
             'failures': self.get_failures(limit=10),
             'anomalies': self.detect_anomalies()
         }
+
+    async def log_admin_action(
+        self,
+        admin_id: str = "",
+        admin_name: str = "",
+        action: str = "",
+        target_type: str = "",
+        target_id: str = "",
+        description: str = ""
+    ) -> None:
+        """記錄管理員操作（兼容 http_server 調用）"""
+        await self.log(
+            action=AuditAction.SYSTEM_CONFIG,
+            resource_type=ResourceType.SYSTEM,
+            resource_id=target_id or action,
+            user_id=admin_id,
+            user_name=admin_name,
+            details=description or action
+        )
+
+    def query(
+        self,
+        user_id: str = None,
+        category: str = None,
+        action: str = None,
+        start_time: float = None,
+        end_time: float = None,
+        limit: int = 100,
+        offset: int = 0
+    ) -> List[AuditLog]:
+        """查詢審計日誌（兼容 http_server 調用）"""
+        results = self.search(
+            user_id=user_id,
+            start_time=start_time,
+            end_time=end_time,
+            limit=limit + offset
+        )
+        # 跳過 offset，轉為 AuditLog 對象
+        trimmed = results[offset:offset + limit]
+        return [
+            AuditLog(
+                id=r.get('id', ''),
+                action=r.get('action', ''),
+                category=r.get('resource_type', ''),
+                user_id=r.get('user_id', ''),
+                details=r.get('details', ''),
+                timestamp=r.get('timestamp', 0)
+            )
+            for r in trimmed
+        ]
 
 
 # ==================== 装饰器 ====================

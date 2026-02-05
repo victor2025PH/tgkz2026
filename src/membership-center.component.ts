@@ -1229,10 +1229,15 @@ export class MembershipCenterComponent implements OnInit, OnDestroy {
   });
   
   // 計算屬性
+  // 🔧 P0 修復：使用 MembershipService 作為會員等級的單一數據源
+  // 確保與 app.component.ts 和其他組件保持一致
   user = computed(() => this.authService.user());
-  membershipLevel = computed(() => this.authService.membershipLevel());
-  membershipExpires = computed(() => this.authService.user()?.membershipExpires);
-  membershipDaysLeft = computed(() => this.authService.membershipDaysLeft());
+  membershipLevel = computed(() => this.membershipService.level());
+  membershipExpires = computed(() => {
+    // 優先從 AuthService 獲取（保持與舊邏輯兼容）
+    return this.authService.user()?.membershipExpires;
+  });
+  membershipDaysLeft = computed(() => this.membershipService.daysRemaining());
   usageStats = computed(() => this.authService.usageStats());
   
   inviteCode = signal('');

@@ -165,7 +165,7 @@ except ImportError:
 from pyrogram.types import Message, User
 from pyrogram.handlers import MessageHandler
 from pyrogram import filters
-from config import config
+from config import config, SandboxConfig
 
 # Pyrogram version info
 import sys
@@ -201,9 +201,13 @@ class TelegramClientManager:
         self._processing_semaphore: Optional[asyncio.Semaphore] = None  # 最多50個並發處理（延遲初始化）
         self._login_semaphore: Optional[asyncio.Semaphore] = None  # 🔧 限制並發登錄數量，避免數據庫鎖定
         
-        # 🆕 性能優化：限制同時在線的客戶端數量
-        self.MAX_CONCURRENT_CLIENTS = 5  # 最多 5 個客戶端同時在線，防止 CPU 過載
+        # 🆕 性能優化：限制同時在線的客戶端數量（從沙盒配置讀取）
+        self.MAX_CONCURRENT_CLIENTS = SandboxConfig.MAX_CONCURRENT_CLIENTS
         self.behavior_simulator = BehaviorSimulator()  # 行為模擬器
+        
+        # 🔒 沙盒隔離配置
+        self.sandbox_config = SandboxConfig
+        print(f"[TelegramClient] 沙盒配置: 強制代理={SandboxConfig.REQUIRE_PROXY}, 獨立目錄={SandboxConfig.USE_ISOLATED_DIRS}", file=sys.stderr)
         
         # 🔧 Phase 2 優化：內存管理
         self._last_cleanup_time = time.time()
@@ -736,8 +740,15 @@ class TelegramClientManager:
                     "message": "API ID and API Hash are required"
                 }
             
-            # Get session path
+            # 🔒 使用沙盒隔離的目錄結構
+            # 確保賬號的所有目錄都存在（session、cache、temp、media）
+            account_dirs = config.ensure_account_dirs(phone)
             session_path = config.get_session_path(phone)
+            account_workdir = str(account_dirs['base'])  # 使用賬號專屬目錄作為工作目錄
+            
+            print(f"[TelegramClient] 🔒 沙盒隔離: {phone}", file=sys.stderr)
+            print(f"[TelegramClient]   Session: {session_path}", file=sys.stderr)
+            print(f"[TelegramClient]   Workdir: {account_workdir}", file=sys.stderr)
             
             # 🆕 自動代理分配：如果沒有指定代理，嘗試從代理池自動分配
             effective_proxy = proxy
@@ -764,6 +775,17 @@ class TelegramClientManager:
                     print(f"[TelegramClient] Proxy pool module not available", file=sys.stderr)
                 except Exception as e:
                     print(f"[TelegramClient] Proxy pool error: {e}", file=sys.stderr)
+            
+            # 🔒 強制代理檢查：如果配置要求代理但沒有代理，則拒絕啟動
+            if SandboxConfig.REQUIRE_PROXY and not effective_proxy:
+                error_msg = f"代理連接失敗：賬號 {phone} 需要代理但未能分配。請配置代理後再試。"
+                print(f"[TelegramClient] ❌ {error_msg}", file=sys.stderr)
+                return {
+                    "success": False,
+                    "status": "error",
+                    "message": error_msg,
+                    "error_code": "PROXY_REQUIRED"
+                }
             
             # Parse proxy
             proxy_dict = self._parse_proxy(effective_proxy)
@@ -817,13 +839,14 @@ class TelegramClientManager:
                     # 從字典中移除，避免重複使用
                     del self.clients[phone]
             
-            # Create client with device fingerprint (防封)
+            # 🔒 Create client with device fingerprint and isolated workdir (防封)
+            # 使用賬號專屬目錄作為工作目錄，確保完全隔離
             client = Client(
                 name=str(session_path.with_suffix('')),
                 api_id=api_id_int,
                 api_hash=api_hash_str,
                 proxy=proxy_dict,
-                workdir=str(session_path.parent),
+                workdir=account_workdir,  # 🔒 使用隔離的賬號目錄
                 device_model=device_model,
                 system_version=system_version,
                 app_version=app_version,
@@ -967,7 +990,7 @@ class TelegramClientManager:
                         api_id=api_id_int,
                         api_hash=api_hash_str,
                         proxy=proxy_dict,
-                        workdir=str(session_path.parent),
+                        workdir=account_workdir,  # 🔒 使用隔離的賬號目錄
                         device_model=device_model,
                         system_version=system_version,
                         app_version=app_version,

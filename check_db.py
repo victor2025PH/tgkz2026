@@ -1,22 +1,13 @@
-#!/usr/bin/env python3
 import sqlite3
-import os
 
-db_path = '/app/data/tgmatrix.db'
-if os.path.exists(db_path):
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    print("=== Accounts owner_user_id ===")
-    cursor.execute('SELECT phone, owner_user_id FROM accounts')
-    for row in cursor.fetchall():
-        print(f"Phone: {row[0]}, Owner: {row[1]}")
-    
-    print("\n=== Users ===")
-    cursor.execute('SELECT id, username FROM users LIMIT 10')
-    for row in cursor.fetchall():
-        print(f"ID: {row[0]}, Username: {row[1]}")
-    
-    conn.close()
-else:
-    print(f"Database not found: {db_path}")
+for db in ["auth.db", "tgmatrix.db", "tgai_server.db"]:
+    try:
+        c = sqlite3.connect(f"/app/data/{db}")
+        tables = c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        print(f"{db}: {tables}")
+        if "users" in str(tables):
+            c.row_factory = sqlite3.Row
+            for row in c.execute("SELECT id, username, display_name, subscription_tier, telegram_id FROM users LIMIT 5"):
+                print(dict(row))
+    except Exception as e:
+        print(f"{db}: {e}")

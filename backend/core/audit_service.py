@@ -1,648 +1,522 @@
 """
-審計日誌服務
+运维操作审计日志服务
 
 功能：
-1. 完整操作記錄
-2. 安全事件追蹤
-3. 合規審計支持
-4. 日誌查詢分析
+1. 记录所有运维操作
+2. 操作分类和标签
+3. 操作回溯和查询
+4. 安全审计报告
 """
 
-import os
-import sqlite3
-import logging
+import sys
+import time
+import asyncio
 import json
-import hashlib
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List
-from dataclasses import dataclass, field, asdict
+from typing import Dict, Any, List, Optional, Callable
+from dataclasses import dataclass, field
 from enum import Enum
-import threading
-import uuid
+from datetime import datetime, timedelta
+from functools import wraps
+import logging
 
 logger = logging.getLogger(__name__)
 
 
-# ==================== 審計事件類型 ====================
-
-class AuditCategory(str, Enum):
-    AUTHENTICATION = 'authentication'   # 認證
-    AUTHORIZATION = 'authorization'     # 授權
-    DATA_ACCESS = 'data_access'         # 數據訪問
-    DATA_MODIFY = 'data_modify'         # 數據修改
-    SYSTEM = 'system'                   # 系統
-    SECURITY = 'security'               # 安全
-    BILLING = 'billing'                 # 計費
-    ADMIN = 'admin'                     # 管理員操作
-
-
-class AuditAction(str, Enum):
-    # 認證
-    LOGIN = 'login'
-    LOGOUT = 'logout'
-    LOGIN_FAILED = 'login_failed'
-    PASSWORD_CHANGE = 'password_change'
-    PASSWORD_RESET = 'password_reset'
-    MFA_ENABLED = 'mfa_enabled'
-    MFA_DISABLED = 'mfa_disabled'
+class AuditAction(Enum):
+    """审计操作类型"""
+    # API 池操作
+    API_ADD = "api.add"                     # 添加 API
+    API_REMOVE = "api.remove"               # 移除 API
+    API_ENABLE = "api.enable"               # 启用 API
+    API_DISABLE = "api.disable"             # 禁用 API
+    API_UPDATE = "api.update"               # 更新 API
     
-    # 授權
-    PERMISSION_GRANTED = 'permission_granted'
-    PERMISSION_REVOKED = 'permission_revoked'
-    ROLE_ASSIGNED = 'role_assigned'
+    # 账号操作
+    ACCOUNT_LOGIN = "account.login"         # 账号登录
+    ACCOUNT_LOGOUT = "account.logout"       # 账号登出
+    ACCOUNT_ADD = "account.add"             # 添加账号
+    ACCOUNT_REMOVE = "account.remove"       # 移除账号
     
-    # 數據
-    CREATE = 'create'
-    READ = 'read'
-    UPDATE = 'update'
-    DELETE = 'delete'
-    EXPORT = 'export'
-    IMPORT = 'import'
+    # 告警操作
+    ALERT_RESOLVE = "alert.resolve"         # 解决告警
+    ALERT_CLEAR = "alert.clear"             # 清除告警
+    ALERT_CONFIGURE = "alert.configure"     # 配置告警规则
     
-    # 訂閱
-    SUBSCRIPTION_CREATE = 'subscription_create'
-    SUBSCRIPTION_UPGRADE = 'subscription_upgrade'
-    SUBSCRIPTION_DOWNGRADE = 'subscription_downgrade'
-    SUBSCRIPTION_CANCEL = 'subscription_cancel'
+    # 系统操作
+    SYSTEM_CONFIG = "system.config"         # 系统配置变更
+    SYSTEM_RESTART = "system.restart"       # 系统重启
+    SYSTEM_BACKUP = "system.backup"         # 系统备份
     
-    # 支付
-    PAYMENT_SUCCESS = 'payment_success'
-    PAYMENT_FAILED = 'payment_failed'
-    REFUND = 'refund'
+    # 用户操作
+    USER_LOGIN = "user.login"               # 用户登录
+    USER_LOGOUT = "user.logout"             # 用户登出
+    USER_CREATE = "user.create"             # 创建用户
+    USER_UPDATE = "user.update"             # 更新用户
+    USER_DELETE = "user.delete"             # 删除用户
     
-    # 安全
-    RATE_LIMITED = 'rate_limited'
-    SUSPICIOUS_ACTIVITY = 'suspicious_activity'
-    API_KEY_CREATED = 'api_key_created'
-    API_KEY_REVOKED = 'api_key_revoked'
-    
-    # 系統
-    CONFIG_CHANGE = 'config_change'
-    SERVICE_START = 'service_start'
-    SERVICE_STOP = 'service_stop'
+    # 数据操作
+    DATA_EXPORT = "data.export"             # 数据导出
+    DATA_IMPORT = "data.import"             # 数据导入
+    DATA_DELETE = "data.delete"             # 数据删除
 
 
-class AuditSeverity(str, Enum):
-    INFO = 'info'
-    WARNING = 'warning'
-    ERROR = 'error'
-    CRITICAL = 'critical'
+class ResourceType(Enum):
+    """资源类型"""
+    API = "api"
+    ACCOUNT = "account"
+    ALERT = "alert"
+    USER = "user"
+    SYSTEM = "system"
+    DATA = "data"
 
-
-# ==================== 數據模型 ====================
 
 @dataclass
-class AuditLog:
-    """審計日誌"""
+class AuditEntry:
+    """审计条目"""
     id: str
-    timestamp: str
-    
-    # 事件信息
-    category: AuditCategory
     action: AuditAction
-    severity: AuditSeverity = AuditSeverity.INFO
-    
-    # 主體
-    user_id: str = ''
-    username: str = ''
-    ip_address: str = ''
-    user_agent: str = ''
-    
-    # 資源
-    resource_type: str = ''
-    resource_id: str = ''
-    
-    # 詳情
-    description: str = ''
-    old_value: Dict = field(default_factory=dict)
-    new_value: Dict = field(default_factory=dict)
-    metadata: Dict = field(default_factory=dict)
-    
-    # 結果
+    resource_type: ResourceType
+    resource_id: str = ""
+    user_id: str = ""
+    user_name: str = ""
+    ip_address: str = ""
+    old_value: Any = None
+    new_value: Any = None
+    details: str = ""
     success: bool = True
-    error_message: str = ''
+    error: str = ""
+    timestamp: float = field(default_factory=time.time)
     
-    # 完整性
-    checksum: str = ''
-    
-    def to_dict(self) -> dict:
-        d = asdict(self)
-        d['category'] = self.category.value
-        d['action'] = self.action.value
-        d['severity'] = self.severity.value
-        return d
-    
-    def compute_checksum(self) -> str:
-        """計算校驗和"""
-        data = f"{self.id}:{self.timestamp}:{self.user_id}:{self.action.value}:{self.resource_id}"
-        return hashlib.sha256(data.encode()).hexdigest()[:16]
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'id': self.id,
+            'action': self.action.value,
+            'resource_type': self.resource_type.value,
+            'resource_id': self.resource_id,
+            'user_id': self.user_id,
+            'user_name': self.user_name,
+            'ip_address': self.ip_address,
+            'old_value': self.old_value,
+            'new_value': self.new_value,
+            'details': self.details,
+            'success': self.success,
+            'error': self.error,
+            'timestamp': self.timestamp
+        }
 
 
 class AuditService:
-    """審計服務"""
+    """
+    审计日志服务
     
-    _instance: Optional['AuditService'] = None
-    _lock = threading.Lock()
+    职责：
+    1. 记录所有敏感操作
+    2. 提供审计查询
+    3. 生成安全报告
+    4. 异常操作检测
+    """
     
-    def __new__(cls, db_path: str = None):
-        with cls._lock:
-            if cls._instance is None:
-                cls._instance = super().__new__(cls)
-                cls._instance._initialized = False
-            return cls._instance
-    
-    def __init__(self, db_path: str = None):
-        if self._initialized:
-            return
+    def __init__(self, persistence=None, max_memory_entries: int = 10000):
+        self.persistence = persistence
+        self.max_memory_entries = max_memory_entries
         
-        self.db_path = db_path or os.environ.get(
-            'DB_PATH',
-            os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
-        )
+        # 内存中的审计日志
+        self._entries: List[AuditEntry] = []
         
-        # 批量寫入緩衝
-        self._buffer: List[AuditLog] = []
-        self._buffer_lock = threading.Lock()
-        self._buffer_size = 100
+        # 计数器
+        self._entry_counter = 0
         
-        self._init_db()
-        self._initialized = True
-        logger.info("AuditService initialized")
+        print("[AuditService] 初始化审计日志服务", file=sys.stderr)
     
-    def _init_db(self):
-        """初始化數據庫表"""
-        try:
-            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # 審計日誌表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS audit_logs (
-                    id TEXT PRIMARY KEY,
-                    timestamp TEXT NOT NULL,
-                    category TEXT NOT NULL,
-                    action TEXT NOT NULL,
-                    severity TEXT DEFAULT 'info',
-                    user_id TEXT,
-                    username TEXT,
-                    ip_address TEXT,
-                    user_agent TEXT,
-                    resource_type TEXT,
-                    resource_id TEXT,
-                    description TEXT,
-                    old_value TEXT,
-                    new_value TEXT,
-                    metadata TEXT,
-                    success INTEGER DEFAULT 1,
-                    error_message TEXT,
-                    checksum TEXT
-                )
-            ''')
-            
-            # 索引
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_audit_category ON audit_logs(category)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_audit_resource ON audit_logs(resource_type, resource_id)')
-            
-            conn.commit()
-            conn.close()
-            
-        except Exception as e:
-            logger.error(f"Init audit DB error: {e}")
+    def set_persistence(self, persistence) -> None:
+        """设置持久化服务"""
+        self.persistence = persistence
     
-    def _get_db(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+    # ==================== 记录接口 ====================
     
-    # ==================== 日誌記錄 ====================
-    
-    def log(
+    async def log(
         self,
-        category: AuditCategory,
         action: AuditAction,
-        user_id: str = None,
-        username: str = None,
-        ip_address: str = None,
-        user_agent: str = None,
-        resource_type: str = None,
-        resource_id: str = None,
-        description: str = None,
-        old_value: Dict = None,
-        new_value: Dict = None,
-        metadata: Dict = None,
+        resource_type: ResourceType,
+        resource_id: str = "",
+        user_id: str = "",
+        user_name: str = "",
+        ip_address: str = "",
+        old_value: Any = None,
+        new_value: Any = None,
+        details: str = "",
         success: bool = True,
-        error_message: str = None,
-        severity: AuditSeverity = None
-    ) -> str:
-        """記錄審計日誌"""
+        error: str = ""
+    ) -> AuditEntry:
+        """记录审计日志"""
+        self._entry_counter += 1
         
-        # 自動判斷嚴重性
-        if severity is None:
-            if not success:
-                severity = AuditSeverity.ERROR
-            elif action in [AuditAction.LOGIN_FAILED, AuditAction.SUSPICIOUS_ACTIVITY]:
-                severity = AuditSeverity.WARNING
-            elif action in [AuditAction.DELETE, AuditAction.PERMISSION_REVOKED]:
-                severity = AuditSeverity.WARNING
-            else:
-                severity = AuditSeverity.INFO
-        
-        log_id = str(uuid.uuid4())
-        now = datetime.utcnow().isoformat()
-        
-        # 脫敏處理
-        if old_value:
-            old_value = self._sanitize_values(old_value)
-        if new_value:
-            new_value = self._sanitize_values(new_value)
-        
-        audit_log = AuditLog(
-            id=log_id,
-            timestamp=now,
-            category=category,
+        entry = AuditEntry(
+            id=f"audit-{self._entry_counter}-{int(time.time())}",
             action=action,
-            severity=severity,
-            user_id=user_id or '',
-            username=username or '',
-            ip_address=ip_address or '',
-            user_agent=user_agent or '',
-            resource_type=resource_type or '',
-            resource_id=resource_id or '',
-            description=description or '',
-            old_value=old_value or {},
-            new_value=new_value or {},
-            metadata=metadata or {},
+            resource_type=resource_type,
+            resource_id=resource_id,
+            user_id=user_id,
+            user_name=user_name,
+            ip_address=ip_address,
+            old_value=old_value,
+            new_value=new_value,
+            details=details,
             success=success,
-            error_message=error_message or ''
+            error=error
         )
         
-        audit_log.checksum = audit_log.compute_checksum()
+        # 添加到内存
+        self._entries.append(entry)
         
-        # 添加到緩衝
-        with self._buffer_lock:
-            self._buffer.append(audit_log)
-            if len(self._buffer) >= self._buffer_size:
-                self._flush_buffer()
+        # 清理过旧的条目
+        if len(self._entries) > self.max_memory_entries:
+            self._entries = self._entries[-self.max_memory_entries:]
         
-        # 關鍵事件立即持久化
-        if severity in [AuditSeverity.ERROR, AuditSeverity.CRITICAL]:
-            self._flush_buffer()
+        # 持久化
+        if self.persistence:
+            await self.persistence.log_audit(
+                action=action.value,
+                resource_type=resource_type.value,
+                resource_id=resource_id,
+                user_id=user_id,
+                user_name=user_name,
+                ip_address=ip_address,
+                old_value=old_value,
+                new_value=new_value,
+                details=details,
+                success=success,
+                error=error
+            )
         
-        return log_id
-    
-    def _sanitize_values(self, data: Dict) -> Dict:
-        """脫敏敏感值"""
-        sensitive_keys = {'password', 'secret', 'token', 'api_key', 'credit_card'}
-        result = {}
+        # 打印日志
+        status = "✅" if success else "❌"
+        print(f"[Audit] {status} {action.value} - {resource_type.value}/{resource_id} "
+              f"by {user_name or user_id or 'system'}", file=sys.stderr)
         
-        for key, value in data.items():
-            if key.lower() in sensitive_keys:
-                result[key] = '***'
-            elif isinstance(value, dict):
-                result[key] = self._sanitize_values(value)
-            else:
-                result[key] = value
-        
-        return result
-    
-    def _flush_buffer(self):
-        """刷新緩衝到數據庫"""
-        with self._buffer_lock:
-            if not self._buffer:
-                return
-            
-            logs_to_write = self._buffer.copy()
-            self._buffer.clear()
-        
-        try:
-            db = self._get_db()
-            for log in logs_to_write:
-                db.execute('''
-                    INSERT INTO audit_logs
-                    (id, timestamp, category, action, severity, user_id, username,
-                     ip_address, user_agent, resource_type, resource_id, description,
-                     old_value, new_value, metadata, success, error_message, checksum)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    log.id, log.timestamp, log.category.value, log.action.value,
-                    log.severity.value, log.user_id, log.username,
-                    log.ip_address, log.user_agent, log.resource_type, log.resource_id,
-                    log.description, json.dumps(log.old_value), json.dumps(log.new_value),
-                    json.dumps(log.metadata), 1 if log.success else 0,
-                    log.error_message, log.checksum
-                ))
-            db.commit()
-            db.close()
-        except Exception as e:
-            logger.error(f"Flush audit buffer error: {e}")
-    
-    def flush(self):
-        """手動刷新緩衝"""
-        self._flush_buffer()
+        return entry
     
     # ==================== 便捷方法 ====================
     
-    def log_login(
+    async def log_api_add(
         self,
-        user_id: str,
-        username: str,
-        ip_address: str,
-        user_agent: str = None,
-        success: bool = True,
-        error_message: str = None
-    ):
-        """記錄登入事件"""
-        action = AuditAction.LOGIN if success else AuditAction.LOGIN_FAILED
-        self.log(
-            category=AuditCategory.AUTHENTICATION,
-            action=action,
+        api_id: str,
+        user_id: str = "",
+        user_name: str = "",
+        ip_address: str = "",
+        details: str = ""
+    ) -> AuditEntry:
+        """记录添加 API"""
+        return await self.log(
+            action=AuditAction.API_ADD,
+            resource_type=ResourceType.API,
+            resource_id=api_id,
             user_id=user_id,
-            username=username,
+            user_name=user_name,
             ip_address=ip_address,
-            user_agent=user_agent,
+            details=details or f"添加 API: {api_id}"
+        )
+    
+    async def log_api_remove(
+        self,
+        api_id: str,
+        user_id: str = "",
+        user_name: str = "",
+        ip_address: str = "",
+        details: str = ""
+    ) -> AuditEntry:
+        """记录移除 API"""
+        return await self.log(
+            action=AuditAction.API_REMOVE,
+            resource_type=ResourceType.API,
+            resource_id=api_id,
+            user_id=user_id,
+            user_name=user_name,
+            ip_address=ip_address,
+            details=details or f"移除 API: {api_id}"
+        )
+    
+    async def log_account_login(
+        self,
+        phone: str,
+        user_id: str = "",
+        ip_address: str = "",
+        success: bool = True,
+        error: str = ""
+    ) -> AuditEntry:
+        """记录账号登录"""
+        return await self.log(
+            action=AuditAction.ACCOUNT_LOGIN,
+            resource_type=ResourceType.ACCOUNT,
+            resource_id=phone,
+            user_id=user_id,
+            ip_address=ip_address,
             success=success,
-            error_message=error_message
+            error=error,
+            details=f"账号登录: {phone}" + (f" - 失败: {error}" if not success else "")
         )
     
-    def log_data_access(
+    async def log_alert_resolve(
         self,
-        user_id: str,
-        resource_type: str,
-        resource_id: str,
-        action: AuditAction = AuditAction.READ,
-        ip_address: str = None
-    ):
-        """記錄數據訪問"""
-        self.log(
-            category=AuditCategory.DATA_ACCESS,
-            action=action,
+        alert_id: str,
+        user_id: str = "",
+        user_name: str = "",
+        details: str = ""
+    ) -> AuditEntry:
+        """记录解决告警"""
+        return await self.log(
+            action=AuditAction.ALERT_RESOLVE,
+            resource_type=ResourceType.ALERT,
+            resource_id=alert_id,
             user_id=user_id,
-            resource_type=resource_type,
-            resource_id=resource_id,
-            ip_address=ip_address
+            user_name=user_name,
+            details=details or f"解决告警: {alert_id}"
         )
     
-    def log_data_change(
+    async def log_system_config(
         self,
-        user_id: str,
-        resource_type: str,
-        resource_id: str,
-        action: AuditAction,
-        old_value: Dict = None,
-        new_value: Dict = None,
-        ip_address: str = None
-    ):
-        """記錄數據變更"""
-        self.log(
-            category=AuditCategory.DATA_MODIFY,
-            action=action,
-            user_id=user_id,
-            resource_type=resource_type,
-            resource_id=resource_id,
+        config_key: str,
+        old_value: Any,
+        new_value: Any,
+        user_id: str = "",
+        user_name: str = ""
+    ) -> AuditEntry:
+        """记录系统配置变更"""
+        return await self.log(
+            action=AuditAction.SYSTEM_CONFIG,
+            resource_type=ResourceType.SYSTEM,
+            resource_id=config_key,
             old_value=old_value,
             new_value=new_value,
-            ip_address=ip_address
-        )
-    
-    def log_security_event(
-        self,
-        action: AuditAction,
-        description: str,
-        user_id: str = None,
-        ip_address: str = None,
-        severity: AuditSeverity = AuditSeverity.WARNING,
-        metadata: Dict = None
-    ):
-        """記錄安全事件"""
-        self.log(
-            category=AuditCategory.SECURITY,
-            action=action,
             user_id=user_id,
-            ip_address=ip_address,
-            description=description,
-            severity=severity,
-            metadata=metadata
+            user_name=user_name,
+            details=f"配置变更: {config_key}"
         )
     
-    def log_admin_action(
-        self,
-        admin_id: str,
-        admin_name: str,
-        action: str,
-        target_type: str,
-        target_id: str,
-        description: str = None,
-        ip_address: str = None
-    ):
-        """記錄管理員操作"""
-        self.log(
-            category=AuditCategory.ADMIN,
-            action=AuditAction.UPDATE,
-            user_id=admin_id,
-            username=admin_name,
-            resource_type=target_type,
-            resource_id=target_id,
-            description=description or f"Admin action: {action}",
-            ip_address=ip_address,
-            metadata={'admin_action': action}
-        )
+    # ==================== 查询接口 ====================
     
-    # ==================== 查詢 ====================
+    def get_recent(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """获取最近的审计日志"""
+        return [e.to_dict() for e in reversed(self._entries[-limit:])]
     
-    def query(
+    def search(
         self,
-        user_id: str = None,
-        category: str = None,
-        action: str = None,
-        resource_type: str = None,
+        action: AuditAction = None,
+        resource_type: ResourceType = None,
         resource_id: str = None,
-        start_time: str = None,
-        end_time: str = None,
-        severity: str = None,
+        user_id: str = None,
         success: bool = None,
-        limit: int = 100,
-        offset: int = 0
-    ) -> List[AuditLog]:
-        """查詢審計日誌"""
-        self._flush_buffer()  # 確保最新數據
+        start_time: float = None,
+        end_time: float = None,
+        limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """搜索审计日志"""
+        results = []
         
-        try:
-            db = self._get_db()
+        for entry in reversed(self._entries):
+            # 应用过滤条件
+            if action and entry.action != action:
+                continue
+            if resource_type and entry.resource_type != resource_type:
+                continue
+            if resource_id and entry.resource_id != resource_id:
+                continue
+            if user_id and entry.user_id != user_id:
+                continue
+            if success is not None and entry.success != success:
+                continue
+            if start_time and entry.timestamp < start_time:
+                continue
+            if end_time and entry.timestamp > end_time:
+                continue
             
-            conditions = []
-            params = []
+            results.append(entry.to_dict())
             
-            if user_id:
-                conditions.append('user_id = ?')
-                params.append(user_id)
-            if category:
-                conditions.append('category = ?')
-                params.append(category)
-            if action:
-                conditions.append('action = ?')
-                params.append(action)
-            if resource_type:
-                conditions.append('resource_type = ?')
-                params.append(resource_type)
-            if resource_id:
-                conditions.append('resource_id = ?')
-                params.append(resource_id)
-            if start_time:
-                conditions.append('timestamp >= ?')
-                params.append(start_time)
-            if end_time:
-                conditions.append('timestamp <= ?')
-                params.append(end_time)
-            if severity:
-                conditions.append('severity = ?')
-                params.append(severity)
-            if success is not None:
-                conditions.append('success = ?')
-                params.append(1 if success else 0)
-            
-            where_clause = ' AND '.join(conditions) if conditions else '1=1'
-            
-            rows = db.execute(f'''
-                SELECT * FROM audit_logs
-                WHERE {where_clause}
-                ORDER BY timestamp DESC
-                LIMIT ? OFFSET ?
-            ''', params + [limit, offset]).fetchall()
-            
-            db.close()
-            
-            logs = []
-            for row in rows:
-                logs.append(AuditLog(
-                    id=row['id'],
-                    timestamp=row['timestamp'],
-                    category=AuditCategory(row['category']),
-                    action=AuditAction(row['action']),
-                    severity=AuditSeverity(row['severity']),
-                    user_id=row['user_id'] or '',
-                    username=row['username'] or '',
-                    ip_address=row['ip_address'] or '',
-                    user_agent=row['user_agent'] or '',
-                    resource_type=row['resource_type'] or '',
-                    resource_id=row['resource_id'] or '',
-                    description=row['description'] or '',
-                    old_value=json.loads(row['old_value']) if row['old_value'] else {},
-                    new_value=json.loads(row['new_value']) if row['new_value'] else {},
-                    metadata=json.loads(row['metadata']) if row['metadata'] else {},
-                    success=bool(row['success']),
-                    error_message=row['error_message'] or '',
-                    checksum=row['checksum'] or ''
-                ))
-            
-            return logs
-            
-        except Exception as e:
-            logger.error(f"Query audit logs error: {e}")
-            return []
-    
-    def get_user_activity(self, user_id: str, days: int = 30) -> List[AuditLog]:
-        """獲取用戶活動記錄"""
-        start_time = (datetime.utcnow() - timedelta(days=days)).isoformat()
-        return self.query(user_id=user_id, start_time=start_time)
-    
-    def get_security_events(self, hours: int = 24) -> List[AuditLog]:
-        """獲取安全事件"""
-        start_time = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
-        return self.query(category='security', start_time=start_time)
-    
-    # ==================== 統計 ====================
-    
-    def get_stats(self, days: int = 7) -> Dict[str, Any]:
-        """獲取統計信息"""
-        self._flush_buffer()
+            if len(results) >= limit:
+                break
         
-        try:
-            db = self._get_db()
-            start_time = (datetime.utcnow() - timedelta(days=days)).isoformat()
-            
-            # 總數
-            total = db.execute('''
-                SELECT COUNT(*) as count FROM audit_logs WHERE timestamp >= ?
-            ''', (start_time,)).fetchone()['count']
-            
-            # 按類別統計
-            by_category = db.execute('''
-                SELECT category, COUNT(*) as count 
-                FROM audit_logs WHERE timestamp >= ?
-                GROUP BY category
-            ''', (start_time,)).fetchall()
-            
-            # 按嚴重性統計
-            by_severity = db.execute('''
-                SELECT severity, COUNT(*) as count 
-                FROM audit_logs WHERE timestamp >= ?
-                GROUP BY severity
-            ''', (start_time,)).fetchall()
-            
-            # 失敗事件
-            failed = db.execute('''
-                SELECT COUNT(*) as count FROM audit_logs 
-                WHERE timestamp >= ? AND success = 0
-            ''', (start_time,)).fetchone()['count']
-            
-            # 登入嘗試
-            logins = db.execute('''
-                SELECT action, COUNT(*) as count 
-                FROM audit_logs 
-                WHERE timestamp >= ? AND action IN ('login', 'login_failed')
-                GROUP BY action
-            ''', (start_time,)).fetchall()
-            
-            db.close()
-            
-            return {
-                'total_events': total,
-                'failed_events': failed,
-                'by_category': {r['category']: r['count'] for r in by_category},
-                'by_severity': {r['severity']: r['count'] for r in by_severity},
-                'logins': {r['action']: r['count'] for r in logins},
-                'period_days': days
-            }
-            
-        except Exception as e:
-            logger.error(f"Get audit stats error: {e}")
-            return {}
+        return results
     
-    # ==================== 合規導出 ====================
+    def get_by_resource(self, resource_type: ResourceType, resource_id: str) -> List[Dict[str, Any]]:
+        """获取特定资源的审计日志"""
+        return self.search(resource_type=resource_type, resource_id=resource_id)
     
-    def export(
-        self,
-        start_time: str,
-        end_time: str,
-        format: str = 'json'
-    ) -> str:
-        """導出審計日誌"""
-        logs = self.query(start_time=start_time, end_time=end_time, limit=10000)
+    def get_by_user(self, user_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """获取特定用户的操作日志"""
+        return self.search(user_id=user_id, limit=limit)
+    
+    def get_failures(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """获取失败的操作"""
+        return self.search(success=False, limit=limit)
+    
+    # ==================== 统计和报告 ====================
+    
+    def get_summary(self, hours: int = 24) -> Dict[str, Any]:
+        """获取审计摘要"""
+        cutoff = time.time() - hours * 3600
         
-        if format == 'json':
-            return json.dumps([log.to_dict() for log in logs], indent=2)
-        elif format == 'csv':
-            lines = ['timestamp,category,action,user_id,resource_type,resource_id,success']
-            for log in logs:
-                lines.append(f"{log.timestamp},{log.category.value},{log.action.value},"
-                           f"{log.user_id},{log.resource_type},{log.resource_id},{log.success}")
-            return '\n'.join(lines)
-        else:
-            raise ValueError(f"Unsupported format: {format}")
+        recent = [e for e in self._entries if e.timestamp >= cutoff]
+        
+        # 按操作类型统计
+        action_counts = {}
+        for entry in recent:
+            action = entry.action.value
+            action_counts[action] = action_counts.get(action, 0) + 1
+        
+        # 按资源类型统计
+        resource_counts = {}
+        for entry in recent:
+            rtype = entry.resource_type.value
+            resource_counts[rtype] = resource_counts.get(rtype, 0) + 1
+        
+        # 成功/失败统计
+        success_count = sum(1 for e in recent if e.success)
+        failure_count = len(recent) - success_count
+        
+        # 活跃用户
+        active_users = set(e.user_id for e in recent if e.user_id)
+        
+        return {
+            'period_hours': hours,
+            'total_entries': len(recent),
+            'success_count': success_count,
+            'failure_count': failure_count,
+            'success_rate': (success_count / len(recent) * 100) if recent else 100,
+            'by_action': action_counts,
+            'by_resource': resource_counts,
+            'active_users': len(active_users),
+            'top_actions': sorted(action_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        }
+    
+    def detect_anomalies(self) -> List[Dict[str, Any]]:
+        """检测异常操作模式"""
+        anomalies = []
+        now = time.time()
+        
+        # 检查最近 1 小时
+        recent = [e for e in self._entries if e.timestamp >= now - 3600]
+        
+        # 1. 连续失败
+        failures = [e for e in recent if not e.success]
+        if len(failures) >= 5:
+            anomalies.append({
+                'type': 'high_failure_rate',
+                'message': f"过去 1 小时有 {len(failures)} 次操作失败",
+                'severity': 'warning' if len(failures) < 10 else 'critical',
+                'count': len(failures)
+            })
+        
+        # 2. 异常操作频率（同一用户）
+        user_counts = {}
+        for entry in recent:
+            if entry.user_id:
+                user_counts[entry.user_id] = user_counts.get(entry.user_id, 0) + 1
+        
+        for user_id, count in user_counts.items():
+            if count > 100:  # 每小时超过 100 次操作
+                anomalies.append({
+                    'type': 'high_activity_user',
+                    'message': f"用户 {user_id} 过去 1 小时有 {count} 次操作",
+                    'severity': 'warning',
+                    'user_id': user_id,
+                    'count': count
+                })
+        
+        # 3. 敏感操作（删除、禁用等）
+        sensitive_actions = [
+            AuditAction.API_REMOVE,
+            AuditAction.API_DISABLE,
+            AuditAction.ACCOUNT_REMOVE,
+            AuditAction.USER_DELETE,
+            AuditAction.DATA_DELETE
+        ]
+        
+        sensitive_ops = [e for e in recent if e.action in sensitive_actions]
+        if len(sensitive_ops) >= 5:
+            anomalies.append({
+                'type': 'high_sensitive_operations',
+                'message': f"过去 1 小时有 {len(sensitive_ops)} 次敏感操作",
+                'severity': 'warning',
+                'count': len(sensitive_ops)
+            })
+        
+        return anomalies
+    
+    def get_dashboard_data(self) -> Dict[str, Any]:
+        """获取仪表板数据"""
+        return {
+            'summary': self.get_summary(hours=24),
+            'recent': self.get_recent(limit=20),
+            'failures': self.get_failures(limit=10),
+            'anomalies': self.detect_anomalies()
+        }
 
 
-# ==================== 單例訪問 ====================
+# ==================== 装饰器 ====================
+
+def audit_log(
+    action: AuditAction,
+    resource_type: ResourceType,
+    get_resource_id: Callable = None
+):
+    """
+    审计日志装饰器
+    
+    用法：
+        @audit_log(AuditAction.API_ADD, ResourceType.API, lambda args: args[0])
+        async def add_api(api_id: str, ...):
+            ...
+    """
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            service = get_audit_service()
+            
+            resource_id = ""
+            if get_resource_id:
+                try:
+                    resource_id = get_resource_id(args, kwargs)
+                except:
+                    pass
+            
+            try:
+                result = await func(*args, **kwargs)
+                await service.log(
+                    action=action,
+                    resource_type=resource_type,
+                    resource_id=str(resource_id),
+                    success=True
+                )
+                return result
+            except Exception as e:
+                await service.log(
+                    action=action,
+                    resource_type=resource_type,
+                    resource_id=str(resource_id),
+                    success=False,
+                    error=str(e)
+                )
+                raise
+        
+        return wrapper
+    return decorator
+
+
+# ==================== 全局实例 ====================
 
 _audit_service: Optional[AuditService] = None
 
 
 def get_audit_service() -> AuditService:
-    """獲取審計服務"""
+    """获取全局审计服务"""
     global _audit_service
     if _audit_service is None:
         _audit_service = AuditService()
+    return _audit_service
+
+
+def init_audit_service(persistence=None, max_entries: int = 10000) -> AuditService:
+    """初始化审计服务"""
+    global _audit_service
+    _audit_service = AuditService(persistence=persistence, max_memory_entries=max_entries)
     return _audit_service

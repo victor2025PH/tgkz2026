@@ -29,6 +29,7 @@ export interface SelectedApi {
   api_id: string;
   api_hash: string;
   name?: string;
+  /** API 來源: pool=用戶API池, platform=平台公共API, manual=手動輸入 */
   source: 'pool' | 'platform' | 'manual';
 }
 
@@ -89,11 +90,31 @@ type SelectMode = 'recommend' | 'pool' | 'manual';
             </div>
             <p class="recommend-reason">💡 此 API 負載最低，可用空間充足</p>
           } @else {
-            <div class="empty-state">
-              <span class="empty-icon">📭</span>
-              <p>暫無可用的 API</p>
-              <p class="hint">請先添加 API 到您的 API 池</p>
-              <button (click)="selectMode('manual')" class="add-btn">➕ 添加新 API</button>
+            <!-- 🆕 没有用户 API 时，显示平台公共 API 选项 -->
+            <div class="platform-api-card">
+              <div class="platform-badge">🚀 一鍵登入</div>
+              <div class="platform-icon">🔐</div>
+              <h3>使用平台公共 API</h3>
+              <p class="platform-desc">無需了解 API，直接開始登入</p>
+              <ul class="platform-features">
+                <li>✅ 免配置，即開即用</li>
+                <li>✅ 穩定可靠</li>
+                <li>✅ 適合新手用戶</li>
+              </ul>
+              <button (click)="usePlatformApi()" class="platform-btn">
+                🚀 立即使用
+              </button>
+            </div>
+            
+            <div class="divider-text">
+              <span>或者</span>
+            </div>
+            
+            <div class="advanced-option">
+              <button (click)="selectMode('manual')" class="advanced-btn">
+                🔧 我有自己的 API（進階用戶）
+              </button>
+              <p class="advanced-hint">如果您有自己的 Telegram API 憑據，點擊此處添加</p>
             </div>
           }
         </div>
@@ -567,6 +588,125 @@ type SelectMode = 'recommend' | 'pool' | 'manual';
       color: var(--primary, #06b6d4);
     }
 
+    /* 🆕 Platform API Card - 一鍵登入 */
+    .platform-api-card {
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(59, 130, 246, 0.15));
+      border: 2px solid rgba(6, 182, 212, 0.5);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      text-align: center;
+      position: relative;
+    }
+
+    .platform-badge {
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0.25rem 1rem;
+      background: linear-gradient(135deg, #06b6d4, #3b82f6);
+      border-radius: 1rem;
+      font-size: 0.75rem;
+      color: white;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .platform-icon {
+      font-size: 2.5rem;
+      margin: 0.5rem 0;
+    }
+
+    .platform-api-card h3 {
+      margin: 0.5rem 0;
+      color: var(--text-primary, white);
+      font-size: 1.125rem;
+    }
+
+    .platform-desc {
+      margin: 0 0 0.75rem 0;
+      font-size: 0.8rem;
+      color: var(--text-muted, #94a3b8);
+    }
+
+    .platform-features {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 1rem 0;
+      text-align: left;
+      display: inline-block;
+    }
+
+    .platform-features li {
+      font-size: 0.8rem;
+      color: var(--text-secondary, #cbd5e1);
+      margin-bottom: 0.25rem;
+    }
+
+    .platform-btn {
+      width: 100%;
+      padding: 0.75rem 1.5rem;
+      background: linear-gradient(135deg, #06b6d4, #3b82f6);
+      border: none;
+      border-radius: 0.5rem;
+      color: white;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .platform-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4);
+    }
+
+    .divider-text {
+      display: flex;
+      align-items: center;
+      margin: 1rem 0;
+      color: var(--text-muted, #64748b);
+      font-size: 0.75rem;
+    }
+
+    .divider-text::before,
+    .divider-text::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-default, rgba(148, 163, 184, 0.2));
+    }
+
+    .divider-text span {
+      padding: 0 0.75rem;
+    }
+
+    .advanced-option {
+      text-align: center;
+    }
+
+    .advanced-btn {
+      background: transparent;
+      border: 1px dashed var(--border-default, rgba(148, 163, 184, 0.3));
+      border-radius: 0.5rem;
+      padding: 0.625rem 1rem;
+      color: var(--text-muted, #94a3b8);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .advanced-btn:hover {
+      border-color: var(--primary, #06b6d4);
+      color: var(--primary, #06b6d4);
+    }
+
+    .advanced-hint {
+      margin: 0.5rem 0 0 0;
+      font-size: 0.7rem;
+      color: var(--text-muted, #64748b);
+    }
+
     /* Selected Display */
     .selected-display {
       display: flex;
@@ -762,6 +902,25 @@ export class ApiSelectorComponent implements OnInit, OnDestroy {
       // 如果沒有 hash，提示用戶
       this.toast.error('此 API 缺少 Hash，請重新添加');
     }
+  }
+
+  /**
+   * 🆕 使用平台公共 API（一鍵登入）
+   * 使用 Telegram Desktop 的公共 API 憑據，讓用戶無需了解 API 即可登入
+   */
+  usePlatformApi(): void {
+    // 使用 Telegram Desktop 的公共 API 憑據
+    // 這是官方公開的 API，安全可靠
+    const platformApi: SelectedApi = {
+      api_id: '2040',
+      api_hash: 'b18441a1ff607e10a989891a5462e627',
+      name: '平台公共 API',
+      source: 'platform'
+    };
+    
+    this.selectedApi.set(platformApi);
+    this.apiSelected.emit(platformApi);
+    this.toast.success('✅ 已選擇平台公共 API，可直接登入');
   }
 
   selectPoolApi(api: ApiCredential): void {

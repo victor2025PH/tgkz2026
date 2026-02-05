@@ -7,11 +7,17 @@ TG-Matrix Device Fingerprint Generator
 2. 桌面設備支持
 3. 智能隨機選擇策略（模擬真實市場份額）
 4. IP 區域感知的設備分配
+5. 🔒 指紋持久化與版本追蹤
 """
 import hashlib
 import random
-from typing import Dict, List, Optional, Tuple
+import json
+from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, asdict
+from datetime import datetime
+
+# 🔒 指紋版本號（更新設備庫時遞增）
+FINGERPRINT_VERSION = "2026.02.05"
 
 
 @dataclass
@@ -599,4 +605,123 @@ class DeviceFingerprintGenerator:
             platform=selected.platform,
             weight=selected.weight
         )
+    
+    # ========== 🔒 指紋持久化功能 ==========
+    
+    @classmethod
+    def generate_fingerprint_hash(cls, fingerprint: Dict[str, str]) -> str:
+        """
+        生成指紋的唯一哈希值，用於驗證一致性
+        
+        Args:
+            fingerprint: 設備指紋字典
+            
+        Returns:
+            32位的十六進制哈希字符串
+        """
+        # 按鍵排序確保一致性
+        sorted_keys = ['device_model', 'system_version', 'app_version', 'lang_code', 'platform']
+        data = '|'.join(str(fingerprint.get(k, '')) for k in sorted_keys)
+        return hashlib.md5(data.encode()).hexdigest()
+    
+    @classmethod
+    def validate_fingerprint(cls, fingerprint: Dict[str, str]) -> Tuple[bool, str]:
+        """
+        驗證指紋的完整性和有效性
+        
+        Args:
+            fingerprint: 設備指紋字典
+            
+        Returns:
+            (是否有效, 錯誤信息)
+        """
+        required_fields = ['device_model', 'system_version', 'app_version']
+        
+        for field in required_fields:
+            if not fingerprint.get(field):
+                return False, f"缺少必要欄位: {field}"
+        
+        # 驗證設備型號是否在已知列表中
+        known_models = set()
+        for device in cls.IOS_DEVICES + cls.ANDROID_DEVICES + cls.DESKTOP_DEVICES:
+            known_models.add(device.device_model)
+        
+        if fingerprint.get('device_model') not in known_models:
+            return False, f"未知的設備型號: {fingerprint.get('device_model')}"
+        
+        return True, ""
+    
+    @classmethod
+    def create_persistent_fingerprint(cls, phone: str, existing: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        創建或驗證持久化的設備指紋
+        
+        如果已有有效指紋則返回，否則生成新指紋
+        
+        Args:
+            phone: 手機號碼
+            existing: 現有的指紋數據（從數據庫讀取）
+            
+        Returns:
+            包含指紋和元數據的字典:
+            {
+                'device_model': str,
+                'system_version': str,
+                'app_version': str,
+                'lang_code': str,
+                'platform': str,
+                'device_id': str,
+                'fingerprint_hash': str,
+                'fingerprint_version': str,
+                'created_at': str,
+                'is_new': bool
+            }
+        """
+        # 檢查現有指紋是否有效
+        if existing:
+            is_valid, error = cls.validate_fingerprint(existing)
+            if is_valid:
+                # 計算哈希並返回
+                fp_hash = cls.generate_fingerprint_hash(existing)
+                return {
+                    'device_model': existing.get('device_model'),
+                    'system_version': existing.get('system_version'),
+                    'app_version': existing.get('app_version'),
+                    'lang_code': existing.get('lang_code', 'en'),
+                    'platform': existing.get('platform', 'ios'),
+                    'device_id': existing.get('device_id', ''),
+                    'fingerprint_hash': fp_hash,
+                    'fingerprint_version': existing.get('fingerprint_version', FINGERPRINT_VERSION),
+                    'created_at': existing.get('fingerprint_created_at', ''),
+                    'is_new': False
+                }
+        
+        # 生成新指紋
+        new_fp = cls.generate_for_phone(phone)
+        fp_hash = cls.generate_fingerprint_hash(new_fp)
+        
+        return {
+            'device_model': new_fp.get('device_model'),
+            'system_version': new_fp.get('system_version'),
+            'app_version': new_fp.get('app_version'),
+            'lang_code': new_fp.get('lang_code'),
+            'platform': new_fp.get('platform'),
+            'device_id': new_fp.get('device_id'),
+            'fingerprint_hash': fp_hash,
+            'fingerprint_version': FINGERPRINT_VERSION,
+            'created_at': datetime.now().isoformat(),
+            'is_new': True
+        }
+    
+    @classmethod
+    def get_fingerprint_info(cls) -> Dict[str, Any]:
+        """獲取指紋生成器的狀態信息"""
+        return {
+            'version': FINGERPRINT_VERSION,
+            'ios_devices': len(cls.IOS_DEVICES),
+            'android_devices': len(cls.ANDROID_DEVICES),
+            'desktop_devices': len(cls.DESKTOP_DEVICES),
+            'total_devices': len(cls.IOS_DEVICES) + len(cls.ANDROID_DEVICES) + len(cls.DESKTOP_DEVICES),
+            'platform_weights': cls.PLATFORM_WEIGHTS,
+        }
 

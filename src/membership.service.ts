@@ -24,7 +24,9 @@
  * 重要：當需要顯示會員等級時，優先使用 AuthService.membershipLevel()
  * ==========================================
  */
-import { Injectable, signal, computed, WritableSignal, inject } from '@angular/core';
+import { Injectable, signal, computed, WritableSignal, inject, OnDestroy } from '@angular/core';
+import { Subscription } from 'rxjs';
+import { AuthEventsService } from './core/auth-events.service';
 
 // ============ 類型定義 ============
 
@@ -491,8 +493,69 @@ export class MembershipService {
     return this._membership()?.usage || this.getDefaultUsage();
   });
   
+  // 🆕 事件訂閱管理
+  private authEventsService = inject(AuthEventsService);
+  private eventSubscription: Subscription | null = null;
+  
   constructor() {
     this.loadMembership();
+    this.subscribeToAuthEvents();
+  }
+  
+  /**
+   * 🆕 訂閱認證事件
+   * 在 SaaS 模式下，當用戶登入或數據更新時自動同步會員狀態
+   */
+  private subscribeToAuthEvents(): void {
+    // Electron 模式不需要訂閱（使用本地卡密）
+    if (this.SKIP_LOGIN) {
+      return;
+    }
+    
+    this.eventSubscription = this.authEventsService.authEvents$.subscribe(event => {
+      if (event.type === 'login' || event.type === 'user_update') {
+        const user = event.payload?.user;
+        if (user) {
+          // 從用戶數據中提取會員等級
+          const tier = user.membershipLevel || user.subscription_tier || 'free';
+          const level = this.tierToLevel(tier);
+          const expires = user.membershipExpires || user.membership_expires;
+          
+          console.log(`[MembershipService] 🔄 收到 ${event.type} 事件，同步會員: ${level}`);
+          this.syncFromAuthService(level, expires);
+        }
+      } else if (event.type === 'logout') {
+        // 登出時重置為青銅
+        console.log('[MembershipService] 收到 logout 事件，重置會員狀態');
+        this.initializeFreeMembership();
+      }
+    });
+  }
+  
+  /**
+   * 🆕 將 subscription_tier 轉換為 MembershipLevel
+   */
+  private tierToLevel(tier: string): MembershipLevel {
+    const tierMap: Record<string, MembershipLevel> = {
+      'free': 'bronze',
+      'basic': 'silver',
+      'pro': 'gold',
+      'enterprise': 'diamond',
+      'bronze': 'bronze',
+      'silver': 'silver',
+      'gold': 'gold',
+      'diamond': 'diamond',
+      'star': 'star',
+      'king': 'king'
+    };
+    return tierMap[tier] || 'bronze';
+  }
+  
+  /**
+   * 🆕 清理訂閱
+   */
+  ngOnDestroy(): void {
+    this.eventSubscription?.unsubscribe();
   }
   
   // ============ 🔧 P2: 數據同步 ============
@@ -514,28 +577,37 @@ export class MembershipService {
     const currentMembership = this._membership();
     const currentLevel = currentMembership?.level;
     
-    // 檢查是否需要同步
+    // 🔧 修復：始終更新會員數據，確保 expiresAt 等屬性也被同步
+    // 即使等級相同，也需要確保完整的會員信息被設置
+    const levelConfig = MEMBERSHIP_CONFIG[authLevel];
+    const newMembership: MembershipInfo = {
+      level: authLevel,
+      levelName: levelConfig?.name || '未知',
+      levelIcon: levelConfig?.icon || '?',
+      // 🔧 修復：對於付費會員，如果沒有過期時間，設置為永久（100年）
+      expiresAt: authExpires 
+        ? new Date(authExpires) 
+        : (authLevel !== 'bronze' ? new Date(Date.now() + 365 * 100 * 24 * 60 * 60 * 1000) : undefined),
+      activatedAt: currentMembership?.activatedAt || new Date(),
+      machineId: this.getMachineId(),
+      usage: currentMembership?.usage || this.getDefaultUsage(),
+      inviteCode: currentMembership?.inviteCode || this.generateInviteCode(),
+      inviteCount: currentMembership?.inviteCount || 0,
+      inviteRewards: currentMembership?.inviteRewards || 0,
+    };
+    
+    // 檢查是否有變化（用於日誌）
     if (currentLevel !== authLevel) {
-      console.log(`[MembershipService] 🔄 從 AuthService 同步: ${currentLevel} → ${authLevel}`);
-      
-      const levelConfig = MEMBERSHIP_CONFIG[authLevel];
-      const newMembership: MembershipInfo = {
-        level: authLevel,
-        levelName: levelConfig?.name || '未知',
-        levelIcon: levelConfig?.icon || '?',
-        expiresAt: authExpires ? new Date(authExpires) : undefined,
-        activatedAt: currentMembership?.activatedAt || new Date(),
-        machineId: this.getMachineId(),
-        usage: currentMembership?.usage || this.getDefaultUsage(),
-        inviteCode: currentMembership?.inviteCode || this.generateInviteCode(),
-        inviteCount: currentMembership?.inviteCount || 0,
-        inviteRewards: currentMembership?.inviteRewards || 0,
-      };
-      
-      this._membership.set(newMembership);
-      // 注意：不保存到 localStorage，避免覆蓋本地卡密數據
-      // 下次刷新時會重新從 AuthService 獲取
+      console.log(`[MembershipService] 🔄 會員等級變更: ${currentLevel} → ${authLevel}`);
+    } else {
+      console.log(`[MembershipService] ✓ 會員同步確認: ${authLevel} (expiresAt: ${newMembership.expiresAt || '永久'})`);
     }
+    
+    this._membership.set(newMembership);
+    
+    // 🔧 修復：在 SaaS 模式下保存到 localStorage，確保刷新後立即可用
+    // 這樣用戶刷新頁面後，在 AuthService 完成初始化前就能有正確的會員狀態
+    this.saveMembership(newMembership);
   }
   
   /**

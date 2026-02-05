@@ -265,11 +265,14 @@ class QuotaService:
         
         db = self._get_db()
         try:
-            # 1. 檢查自定義配額
-            row = db.execute('''
-                SELECT custom_value, expires_at FROM user_custom_quotas 
-                WHERE user_id = ? AND quota_type = ?
-            ''', (user_id, quota_type)).fetchone()
+            # 1. 檢查自定義配額（表可能尚未創建，容錯）
+            try:
+                row = db.execute('''
+                    SELECT custom_value, expires_at FROM user_custom_quotas 
+                    WHERE user_id = ? AND quota_type = ?
+                ''', (user_id, quota_type)).fetchone()
+            except Exception:
+                row = None
             
             if row:
                 expires_at = row['expires_at']

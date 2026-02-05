@@ -3392,7 +3392,11 @@ class BackendService:
             
             # Get proxy country from phone number (if proxy is provided)
             if payload.get('proxy'):
-                proxy_country = ProxyManager.get_country_from_phone(phone)
+                try:
+                    PM = get_ProxyManager()
+                    proxy_country = PM.get_country_from_phone(phone) if PM else None
+                except Exception:
+                    proxy_country = None
                 if proxy_country:
                     payload['proxyCountry'] = proxy_country
                     payload['proxyType'] = 'residential'  # Default to residential proxy

@@ -11,7 +11,7 @@
 
 import { Injectable, NgZone, OnDestroy } from '@angular/core';
 import { BehaviorSubject, Observable, Subject, filter, map } from 'rxjs';
-import { ElectronIpcService } from './electron-ipc.service';
+import { ElectronIpcService } from '../electron-ipc.service';
 
 // 事件类型枚举
 export enum EventType {

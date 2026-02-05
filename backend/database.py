@@ -2752,8 +2752,10 @@ class Database:
                 query = 'SELECT * FROM accounts ORDER BY id'
                 params = ()
             else:
-                # SaaS 模式：只返回當前用戶的帳號
-                query = 'SELECT * FROM accounts WHERE owner_user_id = ? ORDER BY id'
+                # SaaS 模式：返回當前用戶的帳號 + 未綁定/歷史帳號（owner_user_id 為空或 local_user，兼容舊數據）
+                query = '''SELECT * FROM accounts
+                    WHERE owner_user_id = ? OR owner_user_id IS NULL OR owner_user_id = '' OR owner_user_id = 'local_user'
+                    ORDER BY id'''
                 params = (owner_user_id,)
             
             if not HAS_AIOSQLITE:

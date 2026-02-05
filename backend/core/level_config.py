@@ -295,11 +295,14 @@ class LevelConfigService:
         return sorted(self._configs.values(), key=lambda x: x.order)
     
     def get_quota(self, level: MembershipLevel, quota_type: QuotaType) -> int:
-        """獲取指定等級的指定配額"""
+        """獲取指定等級的指定配額（tg_accounts 至少為 1，避免免費用戶無法添加首個帳號）"""
         config = self.get_level_config(level)
         if config:
-            return config.quotas.get(quota_type)
-        return 0
+            value = getattr(config.quotas, quota_type.value, 0)
+            if quota_type == QuotaType.TG_ACCOUNTS and value is not None and value < 1:
+                return 1
+            return value if value is not None else 0
+        return 1 if quota_type == QuotaType.TG_ACCOUNTS else 0
     
     def has_feature(self, level: MembershipLevel, feature: str) -> bool:
         """檢查指定等級是否有指定功能"""

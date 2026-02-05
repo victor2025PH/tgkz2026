@@ -299,8 +299,11 @@ class QuotaService:
             except ImportError:
                 pass
             
-            # 3. 默認值
-            return self._get_default_limit(quota_type)
+            # 3. 默認值（保證免費用戶至少可添加 1 個 TG 帳號）
+            limit = self._get_default_limit(quota_type)
+            if quota_type == 'tg_accounts' and limit < 1:
+                limit = 1
+            return limit
         finally:
             db.close()
     
@@ -357,13 +360,16 @@ class QuotaService:
                 ''', (user_id, quota_type, today)).fetchone()
                 return row['used'] if row else 0
             
-            # 對於非每日重置的配額，直接統計
+            # 對於非每日重置的配額，直接統計（accounts 表僅有 owner_user_id）
             if quota_type == 'tg_accounts':
-                row = db.execute('''
-                    SELECT COUNT(*) as count FROM accounts 
-                    WHERE user_id = ? OR owner_user_id = ?
-                ''', (user_id, user_id)).fetchone()
-                return row['count'] if row else 0
+                try:
+                    row = db.execute(
+                        'SELECT COUNT(*) as count FROM accounts WHERE owner_user_id = ?',
+                        (user_id,)
+                    ).fetchone()
+                    return row['count'] if row else 0
+                except Exception:
+                    return 0
             
             elif quota_type == 'groups':
                 row = db.execute('''

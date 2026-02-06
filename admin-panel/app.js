@@ -2943,7 +2943,11 @@ createApp({
             );
         };
         
-        // 優惠券操作
+        // 優惠券操作（打開時關閉可能殘留的確認框，避免遮擋）
+        const openCouponModal = () => {
+            confirmDialog.show = false;
+            showCouponModal.value = true;
+        };
         const createCoupon = async () => {
             const form = couponForm.value;
             
@@ -3603,6 +3607,7 @@ createApp({
             deleteAnnouncement,
             
             // 優惠券操作
+            openCouponModal,
             createCoupon,
             
             // 確認操作

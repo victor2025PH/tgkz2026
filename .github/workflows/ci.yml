@@ -31,7 +31,7 @@ jobs:
         run: |
           export PYTHONPATH="$GITHUB_WORKSPACE/backend"
           cd "$GITHUB_WORKSPACE/backend"
-          pip install --quiet pytest pytest-asyncio aiohttp cryptography PyJWT
+          pip install --quiet pytest pytest-asyncio aiohttp cryptography PyJWT aiosqlite
           python -m pytest tests/test_admin_modules.py -v --tb=short -k "not test_module_imports"
 
   lint:

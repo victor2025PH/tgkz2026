@@ -2952,6 +2952,10 @@ createApp({
             confirmDialog.show = false;
             showCouponModal.value = true;
         };
+        const closeCouponModal = () => {
+            showCouponModal.value = false;
+            confirmDialog.show = false;  // 同時關閉可能擋住的確認框
+        };
         const createCoupon = async () => {
             const form = couponForm.value;
             
@@ -3612,6 +3616,7 @@ createApp({
             
             // 優惠券操作
             openCouponModal,
+            closeCouponModal,
             createCoupon,
             
             // 確認操作

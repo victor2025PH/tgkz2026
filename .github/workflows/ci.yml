@@ -33,6 +33,8 @@ jobs:
           pip install --quiet pytest pytest-asyncio aiohttp
 
       - name: Run admin module tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
         run: |
           cd backend
           python -m pytest tests/test_admin_modules.py -v --tb=short
@@ -52,13 +54,14 @@ jobs:
           python-version: '3.11'
 
       - name: Check backend imports
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
         run: |
           cd backend
           pip install --quiet aiohttp
           python -c "
           import sys
-          sys.path.insert(0, '.')
-          for m in ['admin.api_pool', 'admin.health_score', 'admin.ml_prediction', 'admin.handlers']:
+          for m in ['admin.api_pool', 'admin.health_score', 'admin.ml_prediction', 'admin.cost_optimizer', 'admin.performance_analyzer', 'admin.report_generator', 'admin.disaster_recovery', 'admin.alert_service', 'admin.anomaly_detection', 'admin.scheduler', 'admin.webhook_events']:
               __import__(m)
-          print('✅ Admin modules import OK')
+          print('Admin modules import OK')
           "

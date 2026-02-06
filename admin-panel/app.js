@@ -2568,10 +2568,17 @@ createApp({
         };
         
         // 確認操作（保證 onConfirm 為函數，避免點擊確認時報錯導致無法關閉）
+        // 防止空對話框：若 title 或 message 為空則不顯示，避免出現空白遮罩阻塞按鈕
         const showConfirm = (title, message, onConfirm, type = 'normal', icon = '⚠️') => {
-            confirmDialog.title = title;
-            confirmDialog.message = message;
-            confirmDialog.icon = icon;
+            const t = typeof title === 'string' ? title : (title != null ? String(title) : '');
+            const m = typeof message === 'string' ? message : (message != null ? String(message) : '');
+            if (!t.trim() || !m.trim()) {
+                console.warn('showConfirm: 跳過空對話框，title/message 不能為空');
+                return;
+            }
+            confirmDialog.title = t;
+            confirmDialog.message = m;
+            confirmDialog.icon = icon || '⚠️';
             confirmDialog.type = type;
             confirmDialog.onConfirm = typeof onConfirm === 'function' ? onConfirm : () => {};
             confirmDialog.show = true;

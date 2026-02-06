@@ -2947,8 +2947,13 @@ createApp({
             );
         };
         
-        // 優惠券操作（打開時關閉可能殘留的確認框，避免遮擋）
+        // 優惠券操作（打開時關閉所有其他彈窗，避免多層遮擋導致按鈕無法點擊）
         const openCouponModal = () => {
+            showUserModal.value = false;
+            showAdjustModal.value = false;
+            showExtendModal.value = false;
+            showAnnouncementModal.value = false;
+            showPasswordModal.value = false;
             confirmDialog.show = false;
             showCouponModal.value = true;
         };
@@ -2966,8 +2971,13 @@ createApp({
         watch(showCouponModal, (isOpen) => {
             if (isOpen) {
                 document.addEventListener('keydown', onCouponEsc);
+                // 原生 JS 回退：當 Vue 事件失效時，window 上的函數仍可被 onclick 調用
+                window.__adminCouponClose = closeCouponModal;
+                window.__adminCouponCreate = createCoupon;
             } else {
                 document.removeEventListener('keydown', onCouponEsc);
+                delete window.__adminCouponClose;
+                delete window.__adminCouponCreate;
             }
         });
         const createCoupon = async () => {

@@ -140,10 +140,12 @@ createApp({
             setTimeout(() => { toast.show = false; }, 3000);
         };
         
-        // 菜單項
+        // 菜單項（API對接池、代理池管理 提前以利發現）
         const menuItems = ref([
             { id: 'dashboard', name: '儀表盤', icon: '📊' },
             { id: 'users', name: '用戶管理', icon: '👥' },
+            { id: 'apiPool', name: 'API 管理 (ID/Hash 池)', icon: '🔑' },
+            { id: 'proxies', name: '代理池管理', icon: '🌐' },
             { id: 'expiring', name: '即將到期', icon: '⏰', badge: null },
             { id: 'licenses', name: '卡密管理', icon: '🎟️' },
             { id: 'orders', name: '訂單管理', icon: '💰' },
@@ -162,8 +164,6 @@ createApp({
             { id: 'serviceDashboard', name: '服務狀態', icon: '🏥' },  // 🆕 Phase 9
             { id: 'analyticsCenter', name: '分析中心', icon: '🔬' },  // 🆕 Phase 10
             { id: 'devices', name: '設備管理', icon: '💻' },
-            { id: 'proxies', name: '代理池管理', icon: '🌐' },
-            { id: 'apiPool', name: 'API對接池', icon: '🔑' },
             { id: 'logs', name: '操作日誌', icon: '📝' },
             { id: 'admins', name: '管理員', icon: '👤' },
             { id: 'settings', name: '系統設置', icon: '⚙️' },

@@ -157,8 +157,13 @@ createApp({
             { id: 'referrals', name: '邀請管理', icon: '🎁' },
             { id: 'notifications', name: '批量通知', icon: '📨' },
             { id: 'announcements', name: '公告管理', icon: '📢' },
+            { id: 'sysSettings', name: '系統設置', icon: '⚙️' },  // 🆕 Phase 5
+            { id: 'smartOps', name: '智能運維', icon: '🧠' },  // 🆕 Phase 7
+            { id: 'serviceDashboard', name: '服務狀態', icon: '🏥' },  // 🆕 Phase 9
+            { id: 'analyticsCenter', name: '分析中心', icon: '🔬' },  // 🆕 Phase 10
             { id: 'devices', name: '設備管理', icon: '💻' },
             { id: 'proxies', name: '代理池管理', icon: '🌐' },
+            { id: 'apiPool', name: 'API對接池', icon: '🔑' },
             { id: 'logs', name: '操作日誌', icon: '📝' },
             { id: 'admins', name: '管理員', icon: '👤' },
             { id: 'settings', name: '系統設置', icon: '⚙️' },
@@ -175,6 +180,26 @@ createApp({
             totalLicenses: 0,
             unusedLicenses: 0
         });
+        
+        // 🆕 雙池健康度統計（儀表盤用）
+        const dashboardPoolStats = ref({
+            api: { total: 0, available: 0, full: 0, banned: 0, total_allocations: 0, healthPercent: 100 },
+            proxy: { total: 0, available: 0, assigned: 0, testing: 0, failed: 0, healthPercent: 100 }
+        });
+        
+        // 🆕 系統告警（儀表盤用）
+        const systemAlerts = ref({
+            alert_level: 'normal',
+            alerts: [],
+            stats: {}
+        });
+        const capacityForecast = ref({
+            avg_daily_allocations: 0,
+            remaining_capacity: 0,
+            days_until_exhausted: null,
+            forecast_message: ''
+        });
+        const alertsDismissed = ref(false);
         
         // 用戶數據
         const users = ref([]);
@@ -223,6 +248,62 @@ createApp({
         });
         const logsStats = ref({});
         
+        // 🆕 API 對接池數據
+        const apiPoolList = ref([]);
+        const apiPoolStats = ref({ total: 0, available: 0, full: 0, disabled: 0, banned: 0, available_for_assign: 0, total_allocations: 0 });
+        const showApiPoolModal = ref(false);
+        const apiPoolForm = reactive({
+            api_id: '',
+            api_hash: '',
+            name: '',
+            source_phone: '',
+            max_accounts: 5,
+            note: ''
+        });
+        const showApiPoolBatchModal = ref(false);
+        const apiPoolBatchForm = reactive({
+            text: '',
+            default_max_accounts: 5
+        });
+        const apiPoolBatchResult = ref(null);
+        const apiPoolFilter = ref('');  // all, available, full, disabled
+        const apiPoolStrategy = ref('balanced');  // 🆕 分配策略
+        
+        // 🆕 API 分組管理
+        const apiGroups = ref([]);
+        const apiPoolGroupFilter = ref('');
+        const showGroupManagerModal = ref(false);
+        const newGroupForm = ref({
+            name: '',
+            description: '',
+            color: '#3B82F6',
+            icon: '📁'
+        });
+        
+        // 🆕 系統設置
+        const alertConfig = ref({
+            enabled: true,
+            webhook_url: '',
+            webhook_secret: '',
+            email_enabled: false,
+            email_smtp_host: '',
+            email_smtp_port: 587,
+            email_smtp_user: '',
+            email_smtp_password: '',
+            email_from: '',
+            email_to: '',
+            telegram_bot_token: '',
+            telegram_chat_id: '',
+            throttle_minutes: 30,
+            min_level: 'warning'
+        });
+        const scheduledTasks = ref([]);
+        const alertChannels = ref({
+            webhook: false,
+            email: false,
+            telegram: false
+        });
+        
         // 🆕 Phase 3: 錢包運營工具
         const walletOperations = ref([]);
         const walletAnalytics = ref({
@@ -267,6 +348,34 @@ createApp({
             userIds: '',
             rewardAmount: 100,
             rewardType: 'bonus'
+        });
+        
+        // 🆕 Phase 7: 智能運維
+        const healthScores = ref([]);
+        const healthSummary = ref({ total_apis: 0, average_score: 0, grade_distribution: {} });
+        const anomalies = ref([]);
+        const predictionReport = ref(null);
+        const webhookSubscribers = ref([]);
+        const webhookEvents = ref([]);
+        const webhookStats = ref({ total_events: 0, success_rate: 100 });
+        const billingPlans = ref([]);
+        const invoices = ref([]);
+        const scalingPolicies = ref([]);
+        const scalingRecommendations = ref([]);
+        const scalingHistory = ref([]);
+        const showWebhookModal = ref(false);
+        const webhookForm = reactive({
+            name: '',
+            url: '',
+            secret: '',
+            events: ['*']
+        });
+        const showScalingModal = ref(false);
+        const scalingForm = reactive({
+            name: '',
+            scale_up_threshold: 80,
+            scale_down_threshold: 30,
+            group_id: null
         });
         
         // 即將到期用戶
@@ -402,6 +511,10 @@ createApp({
                 revenueTrend.value = data.revenueTrend || [];
                 levelDistribution.value = data.levelDistribution || {};
                 lastUpdate.value = new Date().toLocaleString('zh-TW');
+                
+                // 🆕 加載雙池健康度和告警
+                await loadPoolHealthStats();
+                await loadSystemAlerts();
                 
                 setTimeout(initCharts, 100);
             }
@@ -710,6 +823,833 @@ createApp({
                 'testing': '測試中',
                 'failed': '失敗',
                 'disabled': '已禁用'
+            };
+            return texts[status] || status;
+        };
+        
+        // ============ 🆕 API 對接池管理 ============
+        
+        // 🆕 加載雙池健康度統計（用於儀表盤）
+        const loadPoolHealthStats = async () => {
+            try {
+                // 並行加載 API 池和代理池統計
+                const [apiResult, proxyResult] = await Promise.all([
+                    apiRequest('/admin/api-pool?include_hash=false'),
+                    apiRequest('/admin/proxies')
+                ]);
+                
+                // API 池統計
+                if (apiResult.success) {
+                    const apiStats = apiResult.data?.stats || apiResult.stats || {};
+                    const total = apiStats.total || 0;
+                    const available = apiStats.available_for_assign || apiStats.available || 0;
+                    const full = apiStats.full || 0;
+                    const banned = apiStats.banned || 0;
+                    const disabled = apiStats.disabled || 0;
+                    
+                    // 健康度 = (可用 + 已分配) / 總數 * 100（排除封禁和禁用）
+                    const healthy = total - banned - disabled;
+                    const healthPercent = total > 0 ? Math.round(healthy / total * 100) : 100;
+                    
+                    dashboardPoolStats.value.api = {
+                        total,
+                        available,
+                        full,
+                        banned,
+                        disabled,
+                        total_allocations: apiStats.total_allocations || 0,
+                        healthPercent
+                    };
+                }
+                
+                // 代理池統計
+                if (proxyResult.success) {
+                    const proxyStats = proxyResult.data?.stats || proxyResult.stats || {};
+                    const total = proxyStats.total || 0;
+                    const available = proxyStats.available || 0;
+                    const assigned = proxyStats.assigned || 0;
+                    const failed = proxyStats.failed || 0;
+                    const testing = proxyStats.testing || 0;
+                    
+                    // 健康度 = (可用 + 已分配) / 總數 * 100
+                    const healthy = available + assigned;
+                    const healthPercent = total > 0 ? Math.round(healthy / total * 100) : 100;
+                    
+                    dashboardPoolStats.value.proxy = {
+                        total,
+                        available,
+                        assigned,
+                        testing,
+                        failed,
+                        healthPercent
+                    };
+                }
+            } catch (e) {
+                console.error('加載池健康度失敗:', e);
+            }
+        };
+        
+        // 🆕 加載系統告警
+        const loadSystemAlerts = async () => {
+            if (alertsDismissed.value) return;
+            
+            try {
+                // 並行加載告警和預測
+                const [alertsResult, forecastResult] = await Promise.all([
+                    apiRequest('/admin/api-pool/alerts'),
+                    apiRequest('/admin/api-pool/forecast')
+                ]);
+                
+                if (alertsResult.success) {
+                    const data = alertsResult.data || alertsResult;
+                    systemAlerts.value = {
+                        alert_level: data.alert_level || 'normal',
+                        alerts: data.alerts || [],
+                        stats: data.stats || {}
+                    };
+                }
+                
+                if (forecastResult.success) {
+                    const data = forecastResult.data || forecastResult;
+                    capacityForecast.value = {
+                        avg_daily_allocations: data.avg_daily_allocations || 0,
+                        remaining_capacity: data.remaining_capacity || 0,
+                        days_until_exhausted: data.days_until_exhausted,
+                        forecast_message: data.forecast_message || ''
+                    };
+                }
+            } catch (e) {
+                console.error('加載系統告警失敗:', e);
+            }
+        };
+        
+        // 🆕 暫時忽略告警
+        const dismissAlerts = () => {
+            alertsDismissed.value = true;
+            systemAlerts.value = { alert_level: 'normal', alerts: [], stats: {} };
+            showToast('告警已暫時忽略，下次刷新時會重新顯示', 'info');
+        };
+        
+        // 🆕 加載系統設置
+        const loadSystemSettings = async () => {
+            try {
+                const [configResult, tasksResult] = await Promise.all([
+                    apiRequest('/admin/alerts/config'),
+                    apiRequest('/admin/scheduler/tasks')
+                ]);
+                
+                if (configResult.success) {
+                    const data = configResult.data || configResult;
+                    alertChannels.value = data.channels || {};
+                    // 從已保存的配置更新表單（注意：敏感信息可能被隱藏）
+                    if (data.config) {
+                        alertConfig.value.enabled = data.config.enabled ?? true;
+                        alertConfig.value.throttle_minutes = data.config.throttle_minutes || 30;
+                        alertConfig.value.min_level = data.config.min_level || 'warning';
+                    }
+                }
+                
+                if (tasksResult.success) {
+                    const data = tasksResult.data || tasksResult;
+                    scheduledTasks.value = data.tasks || [];
+                }
+            } catch (e) {
+                console.error('加載系統設置失敗:', e);
+            }
+        };
+        
+        // 🆕 保存告警配置
+        const saveAlertConfig = async () => {
+            try {
+                // 處理郵件收件人（逗號分隔轉數組）
+                const config = { ...alertConfig.value };
+                if (typeof config.email_to === 'string') {
+                    config.email_to = config.email_to.split(',').map(e => e.trim()).filter(e => e);
+                }
+                
+                const result = await apiRequest('/admin/alerts/config', {
+                    method: 'POST',
+                    body: JSON.stringify(config)
+                });
+                
+                if (result.success) {
+                    showToast('告警配置已保存', 'success');
+                    await loadSystemSettings();
+                } else {
+                    showToast(result.error || '保存失敗', 'error');
+                }
+            } catch (e) {
+                showToast('保存失敗: ' + e.message, 'error');
+            }
+        };
+        
+        // 🆕 測試告警渠道
+        const testAlertChannel = async (channel) => {
+            try {
+                const result = await apiRequest('/admin/alerts/test', {
+                    method: 'POST',
+                    body: JSON.stringify({ channel })
+                });
+                
+                if (result.success) {
+                    showToast(`${channel} 測試告警已發送`, 'success');
+                } else {
+                    showToast(result.error || '發送失敗', 'error');
+                }
+            } catch (e) {
+                showToast('測試失敗: ' + e.message, 'error');
+            }
+        };
+        
+        // 🆕 更新定時任務
+        const updateScheduledTask = async (taskId, updates) => {
+            try {
+                const result = await apiRequest(`/admin/scheduler/tasks/${taskId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(updates)
+                });
+                
+                if (result.success) {
+                    showToast('任務設置已更新', 'success');
+                    await loadSystemSettings();
+                } else {
+                    showToast(result.error || '更新失敗', 'error');
+                }
+            } catch (e) {
+                showToast('更新失敗: ' + e.message, 'error');
+            }
+        };
+        
+        // 🆕 立即執行任務
+        const runTaskNow = async (taskId) => {
+            try {
+                const result = await apiRequest(`/admin/scheduler/tasks/${taskId}/run`, {
+                    method: 'POST'
+                });
+                
+                if (result.success) {
+                    showToast('任務已執行', 'success');
+                    await loadSystemSettings();
+                } else {
+                    showToast(result.error || '執行失敗', 'error');
+                }
+            } catch (e) {
+                showToast('執行失敗: ' + e.message, 'error');
+            }
+        };
+        
+        // 🆕 導出數據
+        const exportData = async (type, format = 'csv') => {
+            try {
+                const endpoints = {
+                    'api-pool': '/admin/export/api-pool',
+                    'allocation-history': '/admin/export/allocation-history',
+                    'alert-history': '/admin/export/alert-history'
+                };
+                
+                const url = `${endpoints[type]}?format=${format}`;
+                const result = await apiRequest(url);
+                
+                if (format === 'csv') {
+                    // 對於 CSV，下載文件
+                    const blob = new Blob([result], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `${type}_export.csv`;
+                    link.click();
+                    showToast('導出成功', 'success');
+                } else {
+                    showToast(`已導出 ${result.data?.total || 0} 條記錄`, 'success');
+                }
+            } catch (e) {
+                showToast('導出失敗: ' + e.message, 'error');
+            }
+        };
+        
+        // ==================== 🆕 P7: 智能運維功能 ====================
+        
+        // 加載健康評分
+        const loadHealthScores = async () => {
+            try {
+                const [scoresRes, summaryRes, anomaliesRes] = await Promise.all([
+                    apiRequest('/admin/api-pool/health-scores'),
+                    apiRequest('/admin/api-pool/health-summary'),
+                    apiRequest('/admin/api-pool/anomalies')
+                ]);
+                
+                if (scoresRes.success) {
+                    healthScores.value = scoresRes.data?.scores || [];
+                }
+                if (summaryRes.success) {
+                    healthSummary.value = summaryRes.data || {};
+                }
+                if (anomaliesRes.success) {
+                    anomalies.value = anomaliesRes.data?.anomalies || [];
+                }
+            } catch (e) {
+                console.error('加載健康評分失敗:', e);
+            }
+        };
+        
+        // 加載預測報告
+        const loadPredictionReport = async () => {
+            try {
+                const result = await apiRequest('/admin/api-pool/prediction/report');
+                if (result.success) {
+                    predictionReport.value = result.data;
+                }
+            } catch (e) {
+                console.error('加載預測報告失敗:', e);
+            }
+        };
+        
+        // 加載 Webhook 訂閱者
+        const loadWebhookSubscribers = async () => {
+            try {
+                const [subsRes, eventsRes, statsRes] = await Promise.all([
+                    apiRequest('/admin/webhooks/subscribers'),
+                    apiRequest('/admin/webhooks/events?limit=50'),
+                    apiRequest('/admin/webhooks/stats')
+                ]);
+                
+                if (subsRes.success) {
+                    webhookSubscribers.value = subsRes.data?.subscribers || [];
+                }
+                if (eventsRes.success) {
+                    webhookEvents.value = eventsRes.data?.events || [];
+                }
+                if (statsRes.success) {
+                    webhookStats.value = statsRes.data || {};
+                }
+            } catch (e) {
+                console.error('加載 Webhook 數據失敗:', e);
+            }
+        };
+        
+        // 添加 Webhook 訂閱者
+        const addWebhookSubscriber = async () => {
+            if (!webhookForm.url.trim()) {
+                showToast('請輸入 Webhook URL', 'error');
+                return;
+            }
+            
+            try {
+                const result = await apiRequest('/admin/webhooks/subscribers', {
+                    method: 'POST',
+                    body: JSON.stringify(webhookForm)
+                });
+                
+                if (result.success) {
+                    showToast('Webhook 訂閱者已添加', 'success');
+                    showWebhookModal.value = false;
+                    Object.assign(webhookForm, { name: '', url: '', secret: '', events: ['*'] });
+                    await loadWebhookSubscribers();
+                } else {
+                    showToast(result.error || '添加失敗', 'error');
+                }
+            } catch (e) {
+                showToast('添加失敗: ' + e.message, 'error');
+            }
+        };
+        
+        // 刪除 Webhook 訂閱者
+        const deleteWebhookSubscriber = async (id) => {
+            if (!confirm('確定要刪除此訂閱者嗎？')) return;
+            
+            try {
+                const result = await apiRequest(`/admin/webhooks/subscribers/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (result.success) {
+                    showToast('已刪除', 'success');
+                    await loadWebhookSubscribers();
+                } else {
+                    showToast(result.error || '刪除失敗', 'error');
+                }
+            } catch (e) {
+                showToast('刪除失敗: ' + e.message, 'error');
+            }
+        };
+        
+        // 測試 Webhook
+        const testWebhook = async (id) => {
+            try {
+                const result = await apiRequest(`/admin/webhooks/test/${id}`, {
+                    method: 'POST'
+                });
+                
+                if (result.success) {
+                    showToast('測試事件已發送', 'success');
+                } else {
+                    showToast(result.error || '測試失敗', 'error');
+                }
+            } catch (e) {
+                showToast('測試失敗: ' + e.message, 'error');
+            }
+        };
+        
+        // 加載計費方案
+        const loadBillingPlans = async () => {
+            try {
+                const [plansRes, invoicesRes] = await Promise.all([
+                    apiRequest('/admin/billing/plans'),
+                    apiRequest('/admin/billing/invoices?limit=50')
+                ]);
+                
+                if (plansRes.success) {
+                    billingPlans.value = plansRes.data?.plans || [];
+                }
+                if (invoicesRes.success) {
+                    invoices.value = invoicesRes.data?.invoices || [];
+                }
+            } catch (e) {
+                console.error('加載計費數據失敗:', e);
+            }
+        };
+        
+        // 加載擴縮容策略
+        const loadScalingPolicies = async () => {
+            try {
+                const [policiesRes, historyRes, evalRes] = await Promise.all([
+                    apiRequest('/admin/scaling/policies'),
+                    apiRequest('/admin/scaling/history?limit=50'),
+                    apiRequest('/admin/scaling/evaluate')
+                ]);
+                
+                if (policiesRes.success) {
+                    scalingPolicies.value = policiesRes.data?.policies || [];
+                }
+                if (historyRes.success) {
+                    scalingHistory.value = historyRes.data?.events || [];
+                }
+                if (evalRes.success) {
+                    scalingRecommendations.value = evalRes.data?.recommendations || [];
+                }
+            } catch (e) {
+                console.error('加載擴縮容數據失敗:', e);
+            }
+        };
+        
+        // 創建擴縮容策略
+        const createScalingPolicy = async () => {
+            if (!scalingForm.name.trim()) {
+                showToast('請輸入策略名稱', 'error');
+                return;
+            }
+            
+            try {
+                const result = await apiRequest('/admin/scaling/policies', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        name: scalingForm.name,
+                        scale_up: { threshold: scalingForm.scale_up_threshold },
+                        scale_down: { threshold: scalingForm.scale_down_threshold },
+                        group_id: scalingForm.group_id
+                    })
+                });
+                
+                if (result.success) {
+                    showToast('策略已創建', 'success');
+                    showScalingModal.value = false;
+                    Object.assign(scalingForm, { name: '', scale_up_threshold: 80, scale_down_threshold: 30, group_id: null });
+                    await loadScalingPolicies();
+                } else {
+                    showToast(result.error || '創建失敗', 'error');
+                }
+            } catch (e) {
+                showToast('創建失敗: ' + e.message, 'error');
+            }
+        };
+        
+        // 執行擴縮容
+        const executeScaling = async (recommendation) => {
+            if (!confirm(`確定要執行 ${recommendation.action === 'scale_up' ? '擴容' : '縮容'} 操作嗎？`)) return;
+            
+            try {
+                const result = await apiRequest('/admin/scaling/execute', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        policy_id: recommendation.policy_id,
+                        action: recommendation.action,
+                        capacity_change: recommendation.recommended_change,
+                        trigger_value: recommendation.current_utilization
+                    })
+                });
+                
+                if (result.success) {
+                    showToast(result.message || '操作成功', 'success');
+                    await loadScalingPolicies();
+                } else {
+                    showToast(result.error || '操作失敗', 'error');
+                }
+            } catch (e) {
+                showToast('操作失敗: ' + e.message, 'error');
+            }
+        };
+        
+        // 加載智能運維頁面所有數據
+        const loadSmartOpsData = async () => {
+            await Promise.all([
+                loadHealthScores(),
+                loadPredictionReport(),
+                loadWebhookSubscribers(),
+                loadBillingPlans(),
+                loadScalingPolicies()
+            ]);
+        };
+        
+        // 🆕 P9: 服務健康儀表盤
+        const serviceDashboard = ref({});
+        const showIncidentModal = ref(false);
+        const showMaintenanceModal = ref(false);
+        const incidentForm = ref({ title: '', message: '', status: 'degraded' });
+        const maintenanceForm = ref({ title: '', description: '', scheduled_start: '', scheduled_end: '' });
+        
+        const loadServiceDashboard = async () => {
+            try {
+                const result = await apiRequest('/admin/service-dashboard');
+                if (result.success) {
+                    serviceDashboard.value = result.data || {};
+                }
+            } catch (e) {
+                console.error('加載服務儀表盤失敗:', e);
+            }
+        };
+        
+        const createStatusUpdate = async () => {
+            try {
+                const result = await apiRequest('/admin/service-dashboard/updates', 'POST', incidentForm.value);
+                if (result.success) {
+                    showIncidentModal.value = false;
+                    incidentForm.value = { title: '', message: '', status: 'degraded' };
+                    await loadServiceDashboard();
+                }
+            } catch (e) {
+                console.error('創建狀態更新失敗:', e);
+            }
+        };
+        
+        const scheduleMaintenance = async () => {
+            try {
+                const result = await apiRequest('/admin/service-dashboard/maintenance', 'POST', maintenanceForm.value);
+                if (result.success) {
+                    showMaintenanceModal.value = false;
+                    maintenanceForm.value = { title: '', description: '', scheduled_start: '', scheduled_end: '' };
+                    await loadServiceDashboard();
+                }
+            } catch (e) {
+                console.error('排程維護失敗:', e);
+            }
+        };
+        
+        // 🆕 P10: 分析中心
+        const analyticsCenter = ref({
+            predictions: {},
+            costSummary: {},
+            performanceSummary: {},
+            reports: [],
+            drStats: {}
+        });
+        const analyticsActiveTab = ref('predictions');
+        const showReportModal = ref(false);
+        const reportForm = ref({ type: 'daily', date: '', tenant_id: '' });
+        
+        const loadAnalyticsCenter = async () => {
+            try {
+                // 並行加載多個數據
+                const [predResult, costResult, perfResult, reportResult, drResult] = await Promise.all([
+                    apiRequest('/admin/ml/predict/usage?metric=api_calls&periods=24').catch(() => ({ data: {} })),
+                    apiRequest('/admin/cost/summary?days=30').catch(() => ({ data: {} })),
+                    apiRequest('/admin/performance/summary').catch(() => ({ data: {} })),
+                    apiRequest('/admin/reports?limit=10').catch(() => ({ data: { reports: [] } })),
+                    apiRequest('/admin/dr/stats').catch(() => ({ data: {} }))
+                ]);
+                
+                analyticsCenter.value = {
+                    predictions: predResult.data || {},
+                    costSummary: costResult.data || {},
+                    performanceSummary: perfResult.data || {},
+                    reports: reportResult.data?.reports || [],
+                    drStats: drResult.data || {}
+                };
+            } catch (e) {
+                console.error('加載分析中心失敗:', e);
+            }
+        };
+        
+        const generateReport = async () => {
+            try {
+                const endpoint = reportForm.value.type === 'daily' ? '/admin/reports/daily' : '/admin/reports/weekly';
+                const result = await apiRequest(endpoint, 'POST', reportForm.value);
+                if (result.success) {
+                    showReportModal.value = false;
+                    reportForm.value = { type: 'daily', date: '', tenant_id: '' };
+                    await loadAnalyticsCenter();
+                }
+            } catch (e) {
+                console.error('生成報告失敗:', e);
+            }
+        };
+        
+        const detectBottlenecks = async () => {
+            try {
+                const result = await apiRequest('/admin/performance/bottlenecks/detect', 'POST');
+                if (result.success) {
+                    alert('瓶頸檢測完成，發現 ' + (result.data?.bottlenecks?.length || 0) + ' 個瓶頸');
+                }
+            } catch (e) {
+                console.error('檢測瓶頸失敗:', e);
+            }
+        };
+        
+        // 🆕 加載 API 分組
+        const loadApiGroups = async () => {
+            try {
+                const result = await apiRequest('/admin/api-pool/groups');
+                if (result.success) {
+                    apiGroups.value = result.data?.groups || result.groups || [];
+                }
+            } catch (e) {
+                console.error('加載分組失敗:', e);
+            }
+        };
+        
+        // 🆕 打開分組管理彈窗
+        const openGroupManagerModal = async () => {
+            await loadApiGroups();
+            showGroupManagerModal.value = true;
+        };
+        
+        // 🆕 創建分組
+        const createApiGroup = async () => {
+            if (!newGroupForm.value.name.trim()) {
+                showToast('請輸入分組名稱', 'error');
+                return;
+            }
+            
+            try {
+                const result = await apiRequest('/admin/api-pool/groups', {
+                    method: 'POST',
+                    body: JSON.stringify(newGroupForm.value)
+                });
+                
+                if (result.success) {
+                    showToast(result.message || '分組創建成功', 'success');
+                    newGroupForm.value = { name: '', description: '', color: '#3B82F6', icon: '📁' };
+                    await loadApiGroups();
+                } else {
+                    showToast(result.error || '創建失敗', 'error');
+                }
+            } catch (e) {
+                showToast('創建失敗: ' + e.message, 'error');
+            }
+        };
+        
+        // 🆕 刪除分組
+        const deleteApiGroup = async (groupId) => {
+            if (!confirm('確定要刪除此分組嗎？該分組內的 API 將移至默認分組。')) return;
+            
+            try {
+                const result = await apiRequest(`/admin/api-pool/groups/${groupId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (result.success) {
+                    showToast(result.message || '分組已刪除', 'success');
+                    await loadApiGroups();
+                } else {
+                    showToast(result.error || '刪除失敗', 'error');
+                }
+            } catch (e) {
+                showToast('刪除失敗: ' + e.message, 'error');
+            }
+        };
+        
+        // 🆕 編輯分組（簡單實現：彈出 prompt）
+        const editApiGroup = async (group) => {
+            const newName = prompt('輸入新的分組名稱:', group.name);
+            if (!newName || newName === group.name) return;
+            
+            try {
+                const result = await apiRequest(`/admin/api-pool/groups/${group.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ name: newName })
+                });
+                
+                if (result.success) {
+                    showToast('分組已更新', 'success');
+                    await loadApiGroups();
+                } else {
+                    showToast(result.error || '更新失敗', 'error');
+                }
+            } catch (e) {
+                showToast('更新失敗: ' + e.message, 'error');
+            }
+        };
+        
+        const loadApiPool = async () => {
+            const params = new URLSearchParams();
+            if (apiPoolFilter.value) params.append('status', apiPoolFilter.value);
+            params.append('include_hash', 'true');
+            
+            // 🆕 加載分組列表
+            await loadApiGroups();
+            
+            const result = await apiRequest(`/admin/api-pool?${params}`);
+            if (result.success) {
+                const data = result.data || result;
+                let apis = data.apis || [];
+                
+                // 🆕 前端過濾分組
+                if (apiPoolGroupFilter.value) {
+                    apis = apis.filter(api => api.group_id === apiPoolGroupFilter.value);
+                }
+                
+                apiPoolList.value = apis;
+                apiPoolStats.value = data.stats || apiPoolStats.value;
+                // 🆕 更新當前策略
+                if (data.stats?.allocation_strategy) {
+                    apiPoolStrategy.value = data.stats.allocation_strategy;
+                }
+            }
+        };
+        
+        // 🆕 設置分配策略
+        const setApiPoolStrategy = async () => {
+            const result = await apiRequest('/admin/api-pool/strategy', {
+                method: 'POST',
+                body: JSON.stringify({ strategy: apiPoolStrategy.value })
+            });
+            
+            if (result.success) {
+                showToast(`分配策略已更改`, 'success');
+            } else {
+                showToast('設置失敗: ' + (result.message || result.error?.message), 'error');
+                await loadApiPool();  // 重新加載以恢復正確的策略
+            }
+        };
+        
+        const openApiPoolModal = () => {
+            apiPoolForm.api_id = '';
+            apiPoolForm.api_hash = '';
+            apiPoolForm.name = '';
+            apiPoolForm.source_phone = '';
+            apiPoolForm.max_accounts = 5;
+            apiPoolForm.note = '';
+            showApiPoolModal.value = true;
+        };
+        
+        const addApiToPool = async () => {
+            if (!apiPoolForm.api_id.trim() || !apiPoolForm.api_hash.trim()) {
+                showToast('API ID 和 API Hash 不能為空', 'error');
+                return;
+            }
+            
+            const result = await apiRequest('/admin/api-pool', {
+                method: 'POST',
+                body: JSON.stringify({
+                    api_id: apiPoolForm.api_id.trim(),
+                    api_hash: apiPoolForm.api_hash.trim(),
+                    name: apiPoolForm.name.trim() || `API-${apiPoolForm.api_id}`,
+                    source_phone: apiPoolForm.source_phone.trim() || null,
+                    max_accounts: parseInt(apiPoolForm.max_accounts) || 5,
+                    note: apiPoolForm.note.trim() || null
+                })
+            });
+            
+            if (result.success) {
+                showToast('API 憑據添加成功', 'success');
+                showApiPoolModal.value = false;
+                await loadApiPool();
+            } else {
+                showToast('添加失敗: ' + (result.message || result.error?.message), 'error');
+            }
+        };
+        
+        const openApiPoolBatchModal = () => {
+            apiPoolBatchForm.text = '';
+            apiPoolBatchForm.default_max_accounts = 5;
+            apiPoolBatchResult.value = null;
+            showApiPoolBatchModal.value = true;
+        };
+        
+        const importApisFromText = async () => {
+            if (!apiPoolBatchForm.text.trim()) {
+                showToast('請輸入 API 列表', 'error');
+                return;
+            }
+            
+            const result = await apiRequest('/admin/api-pool/batch', {
+                method: 'POST',
+                body: JSON.stringify({
+                    text: apiPoolBatchForm.text,
+                    default_max_accounts: parseInt(apiPoolBatchForm.default_max_accounts) || 5
+                })
+            });
+            
+            if (result.success) {
+                const data = result.data || result;
+                apiPoolBatchResult.value = data;
+                
+                if (data.success > 0) {
+                    showToast(`成功導入 ${data.success} 個 API 憑據`, 'success');
+                    await loadApiPool();
+                } else if (data.duplicates > 0) {
+                    showToast(`全部 ${data.duplicates} 個已存在，無需重複導入`, 'info');
+                } else {
+                    showToast('導入失敗，請檢查格式', 'error');
+                }
+            } else {
+                showToast('導入失敗: ' + (result.message || result.error?.message), 'error');
+            }
+        };
+        
+        const deleteApiFromPool = async (apiId) => {
+            if (!confirm('確定要刪除此 API 憑據嗎？\n如有帳號綁定，需先釋放。')) return;
+            
+            const result = await apiRequest(`/admin/api-pool/${apiId}`, {
+                method: 'DELETE'
+            });
+            
+            if (result.success) {
+                showToast('API 憑據已刪除', 'success');
+                await loadApiPool();
+            } else {
+                showToast('刪除失敗: ' + (result.message || result.error?.message), 'error');
+            }
+        };
+        
+        const toggleApiStatus = async (api) => {
+            const isDisabled = api.status === 'disabled';
+            const endpoint = isDisabled ? 'enable' : 'disable';
+            
+            const result = await apiRequest(`/admin/api-pool/${api.api_id}/${endpoint}`, {
+                method: 'POST'
+            });
+            
+            if (result.success) {
+                showToast(isDisabled ? 'API 已啟用' : 'API 已禁用', 'success');
+                await loadApiPool();
+            }
+        };
+        
+        const getApiStatusClass = (status) => {
+            const classes = {
+                'available': 'text-green-400',
+                'full': 'text-yellow-400',
+                'disabled': 'text-gray-400',
+                'banned': 'text-red-400'
+            };
+            return classes[status] || 'text-gray-400';
+        };
+        
+        const getApiStatusText = (status) => {
+            const texts = {
+                'available': '可用',
+                'full': '已滿',
+                'disabled': '已禁用',
+                'banned': '已封禁'
             };
             return texts[status] || status;
         };
@@ -1487,6 +2427,10 @@ createApp({
             if (currentPage.value === 'quotas') await loadQuotaStats();
             if (currentPage.value === 'notifications') await loadNotificationHistory();
             if (currentPage.value === 'devices') await loadDevices();
+            if (currentPage.value === 'sysSettings') await loadSystemSettings();
+            if (currentPage.value === 'smartOps') await loadSmartOpsData();
+            if (currentPage.value === 'serviceDashboard') await loadServiceDashboard();
+            if (currentPage.value === 'analyticsCenter') await loadAnalyticsCenter();
         };
         
         // ============ 計算屬性 ============
@@ -2412,6 +3356,7 @@ createApp({
             else if (newPage === 'devices') await loadDevices();
             else if (newPage === 'logs') { await loadLogs(); await loadLogsStats(); }
             else if (newPage === 'proxies') await loadProxies();
+            else if (newPage === 'apiPool') await loadApiPool();
             else if (newPage === 'admins') await loadAdmins();
             else if (newPage === 'referrals') await loadReferralStats();
             else if (newPage === 'announcements') await loadAnnouncements();
@@ -2439,6 +3384,10 @@ createApp({
             currentPage,
             menuItems,
             stats,
+            dashboardPoolStats,
+            systemAlerts,
+            capacityForecast,
+            dismissAlerts,
             users,
             userSearch,
             userFilter,
@@ -2478,6 +3427,43 @@ createApp({
             releaseProxy,
             getProxyStatusClass,
             getProxyStatusText,
+            // 🆕 API 對接池
+            apiPoolList,
+            apiPoolStats,
+            apiPoolFilter,
+            apiPoolStrategy,
+            apiGroups,
+            apiPoolGroupFilter,
+            showGroupManagerModal,
+            newGroupForm,
+            openGroupManagerModal,
+            createApiGroup,
+            deleteApiGroup,
+            editApiGroup,
+            alertConfig,
+            scheduledTasks,
+            alertChannels,
+            loadSystemSettings,
+            saveAlertConfig,
+            testAlertChannel,
+            updateScheduledTask,
+            runTaskNow,
+            exportData,
+            showApiPoolModal,
+            apiPoolForm,
+            showApiPoolBatchModal,
+            apiPoolBatchForm,
+            apiPoolBatchResult,
+            loadApiPool,
+            openApiPoolModal,
+            addApiToPool,
+            openApiPoolBatchModal,
+            importApisFromText,
+            setApiPoolStrategy,
+            deleteApiFromPool,
+            toggleApiStatus,
+            getApiStatusClass,
+            getApiStatusText,
             // 🆕 Phase 3: 錢包運營
             walletOperations,
             walletAnalytics,
@@ -2646,6 +3632,54 @@ createApp({
             filteredDevices,
             loadDevices,
             revokeDevice,
+            
+            // 🆕 P7: 智能運維
+            healthScores,
+            healthSummary,
+            anomalies,
+            predictionReport,
+            webhookSubscribers,
+            webhookEvents,
+            webhookStats,
+            billingPlans,
+            invoices,
+            scalingPolicies,
+            scalingRecommendations,
+            scalingHistory,
+            showWebhookModal,
+            webhookForm,
+            showScalingModal,
+            scalingForm,
+            loadHealthScores,
+            loadPredictionReport,
+            loadWebhookSubscribers,
+            addWebhookSubscriber,
+            deleteWebhookSubscriber,
+            testWebhook,
+            loadBillingPlans,
+            loadScalingPolicies,
+            createScalingPolicy,
+            executeScaling,
+            loadSmartOpsData,
+            
+            // 🆕 P9: 服務健康儀表盤
+            serviceDashboard,
+            showIncidentModal,
+            showMaintenanceModal,
+            incidentForm,
+            maintenanceForm,
+            loadServiceDashboard,
+            createStatusUpdate,
+            scheduleMaintenance,
+            
+            // 🆕 P10: 分析中心
+            analyticsCenter,
+            analyticsActiveTab,
+            showReportModal,
+            reportForm,
+            loadAnalyticsCenter,
+            generateReport,
+            detectBottlenecks,
             
             // 其他
             refreshData,

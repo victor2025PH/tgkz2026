@@ -6,6 +6,7 @@ API Pool Integration - 集成 API 池到登錄流程
 2. 登錄成功/失敗時的 API 池更新
 3. 與現有 main.py 的無縫集成
 4. 智能錯誤處理和重試策略
+5. 🆕 雙池支持：先 API 池，再代理池
 
 使用方式：
     from core.api_pool_integration import get_api_for_login, report_login_result
@@ -24,6 +25,16 @@ import sys
 import time
 from typing import Optional, Dict, Any, Tuple
 
+# 🆕 優先使用 SQLite 基礎的 API 池管理器（admin/api_pool.py）
+_use_sqlite_api_pool = False
+try:
+    from admin.api_pool import get_api_pool_manager as get_sqlite_api_pool
+    _use_sqlite_api_pool = True
+    print("[ApiPoolIntegration] Using SQLite-based API pool manager", file=sys.stderr)
+except ImportError:
+    get_sqlite_api_pool = None
+
+# 回退到舊的內存 API 池
 from core.api_pool import (
     get_api_pool,
     ApiCredential,
@@ -66,7 +77,7 @@ def get_api_for_login(
     provided_api_hash: Optional[str] = None
 ) -> Tuple[Optional[str], Optional[str], str]:
     """
-    為登錄獲取 API 憑據
+    為登錄獲取 API 憑據（雙池策略：優先使用 SQLite API 池）
     
     Args:
         phone: 手機號
@@ -76,7 +87,7 @@ def get_api_for_login(
     
     Returns:
         (api_id, api_hash, source) 元組
-        - source: 'user' | 'platform' | 'fallback'
+        - source: 'user' | 'platform' | 'platform_sqlite' | 'fallback'
     """
     # 如果用戶提供了 API，優先使用
     if provided_api_id and provided_api_hash:
@@ -85,13 +96,31 @@ def get_api_for_login(
     
     # 如果請求使用平台 API
     if use_platform_api:
+        # 🆕 優先使用 SQLite API 池
+        if _use_sqlite_api_pool and get_sqlite_api_pool:
+            try:
+                sqlite_pool = get_sqlite_api_pool()
+                success, msg, result = sqlite_pool.allocate_api(account_phone=phone)
+                
+                if success and result:
+                    api_id = result['api_id']
+                    api_hash = result['api_hash']
+                    _phone_api_map[phone] = api_id
+                    print(f"[ApiPoolIntegration] 從 SQLite API 池分配: {api_id} -> {phone}", file=sys.stderr)
+                    return (api_id, api_hash, 'platform_sqlite')
+                else:
+                    print(f"[ApiPoolIntegration] SQLite API 池分配失敗: {msg}", file=sys.stderr)
+            except Exception as e:
+                print(f"[ApiPoolIntegration] SQLite API 池錯誤: {e}", file=sys.stderr)
+        
+        # 回退到內存 API 池
         pool = get_api_pool()
         api = pool.allocate_api(phone)
         
         if api:
             # 記錄手機號和 API 的關聯
             _phone_api_map[phone] = api.api_id
-            print(f"[ApiPoolIntegration] 從平台池分配 API: {api.api_id} -> {phone}", file=sys.stderr)
+            print(f"[ApiPoolIntegration] 從內存 API 池分配: {api.api_id} -> {phone}", file=sys.stderr)
             return (api.api_id, api.api_hash, 'platform')
         else:
             # 池為空時使用 Telegram Desktop 公共 API 作為後備（與前端 usePlatformApi 一致）
@@ -115,6 +144,14 @@ def report_login_success(phone: str):
     """
     api_id = _phone_api_map.get(phone)
     if api_id:
+        # 🆕 同時報告給 SQLite API 池
+        if _use_sqlite_api_pool and get_sqlite_api_pool:
+            try:
+                sqlite_pool = get_sqlite_api_pool()
+                sqlite_pool.report_success(api_id)
+            except Exception as e:
+                print(f"[ApiPoolIntegration] SQLite 報告成功錯誤: {e}", file=sys.stderr)
+        
         pool = get_api_pool()
         pool.report_success(api_id)
         print(f"[ApiPoolIntegration] 登錄成功報告: {phone} -> API {api_id}", file=sys.stderr)
@@ -175,6 +212,14 @@ def release_api_for_phone(phone: str):
     """
     api_id = _phone_api_map.pop(phone, None)
     if api_id:
+        # 🆕 同時從 SQLite API 池釋放
+        if _use_sqlite_api_pool and get_sqlite_api_pool:
+            try:
+                sqlite_pool = get_sqlite_api_pool()
+                sqlite_pool.release_api(phone)
+            except Exception as e:
+                print(f"[ApiPoolIntegration] SQLite 釋放 API 錯誤: {e}", file=sys.stderr)
+        
         pool = get_api_pool()
         pool.release_api(api_id)
         print(f"[ApiPoolIntegration] 釋放 API: {phone} -> {api_id}", file=sys.stderr)
@@ -209,20 +254,25 @@ def bind_phone_to_api(phone: str, api_id: str):
 
 def process_login_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    處理登錄請求的 payload，自動填充 API 憑據
+    處理登錄請求的 payload，自動填充 API 憑據和代理（雙池分配）
+    
+    登錄流程：
+    1. 先從 API 對接池獲取 api_id + api_hash
+    2. 再從代理池獲取獨立 IP（如果啟用）
+    3. 每個帳號 = 一組 API + 一個 IP，雙重隔離
     
     Args:
         payload: 原始請求 payload
     
     Returns:
-        處理後的 payload（包含 API 憑據）
+        處理後的 payload（包含 API 憑據和代理）
     """
     phone = payload.get('phone', '')
     use_platform_api = payload.get('usePlatformApi', False)
     provided_api_id = payload.get('apiId')
     provided_api_hash = payload.get('apiHash')
     
-    # 獲取 API
+    # ========== Step 1: 從 API 對接池獲取憑據 ==========
     api_id, api_hash, source = get_api_for_login(
         phone=phone,
         use_platform_api=use_platform_api,
@@ -235,9 +285,46 @@ def process_login_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         payload['apiId'] = api_id
         payload['apiHash'] = api_hash
         payload['_api_source'] = source
+        print(f"[ApiPoolIntegration] Step 1 完成: API 分配 {api_id} -> {phone}", file=sys.stderr)
     elif source == 'none' and use_platform_api:
         # 平台 API 池為空，返回錯誤
         payload['_api_error'] = 'API 池暫時無可用資源，請稍後重試或使用自己的 API'
+        return payload
+    
+    # ========== Step 2: 從代理池獲取獨立 IP ==========
+    # 只有當未提供代理時才自動分配
+    if not payload.get('proxy') and payload.get('useProxyPool', True):
+        try:
+            from admin.proxy_pool import get_proxy_pool
+            proxy_pool = get_proxy_pool()
+            
+            # 先檢查是否已有綁定的代理
+            existing_proxy = proxy_pool.get_proxy_for_account(phone=phone)
+            if existing_proxy:
+                payload['proxy'] = existing_proxy.to_url()
+                payload['_proxy_source'] = 'existing'
+                print(f"[ApiPoolIntegration] Step 2 完成: 使用已綁定代理 -> {phone}", file=sys.stderr)
+            else:
+                # 分配新代理（account_id 暫時使用手機號作為標識）
+                account_id = payload.get('account_id', phone)
+                assigned_proxy = proxy_pool.assign_proxy_to_account(
+                    account_id=str(account_id),
+                    phone=phone
+                )
+                if assigned_proxy:
+                    payload['proxy'] = assigned_proxy.to_url()
+                    payload['_proxy_source'] = 'pool'
+                    print(f"[ApiPoolIntegration] Step 2 完成: 代理分配 {assigned_proxy.host}:{assigned_proxy.port} -> {phone}", file=sys.stderr)
+                else:
+                    # 代理池為空，記錄警告但不阻止登錄
+                    print(f"[ApiPoolIntegration] Step 2 跳過: 代理池無可用代理，將使用直連", file=sys.stderr)
+                    payload['_proxy_warning'] = '代理池無可用資源，將使用直連（風控風險較高）'
+        except ImportError:
+            print(f"[ApiPoolIntegration] Step 2 跳過: 代理池模塊未載入", file=sys.stderr)
+        except Exception as e:
+            print(f"[ApiPoolIntegration] Step 2 錯誤: {e}", file=sys.stderr)
+    else:
+        print(f"[ApiPoolIntegration] Step 2 跳過: 已提供代理或禁用代理池", file=sys.stderr)
     
     return payload
 

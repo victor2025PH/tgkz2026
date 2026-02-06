@@ -2584,7 +2584,11 @@ createApp({
             confirmDialog.show = true;
         };
         const showConfirmDialog = showConfirm;  // 別名，供支付配置等處調用
-        const closeConfirmDialog = () => { confirmDialog.show = false; };
+        const closeConfirmDialog = () => { 
+            confirmDialog.show = false; 
+            confirmDialog.title = ''; 
+            confirmDialog.message = ''; 
+        };
         const handleConfirmOk = () => {
             try { confirmDialog.onConfirm(); } catch (e) { console.error(e); }
             confirmDialog.show = false;

@@ -4427,10 +4427,10 @@ api_id,api_hash,name
         <div v-if="confirmDialog.show" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
             <div class="bg-gray-800 rounded-xl p-6 w-[400px] border border-gray-700">
                 <h3 class="text-lg font-bold mb-4 flex items-center">
-                    <span class="text-2xl mr-2">{{ confirmDialog.icon }}</span>
-                    {{ confirmDialog.title }}
+                    <span class="text-2xl mr-2" v-text="confirmDialog.icon"></span>
+                    <span v-text="confirmDialog.title"></span>
                 </h3>
-                <p class="text-gray-400 mb-6">{{ confirmDialog.message }}</p>
+                <p class="text-gray-400 mb-6" v-text="confirmDialog.message"></p>
                 <div class="flex justify-end gap-4">
                     <button @click="confirmDialog.show = false" 
                             class="px-4 py-2 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors">
@@ -4453,6 +4453,6 @@ api_id,api_hash,name
         </div>
     </div>
     
-    <script src="app.js?v=20260203-5"></script>
+    <script src="app.js?v=20260206-menu"></script>
 </body>
 </html>

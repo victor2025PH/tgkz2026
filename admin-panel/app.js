@@ -2567,14 +2567,20 @@ createApp({
             return labels[key] || key;
         };
         
-        // 確認操作
+        // 確認操作（保證 onConfirm 為函數，避免點擊確認時報錯導致無法關閉）
         const showConfirm = (title, message, onConfirm, type = 'normal', icon = '⚠️') => {
             confirmDialog.title = title;
             confirmDialog.message = message;
             confirmDialog.icon = icon;
             confirmDialog.type = type;
-            confirmDialog.onConfirm = onConfirm;
+            confirmDialog.onConfirm = typeof onConfirm === 'function' ? onConfirm : () => {};
             confirmDialog.show = true;
+        };
+        const showConfirmDialog = showConfirm;  // 別名，供支付配置等處調用
+        const closeConfirmDialog = () => { confirmDialog.show = false; };
+        const handleConfirmOk = () => {
+            try { confirmDialog.onConfirm(); } catch (e) { console.error(e); }
+            confirmDialog.show = false;
         };
         
         const extendUser = (user) => {
@@ -3546,6 +3552,8 @@ createApp({
             // 新增狀態
             userDetail,
             confirmDialog,
+            closeConfirmDialog,
+            handleConfirmOk,
             announcementForm,
             couponForm,
             

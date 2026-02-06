@@ -4423,8 +4423,8 @@ api_id,api_hash,name
             </div>
         </div>
         
-        <!-- ==================== 確認對話框 ==================== -->
-        <div v-if="confirmDialog.show" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <!-- ==================== 確認對話框（z-[60] 高於其他彈窗，按鈕用方法確保可關閉）==================== -->
+        <div v-if="confirmDialog.show" class="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]">
             <div class="bg-gray-800 rounded-xl p-6 w-[400px] border border-gray-700">
                 <h3 class="text-lg font-bold mb-4 flex items-center">
                     <span class="text-2xl mr-2" v-text="confirmDialog.icon"></span>
@@ -4432,11 +4432,11 @@ api_id,api_hash,name
                 </h3>
                 <p class="text-gray-400 mb-6" v-text="confirmDialog.message"></p>
                 <div class="flex justify-end gap-4">
-                    <button @click="confirmDialog.show = false" 
+                    <button @click="closeConfirmDialog()" 
                             class="px-4 py-2 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors">
                         取消
                     </button>
-                    <button @click="confirmDialog.onConfirm(); confirmDialog.show = false" 
+                    <button @click="handleConfirmOk()" 
                             :class="confirmDialog.type === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'gradient-bg hover:opacity-90'"
                             class="px-4 py-2 rounded-lg font-medium transition-colors">
                         確認

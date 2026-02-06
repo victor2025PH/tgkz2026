@@ -3393,6 +3393,8 @@ createApp({
         // ============ 生命週期 ============
         
         onMounted(async () => {
+            // 確保登錄後不彈出優惠券面板（僅通過點擊「創建優惠券」按鈕打開）
+            showCouponModal.value = false;
             await loadDashboard();
         });
         

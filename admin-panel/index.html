@@ -4364,10 +4364,11 @@ api_id,api_hash,name
             </div>
         </div>
         
-        <!-- ==================== 優惠券管理彈窗（z-[100] 最高層，點擊遮罩可關閉）==================== -->
-        <div v-if="showCouponModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]" @click.self="closeCouponModal()">
-            <div class="bg-gray-800 rounded-xl p-6 w-[500px] border border-gray-700 relative" @click.stop style="pointer-events: auto;">
-                <button type="button" @click.prevent="closeCouponModal()" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-600 rounded text-2xl cursor-pointer z-10" title="關閉">×</button>
+        <!-- ==================== 優惠券管理彈窗（使用 Teleport 避免被其他層遮擋，登錄時不自動彈出）==================== -->
+        <Teleport to="body">
+        <div v-if="showCouponModal" class="fixed inset-0 bg-black/60 flex items-center justify-center" style="z-index: 99999;" @click.self="closeCouponModal()">
+            <div class="bg-gray-800 rounded-xl p-6 w-[500px] border border-gray-700 relative shadow-2xl" @click.stop style="pointer-events: auto;">
+                <button type="button" @click="closeCouponModal()" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-600 rounded text-2xl cursor-pointer z-10" title="關閉">×</button>
                 <h3 class="text-xl font-bold mb-6 flex items-center">
                     <span class="text-2xl mr-2">🎫</span>
                     創建優惠券
@@ -4419,17 +4420,18 @@ api_id,api_hash,name
                 </div>
                 
                 <div class="flex justify-end gap-4 mt-6">
-                    <button type="button" @click.prevent="closeCouponModal()" 
+                    <button type="button" @click="closeCouponModal()" 
                             class="px-6 py-2 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
                         取消
                     </button>
-                    <button type="button" @click.prevent="createCoupon" 
+                    <button type="button" @click="createCoupon" 
                             class="gradient-bg hover:opacity-90 px-6 py-2 rounded-lg font-medium transition-opacity cursor-pointer">
                         創建優惠券
                     </button>
                 </div>
             </div>
         </div>
+        </Teleport>
         
         <!-- ==================== 確認對話框（優惠券開啟時不渲染，避免任何遮擋）==================== -->
         <div v-if="confirmDialog.show && !showCouponModal" 

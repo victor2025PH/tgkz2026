@@ -2956,6 +2956,20 @@ createApp({
             showCouponModal.value = false;
             confirmDialog.show = false;  // 同時關閉可能擋住的確認框
         };
+        // Esc 鍵關閉優惠券彈窗（備用，當按鈕無法點擊時仍可關閉）
+        const onCouponEsc = (e) => {
+            if (e.key === 'Escape' && showCouponModal.value) {
+                closeCouponModal();
+                document.removeEventListener('keydown', onCouponEsc);
+            }
+        };
+        watch(showCouponModal, (isOpen) => {
+            if (isOpen) {
+                document.addEventListener('keydown', onCouponEsc);
+            } else {
+                document.removeEventListener('keydown', onCouponEsc);
+            }
+        });
         const createCoupon = async () => {
             const form = couponForm.value;
             

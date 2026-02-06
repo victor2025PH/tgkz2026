@@ -504,7 +504,246 @@ class HttpApiServer:
             self.app.router.add_post('/api/admin/proxies/assign', admin_handlers.assign_proxy)
             self.app.router.add_post('/api/admin/proxies/release', admin_handlers.release_proxy)
             self.app.router.add_get('/api/admin/proxies/account', admin_handlers.get_account_proxy)
-            logger.info("✅ Admin module loaded with Phase 2 & Proxy Pool features")
+            # API 對接池管理
+            self.app.router.add_get('/api/admin/api-pool', admin_handlers.list_api_pool)
+            self.app.router.add_post('/api/admin/api-pool', admin_handlers.add_api_to_pool)
+            self.app.router.add_post('/api/admin/api-pool/batch', admin_handlers.add_apis_batch)
+            self.app.router.add_put('/api/admin/api-pool/{api_id}', admin_handlers.update_api_in_pool)
+            self.app.router.add_delete('/api/admin/api-pool/{api_id}', admin_handlers.delete_api_from_pool)
+            self.app.router.add_post('/api/admin/api-pool/{api_id}/disable', admin_handlers.disable_api_in_pool)
+            self.app.router.add_post('/api/admin/api-pool/{api_id}/enable', admin_handlers.enable_api_in_pool)
+            self.app.router.add_post('/api/admin/api-pool/allocate', admin_handlers.allocate_api)
+            self.app.router.add_post('/api/admin/api-pool/release', admin_handlers.release_api)
+            self.app.router.add_get('/api/admin/api-pool/account', admin_handlers.get_account_api)
+            # 🆕 智能分配策略 API
+            self.app.router.add_get('/api/admin/api-pool/strategies', admin_handlers.get_api_pool_strategies)
+            self.app.router.add_post('/api/admin/api-pool/strategy', admin_handlers.set_api_pool_strategy)
+            # 🆕 分配歷史審計 API
+            self.app.router.add_get('/api/admin/api-pool/history', admin_handlers.get_api_allocation_history)
+            # 🆕 容量規劃告警 API
+            self.app.router.add_get('/api/admin/api-pool/alerts', admin_handlers.get_api_pool_alerts)
+            self.app.router.add_get('/api/admin/api-pool/forecast', admin_handlers.get_api_pool_forecast)
+            # 🆕 告警服務 API
+            self.app.router.add_get('/api/admin/alerts/config', admin_handlers.get_alert_config)
+            self.app.router.add_post('/api/admin/alerts/config', admin_handlers.update_alert_config)
+            self.app.router.add_post('/api/admin/alerts/test', admin_handlers.test_alert_channel)
+            self.app.router.add_get('/api/admin/alerts/history', admin_handlers.get_alert_history)
+            self.app.router.add_post('/api/admin/alerts/check', admin_handlers.trigger_capacity_check)
+            # 🆕 API 分組管理
+            self.app.router.add_get('/api/admin/api-pool/groups', admin_handlers.list_api_groups)
+            self.app.router.add_post('/api/admin/api-pool/groups', admin_handlers.create_api_group)
+            self.app.router.add_put('/api/admin/api-pool/groups/{group_id}', admin_handlers.update_api_group)
+            self.app.router.add_delete('/api/admin/api-pool/groups/{group_id}', admin_handlers.delete_api_group)
+            self.app.router.add_post('/api/admin/api-pool/assign-group', admin_handlers.assign_api_to_group)
+            self.app.router.add_post('/api/admin/api-pool/batch-assign-group', admin_handlers.batch_assign_to_group)
+            # 🆕 定時任務管理
+            self.app.router.add_get('/api/admin/scheduler/tasks', admin_handlers.list_scheduled_tasks)
+            self.app.router.add_put('/api/admin/scheduler/tasks/{task_id}', admin_handlers.update_scheduled_task)
+            self.app.router.add_post('/api/admin/scheduler/tasks/{task_id}/run', admin_handlers.run_scheduled_task_now)
+            # 🆕 數據導出
+            self.app.router.add_get('/api/admin/export/api-pool', admin_handlers.export_api_pool)
+            self.app.router.add_get('/api/admin/export/allocation-history', admin_handlers.export_allocation_history)
+            self.app.router.add_get('/api/admin/export/alert-history', admin_handlers.export_alert_history)
+            # 🆕 P6: 統計可視化
+            self.app.router.add_get('/api/admin/api-pool/stats/hourly', admin_handlers.get_api_hourly_stats)
+            self.app.router.add_get('/api/admin/api-pool/stats/load', admin_handlers.get_api_load_distribution)
+            self.app.router.add_get('/api/admin/api-pool/stats/trend', admin_handlers.get_daily_trend)
+            # 🆕 P6: 故障轉移
+            self.app.router.add_post('/api/admin/api-pool/result', admin_handlers.record_api_result)
+            self.app.router.add_get('/api/admin/api-pool/failed', admin_handlers.get_failed_apis)
+            self.app.router.add_post('/api/admin/api-pool/reset-failures', admin_handlers.reset_api_failures)
+            # 🆕 P6: 分配規則引擎
+            self.app.router.add_get('/api/admin/api-pool/rules', admin_handlers.list_allocation_rules)
+            self.app.router.add_post('/api/admin/api-pool/rules', admin_handlers.create_allocation_rule)
+            self.app.router.add_delete('/api/admin/api-pool/rules/{rule_id}', admin_handlers.delete_allocation_rule)
+            self.app.router.add_put('/api/admin/api-pool/rules/{rule_id}/toggle', admin_handlers.toggle_allocation_rule)
+            # 🆕 P6: 備份與恢復
+            self.app.router.add_get('/api/admin/api-pool/backup', admin_handlers.create_api_pool_backup)
+            self.app.router.add_post('/api/admin/api-pool/restore', admin_handlers.restore_api_pool_backup)
+            # 🆕 P6: 多租戶支持
+            self.app.router.add_get('/api/admin/tenants', admin_handlers.list_tenants)
+            self.app.router.add_post('/api/admin/tenants', admin_handlers.create_tenant)
+            self.app.router.add_get('/api/admin/tenants/{tenant_id}/stats', admin_handlers.get_tenant_stats)
+            self.app.router.add_post('/api/admin/api-pool/assign-tenant', admin_handlers.assign_api_to_tenant)
+            
+            # 🆕 P7: 健康評分系統
+            self.app.router.add_get('/api/admin/api-pool/health-scores', admin_handlers.get_health_scores)
+            self.app.router.add_get('/api/admin/api-pool/health-summary', admin_handlers.get_health_summary)
+            self.app.router.add_get('/api/admin/api-pool/anomalies', admin_handlers.detect_anomalies)
+            
+            # 🆕 P7: 智能預測系統
+            self.app.router.add_get('/api/admin/api-pool/prediction/usage', admin_handlers.get_usage_prediction)
+            self.app.router.add_get('/api/admin/api-pool/prediction/capacity', admin_handlers.get_capacity_prediction)
+            self.app.router.add_get('/api/admin/api-pool/prediction/timing', admin_handlers.get_optimal_timing)
+            self.app.router.add_get('/api/admin/api-pool/prediction/report', admin_handlers.get_prediction_report)
+            
+            # 🆕 P7: Webhook 事件訂閱
+            self.app.router.add_get('/api/admin/webhooks/subscribers', admin_handlers.list_webhook_subscribers)
+            self.app.router.add_post('/api/admin/webhooks/subscribers', admin_handlers.add_webhook_subscriber)
+            self.app.router.add_put('/api/admin/webhooks/subscribers/{subscriber_id}', admin_handlers.update_webhook_subscriber)
+            self.app.router.add_delete('/api/admin/webhooks/subscribers/{subscriber_id}', admin_handlers.remove_webhook_subscriber)
+            self.app.router.add_get('/api/admin/webhooks/events', admin_handlers.get_webhook_events)
+            self.app.router.add_get('/api/admin/webhooks/stats', admin_handlers.get_webhook_stats)
+            self.app.router.add_post('/api/admin/webhooks/test/{subscriber_id}', admin_handlers.test_webhook)
+            self.app.router.add_post('/api/admin/webhooks/retry', admin_handlers.retry_failed_webhooks)
+            
+            # 🆕 P7: API 使用計費
+            self.app.router.add_get('/api/admin/billing/plans', admin_handlers.list_billing_plans)
+            self.app.router.add_post('/api/admin/billing/plans', admin_handlers.create_billing_plan)
+            self.app.router.add_post('/api/admin/billing/assign', admin_handlers.assign_billing_plan)
+            self.app.router.add_get('/api/admin/billing/tenant/{tenant_id}', admin_handlers.get_tenant_billing)
+            self.app.router.add_get('/api/admin/billing/usage/{tenant_id}', admin_handlers.get_usage_summary)
+            self.app.router.add_post('/api/admin/billing/calculate', admin_handlers.calculate_charges)
+            self.app.router.add_post('/api/admin/billing/invoice', admin_handlers.generate_invoice)
+            self.app.router.add_get('/api/admin/billing/invoices', admin_handlers.list_invoices)
+            self.app.router.add_post('/api/admin/billing/invoices/{invoice_id}/paid', admin_handlers.mark_invoice_paid)
+            
+            # 🆕 P7: 自動擴縮容
+            self.app.router.add_get('/api/admin/scaling/policies', admin_handlers.list_scaling_policies)
+            self.app.router.add_post('/api/admin/scaling/policies', admin_handlers.create_scaling_policy)
+            self.app.router.add_put('/api/admin/scaling/policies/{policy_id}', admin_handlers.update_scaling_policy)
+            self.app.router.add_delete('/api/admin/scaling/policies/{policy_id}', admin_handlers.delete_scaling_policy)
+            self.app.router.add_get('/api/admin/scaling/evaluate', admin_handlers.evaluate_scaling)
+            self.app.router.add_post('/api/admin/scaling/execute', admin_handlers.execute_scaling)
+            self.app.router.add_get('/api/admin/scaling/history', admin_handlers.get_scaling_history)
+            self.app.router.add_get('/api/admin/scaling/stats', admin_handlers.get_scaling_stats)
+            
+            # 🆕 P8: 審計合規
+            self.app.router.add_get('/api/admin/audit/logs', admin_handlers.query_audit_logs)
+            self.app.router.add_get('/api/admin/audit/resource/{resource_type}/{resource_id}', admin_handlers.get_resource_history)
+            self.app.router.add_post('/api/admin/compliance/reports', admin_handlers.generate_compliance_report)
+            self.app.router.add_get('/api/admin/compliance/reports', admin_handlers.list_compliance_reports)
+            self.app.router.add_get('/api/admin/compliance/reports/{report_id}', admin_handlers.get_compliance_report)
+            self.app.router.add_get('/api/admin/audit/export', admin_handlers.export_audit_logs)
+            self.app.router.add_get('/api/admin/audit/storage', admin_handlers.get_audit_storage_stats)
+            
+            # 🆕 P8: 多集群管理
+            self.app.router.add_get('/api/admin/clusters', admin_handlers.list_clusters)
+            self.app.router.add_post('/api/admin/clusters', admin_handlers.register_cluster)
+            self.app.router.add_put('/api/admin/clusters/{cluster_id}', admin_handlers.update_cluster)
+            self.app.router.add_delete('/api/admin/clusters/{cluster_id}', admin_handlers.remove_cluster)
+            self.app.router.add_get('/api/admin/clusters/{cluster_id}/health', admin_handlers.check_cluster_health)
+            self.app.router.add_post('/api/admin/clusters/failover', admin_handlers.trigger_failover)
+            self.app.router.add_get('/api/admin/clusters/stats', admin_handlers.get_cluster_stats)
+            
+            # 🆕 P8: 告警升級
+            self.app.router.add_get('/api/admin/escalation/schedules', admin_handlers.list_on_call_schedules)
+            self.app.router.add_get('/api/admin/escalation/policies', admin_handlers.list_escalation_policies)
+            self.app.router.add_get('/api/admin/escalation/alerts', admin_handlers.list_escalation_alerts)
+            self.app.router.add_post('/api/admin/escalation/alerts/{alert_id}/acknowledge', admin_handlers.acknowledge_escalation)
+            self.app.router.add_post('/api/admin/escalation/alerts/{alert_id}/resolve', admin_handlers.resolve_escalation)
+            self.app.router.add_get('/api/admin/escalation/stats', admin_handlers.get_escalation_stats)
+            
+            # 🆕 P8: API 版本管理
+            self.app.router.add_get('/api/admin/versions', admin_handlers.list_api_versions)
+            self.app.router.add_post('/api/admin/versions', admin_handlers.create_api_version)
+            self.app.router.add_get('/api/admin/rollouts', admin_handlers.list_rollouts)
+            self.app.router.add_post('/api/admin/rollouts', admin_handlers.create_rollout)
+            self.app.router.add_post('/api/admin/rollouts/{plan_id}/{action}', admin_handlers.control_rollout)
+            
+            # 🆕 P8: 異常檢測
+            self.app.router.add_get('/api/admin/anomaly/detectors', admin_handlers.list_anomaly_detectors)
+            self.app.router.add_get('/api/admin/anomaly/list', admin_handlers.list_anomalies)
+            self.app.router.add_post('/api/admin/anomaly/{anomaly_id}/acknowledge', admin_handlers.acknowledge_anomaly)
+            self.app.router.add_get('/api/admin/anomaly/stats', admin_handlers.get_anomaly_stats)
+            self.app.router.add_get('/api/admin/anomaly/detector-status', admin_handlers.get_detector_status)
+            
+            # 🆕 P9: 可觀測性平台
+            self.app.router.add_get('/api/admin/observability/metrics', admin_handlers.get_current_metrics)
+            self.app.router.add_get('/api/admin/observability/metrics/query', admin_handlers.query_metrics)
+            self.app.router.add_get('/api/admin/observability/metrics/aggregation', admin_handlers.get_metric_aggregation)
+            self.app.router.add_get('/api/admin/observability/traces/{trace_id}', admin_handlers.get_trace)
+            self.app.router.add_get('/api/admin/observability/traces', admin_handlers.search_traces)
+            self.app.router.add_get('/api/admin/observability/dashboards', admin_handlers.list_dashboards)
+            self.app.router.add_get('/api/admin/observability/overview', admin_handlers.get_system_overview)
+            
+            # 🆕 P9: 多租戶增強
+            self.app.router.add_get('/api/admin/tenants-enhanced', admin_handlers.list_tenants_enhanced)
+            self.app.router.add_get('/api/admin/tenants-enhanced/{tenant_id}/quotas', admin_handlers.get_tenant_quotas)
+            self.app.router.add_post('/api/admin/tenants-enhanced/{tenant_id}/quotas', admin_handlers.set_tenant_quota)
+            self.app.router.add_get('/api/admin/tenants-enhanced/alerts', admin_handlers.get_quota_alerts)
+            self.app.router.add_post('/api/admin/tenants-enhanced/{tenant_id}/reports', admin_handlers.generate_tenant_report)
+            self.app.router.add_get('/api/admin/tenants-enhanced/{tenant_id}/summary', admin_handlers.get_tenant_summary)
+            self.app.router.add_get('/api/admin/tenants-enhanced/overview', admin_handlers.get_tenants_overview)
+            
+            # 🆕 P9: 安全增強
+            self.app.router.add_get('/api/admin/security/roles/{user_id}', admin_handlers.list_user_roles)
+            self.app.router.add_post('/api/admin/security/roles/{user_id}', admin_handlers.assign_user_role)
+            self.app.router.add_post('/api/admin/security/tokens', admin_handlers.create_access_token)
+            self.app.router.add_get('/api/admin/security/tokens', admin_handlers.list_access_tokens)
+            self.app.router.add_delete('/api/admin/security/tokens/{token_id}', admin_handlers.revoke_access_token)
+            self.app.router.add_get('/api/admin/security/events', admin_handlers.query_security_events)
+            self.app.router.add_get('/api/admin/security/summary', admin_handlers.get_security_summary)
+            self.app.router.add_post('/api/admin/security/rotate-secrets', admin_handlers.rotate_secrets)
+            
+            # 🆕 P9: 智能根因分析
+            self.app.router.add_post('/api/admin/incidents', admin_handlers.create_incident)
+            self.app.router.add_get('/api/admin/incidents', admin_handlers.list_incidents)
+            self.app.router.add_get('/api/admin/incidents/{incident_id}', admin_handlers.get_incident)
+            self.app.router.add_post('/api/admin/incidents/{incident_id}/analyze', admin_handlers.analyze_root_cause)
+            self.app.router.add_put('/api/admin/incidents/{incident_id}/status', admin_handlers.update_incident_status)
+            self.app.router.add_post('/api/admin/incidents/predict', admin_handlers.predict_issues)
+            self.app.router.add_get('/api/admin/incidents/stats', admin_handlers.get_rca_stats)
+            
+            # 🆕 P9: 服務健康儀表盤
+            self.app.router.add_get('/api/admin/service-dashboard', admin_handlers.get_service_dashboard)
+            self.app.router.add_get('/api/admin/service-dashboard/components', admin_handlers.list_service_components)
+            self.app.router.add_put('/api/admin/service-dashboard/components/{component_id}', admin_handlers.update_component_status)
+            self.app.router.add_get('/api/admin/service-dashboard/components/{component_id}/history', admin_handlers.get_component_history)
+            self.app.router.add_get('/api/admin/service-dashboard/sla', admin_handlers.get_sla_status)
+            self.app.router.add_post('/api/admin/service-dashboard/updates', admin_handlers.create_status_update)
+            self.app.router.add_post('/api/admin/service-dashboard/updates/{update_id}/resolve', admin_handlers.resolve_status_update)
+            self.app.router.add_get('/api/admin/service-dashboard/maintenance', admin_handlers.list_maintenance_windows)
+            self.app.router.add_post('/api/admin/service-dashboard/maintenance', admin_handlers.schedule_maintenance)
+            self.app.router.add_get('/api/status', admin_handlers.get_status_page)
+            
+            # 🆕 P10: 智能預測引擎
+            self.app.router.add_get('/api/admin/ml/predict/usage', admin_handlers.predict_usage)
+            self.app.router.add_post('/api/admin/ml/predict/capacity', admin_handlers.predict_capacity)
+            self.app.router.add_get('/api/admin/ml/patterns', admin_handlers.analyze_patterns)
+            self.app.router.add_get('/api/admin/ml/threshold', admin_handlers.get_adaptive_threshold)
+            self.app.router.add_get('/api/admin/ml/performance', admin_handlers.get_model_performance)
+            
+            # 🆕 P10: 災備恢復
+            self.app.router.add_post('/api/admin/backup', admin_handlers.create_backup)
+            self.app.router.add_get('/api/admin/backups', admin_handlers.list_backups)
+            self.app.router.add_post('/api/admin/backup/{backup_id}/verify', admin_handlers.verify_backup)
+            self.app.router.add_post('/api/admin/backup/{backup_id}/restore', admin_handlers.restore_backup)
+            self.app.router.add_get('/api/admin/dr/rpo', admin_handlers.get_rpo_status)
+            self.app.router.add_get('/api/admin/dr/stats', admin_handlers.get_dr_stats)
+            self.app.router.add_get('/api/admin/dr/plans', admin_handlers.list_recovery_plans)
+            
+            # 🆕 P10: 成本優化
+            self.app.router.add_get('/api/admin/cost/summary', admin_handlers.get_cost_summary)
+            self.app.router.add_get('/api/admin/cost/breakdown', admin_handlers.get_cost_breakdown)
+            self.app.router.add_get('/api/admin/cost/forecast', admin_handlers.forecast_cost)
+            self.app.router.add_get('/api/admin/cost/budgets', admin_handlers.get_budget_status)
+            self.app.router.add_get('/api/admin/cost/recommendations', admin_handlers.get_cost_recommendations)
+            self.app.router.add_get('/api/admin/cost/stats', admin_handlers.get_cost_stats)
+            
+            # 🆕 P10: 性能分析
+            self.app.router.add_get('/api/admin/performance/latency', admin_handlers.get_latency_stats)
+            self.app.router.add_get('/api/admin/performance/endpoint/{endpoint}', admin_handlers.get_endpoint_performance)
+            self.app.router.add_post('/api/admin/performance/bottlenecks/detect', admin_handlers.detect_bottlenecks)
+            self.app.router.add_get('/api/admin/performance/bottlenecks', admin_handlers.list_bottlenecks)
+            self.app.router.add_get('/api/admin/performance/regressions', admin_handlers.list_regressions)
+            self.app.router.add_get('/api/admin/performance/summary', admin_handlers.get_performance_summary)
+            
+            # 🆕 P10: 報告生成
+            self.app.router.add_post('/api/admin/reports/daily', admin_handlers.generate_daily_report)
+            self.app.router.add_post('/api/admin/reports/weekly', admin_handlers.generate_weekly_report)
+            self.app.router.add_get('/api/admin/reports/{report_id}', admin_handlers.get_report)
+            self.app.router.add_get('/api/admin/reports', admin_handlers.list_reports)
+            self.app.router.add_get('/api/admin/reports/{report_id}/export', admin_handlers.export_report)
+            self.app.router.add_get('/api/admin/reports/templates', admin_handlers.list_report_templates)
+            self.app.router.add_get('/api/admin/reports/stats', admin_handlers.get_report_stats)
+            
+            # 初始化定時任務調度器
+            from admin.scheduler import get_scheduler, init_scheduled_tasks
+            init_scheduled_tasks()
+            scheduler = get_scheduler()
+            scheduler.start()
+            logger.info("✅ Admin module loaded with Phase 2-10 Complete: API Pool Enterprise Ultimate Edition")
         
         # 🆕 Phase 0 (Wallet): 設置錢包路由
         if WALLET_MODULE_AVAILABLE and wallet_handlers:

@@ -230,7 +230,7 @@ export class AuthService implements OnDestroy {
           // 🔧 轉換用戶對象格式（新版 API 返回的格式可能不同）
           // 🔧 P0 修復：保留原始 subscription_tier
           const originalTier = rawUser.subscription_tier || rawUser.membershipLevel || 'free';
-          const user: User = {
+          let user: User = {
             id: rawUser.id || 0,
             username: rawUser.username || 'User',
             displayName: rawUser.display_name || rawUser.displayName || rawUser.nickname || rawUser.telegram_first_name || undefined,
@@ -249,8 +249,20 @@ export class AuthService implements OnDestroy {
             status: rawUser.status || (rawUser.is_active ? 'active' : 'suspended')
           };
           
-          // 設置用戶狀態
+          // 設置 Token，供後續 fetchCurrentUser 使用
           this._token.set(storedToken);
+          
+          // 🔧 菜單欄顯示昵稱修復：若緩存中無顯示名稱，先從服務端拉取完整用戶信息再渲染，避免菜單欄先顯示用戶名
+          const needDisplayName = !user.displayName || (user.displayName || '').trim() === '' || user.displayName === user.username;
+          if (needDisplayName) {
+            const freshUser = await this.fetchCurrentUser();
+            if (freshUser) {
+              user = freshUser;
+              console.log('[AuthService] 已從服務端補全顯示名稱:', user.displayName || user.username);
+            }
+          }
+          
+          // 設置用戶狀態
           this._user.set(user);
           this._isAuthenticated.set(true);
           
@@ -259,7 +271,7 @@ export class AuthService implements OnDestroy {
           const cacheAge = Date.now() - cachedAt;
           const isStale = cacheAge > this.USER_DATA_TTL;
           
-          console.log('[AuthService] 已從本地存儲恢復用戶:', user.username, '等級:', user.membershipLevel, 
+          console.log('[AuthService] 已從本地存儲恢復用戶:', user.username, '顯示名稱:', user.displayName || '(無)', '等級:', user.membershipLevel, 
             `緩存年齡: ${Math.round(cacheAge / 1000)}s`, isStale ? '(已過期)' : '(有效)');
           
           // 記錄緩存時間（如果有）
@@ -279,13 +291,16 @@ export class AuthService implements OnDestroy {
             this.refreshUserFromServer().catch(err => {
               console.warn('[AuthService] 服務端用戶數據刷新失敗，保持使用本地緩存:', err);
             });
-          } else {
-            // 緩存有效，但仍在後台刷新以確保最新
+          } else if (!needDisplayName) {
+            // 緩存有效且已有顯示名稱，延遲後台刷新
             setTimeout(() => {
               this.refreshUserFromServer().catch(err => {
                 console.warn('[AuthService] 後台刷新用戶數據失敗:', err);
               });
             }, 1000);  // 延遲 1 秒，避免阻塞首次渲染
+          } else {
+            // 剛已通過 fetchCurrentUser 補全，可選輕量後台刷新
+            this.refreshUserFromServer().catch(() => {});
           }
         } catch (parseError) {
           console.error('解析用戶數據失敗:', parseError);

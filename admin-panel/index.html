@@ -202,6 +202,157 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- 🆕 雙池健康度 -->
+                    <div class="grid grid-cols-2 gap-6 mt-6">
+                        <!-- API 對接池健康度 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold">🔑 API 對接池健康度</h3>
+                                <button @click="currentPage = 'apiPool'" class="text-blue-400 hover:text-blue-300 text-sm">
+                                    查看詳情 →
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-4 gap-4 mb-4">
+                                <div class="text-center">
+                                    <p class="text-2xl font-bold text-green-400">{{ dashboardPoolStats.api?.available || 0 }}</p>
+                                    <p class="text-xs text-gray-400">可用</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-2xl font-bold text-blue-400">{{ dashboardPoolStats.api?.total_allocations || 0 }}</p>
+                                    <p class="text-xs text-gray-400">已分配</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-2xl font-bold text-yellow-400">{{ dashboardPoolStats.api?.full || 0 }}</p>
+                                    <p class="text-xs text-gray-400">已滿</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-2xl font-bold text-red-400">{{ dashboardPoolStats.api?.banned || 0 }}</p>
+                                    <p class="text-xs text-gray-400">封禁</p>
+                                </div>
+                            </div>
+                            <!-- 健康度進度條 -->
+                            <div class="relative h-2 bg-gray-700 rounded-full overflow-hidden">
+                                <div class="absolute h-full bg-green-500 rounded-full" 
+                                     :style="{width: dashboardPoolStats.api?.healthPercent + '%'}"></div>
+                            </div>
+                            <p class="text-center text-sm text-gray-400 mt-2">
+                                健康度: <span :class="dashboardPoolStats.api?.healthPercent >= 80 ? 'text-green-400' : dashboardPoolStats.api?.healthPercent >= 50 ? 'text-yellow-400' : 'text-red-400'">
+                                    {{ dashboardPoolStats.api?.healthPercent || 0 }}%
+                                </span>
+                                <span class="text-gray-500">（{{ dashboardPoolStats.api?.total || 0 }} 組憑據）</span>
+                            </p>
+                        </div>
+                        
+                        <!-- 代理池健康度 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold">🌐 代理池健康度</h3>
+                                <button @click="currentPage = 'proxies'" class="text-blue-400 hover:text-blue-300 text-sm">
+                                    查看詳情 →
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-4 gap-4 mb-4">
+                                <div class="text-center">
+                                    <p class="text-2xl font-bold text-green-400">{{ dashboardPoolStats.proxy?.available || 0 }}</p>
+                                    <p class="text-xs text-gray-400">可用</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-2xl font-bold text-blue-400">{{ dashboardPoolStats.proxy?.assigned || 0 }}</p>
+                                    <p class="text-xs text-gray-400">已分配</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-2xl font-bold text-yellow-400">{{ dashboardPoolStats.proxy?.testing || 0 }}</p>
+                                    <p class="text-xs text-gray-400">測試中</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-2xl font-bold text-red-400">{{ dashboardPoolStats.proxy?.failed || 0 }}</p>
+                                    <p class="text-xs text-gray-400">失敗</p>
+                                </div>
+                            </div>
+                            <!-- 健康度進度條 -->
+                            <div class="relative h-2 bg-gray-700 rounded-full overflow-hidden">
+                                <div class="absolute h-full bg-green-500 rounded-full" 
+                                     :style="{width: dashboardPoolStats.proxy?.healthPercent + '%'}"></div>
+                            </div>
+                            <p class="text-center text-sm text-gray-400 mt-2">
+                                健康度: <span :class="dashboardPoolStats.proxy?.healthPercent >= 80 ? 'text-green-400' : dashboardPoolStats.proxy?.healthPercent >= 50 ? 'text-yellow-400' : 'text-red-400'">
+                                    {{ dashboardPoolStats.proxy?.healthPercent || 0 }}%
+                                </span>
+                                <span class="text-gray-500">（{{ dashboardPoolStats.proxy?.total || 0 }} 個代理）</span>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- 🆕 系統告警中心 -->
+                    <div v-if="systemAlerts.alerts && systemAlerts.alerts.length > 0" class="mt-6">
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold flex items-center gap-2">
+                                    <span v-if="systemAlerts.alert_level === 'critical'" class="text-red-400">🚨</span>
+                                    <span v-else-if="systemAlerts.alert_level === 'warning'" class="text-yellow-400">⚠️</span>
+                                    <span v-else class="text-green-400">✅</span>
+                                    系統告警
+                                    <span v-if="systemAlerts.alert_level === 'critical'" 
+                                          class="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full animate-pulse">
+                                        緊急
+                                    </span>
+                                    <span v-else-if="systemAlerts.alert_level === 'warning'" 
+                                          class="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">
+                                        警告
+                                    </span>
+                                </h3>
+                                <button @click="dismissAlerts" class="text-gray-500 hover:text-gray-300 text-sm">
+                                    暫時忽略
+                                </button>
+                            </div>
+                            
+                            <div class="space-y-3">
+                                <div v-for="(alert, idx) in systemAlerts.alerts" :key="idx"
+                                     :class="[
+                                         'rounded-lg p-4 border-l-4',
+                                         alert.level === 'critical' ? 'bg-red-500/10 border-red-500' : 'bg-yellow-500/10 border-yellow-500'
+                                     ]">
+                                    <div class="flex items-start justify-between">
+                                        <div>
+                                            <p :class="alert.level === 'critical' ? 'text-red-300' : 'text-yellow-300'" class="font-medium">
+                                                {{ alert.message }}
+                                            </p>
+                                            <p class="text-gray-400 text-sm mt-1">{{ alert.suggestion }}</p>
+                                        </div>
+                                        <span class="text-xs text-gray-500 whitespace-nowrap ml-4">
+                                            {{ alert.type }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 容量預測 -->
+                            <div v-if="capacityForecast.days_until_exhausted" class="mt-4 pt-4 border-t border-gray-700">
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="text-gray-400">📊 容量預測</span>
+                                    <span :class="capacityForecast.days_until_exhausted < 7 ? 'text-red-400' : capacityForecast.days_until_exhausted < 14 ? 'text-yellow-400' : 'text-green-400'">
+                                        {{ capacityForecast.forecast_message }}
+                                    </span>
+                                </div>
+                                <div class="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                                    <span>日均分配: {{ capacityForecast.avg_daily_allocations }} 個</span>
+                                    <span>剩餘容量: {{ capacityForecast.remaining_capacity }} 個</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 無告警時顯示健康狀態 -->
+                    <div v-else-if="systemAlerts.alert_level === 'normal'" class="mt-6">
+                        <div class="bg-green-500/10 border border-green-500/30 rounded-xl p-4 flex items-center gap-3">
+                            <span class="text-2xl">✅</span>
+                            <div>
+                                <p class="text-green-400 font-medium">系統運行正常</p>
+                                <p class="text-gray-400 text-sm">API 池和代理池容量充足，無需擔心</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- ==================== 用戶管理 ==================== -->
@@ -886,6 +1037,1042 @@
                     </div>
                 </div>
                 
+                <!-- ==================== API 對接池管理 ==================== -->
+                <div v-if="currentPage === 'apiPool'">
+                    <!-- 統計卡片 -->
+                    <div class="grid grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gradient-to-r from-green-600 to-green-700 rounded-xl p-4">
+                            <p class="text-green-200 text-sm">可用 API</p>
+                            <p class="text-2xl font-bold mt-1">{{ apiPoolStats.available_for_assign || 0 }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4">
+                            <p class="text-blue-200 text-sm">已分配帳號</p>
+                            <p class="text-2xl font-bold mt-1">{{ apiPoolStats.total_allocations || 0 }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-yellow-600 to-yellow-700 rounded-xl p-4">
+                            <p class="text-yellow-200 text-sm">已滿 / 禁用</p>
+                            <p class="text-2xl font-bold mt-1">{{ (apiPoolStats.full || 0) + (apiPoolStats.disabled || 0) }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl p-4">
+                            <p class="text-purple-200 text-sm">總計</p>
+                            <p class="text-2xl font-bold mt-1">{{ apiPoolStats.total || 0 }}</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 操作欄 -->
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="flex gap-4">
+                            <select v-model="apiPoolFilter" @change="loadApiPool" 
+                                    class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2">
+                                <option value="">全部狀態</option>
+                                <option value="available">可用</option>
+                                <option value="full">已滿</option>
+                                <option value="disabled">已禁用</option>
+                                <option value="banned">已封禁</option>
+                            </select>
+                            <!-- 🆕 分組過濾器 -->
+                            <select v-model="apiPoolGroupFilter" @change="loadApiPool" 
+                                    class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2">
+                                <option value="">全部分組</option>
+                                <option v-for="group in apiGroups" :key="group.id" :value="group.id">
+                                    {{ group.icon }} {{ group.name }} ({{ group.api_count }})
+                                </option>
+                            </select>
+                            <!-- 🆕 分配策略選擇器 -->
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm text-gray-400">分配策略:</span>
+                                <select v-model="apiPoolStrategy" @change="setApiPoolStrategy" 
+                                        class="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                                    <option value="balanced">🔄 負載均衡</option>
+                                    <option value="success_rate">✅ 成功率優先</option>
+                                    <option value="least_failures">🛡️ 最少失敗</option>
+                                    <option value="round_robin">🔃 輪詢分配</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button @click="openGroupManagerModal" 
+                                    class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg font-medium transition-colors">
+                                📁 分組管理
+                            </button>
+                            <button @click="openApiPoolModal" 
+                                    class="gradient-bg hover:opacity-90 px-4 py-2 rounded-lg font-medium transition-opacity">
+                                ➕ 添加單個
+                            </button>
+                            <button @click="openApiPoolBatchModal" 
+                                    class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg font-medium transition-colors">
+                                📥 批量導入
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- API 列表 -->
+                    <div class="glass-card rounded-2xl p-6">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="text-gray-400 text-sm">
+                                    <th class="text-left px-6 py-4 font-medium">API 憑據</th>
+                                    <th class="text-left px-6 py-4 font-medium">狀態</th>
+                                    <th class="text-left px-6 py-4 font-medium">綁定帳號</th>
+                                    <th class="text-left px-6 py-4 font-medium">成功率</th>
+                                    <th class="text-left px-6 py-4 font-medium">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="api in apiPoolList" :key="api.id" 
+                                    class="border-t border-gray-700 table-row-hover">
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center">
+                                            <span class="text-lg mr-2">🔑</span>
+                                            <div>
+                                                <p class="font-medium">{{ api.name }}</p>
+                                                <p class="text-sm text-gray-400">
+                                                    ID: {{ api.api_id }}
+                                                    <span v-if="api.api_hash_masked" class="ml-2">Hash: {{ api.api_hash_masked }}</span>
+                                                </p>
+                                                <p class="text-xs text-gray-500" v-if="api.source_phone">來源: {{ api.source_phone }}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span :class="getApiStatusClass(api.status)" class="font-medium">
+                                            {{ getApiStatusText(api.status) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="text-blue-400">
+                                            {{ api.current_accounts }} / {{ api.max_accounts }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span :class="api.success_rate >= 80 ? 'text-green-400' : api.success_rate >= 50 ? 'text-yellow-400' : 'text-red-400'">
+                                            {{ api.success_rate }}%
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex gap-2">
+                                            <button @click="toggleApiStatus(api)" 
+                                                    :class="api.status === 'disabled' ? 'text-green-400 hover:text-green-300' : 'text-yellow-400 hover:text-yellow-300'"
+                                                    class="text-sm">
+                                                {{ api.status === 'disabled' ? '啟用' : '禁用' }}
+                                            </button>
+                                            <button @click="deleteApiFromPool(api.api_id)" 
+                                                    class="text-red-400 hover:text-red-300 text-sm">刪除</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="apiPoolList.length === 0">
+                                    <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                                        暫無 API 憑據，點擊上方按鈕添加
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 使用說明 -->
+                    <div class="mt-6 glass-card rounded-xl p-4">
+                        <h4 class="font-medium mb-2">📖 使用說明</h4>
+                        <ul class="text-sm text-gray-400 space-y-1">
+                            <li>• 本池為 <span class="text-blue-400">Telegram 官方 API 憑據池</span>，與「代理池」為兩個獨立功能</li>
+                            <li>• 憑據須在 <a href="https://my.telegram.org" target="_blank" class="text-blue-400 hover:underline">my.telegram.org</a> 登入 → API development tools → 創建應用後獲得</li>
+                            <li>• 每個帳號登錄時 <span class="text-yellow-400">先</span> 從本池取一組 API 憑據，<span class="text-yellow-400">再</span> 從代理池取獨立 IP</li>
+                            <li>• 每個帳號 = <span class="text-green-400">一組 API + 一個 IP</span>，雙重隔離以降低風控</li>
+                            <li>• 每組 API 建議最多綁定 3-5 個帳號，避免過度使用觸發風控</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- ==================== 🆕 系統設置 ==================== -->
+                <div v-if="currentPage === 'sysSettings'" @vue:mounted="loadSystemSettings()">
+                    <div class="grid grid-cols-2 gap-6">
+                        <!-- 告警配置 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                🔔 告警推送配置
+                                <span v-if="alertChannels.webhook || alertChannels.email || alertChannels.telegram" 
+                                      class="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">已配置</span>
+                            </h3>
+                            
+                            <div class="space-y-4">
+                                <!-- 基本設置 -->
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-400">啟用告警推送</span>
+                                    <button @click="alertConfig.enabled = !alertConfig.enabled"
+                                            :class="alertConfig.enabled ? 'bg-green-600' : 'bg-gray-600'"
+                                            class="px-4 py-1 rounded-full text-sm transition-colors">
+                                        {{ alertConfig.enabled ? '已啟用' : '已停用' }}
+                                    </button>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm text-gray-400 mb-1">節流間隔（分鐘）</label>
+                                        <input v-model.number="alertConfig.throttle_minutes" type="number" min="1" max="1440"
+                                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-gray-400 mb-1">最低告警級別</label>
+                                        <select v-model="alertConfig.min_level"
+                                                class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                                            <option value="info">ℹ️ 通知</option>
+                                            <option value="warning">⚠️ 警告</option>
+                                            <option value="critical">🚨 緊急</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <!-- Webhook -->
+                                <div class="border-t border-gray-700 pt-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="font-medium">Webhook</span>
+                                        <span :class="alertChannels.webhook ? 'text-green-400' : 'text-gray-500'" class="text-xs">
+                                            {{ alertChannels.webhook ? '✓ 已配置' : '未配置' }}
+                                        </span>
+                                    </div>
+                                    <input v-model="alertConfig.webhook_url" type="url" placeholder="https://your-webhook-url.com/alerts"
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm mb-2">
+                                    <input v-model="alertConfig.webhook_secret" type="password" placeholder="Webhook 密鑰（可選）"
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                                </div>
+                                
+                                <!-- Telegram -->
+                                <div class="border-t border-gray-700 pt-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="font-medium">Telegram Bot</span>
+                                        <span :class="alertChannels.telegram ? 'text-green-400' : 'text-gray-500'" class="text-xs">
+                                            {{ alertChannels.telegram ? '✓ 已配置' : '未配置' }}
+                                        </span>
+                                    </div>
+                                    <input v-model="alertConfig.telegram_bot_token" type="password" placeholder="Bot Token"
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm mb-2">
+                                    <input v-model="alertConfig.telegram_chat_id" type="text" placeholder="Chat ID"
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                                </div>
+                                
+                                <!-- 郵件 -->
+                                <div class="border-t border-gray-700 pt-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="font-medium">郵件通知</span>
+                                        <button @click="alertConfig.email_enabled = !alertConfig.email_enabled"
+                                                :class="alertConfig.email_enabled ? 'bg-green-600' : 'bg-gray-600'"
+                                                class="px-3 py-0.5 rounded-full text-xs transition-colors">
+                                            {{ alertConfig.email_enabled ? '啟用' : '停用' }}
+                                        </button>
+                                    </div>
+                                    <div v-if="alertConfig.email_enabled" class="space-y-2">
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input v-model="alertConfig.email_smtp_host" type="text" placeholder="SMTP 主機"
+                                                   class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                                            <input v-model.number="alertConfig.email_smtp_port" type="number" placeholder="端口"
+                                                   class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                                        </div>
+                                        <input v-model="alertConfig.email_smtp_user" type="text" placeholder="SMTP 用戶名"
+                                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                                        <input v-model="alertConfig.email_smtp_password" type="password" placeholder="SMTP 密碼"
+                                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                                        <input v-model="alertConfig.email_from" type="email" placeholder="發件人郵箱"
+                                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                                        <input v-model="alertConfig.email_to" type="text" placeholder="收件人郵箱（多個用逗號分隔）"
+                                               class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                                    </div>
+                                </div>
+                                
+                                <!-- 操作按鈕 -->
+                                <div class="flex gap-2 pt-4">
+                                    <button @click="saveAlertConfig" class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded-lg text-sm">
+                                        💾 保存配置
+                                    </button>
+                                    <button @click="testAlertChannel('webhook')" :disabled="!alertConfig.webhook_url"
+                                            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm disabled:opacity-50">
+                                        測試
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 定時任務 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">⏰ 定時任務管理</h3>
+                            
+                            <div class="space-y-3">
+                                <div v-for="task in scheduledTasks" :key="task.id"
+                                     class="bg-gray-700/50 rounded-lg p-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-medium">{{ task.name }}</span>
+                                            <span :class="task.enabled ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'"
+                                                  class="text-xs px-2 py-0.5 rounded-full">
+                                                {{ task.enabled ? '運行中' : '已停用' }}
+                                            </span>
+                                        </div>
+                                        <button @click="updateScheduledTask(task.id, {enabled: !task.enabled})"
+                                                :class="task.enabled ? 'text-yellow-400' : 'text-green-400'"
+                                                class="text-sm hover:underline">
+                                            {{ task.enabled ? '停用' : '啟用' }}
+                                        </button>
+                                    </div>
+                                    <div class="text-sm text-gray-400 space-y-1">
+                                        <p>間隔: {{ task.interval_minutes }} 分鐘</p>
+                                        <p>上次執行: {{ task.last_run ? new Date(task.last_run).toLocaleString() : '從未' }}</p>
+                                        <p>執行次數: {{ task.run_count }} 次 (失敗: {{ task.fail_count }})</p>
+                                    </div>
+                                    <div class="flex gap-2 mt-3">
+                                        <button @click="runTaskNow(task.id)" 
+                                                class="px-3 py-1 bg-blue-600/20 text-blue-400 rounded text-sm hover:bg-blue-600/40">
+                                            ▶️ 立即執行
+                                        </button>
+                                        <input v-model.number="task.interval_minutes" type="number" min="1" max="1440"
+                                               @change="updateScheduledTask(task.id, {interval_minutes: task.interval_minutes})"
+                                               class="w-24 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm">
+                                        <span class="text-gray-500 text-sm leading-loose">分鐘</span>
+                                    </div>
+                                </div>
+                                
+                                <div v-if="scheduledTasks.length === 0" class="text-center text-gray-400 py-8">
+                                    暫無定時任務
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 數據導出 -->
+                    <div class="bg-gray-800 rounded-xl p-6 mt-6">
+                        <h3 class="text-lg font-semibold mb-4">📤 數據導出</h3>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="bg-gray-700/50 rounded-lg p-4">
+                                <h4 class="font-medium mb-2">🔑 API 池數據</h4>
+                                <p class="text-sm text-gray-400 mb-3">導出所有 API 憑據信息</p>
+                                <div class="flex gap-2">
+                                    <button @click="exportData('api-pool', 'csv')" 
+                                            class="flex-1 bg-green-600 hover:bg-green-500 py-2 rounded text-sm">
+                                        CSV
+                                    </button>
+                                    <button @click="exportData('api-pool', 'json')" 
+                                            class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded text-sm">
+                                        JSON
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="bg-gray-700/50 rounded-lg p-4">
+                                <h4 class="font-medium mb-2">📋 分配歷史</h4>
+                                <p class="text-sm text-gray-400 mb-3">導出 API 分配記錄</p>
+                                <div class="flex gap-2">
+                                    <button @click="exportData('allocation-history', 'csv')" 
+                                            class="flex-1 bg-green-600 hover:bg-green-500 py-2 rounded text-sm">
+                                        CSV
+                                    </button>
+                                    <button @click="exportData('allocation-history', 'json')" 
+                                            class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded text-sm">
+                                        JSON
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="bg-gray-700/50 rounded-lg p-4">
+                                <h4 class="font-medium mb-2">🚨 告警歷史</h4>
+                                <p class="text-sm text-gray-400 mb-3">導出系統告警記錄</p>
+                                <div class="flex gap-2">
+                                    <button @click="exportData('alert-history', 'csv')" 
+                                            class="flex-1 bg-green-600 hover:bg-green-500 py-2 rounded text-sm">
+                                        CSV
+                                    </button>
+                                    <button @click="exportData('alert-history', 'json')" 
+                                            class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded text-sm">
+                                        JSON
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ==================== 🆕 P7: 智能運維 ==================== -->
+                <div v-if="currentPage === 'smartOps'" @vue:mounted="loadSmartOpsData()">
+                    <!-- 健康摘要卡片 -->
+                    <div class="grid grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gradient-to-r from-green-600 to-green-700 rounded-xl p-4">
+                            <p class="text-green-200 text-sm">健康 API</p>
+                            <p class="text-2xl font-bold mt-1">{{ (healthSummary.grade_distribution?.excellent || 0) + (healthSummary.grade_distribution?.good || 0) }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-yellow-600 to-yellow-700 rounded-xl p-4">
+                            <p class="text-yellow-200 text-sm">需關注</p>
+                            <p class="text-2xl font-bold mt-1">{{ healthSummary.needs_attention || 0 }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4">
+                            <p class="text-blue-200 text-sm">平均健康分</p>
+                            <p class="text-2xl font-bold mt-1">{{ healthSummary.average_score || 0 }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl p-4">
+                            <p class="text-purple-200 text-sm">Webhook 成功率</p>
+                            <p class="text-2xl font-bold mt-1">{{ webhookStats.success_rate || 100 }}%</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-6">
+                        <!-- 健康評分列表 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                💚 API 健康評分
+                            </h3>
+                            <div class="space-y-3 max-h-96 overflow-y-auto">
+                                <div v-for="api in healthScores.slice(0, 10)" :key="api.api_id" 
+                                     class="bg-gray-700/50 rounded-lg p-3 flex items-center justify-between">
+                                    <div>
+                                        <p class="font-medium">{{ api.name || api.api_id }}</p>
+                                        <p class="text-xs text-gray-400">{{ api.status }}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <span :class="['text-lg font-bold', 
+                                            api.health_grade === 'excellent' ? 'text-green-400' : 
+                                            api.health_grade === 'good' ? 'text-blue-400' : 
+                                            api.health_grade === 'fair' ? 'text-yellow-400' : 'text-red-400']">
+                                            {{ api.health_score }}
+                                        </span>
+                                        <p class="text-xs text-gray-400">{{ api.health_grade }}</p>
+                                    </div>
+                                </div>
+                                <p v-if="healthScores.length === 0" class="text-gray-400 text-center py-4">暫無數據</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 異常檢測 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                🚨 異常 API
+                            </h3>
+                            <div class="space-y-3 max-h-96 overflow-y-auto">
+                                <div v-for="api in anomalies" :key="api.api_id" 
+                                     class="bg-red-900/30 border border-red-500/30 rounded-lg p-3">
+                                    <div class="flex justify-between items-start">
+                                        <p class="font-medium text-red-300">{{ api.name || api.api_id }}</p>
+                                        <span class="text-red-400 font-bold">{{ api.score }}</span>
+                                    </div>
+                                    <div class="mt-2">
+                                        <span v-for="issue in api.issues" :key="issue" 
+                                              class="inline-block bg-red-600/50 text-xs px-2 py-0.5 rounded mr-1 mb-1">
+                                            {{ issue }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <p v-if="anomalies.length === 0" class="text-green-400 text-center py-4">
+                                    ✓ 所有 API 運行正常
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- 預測報告 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                📊 智能預測
+                            </h3>
+                            <div v-if="predictionReport">
+                                <div class="grid grid-cols-2 gap-4 mb-4">
+                                    <div class="bg-gray-700/50 rounded-lg p-3">
+                                        <p class="text-xs text-gray-400">趨勢</p>
+                                        <p :class="['font-bold', 
+                                            predictionReport.daily_prediction?.trend === 'up' ? 'text-green-400' :
+                                            predictionReport.daily_prediction?.trend === 'down' ? 'text-red-400' : 'text-gray-400']">
+                                            {{ predictionReport.daily_prediction?.trend === 'up' ? '📈 上升' : 
+                                               predictionReport.daily_prediction?.trend === 'down' ? '📉 下降' : '➡️ 穩定' }}
+                                        </p>
+                                    </div>
+                                    <div class="bg-gray-700/50 rounded-lg p-3">
+                                        <p class="text-xs text-gray-400">風險等級</p>
+                                        <p :class="['font-bold', 
+                                            predictionReport.risk_assessment?.level === 'high' ? 'text-red-400' :
+                                            predictionReport.risk_assessment?.level === 'medium' ? 'text-yellow-400' : 'text-green-400']">
+                                            {{ predictionReport.risk_assessment?.level === 'high' ? '🔴 高' : 
+                                               predictionReport.risk_assessment?.level === 'medium' ? '🟡 中' : '🟢 低' }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-700/50 rounded-lg p-3">
+                                    <p class="text-xs text-gray-400 mb-2">容量預測</p>
+                                    <p class="text-sm">
+                                        當前使用率: <span class="font-bold">{{ predictionReport.capacity_prediction?.current_utilization || 0 }}%</span>
+                                    </p>
+                                    <p class="text-sm" v-if="predictionReport.capacity_prediction?.days_until_full">
+                                        預計耗盡: <span class="font-bold text-yellow-400">{{ predictionReport.capacity_prediction?.days_until_full }} 天後</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <p v-else class="text-gray-400 text-center py-4">加載中...</p>
+                        </div>
+                        
+                        <!-- Webhook 訂閱者 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold flex items-center gap-2">
+                                    🔗 Webhook 訂閱
+                                </h3>
+                                <button @click="showWebhookModal = true" 
+                                        class="bg-purple-600 hover:bg-purple-500 px-3 py-1 rounded text-sm">
+                                    + 添加
+                                </button>
+                            </div>
+                            <div class="space-y-2 max-h-48 overflow-y-auto">
+                                <div v-for="sub in webhookSubscribers" :key="sub.id" 
+                                     class="bg-gray-700/50 rounded-lg p-3 flex items-center justify-between">
+                                    <div>
+                                        <p class="font-medium">{{ sub.name }}</p>
+                                        <p class="text-xs text-gray-400 truncate" style="max-width: 200px;">{{ sub.url }}</p>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button @click="testWebhook(sub.id)" class="text-blue-400 hover:text-blue-300 text-sm">測試</button>
+                                        <button @click="deleteWebhookSubscriber(sub.id)" class="text-red-400 hover:text-red-300 text-sm">刪除</button>
+                                    </div>
+                                </div>
+                                <p v-if="webhookSubscribers.length === 0" class="text-gray-400 text-center py-4">暫無訂閱者</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 擴縮容策略 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold flex items-center gap-2">
+                                    ⚡ 自動擴縮容
+                                </h3>
+                                <button @click="showScalingModal = true" 
+                                        class="bg-purple-600 hover:bg-purple-500 px-3 py-1 rounded text-sm">
+                                    + 策略
+                                </button>
+                            </div>
+                            <!-- 擴縮容建議 -->
+                            <div v-if="scalingRecommendations.length > 0" class="mb-4">
+                                <p class="text-sm text-yellow-400 mb-2">💡 擴縮容建議</p>
+                                <div v-for="rec in scalingRecommendations" :key="rec.policy_id" 
+                                     class="bg-yellow-900/30 border border-yellow-500/30 rounded-lg p-3 mb-2">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <p class="font-medium">{{ rec.policy_name }}</p>
+                                            <p class="text-xs text-gray-400">{{ rec.reason }}</p>
+                                        </div>
+                                        <button @click="executeScaling(rec)" 
+                                                class="bg-yellow-600 hover:bg-yellow-500 px-3 py-1 rounded text-sm">
+                                            {{ rec.action === 'scale_up' ? '擴容' : '縮容' }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- 策略列表 -->
+                            <div class="space-y-2 max-h-32 overflow-y-auto">
+                                <div v-for="policy in scalingPolicies" :key="policy.id" 
+                                     class="bg-gray-700/50 rounded-lg p-3 flex items-center justify-between">
+                                    <div>
+                                        <p class="font-medium">{{ policy.name }}</p>
+                                        <p class="text-xs text-gray-400">
+                                            擴容 >{{ policy.scale_up?.threshold || 80 }}% | 縮容 &lt;{{ policy.scale_down?.threshold || 30 }}%
+                                        </p>
+                                    </div>
+                                    <span :class="['px-2 py-0.5 rounded text-xs', 
+                                        policy.is_active ? 'bg-green-600' : 'bg-gray-600']">
+                                        {{ policy.is_active ? '啟用' : '禁用' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 計費方案 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                💰 計費方案
+                            </h3>
+                            <div class="space-y-2 max-h-48 overflow-y-auto">
+                                <div v-for="plan in billingPlans" :key="plan.id" 
+                                     class="bg-gray-700/50 rounded-lg p-3 flex items-center justify-between">
+                                    <div>
+                                        <p class="font-medium">{{ plan.name }}</p>
+                                        <p class="text-xs text-gray-400">{{ plan.plan_type }}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="font-bold text-green-400">${{ plan.base_price || 0 }}</p>
+                                        <p class="text-xs text-gray-400">/ 月</p>
+                                    </div>
+                                </div>
+                                <p v-if="billingPlans.length === 0" class="text-gray-400 text-center py-4">暫無計費方案</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Webhook 添加彈窗 -->
+                <div v-if="showWebhookModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 rounded-xl p-6 w-full max-w-md">
+                        <h3 class="text-xl font-bold mb-4">添加 Webhook 訂閱者</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">名稱</label>
+                                <input v-model="webhookForm.name" type="text" 
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                       placeholder="訂閱者名稱">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">Webhook URL</label>
+                                <input v-model="webhookForm.url" type="url" 
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                       placeholder="https://...">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">Secret (可選)</label>
+                                <input v-model="webhookForm.secret" type="password" 
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                       placeholder="用於簽名驗證">
+                            </div>
+                        </div>
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button @click="showWebhookModal = false" 
+                                    class="px-6 py-2 rounded-lg bg-gray-700 hover:bg-gray-600">取消</button>
+                            <button @click="addWebhookSubscriber" 
+                                    class="px-6 py-2 rounded-lg gradient-bg hover:opacity-90">添加</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 擴縮容策略彈窗 -->
+                <div v-if="showScalingModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 rounded-xl p-6 w-full max-w-md">
+                        <h3 class="text-xl font-bold mb-4">創建擴縮容策略</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">策略名稱</label>
+                                <input v-model="scalingForm.name" type="text" 
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                       placeholder="策略名稱">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">擴容閾值 (%)</label>
+                                <input v-model.number="scalingForm.scale_up_threshold" type="number" 
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                       min="50" max="100">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">縮容閾值 (%)</label>
+                                <input v-model.number="scalingForm.scale_down_threshold" type="number" 
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                       min="0" max="50">
+                            </div>
+                        </div>
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button @click="showScalingModal = false" 
+                                    class="px-6 py-2 rounded-lg bg-gray-700 hover:bg-gray-600">取消</button>
+                            <button @click="createScalingPolicy" 
+                                    class="px-6 py-2 rounded-lg gradient-bg hover:opacity-90">創建</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ==================== 🆕 P9: 服務健康儀表盤 ==================== -->
+                <div v-if="currentPage === 'serviceDashboard'" @vue:mounted="loadServiceDashboard()">
+                    <!-- 系統狀態卡片 -->
+                    <div class="grid grid-cols-4 gap-4 mb-6">
+                        <div :class="['rounded-xl p-4', 
+                            serviceDashboard.overall_status === 'operational' ? 'bg-gradient-to-r from-green-600 to-green-700' :
+                            serviceDashboard.overall_status === 'degraded' ? 'bg-gradient-to-r from-yellow-600 to-yellow-700' :
+                            'bg-gradient-to-r from-red-600 to-red-700']">
+                            <p class="text-white/80 text-sm">系統狀態</p>
+                            <p class="text-2xl font-bold mt-1">{{ serviceDashboard.overall_status_display || '正常' }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4">
+                            <p class="text-blue-200 text-sm">平均可用性</p>
+                            <p class="text-2xl font-bold mt-1">{{ serviceDashboard.average_uptime || 100 }}%</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl p-4">
+                            <p class="text-purple-200 text-sm">SLA 合規</p>
+                            <p class="text-2xl font-bold mt-1">{{ serviceDashboard.sla?.compliance_percent || 100 }}%</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-orange-600 to-orange-700 rounded-xl p-4">
+                            <p class="text-orange-200 text-sm">活躍事件</p>
+                            <p class="text-2xl font-bold mt-1">{{ serviceDashboard.active_incidents || 0 }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-6">
+                        <!-- 服務組件狀態 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                🔧 服務組件
+                            </h3>
+                            <div class="space-y-3 max-h-96 overflow-y-auto">
+                                <div v-for="comp in serviceDashboard.components?.list || []" :key="comp.id" 
+                                     class="bg-gray-700/50 rounded-lg p-3 flex items-center justify-between">
+                                    <div>
+                                        <p class="font-medium">{{ comp.name }}</p>
+                                        <p class="text-xs text-gray-400">{{ comp.description }}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <span :class="['px-2 py-1 rounded text-xs font-medium',
+                                            comp.status === 'operational' ? 'bg-green-600' :
+                                            comp.status === 'degraded' ? 'bg-yellow-600' :
+                                            comp.status === 'maintenance' ? 'bg-blue-600' : 'bg-red-600']">
+                                            {{ comp.status === 'operational' ? '正常' : 
+                                               comp.status === 'degraded' ? '降級' : 
+                                               comp.status === 'maintenance' ? '維護' : '中斷' }}
+                                        </span>
+                                        <p class="text-xs text-gray-400 mt-1">{{ comp.uptime_percent?.toFixed(1) }}%</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- SLA 目標 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                📊 SLA 目標
+                            </h3>
+                            <div class="space-y-3">
+                                <div v-for="sla in serviceDashboard.sla?.details || []" :key="sla.id" 
+                                     class="bg-gray-700/50 rounded-lg p-3">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="font-medium">{{ sla.name }}</span>
+                                        <span :class="['px-2 py-0.5 rounded text-xs',
+                                            sla.status === 'met' ? 'bg-green-600' :
+                                            sla.status === 'at_risk' ? 'bg-yellow-600' : 'bg-red-600']">
+                                            {{ sla.status === 'met' ? '達標' : sla.status === 'at_risk' ? '風險' : '違約' }}
+                                        </span>
+                                    </div>
+                                    <div class="flex justify-between text-sm text-gray-400">
+                                        <span>目標: {{ sla.target_value }}</span>
+                                        <span>當前: {{ sla.current_value }}</span>
+                                    </div>
+                                    <div class="mt-2 bg-gray-600 rounded-full h-2">
+                                        <div :class="['h-2 rounded-full',
+                                            sla.status === 'met' ? 'bg-green-500' :
+                                            sla.status === 'at_risk' ? 'bg-yellow-500' : 'bg-red-500']"
+                                             :style="{width: Math.min(100, (sla.current_value / sla.target_value) * 100) + '%'}"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 活躍事件 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold flex items-center gap-2">
+                                    🚨 活躍事件
+                                </h3>
+                                <button @click="showIncidentModal = true" 
+                                        class="bg-red-600 hover:bg-red-500 px-3 py-1 rounded text-sm">
+                                    + 報告事件
+                                </button>
+                            </div>
+                            <div class="space-y-2 max-h-48 overflow-y-auto">
+                                <div v-for="incident in serviceDashboard.incidents || []" :key="incident.id" 
+                                     class="bg-red-900/30 border border-red-500/30 rounded-lg p-3">
+                                    <div class="flex justify-between">
+                                        <span class="font-medium text-red-300">{{ incident.title }}</span>
+                                        <span class="text-xs text-gray-400">{{ incident.created_at?.split('T')[0] }}</span>
+                                    </div>
+                                    <p class="text-sm text-gray-400 mt-1">{{ incident.message }}</p>
+                                </div>
+                                <p v-if="!serviceDashboard.incidents?.length" class="text-green-400 text-center py-4">
+                                    ✓ 暫無活躍事件
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- 計劃維護 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold flex items-center gap-2">
+                                    🔧 計劃維護
+                                </h3>
+                                <button @click="showMaintenanceModal = true" 
+                                        class="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-sm">
+                                    + 排程
+                                </button>
+                            </div>
+                            <div class="space-y-2 max-h-48 overflow-y-auto">
+                                <div v-for="maint in serviceDashboard.upcoming_maintenance || []" :key="maint.id" 
+                                     class="bg-blue-900/30 border border-blue-500/30 rounded-lg p-3">
+                                    <div class="flex justify-between">
+                                        <span class="font-medium text-blue-300">{{ maint.title }}</span>
+                                        <span class="text-xs text-gray-400">{{ maint.scheduled_start?.split('T')[0] }}</span>
+                                    </div>
+                                    <p class="text-sm text-gray-400 mt-1">{{ maint.description }}</p>
+                                </div>
+                                <p v-if="!serviceDashboard.upcoming_maintenance?.length" class="text-gray-400 text-center py-4">
+                                    暫無計劃維護
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 事件報告彈窗 -->
+                <div v-if="showIncidentModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 rounded-xl p-6 w-full max-w-md">
+                        <h3 class="text-xl font-bold mb-4">報告事件</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">標題</label>
+                                <input v-model="incidentForm.title" type="text" 
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                       placeholder="事件標題">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">描述</label>
+                                <textarea v-model="incidentForm.message" rows="3"
+                                          class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                          placeholder="事件描述"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">嚴重程度</label>
+                                <select v-model="incidentForm.status" 
+                                        class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
+                                    <option value="degraded">性能下降</option>
+                                    <option value="partial_outage">部分中斷</option>
+                                    <option value="major_outage">嚴重中斷</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button @click="showIncidentModal = false" 
+                                    class="px-6 py-2 rounded-lg bg-gray-700 hover:bg-gray-600">取消</button>
+                            <button @click="createStatusUpdate" 
+                                    class="px-6 py-2 rounded-lg bg-red-600 hover:bg-red-500">報告</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 維護排程彈窗 -->
+                <div v-if="showMaintenanceModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 rounded-xl p-6 w-full max-w-md">
+                        <h3 class="text-xl font-bold mb-4">排程維護</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">標題</label>
+                                <input v-model="maintenanceForm.title" type="text" 
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                       placeholder="維護標題">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">描述</label>
+                                <textarea v-model="maintenanceForm.description" rows="3"
+                                          class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                          placeholder="維護描述"></textarea>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">開始時間</label>
+                                    <input v-model="maintenanceForm.scheduled_start" type="datetime-local"
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">結束時間</label>
+                                    <input v-model="maintenanceForm.scheduled_end" type="datetime-local"
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button @click="showMaintenanceModal = false" 
+                                    class="px-6 py-2 rounded-lg bg-gray-700 hover:bg-gray-600">取消</button>
+                            <button @click="scheduleMaintenance" 
+                                    class="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-500">排程</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ==================== 🆕 P10: 分析中心 ==================== -->
+                <div v-if="currentPage === 'analyticsCenter'" @vue:mounted="loadAnalyticsCenter()">
+                    <!-- 標籤頁導航 -->
+                    <div class="flex gap-2 mb-6">
+                        <button v-for="tab in [
+                            {id: 'predictions', name: '智能預測', icon: '🔮'},
+                            {id: 'cost', name: '成本分析', icon: '💰'},
+                            {id: 'performance', name: '性能監控', icon: '⚡'},
+                            {id: 'reports', name: '報告中心', icon: '📊'},
+                            {id: 'disaster', name: '災備狀態', icon: '🛡️'}
+                        ]" :key="tab.id"
+                                @click="analyticsActiveTab = tab.id"
+                                :class="['px-4 py-2 rounded-lg font-medium transition-all',
+                                        analyticsActiveTab === tab.id 
+                                            ? 'bg-blue-600 text-white' 
+                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600']">
+                            {{ tab.icon }} {{ tab.name }}
+                        </button>
+                    </div>
+                    
+                    <!-- 智能預測 -->
+                    <div v-if="analyticsActiveTab === 'predictions'" class="space-y-6">
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-bold mb-4">🔮 使用量預測</h3>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div class="bg-gray-700 rounded-lg p-4">
+                                    <p class="text-gray-400 text-sm">預測類型</p>
+                                    <p class="text-xl font-bold mt-1">{{ analyticsCenter.predictions?.prediction?.type || '使用量' }}</p>
+                                </div>
+                                <div class="bg-gray-700 rounded-lg p-4">
+                                    <p class="text-gray-400 text-sm">置信度</p>
+                                    <p class="text-xl font-bold mt-1">{{ ((analyticsCenter.predictions?.prediction?.confidence || 0) * 100).toFixed(1) }}%</p>
+                                </div>
+                                <div class="bg-gray-700 rounded-lg p-4">
+                                    <p class="text-gray-400 text-sm">預測時段</p>
+                                    <p class="text-xl font-bold mt-1">未來 24 小時</p>
+                                </div>
+                            </div>
+                            <div class="mt-4 h-40 flex items-center justify-center bg-gray-700 rounded-lg">
+                                <span class="text-gray-400">預測趨勢圖（基於統計模型）</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 成本分析 -->
+                    <div v-if="analyticsActiveTab === 'cost'" class="space-y-6">
+                        <div class="grid grid-cols-4 gap-4">
+                            <div class="bg-gradient-to-r from-green-600 to-green-700 rounded-xl p-4">
+                                <p class="text-white/80 text-sm">30天總成本</p>
+                                <p class="text-2xl font-bold mt-1">${{ (analyticsCenter.costSummary?.total_cost || 0).toFixed(2) }}</p>
+                            </div>
+                            <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4">
+                                <p class="text-blue-200 text-sm">日均成本</p>
+                                <p class="text-2xl font-bold mt-1">${{ (analyticsCenter.costSummary?.avg_daily_cost || 0).toFixed(2) }}</p>
+                            </div>
+                            <div class="bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl p-4">
+                                <p class="text-purple-200 text-sm">記錄數</p>
+                                <p class="text-2xl font-bold mt-1">{{ analyticsCenter.costSummary?.record_count || 0 }}</p>
+                            </div>
+                            <div class="bg-gradient-to-r from-orange-600 to-orange-700 rounded-xl p-4">
+                                <p class="text-orange-200 text-sm">優化機會</p>
+                                <p class="text-2xl font-bold mt-1">待發現</p>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-bold mb-4">📊 成本分佈</h3>
+                            <div class="space-y-2">
+                                <div v-for="(data, type) in analyticsCenter.costSummary?.by_resource_type || {}" :key="type" 
+                                     class="flex justify-between items-center p-3 bg-gray-700 rounded-lg">
+                                    <span>{{ type }}</span>
+                                    <span class="font-bold">${{ (data.total_cost || 0).toFixed(2) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 性能監控 -->
+                    <div v-if="analyticsActiveTab === 'performance'" class="space-y-6">
+                        <div class="grid grid-cols-4 gap-4">
+                            <div :class="['rounded-xl p-4',
+                                analyticsCenter.performanceSummary?.overall_status === 'excellent' ? 'bg-gradient-to-r from-green-600 to-green-700' :
+                                analyticsCenter.performanceSummary?.overall_status === 'good' ? 'bg-gradient-to-r from-blue-600 to-blue-700' :
+                                'bg-gradient-to-r from-yellow-600 to-yellow-700']">
+                                <p class="text-white/80 text-sm">整體健康</p>
+                                <p class="text-2xl font-bold mt-1">{{ analyticsCenter.performanceSummary?.overall_health_score || 0 }}分</p>
+                            </div>
+                            <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4">
+                                <p class="text-blue-200 text-sm">平均延遲</p>
+                                <p class="text-2xl font-bold mt-1">{{ analyticsCenter.performanceSummary?.latency_summary?.mean || '-' }}ms</p>
+                            </div>
+                            <div class="bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl p-4">
+                                <p class="text-purple-200 text-sm">P99 延遲</p>
+                                <p class="text-2xl font-bold mt-1">{{ analyticsCenter.performanceSummary?.latency_summary?.p99 || '-' }}ms</p>
+                            </div>
+                            <div class="bg-gradient-to-r from-red-600 to-red-700 rounded-xl p-4">
+                                <p class="text-red-200 text-sm">活躍瓶頸</p>
+                                <p class="text-2xl font-bold mt-1">{{ analyticsCenter.performanceSummary?.active_bottlenecks?.count || 0 }}</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <button @click="detectBottlenecks" class="px-4 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg">
+                                🔍 檢測瓶頸
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 報告中心 -->
+                    <div v-if="analyticsActiveTab === 'reports'" class="space-y-6">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-bold">📊 報告列表</h3>
+                            <button @click="showReportModal = true" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg">
+                                ➕ 生成報告
+                            </button>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl overflow-hidden">
+                            <table class="w-full">
+                                <thead class="bg-gray-700">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left">標題</th>
+                                        <th class="px-4 py-3 text-left">類型</th>
+                                        <th class="px-4 py-3 text-left">週期</th>
+                                        <th class="px-4 py-3 text-left">生成時間</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="report in analyticsCenter.reports" :key="report.id" 
+                                        class="border-t border-gray-700 hover:bg-gray-700/50">
+                                        <td class="px-4 py-3">{{ report.title }}</td>
+                                        <td class="px-4 py-3">{{ report.report_type }}</td>
+                                        <td class="px-4 py-3">{{ report.period_start?.slice(0, 10) }}</td>
+                                        <td class="px-4 py-3">{{ report.generated_at?.slice(0, 16) }}</td>
+                                    </tr>
+                                    <tr v-if="!analyticsCenter.reports?.length">
+                                        <td colspan="4" class="px-4 py-8 text-center text-gray-400">暫無報告</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- 災備狀態 -->
+                    <div v-if="analyticsActiveTab === 'disaster'" class="space-y-6">
+                        <div class="grid grid-cols-3 gap-4">
+                            <div :class="['rounded-xl p-4',
+                                analyticsCenter.drStats?.rpo?.status === 'met' ? 'bg-gradient-to-r from-green-600 to-green-700' :
+                                'bg-gradient-to-r from-red-600 to-red-700']">
+                                <p class="text-white/80 text-sm">RPO 狀態</p>
+                                <p class="text-2xl font-bold mt-1">{{ analyticsCenter.drStats?.rpo?.status === 'met' ? '達標' : '超時' }}</p>
+                                <p class="text-sm mt-1">目標: {{ analyticsCenter.drStats?.rpo?.target_hours || 4 }} 小時</p>
+                            </div>
+                            <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4">
+                                <p class="text-blue-200 text-sm">RTO 平均</p>
+                                <p class="text-2xl font-bold mt-1">{{ analyticsCenter.drStats?.rto?.avg_seconds || 0 }}s</p>
+                                <p class="text-sm mt-1">成功率: {{ analyticsCenter.drStats?.rto?.success_rate || 100 }}%</p>
+                            </div>
+                            <div class="bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl p-4">
+                                <p class="text-purple-200 text-sm">活躍調度</p>
+                                <p class="text-2xl font-bold mt-1">{{ analyticsCenter.drStats?.active_schedules || 0 }}</p>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-bold mb-4">📦 備份統計</h3>
+                            <div class="grid grid-cols-4 gap-4">
+                                <div v-for="(data, status) in analyticsCenter.drStats?.backups || {}" :key="status"
+                                     class="bg-gray-700 rounded-lg p-4">
+                                    <p class="text-gray-400 text-sm">{{ status }}</p>
+                                    <p class="text-xl font-bold mt-1">{{ data.count || 0 }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 生成報告彈窗 -->
+                    <div v-if="showReportModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-md">
+                            <h3 class="text-xl font-bold mb-4">📊 生成報告</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">報告類型</label>
+                                    <select v-model="reportForm.type" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
+                                        <option value="daily">每日摘要</option>
+                                        <option value="weekly">每週回顧</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">日期（可選）</label>
+                                    <input v-model="reportForm.date" type="date" 
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
+                                </div>
+                            </div>
+                            <div class="flex justify-end gap-3 mt-6">
+                                <button @click="showReportModal = false" 
+                                        class="px-6 py-2 rounded-lg bg-gray-700 hover:bg-gray-600">取消</button>
+                                <button @click="generateReport" 
+                                        class="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-500">生成</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- 添加代理彈窗 -->
                 <div v-if="showProxyModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-lg">
@@ -924,6 +2111,210 @@ host:port"></textarea>
                                     class="px-6 py-2 rounded-lg bg-gray-700 hover:bg-gray-600">取消</button>
                             <button @click="addProxies" 
                                     class="px-6 py-2 rounded-lg gradient-bg hover:opacity-90">添加代理</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 添加 API 憑據彈窗 -->
+                <div v-if="showApiPoolModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-lg">
+                        <h3 class="text-xl font-bold mb-4">🔑 添加 API 憑據</h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">API ID <span class="text-red-400">*</span></label>
+                                <input v-model="apiPoolForm.api_id" type="text" 
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                       placeholder="如：12345678">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">API Hash <span class="text-red-400">*</span></label>
+                                <input v-model="apiPoolForm.api_hash" type="password" 
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                       placeholder="32 位字符">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">別名</label>
+                                <input v-model="apiPoolForm.name" type="text" 
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                       placeholder="如：我的 API 1">
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">來源手機號（可選）</label>
+                                    <input v-model="apiPoolForm.source_phone" type="text" 
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                           placeholder="申請時用的手機號">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">最大綁定帳號數</label>
+                                    <input v-model="apiPoolForm.max_accounts" type="number" min="1" max="50"
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">備註（可選）</label>
+                                <input v-model="apiPoolForm.note" type="text" 
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2"
+                                       placeholder="任意備註信息">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 p-3 bg-gray-700/50 rounded-lg text-sm text-gray-400">
+                            💡 獲取方式：登錄 <a href="https://my.telegram.org" target="_blank" class="text-blue-400 hover:underline">my.telegram.org</a> → API development tools → 創建應用
+                        </div>
+                        
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button @click="showApiPoolModal = false" 
+                                    class="px-6 py-2 rounded-lg bg-gray-700 hover:bg-gray-600">取消</button>
+                            <button @click="addApiToPool" 
+                                    class="px-6 py-2 rounded-lg gradient-bg hover:opacity-90">添加</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 批量導入 API 憑據彈窗 -->
+                <div v-if="showApiPoolBatchModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <h3 class="text-xl font-bold mb-4">📥 批量導入 API 憑據</h3>
+                        
+                        <div class="space-y-4">
+                            <!-- 格式說明 -->
+                            <div class="bg-gray-700/50 rounded-lg p-4">
+                                <h4 class="font-medium text-sm mb-2">📖 支持格式</h4>
+                                <div class="text-xs text-gray-400 space-y-1">
+                                    <p><span class="text-blue-400">CSV 格式</span>：api_id,api_hash,name,source_phone,max_accounts</p>
+                                    <p><span class="text-blue-400">簡單格式</span>：api_id:api_hash 或 api_id,api_hash（每行一條）</p>
+                                    <p><span class="text-blue-400">JSON 格式</span>：[{"api_id":"123","api_hash":"abc"}]</p>
+                                </div>
+                            </div>
+                            
+                            <!-- 文本輸入 -->
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">粘貼或輸入 API 列表</label>
+                                <textarea v-model="apiPoolBatchForm.text" 
+                                          class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 h-48 font-mono text-sm"
+                                          placeholder="示例：
+12345678,abc123def456789012345678901234,MyApp1,+8613800138000,5
+87654321,xyz789abc123456789012345678901,MyApp2,,3
+
+或 CSV 格式（帶表頭）：
+api_id,api_hash,name
+12345678,abc123def456789012345678901234,MyApp1"></textarea>
+                            </div>
+                            
+                            <!-- 默認設置 -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">默認最大綁定帳號數</label>
+                                    <input v-model="apiPoolBatchForm.default_max_accounts" type="number" min="1" max="50"
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
+                                </div>
+                                <div class="flex items-end">
+                                    <p class="text-sm text-gray-500">未指定時使用此值</p>
+                                </div>
+                            </div>
+                            
+                            <!-- 導入結果 -->
+                            <div v-if="apiPoolBatchResult" class="bg-gray-700/50 rounded-lg p-4">
+                                <h4 class="font-medium text-sm mb-2">導入結果</h4>
+                                <div class="flex gap-4 text-sm">
+                                    <span class="text-green-400">✅ 成功: {{ apiPoolBatchResult.success }}</span>
+                                    <span class="text-yellow-400">🔄 重複: {{ apiPoolBatchResult.duplicates || 0 }}</span>
+                                    <span class="text-red-400">❌ 失敗: {{ apiPoolBatchResult.failed - (apiPoolBatchResult.duplicates || 0) }}</span>
+                                </div>
+                                <div v-if="apiPoolBatchResult.errors && apiPoolBatchResult.errors.length > 0" class="mt-2 text-xs text-red-400 max-h-24 overflow-y-auto">
+                                    <div v-for="err in apiPoolBatchResult.errors.slice(0, 5)" :key="err.api_id">
+                                        {{ err.api_id }}: {{ err.error }}
+                                    </div>
+                                    <div v-if="apiPoolBatchResult.errors.length > 5" class="text-gray-500">
+                                        ...還有 {{ apiPoolBatchResult.errors.length - 5 }} 條錯誤
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button @click="showApiPoolBatchModal = false" 
+                                    class="px-6 py-2 rounded-lg bg-gray-700 hover:bg-gray-600">關閉</button>
+                            <button @click="importApisFromText" 
+                                    :disabled="!apiPoolBatchForm.text.trim()"
+                                    :class="apiPoolBatchForm.text.trim() ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gray-600 cursor-not-allowed'"
+                                    class="px-6 py-2 rounded-lg font-medium">導入</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 🆕 分組管理彈窗 -->
+                <div v-if="showGroupManagerModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-3xl max-h-[85vh] overflow-y-auto">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-xl font-bold">📁 API 分組管理</h3>
+                            <button @click="showGroupManagerModal = false" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+                        </div>
+                        
+                        <!-- 新建分組表單 -->
+                        <div class="bg-gray-700/50 rounded-xl p-4 mb-6">
+                            <h4 class="font-medium mb-3">新建分組</h4>
+                            <div class="flex gap-4">
+                                <div class="flex-1">
+                                    <input v-model="newGroupForm.name" type="text" placeholder="分組名稱"
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2">
+                                </div>
+                                <div class="w-24">
+                                    <input v-model="newGroupForm.icon" type="text" placeholder="📁"
+                                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-center">
+                                </div>
+                                <div class="w-24">
+                                    <input v-model="newGroupForm.color" type="color" 
+                                           class="w-full h-10 bg-gray-700 border border-gray-600 rounded-lg">
+                                </div>
+                                <button @click="createApiGroup" 
+                                        :disabled="!newGroupForm.name.trim()"
+                                        class="px-6 py-2 rounded-lg bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed">
+                                    ➕ 創建
+                                </button>
+                            </div>
+                            <input v-model="newGroupForm.description" type="text" placeholder="分組描述（可選）"
+                                   class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 mt-2">
+                        </div>
+                        
+                        <!-- 分組列表 -->
+                        <div class="space-y-3">
+                            <div v-for="group in apiGroups" :key="group.id"
+                                 class="bg-gray-700/30 rounded-xl p-4 border-l-4"
+                                 :style="{borderColor: group.color}">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-2xl">{{ group.icon }}</span>
+                                        <div>
+                                            <h5 class="font-medium">{{ group.name }}</h5>
+                                            <p class="text-sm text-gray-400">{{ group.description || '無描述' }}</p>
+                                        </div>
+                                        <span v-if="group.is_default" class="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">默認</span>
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <div class="text-right text-sm">
+                                            <p class="text-gray-300">{{ group.api_count }} 個 API</p>
+                                            <p class="text-gray-500">{{ group.total_allocations }} 個帳號</p>
+                                        </div>
+                                        <div v-if="!group.is_default" class="flex gap-2">
+                                            <button @click="editApiGroup(group)" 
+                                                    class="p-2 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 text-blue-400">✏️</button>
+                                            <button @click="deleteApiGroup(group.id)" 
+                                                    class="p-2 rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-400">🗑️</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div v-if="apiGroups.length === 0" class="text-center text-gray-400 py-8">
+                                暫無分組，請先創建一個分組
+                            </div>
                         </div>
                     </div>
                 </div>

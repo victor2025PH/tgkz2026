@@ -5110,6 +5110,31 @@ class BackendService:
             
             print(f"[Backend] Bulk deleting {len(account_ids)} accounts", file=sys.stderr)
             
+            # 🆕 先釋放雙池分配（在刪除數據庫記錄之前）
+            for account_id in account_ids:
+                try:
+                    account = await db.get_account(account_id)
+                    if account:
+                        phone = account.get('phone')
+                        if phone:
+                            # 釋放 SQLite API 對接池
+                            try:
+                                from admin.api_pool import get_api_pool_manager
+                                api_pool = get_api_pool_manager()
+                                api_pool.release_api(phone)
+                            except Exception as e:
+                                print(f"[Backend] Error releasing API pool for {phone}: {e}", file=sys.stderr)
+                            
+                            # 釋放代理池
+                            try:
+                                from admin.proxy_pool import get_proxy_pool
+                                proxy_pool = get_proxy_pool()
+                                proxy_pool.release_proxy(phone=phone)
+                            except Exception as e:
+                                print(f"[Backend] Error releasing proxy pool for {phone}: {e}", file=sys.stderr)
+                except Exception as e:
+                    print(f"[Backend] Error releasing pools for account {account_id}: {e}", file=sys.stderr)
+            
             # Delete from database (this also cleans up related data)
             deleted_phones = await db.bulk_delete_accounts(account_ids)
             print(f"[Backend] {len(deleted_phones)} accounts deleted from database", file=sys.stderr)
@@ -5189,7 +5214,7 @@ class BackendService:
             api_id = account.get('apiId')
             print(f"[Backend] Removing account {account_id} (phone: {phone})", file=sys.stderr)
             
-            # 0. 釋放 API 憑據使用計數
+            # 0. 釋放 API 憑據使用計數（舊池）
             if api_id:
                 try:
                     from api_credential_pool import get_api_credential_pool
@@ -5202,6 +5227,28 @@ class BackendService:
                         self.send_event("api-credentials-updated", {"credentials": credentials})
                 except Exception as e:
                     print(f"[Backend] Error releasing API credential: {e}", file=sys.stderr)
+            
+            # 0.1 🆕 釋放 SQLite API 對接池分配
+            if phone:
+                try:
+                    from admin.api_pool import get_api_pool_manager
+                    api_pool = get_api_pool_manager()
+                    success, msg = api_pool.release_api(phone)
+                    if success:
+                        print(f"[Backend] SQLite API pool released for {phone}", file=sys.stderr)
+                except Exception as e:
+                    print(f"[Backend] Error releasing SQLite API pool: {e}", file=sys.stderr)
+            
+            # 0.2 🆕 釋放代理池分配
+            if phone:
+                try:
+                    from admin.proxy_pool import get_proxy_pool
+                    proxy_pool = get_proxy_pool()
+                    success = proxy_pool.release_proxy(phone=phone)
+                    if success:
+                        print(f"[Backend] Proxy pool released for {phone}", file=sys.stderr)
+                except Exception as e:
+                    print(f"[Backend] Error releasing proxy pool: {e}", file=sys.stderr)
             
             # 1. Delete from database (this also cleans up related data)
             deleted_phone = await db.remove_account(account_id)

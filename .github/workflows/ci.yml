@@ -1,0 +1,64 @@
+# CI: 代碼檢查與測試
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install --quiet pytest pytest-asyncio aiohttp
+
+      - name: Run admin module tests
+        run: |
+          cd backend
+          python -m pytest tests/test_admin_modules.py -v --tb=short
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check backend imports
+        run: |
+          cd backend
+          pip install --quiet aiohttp
+          python -c "
+          import sys
+          sys.path.insert(0, '.')
+          for m in ['admin.api_pool', 'admin.health_score', 'admin.ml_prediction', 'admin.handlers']:
+              __import__(m)
+          print('✅ Admin modules import OK')
+          "

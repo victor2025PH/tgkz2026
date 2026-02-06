@@ -31,7 +31,7 @@ jobs:
         run: |
           export PYTHONPATH="$GITHUB_WORKSPACE/backend"
           cd "$GITHUB_WORKSPACE/backend"
-          pip install --quiet pytest pytest-asyncio aiohttp cryptography
+          pip install --quiet pytest pytest-asyncio aiohttp cryptography PyJWT
           python -m pytest tests/test_admin_modules.py -v --tb=short -k "not test_module_imports"
 
   lint:
@@ -52,7 +52,7 @@ jobs:
         run: |
           export PYTHONPATH="$GITHUB_WORKSPACE/backend"
           cd "$GITHUB_WORKSPACE/backend"
-          pip install --quiet aiohttp cryptography
+          pip install --quiet aiohttp cryptography PyJWT
           python -c '
           for m in ["admin.api_pool", "admin.health_score", "admin.ml_prediction", "admin.cost_optimizer", "admin.performance_analyzer", "admin.report_generator", "admin.disaster_recovery", "admin.alert_service", "admin.anomaly_detection", "admin.scheduler", "admin.webhook_events"]:
               __import__(m)

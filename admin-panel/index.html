@@ -4365,12 +4365,15 @@ api_id,api_hash,name
         </div>
         
         <!-- ==================== 優惠券管理彈窗 ==================== -->
-        <div v-if="showCouponModal" 
-             class="fixed inset-0 flex items-center justify-center z-[9999]" 
-             style="background: rgba(0,0,0,0.6);" 
-             @click.self="closeCouponModal()">
-            <div class="bg-gray-800 rounded-xl p-6 w-[500px] border border-gray-700 relative shadow-2xl" @click.stop>
-                <button type="button" @click="closeCouponModal()" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-600 rounded text-2xl cursor-pointer z-10" title="關閉">×</button>
+        <div id="coupon-modal" v-show="showCouponModal" 
+             class="fixed inset-0 flex items-center justify-center"
+             style="display:none; z-index:9999; background:rgba(0,0,0,0.6);"
+             onclick="if(event.target===this){this.style.display='none'}">
+            <div class="bg-gray-800 rounded-xl p-6 w-[500px] border border-gray-700 relative shadow-2xl" onclick="event.stopPropagation()">
+                <button type="button" 
+                        @click="closeCouponModal()" 
+                        onclick="document.getElementById('coupon-modal').style.display='none'"
+                        class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-600 rounded text-2xl cursor-pointer z-10" title="關閉">×</button>
                 <h3 class="text-xl font-bold mb-6 flex items-center">
                     <span class="text-2xl mr-2">🎫</span>
                     創建優惠券
@@ -4422,11 +4425,14 @@ api_id,api_hash,name
                 </div>
                 
                 <div class="flex justify-end gap-4 mt-6">
-                    <button type="button" @click="closeCouponModal()" 
+                    <button type="button" 
+                            @click="closeCouponModal()" 
+                            onclick="document.getElementById('coupon-modal').style.display='none'"
                             class="px-6 py-2 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
                         取消
                     </button>
-                    <button type="button" @click="createCoupon" 
+                    <button type="button" 
+                            @click="createCoupon" 
                             class="gradient-bg hover:opacity-90 px-6 py-2 rounded-lg font-medium transition-opacity cursor-pointer">
                         創建優惠券
                     </button>
@@ -4466,6 +4472,6 @@ api_id,api_hash,name
         </div>
     </div>
     
-    <script src="app.js?v=20260207-coupon-fix3"></script>
+    <script src="app.js?v=20260207-coupon-fix4"></script>
 </body>
 </html>

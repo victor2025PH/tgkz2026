@@ -2950,9 +2950,15 @@ createApp({
         // 優惠券操作
         const openCouponModal = () => {
             showCouponModal.value = true;
+            // 備用：直接操作 DOM 確保顯示
+            const el = document.getElementById('coupon-modal');
+            if (el) el.style.display = 'flex';
         };
         const closeCouponModal = () => {
             showCouponModal.value = false;
+            // 備用：直接操作 DOM 確保隱藏
+            const el = document.getElementById('coupon-modal');
+            if (el) el.style.display = 'none';
         };
         const createCoupon = async () => {
             const form = couponForm.value;

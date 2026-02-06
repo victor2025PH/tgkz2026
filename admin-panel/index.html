@@ -4364,10 +4364,12 @@ api_id,api_hash,name
             </div>
         </div>
         
-        <!-- ==================== 優惠券管理彈窗（使用 Teleport 避免被其他層遮擋，登錄時不自動彈出）==================== -->
-        <Teleport to="body">
-        <div v-if="showCouponModal" class="fixed inset-0 bg-black/60 flex items-center justify-center" style="z-index: 99999;" @click.self="closeCouponModal()">
-            <div class="bg-gray-800 rounded-xl p-6 w-[500px] border border-gray-700 relative shadow-2xl" @click.stop style="pointer-events: auto;">
+        <!-- ==================== 優惠券管理彈窗（置於最底層 z-[99999]，登錄時不自動彈出）==================== -->
+        <div v-if="showCouponModal" 
+             class="fixed inset-0 flex items-center justify-center" 
+             style="z-index: 99999; background: rgba(0,0,0,0.6);" 
+             @click.self="closeCouponModal()">
+            <div class="bg-gray-800 rounded-xl p-6 w-[500px] border border-gray-700 relative shadow-2xl" @click.stop>
                 <button type="button" @click="closeCouponModal()" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-600 rounded text-2xl cursor-pointer z-10" title="關閉">×</button>
                 <h3 class="text-xl font-bold mb-6 flex items-center">
                     <span class="text-2xl mr-2">🎫</span>
@@ -4431,7 +4433,6 @@ api_id,api_hash,name
                 </div>
             </div>
         </div>
-        </Teleport>
         
         <!-- ==================== 確認對話框（優惠券開啟時不渲染，避免任何遮擋）==================== -->
         <div v-if="confirmDialog.show && !showCouponModal" 
@@ -4465,6 +4466,6 @@ api_id,api_hash,name
         </div>
     </div>
     
-    <script src="app.js?v=20260206-close-fix"></script>
+    <script src="app.js?v=20260207-coupon-fix2"></script>
 </body>
 </html>

@@ -4430,8 +4430,10 @@ api_id,api_hash,name
             </div>
         </div>
         
-        <!-- ==================== 確認對話框（僅在有內容時渲染，避免空彈窗阻塞）==================== -->
-        <div v-if="confirmDialog.show && (confirmDialog.title || confirmDialog.message)" class="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]" @click.self="closeConfirmDialog()">
+        <!-- ==================== 確認對話框：優惠券彈窗開啟時置於其下(z-40)，避免任何確認框遮擋表單 ==================== -->
+        <div v-if="confirmDialog.show" 
+             :class="['fixed inset-0 bg-black/60 flex items-center justify-center', showCouponModal ? 'z-[40]' : 'z-[60]']" 
+             @click.self="closeConfirmDialog()">
             <div class="bg-gray-800 rounded-xl p-6 w-[400px] border border-gray-700" @click.stop>
                 <h3 class="text-lg font-bold mb-4 flex items-center">
                     <span class="text-2xl mr-2" v-text="confirmDialog.icon || '⚠️'"></span>
@@ -4460,6 +4462,6 @@ api_id,api_hash,name
         </div>
     </div>
     
-    <script src="app.js?v=20260206-coupon-fix"></script>
+    <script src="app.js?v=20260206-zindex-fix"></script>
 </body>
 </html>

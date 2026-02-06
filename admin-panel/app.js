@@ -2947,39 +2947,13 @@ createApp({
             );
         };
         
-        // 優惠券操作（打開時關閉所有其他彈窗，避免多層遮擋導致按鈕無法點擊）
+        // 優惠券操作
         const openCouponModal = () => {
-            showUserModal.value = false;
-            showAdjustModal.value = false;
-            showExtendModal.value = false;
-            showAnnouncementModal.value = false;
-            showPasswordModal.value = false;
-            confirmDialog.show = false;
             showCouponModal.value = true;
         };
         const closeCouponModal = () => {
             showCouponModal.value = false;
-            confirmDialog.show = false;  // 同時關閉可能擋住的確認框
         };
-        // Esc 鍵關閉優惠券彈窗（備用，當按鈕無法點擊時仍可關閉）
-        const onCouponEsc = (e) => {
-            if (e.key === 'Escape' && showCouponModal.value) {
-                closeCouponModal();
-                document.removeEventListener('keydown', onCouponEsc);
-            }
-        };
-        watch(showCouponModal, (isOpen) => {
-            if (isOpen) {
-                document.addEventListener('keydown', onCouponEsc);
-                // 原生 JS 回退：當 Vue 事件失效時，window 上的函數仍可被 onclick 調用
-                window.__adminCouponClose = closeCouponModal;
-                window.__adminCouponCreate = createCoupon;
-            } else {
-                document.removeEventListener('keydown', onCouponEsc);
-                delete window.__adminCouponClose;
-                delete window.__adminCouponCreate;
-            }
-        });
         const createCoupon = async () => {
             const form = couponForm.value;
             

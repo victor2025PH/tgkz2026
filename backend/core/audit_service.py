@@ -83,6 +83,7 @@ class AuditAction(Enum):
     
     # 系统操作
     SYSTEM_CONFIG = "system.config"         # 系统配置变更
+    SYSTEM_CONFIG_CHANGE = "system.config_change"  # 系统配置修改
     SYSTEM_RESTART = "system.restart"       # 系统重启
     SYSTEM_BACKUP = "system.backup"         # 系统备份
     

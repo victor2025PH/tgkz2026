@@ -77,6 +77,7 @@ class AuditAction(Enum):
     ADMIN_DELETE = ("system.admin.delete", AuditCategory.SYSTEM, "刪除管理員")
     DATA_BACKUP = ("system.backup", AuditCategory.SYSTEM, "數據備份")
     DATA_EXPORT = ("system.export", AuditCategory.SYSTEM, "數據導出")
+    SYSTEM_CONFIG_CHANGE = ("system.config_change", AuditCategory.SYSTEM, "系統配置變更")
     
     # NOTIFICATION
     NOTIFICATION_SEND = ("notification.send", AuditCategory.NOTIFICATION, "發送通知")
@@ -467,4 +468,24 @@ class AuditLogger:
 
 
 # 全局實例
-audit_log = AuditLogger()
+_audit_logger = AuditLogger()
+
+
+async def audit_log(action=None, admin_id=None, target_id=None, details=None, ip_address=None, **kwargs):
+    """
+    異步審計日誌包裝函數
+    兼容 handlers.py 中的 await audit_log(...) 調用模式
+    """
+    try:
+        _audit_logger.log(
+            action=action,
+            admin_id=admin_id or 0,
+            admin_username=str(admin_id or 'system'),
+            resource_type=action.category.value if action else 'system',
+            resource_id=str(target_id or ''),
+            new_value=details if isinstance(details, dict) else None,
+            description=str(details) if details and not isinstance(details, dict) else '',
+            ip_address=ip_address or '',
+        )
+    except Exception as e:
+        logger.error(f"Audit log error: {e}")

@@ -353,6 +353,10 @@ class TestFrontendFileStructure:
     
     @pytest.fixture
     def src_dir(self):
+        # CI: GITHUB_WORKSPACE 為倉庫根目錄，避免 cd backend 後路徑解析錯誤
+        root = os.environ.get('GITHUB_WORKSPACE')
+        if root:
+            return Path(root) / 'src'
         return Path(__file__).parent.parent.parent / 'src'
     
     def test_dead_code_removed(self, src_dir):

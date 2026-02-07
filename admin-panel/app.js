@@ -278,6 +278,44 @@ createApp({
         });
         const expandedApiId = ref(null);  // 展開詳情的 API ID
         
+        // ============ P1 狀態 ============
+        const apiSortKey = ref('');          // 排序字段
+        const apiSortOrder = ref('asc');     // asc | desc
+        const apiPage = ref(1);             // 當前頁
+        const apiPageSize = ref(20);        // 每頁條數
+        // 確認對話框
+        const confirmDialog = reactive({
+            show: false, title: '', message: '', type: 'warning',
+            confirmText: '確定', cancelText: '取消',
+            onConfirm: null, onCancel: null
+        });
+        // 導出選項
+        const showExportModal = ref(false);
+        const exportOptions = reactive({
+            format: 'csv', includeHash: false,
+            columns: ['api_id', 'name', 'status', 'success_rate', 'current_accounts', 'max_accounts', 'priority', 'group_name', 'source_phone', 'created_at'],
+            useFilter: true  // 是否只導出篩選後的結果
+        });
+        const allExportColumns = [
+            { key: 'api_id', label: 'API ID' },
+            { key: 'name', label: '名稱' },
+            { key: 'api_hash', label: 'API Hash' },
+            { key: 'status', label: '狀態' },
+            { key: 'success_rate', label: '成功率' },
+            { key: 'current_accounts', label: '當前帳號' },
+            { key: 'max_accounts', label: '最大帳號' },
+            { key: 'priority', label: '優先級' },
+            { key: 'is_premium', label: 'Premium' },
+            { key: 'group_name', label: '分組' },
+            { key: 'source_phone', label: '來源手機' },
+            { key: 'note', label: '備註' },
+            { key: 'total_requests', label: '總請求' },
+            { key: 'failed_requests', label: '失敗請求' },
+            { key: 'health_score', label: '健康分數' },
+            { key: 'created_at', label: '創建時間' },
+            { key: 'last_used_at', label: '最後使用' }
+        ];
+        
         // 🆕 API 分組管理
         const apiGroups = ref([]);
         const apiPoolGroupFilter = ref('');
@@ -1642,19 +1680,23 @@ createApp({
             }
         };
         
-        const deleteApiFromPool = async (apiId) => {
-            if (!confirm('確定要刪除此 API 憑據嗎？\n如有帳號綁定，需先釋放。')) return;
-            
-            const result = await apiRequest(`/admin/api-pool/${apiId}`, {
-                method: 'DELETE'
+        const deleteApiFromPool = (apiId) => {
+            openConfirmDialog({
+                title: '刪除 API 憑據',
+                message: `確定要刪除 API「${apiId}」嗎？如有帳號綁定，需先釋放。此操作不可恢復。`,
+                type: 'danger',
+                confirmText: '確認刪除',
+                onConfirm: async () => {
+                    const result = await apiRequest(`/admin/api-pool/${apiId}`, { method: 'DELETE' });
+                    if (result.success) {
+                        showToast('API 憑據已刪除', 'success');
+                        await loadApiPool();
+                    } else {
+                        const errMsg = result.message || result.error?.message || result.detail || JSON.stringify(result.error || result);
+                        showToast('刪除失敗: ' + errMsg, 'error');
+                    }
+                }
             });
-            
-            if (result.success) {
-                showToast('API 憑據已刪除', 'success');
-                await loadApiPool();
-            } else {
-                showToast('刪除失敗: ' + (result.message || result.error?.message), 'error');
-            }
         };
         
         const toggleApiStatus = async (api) => {
@@ -1794,37 +1836,38 @@ createApp({
         };
         
         // 批量操作
-        const batchApiAction = async (action) => {
+        const batchApiAction = (action) => {
             if (selectedApis.value.length === 0) {
                 showToast('請先勾選要操作的 API', 'error');
                 return;
             }
             const count = selectedApis.value.length;
-            const actionTexts = {
-                enable: '啟用', disable: '禁用', delete: '刪除'
-            };
-            if (action === 'delete') {
-                if (!confirm(`確定要刪除選中的 ${count} 個 API 嗎？此操作不可恢復！`)) return;
-            } else {
-                if (!confirm(`確定要${actionTexts[action]}選中的 ${count} 個 API 嗎？`)) return;
-            }
+            const actionTexts = { enable: '啟用', disable: '禁用', delete: '刪除' };
+            const typeMap = { enable: 'warning', disable: 'warning', delete: 'danger' };
             
-            let success = 0, fail = 0;
-            for (const apiId of selectedApis.value) {
-                try {
-                    let result;
-                    if (action === 'delete') {
-                        result = await apiRequest(`/admin/api-pool/${apiId}`, { method: 'DELETE' });
-                    } else {
-                        result = await apiRequest(`/admin/api-pool/${apiId}/${action}`, { method: 'POST' });
+            openConfirmDialog({
+                title: `批量${actionTexts[action]}`,
+                message: `確定要${actionTexts[action]}選中的 ${count} 個 API 嗎？${action === 'delete' ? '\n此操作不可恢復！' : ''}`,
+                type: typeMap[action],
+                confirmText: `${actionTexts[action]} ${count} 個`,
+                onConfirm: async () => {
+                    let success = 0, fail = 0;
+                    for (const apiId of selectedApis.value) {
+                        try {
+                            let result;
+                            if (action === 'delete') {
+                                result = await apiRequest(`/admin/api-pool/${apiId}`, { method: 'DELETE' });
+                            } else {
+                                result = await apiRequest(`/admin/api-pool/${apiId}/${action}`, { method: 'POST' });
+                            }
+                            if (result.success) success++; else fail++;
+                        } catch (e) { fail++; }
                     }
-                    if (result.success) success++; else fail++;
-                } catch (e) { fail++; }
-            }
-            
-            showToast(`${actionTexts[action]}完成：成功 ${success}，失敗 ${fail}`, success > 0 ? 'success' : 'error');
-            selectedApis.value = [];
-            await loadApiPool();
+                    showToast(`${actionTexts[action]}完成：成功 ${success}，失敗 ${fail}`, success > 0 ? 'success' : 'error');
+                    selectedApis.value = [];
+                    await loadApiPool();
+                }
+            });
         };
         
         // 批量分配到分組
@@ -1864,6 +1907,163 @@ createApp({
             const d = new Date(ts);
             if (isNaN(d.getTime())) return ts;
             return d.toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        };
+        
+        // ============ P1 增強：排序 / 分頁 / 確認框 / 導出 / 健康監控 ============
+        
+        // --- 通用確認對話框 ---
+        const openConfirmDialog = ({ title, message, type, confirmText, onConfirm }) => {
+            confirmDialog.show = true;
+            confirmDialog.title = title || '確認操作';
+            confirmDialog.message = message || '確定要執行此操作嗎？';
+            confirmDialog.type = type || 'warning';
+            confirmDialog.confirmText = confirmText || '確定';
+            confirmDialog.onConfirm = onConfirm || null;
+        };
+        const closeConfirmDialog = () => { confirmDialog.show = false; confirmDialog.onConfirm = null; };
+        const executeConfirmDialog = () => {
+            if (confirmDialog.onConfirm) confirmDialog.onConfirm();
+            closeConfirmDialog();
+        };
+        
+        // --- 排序 ---
+        const toggleApiSort = (key) => {
+            if (apiSortKey.value === key) {
+                apiSortOrder.value = apiSortOrder.value === 'asc' ? 'desc' : 'asc';
+            } else {
+                apiSortKey.value = key;
+                apiSortOrder.value = 'desc';  // 默認降序
+            }
+            apiPage.value = 1;  // 排序改變重置到第1頁
+        };
+        
+        const getSortIcon = (key) => {
+            if (apiSortKey.value !== key) return '↕';
+            return apiSortOrder.value === 'asc' ? '↑' : '↓';
+        };
+        
+        // --- 排序+分頁後的最終列表 (computed) ---
+        const sortedApiPoolList = Vue.computed(() => {
+            let list = [...filteredApiPoolList.value];
+            if (apiSortKey.value) {
+                const key = apiSortKey.value;
+                const dir = apiSortOrder.value === 'asc' ? 1 : -1;
+                list.sort((a, b) => {
+                    let va = a[key], vb = b[key];
+                    if (va == null) va = '';
+                    if (vb == null) vb = '';
+                    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+                    if (typeof va === 'string') return va.localeCompare(vb) * dir;
+                    return 0;
+                });
+            }
+            return list;
+        });
+        
+        const totalApiPages = Vue.computed(() => Math.max(1, Math.ceil(sortedApiPoolList.value.length / apiPageSize.value)));
+        
+        const pagedApiPoolList = Vue.computed(() => {
+            const start = (apiPage.value - 1) * apiPageSize.value;
+            return sortedApiPoolList.value.slice(start, start + apiPageSize.value);
+        });
+        
+        const goToApiPage = (page) => {
+            if (page >= 1 && page <= totalApiPages.value) apiPage.value = page;
+        };
+        
+        // 頁碼列表 (最多顯示 7 頁)
+        const apiPageNumbers = Vue.computed(() => {
+            const total = totalApiPages.value;
+            const cur = apiPage.value;
+            if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+            const pages = [1];
+            let start = Math.max(2, cur - 2);
+            let end = Math.min(total - 1, cur + 2);
+            if (start > 2) pages.push('...');
+            for (let i = start; i <= end; i++) pages.push(i);
+            if (end < total - 1) pages.push('...');
+            pages.push(total);
+            return pages;
+        });
+        
+        // --- 健康概覽統計 (computed) ---
+        const apiHealthOverview = Vue.computed(() => {
+            const list = apiPoolList.value;
+            if (list.length === 0) return { avgRate: 0, healthy: 0, warning: 0, critical: 0, avgHealth: 0 };
+            const rates = list.map(a => a.success_rate || 0);
+            const avgRate = rates.reduce((s, r) => s + r, 0) / rates.length;
+            const healthy = list.filter(a => (a.health_score || 100) >= 80).length;
+            const warning = list.filter(a => (a.health_score || 100) >= 50 && (a.health_score || 100) < 80).length;
+            const critical = list.filter(a => (a.health_score || 100) < 50).length;
+            const healthScores = list.map(a => a.health_score || 100);
+            const avgHealth = healthScores.reduce((s, h) => s + h, 0) / healthScores.length;
+            return { avgRate: avgRate.toFixed(1), healthy, warning, critical, avgHealth: avgHealth.toFixed(0) };
+        });
+        
+        // --- 導出功能增強 ---
+        const openExportModal = () => {
+            showExportModal.value = true;
+        };
+        
+        const toggleExportColumn = (key) => {
+            const idx = exportOptions.columns.indexOf(key);
+            if (idx >= 0) exportOptions.columns.splice(idx, 1);
+            else exportOptions.columns.push(key);
+        };
+        
+        const executeExport = () => {
+            const sourceList = exportOptions.useFilter ? sortedApiPoolList.value : apiPoolList.value;
+            const cols = exportOptions.columns;
+            
+            if (cols.length === 0) {
+                showToast('請至少選擇一個導出列', 'error');
+                return;
+            }
+            
+            // 列頭映射
+            const colLabels = {};
+            allExportColumns.forEach(c => { colLabels[c.key] = c.label; });
+            
+            if (exportOptions.format === 'csv') {
+                const header = cols.map(k => colLabels[k] || k).join(',');
+                const rows = sourceList.map(api => {
+                    return cols.map(k => {
+                        let v = api[k];
+                        if (k === 'api_hash' && !exportOptions.includeHash) v = maskApiHash(v || '');
+                        if (v == null) v = '';
+                        v = String(v).replace(/"/g, '""');
+                        return `"${v}"`;
+                    }).join(',');
+                });
+                const bom = '\uFEFF';  // UTF-8 BOM for Excel
+                const csvContent = bom + header + '\n' + rows.join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `api_pool_export_${new Date().toISOString().slice(0,10)}.csv`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+            } else {
+                const data = sourceList.map(api => {
+                    const row = {};
+                    cols.forEach(k => {
+                        let v = api[k];
+                        if (k === 'api_hash' && !exportOptions.includeHash) v = maskApiHash(v || '');
+                        row[colLabels[k] || k] = v;
+                    });
+                    return row;
+                });
+                const jsonStr = JSON.stringify(data, null, 2);
+                const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `api_pool_export_${new Date().toISOString().slice(0,10)}.json`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+            }
+            
+            showToast(`已導出 ${sourceList.length} 條記錄 (${exportOptions.format.toUpperCase()})`, 'success');
+            showExportModal.value = false;
         };
         
         // ============ Phase 3: 錢包運營工具 ============
@@ -3576,6 +3776,9 @@ createApp({
             }
         };
         
+        // ============ API 列表搜索/過濾重置分頁 ============
+        watch([apiSearchQuery, apiPoolFilter, apiPoolGroupFilter], () => { apiPage.value = 1; });
+        
         // ============ 頁面切換監聽 ============
         
         watch(currentPage, async (newPage) => {
@@ -3730,6 +3933,14 @@ createApp({
             maskApiHash,
             formatApiTime,
             validateApiFields,
+            // P1 增強
+            apiSortKey, apiSortOrder, apiPage, apiPageSize,
+            confirmDialog, openConfirmDialog, closeConfirmDialog, executeConfirmDialog,
+            toggleApiSort, getSortIcon,
+            sortedApiPoolList, pagedApiPoolList, totalApiPages, goToApiPage, apiPageNumbers,
+            apiHealthOverview,
+            showExportModal, exportOptions, allExportColumns,
+            openExportModal, toggleExportColumn, executeExport,
             // 🆕 Phase 3: 錢包運營
             walletOperations,
             walletAnalytics,

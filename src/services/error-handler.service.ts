@@ -216,6 +216,10 @@ export class ErrorHandlerService {
   private detectErrorType(message: string): ErrorType {
     const msg = message.toLowerCase();
     
+    // 服務返回 HTML 等非 JSON 時（如 502/404 錯誤頁）視為網絡/服務不可用
+    if (msg.includes('json') || msg.includes('unexpected token') || msg.includes('is not valid json')) {
+      return 'network';
+    }
     if (msg.includes('network') || msg.includes('fetch') || msg.includes('timeout') || msg.includes('connection')) {
       return 'network';
     }

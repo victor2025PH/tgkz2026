@@ -329,7 +329,10 @@ export class UnifiedAuthService {
         })
       });
       
-      const result = await response.json();
+      const result = await this.parseJsonResponse(response);
+      if (!result) {
+        return { success: false, error: '網絡錯誤，請稍後重試' };
+      }
       
       if (result.success) {
         this.setAuthState({
@@ -346,12 +349,26 @@ export class UnifiedAuthService {
         error: result.error || result.message || '登入失敗' 
       };
     } catch (e: any) {
+      const msg = e?.message || '';
+      const isNetwork = /json|fetch|network|unexpected token/i.test(msg);
       return { 
         success: false, 
-        error: e.message || '網絡錯誤，請檢查連接' 
+        error: isNetwork ? '網絡錯誤，請稍後重試' : (e.message || '網絡錯誤，請檢查連接') 
       };
     } finally {
       this._isLoading.set(false);
+    }
+  }
+
+  /** 安全解析 JSON，後端返回 HTML 時返回 null */
+  private async parseJsonResponse(response: Response): Promise<Record<string, unknown> | null> {
+    const text = await response.text();
+    const trimmed = text.trim();
+    if (trimmed.startsWith('<') || !trimmed) return null;
+    try {
+      return JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return null;
     }
   }
   

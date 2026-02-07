@@ -326,6 +326,7 @@ except Exception as _audit_err:
         API_ADD = "api.add"
         ACCOUNT_LOGIN = "account.login"
         USER_LOGIN = "user.login"
+        SYSTEM_CONFIG_CHANGE = "system.config_change"
     class AuditLog:
         pass
     class _StubAuditService:

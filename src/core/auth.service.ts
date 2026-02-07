@@ -293,12 +293,10 @@ export class AuthService implements OnDestroy {
   async getTelegramConfig(): Promise<{ enabled: boolean; bot_username?: string; bot_id?: string }> {
     try {
       const response = await fetch(`${this.getApiBaseUrl()}/api/v1/oauth/telegram/config`);
-      const result = await response.json();
-      
-      if (result.success && result.data) {
-        return result.data;
+      const result = await this.parseJsonResponse(response);
+      if (result?.success && result?.data) {
+        return result.data as { enabled: boolean; bot_username?: string; bot_id?: string };
       }
-      
       return { enabled: false };
     } catch (e) {
       console.error('Failed to get Telegram config:', e);
@@ -319,8 +317,10 @@ export class AuthService implements OnDestroy {
         body: JSON.stringify(authData)
       });
       
-      const result = await response.json();
-      
+      const result = await this.parseJsonResponse(response);
+      if (!result) {
+        return { success: false, error: '網絡錯誤，請稍後重試' };
+      }
       if (result.success) {
         // 設置認證狀態
         this.setAuthState({
@@ -332,9 +332,11 @@ export class AuthService implements OnDestroy {
         return { success: true };
       }
       
-      return { success: false, error: result.error || 'Telegram 登入失敗' };
+      return { success: false, error: String(result?.error || 'Telegram 登入失敗') };
     } catch (e: any) {
-      return { success: false, error: e.message || 'Telegram 登入失敗' };
+      const msg = e?.message || '';
+      const isNetwork = /json|fetch|network|unexpected token/i.test(msg);
+      return { success: false, error: isNetwork ? '網絡錯誤，請稍後重試' : (e.message || 'Telegram 登入失敗') };
     } finally {
       this._isLoading.set(false);
     }

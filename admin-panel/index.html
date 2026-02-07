@@ -1162,6 +1162,126 @@
                         </div>
                     </div>
                     
+                    <!-- 容量預測面板 (P4) -->
+                    <div v-if="showPredictionPanel" class="mb-6 glass-card rounded-2xl p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-medium text-gray-300">🔮 容量預測報告</h3>
+                            <button @click="loadPredictionReport" :disabled="predictionLoading"
+                                    class="text-xs text-blue-400 hover:text-blue-300">{{ predictionLoading ? '載入中...' : '🔄 刷新' }}</button>
+                        </div>
+                        <div v-if="predictionLoading" class="text-center text-gray-500 py-8">載入預測數據中...</div>
+                        <div v-else-if="predictionReport">
+                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                                <!-- 耗盡時間 -->
+                                <div class="bg-gray-800/50 rounded-xl p-4 text-center">
+                                    <p class="text-xs text-gray-400 mb-1">容量耗盡預計</p>
+                                    <p class="text-3xl font-bold"
+                                       :class="(predictionReport.capacity_prediction?.days_until_full || 999) <= 7 ? 'text-red-400' : (predictionReport.capacity_prediction?.days_until_full || 999) <= 30 ? 'text-yellow-400' : 'text-green-400'">
+                                        {{ predictionReport.capacity_prediction?.days_until_full != null ? predictionReport.capacity_prediction.days_until_full + ' 天' : '∞' }}
+                                    </p>
+                                </div>
+                                <!-- 使用率 -->
+                                <div class="bg-gray-800/50 rounded-xl p-4 text-center">
+                                    <p class="text-xs text-gray-400 mb-1">當前使用率</p>
+                                    <p class="text-3xl font-bold text-blue-400">
+                                        {{ (predictionReport.capacity_prediction?.current_utilization || 0).toFixed(0) }}%
+                                    </p>
+                                </div>
+                                <!-- 風險等級 -->
+                                <div class="bg-gray-800/50 rounded-xl p-4 text-center">
+                                    <p class="text-xs text-gray-400 mb-1">風險等級</p>
+                                    <p class="text-2xl font-bold" :class="getRiskColor(predictionReport.risk_assessment?.level)">
+                                        {{ getRiskIcon(predictionReport.risk_assessment?.level) }}
+                                        {{ predictionReport.risk_assessment?.level === 'high' ? '高風險' : predictionReport.risk_assessment?.level === 'medium' ? '中風險' : '低風險' }}
+                                    </p>
+                                </div>
+                                <!-- 趨勢 -->
+                                <div class="bg-gray-800/50 rounded-xl p-4 text-center">
+                                    <p class="text-xs text-gray-400 mb-1">使用趨勢</p>
+                                    <p class="text-2xl font-bold text-gray-300">
+                                        {{ getTrendIcon(predictionReport.capacity_prediction?.trend) }}
+                                        {{ predictionReport.capacity_prediction?.trend === 'up' ? '上升' : predictionReport.capacity_prediction?.trend === 'down' ? '下降' : '穩定' }}
+                                    </p>
+                                </div>
+                            </div>
+                            <!-- 預測圖表 -->
+                            <div v-if="predictionReport.daily_prediction?.predictions?.length" class="bg-gray-800/50 rounded-xl p-4 mb-4">
+                                <h4 class="text-xs font-medium text-gray-400 mb-2">未來 14 天分配量預測（含信賴區間）</h4>
+                                <div style="height:180px;"><canvas id="predictionChart"></canvas></div>
+                            </div>
+                            <!-- 建議 + 時段 -->
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <div v-if="predictionReport.capacity_prediction?.recommendations?.length" class="bg-gray-800/50 rounded-xl p-4">
+                                    <h4 class="text-xs font-medium text-gray-400 mb-2">💡 建議</h4>
+                                    <ul class="space-y-1">
+                                        <li v-for="(rec, i) in predictionReport.capacity_prediction.recommendations" :key="i"
+                                            class="text-xs text-gray-300 flex gap-2">
+                                            <span class="text-blue-400">•</span> {{ rec }}
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div v-if="predictionReport.timing_analysis" class="bg-gray-800/50 rounded-xl p-4">
+                                    <h4 class="text-xs font-medium text-gray-400 mb-2">⏰ 最佳操作時段</h4>
+                                    <div class="flex gap-4">
+                                        <div>
+                                            <p class="text-[10px] text-gray-500">高峰時段</p>
+                                            <p class="text-xs text-red-400 font-mono">{{ (predictionReport.timing_analysis.peak_hours || []).map(h => h + ':00').join(', ') || '-' }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-[10px] text-gray-500">最佳時段</p>
+                                            <p class="text-xs text-green-400 font-mono">{{ (predictionReport.timing_analysis.optimal_hours || []).map(h => h + ':00').join(', ') || '-' }}</p>
+                                        </div>
+                                    </div>
+                                    <p v-if="predictionReport.timing_analysis.message" class="text-[11px] text-gray-400 mt-2">{{ predictionReport.timing_analysis.message }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="text-center text-gray-500 text-sm py-6">暫無預測數據，需要至少 7 天的歷史數據</div>
+                    </div>
+                    
+                    <!-- 輪換建議面板 (P4) -->
+                    <div v-if="showRotationPanel" class="mb-6 glass-card rounded-2xl p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-medium text-gray-300">🔄 智能輪換建議</h3>
+                            <button v-if="rotationCandidates.filter(a => a.lifecycle.recommendation === 'rotate').length > 0"
+                                    @click="executeRotationPlan"
+                                    class="bg-red-600/80 hover:bg-red-600 px-3 py-1 rounded-lg text-xs font-medium transition-colors">
+                                ⚡ 執行輪換計劃
+                            </button>
+                        </div>
+                        <div v-if="rotationCandidates.length === 0" class="text-center text-gray-500 text-sm py-6">
+                            ✅ 所有 API 狀態良好，無需輪換
+                        </div>
+                        <div v-else class="space-y-2">
+                            <div v-for="api in rotationCandidates" :key="api.api_id"
+                                 class="flex items-center justify-between bg-gray-800/50 rounded-lg px-4 py-3"
+                                 :class="api.lifecycle.recommendation === 'rotate' ? 'border border-red-700/30' : 'border border-yellow-700/20'">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg">{{ api.lifecycle.recommendation === 'rotate' ? '🔴' : '🟡' }}</span>
+                                    <div>
+                                        <p class="text-sm font-medium">{{ api.name || api.api_id }}</p>
+                                        <p class="text-xs text-gray-400">
+                                            服役 {{ api.lifecycle.ageDays }} 天 | 成功率 {{ (api.success_rate||0).toFixed(0) }}% | 日均 {{ api.lifecycle.intensity }} 次
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-medium px-2 py-0.5 rounded-full"
+                                          :class="api.lifecycle.recommendation === 'rotate' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'">
+                                        {{ api.lifecycle.recText }}
+                                    </span>
+                                    <!-- 槽位可視化 -->
+                                    <div class="flex gap-0.5">
+                                        <div v-for="(slot, si) in getApiSlots(api)" :key="si"
+                                             class="w-2 h-2 rounded-sm"
+                                             :class="slot === 'used' ? 'bg-blue-500' : 'bg-gray-700'">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- 操作欄 -->
                     <div class="flex flex-wrap justify-between items-center mb-4 gap-3">
                         <div class="flex flex-wrap gap-3 items-center">
@@ -1222,12 +1342,22 @@
                                     class="bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
                                 📥 批量導入
                             </button>
-                            <!-- P3: 圖表/刷新/視圖 -->
+                            <!-- P3+P4: 工具列 -->
                             <div class="flex gap-1 ml-1 border-l border-gray-700 pl-2">
                                 <button @click="toggleChartsPanel" 
                                         :class="showChartsPanel ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'"
                                         class="px-2.5 py-2 rounded-lg text-sm transition-colors" title="數據圖表">
                                     📈
+                                </button>
+                                <button @click="togglePredictionPanel"
+                                        :class="showPredictionPanel ? 'bg-purple-600 text-white' : 'bg-gray-700 hover:bg-gray-600'"
+                                        class="px-2.5 py-2 rounded-lg text-sm transition-colors" title="容量預測">
+                                    🔮
+                                </button>
+                                <button @click="showRotationPanel = !showRotationPanel"
+                                        :class="showRotationPanel ? 'bg-orange-600 text-white' : 'bg-gray-700 hover:bg-gray-600'"
+                                        class="px-2.5 py-2 rounded-lg text-sm transition-colors" title="輪換建議">
+                                    🔄
                                 </button>
                                 <button @click="toggleViewMode"
                                         class="bg-gray-700 hover:bg-gray-600 px-2.5 py-2 rounded-lg text-sm transition-colors"
@@ -1238,10 +1368,14 @@
                                     <button @click="toggleAutoRefresh"
                                             :class="autoRefreshEnabled ? 'bg-green-600 text-white' : 'bg-gray-700 hover:bg-gray-600'"
                                             class="px-2.5 py-2 rounded-lg text-sm transition-colors" title="自動刷新">
-                                        🔄
+                                        ♻️
                                     </button>
                                     <span v-if="autoRefreshEnabled" class="text-xs text-green-400 font-mono w-6 text-center">{{ autoRefreshCountdown }}s</span>
                                 </div>
+                                <button @click="openCommandPalette"
+                                        class="bg-gray-700 hover:bg-gray-600 px-2.5 py-2 rounded-lg text-sm transition-colors" title="命令面板 (Ctrl+K)">
+                                    ⌘
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1298,16 +1432,17 @@
                                         {{ getApiStatusText(api.status) }}
                                     </span>
                                 </div>
-                                <!-- 帳號進度條 -->
+                                <!-- 帳號槽位視覺化 -->
                                 <div class="mb-3">
                                     <div class="flex justify-between text-[10px] text-gray-400 mb-1">
-                                        <span>帳號</span>
+                                        <span>帳號槽位</span>
                                         <span class="font-mono">{{ api.current_accounts }}/{{ api.max_accounts }}</span>
                                     </div>
-                                    <div class="w-full bg-gray-700 rounded-full h-1.5">
-                                        <div class="h-1.5 rounded-full transition-all"
-                                             :class="api.current_accounts >= api.max_accounts ? 'bg-red-500' : api.current_accounts > api.max_accounts * 0.7 ? 'bg-yellow-500' : 'bg-green-500'"
-                                             :style="{ width: Math.min(100, (api.current_accounts / Math.max(1, api.max_accounts)) * 100) + '%' }">
+                                    <div class="flex gap-0.5 flex-wrap">
+                                        <div v-for="(slot, si) in getApiSlots(api)" :key="si"
+                                             class="w-3.5 h-3.5 rounded transition-colors"
+                                             :class="slot === 'used' ? (api.current_accounts >= api.max_accounts ? 'bg-red-500/80' : 'bg-blue-500/80') : 'bg-gray-700/60 border border-gray-600/30'"
+                                             :title="slot === 'used' ? '已分配' : '空閒'">
                                         </div>
                                     </div>
                                 </div>
@@ -1526,6 +1661,18 @@
                                                 </div>
                                             </div>
                                             
+                                            <!-- 帳號槽位視覺化 (P4) -->
+                                            <div class="mt-4 pt-4 border-t border-gray-700/50">
+                                                <p class="text-xs text-gray-400 mb-2">🧩 帳號槽位 ({{ api.current_accounts }}/{{ api.max_accounts }})</p>
+                                                <div class="flex gap-1 flex-wrap">
+                                                    <div v-for="(slot, si) in getApiSlots(api)" :key="si"
+                                                         class="w-4 h-4 rounded transition-colors"
+                                                         :class="slot === 'used' ? 'bg-blue-500/80' : 'bg-gray-700 border border-gray-600/30'"
+                                                         :title="slot === 'used' ? `帳號 #${si+1} 已分配` : `槽位 #${si+1} 空閒`">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
                                             <!-- 操作時間線 (P2) -->
                                             <div class="mt-4 pt-4 border-t border-gray-700/50">
                                                 <h4 class="text-xs font-medium text-gray-400 mb-3">📋 操作記錄</h4>
@@ -1620,7 +1767,7 @@
                             <li>• 每個帳號 = <span class="text-green-400">一組 API + 一個 IP</span>，雙重隔離以降低風控</li>
                             <li>• 每組 API 建議最多綁定 3-5 個帳號，避免過度使用觸發風控</li>
                             <li>• 點擊行可展開詳情+操作記錄，勾選多個 API 可進行批量操作</li>
-                            <li>• 快捷鍵：<span class="text-blue-400">Ctrl+F</span> 搜索 | <span class="text-blue-400">Ctrl+A</span> 全選 | <span class="text-blue-400">Ctrl+E</span> 導出 | <span class="text-blue-400">Ctrl+N</span> 添加 | <span class="text-blue-400">Delete</span> 刪除選中 | <span class="text-blue-400">Esc</span> 關閉/取消</li>
+                            <li>• 快捷鍵：<span class="text-blue-400">Ctrl+K</span> 命令面板 | <span class="text-blue-400">Ctrl+F</span> 搜索 | <span class="text-blue-400">Ctrl+A</span> 全選 | <span class="text-blue-400">Ctrl+E</span> 導出 | <span class="text-blue-400">Ctrl+N</span> 添加 | <span class="text-blue-400">Delete</span> 刪除選中 | <span class="text-blue-400">Esc</span> 關閉/取消</li>
                         </ul>
                     </div>
                 </div>
@@ -2998,6 +3145,35 @@ api_id,api_hash,name,source_phone,max_accounts
                             <button @click="executeExport" class="px-5 py-2 rounded-lg gradient-bg hover:opacity-90 text-sm font-medium transition-opacity">
                                 📥 導出 {{ exportOptions.format.toUpperCase() }}
                             </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 命令面板 (P4 Ctrl+K) -->
+                <div v-if="showCommandPalette" class="fixed inset-0 bg-black/60 flex items-start justify-center z-[60] pt-[15vh]"
+                     @click.self="showCommandPalette = false">
+                    <div class="bg-gray-800 rounded-2xl w-full max-w-lg shadow-2xl border border-gray-700 overflow-hidden" @click.stop>
+                        <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-700">
+                            <span class="text-gray-400 text-sm">⌘</span>
+                            <input id="command-palette-input" v-model="commandQuery" type="text"
+                                   class="flex-1 bg-transparent text-white text-sm outline-none placeholder-gray-500"
+                                   placeholder="輸入命令或搜索..."
+                                   @keydown.escape="showCommandPalette = false"
+                                   @keydown.enter="filteredCommands.length > 0 && filteredCommands[0].action()">
+                            <kbd class="text-[10px] text-gray-500 bg-gray-700 px-1.5 py-0.5 rounded">ESC</kbd>
+                        </div>
+                        <div class="max-h-[50vh] overflow-y-auto py-1">
+                            <div v-for="cmd in filteredCommands" :key="cmd.id"
+                                 @click="cmd.action()"
+                                 class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-700/60 cursor-pointer transition-colors group">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-base w-6 text-center">{{ cmd.icon }}</span>
+                                    <span class="text-sm text-gray-200 group-hover:text-white">{{ cmd.label }}</span>
+                                    <span v-if="cmd.category" class="text-[10px] text-gray-500 bg-gray-700 px-1.5 py-0.5 rounded">{{ cmd.category }}</span>
+                                </div>
+                                <kbd v-if="cmd.shortcut" class="text-[10px] text-gray-500 bg-gray-700 px-1.5 py-0.5 rounded">{{ cmd.shortcut }}</kbd>
+                            </div>
+                            <div v-if="filteredCommands.length === 0" class="text-center text-gray-500 text-sm py-6">找不到匹配的命令</div>
                         </div>
                     </div>
                 </div>
@@ -5225,6 +5401,6 @@ api_id,api_hash,name,source_phone,max_accounts
         </div>
     </div>
     
-    <script src="app.js?v=20260207-p3-enhance"></script>
+    <script src="app.js?v=20260207-p4-enhance"></script>
 </body>
 </html>

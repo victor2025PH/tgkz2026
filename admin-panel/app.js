@@ -355,6 +355,17 @@ createApp({
         // 視圖模式
         const apiViewMode = ref('table');  // table | card
         
+        // ============ P4 狀態 ============
+        const showPredictionPanel = ref(false);
+        const predictionReport = ref(null);
+        const predictionLoading = ref(false);
+        let predictionChartInstance = null;
+        // 命令面板
+        const showCommandPalette = ref(false);
+        const commandQuery = ref('');
+        // 輪換建議
+        const showRotationPanel = ref(false);
+        
         // 🆕 API 分組管理
         const apiGroups = ref([]);
         const apiPoolGroupFilter = ref('');
@@ -440,7 +451,7 @@ createApp({
         const healthScores = ref([]);
         const healthSummary = ref({ total_apis: 0, average_score: 0, grade_distribution: {} });
         const anomalies = ref([]);
-        const predictionReport = ref(null);
+        // predictionReport 已在 P4 狀態區定義
         const webhookSubscribers = ref([]);
         const webhookEvents = ref([]);
         const webhookStats = ref({ total_events: 0, success_rate: 100 });
@@ -1174,18 +1185,6 @@ createApp({
                 }
             } catch (e) {
                 console.error('加載健康評分失敗:', e);
-            }
-        };
-        
-        // 加載預測報告
-        const loadPredictionReport = async () => {
-            try {
-                const result = await apiRequest('/admin/api-pool/prediction/report');
-                if (result.success) {
-                    predictionReport.value = result.data;
-                }
-            } catch (e) {
-                console.error('加載預測報告失敗:', e);
             }
         };
         
@@ -2320,6 +2319,7 @@ createApp({
                 
                 // Escape: 關閉所有彈窗 / 取消選擇
                 if (e.key === 'Escape') {
+                    if (showCommandPalette.value) { showCommandPalette.value = false; e.preventDefault(); return; }
                     if (confirmDialog.show) { closeConfirmDialog(); e.preventDefault(); return; }
                     if (showEditApiModal.value) { showEditApiModal.value = false; e.preventDefault(); return; }
                     if (showExportModal.value) { showExportModal.value = false; e.preventDefault(); return; }
@@ -2353,6 +2353,11 @@ createApp({
                 if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
                     e.preventDefault();
                     openApiPoolModal();
+                }
+                // Ctrl+K: 命令面板
+                if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                    e.preventDefault();
+                    openCommandPalette();
                 }
                 // Delete: 刪除選中
                 if (e.key === 'Delete' && selectedApis.value.length > 0) {
@@ -2582,6 +2587,215 @@ createApp({
             else if (health < 60 || rate < 60 || ageDays > 180) { recommendation = 'monitor'; recText = '需要關注'; }
             else if (ageDays > 365) { recommendation = 'monitor'; recText = '服役超一年'; }
             return { ageDays, intensity, recommendation, recText };
+        };
+        
+        // ============ P4 增強：預測 / 輪換 / 流向 / 命令面板 ============
+        
+        // --- 容量預測 ---
+        const loadPredictionReport = async () => {
+            predictionLoading.value = true;
+            try {
+                const result = await apiRequest('/admin/api-pool/prediction/report');
+                if (result.success && result.data) {
+                    predictionReport.value = result.data;
+                    Vue.nextTick(() => renderPredictionChart());
+                } else {
+                    // 降級：用 forecast 端點
+                    const fallback = await apiRequest('/admin/api-pool/forecast?days=14');
+                    if (fallback.success && fallback.data) {
+                        predictionReport.value = {
+                            capacity_prediction: {
+                                current_capacity: (apiPoolStats.value.total || 0) * 5,
+                                current_used: apiPoolStats.value.total_allocations || 0,
+                                current_available: apiPoolStats.value.available_for_assign || 0,
+                                current_utilization: 0,
+                                days_until_full: fallback.data.days_until_exhausted,
+                                trend: 'stable',
+                                confidence: 0.7,
+                                recommendations: [fallback.data.forecast_message || '']
+                            },
+                            daily_prediction: { predictions: [] },
+                            timing_analysis: null,
+                            risk_assessment: { level: fallback.data.forecast_warning ? 'high' : 'low', factors: [] },
+                            overall_confidence: 0.7
+                        };
+                    }
+                }
+            } catch (e) { /* silent */ }
+            predictionLoading.value = false;
+        };
+        
+        const togglePredictionPanel = async () => {
+            showPredictionPanel.value = !showPredictionPanel.value;
+            if (showPredictionPanel.value && !predictionReport.value) {
+                await loadPredictionReport();
+            }
+        };
+        
+        const renderPredictionChart = () => {
+            const ctx = document.getElementById('predictionChart');
+            if (!ctx || !predictionReport.value?.daily_prediction?.predictions?.length) return;
+            if (predictionChartInstance) predictionChartInstance.destroy();
+            
+            const preds = predictionReport.value.daily_prediction.predictions;
+            const labels = preds.map(p => (p.date || '').slice(5));  // MM-DD
+            
+            predictionChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: '預測分配量',
+                            data: preds.map(p => p.predicted_allocations || 0),
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59,130,246,0.1)',
+                            fill: false, tension: 0.4, pointRadius: 3, borderWidth: 2
+                        },
+                        {
+                            label: '上界',
+                            data: preds.map(p => p.upper_bound || 0),
+                            borderColor: 'rgba(59,130,246,0.3)',
+                            backgroundColor: 'rgba(59,130,246,0.05)',
+                            fill: '+1', tension: 0.4, pointRadius: 0, borderWidth: 1, borderDash: [4, 4]
+                        },
+                        {
+                            label: '下界',
+                            data: preds.map(p => p.lower_bound || 0),
+                            borderColor: 'rgba(59,130,246,0.3)',
+                            backgroundColor: 'transparent',
+                            fill: false, tension: 0.4, pointRadius: 0, borderWidth: 1, borderDash: [4, 4]
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#9CA3AF', font: { size: 10 } } },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#6B7280', font: { size: 10 } } },
+                        x: { grid: { display: false }, ticks: { color: '#6B7280', font: { size: 9 } } }
+                    }
+                }
+            });
+        };
+        
+        const getRiskColor = (level) => {
+            if (level === 'high') return 'text-red-400';
+            if (level === 'medium') return 'text-yellow-400';
+            return 'text-green-400';
+        };
+        const getRiskBg = (level) => {
+            if (level === 'high') return 'bg-red-500/20';
+            if (level === 'medium') return 'bg-yellow-500/20';
+            return 'bg-green-500/20';
+        };
+        const getRiskIcon = (level) => {
+            if (level === 'high') return '🔴';
+            if (level === 'medium') return '🟡';
+            return '🟢';
+        };
+        const getTrendIcon = (trend) => {
+            if (trend === 'up') return '📈';
+            if (trend === 'down') return '📉';
+            return '➡️';
+        };
+        
+        // --- 智能輪換建議 ---
+        const rotationCandidates = Vue.computed(() => {
+            return apiPoolList.value
+                .map(api => ({ ...api, lifecycle: getApiLifecycle(api) }))
+                .filter(a => a.lifecycle.recommendation !== 'good' && a.status !== 'disabled')
+                .sort((a, b) => {
+                    const order = { rotate: 0, monitor: 1 };
+                    return (order[a.lifecycle.recommendation] || 2) - (order[b.lifecycle.recommendation] || 2);
+                });
+        });
+        
+        const executeRotationPlan = () => {
+            const toDisable = rotationCandidates.value.filter(a => a.lifecycle.recommendation === 'rotate');
+            if (toDisable.length === 0) {
+                showToast('沒有需要立即輪換的 API', 'success');
+                return;
+            }
+            openConfirmDialog({
+                title: '執行輪換計劃',
+                message: `將禁用 ${toDisable.length} 個狀態為「建議輪換」的 API：\n\n${toDisable.map(a => `• ${a.name || a.api_id}（成功率 ${(a.success_rate||0).toFixed(0)}%，服役 ${a.lifecycle.ageDays} 天）`).join('\n')}\n\n禁用後可隨時重新啟用。`,
+                type: 'danger',
+                confirmText: `禁用 ${toDisable.length} 個`,
+                onConfirm: async () => {
+                    let ok = 0, fail = 0;
+                    for (const api of toDisable) {
+                        try {
+                            const r = await apiRequest(`/admin/api-pool/${api.api_id}/disable`, { method: 'POST' });
+                            if (r.success) ok++; else fail++;
+                        } catch (e) { fail++; }
+                    }
+                    showToast(`輪換完成：已禁用 ${ok} 個，失敗 ${fail} 個`, ok > 0 ? 'success' : 'error');
+                    showRotationPanel.value = false;
+                    await loadApiPool();
+                }
+            });
+        };
+        
+        // --- API 分配槽位視覺化 ---
+        const getApiSlots = (api) => {
+            const max = api.max_accounts || 5;
+            const used = api.current_accounts || 0;
+            const slots = [];
+            for (let i = 0; i < max; i++) {
+                slots.push(i < used ? 'used' : 'empty');
+            }
+            return slots;
+        };
+        
+        // --- 命令面板 (Ctrl+K) ---
+        const commandActions = Vue.computed(() => {
+            const actions = [
+                { id: 'add', icon: '➕', label: '添加新 API', shortcut: 'Ctrl+N', action: () => { openApiPoolModal(); showCommandPalette.value = false; } },
+                { id: 'batch', icon: '📥', label: '批量導入 API', action: () => { openApiPoolBatchModal(); showCommandPalette.value = false; } },
+                { id: 'export', icon: '📤', label: '導出數據', shortcut: 'Ctrl+E', action: () => { openExportModal(); showCommandPalette.value = false; } },
+                { id: 'backup', icon: '💾', label: '備份 API 池', action: () => { createApiPoolBackup(); showCommandPalette.value = false; } },
+                { id: 'restore', icon: '📂', label: '恢復備份', action: () => { showRestoreModal.value = true; showCommandPalette.value = false; } },
+                { id: 'charts', icon: '📈', label: showChartsPanel.value ? '隱藏圖表' : '顯示圖表', action: () => { toggleChartsPanel(); showCommandPalette.value = false; } },
+                { id: 'predict', icon: '🔮', label: '容量預測', action: () => { togglePredictionPanel(); showCommandPalette.value = false; } },
+                { id: 'rotation', icon: '🔄', label: '輪換建議', action: () => { showRotationPanel.value = !showRotationPanel.value; showCommandPalette.value = false; } },
+                { id: 'refresh', icon: '🔃', label: autoRefreshEnabled.value ? '停止自動刷新' : '開啟自動刷新', action: () => { toggleAutoRefresh(); showCommandPalette.value = false; } },
+                { id: 'view', icon: apiViewMode.value === 'table' ? '🃏' : '📋', label: apiViewMode.value === 'table' ? '切換卡片視圖' : '切換表格視圖', action: () => { toggleViewMode(); showCommandPalette.value = false; } },
+                { id: 'health', icon: '⚙️', label: '健康告警配置', action: () => { showHealthConfigModal.value = true; showCommandPalette.value = false; } },
+                { id: 'group', icon: '📁', label: '分組管理', action: () => { openGroupManagerModal(); showCommandPalette.value = false; } },
+                { id: 'selectall', icon: '☑️', label: '全選 API', shortcut: 'Ctrl+A', action: () => { toggleAllApis(); showCommandPalette.value = false; } },
+                { id: 'deselect', icon: '⬜', label: '取消全選', shortcut: 'Esc', action: () => { selectedApis.value = []; showCommandPalette.value = false; } },
+            ];
+            // 為每個 API 添加快速跳轉
+            apiPoolList.value.slice(0, 10).forEach(api => {
+                actions.push({
+                    id: `goto-${api.api_id}`,
+                    icon: '🔑', label: `跳轉到 ${api.name || api.api_id}`,
+                    category: 'API',
+                    action: () => { expandedApiId.value = api.api_id; loadApiAuditLogs(api.api_id); showCommandPalette.value = false; }
+                });
+            });
+            return actions;
+        });
+        
+        const filteredCommands = Vue.computed(() => {
+            const q = commandQuery.value.toLowerCase().trim();
+            if (!q) return commandActions.value;
+            return commandActions.value.filter(a =>
+                a.label.toLowerCase().includes(q) || a.id.includes(q) || (a.category || '').toLowerCase().includes(q)
+            );
+        });
+        
+        const openCommandPalette = () => {
+            commandQuery.value = '';
+            showCommandPalette.value = true;
+            Vue.nextTick(() => {
+                const el = document.getElementById('command-palette-input');
+                if (el) el.focus();
+            });
         };
         
         // ============ Phase 3: 錢包運營工具 ============
@@ -4473,6 +4687,12 @@ createApp({
             showChartsPanel, toggleChartsPanel, apiViewMode, toggleViewMode,
             autoRefreshEnabled, autoRefreshInterval, autoRefreshCountdown, toggleAutoRefresh,
             getApiLifecycle,
+            // P4 增強
+            showPredictionPanel, predictionReport, predictionLoading,
+            togglePredictionPanel, getRiskColor, getRiskBg, getRiskIcon, getTrendIcon,
+            showRotationPanel, rotationCandidates, executeRotationPlan,
+            getApiSlots,
+            showCommandPalette, commandQuery, filteredCommands, openCommandPalette,
             // 🆕 Phase 3: 錢包運營
             walletOperations,
             walletAnalytics,
@@ -4650,7 +4870,6 @@ createApp({
             healthScores,
             healthSummary,
             anomalies,
-            predictionReport,
             webhookSubscribers,
             webhookEvents,
             webhookStats,
@@ -4664,7 +4883,6 @@ createApp({
             showScalingModal,
             scalingForm,
             loadHealthScores,
-            loadPredictionReport,
             loadWebhookSubscribers,
             addWebhookSubscriber,
             deleteWebhookSubscriber,

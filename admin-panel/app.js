@@ -3069,7 +3069,7 @@ createApp({
             }
         };
         
-        const exportData = (type, status = '') => {
+        const exportCsvData = (type, status = '') => {
             let url = `${API_BASE}/admin/export/${type}?`;
             if (status) url += `status=${status}&`;
             
@@ -3636,7 +3636,7 @@ createApp({
             telegramConfig,
             saveTelegramConfig,
             testTelegram,
-            exportData,
+            exportCsvData,
             
             // 報表和分析
             loadRevenueReport,

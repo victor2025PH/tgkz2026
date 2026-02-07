@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TG-AI智控王 管理後台</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="vue.prod.js"></script>
+    <script src="chart.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Inter', sans-serif; }
@@ -70,6 +70,13 @@
             var el = document.getElementById('vue-loading');
             if (el) el.style.display = 'none';
         };
+        // 超時提示：如果 10 秒後 Vue 仍未掛載，顯示錯誤
+        setTimeout(function() {
+            var el = document.getElementById('vue-loading');
+            if (el && el.style.display !== 'none') {
+                el.innerHTML = '<div style="text-align:center;"><div style="font-size:3rem;margin-bottom:1rem;">⚠️</div><div style="margin-bottom:0.5rem;">頁面載入失敗</div><div style="font-size:0.85rem;color:#6b7280;">請按 Ctrl+Shift+R 強制刷新，或清除瀏覽器快取後重試</div><button onclick="location.reload()" style="margin-top:1rem;padding:0.5rem 1.5rem;background:#667eea;border:none;color:white;border-radius:0.5rem;cursor:pointer;">重新載入</button></div>';
+            }
+        }, 10000);
     </script>
     <div id="app" v-cloak>
         <!-- 側邊欄 -->

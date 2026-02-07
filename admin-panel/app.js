@@ -268,6 +268,15 @@ createApp({
         const apiPoolBatchResult = ref(null);
         const apiPoolFilter = ref('');  // all, available, full, disabled
         const apiPoolStrategy = ref('balanced');  // 🆕 分配策略
+        const apiSearchQuery = ref('');  // 搜索關鍵詞
+        const selectedApis = ref([]);   // 批量選擇
+        const showEditApiModal = ref(false);
+        const editApiForm = reactive({
+            api_id: '', api_hash: '', name: '', source_phone: '',
+            max_accounts: 5, note: '', priority: 0, is_premium: false,
+            min_member_level: 'free', group_id: ''
+        });
+        const expandedApiId = ref(null);  // 展開詳情的 API ID
         
         // 🆕 API 分組管理
         const apiGroups = ref([]);
@@ -1541,10 +1550,8 @@ createApp({
         };
         
         const addApiToPool = async () => {
-            if (!apiPoolForm.api_id.trim() || !apiPoolForm.api_hash.trim()) {
-                showToast('API ID 和 API Hash 不能為空', 'error');
-                return;
-            }
+            const validErr = validateApiFields(apiPoolForm);
+            if (validErr) { showToast(validErr, 'error'); return; }
             
             const result = await apiRequest('/admin/api-pool', {
                 method: 'POST',
@@ -1684,7 +1691,182 @@ createApp({
             return texts[status] || status;
         };
         
-        // ============ 🆕 Phase 3: 錢包運營工具 ============
+        // ============ P0 增強：編輯 / 搜索 / 批量 / 詳情 ============
+        
+        // 字段校驗
+        const validateApiFields = (form) => {
+            const id = String(form.api_id).trim();
+            const hash = String(form.api_hash).trim();
+            if (!id || !hash) return 'API ID 和 API Hash 不能為空';
+            if (!/^\d{4,15}$/.test(id)) return 'API ID 必須為 4-15 位純數字';
+            if (!/^[a-fA-F0-9]{32}$/.test(hash)) return 'API Hash 必須為 32 位十六進制字符';
+            const max = parseInt(form.max_accounts);
+            if (isNaN(max) || max < 1 || max > 100) return '最大帳號數必須在 1-100 之間';
+            return null;
+        };
+        
+        // Hash 遮罩顯示
+        const maskApiHash = (hash) => {
+            if (!hash || hash.length < 8) return hash || '';
+            return hash.substring(0, 4) + '****' + hash.substring(hash.length - 4);
+        };
+        
+        // 搜索過濾 (computed)
+        const filteredApiPoolList = Vue.computed(() => {
+            const q = apiSearchQuery.value.toLowerCase().trim();
+            if (!q) return apiPoolList.value;
+            return apiPoolList.value.filter(api =>
+                (api.name || '').toLowerCase().includes(q) ||
+                String(api.api_id || '').includes(q) ||
+                (api.source_phone || '').includes(q) ||
+                (api.note || '').toLowerCase().includes(q)
+            );
+        });
+        
+        // 展開/收起詳情
+        const toggleApiDetail = (apiId) => {
+            expandedApiId.value = expandedApiId.value === apiId ? null : apiId;
+        };
+        
+        // 編輯 API
+        const openEditApiModal = (api) => {
+            editApiForm.api_id = api.api_id;
+            editApiForm.api_hash = api.api_hash || '';
+            editApiForm.name = api.name || '';
+            editApiForm.source_phone = api.source_phone || '';
+            editApiForm.max_accounts = api.max_accounts || 5;
+            editApiForm.note = api.note || '';
+            editApiForm.priority = api.priority || 0;
+            editApiForm.is_premium = !!api.is_premium;
+            editApiForm.group_id = api.group_id || '';
+            showEditApiModal.value = true;
+        };
+        
+        const updateApiInPool = async () => {
+            const err = validateApiFields(editApiForm);
+            if (err) { showToast(err, 'error'); return; }
+            
+            const result = await apiRequest(`/admin/api-pool/${editApiForm.api_id}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    api_hash: editApiForm.api_hash.trim(),
+                    name: editApiForm.name.trim() || `API-${editApiForm.api_id}`,
+                    source_phone: editApiForm.source_phone.trim() || null,
+                    max_accounts: parseInt(editApiForm.max_accounts) || 5,
+                    note: editApiForm.note.trim() || null,
+                    priority: parseInt(editApiForm.priority) || 0,
+                    is_premium: editApiForm.is_premium,
+                    group_id: editApiForm.group_id || null
+                })
+            });
+            
+            if (result.success) {
+                showToast('API 憑據更新成功', 'success');
+                showEditApiModal.value = false;
+                await loadApiPool();
+            } else {
+                const errMsg = result.message || result.error?.message || result.detail || JSON.stringify(result.error || result);
+                showToast('更新失敗: ' + errMsg, 'error');
+            }
+        };
+        
+        // 批量選擇
+        const isAllApisSelected = Vue.computed(() => {
+            const list = filteredApiPoolList.value;
+            return list.length > 0 && selectedApis.value.length === list.length;
+        });
+        
+        const toggleAllApis = () => {
+            if (isAllApisSelected.value) {
+                selectedApis.value = [];
+            } else {
+                selectedApis.value = filteredApiPoolList.value.map(a => a.api_id);
+            }
+        };
+        
+        const toggleApiSelection = (apiId) => {
+            const idx = selectedApis.value.indexOf(apiId);
+            if (idx >= 0) {
+                selectedApis.value.splice(idx, 1);
+            } else {
+                selectedApis.value.push(apiId);
+            }
+        };
+        
+        // 批量操作
+        const batchApiAction = async (action) => {
+            if (selectedApis.value.length === 0) {
+                showToast('請先勾選要操作的 API', 'error');
+                return;
+            }
+            const count = selectedApis.value.length;
+            const actionTexts = {
+                enable: '啟用', disable: '禁用', delete: '刪除'
+            };
+            if (action === 'delete') {
+                if (!confirm(`確定要刪除選中的 ${count} 個 API 嗎？此操作不可恢復！`)) return;
+            } else {
+                if (!confirm(`確定要${actionTexts[action]}選中的 ${count} 個 API 嗎？`)) return;
+            }
+            
+            let success = 0, fail = 0;
+            for (const apiId of selectedApis.value) {
+                try {
+                    let result;
+                    if (action === 'delete') {
+                        result = await apiRequest(`/admin/api-pool/${apiId}`, { method: 'DELETE' });
+                    } else {
+                        result = await apiRequest(`/admin/api-pool/${apiId}/${action}`, { method: 'POST' });
+                    }
+                    if (result.success) success++; else fail++;
+                } catch (e) { fail++; }
+            }
+            
+            showToast(`${actionTexts[action]}完成：成功 ${success}，失敗 ${fail}`, success > 0 ? 'success' : 'error');
+            selectedApis.value = [];
+            await loadApiPool();
+        };
+        
+        // 批量分配到分組
+        const batchAssignGroup = async (groupId) => {
+            if (selectedApis.value.length === 0) {
+                showToast('請先勾選要操作的 API', 'error');
+                return;
+            }
+            let success = 0, fail = 0;
+            for (const apiId of selectedApis.value) {
+                try {
+                    const result = await apiRequest(`/admin/api-pool/${apiId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ group_id: groupId || null })
+                    });
+                    if (result.success) success++; else fail++;
+                } catch (e) { fail++; }
+            }
+            showToast(`分組分配完成：成功 ${success}，失敗 ${fail}`, success > 0 ? 'success' : 'error');
+            selectedApis.value = [];
+            await loadApiPool();
+        };
+        
+        // 複製 API Hash 到剪貼板
+        const copyApiHash = async (hash) => {
+            try {
+                await navigator.clipboard.writeText(hash);
+                showToast('已複製到剪貼板', 'success');
+            } catch (e) {
+                showToast('複製失敗，請手動複製', 'error');
+            }
+        };
+        
+        // 格式化時間
+        const formatApiTime = (ts) => {
+            if (!ts) return '-';
+            const d = new Date(ts);
+            if (isNaN(d.getTime())) return ts;
+            return d.toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        };
+        
+        // ============ Phase 3: 錢包運營工具 ============
         
         const loadWalletAnalytics = async () => {
             const result = await apiRequest('/admin/wallet/analytics?days=30');
@@ -3529,6 +3711,25 @@ createApp({
             toggleApiStatus,
             getApiStatusClass,
             getApiStatusText,
+            // P0 增強
+            apiSearchQuery,
+            selectedApis,
+            showEditApiModal,
+            editApiForm,
+            expandedApiId,
+            filteredApiPoolList,
+            toggleApiDetail,
+            openEditApiModal,
+            updateApiInPool,
+            isAllApisSelected,
+            toggleAllApis,
+            toggleApiSelection,
+            batchApiAction,
+            batchAssignGroup,
+            copyApiHash,
+            maskApiHash,
+            formatApiTime,
+            validateApiFields,
             // 🆕 Phase 3: 錢包運營
             walletOperations,
             walletAnalytics,

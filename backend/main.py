@@ -620,6 +620,13 @@ class BackendService:
         init_start_time = time.time()
         print("[Backend] ========== Starting initialization ==========", file=sys.stderr)
         
+        # 🔧 P10-2: 環境變量校驗（啟動時）
+        try:
+            from core.env_validator import validate_on_startup
+            validate_on_startup()
+        except Exception as env_err:
+            print(f"[Backend] EnvValidator: {env_err}", file=sys.stderr)
+        
         # Initialize error handler
         def error_log_callback(error_type: str, message: str, details: Dict[str, Any]):
             """Callback for error logging"""
@@ -745,6 +752,25 @@ class BackendService:
         self.alert_manager = get_init_alert_manager()(db, alert_notification_callback)
         await self.alert_manager.start()
         
+        # 🔧 P6-3: 配額變更實時推送 — 註冊回調
+        try:
+            from core.quota_service import get_quota_service
+            _qs = get_quota_service()
+            
+            def _on_quota_change(user_id, quota_type, action, payload):
+                """配額變更時推送到前端（WebSocket + IPC）"""
+                self.send_event('quota-updated', {
+                    'user_id': user_id,
+                    'quota_type': quota_type,
+                    'action': action,
+                    **payload
+                })
+            
+            _qs.on_quota_change(_on_quota_change)
+            print("[Backend] Quota change notification registered", file=sys.stderr)
+        except Exception as e:
+            print(f"[Backend] Failed to register quota change callback: {e}", file=sys.stderr)
+        
         # ========== 優化：延遲執行備份和清理任務（不阻塞啟動） ==========
         async def delayed_maintenance_tasks():
             """延遲執行的維護任務，避免阻塞啟動"""
@@ -808,10 +834,31 @@ class BackendService:
                         if idle_cleaned > 0:
                             print(f"[MemoryCleanup] 已清理 {idle_cleaned} 個閒置客戶端", file=sys.stderr)
                     
-                    # 3. 強制垃圾回收
+                    # 3. 🔧 P4-4: 清理超時的配額預留（防止配額被永久佔用）
+                    try:
+                        from core.quota_service import get_quota_service
+                        qs = get_quota_service()
+                        cleanup_result = qs.cleanup_expired_reservations(timeout_seconds=300)
+                        if cleanup_result.get('cleaned', 0) > 0:
+                            print(f"[QuotaCleanup] 已釋放 {cleanup_result['cleaned']} 個超時預留", file=sys.stderr)
+                    except Exception as qe:
+                        print(f"[QuotaCleanup] 清理失敗: {qe}", file=sys.stderr)
+                    
+                    # 🔧 P7-5: WAL checkpoint（定期將 WAL 日誌合併到主數據庫）
+                    try:
+                        from core.db_utils import get_connection
+                        with get_connection() as wal_conn:
+                            # PASSIVE checkpoint：不阻塞其他連接
+                            result = wal_conn.execute('PRAGMA wal_checkpoint(PASSIVE)').fetchone()
+                            if result and result[1] > 0:  # result[1] = pages written
+                                print(f"[WALCheckpoint] Checkpointed {result[1]} pages", file=sys.stderr)
+                    except Exception as we:
+                        print(f"[WALCheckpoint] Error: {we}", file=sys.stderr)
+                    
+                    # 4. 強制垃圾回收
                     collected = gc.collect()
                     
-                    # 4. 記錄內存使用情況
+                    # 5. 記錄內存使用情況
                     try:
                         import psutil
                         process = psutil.Process()
@@ -822,9 +869,9 @@ class BackendService:
                 except Exception as e:
                     print(f"[MemoryCleanup] 清理失敗: {e}", file=sys.stderr)
         
-        # 🔧 Phase 3 優化：每日數據庫維護任務
+        # 🔧 Phase 3 + P7-5 優化：每日數據庫維護任務
         async def daily_db_maintenance():
-            """每日數據庫維護任務"""
+            """每日數據庫維護任務（含完整性驗證和 TRUNCATE checkpoint）"""
             await asyncio.sleep(3600)  # 首次延遲 1 小時執行
             while True:
                 try:
@@ -841,6 +888,37 @@ class BackendService:
                         await optimizer.analyze()
                 except Exception as e:
                     print(f"[DBMaintenance] 維護失敗: {e}", file=sys.stderr)
+                
+                # P15-2: 清理過期消息隊列記錄
+                try:
+                    cleaned = await db.cleanup_old_queue_messages(days=7)
+                    if cleaned > 0:
+                        print(f"[DBMaintenance] Queue cleanup: removed {cleaned} old messages", file=sys.stderr)
+                except Exception as qe:
+                    print(f"[DBMaintenance] Queue cleanup error: {qe}", file=sys.stderr)
+                
+                # 🔧 P7-5: 每日 WAL TRUNCATE checkpoint + 完整性驗證
+                try:
+                    from core.db_utils import get_connection
+                    with get_connection() as maint_conn:
+                        # TRUNCATE checkpoint（每日凌晨，可以短暫阻塞寫入）
+                        wal_result = maint_conn.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()
+                        if wal_result:
+                            print(
+                                f"[DBMaintenance] WAL TRUNCATE: "
+                                f"busy={wal_result[0]}, log={wal_result[1]}, checkpointed={wal_result[2]}",
+                                file=sys.stderr
+                            )
+                        
+                        # 快速完整性檢查
+                        integrity = maint_conn.execute('PRAGMA quick_check').fetchone()
+                        if integrity and integrity[0] == 'ok':
+                            print("[DBMaintenance] Database integrity: OK", file=sys.stderr)
+                        else:
+                            print(f"[DBMaintenance] ⚠ Integrity issue: {integrity}", file=sys.stderr)
+                            self.send_log("⚠ 數據庫完整性檢查異常", "warning")
+                except Exception as we:
+                    print(f"[DBMaintenance] WAL/integrity check error: {we}", file=sys.stderr)
                 
                 await asyncio.sleep(86400)  # 24 小時
         
@@ -942,6 +1020,13 @@ class BackendService:
         
         # 創建後台任務（不等待完成）
         asyncio.create_task(background_startup_tasks())
+        
+        # 🔧 P11-3: 設置異常→告警橋接（AnomalyDetection → AlertService）
+        try:
+            from core.observability_bridge import setup_anomaly_alert_bridge
+            setup_anomaly_alert_bridge()
+        except Exception as bridge_err:
+            print(f"[Backend] ObservabilityBridge setup: {bridge_err}", file=sys.stderr)
         
         total_init_time = time.time() - init_start_time
         print(f"[Backend] ========== Initialization complete in {total_init_time:.3f}s ==========", file=sys.stderr)
@@ -2525,6 +2610,44 @@ class BackendService:
                 await self.handle_rag_start_guided_build(payload or {})
                 return
             
+            # 🔧 P8-5: 前端審計日誌批量接收
+            elif command == 'audit-log-batch':
+                entries = (payload or {}).get('entries', [])
+                if entries:
+                    try:
+                        from core.db_utils import get_connection
+                        with get_connection() as conn:
+                            # 確保表存在
+                            conn.execute('''
+                                CREATE TABLE IF NOT EXISTS frontend_audit_log (
+                                    id TEXT PRIMARY KEY,
+                                    action TEXT NOT NULL,
+                                    severity TEXT DEFAULT 'info',
+                                    user_id TEXT,
+                                    details TEXT,
+                                    timestamp INTEGER,
+                                    received_at TEXT DEFAULT CURRENT_TIMESTAMP
+                                )
+                            ''')
+                            # 批量插入
+                            for entry in entries[:100]:
+                                conn.execute(
+                                    'INSERT OR IGNORE INTO frontend_audit_log (id, action, severity, user_id, details, timestamp) VALUES (?, ?, ?, ?, ?, ?)',
+                                    (
+                                        entry.get('id', ''),
+                                        entry.get('action', 'unknown'),
+                                        entry.get('severity', 'info'),
+                                        str(entry.get('userId', '')),
+                                        json.dumps(entry.get('details', {}), ensure_ascii=False),
+                                        entry.get('timestamp', 0)
+                                    )
+                                )
+                            conn.commit()
+                        print(f"[Backend] 📝 Stored {len(entries)} frontend audit entries", file=sys.stderr)
+                    except Exception as ae:
+                        print(f"[Backend] Audit log batch error: {ae}", file=sys.stderr)
+                return
+            
             # 🆕 Phase 7: 動態回退機制 - 替代巨型 if-elif 鏈
             # 將命令名轉換為方法名: add-account -> handle_add_account, batch-send:start -> handle_batch_send_start
             # 🔧 P0: 同時處理 - 和 : 符號
@@ -3147,11 +3270,53 @@ class BackendService:
             
             owner_user_id = payload.get('ownerUserId')
             
-            # 配額檢查：TG 帳號數量
-            quota_check = await self.check_quota('tg_accounts', 1, owner_user_id)
-            if not quota_check.get('allowed', True):
-                self.send_quota_exceeded_error('account-added', 'tg_accounts', quota_check.get('result', {}))
-                return {"success": False, "error": "TG 帳號配額已用盡", "code": "QUOTA_EXCEEDED"}
+            # 🔧 P4-3: 使用原子化的配額檢查 + 預留操作（防止並發超額）
+            quota_reserved = False  # 追蹤預留狀態，用於後續 commit/rollback
+            
+            # Electron 模式跳過配額檢查
+            is_electron = os.environ.get('ELECTRON_MODE', 'false').lower() == 'true'
+            if not is_electron and owner_user_id:
+                try:
+                    from core.quota_service import get_quota_service
+                    quota_service = get_quota_service()
+                    
+                    # 原子化：檢查 + 預留一步完成，持有鎖期間其他請求無法插入
+                    allowed, quota_result_obj = quota_service.atomic_check_and_reserve(
+                        owner_user_id, 'tg_accounts', 1
+                    )
+                    quota_result = quota_result_obj.to_dict() if hasattr(quota_result_obj, 'to_dict') else {}
+                    
+                    print(f"[Backend] Atomic quota check for tg_accounts: allowed={allowed}, "
+                          f"user_id={owner_user_id}, limit={quota_result.get('limit', '?')}, "
+                          f"used={quota_result.get('used', '?')}, reserved={quota_result.get('reserved', '?')}", 
+                          file=sys.stderr)
+                    
+                    if not allowed:
+                        limit = quota_result.get('limit', 0)
+                        used = quota_result.get('used', 0)
+                        detail_msg = f"TG 帳號數量已達上限（已有 {used}/{limit} 個帳號）"
+                        upgrade_msg = quota_result.get('upgrade_suggestion', '升級會員等級可添加更多帳號')
+                        
+                        self.send_event('account-added', {
+                            'success': False,
+                            'error': detail_msg,
+                            'code': 'QUOTA_EXCEEDED',
+                            'quota_type': 'tg_accounts',
+                            'quota': quota_result,
+                            'upgrade_suggestion': upgrade_msg,
+                            'detail': {
+                                'limit': limit,
+                                'used': used,
+                                'remaining': 0
+                            }
+                        })
+                        return {"success": False, "error": detail_msg, "code": "QUOTA_EXCEEDED", 
+                                "detail": {"limit": limit, "used": used}}
+                    
+                    quota_reserved = True  # 預留成功，後續需要 commit 或 rollback
+                    
+                except Exception as e:
+                    print(f"[Backend] Atomic quota check error (allowing): {e}", file=sys.stderr)
             
             # Clean phone number - remove spaces, dashes, and parentheses
             if 'phone' in payload:
@@ -3168,6 +3333,11 @@ class BackendService:
                         err = payload['_api_error']
                         self.send_log(err, "error")
                         self.send_event("account-validation-error", {"errors": [err], "account_data": payload})
+                        # 🔧 P4-3: 回滾配額預留
+                        if quota_reserved and owner_user_id:
+                            try:
+                                quota_service.atomic_commit_or_rollback(owner_user_id, 'tg_accounts', 1, commit=False)
+                            except: pass
                         return {"success": False, "error": err}
                 except Exception as e:
                     print(f"[Backend] process_login_payload error: {e}", file=sys.stderr)
@@ -3186,6 +3356,11 @@ class BackendService:
                     AppError(ErrorType.VALIDATION_ERROR, error_message, {"errors": errors}),
                     {"command": "add-account", "payload": payload}
                 )
+                # 🔧 P4-3: 驗證失敗，回滾配額預留
+                if quota_reserved and owner_user_id:
+                    try:
+                        quota_service.atomic_commit_or_rollback(owner_user_id, 'tg_accounts', 1, commit=False)
+                    except: pass
                 # 🆕 返回錯誤結果（HTTP API 模式需要）
                 return {
                     "success": False,
@@ -3200,6 +3375,14 @@ class BackendService:
             # Check if account already exists in database
             existing_account = await db.get_account_by_phone(phone)
             if existing_account:
+                # 🔧 P4-3: 帳號已存在，不需要消耗新配額，回滾預留
+                if quota_reserved and owner_user_id:
+                    try:
+                        quota_service.atomic_commit_or_rollback(owner_user_id, 'tg_accounts', 1, commit=False)
+                        quota_reserved = False
+                        print(f"[Backend] Quota reservation rolled back (account already exists)", file=sys.stderr)
+                    except: pass
+                
                 existing_status = existing_account.get('status', 'Offline')
                 existing_id = existing_account.get('id')
                 
@@ -3371,6 +3554,11 @@ class BackendService:
                         "account_data": payload,
                         "error_type": "file_locked"
                     })
+                    # 🔧 P4-3: 回滾配額預留
+                    if quota_reserved and owner_user_id:
+                        try:
+                            quota_service.atomic_commit_or_rollback(owner_user_id, 'tg_accounts', 1, commit=False)
+                        except: pass
                     return
                 
                 print(f"[Backend] Orphaned session file deleted successfully", file=sys.stderr)
@@ -3438,6 +3626,29 @@ class BackendService:
             self._cache_timestamps.pop("accounts", None)
             self.send_event("accounts-updated", accounts)
             
+            # 🔧 P4-3: 帳號新增成功 → 提交配額預留
+            if quota_reserved and owner_user_id:
+                try:
+                    from core.quota_service import get_quota_service
+                    qs = get_quota_service()
+                    qs.atomic_commit_or_rollback(owner_user_id, 'tg_accounts', 1, commit=True)
+                    print(f"[Backend] Quota reservation committed for user {owner_user_id}", file=sys.stderr)
+                except Exception as e:
+                    print(f"[Backend] Quota commit error (non-fatal): {e}", file=sys.stderr)
+            
+            # 🔧 P3-3: 帳號新增後立即失效配額緩存
+            try:
+                from core.quota_service import get_quota_service
+                qs = get_quota_service()
+                owner_id = payload.get('owner_user_id') or payload.get('ownerUserId')
+                if owner_id:
+                    qs.invalidate_cache(owner_id)
+                else:
+                    qs.invalidate_cache()  # 無法確定用戶，全量失效
+                print(f"[Backend] Quota cache invalidated after add-account for user {owner_id}", file=sys.stderr)
+            except Exception as e:
+                print(f"[Backend] Quota cache invalidation error: {e}", file=sys.stderr)
+            
             # 🆕 返回成功結果（HTTP API 模式需要）
             return {
                 "success": True,
@@ -3448,6 +3659,16 @@ class BackendService:
         
         except ValidationError as e:
             import sys
+            # 🔧 P4-3: 帳號新增失敗 → 回滾配額預留
+            if quota_reserved and owner_user_id:
+                try:
+                    from core.quota_service import get_quota_service
+                    qs = get_quota_service()
+                    qs.atomic_commit_or_rollback(owner_user_id, 'tg_accounts', 1, commit=False)
+                    print(f"[Backend] Quota reservation rolled back for user {owner_user_id}", file=sys.stderr)
+                except Exception as qe:
+                    print(f"[Backend] Quota rollback error: {qe}", file=sys.stderr)
+            
             print(f"[Backend] ValidationError: {e.message}", file=sys.stderr)
             self.send_log(f"验证错误: {e.message}", "error")
             self.send_event("account-validation-error", {
@@ -3457,6 +3678,16 @@ class BackendService:
         except ValueError as e:
             # Handle specific errors like duplicate phone number
             import sys
+            # 🔧 P4-3: 帳號新增失敗 → 回滾配額預留
+            if quota_reserved and owner_user_id:
+                try:
+                    from core.quota_service import get_quota_service
+                    qs = get_quota_service()
+                    qs.atomic_commit_or_rollback(owner_user_id, 'tg_accounts', 1, commit=False)
+                    print(f"[Backend] Quota reservation rolled back for user {owner_user_id}", file=sys.stderr)
+                except Exception as qe:
+                    print(f"[Backend] Quota rollback error: {qe}", file=sys.stderr)
+            
             error_msg = str(e)
             print(f"[Backend] ValueError adding account: {error_msg}", file=sys.stderr)
             self.send_log(error_msg, "error")
@@ -3467,6 +3698,16 @@ class BackendService:
             })
         except Exception as e:
             import sys
+            # 🔧 P4-3: 帳號新增失敗 → 回滾配額預留
+            if quota_reserved and owner_user_id:
+                try:
+                    from core.quota_service import get_quota_service
+                    qs = get_quota_service()
+                    qs.atomic_commit_or_rollback(owner_user_id, 'tg_accounts', 1, commit=False)
+                    print(f"[Backend] Quota reservation rolled back for user {owner_user_id}", file=sys.stderr)
+                except Exception as qe:
+                    print(f"[Backend] Quota rollback error: {qe}", file=sys.stderr)
+            
             error_msg = str(e)
             print(f"[Backend] Exception adding account: {error_msg}", file=sys.stderr)
             import traceback
@@ -5182,6 +5423,14 @@ class BackendService:
             self.send_log(f"已删除 {len(deleted_phones)} 个账户", "success")
             print(f"[Backend] Bulk delete completed: {len(deleted_phones)} accounts removed", file=sys.stderr)
             
+            # 🔧 P3-3: 批量刪除後失效配額緩存（全量失效，因涉及多帳號）
+            try:
+                from core.quota_service import get_quota_service
+                get_quota_service().invalidate_cache()
+                print(f"[Backend] Quota cache invalidated after bulk-delete", file=sys.stderr)
+            except Exception as qe:
+                print(f"[Backend] Quota cache invalidation error: {qe}", file=sys.stderr)
+            
             accounts = await db.get_all_accounts()
             # Invalidate cache
             self._cache.pop("accounts", None)
@@ -5309,6 +5558,20 @@ class BackendService:
             await db.add_log(f"账户 {phone} (ID: {account_id}) 已完全删除", "success")
             self.send_log(f"账户 {phone} 已完全删除", "success")
             print(f"[Backend] Account {account_id} ({phone}) completely removed", file=sys.stderr)
+            
+            # 🔧 P3-3: 帳號刪除後立即失效配額緩存
+            try:
+                from core.quota_service import get_quota_service
+                qs = get_quota_service()
+                # 嘗試從帳號信息獲取 owner_user_id（account 在刪除前已獲取）
+                owner_id = account.get('owner_user_id') if account else None
+                if owner_id:
+                    qs.invalidate_cache(owner_id)
+                else:
+                    qs.invalidate_cache()
+                print(f"[Backend] Quota cache invalidated after remove-account", file=sys.stderr)
+            except Exception as qe:
+                print(f"[Backend] Quota cache invalidation error: {qe}", file=sys.stderr)
         
         except Exception as e:
             import sys
@@ -7839,6 +8102,18 @@ class BackendService:
                 if self.running:
                     await self.reset_daily_send_counts()
                     self.last_reset_date = datetime.now().date()
+                    
+                    # 🔧 P10-3: 每日備份驗證
+                    try:
+                        from core.backup_verifier import verify_backup_on_schedule
+                        db_path = os.environ.get('DATABASE_PATH', os.environ.get('DB_PATH', ''))
+                        if db_path:
+                            backup_dir = str(Path(db_path).parent / 'backups')
+                        else:
+                            backup_dir = os.path.join(os.path.dirname(__file__), 'data', 'backups')
+                        verify_backup_on_schedule(backup_dir)
+                    except Exception as bv_err:
+                        print(f"[Backend] Backup verification error: {bv_err}", file=sys.stderr)
         
         except asyncio.CancelledError:
             pass
@@ -27812,8 +28087,29 @@ class BackendService:
                     time_str = now.strftime('%H:%M')
                     day_str = days[now.weekday()]  # weekday() 返回 0-6（週一到週日）
                     
-                    # 選擇消息模板（支持多模板模式）
-                    if is_multi_template and messages:
+                    # 選擇消息模板（支持多模板模式 + P14-2: A/B 測試集成）
+                    ab_test_id = config.get('abTestId')  # 前端傳入的 A/B 測試 ID
+                    ab_variant_idx = None  # 記錄選中的變體索引
+                    
+                    if ab_test_id:
+                        # P14-2: A/B 測試模式 — 由 ABTestManager 選擇變體
+                        try:
+                            from core.template_ab_test import get_ab_test_manager
+                            ab_mgr = get_ab_test_manager()
+                            variant = ab_mgr.select_template(ab_test_id)
+                            if variant and messages:
+                                ab_variant_idx = variant.get('variant_index', 0)
+                                # 使用變體對應的模板索引
+                                tmpl_idx = min(ab_variant_idx, len(messages) - 1)
+                                selected_template = messages[tmpl_idx]
+                                print(f"[BatchSend] A/B 測試: test={ab_test_id}, variant={ab_variant_idx}, "
+                                      f"template={variant.get('template_name', '?')}", file=sys.stderr)
+                            else:
+                                selected_template = messages[0] if messages else message_template
+                        except Exception as ab_err:
+                            print(f"[BatchSend] A/B 測試回退: {ab_err}", file=sys.stderr)
+                            selected_template = messages[0] if messages else message_template
+                    elif is_multi_template and messages:
                         if send_strategy == 'random':
                             # 隨機選擇一個模板
                             selected_template = random.choice(messages)
@@ -27868,10 +28164,32 @@ class BackendService:
                     
                     success_count += 1
                     
+                    # P14-2: 記錄 A/B 測試發送結果（成功）
+                    if ab_test_id and ab_variant_idx is not None:
+                        try:
+                            from core.template_ab_test import get_ab_test_manager
+                            ab_mgr = get_ab_test_manager()
+                            test_obj = ab_mgr.get_test(ab_test_id)
+                            if test_obj:
+                                test_obj.record_result(ab_variant_idx, success=True)
+                        except Exception:
+                            pass
+                    
                 except Exception as e:
                     error_str = str(e).lower()
                     print(f"[BatchSend] 發送失敗 ({user_id}): {e}", file=sys.stderr)
                     failed_count += 1
+                    
+                    # P14-2: 記錄 A/B 測試發送結果（失敗）
+                    if ab_test_id and ab_variant_idx is not None:
+                        try:
+                            from core.template_ab_test import get_ab_test_manager
+                            ab_mgr = get_ab_test_manager()
+                            test_obj = ab_mgr.get_test(ab_test_id)
+                            if test_obj:
+                                test_obj.record_result(ab_variant_idx, success=False)
+                        except Exception:
+                            pass
                     
                     # 分類失敗原因
                     if 'privacy' in error_str or 'private' in error_str:

@@ -18,6 +18,7 @@ import { FormsModule } from '@angular/forms';
 import { ElectronIpcService } from './electron-ipc.service';
 import { ToastService } from './toast.service';
 import { MembershipService } from './membership.service';
+import { AuthService } from './core/auth.service';
 
 type LoginMethod = 'phone' | 'tdata' | 'advanced';
 type Step = 1 | 2;  // 簡化為 2 步：登入 → 完成
@@ -1085,6 +1086,7 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
   private ipcService = inject(ElectronIpcService);
   private toast = inject(ToastService);
   private membershipService = inject(MembershipService);
+  private authService = inject(AuthService);
 
   @Output() back = new EventEmitter<void>();
   @Output() accountAdded = new EventEmitter<any>();
@@ -1193,6 +1195,14 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
       this.handleLoginError(result);
     });
     this.ipcChannels.push('account-login-error');
+
+    // 🔧 P0 修復：監聽 account-added 事件中的配額錯誤
+    this.ipcService.on('account-added', (result: any) => {
+      if (result && !result.success && result.code === 'QUOTA_EXCEEDED') {
+        this.handleLoginError(result);
+      }
+    });
+    this.ipcChannels.push('account-added');
 
     // TData 掃描結果
     this.ipcService.on('tdata-scan-result', (result: any) => {
@@ -1312,18 +1322,24 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
     this.isSending.set(true);
     this.phoneError.set('');
 
+    // 🔧 P0 修復：傳遞 ownerUserId 確保配額檢查能正確識別用戶
+    const currentUser = this.authService.user();
+    const ownerUserId = currentUser?.id ? String(currentUser.id) : undefined;
+
     // 🆕 使用平台 API 池 - 後端會自動分配 API
     this.ipcService.send('add-account', {
       phone: this.phoneNumber,
       proxy: this.proxyMode === 'auto' ? 'auto' : null,
-      usePlatformApi: true  // 🆕 標記使用平台 API
+      usePlatformApi: true,  // 🆕 標記使用平台 API
+      ownerUserId  // 🔧 P0: 確保配額檢查能找到正確用戶
     });
 
     setTimeout(() => {
       this.ipcService.send('login-account', {
         phone: this.phoneNumber,
         proxy: this.proxyMode === 'auto' ? 'auto' : null,
-        usePlatformApi: true
+        usePlatformApi: true,
+        ownerUserId
       });
     }, 500);
 
@@ -1342,11 +1358,16 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
 
     this.isSending.set(true);
 
+    // 🔧 P0 修復：傳遞 ownerUserId
+    const currentUser = this.authService.user();
+    const ownerUserId = currentUser?.id ? String(currentUser.id) : undefined;
+
     this.ipcService.send('add-account', {
       phone: this.phoneNumber,
       apiId: this.customApiId,
       apiHash: this.customApiHash,
-      proxy: this.proxyMode === 'auto' ? 'auto' : null
+      proxy: this.proxyMode === 'auto' ? 'auto' : null,
+      ownerUserId
     });
 
     setTimeout(() => {
@@ -1354,7 +1375,8 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
         phone: this.phoneNumber,
         apiId: this.customApiId,
         apiHash: this.customApiHash,
-        proxy: this.proxyMode === 'auto' ? 'auto' : null
+        proxy: this.proxyMode === 'auto' ? 'auto' : null,
+        ownerUserId
       });
     }, 500);
 
@@ -1415,6 +1437,16 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
     if (this.verifyTimeout) {
       clearTimeout(this.verifyTimeout);
       this.verifyTimeout = null;
+    }
+
+    // 🔧 P0/P1 修復：配額錯誤提供詳細且友好的提示
+    if (result.code === 'QUOTA_EXCEEDED') {
+      const detail = result.detail || result.quota || {};
+      const limit = detail.limit || '?';
+      const used = detail.used || '?';
+      const errorMessage = `帳號數量已達上限（${used}/${limit}）。升級會員可添加更多帳號。`;
+      this.toast.error(errorMessage);
+      return;
     }
 
     const errorMessage = result.friendlyMessage || result.error || '登入失敗';
@@ -1511,17 +1543,23 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
 
     this.isImporting.set(true);
 
+    // 🔧 P0 修復：TData 導入也傳遞 ownerUserId
+    const currentUser = this.authService.user();
+    const ownerUserId = currentUser?.id ? String(currentUser.id) : undefined;
+
     if (indices.length === 1) {
       this.ipcService.send('import-tdata-account', {
         tdataPath: scanResult.tdata_path,
         accountIndex: indices[0],
-        usePlatformApi: true
+        usePlatformApi: true,
+        ownerUserId
       });
     } else {
       this.ipcService.send('import-tdata-batch', {
         tdataPath: scanResult.tdata_path,
         accountIndices: indices,
-        usePlatformApi: true
+        usePlatformApi: true,
+        ownerUserId
       });
     }
   }

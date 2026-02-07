@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["angular:styles/component:css;aa6a4b688016bc15ad791478e6a7f42a462cb4125e6b48653eb75e706a4793c3;D:/tgkz2026/src/components/quick-actions-panel.component.ts"],
-  "sourcesContent": ["\n    .quick-actions-panel {\n      max-width: 100%;\n    }\n  "],
-  "mappings": ";AACI,CAAC;AACC,aAAW;AACb;",
-  "names": []
-}

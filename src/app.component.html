@@ -8,6 +8,8 @@
 <app-global-input-dialog></app-global-input-dialog>
 <!-- 🆕 实时告警通知 -->
 <app-alert-notification></app-alert-notification>
+<!-- 🔧 P8-1: 離線狀態指示器（離線/慢速/同步中） -->
+<app-offline-indicator></app-offline-indicator>
 
 <!-- 🆕 P2 優化：智能連接狀態指示器（支持離線模式） -->
 @if (backendConnectionState() !== 'connected' || !offlineCache.isOnline()) {
@@ -281,14 +283,47 @@
       </div>
     }
     
+    <!-- 🔧 P8-3: 移動端漢堡選單按鈕（固定在左上角） -->
+    @if (isMobile()) {
+      <button (click)="toggleMobileMenu()" 
+              class="fixed top-3 left-3 z-[9999] w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200"
+              style="background: linear-gradient(135deg, #06b6d4, #8b5cf6); box-shadow: 0 2px 12px rgba(6, 182, 212, 0.5);"
+              [attr.aria-expanded]="mobileMenuOpen()"
+              aria-controls="mobile-sidebar"
+              [attr.aria-label]="mobileMenuOpen() ? '關閉選單' : '開啟選單'">
+        @if (mobileMenuOpen()) {
+          <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        } @else {
+          <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        }
+      </button>
+    }
+    
+    <!-- 🔧 P8-3: 移動端半透明遮罩 -->
+    @if (isMobile() && mobileMenuOpen()) {
+      <div class="fixed inset-0 bg-black/50 z-[998] backdrop-blur-sm transition-opacity"
+           (click)="mobileMenuOpen.set(false)"></div>
+    }
+    
     <!-- Sidebar -->
-    <aside class="backdrop-blur-sm flex-shrink-0 flex flex-col sidebar h-screen transition-all duration-300" 
-           [class.w-64]="!sidebarCollapsed()"
-           [class.w-16]="sidebarCollapsed()"
+    <aside id="mobile-sidebar" role="navigation" aria-label="主導航"
+           class="backdrop-blur-sm flex-shrink-0 flex flex-col sidebar h-screen transition-all duration-300" 
+           [class.w-64]="!sidebarCollapsed() || (isMobile() && mobileMenuOpen())"
+           [class.w-16]="sidebarCollapsed() && !isMobile()"
+           [class.mobile-sidebar-hidden]="isMobile() && !mobileMenuOpen()"
+           [class.mobile-sidebar-visible]="isMobile() && mobileMenuOpen()"
            style="background-color: var(--bg-sidebar); border-right: 1px solid var(--border-default);">
       <!-- 頂部固定區域：Logo + 用戶信息 -->
       <div class="flex-shrink-0">
-        <!-- 收縮/展開按鈕 -->
+        <!-- 收縮/展開按鈕（桌面端才顯示） -->
+        @if (!isMobile()) {
         <button (click)="toggleSidebarCollapse()" 
                 class="absolute top-3 -right-3 z-50 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110"
                 style="background: linear-gradient(135deg, #06b6d4, #8b5cf6); box-shadow: 0 2px 8px rgba(6, 182, 212, 0.4);"
@@ -299,6 +334,7 @@
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </button>
+        }
         
         <!-- Logo - TG-AI智控王 -->
         <div class="flex items-center gap-3 p-4" [class.justify-center]="sidebarCollapsed()">
@@ -337,84 +373,105 @@
           }
         </div>
         
-        <!-- 用戶信息區域（美化版 - 王者榮耀風格） -->
-        <div class="user-profile-card mx-3 mb-4 p-3 rounded-xl cursor-pointer transition-all duration-300 hover:scale-[1.02] group"
-             [class.level-bronze]="userMembershipLevel() === 'bronze'"
-             [class.level-silver]="userMembershipLevel() === 'silver'"
-             [class.level-gold]="userMembershipLevel() === 'gold'"
-             [class.level-diamond]="userMembershipLevel() === 'diamond'"
-             [class.level-star]="userMembershipLevel() === 'star'"
-             [class.level-king]="userMembershipLevel() === 'king'"
-             (click)="changeView('profile')">
-          <div class="flex items-center gap-3">
-            <!-- 頭像框（帶等級邊框） -->
-            <div class="avatar-wrapper relative">
-              <!-- 動態光環 -->
-              <div class="avatar-glow absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                   [class.glow-bronze]="userMembershipLevel() === 'bronze'"
-                   [class.glow-silver]="userMembershipLevel() === 'silver'"
-                   [class.glow-gold]="userMembershipLevel() === 'gold'"
-                   [class.glow-diamond]="userMembershipLevel() === 'diamond'"
-                   [class.glow-star]="userMembershipLevel() === 'star'"
-                   [class.glow-king]="userMembershipLevel() === 'king'">
+        <!-- 🔧 P8-4: 通知中心（鈴鐺 + 面板） -->
+        @if (!sidebarCollapsed()) {
+          <div class="px-3 mb-2 flex justify-end">
+            <app-notification-center></app-notification-center>
+          </div>
+        }
+        
+        <!-- 🔧 P3-4: 用戶信息區域 —— 帶骨架屏防止名稱閃爍 -->
+        @if (!currentUser()) {
+          <!-- 骨架屏：用戶數據未載入時顯示 -->
+          <div class="user-profile-card mx-3 mb-4 p-3 rounded-xl level-bronze">
+            <div class="flex items-center gap-3 animate-pulse">
+              <div class="w-12 h-12 rounded-full bg-slate-600/40"></div>
+              <div class="flex-1 min-w-0">
+                <div class="h-4 w-20 bg-slate-600/40 rounded mb-2"></div>
+                <div class="h-3 w-14 bg-slate-600/30 rounded"></div>
               </div>
-              <!-- 頭像邊框 -->
-              <div class="avatar-border w-12 h-12 rounded-full p-[2px]"
-                   [class.border-bronze]="userMembershipLevel() === 'bronze'"
-                   [class.border-silver]="userMembershipLevel() === 'silver'"
-                   [class.border-gold]="userMembershipLevel() === 'gold'"
-                   [class.border-diamond]="userMembershipLevel() === 'diamond'"
-                   [class.border-star]="userMembershipLevel() === 'star'"
-                   [class.border-king]="userMembershipLevel() === 'king'">
-                <!-- 頭像內容 -->
-                <div class="w-full h-full rounded-full flex items-center justify-center text-white font-bold text-lg avatar-inner"
-                     [class.avatar-bronze]="userMembershipLevel() === 'bronze'"
-                     [class.avatar-silver]="userMembershipLevel() === 'silver'"
-                     [class.avatar-gold]="userMembershipLevel() === 'gold'"
-                     [class.avatar-diamond]="userMembershipLevel() === 'diamond'"
-                     [class.avatar-star]="userMembershipLevel() === 'star'"
-                     [class.avatar-king]="userMembershipLevel() === 'king'">
-                  {{ (currentUser()?.displayName || currentUser()?.username)?.charAt(0).toUpperCase() || '?' }}
-                </div>
-              </div>
-              <!-- 會員徽章（右下角） -->
-              @if (userMembershipLevel() !== 'bronze') {
-                <div class="vip-badge absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] shadow-lg"
-                     [class.badge-silver]="userMembershipLevel() === 'silver'"
-                     [class.badge-gold]="userMembershipLevel() === 'gold'"
-                     [class.badge-diamond]="userMembershipLevel() === 'diamond'"
-                     [class.badge-star]="userMembershipLevel() === 'star'"
-                     [class.badge-king]="userMembershipLevel() === 'king'">
-                  @switch (userMembershipLevel()) {
-                    @case ('silver') { <span class="animate-pulse">🥈</span> }
-                    @case ('gold') { <span class="animate-pulse">🥇</span> }
-                    @case ('diamond') { <span class="animate-pulse">💎</span> }
-                    @case ('star') { <span class="animate-pulse">🌟</span> }
-                    @case ('king') { <span class="animate-bounce">👑</span> }
-                  }
-                </div>
-              }
-            </div>
-            
-            <!-- 用戶信息 -->
-            <div class="flex-1 min-w-0">
-              <div class="text-sm font-semibold truncate" style="color: var(--text-primary);">
-                {{ currentUser()?.displayName || currentUser()?.username || '用戶' }}
-              </div>
-              <div class="flex items-center gap-1.5 mt-0.5">
-                <!-- 🔧 P1-2: 使用統一的會員等級徽章組件 -->
-                <user-level-badge [level]="userMembershipLevel()" size="sm" />
-              </div>
-            </div>
-            
-            <!-- 箭頭 -->
-            <div class="arrow-icon transition-transform duration-300 group-hover:translate-x-1">
-              <svg class="w-4 h-4" style="color: var(--text-muted);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
             </div>
           </div>
-        </div>
+        } @else {
+          <!-- 實際用戶信息（美化版 - 王者榮耀風格） -->
+          <div class="user-profile-card mx-3 mb-4 p-3 rounded-xl cursor-pointer transition-all duration-300 hover:scale-[1.02] group"
+               [class.level-bronze]="userMembershipLevel() === 'bronze'"
+               [class.level-silver]="userMembershipLevel() === 'silver'"
+               [class.level-gold]="userMembershipLevel() === 'gold'"
+               [class.level-diamond]="userMembershipLevel() === 'diamond'"
+               [class.level-star]="userMembershipLevel() === 'star'"
+               [class.level-king]="userMembershipLevel() === 'king'"
+               (click)="changeView('profile')">
+            <div class="flex items-center gap-3">
+              <!-- 頭像框（帶等級邊框） -->
+              <div class="avatar-wrapper relative">
+                <!-- 動態光環 -->
+                <div class="avatar-glow absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                     [class.glow-bronze]="userMembershipLevel() === 'bronze'"
+                     [class.glow-silver]="userMembershipLevel() === 'silver'"
+                     [class.glow-gold]="userMembershipLevel() === 'gold'"
+                     [class.glow-diamond]="userMembershipLevel() === 'diamond'"
+                     [class.glow-star]="userMembershipLevel() === 'star'"
+                     [class.glow-king]="userMembershipLevel() === 'king'">
+                </div>
+                <!-- 頭像邊框 -->
+                <div class="avatar-border w-12 h-12 rounded-full p-[2px]"
+                     [class.border-bronze]="userMembershipLevel() === 'bronze'"
+                     [class.border-silver]="userMembershipLevel() === 'silver'"
+                     [class.border-gold]="userMembershipLevel() === 'gold'"
+                     [class.border-diamond]="userMembershipLevel() === 'diamond'"
+                     [class.border-star]="userMembershipLevel() === 'star'"
+                     [class.border-king]="userMembershipLevel() === 'king'">
+                  <!-- 頭像內容 -->
+                  <div class="w-full h-full rounded-full flex items-center justify-center text-white font-bold text-lg avatar-inner"
+                       [class.avatar-bronze]="userMembershipLevel() === 'bronze'"
+                       [class.avatar-silver]="userMembershipLevel() === 'silver'"
+                       [class.avatar-gold]="userMembershipLevel() === 'gold'"
+                       [class.avatar-diamond]="userMembershipLevel() === 'diamond'"
+                       [class.avatar-star]="userMembershipLevel() === 'star'"
+                       [class.avatar-king]="userMembershipLevel() === 'king'">
+                    {{ (currentUser()?.displayName || currentUser()?.display_name || currentUser()?.username)?.charAt(0).toUpperCase() || '?' }}
+                  </div>
+                </div>
+                <!-- 會員徽章（右下角） -->
+                @if (userMembershipLevel() !== 'bronze') {
+                  <div class="vip-badge absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] shadow-lg"
+                       [class.badge-silver]="userMembershipLevel() === 'silver'"
+                       [class.badge-gold]="userMembershipLevel() === 'gold'"
+                       [class.badge-diamond]="userMembershipLevel() === 'diamond'"
+                       [class.badge-star]="userMembershipLevel() === 'star'"
+                       [class.badge-king]="userMembershipLevel() === 'king'">
+                    @switch (userMembershipLevel()) {
+                      @case ('silver') { <span class="animate-pulse">🥈</span> }
+                      @case ('gold') { <span class="animate-pulse">🥇</span> }
+                      @case ('diamond') { <span class="animate-pulse">💎</span> }
+                      @case ('star') { <span class="animate-pulse">🌟</span> }
+                      @case ('king') { <span class="animate-bounce">👑</span> }
+                    }
+                  </div>
+                }
+              </div>
+              
+              <!-- 用戶信息 -->
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold truncate" style="color: var(--text-primary);">
+                  {{ currentUser()?.displayName || currentUser()?.display_name || currentUser()?.username || '用戶' }}
+                </div>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <!-- 🔧 P1-2: 使用統一的會員等級徽章組件 -->
+                  <user-level-badge [level]="userMembershipLevel()" size="sm" />
+                </div>
+              </div>
+              
+              <!-- 箭頭 -->
+              <div class="arrow-icon transition-transform duration-300 group-hover:translate-x-1">
+                <svg class="w-4 h-4" style="color: var(--text-muted);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </div>
+            </div>
+          </div>
+        }
       </div>
       
       <!-- 可滾動的導航區域 -->
@@ -925,7 +982,7 @@
   </aside>
 
   <!-- Main Content -->
-  <main class="flex-1 p-8 overflow-y-auto" style="background-color: var(--bg-primary);">
+  <main role="main" aria-label="主要內容" class="flex-1 p-8 overflow-y-auto" [class.pt-14]="isMobile()" [class.pl-0]="isMobile()" style="background-color: var(--bg-primary);">
     <!-- 使用 @switch 控制視圖（暫時禁用 Angular Router） -->
     @switch (currentView()) {
       @case ('dashboard') {

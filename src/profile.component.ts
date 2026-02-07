@@ -6,7 +6,8 @@
 import { Component, signal, computed, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AuthService, DeviceInfo, UsageStats } from './auth.service';
+// 🔧 P4-5: 遷移至 Core AuthService（統一認證入口）
+import { AuthService, DeviceInfo, UsageStats } from './core/auth.service';
 import { AuthEventsService } from './core/auth-events.service';  // 🆕 用於廣播用戶更新
 import { MembershipService } from './membership.service';  // 🔧 P0: 使用統一會員服務
 import { Router } from '@angular/router';
@@ -1340,6 +1341,10 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.currentDeviceCode.set(await this.deviceService.getDeviceCode());
     this.currentDeviceName.set(this.deviceService.getDeviceName());
     
+    // 🔧 P4-5: 載入設備和使用統計到 Core AuthService 信號
+    this.authService.loadDevices().catch(e => console.warn('[Profile] Load devices error:', e));
+    this.authService.loadUsageStats().catch(e => console.warn('[Profile] Load usage stats error:', e));
+    
     // 載入邀請獎勵信息
     const rewards = await this.authService.getInviteRewards();
     this.inviteCode.set(rewards.inviteCode);
@@ -1485,7 +1490,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
       this.showChangePassword.set(false);
       this.passwordForm = { oldPassword: '', newPassword: '', confirmPassword: '' };
     } else {
-      this.toast.error(result.message);
+      this.toast.error((result as any).message || result.error || '密碼修改失敗');
     }
   }
   
@@ -1493,14 +1498,14 @@ export class ProfileComponent implements OnInit, OnDestroy {
     const result = await this.authService.renewMembership(this.newLicenseKey);
     
     if (result.success) {
-      this.toast.success(result.message || '卡密激活成功！');
+      this.toast.success((result as any).message || '卡密激活成功！');
       this.newLicenseKey = '';
       // 重新載入激活記錄
       await this.loadActivationHistory();
       // 強制刷新 UI
       this.cdr.detectChanges();
     } else {
-      this.toast.error(result.message);
+      this.toast.error((result as any).message || '卡密激活失敗');
     }
   }
   
@@ -1527,7 +1532,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
     if (result.success) {
       this.toast.success('設備已解綁');
     } else {
-      this.toast.error(result.message);
+      this.toast.error((result as any).message || '解綁失敗');
     }
     
     this.isUnbinding.set(false);
@@ -1595,13 +1600,13 @@ export class ProfileComponent implements OnInit, OnDestroy {
       const result = await this.authService.updateEmail(newEmail, password);
       
       if (result.success) {
-        this.toast.success(result.message || '郵箱更新成功');
+        this.toast.success((result as any).message || '郵箱更新成功');
         this.closeEmailEditor();
         // 刷新用戶信息
         await this.authService.fetchCurrentUser();
         this.cdr.detectChanges();
       } else {
-        this.toast.error(result.message || '郵箱更新失敗');
+        this.toast.error((result as any).message || '郵箱更新失敗');
       }
     } catch (error: any) {
       this.toast.error(error.message || '郵箱更新失敗');
@@ -1641,13 +1646,13 @@ export class ProfileComponent implements OnInit, OnDestroy {
       const result = await this.authService.updateDisplayName(newName);
       
       if (result.success) {
-        this.toast.success(result.message || '顯示名稱更新成功');
+        this.toast.success((result as any).message || '顯示名稱更新成功');
         this.closeDisplayNameEditor();
         // 刷新用戶信息
         await this.authService.fetchCurrentUser();
         this.cdr.detectChanges();
       } else {
-        this.toast.error(result.message || '顯示名稱更新失敗');
+        this.toast.error((result as any).message || '顯示名稱更新失敗');
       }
     } catch (error: any) {
       this.toast.error(error.message || '顯示名稱更新失敗');

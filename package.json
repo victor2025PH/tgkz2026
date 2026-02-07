@@ -47,7 +47,25 @@
     "e2e:chromium": "npx playwright test --config=e2e/playwright.config.ts --project=chromium",
     "e2e:ui": "npx playwright test --config=e2e/playwright.config.ts --ui",
     "e2e:report": "npx playwright show-report playwright-report",
-    "e2e:headed": "npx playwright test --config=e2e/playwright.config.ts --headed"
+    "e2e:headed": "npx playwright test --config=e2e/playwright.config.ts --headed",
+    "lint": "ng lint",
+    "lint:fix": "ng lint --fix",
+    "format": "prettier --write \"src/**/*.{ts,html,css,scss}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,html,css,scss}\"",
+    "precommit": "lint-staged",
+    "quality": "npm run lint && npm run format:check && npm run test:backend"
+  },
+  "lint-staged": {
+    "src/**/*.ts": [
+      "prettier --write",
+      "eslint --fix --max-warnings=0"
+    ],
+    "src/**/*.html": [
+      "prettier --write"
+    ],
+    "backend/**/*.py": [
+      "python -m py_compile"
+    ]
   },
   "devDependencies": {
     "@angular/build": "^21.0.4",

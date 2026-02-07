@@ -90,7 +90,22 @@ export class QuotaService {
     scheduled_tasks: '定時任務',
   };
 
-  constructor(private ipc: ElectronIpcService) {}
+  // 🔧 P6-3: 配額推送防抖計時器
+  private _refreshDebounce: ReturnType<typeof setTimeout> | null = null;
+  
+  constructor(private ipc: ElectronIpcService) {
+    // 🔧 P6-3: 監聽後端配額變更推送（實時更新，500ms 防抖）
+    this.ipc.on('quota-updated', (_event: any, _data: any) => {
+      // 防抖：500ms 內多次變更只刷新一次
+      if (this._refreshDebounce) {
+        clearTimeout(this._refreshDebounce);
+      }
+      this._refreshDebounce = setTimeout(() => {
+        this._refreshDebounce = null;
+        this.loadQuotaSummary();
+      }, 500);
+    });
+  }
 
   /**
    * 加載配額摘要

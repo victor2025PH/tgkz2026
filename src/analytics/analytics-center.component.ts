@@ -18,8 +18,12 @@ import { AIInsightsComponent, AIInsight, Prediction } from './ai-insights.compon
 import { CampaignComparisonComponent, CampaignData } from './campaign-comparison.component';
 import { AccountHealthDashboardComponent, AccountHealthData } from './account-health-dashboard.component';
 import { AnalyticsDataService } from './analytics-data.service';
+import { BusinessApiService, BusinessSummary, LeadSourceData, TemplatePerformance, DailyTrend, FunnelStageData } from '../services/business-api.service';
+import { ABTestPanelComponent } from './ab-test-panel.component';
+import { RetryStatusComponent } from './retry-status.component';
+import { BusinessChartsComponent } from './business-charts.component';
 
-type AnalyticsTab = 'overview' | 'funnel' | 'campaigns' | 'health';
+type AnalyticsTab = 'overview' | 'funnel' | 'campaigns' | 'health' | 'business' | 'abtest' | 'retry';
 
 @Component({
   selector: 'app-analytics-center',
@@ -30,7 +34,10 @@ type AnalyticsTab = 'overview' | 'funnel' | 'campaigns' | 'health';
     ConversionFunnelComponent,
     AIInsightsComponent,
     CampaignComparisonComponent,
-    AccountHealthDashboardComponent
+    AccountHealthDashboardComponent,
+    ABTestPanelComponent,
+    RetryStatusComponent,
+    BusinessChartsComponent
   ],
   template: `
     <div class="analytics-center h-full flex flex-col bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800">
@@ -229,6 +236,135 @@ type AnalyticsTab = 'overview' | 'funnel' | 'campaigns' | 'health';
             </div>
           }
           
+          @case ('business') {
+            <!-- 🔧 P13-2: 業務分析看板 -->
+            <div class="space-y-4">
+              @if (bizLoading()) {
+                <div class="flex items-center justify-center py-16">
+                  <svg class="w-8 h-8 animate-spin text-cyan-400" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  <span class="ml-3 text-slate-400">正在加載業務數據...</span>
+                </div>
+              } @else {
+                <!-- 摘要卡片 -->
+                @if (bizSummary(); as summary) {
+                  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="p-4 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 
+                                border border-blue-500/20 rounded-xl">
+                      <div class="text-sm text-slate-400">線索總量</div>
+                      <div class="text-2xl font-bold text-blue-400 mt-1">{{ summary.total_leads || 0 }}</div>
+                      <div class="text-xs text-blue-400/60 mt-1">今日新增 +{{ summary.new_leads_today || 0 }}</div>
+                    </div>
+                    <div class="p-4 bg-gradient-to-br from-emerald-500/10 to-green-500/10 
+                                border border-emerald-500/20 rounded-xl">
+                      <div class="text-sm text-slate-400">平均評分</div>
+                      <div class="text-2xl font-bold text-emerald-400 mt-1">{{ (summary.avg_lead_score || 0).toFixed(1) }}</div>
+                      <div class="text-xs text-emerald-400/60 mt-1">轉化率 {{ (summary.conversion_rate || 0).toFixed(1) }}%</div>
+                    </div>
+                    <div class="p-4 bg-gradient-to-br from-purple-500/10 to-pink-500/10 
+                                border border-purple-500/20 rounded-xl">
+                      <div class="text-sm text-slate-400">消息發送</div>
+                      <div class="text-2xl font-bold text-purple-400 mt-1">{{ summary.total_messages || 0 }}</div>
+                      <div class="text-xs text-purple-400/60 mt-1">今日 {{ summary.messages_today || 0 }}</div>
+                    </div>
+                    <div class="p-4 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 
+                                border border-yellow-500/20 rounded-xl">
+                      <div class="text-sm text-slate-400">活躍模板</div>
+                      <div class="text-2xl font-bold text-yellow-400 mt-1">{{ summary.active_templates || 0 }}</div>
+                      <div class="text-xs text-yellow-400/60 mt-1">最佳來源: {{ summary.top_source || '-' }}</div>
+                    </div>
+                  </div>
+                }
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <!-- 線索來源排行 -->
+                  <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <span>📡</span> 線索來源 TOP
+                    </h3>
+                    @if (bizLeadSources().length > 0) {
+                      <div class="space-y-3">
+                        @for (src of bizLeadSources().slice(0, 8); track src.source; let i = $index) {
+                          <div class="flex items-center gap-3">
+                            <span class="w-5 text-xs text-slate-500 text-right">{{ i + 1 }}</span>
+                            <div class="flex-1">
+                              <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm text-white truncate max-w-[180px]">{{ src.source || '未知來源' }}</span>
+                                <span class="text-xs text-slate-400">{{ src.count }} 人</span>
+                              </div>
+                              <div class="w-full h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all"
+                                     [style.width.%]="(src.count / (bizLeadSources()[0]?.count || 1)) * 100"></div>
+                              </div>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <div class="text-center text-slate-500 py-8">暫無數據</div>
+                    }
+                  </div>
+
+                  <!-- 模板效果對比 -->
+                  <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <span>📝</span> 模板效果
+                    </h3>
+                    @if (bizTemplatePerf().length > 0) {
+                      <div class="space-y-3">
+                        @for (tmpl of bizTemplatePerf().slice(0, 8); track tmpl.id) {
+                          <div class="p-3 bg-slate-700/30 rounded-lg">
+                            <div class="flex items-center justify-between mb-2">
+                              <span class="text-sm text-white font-medium truncate max-w-[200px]">{{ tmpl.name || 'Unnamed' }}</span>
+                              <span class="text-xs px-2 py-0.5 rounded-full"
+                                    [class]="tmpl.success_rate >= 0.7 ? 'bg-emerald-500/20 text-emerald-400' : 
+                                             tmpl.success_rate >= 0.4 ? 'bg-yellow-500/20 text-yellow-400' : 
+                                             'bg-red-500/20 text-red-400'">
+                                {{ (tmpl.success_rate * 100).toFixed(0) }}%
+                              </span>
+                            </div>
+                            <div class="flex items-center gap-4 text-xs text-slate-400">
+                              <span>使用 {{ tmpl.usage_count }} 次</span>
+                              <span>成功 ~{{ tmpl.estimated_successes }}</span>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <div class="text-center text-slate-500 py-8">暫無數據</div>
+                    }
+                  </div>
+                </div>
+
+                <!-- P14-5: Chart.js 趨勢折線圖（替代表格） -->
+                @if (bizDailyTrends().length > 0) {
+                  <app-business-charts
+                    mode="trends"
+                    [trendData]="bizDailyTrends()">
+                  </app-business-charts>
+                }
+
+                <!-- P14-5: Chart.js 漏斗柱狀圖（替代 div bars） -->
+                @if (bizFunnel().length > 0) {
+                  <app-business-charts
+                    mode="funnel"
+                    [funnelData]="bizFunnel()">
+                  </app-business-charts>
+                }
+
+                <!-- P14-5: Chart.js 線索來源餅圖 -->
+                @if (bizLeadSources().length > 0) {
+                  <app-business-charts
+                    mode="sources"
+                    [sourceData]="bizLeadSources()">
+                  </app-business-charts>
+                }
+              }
+            </div>
+          }
+          
           @case ('funnel') {
             <!-- 漏斗詳情 -->
             <div class="max-w-4xl mx-auto">
@@ -246,6 +382,13 @@ type AnalyticsTab = 'overview' | 'funnel' | 'campaigns' | 'health';
             </app-campaign-comparison>
           }
           
+          @case ('abtest') {
+            <!-- 🔧 P13-4: A/B 測試管理 -->
+            <div class="max-w-4xl mx-auto">
+              <app-ab-test-panel></app-ab-test-panel>
+            </div>
+          }
+          
           @case ('health') {
             <!-- 帳號健康 -->
             <app-account-health-dashboard
@@ -255,6 +398,13 @@ type AnalyticsTab = 'overview' | 'funnel' | 'campaigns' | 'health';
               (healAccount)="onHealAccount($event)"
               (refreshAll)="refreshAccountHealth()">
             </app-account-health-dashboard>
+          }
+          
+          @case ('retry') {
+            <!-- 🔧 P13-5: 重試策略 -->
+            <div class="max-w-4xl mx-auto">
+              <app-retry-status></app-retry-status>
+            </div>
           }
         }
       </div>
@@ -266,6 +416,7 @@ type AnalyticsTab = 'overview' | 'funnel' | 'campaigns' | 'health';
 })
 export class AnalyticsCenterComponent implements OnInit {
   private analyticsService = inject(AnalyticsDataService);
+  private businessApi = inject(BusinessApiService);
   
   // 狀態
   activeTab = signal<AnalyticsTab>('overview');
@@ -275,20 +426,46 @@ export class AnalyticsCenterComponent implements OnInit {
   // Tab 配置
   tabs = [
     { id: 'overview' as const, icon: '📊', label: '概覽' },
+    { id: 'business' as const, icon: '💼', label: '業務分析' },
     { id: 'funnel' as const, icon: '🎯', label: '轉化漏斗' },
     { id: 'campaigns' as const, icon: '📣', label: '活動對比' },
-    { id: 'health' as const, icon: '🏥', label: '帳號健康' }
+    { id: 'abtest' as const, icon: '🧪', label: 'A/B測試' },
+    { id: 'health' as const, icon: '🏥', label: '帳號健康' },
+    { id: 'retry' as const, icon: '🔄', label: '重試策略' }
   ];
   
-  // 數據信號
+  // 數據信號 - 原有
   funnelData = computed(() => this.analyticsService.funnelData() || this.getDefaultFunnelData());
   insights = computed(() => this.analyticsService.insights());
   predictions = computed(() => this.analyticsService.predictions());
   campaigns = computed(() => this.analyticsService.campaigns());
   accountHealth = computed(() => this.analyticsService.accountHealth());
   
+  // 🔧 P13-2: 後端業務數據信號
+  bizSummary = this.businessApi.summary;
+  bizLeadSources = this.businessApi.leadSources;
+  bizTemplatePerf = this.businessApi.templatePerf;
+  bizDailyTrends = this.businessApi.dailyTrends;
+  bizFunnel = this.businessApi.funnelData;
+  bizLoading = this.businessApi.isAnyLoading;
+  
   ngOnInit() {
     this.loadMockData();
+    // 🔧 P13-2: 同時加載後端真實數據
+    this.loadBusinessData();
+  }
+  
+  /** 🔧 P13-2: 從後端加載業務數據 */
+  async loadBusinessData() {
+    const days = this.timeRange === 'today' ? 1 
+               : this.timeRange === 'week' ? 7 
+               : this.timeRange === 'month' ? 30 
+               : 90;
+    try {
+      await this.businessApi.loadAllAnalytics(days);
+    } catch (e) {
+      console.warn('[Analytics] Backend data unavailable, using mock data:', e);
+    }
   }
   
   // 載入模擬數據
@@ -347,10 +524,10 @@ export class AnalyticsCenterComponent implements OnInit {
   // 刷新所有數據
   refreshAllData() {
     this.isLoading.set(true);
-    setTimeout(() => {
-      this.loadMockData();
+    this.loadMockData();
+    this.loadBusinessData().finally(() => {
       this.isLoading.set(false);
-    }, 1000);
+    });
   }
   
   // 刷新洞察

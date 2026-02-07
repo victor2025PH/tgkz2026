@@ -224,6 +224,34 @@ interface TrendData {
         </div>
       </section>
       
+      <!-- 🔧 P5-3: 配額一致性校驗 -->
+      <section class="consistency-section">
+        <div class="section-header">
+          <h2>數據校驗</h2>
+          <button class="check-btn" (click)="runConsistencyCheck()" [disabled]="isCheckingConsistency()">
+            {{ isCheckingConsistency() ? '校驗中...' : '校驗配額一致性' }}
+          </button>
+        </div>
+        <div class="consistency-result" *ngIf="consistencyResult()">
+          <div class="consistency-status" [class.ok]="consistencyResult()?.consistent" [class.mismatch]="!consistencyResult()?.consistent">
+            <span class="status-icon">{{ consistencyResult()?.consistent ? '✅' : '⚠️' }}</span>
+            <span class="status-text">{{ consistencyResult()?.consistent ? '所有配額數據一致' : '發現不一致，已自動修復' }}</span>
+          </div>
+          <div class="check-details" *ngIf="consistencyResult()?.checks">
+            <div class="check-item" *ngFor="let check of consistencyResult()?.checks || []">
+              <span class="check-type">{{ check.quota_type }}</span>
+              <span class="check-status" [class.ok]="check.status === 'ok'" [class.err]="check.status !== 'ok'">
+                {{ check.status === 'ok' ? '✓ 一致' : '⚡ 已修復' }}
+              </span>
+              <span class="check-detail" *ngIf="check.cached_usage !== undefined">
+                緩存: {{ check.cached_usage }} / 實際: {{ check.actual_count }}
+              </span>
+            </div>
+          </div>
+          <div class="check-time">校驗時間: {{ consistencyResult()?.checked_at | date:'short' }}</div>
+        </div>
+      </section>
+      
       <!-- 配額告警 -->
       <section class="alerts-section" *ngIf="(quotaService.alerts() || []).length > 0">
         <div class="section-header">
@@ -505,7 +533,7 @@ interface TrendData {
     }
     
     /* 趨勢圖表區 */
-    .trend-section, .history-section, .alerts-section {
+    .trend-section, .history-section, .alerts-section, .consistency-section {
       background: var(--bg-secondary, #1a1a1a);
       border-radius: 16px;
       padding: 24px;
@@ -708,6 +736,53 @@ interface TrendData {
       cursor: pointer;
     }
     
+    /* 🔧 P5-3: 一致性校驗 */
+    .check-btn {
+      padding: 8px 16px;
+      background: rgba(59, 130, 246, 0.2);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 8px;
+      color: #60a5fa;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .check-btn:hover:not(:disabled) { background: rgba(59, 130, 246, 0.3); }
+    .check-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    .consistency-result { margin-top: 16px; }
+    .consistency-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+    .consistency-status.ok { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+    .consistency-status.mismatch { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+    
+    .check-details {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .check-type { color: var(--text-secondary, #888); min-width: 100px; }
+    .check-status.ok { color: #22c55e; }
+    .check-status.err { color: #f59e0b; }
+    .check-detail { color: var(--text-secondary, #666); margin-left: auto; font-size: 12px; }
+    .check-time { margin-top: 8px; font-size: 12px; color: var(--text-muted, #555); text-align: right; }
+    
     /* 升級引導 */
     .upgrade-section {
       background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1));
@@ -819,6 +894,10 @@ export class QuotaDashboardViewComponent implements OnInit, OnDestroy {
   
   private refreshInterval: any;
   private countdownInterval: any;
+  
+  // 🔧 P5-3: 一致性校驗狀態
+  isCheckingConsistency = signal(false);
+  consistencyResult = signal<any>(null);
   
   // 趨勢數據
   private _trendData = signal<TrendData | null>(null);
@@ -1100,5 +1179,33 @@ export class QuotaDashboardViewComponent implements OnInit, OnDestroy {
 
   goToUpgrade() {
     this.router.navigate(['/upgrade']);
+  }
+  
+  // 🔧 P5-3: 配額一致性校驗
+  async runConsistencyCheck() {
+    this.isCheckingConsistency.set(true);
+    this.consistencyResult.set(null);
+    
+    try {
+      const token = localStorage.getItem('tgm_access_token');
+      const baseUrl = window.location.hostname === 'localhost' && window.location.port === '4200' 
+        ? 'http://localhost:8000' : '';
+      
+      const response = await fetch(`${baseUrl}/api/v1/quota/consistency`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        this.consistencyResult.set(result.data);
+      } else {
+        this.consistencyResult.set({ consistent: false, error: result.error });
+      }
+    } catch (e: any) {
+      this.consistencyResult.set({ consistent: false, error: e.message || '校驗失敗' });
+    } finally {
+      this.isCheckingConsistency.set(false);
+    }
   }
 }

@@ -13,6 +13,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ElectronIpcService } from '../electron-ipc.service';
 import { ToastService } from '../toast.service';
+import { BusinessApiService, ABTestResult } from '../services/business-api.service';
 
 export interface BatchSendTarget {
   telegramId: string;
@@ -309,6 +310,42 @@ export type MessageSource = 'template' | 'custom' | 'ai';
                           </p>
                         </div>
                       }
+
+                      <!-- P15-3: A/B 測試選擇器 -->
+                      @if (abTestsLoaded() && abTests().length > 0 && selectedMessages().size > 1) {
+                        <div class="mt-3 p-3 bg-gradient-to-r from-purple-500/5 to-blue-500/5 
+                                    rounded-lg border border-purple-500/20">
+                          <span class="text-xs text-purple-400 block mb-2">🧪 A/B 測試（可選）：</span>
+                          <div class="flex gap-2 flex-wrap">
+                            <button 
+                              (click)="abTestId.set('')"
+                              class="px-3 py-1.5 rounded-lg text-xs transition-all"
+                              [class.bg-slate-600]="!abTestId()"
+                              [class.text-white]="!abTestId()"
+                              [class.bg-slate-700/50]="abTestId()"
+                              [class.text-slate-400]="abTestId()">
+                              不使用
+                            </button>
+                            @for (test of abTests(); track test.test_id) {
+                              <button 
+                                (click)="abTestId.set(test.test_id)"
+                                class="px-3 py-1.5 rounded-lg text-xs transition-all"
+                                [class.bg-purple-500]="abTestId() === test.test_id"
+                                [class.text-white]="abTestId() === test.test_id"
+                                [class.bg-slate-700/50]="abTestId() !== test.test_id"
+                                [class.text-slate-400]="abTestId() !== test.test_id"
+                                [title]="'使用 A/B 測試: ' + test.name">
+                                🧪 {{ test.name }}
+                              </button>
+                            }
+                          </div>
+                          @if (abTestId()) {
+                            <p class="text-xs text-purple-400/70 mt-2">
+                              將由後端 A/B 測試引擎自動選擇模板變體並記錄效果
+                            </p>
+                          }
+                        </div>
+                      }
                     </div>
                   }
                 </div>
@@ -536,6 +573,7 @@ export type MessageSource = 'template' | 'custom' | 'ai';
 export class BatchSendDialogComponent implements OnInit, OnDestroy {
   private ipc = inject(ElectronIpcService);
   private toast = inject(ToastService);
+  private bizApi = inject(BusinessApiService);
   private listeners: (() => void)[] = [];
   
   // 輸入
@@ -593,6 +631,11 @@ export class BatchSendDialogComponent implements OnInit, OnDestroy {
     { key: 'rotate', label: '🔄 輪轉發送', desc: '依次使用模板（1→2→3→1...）' },
     { key: 'sequential', label: '📋 順序發送', desc: '按順序用完再重複' },
   ];
+  
+  // P15-3: A/B 測試集成
+  abTestId = signal<string>('');
+  abTests = signal<ABTestResult[]>([]);
+  abTestsLoaded = signal(false);
   
   aiStyles = [
     { key: 'friendly', label: '友好親切' },
@@ -683,6 +726,19 @@ export class BatchSendDialogComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.setupIpcListeners();
     this.loadTemplates();
+    this.loadABTests();
+  }
+  
+  /** P15-3: 加載進行中的 A/B 測試 */
+  private async loadABTests() {
+    try {
+      const tests = await this.bizApi.loadABTests();
+      // 只顯示進行中的測試
+      this.abTests.set(tests.filter(t => t.status === 'running'));
+      this.abTestsLoaded.set(true);
+    } catch {
+      this.abTestsLoaded.set(true);
+    }
   }
   
   ngOnDestroy() {
@@ -1074,7 +1130,9 @@ export class BatchSendDialogComponent implements OnInit, OnDestroy {
       config: {
         minInterval: this.minInterval,
         maxInterval: this.maxInterval,
-        accountRotation: this.accountRotation
+        accountRotation: this.accountRotation,
+        // P14-2: A/B 測試 ID
+        ...(this.abTestId() ? { abTestId: this.abTestId() } : {}),
       }
     };
     

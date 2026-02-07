@@ -7,7 +7,7 @@
  * - src/assets/i18n/zh-CN.json
  * - src/assets/i18n/zh-TW.json
  */
-import { Injectable, signal, computed, effect } from '@angular/core';
+import { Injectable, signal, computed, effect, isDevMode } from '@angular/core';
 
 export type SupportedLocale = 'en' | 'zh-CN' | 'zh-TW';
 

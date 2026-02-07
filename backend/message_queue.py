@@ -457,6 +457,26 @@ class MessageQueue:
         
         # 帳號輪換器
         self.account_rotator = AccountRotator(database) if database else None
+        
+        # P14-4: WebSocket 推送服務引用（由外部注入）
+        self.ws_service = None
+    
+    def set_ws_service(self, ws_service):
+        """P14-4: 注入 WebSocket 推送服務以支持實時事件"""
+        self.ws_service = ws_service
+    
+    async def _publish_queue_event(self, event_type: str, data: Dict[str, Any]):
+        """P14-4: 通過 WebSocket 推送隊列事件"""
+        if not self.ws_service:
+            return
+        try:
+            from websocket_service import SubscriptionType
+            self.ws_service.publish(
+                SubscriptionType.MESSAGE_STATUS,
+                {'event': event_type, **data}
+            )
+        except Exception as e:
+            print(f"[MessageQueue] WebSocket publish error: {e}", file=sys.stderr)
     
     async def add_message_auto_rotate(
         self,
@@ -768,6 +788,15 @@ class MessageQueue:
                         (stats["avg_time"] * (total_completed - 1) + elapsed) / total_completed
                     )
                 
+                # P14-4: WebSocket 推送發送成功事件
+                await self._publish_queue_event('message:completed', {
+                    'message_id': message.id,
+                    'phone': message.phone,
+                    'user_id': message.user_id,
+                    'elapsed': round(elapsed, 2),
+                    'message_result_id': result.get('message_id', ''),
+                })
+                
                 # Call callback if provided
                 if message.callback:
                     try:
@@ -795,7 +824,100 @@ class MessageQueue:
             await self._handle_send_failure(message, e, strategy="exponential")
     
     async def _handle_send_failure(self, message: QueuedMessage, error: Exception, strategy: str = "exponential"):
-        """Handle send failure with retry strategy"""
+        """Handle send failure with smart retry strategy (P14: integrated with P12 MessageRetryManager)"""
+        error_str = str(error)
+        message.last_error = error_str
+        
+        # ===== P14-3: 優先使用 P12 智能重試管理器 =====
+        smart_decision = None
+        smart_delay = 0.0
+        smart_reason = ''
+        try:
+            from core.message_retry import get_retry_manager, RetryDecision
+            retry_mgr = get_retry_manager()
+            smart_decision, smart_delay, smart_reason = retry_mgr.should_retry(
+                error_str, message.attempts
+            )
+        except Exception as e:
+            print(f"[MessageQueue] P12 RetryManager unavailable, falling back: {e}", file=sys.stderr)
+        
+        if smart_decision is not None:
+            # 使用 P12 智能重試決策
+            from core.message_retry import RetryDecision
+            
+            if smart_decision in (RetryDecision.RETRY, RetryDecision.RETRY_NOW):
+                message.attempts += 1
+                await self._update_message_status(message, MessageStatus.RETRYING, error_str)
+                
+                # Update stats
+                async with self.lock:
+                    if message.phone in self.stats:
+                        self.stats[message.phone]["retries"] += 1
+                
+                print(f"[MessageQueue] 🔄 智能重試: {message.id} #{message.attempts}, "
+                      f"delay={smart_delay:.1f}s, reason={smart_reason}", file=sys.stderr)
+                
+                # WebSocket 推送重試事件 (P14-4)
+                await self._publish_queue_event('message:retrying', {
+                    'message_id': message.id,
+                    'phone': message.phone,
+                    'attempts': message.attempts,
+                    'delay': smart_delay,
+                    'reason': smart_reason,
+                    'decision': smart_decision.value,
+                })
+                
+                # 等待退避時間
+                if smart_decision == RetryDecision.RETRY and smart_delay > 0:
+                    await asyncio.sleep(smart_delay)
+                
+                # 放回隊列
+                await self._update_message_status(message, MessageStatus.PENDING)
+            
+            elif smart_decision == RetryDecision.DEAD_LETTER:
+                # 死信：永久錯誤或超過最大重試次數
+                message.attempts += 1
+                await self._update_message_status(message, MessageStatus.FAILED, error_str)
+                
+                async with self.lock:
+                    if message.phone in self.stats:
+                        stats = self.stats[message.phone]
+                        stats["total"] += 1
+                        stats["failed"] += 1
+                
+                print(f"[MessageQueue] 💀 死信: {message.id}, reason={smart_reason}", file=sys.stderr)
+                
+                # WebSocket 推送死信事件 (P14-4)
+                await self._publish_queue_event('message:dead_letter', {
+                    'message_id': message.id,
+                    'phone': message.phone,
+                    'error': error_str,
+                    'reason': smart_reason,
+                    'attempts': message.attempts,
+                })
+                
+                # 從內存隊列移除
+                async with self.lock:
+                    if message.phone in self.queues:
+                        self.queues[message.phone] = [
+                            m for m in self.queues[message.phone] if m.id != message.id
+                        ]
+            
+            elif smart_decision == RetryDecision.DISCARD:
+                message.attempts += 1
+                await self._update_message_status(message, MessageStatus.FAILED, error_str)
+                print(f"[MessageQueue] 🗑️ 丟棄: {message.id}, reason={smart_reason}", file=sys.stderr)
+                
+                async with self.lock:
+                    if message.phone in self.stats:
+                        self.stats[message.phone]["failed"] = self.stats[message.phone].get("failed", 0) + 1
+                    if message.phone in self.queues:
+                        self.queues[message.phone] = [
+                            m for m in self.queues[message.phone] if m.id != message.id
+                        ]
+            return
+        
+        # ===== 回退：使用原有 RetryHandler =====
         should_retry, wait_seconds = RetryHandler.should_retry(
             error,
             message.attempts,
@@ -803,18 +925,16 @@ class MessageQueue:
             strategy=strategy
         )
         
-        message.last_error = str(error)
         message.attempts += 1
         
         if should_retry:
-            await self._update_message_status(message, MessageStatus.RETRYING, str(error))
+            await self._update_message_status(message, MessageStatus.RETRYING, error_str)
             
             # Update stats
             async with self.lock:
                 if message.phone in self.stats:
                     self.stats[message.phone]["retries"] += 1
             
-            # 詳細日誌
             print(f"[MessageQueue] 消息 {message.id} 重試 {message.attempts}/{message.max_attempts}，等待 {wait_seconds} 秒", file=sys.stderr)
             
             # Wait before retry
@@ -825,7 +945,7 @@ class MessageQueue:
             await self._update_message_status(message, MessageStatus.PENDING)
         else:
             # Max attempts reached, mark as failed
-            await self._update_message_status(message, MessageStatus.FAILED, str(error))
+            await self._update_message_status(message, MessageStatus.FAILED, error_str)
             
             # Update stats
             async with self.lock:

@@ -16,7 +16,9 @@ import asyncio
 import json
 import logging
 import os
+import sqlite3
 import sys
+import time
 from datetime import datetime
 from typing import Any, Dict, Optional, Callable
 from functools import wraps
@@ -192,6 +194,8 @@ class HttpApiServer:
         self.app.router.add_delete('/api/v1/accounts/{id}', self.delete_account)
         self.app.router.add_post('/api/v1/accounts/{id}/login', self.login_account)
         self.app.router.add_post('/api/v1/accounts/{id}/logout', self.logout_account)
+        # 🔧 P6-5: 批量操作端點
+        self.app.router.add_post('/api/v1/accounts/batch', self.batch_account_operations)
         
         # 用戶認證（SaaS）
         self.app.router.add_post('/api/v1/auth/register', self.user_register)
@@ -342,7 +346,7 @@ class HttpApiServer:
         self.app.router.add_get('/api/v1/system/health', self.system_health)
         self.app.router.add_get('/api/v1/system/metrics', self.system_metrics)
         self.app.router.add_get('/api/v1/system/alerts', self.system_alerts)
-        self.app.router.add_get('/metrics', self.prometheus_metrics)
+        # 🔧 P11-2: /metrics 路由已移至下方健康檢查區塊，避免重複註冊
         
         # 2FA
         self.app.router.add_get('/api/v1/auth/2fa', self.get_2fa_status)
@@ -378,6 +382,10 @@ class HttpApiServer:
         self.app.router.add_post('/api/v1/admin/quota/batch-adjust', self.admin_batch_adjust_quotas)
         self.app.router.add_get('/api/v1/admin/quota/export', self.admin_export_quota_report)
         self.app.router.add_post('/api/v1/admin/quota/reset-daily', self.admin_reset_daily_quotas)
+        
+        # 🔧 P4-2: 配額一致性校驗 API
+        self.app.router.add_get('/api/v1/admin/quota/consistency', self.admin_quota_consistency_check)
+        self.app.router.add_get('/api/v1/quota/consistency', self.quota_consistency_check)
         
         # 管理員計費 API
         self.app.router.add_get('/api/v1/admin/billing/overview', self.admin_billing_overview)
@@ -432,6 +440,44 @@ class HttpApiServer:
         self.app.router.add_get('/api/v1/health/live', self.liveness_probe)
         self.app.router.add_get('/api/v1/health/ready', self.readiness_probe)
         self.app.router.add_get('/api/v1/health/info', self.service_info)
+        # 🔧 P10-4: 健康歷史記錄 + 部署狀態頁
+        self.app.router.add_get('/api/v1/health/history', self.health_history)
+        self.app.router.add_get('/api/v1/status', self.status_page)
+        # 🔧 P11-2: Prometheus 指標導出
+        self.app.router.add_get('/metrics', self.prometheus_metrics)
+        # 🔧 P11-4/5/6: 運維可觀測性 API（管理員專用）
+        self.app.router.add_get('/api/v1/admin/ops/dashboard', self.ops_dashboard)
+        self.app.router.add_get('/api/v1/admin/ops/resources', self.resource_trends)
+        self.app.router.add_get('/api/v1/admin/ops/error-patterns', self.error_patterns)
+        
+        # 🔧 P12: 業務功能增強 API
+        self.app.router.add_post('/api/v1/leads/score', self.score_leads)
+        self.app.router.add_get('/api/v1/leads/dedup/scan', self.scan_duplicates)
+        self.app.router.add_post('/api/v1/leads/dedup/merge', self.merge_duplicates)
+        self.app.router.add_get('/api/v1/analytics/sources', self.analytics_lead_sources)
+        self.app.router.add_get('/api/v1/analytics/templates', self.analytics_templates)
+        self.app.router.add_get('/api/v1/analytics/trends', self.analytics_trends)
+        self.app.router.add_get('/api/v1/analytics/funnel', self.analytics_funnel)
+        self.app.router.add_get('/api/v1/analytics/summary', self.analytics_summary)
+        self.app.router.add_get('/api/v1/retry/schedule', self.retry_schedule)
+        self.app.router.add_post('/api/v1/ab-tests', self.create_ab_test)
+        self.app.router.add_get('/api/v1/ab-tests', self.list_ab_tests)
+        self.app.router.add_get('/api/v1/ab-tests/{test_id}', self.get_ab_test)
+        self.app.router.add_post('/api/v1/ab-tests/{test_id}/complete', self.complete_ab_test)
+        
+        # 🔧 P15-1: 聯繫人 REST API（HTTP 模式回退）
+        self.app.router.add_get('/api/v1/contacts', self.get_contacts)
+        self.app.router.add_get('/api/v1/contacts/stats', self.get_contacts_stats)
+        
+        # 🔧 P5-2: 前端錯誤上報端點
+        self.app.router.add_post('/api/v1/errors', self.receive_frontend_error)
+        self.app.router.add_get('/api/v1/admin/errors', self.admin_get_frontend_errors)
+        
+        # 🔧 P7-6: 前端性能指標上報端點
+        self.app.router.add_post('/api/v1/performance', self.receive_performance_report)
+        
+        # 🔧 P8-5: 前端審計日誌查詢
+        self.app.router.add_get('/api/v1/audit/frontend', self.get_frontend_audit_logs)
         
         # 緩存管理 API（管理員）
         self.app.router.add_get('/api/v1/admin/cache/stats', self.admin_cache_stats)
@@ -946,21 +992,45 @@ class HttpApiServer:
         }
     
     def _json_response(self, data: dict, status: int = 200, events: list = None) -> web.Response:
-        """統一 JSON 響應，支持事件觸發信息
+        """
+        🔧 P5-5: 標準化 JSON 響應
         
-        Args:
-            data: 響應數據
-            status: HTTP 狀態碼
-            events: 前端需要觸發的事件列表，格式: [{'name': 'event-name', 'data': {...}}]
+        統一格式：
+        {
+            "success": bool,
+            "data": any,        // 成功時的數據
+            "error": string,    // 失敗時的錯誤信息
+            "code": string,     // 錯誤碼（可選）
+            "meta": {           // 元數據
+                "timestamp": string,
+                "request_id": string
+            }
+        }
+        
+        向後兼容：如果調用方傳入的 data 不含 success 字段，保持原樣
         """
         # 確保 data 不是 None
         if data is None:
             data = {'success': True}
         
+        # 🔧 P5-5: 注入 meta 元數據
+        request_id = ''
+        try:
+            from core.logging import get_request_id
+            request_id = get_request_id()
+        except:
+            pass
+        
         response_data = {
             **data,
-            'timestamp': datetime.now().isoformat(),
+            'meta': {
+                'timestamp': datetime.now().isoformat(),
+                'request_id': request_id or '',
+            }
         }
+        
+        # 保留舊的 timestamp 字段（向後兼容）
+        response_data['timestamp'] = datetime.now().isoformat()
         
         # 添加事件列表（如果有）
         if events:
@@ -971,6 +1041,24 @@ class HttpApiServer:
             status=status, 
             dumps=lambda x: json.dumps(x, ensure_ascii=False, default=str)
         )
+    
+    def _success_response(self, data: Any = None, message: str = '', status: int = 200) -> web.Response:
+        """🔧 P5-5: 標準成功響應"""
+        resp = {'success': True}
+        if data is not None:
+            resp['data'] = data
+        if message:
+            resp['message'] = message
+        return self._json_response(resp, status)
+    
+    def _error_response(self, error: str, code: str = '', status: int = 400, details: Any = None) -> web.Response:
+        """🔧 P5-5: 標準錯誤響應"""
+        resp: Dict[str, Any] = {'success': False, 'error': error}
+        if code:
+            resp['code'] = code
+        if details is not None:
+            resp['details'] = details
+        return self._json_response(resp, status)
     
     # ==================== 端點處理器 ====================
     
@@ -1085,6 +1173,131 @@ class HttpApiServer:
         account_id = request.match_info['id']
         result = await self._execute_command('logout-account', {'id': account_id})
         return self._json_response(result)
+    
+    async def batch_account_operations(self, request):
+        """
+        🔧 P6-5: 批量帳號操作
+        
+        支持的操作：delete, login, logout, update_status
+        
+        請求格式:
+        {
+            "operations": [
+                {"action": "delete", "account_id": "123"},
+                {"action": "login", "account_id": "456"},
+                {"action": "logout", "account_id": "789"},
+                {"action": "update_status", "account_id": "abc", "status": "paused"}
+            ]
+        }
+        
+        響應格式:
+        {
+            "success": true,
+            "data": {
+                "total": 3,
+                "succeeded": 2,
+                "failed": 1,
+                "results": [
+                    {"account_id": "123", "action": "delete", "success": true},
+                    {"account_id": "456", "action": "login", "success": true},
+                    {"account_id": "789", "action": "logout", "success": false, "error": "..."}
+                ]
+            }
+        }
+        """
+        try:
+            data = await request.json()
+            operations = data.get('operations', [])
+            
+            if not operations:
+                return self._error_response('No operations provided', 'EMPTY_BATCH', 400)
+            
+            # 限制批量操作數量（防止濫用）
+            MAX_BATCH_SIZE = 50
+            if len(operations) > MAX_BATCH_SIZE:
+                return self._error_response(
+                    f'Batch size exceeds limit ({MAX_BATCH_SIZE})',
+                    'BATCH_TOO_LARGE', 400
+                )
+            
+            # 支持的操作映射
+            action_map = {
+                'delete': lambda op: self._execute_command('remove-account', {'id': op['account_id']}),
+                'login': lambda op: self._execute_command('login-account', {'id': op['account_id']}),
+                'logout': lambda op: self._execute_command('logout-account', {'id': op['account_id']}),
+                'update_status': lambda op: self._execute_command('update-account', {
+                    'id': op['account_id'],
+                    'status': op.get('status', 'active')
+                })
+            }
+            
+            results = []
+            succeeded = 0
+            failed = 0
+            
+            for op in operations:
+                action = op.get('action', '')
+                account_id = op.get('account_id', '')
+                
+                if not action or not account_id:
+                    results.append({
+                        'account_id': account_id,
+                        'action': action,
+                        'success': False,
+                        'error': 'Missing action or account_id'
+                    })
+                    failed += 1
+                    continue
+                
+                handler = action_map.get(action)
+                if not handler:
+                    results.append({
+                        'account_id': account_id,
+                        'action': action,
+                        'success': False,
+                        'error': f'Unknown action: {action}'
+                    })
+                    failed += 1
+                    continue
+                
+                try:
+                    result = await handler(op)
+                    is_success = (
+                        isinstance(result, dict) and result.get('success', False)
+                    ) or (
+                        isinstance(result, dict) and 'error' not in result
+                    )
+                    
+                    results.append({
+                        'account_id': account_id,
+                        'action': action,
+                        'success': is_success,
+                        'error': result.get('error') if isinstance(result, dict) and not is_success else None
+                    })
+                    
+                    if is_success:
+                        succeeded += 1
+                    else:
+                        failed += 1
+                        
+                except Exception as op_err:
+                    results.append({
+                        'account_id': account_id,
+                        'action': action,
+                        'success': False,
+                        'error': str(op_err)
+                    })
+                    failed += 1
+            
+            return self._success_response({
+                'total': len(operations),
+                'succeeded': succeeded,
+                'failed': failed,
+                'results': results
+            })
+            
+        except Exception as e:
+            return self._error_response(str(e), 'BATCH_ERROR', 500)
     
     # ==================== 用戶認證 (SaaS) ====================
     
@@ -4565,20 +4778,7 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
             logger.error(f"Get alerts error: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
     
-    async def prometheus_metrics(self, request):
-        """Prometheus 指標端點"""
-        try:
-            from core.monitoring import get_system_monitor
-            monitor = get_system_monitor()
-            metrics = monitor.get_prometheus_metrics()
-            
-            return web.Response(
-                text=metrics,
-                content_type='text/plain; version=0.0.4'
-            )
-        except Exception as e:
-            logger.error(f"Prometheus metrics error: {e}")
-            return web.Response(text=f'# Error: {e}', status=500)
+    # 🔧 P11-2: prometheus_metrics 已移至 P11-2 區塊（見下方），舊版 monitoring 實現已替換
     
     # ==================== API 文檔 ====================
     
@@ -5252,6 +5452,52 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
             return self._json_response(result)
         except Exception as e:
             logger.error(f"Admin reset daily quotas error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== P4-2: 配額一致性校驗 ====================
+    
+    async def admin_quota_consistency_check(self, request):
+        """管理員 - 全量配額一致性校驗"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({
+                    'success': False,
+                    'error': '需要管理員權限'
+                }, 403)
+            
+            from core.quota_service import get_quota_service
+            service = get_quota_service()
+            result = service.run_all_users_consistency_check()
+            
+            return self._json_response({
+                'success': True,
+                'data': result
+            })
+        except Exception as e:
+            logger.error(f"Admin quota consistency check error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def quota_consistency_check(self, request):
+        """用戶 - 個人配額一致性校驗"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({
+                    'success': False,
+                    'error': '未登入'
+                }, 401)
+            
+            from core.quota_service import get_quota_service
+            service = get_quota_service()
+            result = service.verify_quota_consistency(tenant.user_id)
+            
+            return self._json_response({
+                'success': True,
+                'data': result
+            })
+        except Exception as e:
+            logger.error(f"Quota consistency check error: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
     
     # ==================== 管理員計費 API ====================
@@ -6011,6 +6257,1075 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
             })
         except Exception as e:
             logger.error(f"Service info error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 🔧 P10-4: 健康歷史 ====================
+    
+    async def health_history(self, request):
+        """🔧 P10-4: 獲取健康檢查歷史記錄"""
+        try:
+            from core.health_service import get_health_service
+            service = get_health_service()
+            
+            limit = min(int(request.query.get('limit', '50')), 100)
+            history = service.get_health_history(limit)
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'history': history,
+                    'count': len(history)
+                }
+            })
+        except Exception as e:
+            logger.error(f"Health history error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 🔧 P11-2: Prometheus 指標導出 ====================
+    
+    async def prometheus_metrics(self, request):
+        """🔧 P11-2: 導出 Prometheus text 格式指標"""
+        try:
+            from core.metrics_exporter import get_metrics_collector
+            collector = get_metrics_collector()
+            metrics_text = collector.export_metrics()
+            
+            return web.Response(
+                text=metrics_text,
+                content_type='text/plain; version=0.0.4; charset=utf-8',
+                status=200
+            )
+        except Exception as e:
+            logger.error(f"Metrics export error: {e}")
+            return web.Response(text=f'# Error: {e}\n', status=500, content_type='text/plain')
+    
+    # ==================== 🔧 P11-4: 資源趨勢分析 ====================
+    
+    async def resource_trends(self, request):
+        """🔧 P11-4: 資源趨勢分析 + 擴縮容建議"""
+        try:
+            from core.observability_bridge import ResourceAnalyzer
+            analysis = ResourceAnalyzer.analyze_trends()
+            return self._json_response({
+                'success': True,
+                'data': analysis
+            })
+        except Exception as e:
+            logger.error(f"Resource trends error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 🔧 P11-5: 錯誤模式聚類 ====================
+    
+    async def error_patterns(self, request):
+        """🔧 P11-5: 獲取錯誤模式聚類結果"""
+        try:
+            from core.observability_bridge import get_error_cluster
+            cluster = get_error_cluster()
+            
+            view = request.query.get('view', 'top')  # top | recent | stats
+            limit = min(int(request.query.get('limit', '20')), 100)
+            hours = int(request.query.get('hours', '24'))
+            
+            if view == 'recent':
+                data = cluster.get_recent_patterns(hours=hours, limit=limit)
+            elif view == 'stats':
+                data = cluster.get_stats()
+            else:
+                data = cluster.get_top_patterns(limit=limit)
+            
+            return self._json_response({
+                'success': True,
+                'data': data
+            })
+        except Exception as e:
+            logger.error(f"Error patterns error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 🔧 P11-6: 運維 Dashboard ====================
+    
+    async def ops_dashboard(self, request):
+        """
+        🔧 P11-6: 管理員運維 Dashboard
+        
+        統一聚合所有可觀測性數據：
+        - 服務健康與穩定性
+        - 資源趨勢與擴縮容建議
+        - 錯誤模式 Top 5
+        - 異常檢測統計
+        - 告警歷史摘要
+        - Prometheus 核心指標摘要
+        """
+        try:
+            dashboard = {}
+            
+            # 1. 服務健康
+            try:
+                from core.health_service import get_health_service
+                hs = get_health_service()
+                health = await hs.check_all()
+                info = hs.get_service_info()
+                history = hs.get_health_history(10)
+                
+                if history:
+                    healthy_count = sum(1 for h in history if h['status'] == 'healthy')
+                    stability = round(healthy_count / len(history) * 100, 1)
+                else:
+                    stability = 100.0
+                
+                dashboard['health'] = {
+                    'status': health.status.value,
+                    'stability_pct': stability,
+                    'uptime': info.get('uptime_human', ''),
+                    'version': info.get('version', 'unknown'),
+                    'checks_summary': {c.name: c.status.value for c in health.checks},
+                }
+            except Exception as e:
+                dashboard['health'] = {'error': str(e)}
+            
+            # 2. 資源趨勢
+            try:
+                from core.observability_bridge import ResourceAnalyzer
+                dashboard['resources'] = ResourceAnalyzer.analyze_trends()
+            except Exception as e:
+                dashboard['resources'] = {'error': str(e)}
+            
+            # 3. 錯誤模式 Top 5
+            try:
+                from core.observability_bridge import get_error_cluster
+                cluster = get_error_cluster()
+                dashboard['error_patterns'] = {
+                    'top_5': cluster.get_top_patterns(5),
+                    'stats': cluster.get_stats(),
+                }
+            except Exception as e:
+                dashboard['error_patterns'] = {'error': str(e)}
+            
+            # 4. 異常檢測統計
+            try:
+                from admin.anomaly_detection import get_anomaly_manager
+                am = get_anomaly_manager()
+                dashboard['anomalies'] = am.get_anomaly_stats(hours=24)
+            except Exception as e:
+                dashboard['anomalies'] = {'error': str(e)}
+            
+            # 5. 告警歷史摘要
+            try:
+                from admin.alert_service import get_alert_service
+                alert_svc = get_alert_service()
+                alert_history = await alert_svc.get_history(limit=10)
+                dashboard['alerts'] = {
+                    'recent': [
+                        {
+                            'type': a.get('alert_type', ''),
+                            'level': a.get('level', ''),
+                            'time': a.get('timestamp', ''),
+                            'sent': a.get('sent', False),
+                        }
+                        for a in (alert_history if isinstance(alert_history, list) else [])
+                    ][:10]
+                }
+            except Exception as e:
+                dashboard['alerts'] = {'error': str(e)}
+            
+            # 6. Prometheus 指標摘要
+            try:
+                from core.metrics_exporter import get_metrics_collector
+                mc = get_metrics_collector()
+                uptime = time.time() - mc._start_time
+                total_req = mc._counters.get('tgmatrix_http_requests_total', 0)
+                total_err = mc._counters.get('tgmatrix_http_errors_total', 0)
+                
+                dashboard['metrics_summary'] = {
+                    'total_requests': int(total_req),
+                    'total_errors': int(total_err),
+                    'error_rate_pct': round(total_err / max(total_req, 1) * 100, 2),
+                    'avg_rps': round(total_req / max(uptime, 1), 2),
+                    'top_endpoints': sorted(
+                        [
+                            {'endpoint': ep, 'count': cnt}
+                            for ep, cnt in mc._endpoint_requests.items()
+                        ],
+                        key=lambda x: x['count'],
+                        reverse=True
+                    )[:10],
+                }
+            except Exception as e:
+                dashboard['metrics_summary'] = {'error': str(e)}
+            
+            # 7. 熔斷器狀態
+            try:
+                from core.health_service import get_health_service
+                hs2 = get_health_service()
+                dashboard['circuit_breakers'] = hs2.get_all_circuit_breakers()
+            except Exception as e:
+                dashboard['circuit_breakers'] = {'error': str(e)}
+            
+            return self._json_response({
+                'success': True,
+                'data': dashboard,
+                'timestamp': datetime.utcnow().isoformat() if hasattr(datetime, 'utcnow') else '',
+            })
+        except Exception as e:
+            logger.error(f"Ops dashboard error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 🔧 P10-5: 服務狀態頁 ====================
+    
+    async def status_page(self, request):
+        """
+        🔧 P10-5: 服務狀態總覽
+        
+        整合所有健康指標、版本信息、備份狀態為統一的狀態頁面
+        """
+        try:
+            from core.health_service import get_health_service
+            service = get_health_service()
+            
+            # 收集所有狀態信息
+            health = await service.check_all()
+            info = service.get_service_info()
+            breakers = service.get_all_circuit_breakers()
+            history = service.get_health_history(10)
+            
+            # 計算穩定性（最近歷史中 healthy 的佔比）
+            if history:
+                healthy_count = sum(1 for h in history if h['status'] == 'healthy')
+                stability = round(healthy_count / len(history) * 100, 1)
+            else:
+                stability = 100.0
+            
+            status_page_data = {
+                # 總覽
+                'status': health.status.value,
+                'stability_pct': stability,
+                
+                # 服務信息
+                'service': {
+                    'name': info.get('name', 'TG Matrix'),
+                    'version': info.get('version', 'unknown'),
+                    'environment': info.get('environment', 'unknown'),
+                    'uptime': info.get('uptime_human', ''),
+                    'uptime_seconds': info.get('uptime_seconds', 0),
+                    'started_at': info.get('started_at', ''),
+                    'python_version': info.get('python_version', ''),
+                },
+                
+                # 各項檢查
+                'checks': [c.to_dict() for c in health.checks],
+                
+                # 熔斷器狀態
+                'circuit_breakers': breakers,
+                
+                # 最近趨勢
+                'recent_history': history,
+                
+                'timestamp': health.timestamp,
+            }
+            
+            return self._json_response({
+                'success': True,
+                'data': status_page_data
+            })
+        except Exception as e:
+            logger.error(f"Status page error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 🔧 P12: 業務功能增強 ====================
+    
+    async def score_leads(self, request):
+        """🔧 P12-1: 線索自動評分"""
+        try:
+            data = await request.json()
+            lead_ids = data.get('lead_ids', [])
+            
+            from core.lead_scoring import get_scoring_engine
+            engine = get_scoring_engine()
+            
+            from core.db_utils import get_connection
+            with get_connection() as conn:
+                conn.row_factory = sqlite3.Row
+                
+                if lead_ids:
+                    placeholders = ','.join('?' * len(lead_ids))
+                    rows = conn.execute(
+                        f'SELECT * FROM unified_contacts WHERE id IN ({placeholders})',
+                        lead_ids
+                    ).fetchall()
+                else:
+                    # 評分最近 100 條未評分的線索
+                    rows = conn.execute(
+                        'SELECT * FROM unified_contacts WHERE lead_score = 0 OR lead_score IS NULL ORDER BY created_at DESC LIMIT 100'
+                    ).fetchall()
+                
+                results = []
+                for row in rows:
+                    lead = dict(row)
+                    score_result = engine.score_lead(lead)
+                    
+                    # 更新數據庫
+                    conn.execute('''
+                        UPDATE unified_contacts SET
+                            lead_score = ?, intent_level = ?, value_level = ?,
+                            intent_score = ?, quality_score = ?, activity_score = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ''', (
+                        score_result['lead_score'],
+                        score_result['intent_level'],
+                        score_result['value_level'],
+                        score_result['intent_score'],
+                        score_result['quality_score'],
+                        score_result['activity_score'],
+                        lead['id'],
+                    ))
+                    
+                    results.append({
+                        'id': lead['id'],
+                        'telegram_id': lead.get('telegram_id'),
+                        **score_result,
+                    })
+                
+                conn.commit()
+            
+            response_data = {
+                'scored': len(results),
+                'results': results[:50],  # 限制返回數量
+            }
+            
+            # P14-4: WebSocket 推送評分完成事件
+            try:
+                if hasattr(self, 'ws_service') and self.ws_service:
+                    self.ws_service.publish_lead_scoring({
+                        'scored_count': len(results),
+                        'hot': sum(1 for r in results if r.get('intent_level') == 'hot'),
+                        'warm': sum(1 for r in results if r.get('intent_level') == 'warm'),
+                    })
+            except Exception:
+                pass
+            
+            return self._json_response({
+                'success': True,
+                'data': response_data
+            })
+        except Exception as e:
+            logger.error(f"Score leads error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def scan_duplicates(self, request):
+        """🔧 P12-2: 掃描重複線索"""
+        try:
+            limit = min(int(request.query.get('limit', '50')), 200)
+            
+            from core.lead_dedup import LeadDeduplicationService
+            service = LeadDeduplicationService()
+            
+            groups = service.scan_duplicates(limit=limit)
+            stats = service.get_dedup_stats()
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'duplicate_groups': [g.to_dict() for g in groups],
+                    'total_groups': len(groups),
+                    'stats': stats,
+                }
+            })
+        except Exception as e:
+            logger.error(f"Scan duplicates error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def merge_duplicates(self, request):
+        """🔧 P12-2: 合併重複線索"""
+        try:
+            data = await request.json()
+            primary_id = data.get('primary_id')
+            duplicate_ids = data.get('duplicate_ids', [])
+            
+            if not primary_id or not duplicate_ids:
+                return self._json_response({
+                    'success': False,
+                    'error': 'primary_id and duplicate_ids are required'
+                }, 400)
+            
+            from core.lead_dedup import LeadDeduplicationService
+            service = LeadDeduplicationService()
+            result = service.merge_duplicates(primary_id, duplicate_ids)
+            
+            return self._json_response({
+                'success': 'error' not in result,
+                'data': result,
+            })
+        except Exception as e:
+            logger.error(f"Merge duplicates error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def analytics_lead_sources(self, request):
+        """🔧 P12-4: 線索來源分析"""
+        try:
+            days = int(request.query.get('days', '30'))
+            user_id = request.query.get('user_id', '')
+            
+            from core.business_analytics import BusinessAnalytics
+            analytics = BusinessAnalytics()
+            data = analytics.get_lead_source_analysis(days=days, user_id=user_id or None)
+            
+            return self._json_response({'success': True, 'data': data})
+        except Exception as e:
+            logger.error(f"Lead sources analysis error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def analytics_templates(self, request):
+        """🔧 P12-4: 模板效果分析"""
+        try:
+            days = int(request.query.get('days', '30'))
+            
+            from core.business_analytics import BusinessAnalytics
+            analytics = BusinessAnalytics()
+            data = analytics.get_template_performance(days=days)
+            
+            return self._json_response({'success': True, 'data': data})
+        except Exception as e:
+            logger.error(f"Template analytics error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def analytics_trends(self, request):
+        """🔧 P12-4: 每日趨勢分析"""
+        try:
+            days = int(request.query.get('days', '30'))
+            user_id = request.query.get('user_id', '')
+            
+            from core.business_analytics import BusinessAnalytics
+            analytics = BusinessAnalytics()
+            data = analytics.get_daily_trends(days=days, user_id=user_id or None)
+            
+            return self._json_response({'success': True, 'data': data})
+        except Exception as e:
+            logger.error(f"Trends analysis error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def analytics_funnel(self, request):
+        """🔧 P12-4: 漏斗分析"""
+        try:
+            user_id = request.query.get('user_id', '')
+            
+            from core.business_analytics import BusinessAnalytics
+            analytics = BusinessAnalytics()
+            data = analytics.get_funnel_analysis(user_id=user_id or None)
+            
+            return self._json_response({'success': True, 'data': data})
+        except Exception as e:
+            logger.error(f"Funnel analysis error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def analytics_summary(self, request):
+        """🔧 P12-4: 業務摘要看板"""
+        try:
+            user_id = request.query.get('user_id', '')
+            
+            from core.business_analytics import BusinessAnalytics
+            analytics = BusinessAnalytics()
+            data = analytics.get_summary_dashboard(user_id=user_id or None)
+            
+            return self._json_response({'success': True, 'data': data})
+        except Exception as e:
+            logger.error(f"Summary dashboard error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def retry_schedule(self, request):
+        """🔧 P12-3: 獲取重試策略時間表"""
+        try:
+            from core.message_retry import get_retry_manager
+            manager = get_retry_manager()
+            schedule = manager.get_retry_schedule()
+            
+            # 同時展示錯誤分類
+            from core.message_retry import ERROR_CATEGORIES
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'schedule': schedule,
+                    'max_retries': manager.policy.max_retries,
+                    'base_delay': manager.policy.base_delay_seconds,
+                    'max_delay': manager.policy.max_delay_seconds,
+                    'error_categories': {
+                        k: v for k, v in ERROR_CATEGORIES.items()
+                    },
+                }
+            })
+        except Exception as e:
+            logger.error(f"Retry schedule error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def create_ab_test(self, request):
+        """🔧 P12-5: 創建 A/B 測試"""
+        try:
+            data = await request.json()
+            name = data.get('name', 'Untitled Test')
+            template_ids = data.get('template_ids', [])
+            template_names = data.get('template_names', [])
+            
+            if len(template_ids) < 2:
+                return self._json_response({
+                    'success': False,
+                    'error': 'At least 2 template_ids are required for A/B test'
+                }, 400)
+            
+            from core.template_ab_test import get_ab_test_manager
+            manager = get_ab_test_manager()
+            test = manager.create_test(
+                name=name,
+                template_ids=template_ids,
+                template_names=template_names or None,
+            )
+            
+            return self._json_response({
+                'success': True,
+                'data': test.get_results(),
+            })
+        except Exception as e:
+            logger.error(f"Create A/B test error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def list_ab_tests(self, request):
+        """🔧 P12-5: 列出所有 A/B 測試"""
+        try:
+            from core.template_ab_test import get_ab_test_manager
+            manager = get_ab_test_manager()
+            tests = manager.list_tests()
+            
+            return self._json_response({
+                'success': True,
+                'data': tests,
+            })
+        except Exception as e:
+            logger.error(f"List A/B tests error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_ab_test(self, request):
+        """🔧 P12-5: 獲取 A/B 測試詳情"""
+        try:
+            test_id = request.match_info.get('test_id')
+            
+            from core.template_ab_test import get_ab_test_manager
+            manager = get_ab_test_manager()
+            test = manager.get_test(test_id)
+            
+            if not test:
+                return self._json_response({
+                    'success': False,
+                    'error': f'Test {test_id} not found'
+                }, 404)
+            
+            return self._json_response({
+                'success': True,
+                'data': test.get_results(),
+            })
+        except Exception as e:
+            logger.error(f"Get A/B test error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def complete_ab_test(self, request):
+        """🔧 P12-5: 結束 A/B 測試並選出贏家"""
+        try:
+            test_id = request.match_info.get('test_id')
+            
+            from core.template_ab_test import get_ab_test_manager
+            manager = get_ab_test_manager()
+            result = manager.complete_test(test_id)
+            
+            if not result:
+                return self._json_response({
+                    'success': False,
+                    'error': f'Test {test_id} not found'
+                }, 404)
+            
+            # P14-4: WebSocket 推送 A/B 測試完成事件
+            try:
+                if hasattr(self, 'ws_service') and self.ws_service:
+                    winner_name = result.get('winner', {}).get('template_name', 'N/A') if result.get('winner') else 'N/A'
+                    self.ws_service.publish_ab_test_event('ab_test:completed', {
+                        'test_id': test_id,
+                        'test_name': result.get('name', ''),
+                        'winner': winner_name,
+                    })
+            except Exception:
+                pass
+            
+            return self._json_response({
+                'success': True,
+                'data': result,
+            })
+        except Exception as e:
+            logger.error(f"Complete A/B test error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== P15-1: 聯繫人 REST API ====================
+    
+    async def get_contacts(self, request):
+        """🔧 P15-1: 獲取統一聯繫人列表（HTTP 模式回退）"""
+        try:
+            params = request.rel_url.query
+            limit = min(int(params.get('limit', 100)), 500)
+            offset = int(params.get('offset', 0))
+            search = params.get('search', '')
+            status = params.get('status', '')
+            source_type = params.get('source_type', '')
+            order_by = params.get('order_by', 'created_at DESC')
+            
+            # 安全的排序白名單
+            allowed_orders = {
+                'created_at DESC', 'created_at ASC',
+                'ai_score DESC', 'ai_score ASC',
+                'display_name ASC', 'display_name DESC',
+                'lead_score DESC', 'lead_score ASC',
+            }
+            if order_by not in allowed_orders:
+                order_by = 'created_at DESC'
+            
+            from core.db_utils import get_connection
+            with get_connection() as conn:
+                conn.row_factory = sqlite3.Row
+                
+                where_clauses = []
+                params_list = []
+                
+                if search:
+                    where_clauses.append(
+                        "(username LIKE ? OR display_name LIKE ? OR first_name LIKE ? OR phone LIKE ?)"
+                    )
+                    s = f'%{search}%'
+                    params_list.extend([s, s, s, s])
+                
+                if status:
+                    where_clauses.append("status = ?")
+                    params_list.append(status)
+                
+                if source_type:
+                    where_clauses.append("source_type = ?")
+                    params_list.append(source_type)
+                
+                where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+                
+                # 計數
+                count_row = conn.execute(
+                    f"SELECT COUNT(*) as cnt FROM unified_contacts {where_sql}",
+                    params_list
+                ).fetchone()
+                total = count_row['cnt'] if count_row else 0
+                
+                # 查詢
+                rows = conn.execute(
+                    f"""SELECT id, telegram_id, username, display_name, first_name, last_name,
+                               phone, contact_type, source_type, source_name, status, tags,
+                               ai_score, lead_score, intent_level, value_level,
+                               funnel_stage, created_at, updated_at
+                        FROM unified_contacts {where_sql}
+                        ORDER BY {order_by}
+                        LIMIT ? OFFSET ?""",
+                    params_list + [limit, offset]
+                ).fetchall()
+                
+                contacts = []
+                for row in rows:
+                    r = dict(row)
+                    # 解析 tags JSON
+                    import json
+                    try:
+                        r['tags'] = json.loads(r.get('tags') or '[]')
+                    except Exception:
+                        r['tags'] = []
+                    contacts.append(r)
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'contacts': contacts,
+                    'total': total,
+                    'limit': limit,
+                    'offset': offset,
+                }
+            })
+        except Exception as e:
+            logger.error(f"Get contacts error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_contacts_stats(self, request):
+        """🔧 P15-1: 獲取聯繫人統計"""
+        try:
+            from core.db_utils import get_connection
+            with get_connection() as conn:
+                conn.row_factory = sqlite3.Row
+                
+                total = conn.execute("SELECT COUNT(*) as cnt FROM unified_contacts").fetchone()['cnt']
+                
+                status_rows = conn.execute(
+                    "SELECT status, COUNT(*) as cnt FROM unified_contacts GROUP BY status"
+                ).fetchall()
+                by_status = {r['status']: r['cnt'] for r in status_rows}
+                
+                source_rows = conn.execute(
+                    "SELECT source_type, COUNT(*) as cnt FROM unified_contacts GROUP BY source_type"
+                ).fetchall()
+                by_source = {r['source_type']: r['cnt'] for r in source_rows}
+                
+                # 最近 7 天新增
+                recent = conn.execute(
+                    "SELECT COUNT(*) as cnt FROM unified_contacts WHERE created_at > datetime('now', '-7 days')"
+                ).fetchone()['cnt']
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'total': total,
+                    'recent_7d': recent,
+                    'by_status': by_status,
+                    'by_source': by_source,
+                }
+            })
+        except Exception as e:
+            logger.error(f"Get contacts stats error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== P5-2: 前端錯誤上報 ====================
+    
+    async def receive_frontend_error(self, request):
+        """
+        🔧 P5-2: 接收前端錯誤上報
+        
+        不需要認證（允許匿名上報），但做速率限制
+        """
+        try:
+            data = await request.json()
+            
+            # 提取用戶信息（如果有）
+            user_id = ''
+            tenant = request.get('tenant')
+            if tenant:
+                user_id = getattr(tenant, 'user_id', '')
+            
+            # 結構化記錄
+            error_record = {
+                'source': 'frontend',
+                'user_id': user_id,
+                'error_id': data.get('id', ''),
+                'type': data.get('type', 'unknown'),
+                'severity': data.get('severity', 'error'),
+                'code': data.get('code', ''),
+                'message': data.get('message', '')[:500],
+                'component': data.get('component', ''),
+                'action': data.get('action', ''),
+                'stack': data.get('stack', '')[:1000],
+                'url': data.get('url', '')[:200],
+                'user_agent': data.get('userAgent', '')[:200],
+                'client_timestamp': data.get('timestamp', ''),
+                'server_timestamp': datetime.now().isoformat(),
+                'request_id': request.get('request_id', '')
+            }
+            
+            # 寫入日誌
+            logger.warning(
+                f"[FrontendError] type={error_record['type']} severity={error_record['severity']} "
+                f"component={error_record['component']} action={error_record['action']} "
+                f"message={error_record['message'][:100]} user={user_id}"
+            )
+            
+            # 存入數據庫（持久化，方便查詢）
+            try:
+                import sqlite3
+                db_path = os.environ.get('DATABASE_PATH', 
+                    os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db'))
+                conn = sqlite3.connect(db_path)
+                conn.execute('''
+                    CREATE TABLE IF NOT EXISTS frontend_errors (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        error_id TEXT,
+                        user_id TEXT,
+                        type TEXT,
+                        severity TEXT,
+                        code TEXT,
+                        message TEXT,
+                        component TEXT,
+                        action TEXT,
+                        stack TEXT,
+                        url TEXT,
+                        user_agent TEXT,
+                        client_timestamp TEXT,
+                        server_timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                        request_id TEXT
+                    )
+                ''')
+                conn.execute('''
+                    INSERT INTO frontend_errors 
+                    (error_id, user_id, type, severity, code, message, component, action, stack, url, user_agent, client_timestamp, request_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    error_record['error_id'], error_record['user_id'],
+                    error_record['type'], error_record['severity'],
+                    error_record['code'], error_record['message'],
+                    error_record['component'], error_record['action'],
+                    error_record['stack'], error_record['url'],
+                    error_record['user_agent'], error_record['client_timestamp'],
+                    error_record['request_id']
+                ))
+                conn.commit()
+                conn.close()
+            except Exception as db_err:
+                logger.error(f"Failed to persist frontend error: {db_err}")
+            
+            return self._json_response({'success': True, 'received': True})
+            
+        except Exception as e:
+            logger.error(f"Frontend error receive failed: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def admin_get_frontend_errors(self, request):
+        """管理員查詢前端錯誤日誌"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or tenant.role != 'admin':
+                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
+            
+            limit = int(request.query.get('limit', '50'))
+            error_type = request.query.get('type', '')
+            severity = request.query.get('severity', '')
+            
+            import sqlite3
+            db_path = os.environ.get('DATABASE_PATH',
+                os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db'))
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            
+            query = 'SELECT * FROM frontend_errors WHERE 1=1'
+            params = []
+            
+            if error_type:
+                query += ' AND type = ?'
+                params.append(error_type)
+            if severity:
+                query += ' AND severity = ?'
+                params.append(severity)
+            
+            query += ' ORDER BY id DESC LIMIT ?'
+            params.append(min(limit, 200))
+            
+            rows = conn.execute(query, params).fetchall()
+            errors = [dict(row) for row in rows]
+            
+            # 統計
+            stats = conn.execute('''
+                SELECT type, severity, COUNT(*) as count 
+                FROM frontend_errors 
+                WHERE server_timestamp > datetime('now', '-24 hours')
+                GROUP BY type, severity
+            ''').fetchall()
+            
+            conn.close()
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'errors': errors,
+                    'stats_24h': [dict(s) for s in stats],
+                    'total': len(errors)
+                }
+            })
+        except Exception as e:
+            logger.error(f"Admin get frontend errors failed: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    # ==================== 🔧 P7-6: 性能指標 API ====================
+    
+    async def receive_performance_report(self, request):
+        """
+        🔧 P7-6: 接收前端 Web Vitals 性能報告
+        
+        接收格式：
+        {
+            "metrics": [{"name": "LCP", "value": 2100, "rating": "good"}],
+            "navigation": {"loadTime": 1500, "domContentLoaded": 800},
+            "url": "/dashboard",
+            "connection": {"effectiveType": "4g", "rtt": 50}
+        }
+        """
+        try:
+            # 支持 sendBeacon (text/plain) 和 fetch (application/json)
+            content_type = request.content_type or ''
+            
+            if 'json' in content_type or 'plain' in content_type:
+                body = await request.text()
+                import json
+                data = json.loads(body)
+            else:
+                data = await request.json()
+            
+            metrics = data.get('metrics', [])
+            url = data.get('url', '')
+            navigation = data.get('navigation')
+            connection = data.get('connection')
+            
+            if not metrics:
+                return self._json_response({'success': True, 'message': 'No metrics'})
+            
+            # 記錄到日誌（結構化）
+            metric_summary = {m['name']: m['value'] for m in metrics}
+            poor_metrics = [m for m in metrics if m.get('rating') == 'poor']
+            
+            if poor_metrics:
+                logger.warning(
+                    f"[WebVitals] Poor metrics on {url}: "
+                    f"{', '.join(f'{m[\"name\"]}={m[\"value\"]}' for m in poor_metrics)}"
+                )
+            else:
+                logger.info(f"[WebVitals] {url}: {metric_summary}")
+            
+            # 持久化到數據庫
+            try:
+                import sqlite3
+                db_path = os.environ.get('DATABASE_PATH',
+                    os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db'))
+                conn = sqlite3.connect(db_path)
+                
+                # 創建表（如果不存在）
+                conn.execute('''
+                    CREATE TABLE IF NOT EXISTS performance_metrics (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        url TEXT,
+                        metric_name TEXT,
+                        metric_value REAL,
+                        rating TEXT,
+                        load_time INTEGER,
+                        dom_content_loaded INTEGER,
+                        effective_type TEXT,
+                        rtt INTEGER,
+                        user_agent TEXT,
+                        server_timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                
+                conn.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_perf_metrics_time 
+                    ON performance_metrics(server_timestamp)
+                ''')
+                
+                # 插入每個指標
+                user_agent = data.get('userAgent', '')[:200]
+                eff_type = connection.get('effectiveType', '') if connection else ''
+                rtt = connection.get('rtt', 0) if connection else 0
+                load_time = navigation.get('loadTime', 0) if navigation else 0
+                dcl = navigation.get('domContentLoaded', 0) if navigation else 0
+                
+                for metric in metrics:
+                    conn.execute('''
+                        INSERT INTO performance_metrics 
+                        (url, metric_name, metric_value, rating, load_time, 
+                         dom_content_loaded, effective_type, rtt, user_agent)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        url,
+                        metric.get('name', ''),
+                        metric.get('value', 0),
+                        metric.get('rating', ''),
+                        load_time,
+                        dcl,
+                        eff_type,
+                        rtt,
+                        user_agent
+                    ))
+                
+                conn.commit()
+                conn.close()
+                
+            except Exception as db_err:
+                logger.error(f"Failed to persist performance metrics: {db_err}")
+            
+            return self._json_response({'success': True, 'received': len(metrics)})
+            
+        except Exception as e:
+            logger.error(f"Performance report receive failed: {e}")
+            return self._json_response({'success': True})  # 靜默成功（不影響前端）
+    
+    # ==================== 🔧 P8-5: 前端審計日誌查詢 API ====================
+    
+    async def get_frontend_audit_logs(self, request):
+        """
+        🔧 P8-5: 查詢前端審計日誌
+        
+        查詢參數：
+        - action: 過濾操作類型
+        - severity: 過濾嚴重級別
+        - user_id: 過濾用戶
+        - limit: 返回數量（默認 50，最大 200）
+        - offset: 分頁偏移
+        """
+        try:
+            action = request.query.get('action', '')
+            severity = request.query.get('severity', '')
+            user_id = request.query.get('user_id', '')
+            limit = min(int(request.query.get('limit', '50')), 200)
+            offset = int(request.query.get('offset', '0'))
+            
+            from core.db_utils import get_connection
+            with get_connection() as conn:
+                # 確保表存在
+                conn.execute('''
+                    CREATE TABLE IF NOT EXISTS frontend_audit_log (
+                        id TEXT PRIMARY KEY,
+                        action TEXT NOT NULL,
+                        severity TEXT DEFAULT 'info',
+                        user_id TEXT,
+                        details TEXT,
+                        timestamp INTEGER,
+                        received_at TEXT DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                
+                query = 'SELECT * FROM frontend_audit_log WHERE 1=1'
+                params = []
+                
+                if action:
+                    query += ' AND action = ?'
+                    params.append(action)
+                if severity:
+                    query += ' AND severity = ?'
+                    params.append(severity)
+                if user_id:
+                    query += ' AND user_id = ?'
+                    params.append(user_id)
+                    
+                query += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?'
+                params.extend([limit, offset])
+                
+                rows = conn.execute(query, params).fetchall()
+                logs = [dict(row) for row in rows]
+                
+                # 總數
+                count_query = 'SELECT COUNT(*) FROM frontend_audit_log WHERE 1=1'
+                count_params = []
+                if action:
+                    count_query += ' AND action = ?'
+                    count_params.append(action)
+                if severity:
+                    count_query += ' AND severity = ?'
+                    count_params.append(severity)
+                if user_id:
+                    count_query += ' AND user_id = ?'
+                    count_params.append(user_id)
+                    
+                total = conn.execute(count_query, count_params).fetchone()[0]
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'logs': logs,
+                    'total': total,
+                    'limit': limit,
+                    'offset': offset
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Frontend audit logs query error: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
     
     # ==================== 緩存管理 API（管理員）====================

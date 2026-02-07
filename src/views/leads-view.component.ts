@@ -21,12 +21,13 @@ import { ElectronIpcService } from '../electron-ipc.service';
 import { ToastService } from '../toast.service';
 import { DialogService, ExportService } from '../services';
 import { UnifiedContactsService, UnifiedContact } from '../services/unified-contacts.service';
+import { LeadScoringPanelComponent } from '../lead-nurturing/lead-scoring-panel.component';
 
 @Component({
   selector: 'app-leads-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LeadScoringPanelComponent],
   template: `
     <div class="page-content">
       <!-- 🔧 頁面標題 + 操作按鈕 -->
@@ -36,6 +37,15 @@ import { UnifiedContactsService, UnifiedContact } from '../services/unified-cont
           <h2 class="text-2xl font-bold" style="color: var(--text-primary);">發送控制台</h2>
         </div>
         <div class="flex items-center gap-3">
+          <button (click)="showToolsPanel.set(!showToolsPanel())" 
+                  class="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
+                  [class.bg-amber-500]="showToolsPanel()"
+                  [class.text-white]="showToolsPanel()"
+                  [style.background-color]="!showToolsPanel() ? 'var(--bg-tertiary)' : ''"
+                  [style.color]="!showToolsPanel() ? 'var(--text-primary)' : ''">
+            <span>⭐</span>
+            評分 & 去重
+          </button>
           <button (click)="refresh()" 
                   class="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
                   style="background-color: var(--bg-tertiary); color: var(--text-primary);">
@@ -50,6 +60,13 @@ import { UnifiedContactsService, UnifiedContact } from '../services/unified-cont
           </button>
         </div>
       </div>
+      
+      <!-- 🔧 P13-3: 評分 & 去重面板 -->
+      @if (showToolsPanel()) {
+        <div class="mb-6 animate-in slide-in-from-top">
+          <app-lead-scoring-panel></app-lead-scoring-panel>
+        </div>
+      }
       
       <!-- 🔧 統計卡片 -->
       <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
@@ -396,6 +413,7 @@ export class LeadsViewComponent implements OnInit, OnDestroy {
   statusFilter = signal('');
   selectedIds = signal<Set<number>>(new Set());
   viewMode = signal<'list' | 'card'>('card');  // 🔧 P0: 默認卡片視圖
+  showToolsPanel = signal(false);  // 🔧 P13-3: 評分 & 去重面板
   
   // 🔧 P1: 操作 loading 狀態
   isDeleting = signal(false);

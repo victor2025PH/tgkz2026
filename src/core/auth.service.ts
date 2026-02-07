@@ -70,6 +70,24 @@ export interface RegisterRequest {
   display_name?: string;
 }
 
+// 🔧 P4-5: 從 Legacy AuthService 遷移的接口（兼容 profile/membership 組件）
+export interface DeviceInfo {
+  id: number;
+  deviceCode: string;
+  deviceName: string;
+  boundAt: string;
+  lastSeen: string;
+  isCurrent: boolean;
+  status: 'active' | 'inactive';
+}
+
+export interface UsageStats {
+  aiCalls: { used: number; limit: number };
+  messagesSent: { used: number; limit: number };
+  accounts: { used: number; limit: number };
+  storage: { used: number; limit: number };
+}
+
 // Token 存儲鍵（使用集中定義）
 const TOKEN_KEYS = AUTH_STORAGE_KEYS;
 
@@ -93,12 +111,22 @@ export class AuthService implements OnDestroy {
   // Token 刷新定時器
   private refreshTimer: any = null;
   
+  // 🔧 P2: fetchCurrentUser 請求去重 —— 防止多處同時調用導致重複網絡請求
+  private _pendingFetchUser: Promise<User | null> | null = null;
+  
+  // 🔧 P4-5: 設備和使用統計信號（從 Legacy AuthService 遷移）
+  private _devices = signal<DeviceInfo[]>([]);
+  private _usageStats = signal<UsageStats | null>(null);
+  
   // 公開的計算屬性
   readonly user = computed(() => this._user());
   // 🔧 修復：只需要 Token 存在即可認為已認證（user 可以延遲加載）
   readonly isAuthenticated = computed(() => !!this._accessToken());
   readonly isLoading = computed(() => this._isLoading());
   readonly accessToken = computed(() => this._accessToken());
+  // 🔧 P4-5: 設備和使用統計（兼容 Legacy 接口）
+  readonly devices = computed(() => this._devices());
+  readonly usageStats = computed(() => this._usageStats());
   
   // 訂閱信息
   // 🔧 P0 修復：同時檢查 subscription_tier 和 membershipLevel（兼容兩種數據格式）
@@ -468,6 +496,23 @@ export class AuthService implements OnDestroy {
    * 🔧 優化：同時檢查 Signal 和 localStorage，確保 Token 總能被讀取
    */
   async fetchCurrentUser(): Promise<User | null> {
+    // 🔧 P2 修復：請求去重 —— 如果已有進行中的請求，直接複用
+    if (this._pendingFetchUser) {
+      console.log('[AuthService] fetchCurrentUser: Reusing pending request');
+      return this._pendingFetchUser;
+    }
+    
+    const promise = this._fetchCurrentUserInternal();
+    this._pendingFetchUser = promise;
+    
+    try {
+      return await promise;
+    } finally {
+      this._pendingFetchUser = null;
+    }
+  }
+  
+  private async _fetchCurrentUserInternal(): Promise<User | null> {
     // 🔧 修復：同時檢查 Signal 和 localStorage
     const token = this._accessToken() || localStorage.getItem(TOKEN_KEYS.ACCESS_TOKEN);
     if (!token) {
@@ -500,11 +545,34 @@ export class AuthService implements OnDestroy {
       const result = await response.json();
       
       if (result.success && result.data) {
-        console.log('[AuthService] fetchCurrentUser: Success', result.data.username);
-        this._user.set(result.data);
+        // 🔧 P0 修復：統一字段命名 —— 後端返回 display_name（snake_case），
+        // 但模板使用 displayName（camelCase）。此處做雙向映射，確保兩種命名都可用。
+        const userData = { ...result.data };
+        
+        // 確保 displayName (camelCase) 別名存在
+        if (!userData.displayName && userData.display_name) {
+          userData.displayName = userData.display_name;
+        }
+        // 確保 display_name 永不為空（降級鏈：display_name → telegram_first_name → username）
+        if (!userData.display_name || userData.display_name.trim() === '') {
+          userData.display_name = userData.telegram_first_name || userData.username || '用戶';
+          userData.displayName = userData.display_name;
+        }
+        
+        // 其他常用別名映射
+        if (!userData.telegramId && userData.telegram_id) {
+          userData.telegramId = userData.telegram_id;
+        }
+        
+        console.log('[AuthService] fetchCurrentUser: Success', userData.username, 'displayName:', userData.displayName);
+        this._user.set(userData);
         // 🔧 同步更新 localStorage（確保一致性）
-        localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(result.data));
-        return result.data;
+        localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(userData));
+        
+        // 🔧 P3-1: 廣播 user_update 事件，確保 LegacyAuthService 同步更新
+        this.authEvents.emitUserUpdate(userData);
+        
+        return userData;
       }
       
       console.warn('[AuthService] fetchCurrentUser: API returned', result);
@@ -758,12 +826,112 @@ export class AuthService implements OnDestroy {
     }
   }
   
+  // ==================== 🔧 P4-5: 從 Legacy AuthService 遷移的方法 ====================
+  
+  /**
+   * 🔧 P4-5: 更新用戶郵箱
+   */
+  async updateEmail(newEmail: string, password: string): Promise<{ success: boolean; message: string }> {
+    const token = this._accessToken();
+    if (!token) {
+      return { success: false, message: '請先登入' };
+    }
+    
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/me`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          email: newEmail,
+          password: password
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        const currentUser = this._user();
+        if (currentUser) {
+          const updated = { ...currentUser, email: newEmail };
+          this._user.set(updated);
+          localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(updated));
+          this.authEvents.emitUserUpdate(updated);
+        }
+        return { success: true, message: '郵箱更新成功' };
+      }
+      
+      return { success: false, message: result.error || result.message || '郵箱更新失敗' };
+    } catch (error: any) {
+      return { success: false, message: error.message || '修改郵箱失敗' };
+    }
+  }
+  
+  /**
+   * 🔧 P4-5: 更新顯示名稱
+   */
+  async updateDisplayName(newDisplayName: string): Promise<{ success: boolean; message: string }> {
+    const token = this._accessToken();
+    if (!token) {
+      return { success: false, message: '請先登入' };
+    }
+    
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/me`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          display_name: newDisplayName
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        const currentUser = this._user();
+        if (currentUser) {
+          const updated = {
+            ...currentUser,
+            display_name: newDisplayName,
+            displayName: newDisplayName
+          };
+          this._user.set(updated);
+          localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(updated));
+          this.authEvents.emitUserUpdate(updated);
+        }
+        return { success: true, message: '顯示名稱更新成功' };
+      }
+      
+      return { success: false, message: result.error || result.message || '顯示名稱更新失敗' };
+    } catch (error: any) {
+      return { success: false, message: error.message || '修改顯示名稱失敗' };
+    }
+  }
+  
+  /**
+   * 🔧 P4-5: 續費/升級會員（使用卡密）
+   * 兼容 Legacy AuthService 的 renewMembership 簽名
+   */
+  async renewMembership(licenseKey: string): Promise<{ success: boolean; message: string; newExpires?: string }> {
+    const result = await this.activateLicense(licenseKey);
+    return {
+      success: result.success,
+      message: result.message,
+      newExpires: result.data?.expiresAt
+    };
+  }
+  
   // ==================== 🆕 會員管理 ====================
   
   /**
-   * 獲取使用統計
+   * 獲取使用統計（並同步到信號）
    */
-  async getUsageStats(): Promise<any> {
+  async getUsageStats(): Promise<UsageStats | null> {
     const token = this._accessToken();
     if (!token) return null;
     
@@ -773,11 +941,35 @@ export class AuthService implements OnDestroy {
       });
       
       const result = await response.json();
-      return result.success ? result.data : null;
+      if (result.success && result.data) {
+        this._usageStats.set(result.data);
+        return result.data;
+      }
+      if (result.success && result.stats) {
+        this._usageStats.set(result.stats);
+        return result.stats;
+      }
+      return null;
     } catch (e) {
       console.error('Failed to get usage stats:', e);
       return null;
     }
+  }
+  
+  /**
+   * 🔧 P4-5: 載入使用統計到信號（兼容 Legacy loadUsageStats）
+   */
+  async loadUsageStats(): Promise<void> {
+    await this.getUsageStats();
+  }
+  
+  /**
+   * 🔧 P4-5: 載入設備列表到信號
+   */
+  async loadDevices(): Promise<DeviceInfo[]> {
+    const devices = await this.getDevices();
+    this._devices.set(devices);
+    return devices;
   }
   
   /**
@@ -961,8 +1153,20 @@ export class AuthService implements OnDestroy {
       }
       if (userJson) {
         try {
-          this._user.set(JSON.parse(userJson));
-          console.log('[Auth] User restored from localStorage');
+          const userData = JSON.parse(userJson);
+          // 🔧 P0 修復：恢復時也做字段名映射，確保 displayName 別名可用
+          if (!userData.displayName && userData.display_name) {
+            userData.displayName = userData.display_name;
+          }
+          if (!userData.display_name || (userData.display_name || '').trim() === '') {
+            userData.display_name = userData.telegram_first_name || userData.username || '用戶';
+            userData.displayName = userData.display_name;
+          }
+          if (!userData.telegramId && userData.telegram_id) {
+            userData.telegramId = userData.telegram_id;
+          }
+          this._user.set(userData);
+          console.log('[Auth] User restored from localStorage, displayName:', userData.displayName || userData.display_name);
         } catch {
           console.warn('[Auth] Invalid user JSON, clearing');
           this.clearAuthState();

@@ -327,6 +327,69 @@ export class ErrorHandlerService {
     } catch (e) {
       console.error('Failed to log error:', e);
     }
+    
+    // 🔧 P5-2: 嚴重錯誤上報到後端（error + critical）
+    if (error.severity === 'error' || error.severity === 'critical') {
+      this.reportToServer(error);
+    }
+  }
+  
+  /**
+   * 🔧 P5-2: 將錯誤上報到後端
+   */
+  private async reportToServer(error: AppError): Promise<void> {
+    try {
+      const token = localStorage.getItem('tgm_access_token');
+      const baseUrl = this.getApiBaseUrl();
+      
+      // 精簡上報數據（避免發送過大 payload）
+      const report = {
+        id: error.id,
+        type: error.type,
+        severity: error.severity,
+        code: error.code || '',
+        message: error.message?.substring(0, 500) || '',
+        userMessage: error.userMessage?.substring(0, 200) || '',
+        component: error.context?.component || '',
+        action: error.context?.action || '',
+        stack: error.stack?.substring(0, 1000) || '',
+        timestamp: error.timestamp,
+        url: typeof window !== 'undefined' ? window.location.href : '',
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 200) : ''
+      };
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // 使用 navigator.sendBeacon 作為首選（不阻塞頁面卸載）
+      // 降級為 fetch
+      const body = JSON.stringify(report);
+      
+      if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        const blob = new Blob([body], { type: 'application/json' });
+        navigator.sendBeacon(`${baseUrl}/api/v1/errors`, blob);
+      } else {
+        fetch(`${baseUrl}/api/v1/errors`, {
+          method: 'POST',
+          headers,
+          body,
+          keepalive: true  // 允許在頁面卸載時完成請求
+        }).catch(() => {});  // 靜默失敗，不要因為上報失敗產生新錯誤
+      }
+    } catch {
+      // 上報失敗不應影響主流程
+    }
+  }
+  
+  private getApiBaseUrl(): string {
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost' && window.location.port === '4200') {
+      return 'http://localhost:8000';
+    }
+    return '';
   }
   
   /**

@@ -183,6 +183,10 @@ class HealthService:
         # 最近檢查結果
         self._last_results: Dict[str, HealthCheck] = {}
         
+        # 🔧 P10-4: 健康歷史記錄（環形緩衝區，保留最近100條）
+        self._health_history: List[Dict[str, Any]] = []
+        self._max_history = 100
+        
         # 註冊內置檢查
         self._register_builtin_checks()
         
@@ -192,22 +196,50 @@ class HealthService:
     def _register_builtin_checks(self):
         """註冊內置健康檢查"""
         
-        # 數據庫檢查
+        # 🔧 P6-1: 數據庫檢查（使用統一連接工具）
         async def check_database():
             try:
-                import sqlite3
-                db_path = os.environ.get(
-                    'DB_PATH',
-                    os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
-                )
-                conn = sqlite3.connect(db_path, timeout=5)
-                conn.execute('SELECT 1')
-                conn.close()
+                from core.db_utils import get_connection, ConnectionStats
+                with get_connection() as conn:
+                    conn.execute('SELECT 1')
+                    
+                    # 檢查 WAL 模式
+                    wal_mode = conn.execute('PRAGMA journal_mode').fetchone()[0]
+                    
+                    # 獲取連接統計
+                    conn_stats = ConnectionStats.stats()
+                
                 return HealthCheck(
                     name='database',
                     status=HealthStatus.HEALTHY,
-                    message='Database connection OK'
+                    message=f'Database OK (WAL: {wal_mode})',
+                    details={
+                        'journal_mode': wal_mode,
+                        'connections': conn_stats
+                    }
                 )
+            except ImportError:
+                # 降級到直接連接
+                try:
+                    import sqlite3
+                    db_path = os.environ.get(
+                        'DB_PATH',
+                        os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
+                    )
+                    conn = sqlite3.connect(db_path, timeout=5)
+                    conn.execute('SELECT 1')
+                    conn.close()
+                    return HealthCheck(
+                        name='database',
+                        status=HealthStatus.HEALTHY,
+                        message='Database connection OK'
+                    )
+                except Exception as e:
+                    return HealthCheck(
+                        name='database',
+                        status=HealthStatus.UNHEALTHY,
+                        message=str(e)
+                    )
             except Exception as e:
                 return HealthCheck(
                     name='database',
@@ -293,6 +325,213 @@ class HealthService:
                 )
         
         self.register_check('disk', check_disk)
+        
+        # 🔧 P5-6: 配額服務檢查
+        async def check_quota_service():
+            try:
+                from core.quota_service import get_quota_service
+                qs = get_quota_service()
+                
+                # 檢查緩存大小和預留數
+                cache_size = len(qs._usage_cache)
+                reservation_count = sum(
+                    sum(v.values()) for v in qs._reservations.values()
+                ) if qs._reservations else 0
+                
+                # 執行清理檢查
+                expired_info = qs.cleanup_expired_reservations(timeout_seconds=300)
+                
+                return HealthCheck(
+                    name='quota_service',
+                    status=HealthStatus.HEALTHY,
+                    message='Quota service operational',
+                    details={
+                        'cache_users': cache_size,
+                        'active_reservations': reservation_count,
+                        'expired_cleaned': expired_info.get('cleaned', 0)
+                    }
+                )
+            except Exception as e:
+                return HealthCheck(
+                    name='quota_service',
+                    status=HealthStatus.DEGRADED,
+                    message=f'Quota service issue: {e}'
+                )
+        
+        self.register_check('quota_service', check_quota_service)
+        
+        # 🔧 P5-6: 進程級指標
+        async def check_process():
+            try:
+                import psutil
+                proc = psutil.Process()
+                mem_info = proc.memory_info()
+                cpu_percent = proc.cpu_percent(interval=0.1)
+                
+                rss_mb = mem_info.rss / (1024 * 1024)
+                status = HealthStatus.HEALTHY
+                if rss_mb > 1024:
+                    status = HealthStatus.UNHEALTHY
+                elif rss_mb > 512:
+                    status = HealthStatus.DEGRADED
+                
+                return HealthCheck(
+                    name='process',
+                    status=status,
+                    message=f'RSS: {rss_mb:.1f}MB, CPU: {cpu_percent}%',
+                    details={
+                        'rss_mb': round(rss_mb, 1),
+                        'vms_mb': round(mem_info.vms / (1024 * 1024), 1),
+                        'cpu_percent': cpu_percent,
+                        'threads': proc.num_threads(),
+                        'open_files': len(proc.open_files()) if hasattr(proc, 'open_files') else -1
+                    }
+                )
+            except ImportError:
+                return HealthCheck(
+                    name='process',
+                    status=HealthStatus.UNKNOWN,
+                    message='psutil not installed'
+                )
+            except Exception as e:
+                return HealthCheck(
+                    name='process',
+                    status=HealthStatus.UNKNOWN,
+                    message=str(e)
+                )
+        
+        self.register_check('process', check_process)
+        
+        # 🔧 P10-4: Redis 連接檢查
+        async def check_redis():
+            try:
+                import aioredis
+                redis_url = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+                redis = await aioredis.from_url(redis_url, socket_timeout=3)
+                pong = await redis.ping()
+                info = await redis.info('memory')
+                await redis.close()
+                
+                used_memory_mb = info.get('used_memory', 0) / (1024 * 1024)
+                return HealthCheck(
+                    name='redis',
+                    status=HealthStatus.HEALTHY,
+                    message=f'Redis OK, memory: {used_memory_mb:.1f}MB',
+                    details={
+                        'ping': pong,
+                        'used_memory_mb': round(used_memory_mb, 1),
+                        'connected_clients': info.get('connected_clients', 0)
+                    }
+                )
+            except ImportError:
+                return HealthCheck(
+                    name='redis',
+                    status=HealthStatus.UNKNOWN,
+                    message='aioredis not installed (Redis check skipped)'
+                )
+            except Exception as e:
+                # Redis 不可用 = 降級但非致命
+                return HealthCheck(
+                    name='redis',
+                    status=HealthStatus.DEGRADED,
+                    message=f'Redis unavailable: {e}'
+                )
+        
+        self.register_check('redis', check_redis)
+        
+        # 🔧 P10-4: 備份狀態檢查
+        async def check_backup():
+            try:
+                from core.backup_verifier import BackupVerifier
+                db_path = os.environ.get('DATABASE_PATH', os.environ.get('DB_PATH', ''))
+                if db_path:
+                    backup_dir = str(os.path.join(os.path.dirname(db_path), 'backups'))
+                else:
+                    backup_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'backups')
+                
+                from pathlib import Path
+                bdir = Path(backup_dir)
+                if not bdir.exists():
+                    return HealthCheck(
+                        name='backup',
+                        status=HealthStatus.DEGRADED,
+                        message='No backup directory found'
+                    )
+                
+                # 找最新備份
+                backups = sorted(
+                    list(bdir.glob('**/*.db')) + list(bdir.glob('**/*.zip')),
+                    key=lambda f: f.stat().st_mtime,
+                    reverse=True
+                )
+                
+                if not backups:
+                    return HealthCheck(
+                        name='backup',
+                        status=HealthStatus.DEGRADED,
+                        message='No backup files found'
+                    )
+                
+                latest = backups[0]
+                age_hours = (time.time() - latest.stat().st_mtime) / 3600
+                file_size_mb = latest.stat().st_size / (1024 * 1024)
+                
+                status = HealthStatus.HEALTHY
+                if age_hours > 48:
+                    status = HealthStatus.UNHEALTHY
+                elif age_hours > 25:
+                    status = HealthStatus.DEGRADED
+                
+                return HealthCheck(
+                    name='backup',
+                    status=status,
+                    message=f'Latest: {latest.name} ({age_hours:.1f}h ago, {file_size_mb:.1f}MB)',
+                    details={
+                        'latest_file': latest.name,
+                        'age_hours': round(age_hours, 1),
+                        'size_mb': round(file_size_mb, 1),
+                        'total_backups': len(backups)
+                    }
+                )
+            except Exception as e:
+                return HealthCheck(
+                    name='backup',
+                    status=HealthStatus.UNKNOWN,
+                    message=f'Backup check error: {e}'
+                )
+        
+        self.register_check('backup', check_backup)
+        
+        # 🔧 P10-4: 數據庫查詢性能檢查
+        async def check_db_performance():
+            try:
+                from core.db_utils import get_connection
+                start_t = time.time()
+                with get_connection() as conn:
+                    # 簡單的 COUNT 查詢
+                    conn.execute('SELECT COUNT(*) FROM sqlite_master')
+                query_ms = (time.time() - start_t) * 1000
+                
+                status = HealthStatus.HEALTHY
+                if query_ms > 500:
+                    status = HealthStatus.UNHEALTHY
+                elif query_ms > 100:
+                    status = HealthStatus.DEGRADED
+                
+                return HealthCheck(
+                    name='db_performance',
+                    status=status,
+                    message=f'Query latency: {query_ms:.1f}ms',
+                    details={'query_latency_ms': round(query_ms, 1)}
+                )
+            except Exception as e:
+                return HealthCheck(
+                    name='db_performance',
+                    status=HealthStatus.UNKNOWN,
+                    message=str(e)
+                )
+        
+        self.register_check('db_performance', check_db_performance)
     
     # ==================== 健康檢查 ====================
     
@@ -358,13 +597,34 @@ class HealthService:
         
         uptime = (datetime.utcnow() - self._start_time).total_seconds()
         
-        return ServiceHealth(
+        health = ServiceHealth(
             status=overall_status,
             version=self._version,
             uptime_seconds=round(uptime, 2),
             checks=checks,
             timestamp=datetime.utcnow().isoformat()
         )
+        
+        # 🔧 P10-4: 記錄歷史
+        self._record_history(health)
+        
+        return health
+    
+    def _record_history(self, health: ServiceHealth):
+        """記錄健康歷史（環形緩衝區）"""
+        entry = {
+            'status': health.status.value,
+            'timestamp': health.timestamp,
+            'checks': {c.name: c.status.value for c in health.checks},
+            'uptime': health.uptime_seconds,
+        }
+        self._health_history.append(entry)
+        if len(self._health_history) > self._max_history:
+            self._health_history = self._health_history[-self._max_history:]
+    
+    def get_health_history(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """獲取健康歷史記錄"""
+        return self._health_history[-limit:]
     
     def get_quick_health(self) -> Dict[str, Any]:
         """快速健康檢查（使用緩存結果）"""

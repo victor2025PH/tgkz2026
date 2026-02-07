@@ -9,7 +9,8 @@ import { TelegramAccount, KeywordConfig, MonitoredGroup, CapturedLead, LogEntry,
 // PerformanceMonitorComponent - 移至路由視圖
 import { TimeSeriesData } from './analytics-charts.component';
 import { GeminiService } from './gemini.service';
-import { TranslationService, Language } from './translation.service';
+// 🔧 P9-2: TranslationService 已遷移至 I18nService，Language 類型保留為兼容別名
+type Language = 'en' | 'zh';
 import { AccountLoaderService } from './account-loader.service';
 import { ElectronIpcService } from './electron-ipc.service';
 import { ToastService } from './toast.service';
@@ -26,6 +27,10 @@ import { UnifiedContactsService } from './services/unified-contacts.service';
 import { PaymentComponent } from './payment.component';
 import { SecurityService } from './security.service';
 import { GlobalErrorHandler } from './services/error-handler.service';
+import { WebVitalsService } from './services/web-vitals.service';
+import { OfflineIndicatorComponent } from './components/offline-indicator.component';
+import { NotificationCenterComponent } from './components/notification-center.component';
+import { AuditTrackerService } from './services/audit-tracker.service';
 import { LoadingService } from './loading.service';
 import { OfflineCacheService } from './services/offline-cache.service';
 import { SwManagerService } from './services/sw-manager.service';
@@ -36,7 +41,7 @@ import { I18nService } from './i18n.service';
 import { LanguageSwitcherCompactComponent } from './language-switcher.component';
 // 新增：用戶認證相關 - 使用統一的 JWT 認證服務
 import { AuthService } from './core/auth.service';
-import { LoginComponent } from './login.component';
+// 🔧 P4-1: Legacy LoginComponent 已移除，統一使用 /auth/login 路由（Core LoginComponent）
 // ProfileComponent, MembershipCenterComponent - 移至路由視圖
 import { QrLoginComponent } from './qr-login.component';
 // AccountCardListComponent, ApiCredentialManagerComponent - 移至路由視圖
@@ -178,6 +183,10 @@ interface SuccessOverlayConfig {
     MarketingReportComponent,
     // 通用組件（模板中使用）
     ToastComponent, GlobalConfirmDialogComponent, GlobalInputDialogComponent, ProgressDialogComponent,
+    // 🔧 P8-1: 離線狀態指示器
+    OfflineIndicatorComponent,
+    // 🔧 P8-4: 通知中心
+    NotificationCenterComponent,
     // 🆕 实时告警通知
     AlertNotificationComponent,
     // 🔧 P1-2: 統一會員等級徽章組件
@@ -185,7 +194,7 @@ interface SuccessOverlayConfig {
     // 會員相關（模板中使用）
     MembershipDialogComponent, UpgradePromptComponent, PaymentComponent,
     // 導航和佈局（模板中使用）
-    OnboardingComponent, LanguageSwitcherCompactComponent, LoginComponent,
+    OnboardingComponent, LanguageSwitcherCompactComponent,
     // 帳號管理（模板中使用）
     QrLoginComponent,
     // 對話框（模板中使用）
@@ -338,12 +347,42 @@ interface SuccessOverlayConfig {
                   linear-gradient(135deg, #06b6d4, #8b5cf6) border-box;
       border: 1px solid transparent;
     }
+    
+    /* 🔧 P8-3: 移動端側邊欄響應式 */
+    :host ::ng-deep .mobile-sidebar-hidden {
+      position: fixed !important;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      z-index: 999;
+      transform: translateX(-100%);
+      width: 16rem !important;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    :host ::ng-deep .mobile-sidebar-visible {
+      position: fixed !important;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      z-index: 999;
+      transform: translateX(0);
+      width: 16rem !important;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    @media (max-width: 768px) {
+      :host ::ng-deep main.flex-1 {
+        padding: 16px !important;
+        padding-top: 52px !important;
+      }
+    }
   `]
 })
 export class AppComponent implements OnDestroy, OnInit {
   private router = inject(Router);  // 🆕 Angular Router 導航
   geminiService = inject(GeminiService);
-  translationService = inject(TranslationService);
+  // 🔧 P9-2: translationService 已移除，使用 i18n（I18nService）替代
   accountLoaderService = inject(AccountLoaderService);
   ipcService = inject(ElectronIpcService);
   offlineCache = inject(OfflineCacheService); // 🆕 P2: 離線緩存服務
@@ -356,6 +395,10 @@ export class AppComponent implements OnDestroy, OnInit {
   backupService = inject(BackupService);
   i18n = inject(I18nService);
   authService = inject(AuthService);  // 新增：認證服務
+  // 🔧 P7-6: Web Vitals 性能監控（注入即啟動採集）
+  private webVitals = inject(WebVitalsService);
+  // 🔧 P8-5: 全局操作審計追蹤
+  private auditTracker = inject(AuditTrackerService);
   // 🆕 Phase 3: 統一導航服務
   navBridge = inject(NavBridgeService);
   navShortcuts = inject(NavShortcutsService);
@@ -497,8 +540,51 @@ export class AppComponent implements OnDestroy, OnInit {
   // --- 🆕 側邊欄收縮模式 ---
   sidebarCollapsed = signal(false);
   
+  // 🔧 P8-3: 移動端響應式狀態
+  isMobile = signal(false);
+  mobileMenuOpen = signal(false);
+  
+  private _mobileMediaQuery: MediaQueryList | null = null;
+  
+  /** P8-3: 初始化移動端偵測 */
+  private initMobileDetection(): void {
+    if (typeof window === 'undefined') return;
+    this._mobileMediaQuery = window.matchMedia('(max-width: 768px)');
+    
+    const handler = (e: MediaQueryListEvent | MediaQueryList) => {
+      const mobile = e.matches;
+      this.isMobile.set(mobile);
+      if (mobile) {
+        this.sidebarCollapsed.set(false);  // 移動端不使用收縮模式
+        this.mobileMenuOpen.set(false);    // 預設隱藏
+      }
+    };
+    
+    // 初始值
+    handler(this._mobileMediaQuery);
+    
+    // 監聽變化
+    this._mobileMediaQuery.addEventListener('change', handler);
+  }
+  
+  /** P8-3: 切換移動端選單 */
+  toggleMobileMenu(): void {
+    this.mobileMenuOpen.update(v => !v);
+  }
+  
+  /** P8-3: 移動端選擇選單項後自動關閉 */
+  onMobileNavSelect(): void {
+    if (this.isMobile()) {
+      this.mobileMenuOpen.set(false);
+    }
+  }
+  
   // 切換側邊欄收縮狀態
   toggleSidebarCollapse(): void {
+    if (this.isMobile()) {
+      this.toggleMobileMenu();
+      return;
+    }
     const newState = !this.sidebarCollapsed();
     this.sidebarCollapsed.set(newState);
     localStorage.setItem('sidebar_collapsed', String(newState));
@@ -6128,11 +6214,14 @@ export class AppComponent implements OnDestroy, OnInit {
       console.log('[App] Angular ready event dispatched');
     }, 100);
     
-    // 设置默认语言为中文
-    this.translationService.setLanguage('zh');
+    // 🔧 P9-2: 語言設定現在由 I18nService 自動處理（從 localStorage 或瀏覽器語言偵測）
+    // 無需手動 setLanguage，I18nService 構造函數已處理初始化
     
     // Load saved AI settings from localStorage
     this.loadAiSettings();
+    
+    // 🔧 P8-3: 初始化移動端偵測
+    this.initMobileDetection();
     
     // 🆕 加載保存的側邊欄分組狀態
     this.loadSidebarGroupsState();
@@ -6177,30 +6266,28 @@ export class AppComponent implements OnDestroy, OnInit {
     // Request initial state from the backend once the app is ready
     this.ipcService.send('get-initial-state');
     
-    // 🆕 刷新用戶數據以確保會員等級和顯示名稱同步
+    // 🔧 P0 修復：刷新用戶數據 —— 移除 500ms 延遲，立即執行以避免菜單欄顯示閃爍
     if (this.isAuthenticated()) {
-      // 延遲執行以確保其他組件初始化完成
-      setTimeout(() => {
-        this.authService.fetchCurrentUser().then(user => {
-          if (user) {
-            console.log('[App] User data refreshed:', {
-              displayName: (user as any).displayName || (user as any).display_name,
-              telegramId: (user as any).telegramId || (user as any).telegram_id,
-              membership: this.authService.membershipLevel()
-            });
-            
-            // 🔧 P2: 同步到 MembershipService（確保數據一致性）
-            if (this.membershipService.isSaaSMode()) {
-              const level = this.authService.membershipLevel() as MembershipLevel;
-              const expires = this.authService.user()?.membershipExpires;
-              this.membershipService.syncFromAuthService(level, expires);
-            }
-            
-            // 強制變更檢測
-            this.cdr.detectChanges();
+      // 直接執行（checkLocalAuth 已在 AuthService 構造中完成，此處只做後台同步）
+      this.authService.fetchCurrentUser().then(user => {
+        if (user) {
+          console.log('[App] User data refreshed:', {
+            displayName: (user as any).displayName || (user as any).display_name,
+            telegramId: (user as any).telegramId || (user as any).telegram_id,
+            membership: this.authService.membershipLevel()
+          });
+          
+          // 🔧 P2: 同步到 MembershipService（確保數據一致性）
+          if (this.membershipService.isSaaSMode()) {
+            const level = this.authService.membershipLevel() as MembershipLevel;
+            const expires = this.authService.user()?.membershipExpires;
+            this.membershipService.syncFromAuthService(level, expires);
           }
-        }).catch(err => console.warn('[App] Failed to refresh user data:', err));
-      }, 500);
+          
+          // 強制變更檢測
+          this.cdr.detectChanges();
+        }
+      }).catch(err => console.warn('[App] Failed to refresh user data:', err));
     }
     
     // Refresh queue status periodically (every 60 seconds to reduce load)
@@ -9624,7 +9711,11 @@ export class AppComponent implements OnDestroy, OnInit {
   }
 
   // --- View & Language ---
-  setLanguage(lang: Language) { this.translationService.setLanguage(lang); }
+  // 🔧 P9-2: 使用 I18nService 替代 TranslationService
+  setLanguage(lang: Language) {
+    const localeMap: Record<Language, 'en' | 'zh-TW'> = { en: 'en', zh: 'zh-TW' };
+    this.i18n.setLocale(localeMap[lang] || 'zh-TW');
+  }
   changeView(view: View) { 
     // ========== 會員等級功能權限檢查 ==========
     
@@ -9699,11 +9790,17 @@ export class AppComponent implements OnDestroy, OnInit {
       return;
     }
     
+    // 🔧 P8-5: 記錄頁面切換
+    const previousView = this.currentView();
+    
     // 🔧 P0: 先同步到 NavBridgeService，讓子組件的 effect 能捕獲變化
     this.navBridge.navigateTo(view as any);
     
     // 然後更新本地視圖（觸發 @switch 重新渲染）
     this.currentView.set(view);
+    
+    // 🔧 P8-5: 審計追蹤
+    this.auditTracker.trackViewChange(previousView, view);
     
     // 🆕 切換到資源中心時自動同步 leads 數據
     if (view === 'resources') {
@@ -9713,6 +9810,9 @@ export class AppComponent implements OnDestroy, OnInit {
         console.log('[changeView] Synced leads to resource center:', currentLeads.length);
       }
     }
+    
+    // 🔧 P8-3: 移動端選擇後自動關閉側邊欄
+    this.onMobileNavSelect();
   }
   
   // 智能模式切換權限檢查

@@ -2747,14 +2747,18 @@ class Database:
             import os
             is_electron = os.environ.get('ELECTRON_MODE', 'false').lower() == 'true'
             
+            # 🔧 P3-6: 排除已刪除/已封禁的帳號（與配額計數邏輯對齊）
+            excluded_status_clause = "AND (status IS NULL OR LOWER(status) NOT IN ('deleted', 'banned', 'removed'))"
+            
             if is_electron or not owner_user_id:
                 # Electron 模式或無用戶上下文：返回所有帳號
-                query = 'SELECT * FROM accounts ORDER BY id'
+                query = f'SELECT * FROM accounts WHERE 1=1 {excluded_status_clause} ORDER BY id'
                 params = ()
             else:
                 # SaaS 模式：返回當前用戶的帳號 + 未綁定/歷史帳號（owner_user_id 為空或 local_user，兼容舊數據）
-                query = '''SELECT * FROM accounts
-                    WHERE owner_user_id = ? OR owner_user_id IS NULL OR owner_user_id = '' OR owner_user_id = 'local_user'
+                query = f'''SELECT * FROM accounts
+                    WHERE (owner_user_id = ? OR owner_user_id IS NULL OR owner_user_id = '' OR owner_user_id = 'local_user')
+                    {excluded_status_clause}
                     ORDER BY id'''
                 params = (owner_user_id,)
             
@@ -5073,7 +5077,7 @@ class Database:
         last_error: Optional[str] = None,
         priority: Optional[str] = None
     ) -> bool:
-        """更新消息隊列中消息的狀態
+        """更新消息隊列中消息的狀態（P14: 真正持久化到數據庫）
         
         Args:
             message_id: 消息 ID
@@ -5085,19 +5089,41 @@ class Database:
             bool: 是否成功
         """
         try:
-            # 消息隊列狀態主要在內存中管理
-            # 這裡可以選擇持久化到數據庫以支持重啟恢復
-            # 暫時只記錄日誌，不做實際數據庫操作
-            import sys
-            print(f"[Database] Queue message status update: id={message_id}, status={status}, error={last_error}", file=sys.stderr)
+            updates = []
+            params = []
+            
+            if status:
+                updates.append("status = ?")
+                params.append(status)
+                if status == 'completed':
+                    updates.append("sent_at = CURRENT_TIMESTAMP")
+            
+            if last_error is not None:
+                updates.append("error_message = ?")
+                params.append(last_error[:500] if last_error else None)
+            
+            if priority:
+                updates.append("priority = ?")
+                params.append(priority)
+            
+            if not updates:
+                return True
+            
+            updates.append("updated_at = CURRENT_TIMESTAMP")
+            params.append(str(message_id))
+            
+            query = f"UPDATE message_queue SET {', '.join(updates)} WHERE id = ? OR CAST(id AS TEXT) = ?"
+            params.append(str(message_id))
+            
+            await self.execute(query, tuple(params))
             return True
         except Exception as e:
             import sys
-            print(f"Error updating queue message status: {e}", file=sys.stderr)
+            print(f"[Database] Queue status update (non-critical): {e}", file=sys.stderr)
             return False
     
     async def increment_queue_message_attempts(self, message_id: str) -> bool:
-        """增加消息嘗試次數
+        """增加消息嘗試次數（P14: 真正持久化）
         
         Args:
             message_id: 消息 ID
@@ -5106,13 +5132,16 @@ class Database:
             bool: 是否成功
         """
         try:
-            # 消息嘗試次數主要在內存中管理
-            import sys
-            print(f"[Database] Queue message attempts incremented: id={message_id}", file=sys.stderr)
+            query = """
+                UPDATE message_queue 
+                SET retry_count = retry_count + 1, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? OR CAST(id AS TEXT) = ?
+            """
+            await self.execute(query, (str(message_id), str(message_id)))
             return True
         except Exception as e:
             import sys
-            print(f"Error incrementing queue message attempts: {e}", file=sys.stderr)
+            print(f"[Database] Queue attempts increment (non-critical): {e}", file=sys.stderr)
             return False
     
     async def save_queue_message(
@@ -5146,16 +5175,96 @@ class Database:
             bool: 是否成功
         """
         try:
-            # 消息隊列主要在內存中管理
-            # 這裡可以選擇持久化到數據庫以支持重啟恢復
-            import sys
-            print(f"[Database] Queue message saved: id={message_id}, phone={phone}, user_id={user_id}", file=sys.stderr)
+            # P14: 真正持久化到 message_queue 表
+            priority_map = {'HIGH': 1, 'NORMAL': 2, 'LOW': 3}
+            priority_int = priority_map.get(str(priority).upper(), 2)
+            
+            query = """
+                INSERT OR REPLACE INTO message_queue 
+                (phone, user_id, text, priority, status, scheduled_at, retry_count)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """
+            await self.execute(query, (
+                phone, user_id, text[:2000], priority_int,
+                status, scheduled_at, attempts
+            ))
             return True
         except Exception as e:
             import sys
-            print(f"Error saving queue message: {e}", file=sys.stderr)
+            print(f"[Database] Queue message save (non-critical): {e}", file=sys.stderr)
             return False
     
+    # ============ P15-2: 消息隊列恢復 ============
+
+    async def get_pending_queue_messages(self) -> list:
+        """獲取所有待處理的消息（用於重啟恢復）
+        
+        查詢 status = pending / retrying 的消息，按優先級和創建時間排序。
+        排除已完成/已失敗/過期超過 24 小時的消息。
+        
+        Returns:
+            list[dict]: 消息列表
+        """
+        try:
+            query = """
+                SELECT id, phone, user_id, text, priority, status,
+                       scheduled_at, error_message AS last_error,
+                       retry_count AS attempts, created_at
+                FROM message_queue
+                WHERE status IN ('pending', 'retrying', 'processing')
+                  AND created_at > datetime('now', '-24 hours')
+                ORDER BY priority ASC, created_at ASC
+                LIMIT 500
+            """
+            rows = await self.fetch_all(query)
+            
+            results = []
+            priority_map = {1: 'HIGH', 2: 'NORMAL', 3: 'LOW'}
+            for row in (rows or []):
+                r = dict(row) if hasattr(row, 'keys') else {
+                    'id': row[0], 'phone': row[1], 'user_id': row[2],
+                    'text': row[3], 'priority': row[4], 'status': row[5],
+                    'scheduled_at': row[6], 'last_error': row[7],
+                    'attempts': row[8], 'created_at': row[9],
+                }
+                # 整數優先級 → 字符串
+                if isinstance(r.get('priority'), int):
+                    r['priority'] = priority_map.get(r['priority'], 'NORMAL')
+                # 重置 processing 為 pending（上次未完成）
+                if r.get('status') == 'processing':
+                    r['status'] = 'pending'
+                r.setdefault('max_attempts', 3)
+                results.append(r)
+            
+            import sys
+            print(f"[Database] Queue recovery: found {len(results)} pending messages", file=sys.stderr)
+            return results
+        except Exception as e:
+            import sys
+            print(f"[Database] Queue recovery error (non-critical): {e}", file=sys.stderr)
+            return []
+
+    async def cleanup_old_queue_messages(self, days: int = 7) -> int:
+        """清理過期的消息隊列記錄
+        
+        刪除超過指定天數的已完成/已失敗消息，保持表精簡。
+        
+        Returns:
+            int: 刪除的記錄數
+        """
+        try:
+            query = f"""
+                DELETE FROM message_queue
+                WHERE status IN ('completed', 'failed')
+                  AND updated_at < datetime('now', '-{int(days)} days')
+            """
+            result = await self.execute(query)
+            return getattr(result, 'rowcount', 0) if result else 0
+        except Exception as e:
+            import sys
+            print(f"[Database] Queue cleanup error: {e}", file=sys.stderr)
+            return 0
+
     # ============ 系統告警相關 ============
     
     async def add_alert(

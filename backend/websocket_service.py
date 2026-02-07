@@ -34,6 +34,10 @@ class SubscriptionType(str, Enum):
     MESSAGE_STATUS = "message:status"
     CONTACT_UPDATE = "contact:update"
     SYSTEM_STATUS = "system:status"
+    # P14: 業務事件
+    BUSINESS_EVENT = "business:event"
+    LEAD_SCORING = "lead:scoring"
+    AB_TEST = "ab:test"
 
 
 @dataclass
@@ -277,6 +281,36 @@ class WebSocketService:
     def publish_system_status(self, status: Dict):
         """發佈系統狀態"""
         self.publish(SubscriptionType.SYSTEM_STATUS, status)
+    
+    # ============ P14: 業務事件便捷方法 ============
+    
+    def publish_business_event(self, event_type: str, data: Dict):
+        """發佈業務事件（評分/去重/分析完成等）"""
+        self.publish(SubscriptionType.BUSINESS_EVENT, {
+            'event': event_type,
+            'timestamp': datetime.now().isoformat(),
+            **data
+        })
+    
+    def publish_lead_scoring(self, data: Dict):
+        """發佈線索評分完成事件"""
+        self.publish(SubscriptionType.LEAD_SCORING, {
+            'event': 'scoring:completed',
+            'timestamp': datetime.now().isoformat(),
+            **data
+        })
+    
+    def publish_ab_test_event(self, event_type: str, data: Dict):
+        """發佈 A/B 測試事件（創建/完成/統計更新）"""
+        self.publish(SubscriptionType.AB_TEST, {
+            'event': event_type,
+            'timestamp': datetime.now().isoformat(),
+            **data
+        })
+    
+    def publish_message_status(self, data: Dict):
+        """發佈消息狀態更新（發送成功/失敗/重試/死信）"""
+        self.publish(SubscriptionType.MESSAGE_STATUS, data)
     
     # ============ 私有方法 ============
     

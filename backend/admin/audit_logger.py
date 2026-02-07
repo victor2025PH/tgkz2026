@@ -418,6 +418,24 @@ class AuditLogger:
             logger.error(f"Failed to query audit logs: {e}")
             return {"logs": [], "pagination": {"total": 0, "page": 1, "page_size": page_size, "total_pages": 0}}
     
+    async def __call__(self, action=None, admin_id=None, target_id=None, details=None, ip_address=None, **kwargs):
+        """
+        異步可調用接口，兼容 await audit_log(...) 調用模式
+        """
+        try:
+            self.log(
+                action=action,
+                admin_id=admin_id or 0,
+                admin_username=str(admin_id or 'system'),
+                resource_type=action.category.value if action else 'system',
+                resource_id=str(target_id or ''),
+                new_value=details if isinstance(details, dict) else None,
+                description=str(details) if details and not isinstance(details, dict) else '',
+                ip_address=ip_address or '',
+            )
+        except Exception as e:
+            logger.error(f"Audit log async call error: {e}")
+
     def get_stats(self, days: int = 7) -> Dict[str, Any]:
         """獲取審計統計"""
         try:
@@ -468,24 +486,4 @@ class AuditLogger:
 
 
 # 全局實例
-_audit_logger = AuditLogger()
-
-
-async def audit_log(action=None, admin_id=None, target_id=None, details=None, ip_address=None, **kwargs):
-    """
-    異步審計日誌包裝函數
-    兼容 handlers.py 中的 await audit_log(...) 調用模式
-    """
-    try:
-        _audit_logger.log(
-            action=action,
-            admin_id=admin_id or 0,
-            admin_username=str(admin_id or 'system'),
-            resource_type=action.category.value if action else 'system',
-            resource_id=str(target_id or ''),
-            new_value=details if isinstance(details, dict) else None,
-            description=str(details) if details and not isinstance(details, dict) else '',
-            ip_address=ip_address or '',
-        )
-    except Exception as e:
-        logger.error(f"Audit log error: {e}")
+audit_log = AuditLogger()

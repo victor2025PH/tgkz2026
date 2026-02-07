@@ -549,41 +549,42 @@ export class AuthService implements OnDestroy {
         return null;
       }
       
-      const result = await response.json();
+      const result = await this.parseJsonResponse(response);
+      if (!result || !result.success || !result.data) {
+        if (!result) {
+          console.warn('[AuthService] fetchCurrentUser: Invalid response (e.g. HTML/502)');
+        } else {
+          console.warn('[AuthService] fetchCurrentUser: API returned', result);
+        }
+        return null;
+      }
+      const data = result.data as Record<string, unknown>;
+      // 🔧 P0 修復：統一字段命名 —— 後端返回 display_name（snake_case），
+      // 但模板使用 displayName（camelCase）。此處做雙向映射，確保兩種命名都可用。
+      const userData: Record<string, unknown> = { ...data };
       
-      if (result.success && result.data) {
-        // 🔧 P0 修復：統一字段命名 —— 後端返回 display_name（snake_case），
-        // 但模板使用 displayName（camelCase）。此處做雙向映射，確保兩種命名都可用。
-        const userData = { ...result.data };
-        
-        // 確保 displayName (camelCase) 別名存在
-        if (!userData.displayName && userData.display_name) {
-          userData.displayName = userData.display_name;
-        }
-        // 確保 display_name 永不為空（降級鏈：display_name → telegram_first_name → username）
-        if (!userData.display_name || userData.display_name.trim() === '') {
-          userData.display_name = userData.telegram_first_name || userData.username || '用戶';
-          userData.displayName = userData.display_name;
-        }
-        
-        // 其他常用別名映射
-        if (!userData.telegramId && userData.telegram_id) {
-          userData.telegramId = userData.telegram_id;
-        }
-        
-        console.log('[AuthService] fetchCurrentUser: Success', userData.username, 'displayName:', userData.displayName);
-        this._user.set(userData);
-        // 🔧 同步更新 localStorage（確保一致性）
-        localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(userData));
-        
-        // 🔧 P3-1: 廣播 user_update 事件，確保 LegacyAuthService 同步更新
-        this.authEvents.emitUserUpdate(userData);
-        
-        return userData;
+      // 確保 displayName (camelCase) 別名存在
+      if (!userData.displayName && userData.display_name) {
+        userData.displayName = userData.display_name;
+      }
+      // 確保 display_name 永不為空（降級鏈：display_name → telegram_first_name → username）
+      const rawDisplayName = (userData.display_name as string)?.trim();
+      if (!rawDisplayName) {
+        userData.display_name = (userData.telegram_first_name as string) || (userData.username as string) || '用戶';
+        userData.displayName = userData.display_name;
       }
       
-      console.warn('[AuthService] fetchCurrentUser: API returned', result);
-      return null;
+      // 其他常用別名映射
+      if (!userData.telegramId && userData.telegram_id) {
+        userData.telegramId = userData.telegram_id;
+      }
+      
+      console.log('[AuthService] fetchCurrentUser: Success', userData.username, 'displayName:', userData.displayName);
+      this._user.set(userData as User);
+      localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(userData));
+      this.authEvents.emitUserUpdate(userData as User);
+      
+      return userData as User;
     } catch (e) {
       console.error('[AuthService] fetchCurrentUser error:', e);
       return null;

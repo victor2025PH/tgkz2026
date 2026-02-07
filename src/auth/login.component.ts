@@ -56,11 +56,11 @@ import { ElectronIpcService } from '../electron-ipc.service';
         </div>
       }
       
-      <!-- 錯誤提示 -->
-      @if (error() && !isLocked()) {
+      <!-- 錯誤提示（兜底：若為 JSON 解析錯誤則顯示網絡錯誤文案） -->
+      @if (displayError() && !isLocked()) {
         <div class="error-alert">
           <span class="error-icon">⚠️</span>
-          <span>{{ error() }}</span>
+          <span>{{ displayError() }}</span>
         </div>
       }
       
@@ -1018,6 +1018,13 @@ export class LoginComponent implements OnInit, OnDestroy {
   telegramLoading = signal(false);
   telegramWidgetReady = signal(false);  // 🆕 Widget 是否已載入
   error = signal<string | null>(null);
+  /** 顯示用錯誤文案：若為 JSON 解析類錯誤則統一顯示網絡錯誤（兜底） */
+  displayError = computed(() => {
+    const e = this.error();
+    if (!e) return null;
+    if (/json|unexpected token|not valid json/i.test(e)) return this.i18n.t('auth.networkError');
+    return e;
+  });
   
   // 🆕 Deep Link 登入狀態
   deepLinkLoading = signal(false);

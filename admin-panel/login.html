@@ -27,6 +27,9 @@
         }
         
         /* 浮動粒子 */
+        /* Vue 未掛載時隱藏模板，防止原始 {{}} 和 v-if 內容閃現 */
+        [v-cloak] { display: none !important; }
+        
         .particle {
             position: absolute;
             width: 10px;
@@ -43,6 +46,13 @@
     </style>
 </head>
 <body class="bg-animated min-h-screen flex items-center justify-center relative overflow-hidden">
+    <!-- Vue 載入前的 loading 提示 -->
+    <div id="vue-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#9ca3af;z-index:5;">
+        <div style="text-align:center;">
+            <div style="font-size:3rem;margin-bottom:1rem;">🤖</div>
+            <div>載入中...</div>
+        </div>
+    </div>
     <!-- 裝飾粒子 -->
     <div class="particle" style="top: 10%; left: 10%; animation-delay: 0s;"></div>
     <div class="particle" style="top: 20%; left: 80%; animation-delay: 1s; width: 15px; height: 15px;"></div>
@@ -51,7 +61,7 @@
     <div class="particle" style="top: 40%; left: 90%; animation-delay: 4s;"></div>
     <div class="particle" style="top: 80%; left: 40%; animation-delay: 5s; width: 12px; height: 12px;"></div>
     
-    <div id="app" class="relative z-10">
+    <div id="app" v-cloak class="relative z-10">
         <!-- 服務器配置對話框 -->
         <div v-if="showServerConfig" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div class="glass rounded-2xl p-6 border border-gray-700 w-[400px]">
@@ -180,6 +190,10 @@
                 
                 // 檢查是否需要配置服務器（只有 GitHub Pages 需要）
                 onMounted(() => {
+                    // 隱藏載入提示（Vue 已成功掛載）
+                    var loadEl = document.getElementById('vue-loading');
+                    if (loadEl) loadEl.style.display = 'none';
+                    
                     // 只有當訪問 github.io 時才需要配置 API 服務器
                     const isGitHubPages = window.location.hostname.endsWith('.github.io');
                     if (!API_SERVER && isGitHubPages) {

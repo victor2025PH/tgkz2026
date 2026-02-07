@@ -10,6 +10,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Inter', sans-serif; }
+        /* Vue 未掛載時隱藏模板，防止原始 {{}} 和 v-if 內容閃現 */
+        [v-cloak] { display: none !important; }
         .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
         .gradient-text { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); }
@@ -55,7 +57,21 @@
     </script>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
-    <div id="app">
+    <!-- Vue 載入前的 loading 提示（Vue 掛載後會被 #app 內容替換） -->
+    <div id="vue-loading" style="display:flex;align-items:center;justify-content:center;height:100vh;color:#9ca3af;">
+        <div style="text-align:center;">
+            <div style="font-size:3rem;margin-bottom:1rem;">🤖</div>
+            <div>載入中...</div>
+        </div>
+    </div>
+    <script>
+        // Vue 掛載成功後移除 loading 提示
+        window.__hideLoading = function() {
+            var el = document.getElementById('vue-loading');
+            if (el) el.style.display = 'none';
+        };
+    </script>
+    <div id="app" v-cloak>
         <!-- 側邊欄 -->
         <div class="fixed left-0 top-0 h-full w-64 bg-gray-800 border-r border-gray-700 z-50 flex flex-col">
             <!-- Logo -->
@@ -4472,6 +4488,6 @@ api_id,api_hash,name
         </div>
     </div>
     
-    <script src="app.js?v=20260207-coupon-fix4"></script>
+    <script src="app.js?v=20260207-vcloak"></script>
 </body>
 </html>

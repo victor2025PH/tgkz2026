@@ -3397,6 +3397,8 @@ createApp({
         // ============ 生命週期 ============
         
         onMounted(async () => {
+            // 隱藏載入提示（Vue 已成功掛載）
+            if (window.__hideLoading) window.__hideLoading();
             // 確保登錄後不彈出優惠券面板（僅通過點擊「創建優惠券」按鈕打開）
             showCouponModal.value = false;
             await loadDashboard();

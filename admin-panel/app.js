@@ -338,6 +338,23 @@ createApp({
         });
         const backupLoading = ref(false);
         
+        // ============ P3 狀態 ============
+        // 圖表
+        const showChartsPanel = ref(false);
+        const hourlyStatsData = ref([]);
+        const loadDistData = ref([]);
+        const dailyTrendData = ref([]);
+        let trendChartInstance = null;
+        let loadChartInstance = null;
+        let dailyTrendChartInstance = null;
+        // 自動刷新
+        const autoRefreshEnabled = ref(false);
+        const autoRefreshInterval = ref(30);  // 秒
+        const autoRefreshCountdown = ref(0);
+        let autoRefreshTimer = null;
+        // 視圖模式
+        const apiViewMode = ref('table');  // table | card
+        
         // 🆕 API 分組管理
         const apiGroups = ref([]);
         const apiPoolGroupFilter = ref('');
@@ -2345,6 +2362,228 @@ createApp({
             });
         };
         
+        // ============ P3 增強：圖表 / 自動刷新 / 雙視圖 / 生命週期 ============
+        
+        // --- 數據加載 ---
+        const loadApiChartData = async () => {
+            try {
+                const [hourlyRes, loadRes, trendRes] = await Promise.all([
+                    apiRequest('/admin/api-pool/stats/hourly?hours=168'),
+                    apiRequest('/admin/api-pool/stats/load'),
+                    apiRequest('/admin/api-pool/stats/trend?days=7')
+                ]);
+                if (hourlyRes.success) hourlyStatsData.value = hourlyRes.data?.stats || [];
+                if (loadRes.success) loadDistData.value = loadRes.data?.distribution || [];
+                if (trendRes.success) dailyTrendData.value = trendRes.data?.trend || [];
+            } catch (e) { /* silent */ }
+        };
+        
+        const toggleChartsPanel = async () => {
+            showChartsPanel.value = !showChartsPanel.value;
+            if (showChartsPanel.value) {
+                await loadApiChartData();
+                Vue.nextTick(() => { renderTrendChart(); renderLoadChart(); renderDailyTrendChart(); });
+            }
+        };
+        
+        // --- 趨勢圖 (成功/失敗 按小時) ---
+        const renderTrendChart = () => {
+            const ctx = document.getElementById('apiTrendChart');
+            if (!ctx) return;
+            if (trendChartInstance) trendChartInstance.destroy();
+            
+            const data = hourlyStatsData.value;
+            if (data.length === 0) return;
+            
+            // 按 6 小時聚合以降低密度
+            const buckets = {};
+            data.forEach(d => {
+                const dayHour = d.hour || '';
+                const bucket = dayHour.substring(0, 13);  // "YYYY-MM-DD-HH" -> 取前13字符做key
+                if (!buckets[bucket]) buckets[bucket] = { successes: 0, failures: 0 };
+                buckets[bucket].successes += d.successes || 0;
+                buckets[bucket].failures += d.failures || 0;
+            });
+            const keys = Object.keys(buckets).sort().slice(-28);  // 最近 28 個時段
+            const labels = keys.map(k => {
+                const parts = k.split('-');
+                return parts.length >= 4 ? `${parts[1]}/${parts[2]} ${parts[3]}h` : k;
+            });
+            
+            trendChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: '成功',
+                            data: keys.map(k => buckets[k].successes),
+                            borderColor: '#22c55e',
+                            backgroundColor: 'rgba(34,197,94,0.1)',
+                            fill: true, tension: 0.4, pointRadius: 2
+                        },
+                        {
+                            label: '失敗',
+                            data: keys.map(k => buckets[k].failures),
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239,68,68,0.1)',
+                            fill: true, tension: 0.4, pointRadius: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#9CA3AF', font: { size: 11 } } } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#6B7280', font: { size: 10 } } },
+                        x: { grid: { display: false }, ticks: { color: '#6B7280', font: { size: 9 }, maxRotation: 45 } }
+                    }
+                }
+            });
+        };
+        
+        // --- 負載分佈圖 (水平柱狀) ---
+        const renderLoadChart = () => {
+            const ctx = document.getElementById('apiLoadChart');
+            if (!ctx) return;
+            if (loadChartInstance) loadChartInstance.destroy();
+            
+            // 用當前 API 列表生成負載分佈
+            const list = apiPoolList.value.slice(0, 15);  // 最多 15 個
+            if (list.length === 0) return;
+            
+            const labels = list.map(a => a.name || `API-${a.api_id}`);
+            const usage = list.map(a => a.current_accounts || 0);
+            const max = list.map(a => a.max_accounts || 5);
+            const rates = list.map(a => ((a.current_accounts || 0) / Math.max(1, a.max_accounts || 5)) * 100);
+            const colors = rates.map(r => r >= 100 ? '#ef4444' : r >= 70 ? '#eab308' : '#22c55e');
+            
+            loadChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: '已用帳號',
+                            data: usage,
+                            backgroundColor: colors,
+                            borderRadius: 4
+                        },
+                        {
+                            label: '最大帳號',
+                            data: max,
+                            backgroundColor: 'rgba(107,114,128,0.2)',
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#9CA3AF', font: { size: 11 } } } },
+                    scales: {
+                        x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#6B7280', font: { size: 10 } } },
+                        y: { grid: { display: false }, ticks: { color: '#9CA3AF', font: { size: 10 } } }
+                    }
+                }
+            });
+        };
+        
+        // --- 每日分配趨勢圖 ---
+        const renderDailyTrendChart = () => {
+            const ctx = document.getElementById('apiDailyTrendChart');
+            if (!ctx) return;
+            if (dailyTrendChartInstance) dailyTrendChartInstance.destroy();
+            
+            const data = dailyTrendData.value;
+            if (data.length === 0) return;
+            
+            const labels = data.map(d => (d.date || '').slice(5));  // MM-DD
+            
+            dailyTrendChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: '分配',
+                            data: data.map(d => d.allocations || 0),
+                            backgroundColor: 'rgba(59,130,246,0.6)',
+                            borderRadius: 4
+                        },
+                        {
+                            label: '釋放',
+                            data: data.map(d => d.releases || 0),
+                            backgroundColor: 'rgba(168,85,247,0.6)',
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#9CA3AF', font: { size: 11 } } } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#6B7280', font: { size: 10 } } },
+                        x: { grid: { display: false }, ticks: { color: '#6B7280', font: { size: 10 } } }
+                    }
+                }
+            });
+        };
+        
+        // --- 自動刷新 ---
+        const toggleAutoRefresh = () => {
+            autoRefreshEnabled.value = !autoRefreshEnabled.value;
+            if (autoRefreshEnabled.value) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        };
+        
+        const startAutoRefresh = () => {
+            stopAutoRefresh();
+            autoRefreshCountdown.value = autoRefreshInterval.value;
+            autoRefreshTimer = setInterval(() => {
+                autoRefreshCountdown.value--;
+                if (autoRefreshCountdown.value <= 0) {
+                    // 如果有彈窗打開就跳過本次刷新
+                    const anyModalOpen = confirmDialog.show || showEditApiModal.value || showExportModal.value || showApiPoolModal.value || showApiPoolBatchModal.value || showRestoreModal.value || showHealthConfigModal.value;
+                    if (!anyModalOpen && currentPage.value === 'apiPool') {
+                        loadApiPool();
+                        if (showChartsPanel.value) loadApiChartData().then(() => { renderTrendChart(); renderLoadChart(); renderDailyTrendChart(); });
+                    }
+                    autoRefreshCountdown.value = autoRefreshInterval.value;
+                }
+            }, 1000);
+        };
+        
+        const stopAutoRefresh = () => {
+            if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+            autoRefreshCountdown.value = 0;
+        };
+        
+        // --- 視圖切換 ---
+        const toggleViewMode = () => {
+            apiViewMode.value = apiViewMode.value === 'table' ? 'card' : 'table';
+        };
+        
+        // --- 生命週期指標 (computed) ---
+        const getApiLifecycle = (api) => {
+            const now = Date.now();
+            const created = api.created_at ? new Date(api.created_at).getTime() : now;
+            const ageDays = Math.max(0, Math.floor((now - created) / 86400000));
+            const totalReqs = (api.total_requests || 0);
+            const intensity = ageDays > 0 ? (totalReqs / ageDays).toFixed(1) : '0';
+            const rate = api.success_rate || 100;
+            const health = api.health_score || 100;
+            // 輪換建議
+            let recommendation = 'good';  // good, monitor, rotate
+            let recText = '狀態良好';
+            if (health < 30 || rate < 30) { recommendation = 'rotate'; recText = '建議輪換'; }
+            else if (health < 60 || rate < 60 || ageDays > 180) { recommendation = 'monitor'; recText = '需要關注'; }
+            else if (ageDays > 365) { recommendation = 'monitor'; recText = '服役超一年'; }
+            return { ageDays, intensity, recommendation, recText };
+        };
+        
         // ============ Phase 3: 錢包運營工具 ============
         
         const loadWalletAnalytics = async () => {
@@ -4079,7 +4318,8 @@ createApp({
             else if (newPage === 'devices') await loadDevices();
             else if (newPage === 'logs') { await loadLogs(); await loadLogsStats(); }
             else if (newPage === 'proxies') await loadProxies();
-            else if (newPage === 'apiPool') await loadApiPool();
+            else if (newPage === 'apiPool') { await loadApiPool(); }
+            if (newPage !== 'apiPool') { stopAutoRefresh(); autoRefreshEnabled.value = false; }
             else if (newPage === 'admins') await loadAdmins();
             else if (newPage === 'referrals') await loadReferralStats();
             else if (newPage === 'announcements') await loadAnnouncements();
@@ -4229,6 +4469,10 @@ createApp({
             apiAuditLogs, apiAuditLoading, loadApiAuditLogs,
             showRestoreModal, restoreFile, restoreOptions, backupLoading,
             createApiPoolBackup, handleRestoreFile, executeRestore,
+            // P3 增強
+            showChartsPanel, toggleChartsPanel, apiViewMode, toggleViewMode,
+            autoRefreshEnabled, autoRefreshInterval, autoRefreshCountdown, toggleAutoRefresh,
+            getApiLifecycle,
             // 🆕 Phase 3: 錢包運營
             walletOperations,
             walletAnalytics,

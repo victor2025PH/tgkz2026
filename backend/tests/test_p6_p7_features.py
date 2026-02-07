@@ -250,11 +250,13 @@ class TestQuotaService:
         assert results == ['called']
     
     def test_reservation_timestamps_cleanup(self, quota_service):
-        """過期預留應被清理"""
-        # 模擬過期的預留時間戳
+        """過期預留應被清理（需同時有 _reservations 與 _reservation_timestamps 才計入 cleaned）"""
         if not hasattr(quota_service, '_reservation_timestamps'):
             quota_service._reservation_timestamps = {}
-        
+        # 模擬過期的預留：須在 _reservations 中有對應預留才會被 release 並計入 cleaned
+        if 'user1' not in quota_service._reservations:
+            quota_service._reservations['user1'] = {}
+        quota_service._reservations['user1']['tg_accounts'] = 1
         quota_service._reservation_timestamps['user1:tg_accounts'] = (
             datetime.now() - timedelta(minutes=10)
         )

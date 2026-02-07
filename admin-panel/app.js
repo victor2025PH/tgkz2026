@@ -2578,8 +2578,8 @@ createApp({
             const ageDays = Math.max(0, Math.floor((now - created) / 86400000));
             const totalReqs = (api.total_requests || 0);
             const intensity = ageDays > 0 ? (totalReqs / ageDays).toFixed(1) : '0';
-            const rate = api.success_rate || 100;
-            const health = api.health_score || 100;
+            const rate = api.success_rate != null ? api.success_rate : 100;
+            const health = api.health_score != null ? api.health_score : 100;
             // 輪換建議
             let recommendation = 'good';  // good, monitor, rotate
             let recText = '狀態良好';
@@ -2710,7 +2710,7 @@ createApp({
                 .filter(a => a.lifecycle.recommendation !== 'good' && a.status !== 'disabled')
                 .sort((a, b) => {
                     const order = { rotate: 0, monitor: 1 };
-                    return (order[a.lifecycle.recommendation] || 2) - (order[b.lifecycle.recommendation] || 2);
+                    return (order[a.lifecycle.recommendation] ?? 2) - (order[b.lifecycle.recommendation] ?? 2);
                 });
         });
         

@@ -316,6 +316,28 @@ createApp({
             { key: 'last_used_at', label: '最後使用' }
         ];
         
+        // ============ P2 狀態 ============
+        // 健康告警閾值
+        const healthThresholds = reactive({
+            autoDisable: true,
+            minSuccessRate: 30,       // 成功率低於此值自動禁用
+            maxConsecutiveFails: 10,  // 連續失敗次數閾值
+            warningRate: 60,          // 警告閾值
+            criticalRate: 30          // 危險閾值
+        });
+        const showHealthConfigModal = ref(false);
+        // 審計時間線
+        const apiAuditLogs = ref([]);
+        const apiAuditLoading = ref(false);
+        // 備份/恢復
+        const showRestoreModal = ref(false);
+        const restoreFile = ref(null);
+        const restoreOptions = reactive({
+            overwrite: false,
+            restoreAllocations: false
+        });
+        const backupLoading = ref(false);
+        
         // 🆕 API 分組管理
         const apiGroups = ref([]);
         const apiPoolGroupFilter = ref('');
@@ -1767,7 +1789,12 @@ createApp({
         
         // 展開/收起詳情
         const toggleApiDetail = (apiId) => {
-            expandedApiId.value = expandedApiId.value === apiId ? null : apiId;
+            if (expandedApiId.value === apiId) {
+                expandedApiId.value = null;
+            } else {
+                expandedApiId.value = apiId;
+                loadApiAuditLogs(apiId);  // P2: 加載審計時間線
+            }
         };
         
         // 編輯 API
@@ -2064,6 +2091,258 @@ createApp({
             
             showToast(`已導出 ${sourceList.length} 條記錄 (${exportOptions.format.toUpperCase()})`, 'success');
             showExportModal.value = false;
+        };
+        
+        // ============ P2 增強：健康告警 / 審計時間線 / 備份恢復 / 快捷鍵 ============
+        
+        // --- 健康告警閾值配置 ---
+        const saveHealthThresholds = () => {
+            localStorage.setItem('api_health_thresholds', JSON.stringify({
+                autoDisable: healthThresholds.autoDisable,
+                minSuccessRate: healthThresholds.minSuccessRate,
+                maxConsecutiveFails: healthThresholds.maxConsecutiveFails,
+                warningRate: healthThresholds.warningRate,
+                criticalRate: healthThresholds.criticalRate
+            }));
+            showHealthConfigModal.value = false;
+            showToast('健康告警閾值已保存', 'success');
+        };
+        
+        const loadHealthThresholds = () => {
+            try {
+                const saved = JSON.parse(localStorage.getItem('api_health_thresholds') || '{}');
+                if (saved.minSuccessRate != null) healthThresholds.minSuccessRate = saved.minSuccessRate;
+                if (saved.maxConsecutiveFails != null) healthThresholds.maxConsecutiveFails = saved.maxConsecutiveFails;
+                if (saved.warningRate != null) healthThresholds.warningRate = saved.warningRate;
+                if (saved.criticalRate != null) healthThresholds.criticalRate = saved.criticalRate;
+                if (saved.autoDisable != null) healthThresholds.autoDisable = saved.autoDisable;
+            } catch (e) { /* ignore */ }
+        };
+        
+        // 根據自定義閾值計算健康概覽（覆寫 P1 硬編碼版本）
+        const apiHealthOverviewP2 = Vue.computed(() => {
+            const list = apiPoolList.value;
+            if (list.length === 0) return { avgRate: 0, healthy: 0, warning: 0, critical: 0, avgHealth: 0, atRisk: [] };
+            const rates = list.map(a => a.success_rate || 0);
+            const avgRate = rates.reduce((s, r) => s + r, 0) / rates.length;
+            const warnT = healthThresholds.warningRate;
+            const critT = healthThresholds.criticalRate;
+            const healthy = list.filter(a => (a.success_rate || 100) >= warnT).length;
+            const warning = list.filter(a => (a.success_rate || 100) >= critT && (a.success_rate || 100) < warnT).length;
+            const critical = list.filter(a => (a.success_rate || 100) < critT).length;
+            const healthScores = list.map(a => a.health_score || 100);
+            const avgHealth = healthScores.reduce((s, h) => s + h, 0) / healthScores.length;
+            // 找出需要告警的 API
+            const atRisk = list.filter(a => (a.success_rate || 100) < critT && a.status === 'available');
+            return { avgRate: avgRate.toFixed(1), healthy, warning, critical, avgHealth: avgHealth.toFixed(0), atRisk };
+        });
+        
+        // 自動禁用危險 API（一鍵操作）
+        const autoDisableUnhealthyApis = async () => {
+            const atRisk = apiHealthOverviewP2.value.atRisk;
+            if (atRisk.length === 0) {
+                showToast('沒有需要自動禁用的 API', 'success');
+                return;
+            }
+            openConfirmDialog({
+                title: '自動禁用危險 API',
+                message: `檢測到 ${atRisk.length} 個 API 成功率低於 ${healthThresholds.criticalRate}%，確定要全部禁用嗎？\n\n涉及: ${atRisk.map(a => a.name || a.api_id).join(', ')}`,
+                type: 'danger',
+                confirmText: `禁用 ${atRisk.length} 個`,
+                onConfirm: async () => {
+                    let success = 0, fail = 0;
+                    for (const api of atRisk) {
+                        try {
+                            const r = await apiRequest(`/admin/api-pool/${api.api_id}/disable`, { method: 'POST' });
+                            if (r.success) success++; else fail++;
+                        } catch (e) { fail++; }
+                    }
+                    showToast(`自動禁用完成：成功 ${success}，失敗 ${fail}`, success > 0 ? 'success' : 'error');
+                    await loadApiPool();
+                }
+            });
+        };
+        
+        // --- 審計時間線 ---
+        const loadApiAuditLogs = async (apiId) => {
+            apiAuditLoading.value = true;
+            apiAuditLogs.value = [];
+            try {
+                const iconMap = (action) => {
+                    const a = (action || '').toLowerCase();
+                    if (a.includes('allocat')) return '🔗';
+                    if (a.includes('release')) return '🔓';
+                    if (a.includes('create') || a.includes('add')) return '➕';
+                    if (a.includes('update') || a.includes('edit') || a.includes('config')) return '✏️';
+                    if (a.includes('disable')) return '⏸️';
+                    if (a.includes('enable')) return '✅';
+                    if (a.includes('delete') || a.includes('remove')) return '🗑️';
+                    if (a.includes('backup')) return '💾';
+                    if (a.includes('restore')) return '📂';
+                    return '📋';
+                };
+                // 從 allocation history 獲取
+                const result = await apiRequest(`/admin/api-pool/history?api_id=${apiId}&limit=20`);
+                if (result.success && result.data?.history) {
+                    apiAuditLogs.value = result.data.history.map(h => ({
+                        time: h.created_at || h.timestamp,
+                        action: h.action || 'unknown',
+                        detail: h.details || h.account_phone || '',
+                        operator: h.operator_name || h.admin_id || 'system',
+                        icon: iconMap(h.action)
+                    }));
+                }
+                // 也嘗試從審計日誌獲取
+                try {
+                    const auditResult = await apiRequest(`/admin/audit-logs?resource_type=api_pool&page_size=15`);
+                    if (auditResult.success && auditResult.data) {
+                        const allLogs = auditResult.data.logs || auditResult.data || [];
+                        // 只保留與此 API 相關的
+                        const relevant = allLogs.filter(l => {
+                            const details = typeof l.details === 'string' ? l.details : JSON.stringify(l.details || {});
+                            return (l.resource_id === apiId || l.target_id === apiId || details.includes(apiId));
+                        });
+                        const logs = relevant.map(l => ({
+                            time: l.created_at || l.timestamp,
+                            action: l.description || l.action || '',
+                            detail: typeof l.details === 'object' ? JSON.stringify(l.details) : (l.details || ''),
+                            operator: l.admin_username || l.admin_id || 'system',
+                            icon: iconMap(l.action || l.description || '')
+                        }));
+                        const existing = new Set(apiAuditLogs.value.map(l => l.time + l.action));
+                        for (const log of logs) {
+                            if (!existing.has(log.time + log.action)) {
+                                apiAuditLogs.value.push(log);
+                            }
+                        }
+                    }
+                } catch (e2) { /* audit log endpoint may not be available */ }
+                // 按時間倒序
+                apiAuditLogs.value.sort((a, b) => new Date(b.time) - new Date(a.time));
+            } catch (e) { /* silent */ }
+            apiAuditLoading.value = false;
+        };
+        
+        // --- 備份/恢復 ---
+        const createApiPoolBackup = async () => {
+            backupLoading.value = true;
+            try {
+                const result = await apiRequest('/admin/api-pool/backup?include_allocations=true&include_history=true');
+                if (result.success && result.data) {
+                    const jsonStr = JSON.stringify(result.data, null, 2);
+                    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `api_pool_backup_${new Date().toISOString().slice(0,10)}.json`;
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                    showToast(`備份成功：${result.data.apis?.length || 0} 個 API`, 'success');
+                } else {
+                    showToast('備份失敗: ' + (result.message || '未知錯誤'), 'error');
+                }
+            } catch (e) {
+                showToast('備份失敗: ' + e.message, 'error');
+            }
+            backupLoading.value = false;
+        };
+        
+        const handleRestoreFile = (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            restoreFile.value = file;
+        };
+        
+        const executeRestore = async () => {
+            if (!restoreFile.value) {
+                showToast('請選擇備份文件', 'error');
+                return;
+            }
+            try {
+                const text = await restoreFile.value.text();
+                const data = JSON.parse(text);
+                
+                openConfirmDialog({
+                    title: '恢復 API 池配置',
+                    message: `即將從備份文件恢復 ${data.apis?.length || '?'} 個 API 配置。\n\n${restoreOptions.overwrite ? '⚠️ 覆寫模式：已存在的 API 將被覆蓋' : '安全模式：已存在的 API 將被跳過'}\n\n確定要繼續嗎？`,
+                    type: restoreOptions.overwrite ? 'danger' : 'warning',
+                    confirmText: '確認恢復',
+                    onConfirm: async () => {
+                        const result = await apiRequest('/admin/api-pool/restore', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                backup_data: data,
+                                overwrite: restoreOptions.overwrite,
+                                restore_allocations: restoreOptions.restoreAllocations
+                            })
+                        });
+                        if (result.success) {
+                            const d = result.data || {};
+                            showToast(`恢復成功：新增 ${d.created || 0}，更新 ${d.updated || 0}，跳過 ${d.skipped || 0}`, 'success');
+                            showRestoreModal.value = false;
+                            restoreFile.value = null;
+                            await loadApiPool();
+                        } else {
+                            const errMsg = result.message || result.error?.message || result.detail || JSON.stringify(result.error || result);
+                            showToast('恢復失敗: ' + errMsg, 'error');
+                        }
+                    }
+                });
+            } catch (e) {
+                showToast('文件解析失敗，請確認是有效的 JSON 備份文件', 'error');
+            }
+        };
+        
+        // --- 快捷鍵 ---
+        const setupApiPoolShortcuts = () => {
+            document.addEventListener('keydown', (e) => {
+                // 只在 API 池頁面生效
+                if (currentPage.value !== 'apiPool') return;
+                // 不在輸入框內時才生效
+                const tag = document.activeElement?.tagName?.toLowerCase();
+                const isInput = tag === 'input' || tag === 'textarea' || tag === 'select';
+                
+                // Escape: 關閉所有彈窗 / 取消選擇
+                if (e.key === 'Escape') {
+                    if (confirmDialog.show) { closeConfirmDialog(); e.preventDefault(); return; }
+                    if (showEditApiModal.value) { showEditApiModal.value = false; e.preventDefault(); return; }
+                    if (showExportModal.value) { showExportModal.value = false; e.preventDefault(); return; }
+                    if (showHealthConfigModal.value) { showHealthConfigModal.value = false; e.preventDefault(); return; }
+                    if (showRestoreModal.value) { showRestoreModal.value = false; e.preventDefault(); return; }
+                    if (showApiPoolModal.value) { showApiPoolModal.value = false; e.preventDefault(); return; }
+                    if (showApiPoolBatchModal.value) { showApiPoolBatchModal.value = false; e.preventDefault(); return; }
+                    if (selectedApis.value.length > 0) { selectedApis.value = []; e.preventDefault(); return; }
+                    if (expandedApiId.value) { expandedApiId.value = null; e.preventDefault(); return; }
+                }
+                
+                if (isInput) return;
+                
+                // Ctrl+A: 全選
+                if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                    e.preventDefault();
+                    toggleAllApis();
+                }
+                // Ctrl+F: 聚焦搜索框
+                if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                    e.preventDefault();
+                    const el = document.getElementById('api-search-input');
+                    if (el) el.focus();
+                }
+                // Ctrl+E: 導出
+                if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+                    e.preventDefault();
+                    openExportModal();
+                }
+                // Ctrl+N: 添加新 API
+                if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+                    e.preventDefault();
+                    openApiPoolModal();
+                }
+                // Delete: 刪除選中
+                if (e.key === 'Delete' && selectedApis.value.length > 0) {
+                    e.preventDefault();
+                    batchApiAction('delete');
+                }
+            });
         };
         
         // ============ Phase 3: 錢包運營工具 ============
@@ -3816,6 +4095,9 @@ createApp({
             if (window.__hideLoading) window.__hideLoading();
             // 確保登錄後不彈出優惠券面板（僅通過點擊「創建優惠券」按鈕打開）
             showCouponModal.value = false;
+            // P2: 初始化健康閾值 + 快捷鍵
+            loadHealthThresholds();
+            setupApiPoolShortcuts();
             await loadDashboard();
         });
         
@@ -3941,6 +4223,12 @@ createApp({
             apiHealthOverview,
             showExportModal, exportOptions, allExportColumns,
             openExportModal, toggleExportColumn, executeExport,
+            // P2 增強
+            healthThresholds, showHealthConfigModal, saveHealthThresholds,
+            apiHealthOverviewP2, autoDisableUnhealthyApis,
+            apiAuditLogs, apiAuditLoading, loadApiAuditLogs,
+            showRestoreModal, restoreFile, restoreOptions, backupLoading,
+            createApiPoolBackup, handleRestoreFile, executeRestore,
             // 🆕 Phase 3: 錢包運營
             walletOperations,
             walletAnalytics,

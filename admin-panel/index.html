@@ -1089,39 +1089,54 @@
                         </div>
                     </div>
                     
-                    <!-- 健康監控概覽 -->
-                    <div v-if="apiPoolList.length > 0" class="grid grid-cols-4 gap-4 mb-6">
-                        <div class="glass-card rounded-xl p-4 flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg"
-                                 :class="apiHealthOverview.avgHealth >= 80 ? 'bg-green-500/20' : apiHealthOverview.avgHealth >= 50 ? 'bg-yellow-500/20' : 'bg-red-500/20'">
-                                {{ apiHealthOverview.avgHealth >= 80 ? '💚' : apiHealthOverview.avgHealth >= 50 ? '💛' : '❤️' }}
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-400">平均健康分</p>
-                                <p class="text-lg font-bold" :class="apiHealthOverview.avgHealth >= 80 ? 'text-green-400' : apiHealthOverview.avgHealth >= 50 ? 'text-yellow-400' : 'text-red-400'">
-                                    {{ apiHealthOverview.avgHealth }}<span class="text-xs text-gray-500">/100</span>
-                                </p>
-                            </div>
-                        </div>
-                        <div class="glass-card rounded-xl p-4 flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-lg">✅</div>
-                            <div>
-                                <p class="text-xs text-gray-400">健康 (≥80)</p>
-                                <p class="text-lg font-bold text-green-400">{{ apiHealthOverview.healthy }}</p>
+                    <!-- 健康監控概覽 (P2 增強) -->
+                    <div v-if="apiPoolList.length > 0" class="mb-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-medium text-gray-400">健康監控</h3>
+                            <div class="flex gap-2">
+                                <button v-if="apiHealthOverviewP2.critical > 0" @click="autoDisableUnhealthyApis"
+                                        class="bg-red-600/80 hover:bg-red-600 px-3 py-1 rounded-lg text-xs font-medium transition-colors animate-pulse">
+                                    🚨 自動禁用 {{ apiHealthOverviewP2.critical }} 個危險 API
+                                </button>
+                                <button @click="showHealthConfigModal = true"
+                                        class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-lg text-xs transition-colors">
+                                    ⚙️ 告警閾值
+                                </button>
                             </div>
                         </div>
-                        <div class="glass-card rounded-xl p-4 flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center text-lg">⚠️</div>
-                            <div>
-                                <p class="text-xs text-gray-400">警告 (50-79)</p>
-                                <p class="text-lg font-bold text-yellow-400">{{ apiHealthOverview.warning }}</p>
+                        <div class="grid grid-cols-4 gap-4">
+                            <div class="glass-card rounded-xl p-4 flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg"
+                                     :class="apiHealthOverviewP2.avgHealth >= healthThresholds.warningRate ? 'bg-green-500/20' : apiHealthOverviewP2.avgHealth >= healthThresholds.criticalRate ? 'bg-yellow-500/20' : 'bg-red-500/20'">
+                                    {{ apiHealthOverviewP2.avgHealth >= healthThresholds.warningRate ? '💚' : apiHealthOverviewP2.avgHealth >= healthThresholds.criticalRate ? '💛' : '❤️' }}
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-400">平均健康分</p>
+                                    <p class="text-lg font-bold" :class="apiHealthOverviewP2.avgHealth >= healthThresholds.warningRate ? 'text-green-400' : apiHealthOverviewP2.avgHealth >= healthThresholds.criticalRate ? 'text-yellow-400' : 'text-red-400'">
+                                        {{ apiHealthOverviewP2.avgHealth }}<span class="text-xs text-gray-500">/100</span>
+                                    </p>
+                                </div>
                             </div>
-                        </div>
-                        <div class="glass-card rounded-xl p-4 flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-lg">🚨</div>
-                            <div>
-                                <p class="text-xs text-gray-400">危險 (&lt;50)</p>
-                                <p class="text-lg font-bold text-red-400">{{ apiHealthOverview.critical }}</p>
+                            <div class="glass-card rounded-xl p-4 flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-lg">✅</div>
+                                <div>
+                                    <p class="text-xs text-gray-400">健康 (≥{{ healthThresholds.warningRate }}%)</p>
+                                    <p class="text-lg font-bold text-green-400">{{ apiHealthOverviewP2.healthy }}</p>
+                                </div>
+                            </div>
+                            <div class="glass-card rounded-xl p-4 flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center text-lg">⚠️</div>
+                                <div>
+                                    <p class="text-xs text-gray-400">警告 ({{ healthThresholds.criticalRate }}-{{ healthThresholds.warningRate - 1 }}%)</p>
+                                    <p class="text-lg font-bold text-yellow-400">{{ apiHealthOverviewP2.warning }}</p>
+                                </div>
+                            </div>
+                            <div class="glass-card rounded-xl p-4 flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-lg">🚨</div>
+                                <div>
+                                    <p class="text-xs text-gray-400">危險 (&lt;{{ healthThresholds.criticalRate }}%)</p>
+                                    <p class="text-lg font-bold text-red-400">{{ apiHealthOverviewP2.critical }}</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1131,8 +1146,8 @@
                         <div class="flex flex-wrap gap-3 items-center">
                             <!-- 搜索框 -->
                             <div class="relative">
-                                <input v-model="apiSearchQuery" type="text" placeholder="搜索 名稱/ID/手機/備註..."
-                                       class="bg-gray-800 border border-gray-600 rounded-lg pl-9 pr-4 py-2 text-sm w-56 focus:border-blue-500 focus:outline-none transition-colors">
+                                <input id="api-search-input" v-model="apiSearchQuery" type="text" placeholder="搜索 名稱/ID/手機/備註... (Ctrl+F)"
+                                       class="bg-gray-800 border border-gray-600 rounded-lg pl-9 pr-4 py-2 text-sm w-64 focus:border-blue-500 focus:outline-none transition-colors">
                                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
                             </div>
                             <select v-model="apiPoolFilter" @change="loadApiPool" 
@@ -1161,10 +1176,18 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex gap-2 flex-wrap">
                             <button @click="openGroupManagerModal" 
                                     class="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded-lg text-sm transition-colors">
                                 📁 分組
+                            </button>
+                            <button @click="createApiPoolBackup" :disabled="backupLoading"
+                                    class="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded-lg text-sm transition-colors disabled:opacity-50">
+                                {{ backupLoading ? '⏳' : '💾' }} 備份
+                            </button>
+                            <button @click="showRestoreModal = true"
+                                    class="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded-lg text-sm transition-colors">
+                                📂 恢復
                             </button>
                             <button @click="openExportModal" 
                                     class="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded-lg text-sm transition-colors">
@@ -1357,9 +1380,38 @@
                                                 </div>
                                                 <div>
                                                     <p class="text-gray-400 text-xs mb-1">健康分數</p>
-                                                    <p class="font-mono text-xs" :class="(api.health_score || 100) >= 80 ? 'text-green-400' : (api.health_score || 100) >= 50 ? 'text-yellow-400' : 'text-red-400'">
+                                                    <p class="font-mono text-xs" :class="(api.health_score || 100) >= healthThresholds.warningRate ? 'text-green-400' : (api.health_score || 100) >= healthThresholds.criticalRate ? 'text-yellow-400' : 'text-red-400'">
                                                         {{ (api.health_score || 100).toFixed(0) }}/100
                                                     </p>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- 操作時間線 (P2) -->
+                                            <div class="mt-4 pt-4 border-t border-gray-700/50">
+                                                <h4 class="text-xs font-medium text-gray-400 mb-3">📋 操作記錄</h4>
+                                                <div v-if="apiAuditLoading" class="text-center text-gray-500 text-xs py-4">
+                                                    載入中...
+                                                </div>
+                                                <div v-else-if="apiAuditLogs.length === 0" class="text-center text-gray-500 text-xs py-4">
+                                                    暫無操作記錄
+                                                </div>
+                                                <div v-else class="relative pl-6 space-y-3 max-h-48 overflow-y-auto">
+                                                    <!-- 時間線軸線 -->
+                                                    <div class="absolute left-2 top-1 bottom-1 w-px bg-gray-700"></div>
+                                                    <div v-for="(log, idx) in apiAuditLogs" :key="idx" class="relative">
+                                                        <!-- 時間線節點 -->
+                                                        <div class="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-gray-800 border-2 border-gray-600 flex items-center justify-center text-[8px]">
+                                                            {{ log.icon }}
+                                                        </div>
+                                                        <div class="bg-gray-700/30 rounded-lg px-3 py-2">
+                                                            <div class="flex items-center justify-between mb-0.5">
+                                                                <span class="text-xs font-medium text-white">{{ log.action }}</span>
+                                                                <span class="text-[10px] text-gray-500">{{ formatApiTime(log.time) }}</span>
+                                                            </div>
+                                                            <p v-if="log.detail" class="text-[11px] text-gray-400 truncate">{{ log.detail }}</p>
+                                                            <p class="text-[10px] text-gray-500 mt-0.5">操作者: {{ log.operator }}</p>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </td>
@@ -1426,7 +1478,8 @@
                             <li>• 每個帳號登錄時 <span class="text-yellow-400">先</span> 從本池取一組 API 憑據，<span class="text-yellow-400">再</span> 從代理池取獨立 IP</li>
                             <li>• 每個帳號 = <span class="text-green-400">一組 API + 一個 IP</span>，雙重隔離以降低風控</li>
                             <li>• 每組 API 建議最多綁定 3-5 個帳號，避免過度使用觸發風控</li>
-                            <li>• 點擊行可展開查看完整詳情，勾選多個 API 可進行批量操作</li>
+                            <li>• 點擊行可展開詳情+操作記錄，勾選多個 API 可進行批量操作</li>
+                            <li>• 快捷鍵：<span class="text-blue-400">Ctrl+F</span> 搜索 | <span class="text-blue-400">Ctrl+A</span> 全選 | <span class="text-blue-400">Ctrl+E</span> 導出 | <span class="text-blue-400">Ctrl+N</span> 添加 | <span class="text-blue-400">Delete</span> 刪除選中 | <span class="text-blue-400">Esc</span> 關閉/取消</li>
                         </ul>
                     </div>
                 </div>
@@ -2623,6 +2676,114 @@ api_id,api_hash,name,source_phone,max_accounts
                                     :class="confirmDialog.type === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'bg-yellow-600 hover:bg-yellow-500'">
                                 {{ confirmDialog.confirmText }}
                             </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ==================== 健康告警閾值配置彈窗 ==================== -->
+                <div v-if="showHealthConfigModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                     @click.self="showHealthConfigModal = false">
+                    <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-md" @click.stop>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold">⚙️ 健康告警閾值</h3>
+                            <button @click="showHealthConfigModal = false" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium">自動禁用危險 API</p>
+                                    <p class="text-xs text-gray-400">成功率低於危險閾值的 API 可一鍵禁用</p>
+                                </div>
+                                <button @click="healthThresholds.autoDisable = !healthThresholds.autoDisable"
+                                        :class="healthThresholds.autoDisable ? 'bg-green-600' : 'bg-gray-600'"
+                                        class="px-4 py-1 rounded-full text-xs font-medium transition-colors">
+                                    {{ healthThresholds.autoDisable ? '已啟用' : '已停用' }}
+                                </button>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">
+                                    ⚠️ 警告閾值 <span class="text-yellow-400 font-mono">{{ healthThresholds.warningRate }}%</span>
+                                </label>
+                                <input type="range" v-model.number="healthThresholds.warningRate" min="10" max="95" step="5"
+                                       class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500">
+                                <p class="text-xs text-gray-500 mt-1">成功率低於此值顯示黃色警告</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">
+                                    🚨 危險閾值 <span class="text-red-400 font-mono">{{ healthThresholds.criticalRate }}%</span>
+                                </label>
+                                <input type="range" v-model.number="healthThresholds.criticalRate" min="5" max="80" step="5"
+                                       class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-red-500">
+                                <p class="text-xs text-gray-500 mt-1">成功率低於此值顯示紅色危險，可觸發自動禁用</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">
+                                    連續失敗次數閾值 <span class="font-mono text-white">{{ healthThresholds.maxConsecutiveFails }}</span>
+                                </label>
+                                <input type="range" v-model.number="healthThresholds.maxConsecutiveFails" min="3" max="50" step="1"
+                                       class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 p-3 bg-gray-700/50 rounded-lg text-xs text-gray-400">
+                            💡 閾值保存在瀏覽器本地，不同設備可獨立配置。健康分數 = 成功率，實時根據 API 請求結果更新。
+                        </div>
+                        
+                        <div class="flex justify-end gap-3 mt-4">
+                            <button @click="showHealthConfigModal = false" class="px-5 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm transition-colors">取消</button>
+                            <button @click="saveHealthThresholds" class="px-5 py-2 rounded-lg gradient-bg hover:opacity-90 text-sm font-medium transition-opacity">💾 保存</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ==================== 恢復備份彈窗 ==================== -->
+                <div v-if="showRestoreModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                     @click.self="showRestoreModal = false">
+                    <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-md" @click.stop>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold">📂 恢復 API 池配置</h3>
+                            <button @click="showRestoreModal = false" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-2">選擇備份文件 (.json)</label>
+                                <input type="file" accept=".json" @change="handleRestoreFile"
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-blue-600 file:text-white file:cursor-pointer">
+                            </div>
+                            
+                            <div v-if="restoreFile" class="bg-gray-700/50 rounded-lg p-3 text-sm">
+                                <p class="text-gray-300">📄 {{ restoreFile.name }}</p>
+                                <p class="text-xs text-gray-500">{{ (restoreFile.size / 1024).toFixed(1) }} KB</p>
+                            </div>
+                            
+                            <div class="space-y-3">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" v-model="restoreOptions.overwrite" class="rounded border-gray-600 bg-gray-700">
+                                    <span class="text-sm text-gray-300">覆寫模式</span>
+                                    <span class="text-xs text-yellow-400">(已存在的 API 將被更新)</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" v-model="restoreOptions.restoreAllocations" class="rounded border-gray-600 bg-gray-700">
+                                    <span class="text-sm text-gray-300">恢復帳號分配</span>
+                                    <span class="text-xs text-gray-500">(包含分配關係)</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg text-xs text-yellow-300">
+                            ⚠️ 恢復操作會直接修改數據庫。建議先備份當前配置後再恢復。
+                        </div>
+                        
+                        <div class="flex justify-end gap-3 mt-4">
+                            <button @click="showRestoreModal = false" class="px-5 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm transition-colors">取消</button>
+                            <button @click="executeRestore" :disabled="!restoreFile"
+                                    :class="restoreFile ? 'gradient-bg hover:opacity-90' : 'bg-gray-600 cursor-not-allowed'"
+                                    class="px-5 py-2 rounded-lg text-sm font-medium transition-opacity">📂 開始恢復</button>
                         </div>
                     </div>
                 </div>
@@ -4923,6 +5084,6 @@ api_id,api_hash,name,source_phone,max_accounts
         </div>
     </div>
     
-    <script src="app.js?v=20260207-p1-enhance"></script>
+    <script src="app.js?v=20260207-p2-enhance"></script>
 </body>
 </html>

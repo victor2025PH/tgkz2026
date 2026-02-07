@@ -1399,13 +1399,16 @@ class AdminHandlers:
         success, msg = pool.update_api(
             api_id=api_id,
             name=data.get('name'),
+            api_hash=data.get('api_hash'),
+            source_phone=data.get('source_phone'),
             max_accounts=data.get('max_accounts'),
             note=data.get('note'),
             status=data.get('status'),
             # 🆕 會員等級相關字段
             min_member_level=data.get('min_member_level'),
             priority=data.get('priority'),
-            is_premium=data.get('is_premium')
+            is_premium=data.get('is_premium'),
+            group_id=data.get('group_id')
         )
         
         if success:

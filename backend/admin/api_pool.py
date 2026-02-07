@@ -83,11 +83,17 @@ class TelegramApiCredential:
             "group_id": self.group_id
         }
         if include_hash:
-            # 脫敏顯示：只顯示前4位和後4位
+            # 包含完整 hash（供編輯使用）及脫敏版本
+            result["api_hash"] = self.api_hash or ""
             if self.api_hash and len(self.api_hash) > 8:
                 result["api_hash_masked"] = f"{self.api_hash[:4]}...{self.api_hash[-4:]}"
             else:
                 result["api_hash_masked"] = "***"
+        # 額外統計字段（供前端詳情面板使用）
+        result["total_requests"] = self.success_count + self.fail_count
+        result["failed_requests"] = self.fail_count
+        result["health_score"] = self._calc_success_rate()  # 用成功率作為健康分數
+        result["last_used_at"] = self.last_used
         return result
 
     def _calc_success_rate(self) -> float:
@@ -713,12 +719,15 @@ class ApiPoolManager:
         self,
         api_id: str,
         name: Optional[str] = None,
+        api_hash: Optional[str] = None,
+        source_phone: Optional[str] = None,
         max_accounts: Optional[int] = None,
         note: Optional[str] = None,
         status: Optional[str] = None,
         min_member_level: Optional[str] = None,
         priority: Optional[int] = None,
-        is_premium: Optional[bool] = None
+        is_premium: Optional[bool] = None,
+        group_id: Optional[str] = None
     ) -> Tuple[bool, str]:
         """更新 API 憑據信息（包括會員等級限制）"""
         conn = self._get_connection()
@@ -732,6 +741,12 @@ class ApiPoolManager:
             if name is not None:
                 updates.append("name = ?")
                 params.append(name)
+            if api_hash is not None:
+                updates.append("api_hash = ?")
+                params.append(api_hash)
+            if source_phone is not None:
+                updates.append("source_phone = ?")
+                params.append(source_phone if source_phone else None)
             if max_accounts is not None:
                 updates.append("max_accounts = ?")
                 params.append(max_accounts)
@@ -751,6 +766,9 @@ class ApiPoolManager:
             if is_premium is not None:
                 updates.append("is_premium = ?")
                 params.append(1 if is_premium else 0)
+            if group_id is not None:
+                updates.append("group_id = ?")
+                params.append(group_id if group_id else None)
             
             if not updates:
                 return False, "沒有要更新的字段"
@@ -816,7 +834,19 @@ class ApiPoolManager:
             else:
                 cursor.execute('SELECT * FROM telegram_api_pool ORDER BY created_at DESC')
             
-            return [self._row_to_credential(row).to_dict(include_hash=include_hash) for row in cursor.fetchall()]
+            apis = [self._row_to_credential(row).to_dict(include_hash=include_hash) for row in cursor.fetchall()]
+            
+            # 填充分組名稱
+            try:
+                cursor.execute('SELECT id, name, icon FROM api_pool_groups')
+                group_map = {row['id']: f"{row['icon']} {row['name']}" if row.get('icon') else row['name'] for row in cursor.fetchall()}
+                for api in apis:
+                    if api.get('group_id') and api['group_id'] in group_map:
+                        api['group_name'] = group_map[api['group_id']]
+            except Exception:
+                pass  # 分組表可能不存在
+            
+            return apis
         finally:
             conn.close()
 

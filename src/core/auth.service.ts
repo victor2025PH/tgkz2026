@@ -277,7 +277,7 @@ export class AuthService implements OnDestroy {
         return { success: true };
       }
       
-      return { success: false, error: result.error || '登入失敗' };
+      return { success: false, error: String(result?.error || '登入失敗') };
     } catch (e: any) {
       const msg = e?.message || '';
       const isNetwork = msg.includes('JSON') || msg.includes('fetch') || msg.includes('network');

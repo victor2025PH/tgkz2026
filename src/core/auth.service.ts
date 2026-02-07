@@ -580,11 +580,11 @@ export class AuthService implements OnDestroy {
       }
       
       console.log('[AuthService] fetchCurrentUser: Success', userData.username, 'displayName:', userData.displayName);
-      this._user.set(userData as User);
+      this._user.set(userData as unknown as User);
       localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(userData));
-      this.authEvents.emitUserUpdate(userData as User);
+      this.authEvents.emitUserUpdate(userData as unknown as User);
       
-      return userData as User;
+      return userData as unknown as User;
     } catch (e) {
       console.error('[AuthService] fetchCurrentUser error:', e);
       return null;

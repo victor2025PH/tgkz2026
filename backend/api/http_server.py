@@ -1455,29 +1455,55 @@ class HttpApiServer:
             
             data = user.to_dict()
             # 若後台標記為終身會員（is_lifetime=1），則不返回過期日，前端顯示「終身」
+            is_lifetime = False
             try:
-                import sqlite3
-                db_path = getattr(auth_service, 'db_path', None) or os.environ.get('DATABASE_PATH', '')
-                if not db_path and os.path.exists('/app/data/tgmatrix.db'):
-                    db_path = '/app/data/tgmatrix.db'
-                if not db_path and os.path.exists('./data/tgmatrix.db'):
-                    db_path = './data/tgmatrix.db'
-                if db_path:
-                    conn = sqlite3.connect(db_path)
+                # 1) 從管理後台庫查（有 user_id / is_lifetime），與後台「到期時間：終身」同源
+                conn = self._get_admin_db()
+                try:
                     conn.row_factory = sqlite3.Row
-                    cur = conn.execute(
-                        "SELECT is_lifetime FROM users WHERE id = ? OR user_id = ?",
-                        (user.id, user.id)
-                    )
-                    row = cur.fetchone()
+                    for q, p in [("SELECT is_lifetime FROM users WHERE user_id = ?", (user.id,)),
+                                ("SELECT is_lifetime FROM users WHERE id = ?", (user.id,))]:
+                        try:
+                            row = conn.execute(q, p).fetchone()
+                            if row and (row['is_lifetime'] or 0) == 1:
+                                is_lifetime = True
+                                break
+                        except Exception:
+                            continue
+                finally:
                     conn.close()
-                    if row and (row['is_lifetime'] or 0) == 1:
-                        data['subscription_expires'] = None
-                        data['subscriptionExpires'] = None
-                        data['membershipExpires'] = None
-                        data['isLifetime'] = True
             except Exception:
                 pass
+            if not is_lifetime:
+                try:
+                    db_path = getattr(auth_service, 'db_path', None) or os.environ.get('DATABASE_PATH', '')
+                    if db_path:
+                        conn = sqlite3.connect(db_path)
+                        conn.row_factory = sqlite3.Row
+                        row = conn.execute(
+                            "SELECT is_lifetime FROM users WHERE id = ? OR user_id = ?", (user.id, user.id)
+                        ).fetchone()
+                        conn.close()
+                        if row and (row['is_lifetime'] or 0) == 1:
+                            is_lifetime = True
+                except Exception:
+                    pass
+            if not is_lifetime and data.get('subscription_expires'):
+                # fallback: 過期日在 30 年後視為終身（與卡密 36500 天一致）
+                try:
+                    exp = data['subscription_expires']
+                    if exp:
+                        dt = datetime.fromisoformat(exp.replace('Z', '+00:00'))
+                        now = datetime.utcnow()
+                        if (dt - now).total_seconds() > 365 * 30 * 86400:
+                            is_lifetime = True
+                except Exception:
+                    pass
+            if is_lifetime:
+                data['subscription_expires'] = None
+                data['subscriptionExpires'] = None
+                data['membershipExpires'] = None
+                data['isLifetime'] = True
             return self._json_response({'success': True, 'data': data})
         except Exception as e:
             return self._json_response({'success': False, 'error': str(e)}, 500)

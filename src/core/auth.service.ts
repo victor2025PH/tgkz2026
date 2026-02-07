@@ -43,6 +43,8 @@ export interface User {
   membershipExpires?: string;  // 兼容別名
   // 🔧 P0 修復：會員等級
   membershipLevel?: string;
+  // 後台標記為終身會員時為 true，前端顯示「終身」
+  isLifetime?: boolean;
 }
 
 // 認證狀態

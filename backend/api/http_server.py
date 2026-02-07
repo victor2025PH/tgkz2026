@@ -1453,7 +1453,32 @@ class HttpApiServer:
             if not user:
                 return self._json_response({'success': False, 'error': '無效的令牌'}, 401)
             
-            return self._json_response({'success': True, 'data': user.to_dict()})
+            data = user.to_dict()
+            # 若後台標記為終身會員（is_lifetime=1），則不返回過期日，前端顯示「終身」
+            try:
+                import sqlite3
+                db_path = getattr(auth_service, 'db_path', None) or os.environ.get('DATABASE_PATH', '')
+                if not db_path and os.path.exists('/app/data/tgmatrix.db'):
+                    db_path = '/app/data/tgmatrix.db'
+                if not db_path and os.path.exists('./data/tgmatrix.db'):
+                    db_path = './data/tgmatrix.db'
+                if db_path:
+                    conn = sqlite3.connect(db_path)
+                    conn.row_factory = sqlite3.Row
+                    cur = conn.execute(
+                        "SELECT is_lifetime FROM users WHERE id = ? OR user_id = ?",
+                        (user.id, user.id)
+                    )
+                    row = cur.fetchone()
+                    conn.close()
+                    if row and (row['is_lifetime'] or 0) == 1:
+                        data['subscription_expires'] = None
+                        data['subscriptionExpires'] = None
+                        data['membershipExpires'] = None
+                        data['isLifetime'] = True
+            except Exception:
+                pass
+            return self._json_response({'success': True, 'data': data})
         except Exception as e:
             return self._json_response({'success': False, 'error': str(e)}, 500)
     

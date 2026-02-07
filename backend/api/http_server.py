@@ -7172,9 +7172,9 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
             poor_metrics = [m for m in metrics if m.get('rating') == 'poor']
             
             if poor_metrics:
+                parts = [f"{m['name']}={m['value']}" for m in poor_metrics]
                 logger.warning(
-                    f"[WebVitals] Poor metrics on {url}: "
-                    f"{', '.join(f'{m[\"name\"]}={m[\"value\"]}' for m in poor_metrics)}"
+                    f"[WebVitals] Poor metrics on {url}: {', '.join(parts)}"
                 )
             else:
                 logger.info(f"[WebVitals] {url}: {metric_summary}")

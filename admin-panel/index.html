@@ -2213,9 +2213,15 @@ host:port"></textarea>
                         <h3 class="text-xl font-bold mb-4">📥 批量導入 API 憑據</h3>
                         
                         <div class="space-y-4">
-                            <!-- 格式說明 -->
+                            <!-- 格式說明 + 模板下載 -->
                             <div class="bg-gray-700/50 rounded-lg p-4">
-                                <h4 class="font-medium text-sm mb-2">📖 支持格式</h4>
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="font-medium text-sm">📖 支持格式</h4>
+                                    <button @click="downloadApiTemplate" 
+                                            class="text-xs bg-green-600 hover:bg-green-500 px-3 py-1 rounded-lg transition-colors">
+                                        📄 下載 CSV 模板
+                                    </button>
+                                </div>
                                 <div class="text-xs text-gray-400 space-y-1">
                                     <p><span class="text-blue-400">CSV 格式</span>：api_id,api_hash,name,source_phone,max_accounts</p>
                                     <p><span class="text-blue-400">簡單格式</span>：api_id:api_hash 或 api_id,api_hash（每行一條）</p>
@@ -2223,18 +2229,22 @@ host:port"></textarea>
                                 </div>
                             </div>
                             
+                            <!-- 文件上傳 -->
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">從文件導入（可選）</label>
+                                <input type="file" accept=".csv,.txt,.json" @change="handleApiFileUpload($event)"
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-sm file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:bg-blue-600 file:text-white file:text-xs file:cursor-pointer">
+                            </div>
+                            
                             <!-- 文本輸入 -->
                             <div>
-                                <label class="block text-sm text-gray-400 mb-1">粘貼或輸入 API 列表</label>
+                                <label class="block text-sm text-gray-400 mb-1">或粘貼/輸入 API 列表</label>
                                 <textarea v-model="apiPoolBatchForm.text" 
-                                          class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 h-48 font-mono text-sm"
+                                          class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 h-40 font-mono text-sm"
                                           placeholder="示例：
+api_id,api_hash,name,source_phone,max_accounts
 12345678,abc123def456789012345678901234,MyApp1,+8613800138000,5
-87654321,xyz789abc123456789012345678901,MyApp2,,3
-
-或 CSV 格式（帶表頭）：
-api_id,api_hash,name
-12345678,abc123def456789012345678901234,MyApp1"></textarea>
+87654321,xyz789abc123456789012345678901,MyApp2,,3"></textarea>
                             </div>
                             
                             <!-- 默認設置 -->

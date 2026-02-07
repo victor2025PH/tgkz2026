@@ -1574,6 +1574,34 @@ createApp({
             showApiPoolBatchModal.value = true;
         };
         
+        // 下載 CSV 模板
+        const downloadApiTemplate = () => {
+            const template = 'api_id,api_hash,name,source_phone,max_accounts\n' +
+                '12345678,abc123def4567890abcdef1234567890,MyApp1,+8613800138000,5\n' +
+                '87654321,xyz789abc1234567890abcdef12345678,MyApp2,,3\n';
+            const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'api_import_template.csv';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        };
+        
+        // 文件上傳讀取
+        const handleApiFileUpload = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                apiPoolBatchForm.text = e.target.result;
+                showToast(`已讀取文件: ${file.name}`, 'success');
+            };
+            reader.onerror = () => {
+                showToast('文件讀取失敗', 'error');
+            };
+            reader.readAsText(file);
+        };
+        
         const importApisFromText = async () => {
             if (!apiPoolBatchForm.text.trim()) {
                 showToast('請輸入 API 列表', 'error');
@@ -3492,6 +3520,8 @@ createApp({
             addApiToPool,
             openApiPoolBatchModal,
             importApisFromText,
+            downloadApiTemplate,
+            handleApiFileUpload,
             setApiPoolStrategy,
             deleteApiFromPool,
             toggleApiStatus,

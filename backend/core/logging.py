@@ -7,15 +7,51 @@ TG-Matrix Secure Logging
 - API 密鑰脫敏
 - Session ID 脫敏
 - 結構化日誌輸出
+- 🔧 P5-1: request_id 追蹤 + 請求耗時
 """
 
 import re
 import sys
 import json
+import uuid
+import time
+import threading
 from typing import Any, Dict, Optional
 from datetime import datetime
 from enum import Enum
 from functools import wraps
+from contextvars import ContextVar
+
+# 🔧 P5-1: 請求上下文（線程安全 + asyncio 安全）
+_request_id_var: ContextVar[str] = ContextVar('request_id', default='')
+_request_start_var: ContextVar[float] = ContextVar('request_start', default=0.0)
+
+
+def set_request_context(request_id: str = None) -> str:
+    """設置當前請求上下文，返回 request_id"""
+    rid = request_id or uuid.uuid4().hex[:12]
+    _request_id_var.set(rid)
+    _request_start_var.set(time.time())
+    return rid
+
+
+def get_request_id() -> str:
+    """獲取當前請求 ID"""
+    return _request_id_var.get('')
+
+
+def get_request_duration_ms() -> float:
+    """獲取當前請求已耗時（毫秒）"""
+    start = _request_start_var.get(0.0)
+    if start > 0:
+        return round((time.time() - start) * 1000, 1)
+    return 0.0
+
+
+def clear_request_context():
+    """清除請求上下文"""
+    _request_id_var.set('')
+    _request_start_var.set(0.0)
 
 
 class LogLevel(Enum):
@@ -181,6 +217,10 @@ class SecureLogger:
         
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
+        # 🔧 P5-1: 注入 request_id 和 duration
+        request_id = get_request_id()
+        duration_ms = get_request_duration_ms()
+        
         if self.enable_json:
             log_entry = {
                 'timestamp': timestamp,
@@ -189,15 +229,19 @@ class SecureLogger:
                 'message': safe_message,
                 'context': context
             }
+            if request_id:
+                log_entry['request_id'] = request_id
+            if duration_ms > 0:
+                log_entry['duration_ms'] = duration_ms
             output = json.dumps(log_entry, ensure_ascii=False, default=str)
         else:
-            output = f"[{timestamp}][{level.value.upper()}][{self.module_name}] {safe_message}{context_str}"
+            # 🔧 P5-1: 在文本格式中也附加 request_id
+            rid_tag = f"[{request_id}]" if request_id else ''
+            dur_tag = f"[{duration_ms}ms]" if duration_ms > 0 else ''
+            output = f"[{timestamp}][{level.value.upper()}][{self.module_name}]{rid_tag}{dur_tag} {safe_message}{context_str}"
         
-        # 根據級別選擇輸出流
-        if level in (LogLevel.ERROR, LogLevel.CRITICAL):
-            print(output, file=sys.stderr)
-        else:
-            print(output, file=sys.stderr)  # 所有日誌輸出到 stderr，避免干擾 IPC
+        # 所有日誌輸出到 stderr，避免干擾 IPC
+        print(output, file=sys.stderr)
     
     def debug(self, message: str, **context):
         """調試日誌"""
@@ -242,6 +286,56 @@ def get_logger(module_name: str, enable_json: bool = False) -> SecureLogger:
         _loggers[key] = SecureLogger(module_name, enable_json)
     
     return _loggers[key]
+
+
+def log_api_call(module: str = 'API'):
+    """
+    🔧 P5-1: 裝飾器 — 自動記錄 API/IPC 調用耗時和結果
+    
+    Usage:
+        @log_api_call('AccountService')
+        async def handle_add_account(self, payload):
+            ...
+    """
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            call_id = uuid.uuid4().hex[:8]
+            func_name = func.__name__
+            start = time.time()
+            
+            # 設置請求上下文（IPC 模式沒有 HTTP middleware）
+            existing_rid = get_request_id()
+            if not existing_rid:
+                set_request_context(f"ipc-{call_id}")
+            
+            slog = get_logger(module, enable_json=False)
+            slog.info(f"→ {func_name} started")
+            
+            try:
+                result = await func(*args, **kwargs)
+                elapsed = (time.time() - start) * 1000
+                
+                success = True
+                if isinstance(result, dict):
+                    success = result.get('success', True)
+                
+                if elapsed > 2000:
+                    slog.warning(f"← {func_name} SLOW ({elapsed:.0f}ms)", success=success)
+                else:
+                    slog.info(f"← {func_name} done ({elapsed:.0f}ms)", success=success)
+                
+                return result
+            except Exception as e:
+                elapsed = (time.time() - start) * 1000
+                slog.error(f"✗ {func_name} failed ({elapsed:.0f}ms)", error=str(e))
+                raise
+            finally:
+                if not existing_rid:
+                    clear_request_context()
+        
+        return wrapper
+    return decorator
 
 
 def log_function_call(logger: Optional[SecureLogger] = None):

@@ -11,6 +11,8 @@
 
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { ElectronIpcService } from '../electron-ipc.service';
+import { ApiService } from '../core/api.service';
+import { environment } from '../environments/environment';
 
 // 聯繫人類型
 export type ContactType = 'user' | 'group' | 'channel';
@@ -123,6 +125,16 @@ export const STATUS_OPTIONS: { value: ContactStatus; label: string; color: strin
 })
 export class UnifiedContactsService {
   private ipc = inject(ElectronIpcService);
+  private api = inject(ApiService);
+  
+  /** P15-1: 是否使用 HTTP API（非 Electron 環境） */
+  private get useHttpApi(): boolean {
+    const mode = environment.apiMode;
+    if (mode === 'http') return true;
+    if (mode === 'ipc') return false;
+    // auto: 檢測 Electron
+    return typeof (window as any)?.electron === 'undefined';
+  }
   
   // 聯繫人列表
   private _contacts = signal<UnifiedContact[]>([]);
@@ -342,6 +354,12 @@ export class UnifiedContactsService {
     console.log('[UnifiedContacts] Loading contacts with filter:', currentFilter);
     this._isLoading.set(true);
     
+    // P15-1: HTTP 模式使用 REST API
+    if (this.useHttpApi) {
+      this._loadContactsViaHttp(currentFilter);
+      return;
+    }
+    
     this.ipc.send('unified-contacts:get', {
       contactType: currentFilter.contactType,
       sourceType: currentFilter.sourceType,
@@ -373,10 +391,77 @@ export class UnifiedContactsService {
       return;
     }
     
+    // P15-1: HTTP 模式
+    if (this.useHttpApi) {
+      this._loadStatsViaHttp();
+      return;
+    }
+    
     console.log('[UnifiedContacts] Loading stats...');
     this.ipc.send('unified-contacts:stats', {});
   }
   
+  /**
+   * P15-1: 通過 HTTP REST API 加載聯繫人（非 Electron 環境）
+   */
+  private async _loadContactsViaHttp(filter: ContactFilter) {
+    try {
+      const params = new URLSearchParams();
+      if (filter.search) params.set('search', filter.search);
+      if (filter.status) params.set('status', filter.status);
+      if (filter.sourceType) params.set('source_type', filter.sourceType);
+      if (filter.orderBy) params.set('order_by', filter.orderBy);
+      params.set('limit', String(filter.limit || 100));
+      params.set('offset', String(filter.offset || 0));
+      
+      const result = await this.api.get<any>(`/api/v1/contacts?${params.toString()}`);
+      if (result.success && result.data) {
+        const respData = result.data.data || result.data;
+        const contacts: UnifiedContact[] = (respData.contacts || []).map((c: any) => ({
+          ...c,
+          tags: Array.isArray(c.tags) ? c.tags : [],
+          ai_score: c.ai_score || 0,
+          activity_score: c.activity_score || 0,
+          value_level: c.value_level || '',
+          is_online: false,
+          is_bot: false,
+          is_premium: false,
+          is_verified: false,
+        }));
+        
+        this._contacts.set(contacts);
+        this._total.set(respData.total ?? contacts.length);
+      }
+    } catch (e) {
+      console.error('[UnifiedContacts] HTTP load failed:', e);
+    } finally {
+      this._isLoading.set(false);
+    }
+  }
+
+  /**
+   * P15-1: 通過 HTTP REST API 加載統計（非 Electron 環境）
+   */
+  private async _loadStatsViaHttp() {
+    try {
+      const result = await this.api.get<any>('/api/v1/contacts/stats');
+      if (result.success && result.data) {
+        const stats = result.data.data || result.data;
+        this._stats.set({
+          total: stats.total || 0,
+          users: 0,
+          groups: 0,
+          channels: 0,
+          by_status: stats.by_status || {},
+          by_source: stats.by_source || {},
+          recent_added: stats.recent_7d || 0,
+        });
+      }
+    } catch (e) {
+      console.error('[UnifiedContacts] HTTP stats load failed:', e);
+    }
+  }
+
   /**
    * 設置篩選條件
    */

@@ -7,6 +7,8 @@ API 中間件
 3. 使用量自動追蹤
 4. 請求日誌和性能監控
 5. 錯誤統一處理
+6. 🔧 P7-1: 全局速率限制（IP/用戶級）
+7. 🔧 P7-4: 安全響應頭（CSP, X-Frame-Options, HSTS 等）
 """
 
 import time
@@ -33,6 +35,17 @@ def create_middleware_stack():
     創建中間件堆棧
     
     返回按順序執行的中間件列表
+    
+    執行順序（由外到內）：
+    1. security_headers_middleware — 安全響應頭（最外層，確保所有響應都帶安全頭）
+    2. request_id_middleware — 請求追蹤
+    3. rate_limit_middleware — 速率限制（在認證前，防止暴力破解）
+    4. logging_middleware — 日誌記錄
+    5. auth_middleware — 認證
+    6. tenant_middleware — 租戶上下文
+    7. usage_tracking_middleware — 使用量追蹤
+    8. quota_check_middleware — 配額檢查
+    9. error_handling_middleware — 錯誤處理（最內層）
     """
     middlewares = []
     
@@ -46,7 +59,9 @@ def create_middleware_stack():
             logger.warning("Auth middleware not found, authentication disabled")
         
         middlewares.extend([
+            security_headers_middleware,    # 🔧 P7-4: 安全響應頭
             request_id_middleware,
+            rate_limit_middleware,          # 🔧 P7-1: 速率限制
             logging_middleware,
         ])
         
@@ -64,18 +79,202 @@ def create_middleware_stack():
     return middlewares
 
 
+# ==================== 🔧 P7-4: 安全響應頭中間件 ====================
+
+# 不需要安全頭的路徑（靜態資源、健康檢查）
+SKIP_SECURITY_HEADERS_PATHS = frozenset(['/health', '/api/health', '/favicon.ico'])
+
+@web.middleware
+async def security_headers_middleware(request, handler):
+    """
+    🔧 P7-4: 為所有 HTTP 響應注入安全頭
+    
+    防護：
+    - X-Content-Type-Options: nosniff — 阻止 MIME 類型嗅探
+    - X-Frame-Options: DENY — 阻止 iframe 嵌入（防 Clickjacking）
+    - X-XSS-Protection: 1; mode=block — 瀏覽器 XSS 過濾器
+    - Referrer-Policy: strict-origin-when-cross-origin — 控制 Referer 洩漏
+    - Permissions-Policy — 禁用不需要的瀏覽器 API
+    - Content-Security-Policy — 限制資源加載來源
+    - Strict-Transport-Security — 強制 HTTPS（僅生產環境）
+    - Cache-Control — API 響應不緩存（防止敏感數據緩存）
+    """
+    response = await handler(request)
+    
+    # 靜態資源/健康檢查跳過部分頭
+    path = request.path
+    if path in SKIP_SECURITY_HEADERS_PATHS or path.startswith('/static/'):
+        return response
+    
+    # 基礎安全頭（所有響應）
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy'] = (
+        'camera=(), microphone=(), geolocation=(), payment=()'
+    )
+    
+    # API 響應不緩存（防止敏感數據被代理/瀏覽器緩存）
+    if path.startswith('/api/'):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+    
+    # CSP（Content Security Policy）
+    # 開發環境較寬鬆，生產環境嚴格
+    is_production = os.environ.get('NODE_ENV', '') == 'production' or \
+                    os.environ.get('IS_DEV_MODE', 'true').lower() == 'false'
+    
+    if is_production:
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "font-src 'self'; "
+            "connect-src 'self' wss: ws:; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        )
+        # HSTS（僅生產環境 + HTTPS 時啟用）
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    else:
+        # 開發環境：較寬鬆的 CSP
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self' localhost:* 127.0.0.1:*; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https: http:; "
+            "connect-src 'self' ws: wss: http: https:; "
+            "frame-ancestors 'none'"
+        )
+    
+    return response
+
+
+# ==================== 🔧 P7-1: 速率限制中間件 ====================
+
+# 不限流的路徑
+SKIP_RATE_LIMIT_PATHS = frozenset([
+    '/health', '/api/health', '/favicon.ico', '/ws', '/api/v1/ws'
+])
+
+@web.middleware
+async def rate_limit_middleware(request, handler):
+    """
+    🔧 P7-1: 全局速率限制中間件
+    
+    利用已有的 RateLimiter 服務（令牌桶 + 滑動窗口），在中間件層全局應用。
+    
+    策略：
+    - 白名單 IP/用戶跳過
+    - 黑名單 IP/用戶直接拒絕
+    - 按規則匹配限流（IP 級 100req/60s, 認證端點 5req/60s 等）
+    - 返回標準 429 + Retry-After 頭
+    - WebSocket/健康檢查跳過
+    - Electron 模式跳過
+    """
+    path = request.path
+    
+    # 跳過不需要限流的路徑
+    if path in SKIP_RATE_LIMIT_PATHS or path.startswith('/static/'):
+        return await handler(request)
+    
+    # Electron 模式跳過
+    if os.environ.get('ELECTRON_MODE', 'false').lower() == 'true':
+        return await handler(request)
+    
+    try:
+        from core.rate_limiter import get_rate_limiter
+        limiter = get_rate_limiter()
+        
+        # 提取客戶端信息
+        ip = request.headers.get(
+            'X-Forwarded-For',
+            request.headers.get('X-Real-IP', request.remote or '127.0.0.1')
+        )
+        # X-Forwarded-For 可能包含多個 IP，取第一個（最靠近客戶端的）
+        if ',' in ip:
+            ip = ip.split(',')[0].strip()
+        
+        # 嘗試從已解析的 tenant 或 token 獲取 user_id
+        user_id = None
+        user_tier = None
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            try:
+                from auth.utils import verify_token
+                payload = verify_token(auth_header[7:])
+                if payload:
+                    user_id = payload.get('sub', '')
+                    user_tier = payload.get('role', 'free')
+            except:
+                pass
+        
+        # 執行限流檢查
+        result = limiter.check(
+            ip=ip,
+            user_id=user_id,
+            user_tier=user_tier,
+            path=path,
+            method=request.method
+        )
+        
+        if not result.allowed:
+            # 被限流 → 返回 429
+            logger.warning(
+                f"[RateLimit] Blocked {request.method} {path} "
+                f"from {ip} (user={user_id}, rule={result.rule_name})"
+            )
+            
+            resp = web.json_response({
+                'success': False,
+                'error': '請求過於頻繁，請稍後再試',
+                'code': 'RATE_LIMITED',
+                'retry_after': result.retry_after
+            }, status=429)
+            
+            # 標準限流響應頭
+            for header_name, header_value in result.to_headers().items():
+                resp.headers[header_name] = header_value
+            
+            return resp
+        
+        # 通過 → 在響應中添加限流信息頭
+        response = await handler(request)
+        response.headers['X-RateLimit-Remaining'] = str(result.remaining)
+        return response
+        
+    except ImportError:
+        # rate_limiter 不可用，降級放行
+        logger.debug("Rate limiter not available, skipping")
+        return await handler(request)
+    except Exception as e:
+        # 限流系統故障不應阻止請求
+        logger.warning(f"Rate limiter error, degrading gracefully: {e}")
+        return await handler(request)
+
+
 # ==================== 請求 ID 中間件 ====================
 
 @web.middleware
 async def request_id_middleware(request, handler):
-    """為每個請求生成唯一 ID"""
+    """為每個請求生成唯一 ID，並注入到 ContextVar（下游日誌自動攜帶）"""
+    from core.logging import set_request_context, clear_request_context
+    
     request_id = request.headers.get('X-Request-ID', str(uuid.uuid4())[:8])
     request['request_id'] = request_id
     
-    response = await handler(request)
-    response.headers['X-Request-ID'] = request_id
+    # 🔧 P5-1: 將 request_id 注入 ContextVar，所有下游 SecureLogger 自動攜帶
+    set_request_context(request_id)
     
-    return response
+    try:
+        response = await handler(request)
+        response.headers['X-Request-ID'] = request_id
+        return response
+    finally:
+        clear_request_context()
 
 
 # ==================== 日誌中間件 ====================
@@ -94,13 +293,26 @@ async def logging_middleware(request, handler):
         
         # 響應日誌
         duration = (time.time() - start_time) * 1000
-        logger.info(
-            f"[{request_id}] {request.method} {request.path} "
-            f"-> {response.status} ({duration:.2f}ms)"
-        )
+        
+        # 🔧 P5-1: 慢請求警告（>2s）
+        if duration > 2000:
+            logger.warning(
+                f"[{request_id}] SLOW {request.method} {request.path} "
+                f"-> {response.status} ({duration:.0f}ms)"
+            )
+        else:
+            logger.info(
+                f"[{request_id}] {request.method} {request.path} "
+                f"-> {response.status} ({duration:.1f}ms)"
+            )
         
         # 添加性能頭
         response.headers['X-Response-Time'] = f"{duration:.2f}ms"
+        
+        # 🔧 P11-1: 自動將請求指標推送到 PerformanceAnalyzer
+        _record_request_metrics(request, response.status, duration)
+        # 🔧 P11-2: 推送到 Prometheus 指標收集器
+        _record_prometheus_metrics(request, response.status, duration)
         
         return response
         
@@ -108,9 +320,92 @@ async def logging_middleware(request, handler):
         duration = (time.time() - start_time) * 1000
         logger.error(
             f"[{request_id}] {request.method} {request.path} "
-            f"-> ERROR: {e} ({duration:.2f}ms)"
+            f"-> ERROR: {e} ({duration:.0f}ms)"
         )
+        # 🔧 P11-1: 錯誤也記錄指標
+        _record_request_metrics(request, 500, duration, is_error=True)
+        # 🔧 P11-2: 錯誤也推送到 Prometheus
+        _record_prometheus_metrics(request, 500, duration)
         raise
+
+
+# 🔧 P11-1: 請求指標記錄（跳過健康檢查和靜態資源）
+_METRICS_SKIP_PREFIXES = ('/api/v1/health', '/metrics', '/favicon', '/assets/')
+
+def _record_request_metrics(request, status_code: int, duration_ms: float, is_error: bool = False):
+    """
+    將請求延遲/錯誤指標推送到 PerformanceAnalyzer + AnomalyDetectionManager
+    
+    非阻塞 — 所有錯誤被靜默吞掉，不影響請求響應
+    """
+    try:
+        path = request.path
+        # 跳過非業務路徑
+        if any(path.startswith(p) for p in _METRICS_SKIP_PREFIXES):
+            return
+        
+        # 歸一化端點（去掉具體 ID，避免高基數）
+        endpoint = _normalize_endpoint(request.method, path)
+        
+        from admin.performance_analyzer import get_performance_analyzer
+        pa = get_performance_analyzer()
+        
+        # 記錄延遲
+        pa.record_latency(endpoint, duration_ms, tags={
+            'method': request.method,
+            'status': status_code,
+        })
+        
+        # 記錄錯誤
+        if is_error or status_code >= 500:
+            pa.record_error_rate(endpoint, 1.0)
+        
+        # 🔧 P11-1: 同步推送到異常檢測（高延遲 / 5xx）
+        if duration_ms > 3000 or status_code >= 500:
+            try:
+                from admin.anomaly_detection import get_anomaly_manager
+                am = get_anomaly_manager()
+                if status_code >= 500:
+                    am.detect('api_error_count', 1.0)
+                if duration_ms > 3000:
+                    am.detect('api_latency', duration_ms)
+            except Exception:
+                pass  # 異常檢測不可用不影響主流程
+                
+    except Exception:
+        pass  # 指標記錄失敗不能影響用戶請求
+
+
+def _normalize_endpoint(method: str, path: str) -> str:
+    """
+    歸一化端點路徑，將動態 ID 替換為佔位符
+    
+    例：
+      GET /api/v1/admin/users/abc123 → GET /api/v1/admin/users/:id
+      DELETE /api/v1/backups/550e8400 → DELETE /api/v1/backups/:id
+    """
+    import re
+    # 替換 UUID 格式
+    normalized = re.sub(r'/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}', '/:id', path)
+    # 替換純數字段
+    normalized = re.sub(r'/\d+', '/:id', normalized)
+    # 替換短 hash（8+ hex chars 作為路徑段）
+    normalized = re.sub(r'/[0-9a-f]{8,}(?=/|$)', '/:id', normalized)
+    return f"{method} {normalized}"
+
+
+def _record_prometheus_metrics(request, status_code: int, duration_ms: float):
+    """🔧 P11-2: 推送到 Prometheus 指標收集器"""
+    try:
+        path = request.path
+        if any(path.startswith(p) for p in _METRICS_SKIP_PREFIXES):
+            return
+        endpoint = _normalize_endpoint(request.method, path)
+        from core.metrics_exporter import get_metrics_collector
+        collector = get_metrics_collector()
+        collector.observe_duration(endpoint, duration_ms, status_code)
+    except Exception:
+        pass
 
 
 # ==================== 租戶中間件 ====================
@@ -324,8 +619,9 @@ async def quota_check_middleware(request, handler):
         service = get_quota_service()
         result = service.check_quota(tenant.user_id, quota_type, quota_amount)
         
-        # 將檢查結果附加到請求
+        # 🔧 P2: 將檢查結果附加到請求，後續處理器可用此跳過重複檢查
         request['quota_check'] = result
+        request['quota_checked'] = True
         
         if not result.allowed:
             # 配額不足，返回詳細錯誤
@@ -396,6 +692,18 @@ async def error_handling_middleware(request, handler):
     except Exception as e:
         request_id = request.get('request_id', '-')
         logger.exception(f"[{request_id}] Unhandled error: {e}")
+        
+        # 🔧 P11-5: 將錯誤推送到模式聚類器
+        try:
+            from core.observability_bridge import get_error_cluster
+            cluster = get_error_cluster()
+            cluster.record_error(str(e), context={
+                'path': request.path,
+                'method': request.method,
+                'request_id': request_id,
+            })
+        except Exception:
+            pass
         
         return web.json_response({
             'success': False,

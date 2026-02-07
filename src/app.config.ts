@@ -6,27 +6,35 @@
  * 🆕 Phase 25: 添加智能預加載策略
  */
 
-import { ApplicationConfig, importProvidersFrom, isDevMode } from '@angular/core';
-import { provideRouter, withDebugTracing } from '@angular/router';
+import { ApplicationConfig, ErrorHandler, importProvidersFrom, isDevMode } from '@angular/core';
+import { provideRouter, withPreloading } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth.interceptor';
+import { offlineInterceptor } from './core/offline.interceptor';
+import { GlobalErrorHandler } from './services/error-handler.service';
+import { SmartPreloadingStrategy } from './preloading-strategy';
 
 /**
  * 應用程式配置
  * 用於 bootstrapApplication
+ * 
+ * 🔧 P6-2: 啟用智能預加載策略（替代 withDebugTracing 減少生產環境日誌噪音）
  */
 export const appConfig: ApplicationConfig = {
   providers: [
-    // 路由配置 - 添加調試追蹤以診斷導航問題
-    provideRouter(routes, withDebugTracing()),
+    // 🔧 P6-2: 路由配置 + 智能預加載策略
+    provideRouter(routes, withPreloading(SmartPreloadingStrategy)),
     
-    // 🆕 HTTP 客戶端 + 認證攔截器
-    provideHttpClient(withInterceptors([authInterceptor])),
+    // 🆕 HTTP 客戶端 + 認證攔截器 + 🔧 P8-1 離線攔截器
+    provideHttpClient(withInterceptors([authInterceptor, offlineInterceptor])),
     
     // 動畫支持
     importProvidersFrom(BrowserAnimationsModule),
+    
+    // 🔧 P5-2: 全局錯誤處理器 — 攔截未捕獲的錯誤並上報到後端
+    { provide: ErrorHandler, useClass: GlobalErrorHandler },
   ]
 };
 

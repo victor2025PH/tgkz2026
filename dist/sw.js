@@ -8,7 +8,7 @@
  * - 後台同步
  */
 
-const CACHE_VERSION = 'v2.1.1';
+const CACHE_VERSION = 'v2.1.2';
 const STATIC_CACHE = `tg-matrix-static-${CACHE_VERSION}`;
 const API_CACHE = `tg-matrix-api-${CACHE_VERSION}`;
 const IMAGE_CACHE = `tg-matrix-images-${CACHE_VERSION}`;
@@ -27,11 +27,12 @@ const CACHEABLE_API_PATHS = [
   '/api/command' // 只緩存 GET 請求或特定命令
 ];
 
-// 不緩存的路徑
+// 不緩存的路徑（管理後台 /admin/ 不使用 SW 緩存，確保更新即時生效）
 const NO_CACHE_PATHS = [
   '/ws',
   '/api/upload',
-  '/api/download'
+  '/api/download',
+  '/admin/'
 ];
 
 // ==================== 安裝 ====================
@@ -189,6 +190,9 @@ async function fetchAndCache(request, cacheName) {
 function shouldSkipCache(url, request) {
   // 跳過 WebSocket
   if (url.pathname.startsWith('/ws')) return true;
+  
+  // 跳過管理後台（不使用 SW 緩存，確保優惠券彈窗等修復即時生效）
+  if (url.pathname.startsWith('/admin/')) return true;
   
   // 跳過非 GET/POST 請求
   if (!['GET', 'POST'].includes(request.method)) return true;

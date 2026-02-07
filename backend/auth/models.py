@@ -84,23 +84,60 @@ class User:
     
     def to_dict(self, include_sensitive: bool = False) -> Dict[str, Any]:
         """轉換為字典"""
+        # 🔧 P0 修復：確保 display_name 永不為空
+        # 降級鏈：display_name → telegram_first_name → username
+        effective_display_name = (
+            self.display_name 
+            or self.telegram_first_name 
+            or self.username 
+            or '用戶'
+        )
+        created_at_iso = self.created_at.isoformat() if self.created_at else None
+        last_login_iso = self.last_login_at.isoformat() if self.last_login_at else None
+        subscription_expires_iso = self.subscription_expires.isoformat() if self.subscription_expires else None
+        
         data = {
+            # ===== snake_case（後端標準格式）=====
             'id': self.id,
             'email': self.email,
             'username': self.username,
-            'display_name': self.display_name,
+            'display_name': effective_display_name,
             'avatar_url': self.avatar_url,
             'role': self.role.value,
             'subscription_tier': self.subscription_tier,
+            'subscription_expires': subscription_expires_iso,
             'max_accounts': self.max_accounts,
             'is_active': self.is_active,
             'is_verified': self.is_verified,
             'two_factor_enabled': self.two_factor_enabled,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login_at': self.last_login_at.isoformat() if self.last_login_at else None,
-            # 🆕 Telegram 信息
+            'created_at': created_at_iso,
+            'last_login_at': last_login_iso,
             'telegram_id': self.telegram_id,
             'telegram_username': self.telegram_username,
+            'telegram_first_name': self.telegram_first_name,
+            'invite_code': self.invite_code if hasattr(self, 'invite_code') else '',
+            'invited_count': self.invite_count if hasattr(self, 'invite_count') else 0,
+            
+            # ===== camelCase（前端兼容別名）=====
+            # 🔧 P3-2: 同時提供 camelCase 格式，消除前端逐一映射的負擔
+            'displayName': effective_display_name,
+            'avatarUrl': self.avatar_url,
+            'subscriptionTier': self.subscription_tier,
+            'subscriptionExpires': subscription_expires_iso,
+            'maxAccounts': self.max_accounts,
+            'isActive': self.is_active,
+            'isVerified': self.is_verified,
+            'twoFactorEnabled': self.two_factor_enabled,
+            'createdAt': created_at_iso,
+            'lastLogin': last_login_iso,
+            'lastLoginAt': last_login_iso,
+            'telegramId': self.telegram_id,
+            'telegramUsername': self.telegram_username,
+            'telegramFirstName': self.telegram_first_name,
+            'inviteCode': self.invite_code if hasattr(self, 'invite_code') else '',
+            'invitedCount': self.invite_count if hasattr(self, 'invite_count') else 0,
+            'membershipLevel': self.subscription_tier,
+            'membershipExpires': subscription_expires_iso,
         }
         
         if include_sensitive:

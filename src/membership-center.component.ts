@@ -7,7 +7,8 @@ import { Component, signal, computed, inject, OnInit, OnDestroy, ChangeDetectorR
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { AuthService } from './auth.service';
+// 🔧 P4-5: 遷移至 Core AuthService（統一認證入口）
+import { AuthService } from './core/auth.service';
 import { MembershipService, MembershipLevel } from './membership.service';
 import { I18nService } from './i18n.service';
 import { ToastService } from './toast.service';
@@ -1249,6 +1250,9 @@ export class MembershipCenterComponent implements OnInit, OnDestroy {
   isLoadingHistory = signal(false);
   
   async ngOnInit(): Promise<void> {
+    // 🔧 P4-5: 載入使用統計到 Core AuthService 信號
+    this.authService.loadUsageStats().catch(e => console.warn('[Membership] Load usage stats error:', e));
+    
     const rewards = await this.authService.getInviteRewards();
     this.inviteCode.set(rewards.inviteCode);
     this.invitedCount.set(rewards.invitedCount);

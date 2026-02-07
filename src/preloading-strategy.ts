@@ -123,12 +123,19 @@ export class NetworkAwarePreloadingStrategy implements PreloadingStrategy {
 }
 
 /**
- * 智能預加載策略（推薦）
- * 結合多種策略的優點
+ * 🔧 P6-2: 智能預加載策略（推薦）
+ * 結合多種策略的優點 + 網絡感知
  * 
- * 1. 核心路由立即預加載
- * 2. 常用路由延遲預加載
- * 3. 低優先級路由空閒時預加載
+ * 策略分層：
+ * 1. 核心路由 → 首次空閒時立即預加載（dashboard, accounts）
+ * 2. 常用路由 → 延遲 3 秒預加載（wallet, quota, settings）
+ * 3. 業務路由 → 空閒時預加載（leads, automation, marketing-hub）
+ * 4. 低頻路由 → 不預加載，按需加載
+ * 
+ * 網絡感知：
+ * - 2G/saveData 模式下僅預加載核心路由
+ * - 3G 模式下預加載核心 + 常用路由
+ * - 4G/WiFi 完全按策略預加載
  */
 @Injectable({
   providedIn: 'root'
@@ -136,69 +143,77 @@ export class NetworkAwarePreloadingStrategy implements PreloadingStrategy {
 export class SmartPreloadingStrategy implements PreloadingStrategy {
   private preloadedRoutes = new Set<string>();
   
-  // 核心路由（立即預加載）
-  private coreRoutes = ['dashboard', 'accounts'];
+  // 核心路由（立即預加載 — 登入後必到）
+  private coreRoutes = new Set(['dashboard', 'accounts']);
   
-  // 常用路由（延遲 2 秒預加載）
-  private commonRoutes = ['leads', 'automation', 'monitoring'];
+  // 常用路由（延遲 3 秒 — 高頻訪問）
+  private commonRoutes = new Set(['wallet', 'quota', 'settings', 'user-settings']);
   
-  // 其他路由（空閒時預加載）
-  private idleRoutes = ['analytics', 'ai-center', 'multi-role', 'settings'];
+  // 業務路由（空閒時 — 中頻訪問）
+  private idleRoutes = new Set([
+    'leads', 'automation', 'monitoring',
+    'marketing-hub', 'role-library', 'ai-engine',
+    'analytics', 'billing', 'upgrade'
+  ]);
   
   preload(route: Route, load: () => Observable<any>): Observable<any> {
     const path = route.path || '';
     
-    // 已預加載則跳過
-    if (this.preloadedRoutes.has(path)) {
+    // 跳過已預加載、redirect、通配符
+    if (this.preloadedRoutes.has(path) || route.redirectTo || path === '**') {
       return of(null);
     }
     
+    // 網絡感知
+    const networkTier = this._getNetworkTier();
+    
     // 核心路由：立即預加載
-    if (this.coreRoutes.includes(path)) {
+    if (this.coreRoutes.has(path)) {
       this.preloadedRoutes.add(path);
-      console.log(`[Smart] Core preload: ${path}`);
       return load();
     }
     
+    // 慢速網絡下不預加載非核心路由
+    if (networkTier === 'slow') {
+      return of(null);
+    }
+    
     // 常用路由：延遲預加載
-    if (this.commonRoutes.includes(path)) {
-      return timer(2000).pipe(
+    if (this.commonRoutes.has(path)) {
+      return timer(3000).pipe(
         mergeMap(() => {
           this.preloadedRoutes.add(path);
-          console.log(`[Smart] Common preload: ${path}`);
           return load();
         })
       );
     }
     
-    // 其他路由：空閒時預加載
-    if (this.idleRoutes.includes(path)) {
+    // 中等網絡不預加載空閒路由
+    if (networkTier === 'medium') {
+      return of(null);
+    }
+    
+    // 業務路由：空閒時預加載（僅快速網絡）
+    if (this.idleRoutes.has(path)) {
       return new Observable(observer => {
+        const doLoad = () => {
+          this.preloadedRoutes.add(path);
+          load().subscribe({
+            next: (val) => observer.next(val),
+            error: (err) => observer.error(err),
+            complete: () => observer.complete()
+          });
+        };
+        
         if ('requestIdleCallback' in window) {
-          (window as any).requestIdleCallback(() => {
-            this.preloadedRoutes.add(path);
-            console.log(`[Smart] Idle preload: ${path}`);
-            load().subscribe({
-              next: (val) => observer.next(val),
-              error: (err) => observer.error(err),
-              complete: () => observer.complete()
-            });
-          }, { timeout: 5000 });
+          (window as any).requestIdleCallback(doLoad, { timeout: 8000 });
         } else {
-          // 回退到 setTimeout
-          setTimeout(() => {
-            this.preloadedRoutes.add(path);
-            console.log(`[Smart] Fallback preload: ${path}`);
-            load().subscribe({
-              next: (val) => observer.next(val),
-              error: (err) => observer.error(err),
-              complete: () => observer.complete()
-            });
-          }, 5000);
+          setTimeout(doLoad, 6000);
         }
       });
     }
     
+    // 其他路由：不預加載（按需加載）
     return of(null);
   }
   
@@ -207,5 +222,20 @@ export class SmartPreloadingStrategy implements PreloadingStrategy {
    */
   getPreloadedRoutes(): string[] {
     return Array.from(this.preloadedRoutes);
+  }
+  
+  /**
+   * 檢測網絡速度等級
+   */
+  private _getNetworkTier(): 'slow' | 'medium' | 'fast' {
+    const connection = (navigator as any).connection;
+    if (!connection) return 'fast'; // 無 API 時假設快速
+    
+    if (connection.saveData) return 'slow';
+    
+    const type = connection.effectiveType;
+    if (type === '2g' || type === 'slow-2g') return 'slow';
+    if (type === '3g') return 'medium';
+    return 'fast'; // 4g, wifi 等
   }
 }

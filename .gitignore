@@ -49,7 +49,17 @@ sessions/
 # Secrets
 *.pem
 *.key
+*.p12
+*.pfx
 credentials.json
+service-account*.json
+*.keystore
+# 🔧 P10-2: 額外秘密防護
+.env.production
+.env.staging
+secrets/
+**/secret_*
+**/*_secret.*
 
 # OS
 .DS_Store
@@ -61,6 +71,9 @@ Thumbs.db
 # Temp
 *.tmp
 *.temp
+
+# Local notes / credentials (do not commit)
+npm run startbuild.txt
 
 # Test results
 test-results/

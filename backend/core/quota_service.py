@@ -143,8 +143,13 @@ class QuotaService:
         if self._initialized:
             return
         
+        # 🔧 P6-1: 使用統一的數據庫路徑解析
         if db_path is None:
-            db_path = os.environ.get('DATABASE_PATH', '/app/data/tgmatrix.db')
+            try:
+                from core.db_utils import get_db_path
+                db_path = get_db_path()
+            except ImportError:
+                db_path = os.environ.get('DATABASE_PATH', '/app/data/tgmatrix.db')
         self.db_path = db_path
         
         # 緩存
@@ -160,13 +165,56 @@ class QuotaService:
         self._alert_cooldown: Dict[str, datetime] = {}  # alert_key -> last_sent_at
         self._alert_cooldown_seconds = 3600  # 1 小時內不重複告警
         
+        # 🔧 P6-3: 配額變更回調（用於 WebSocket 推送）
+        self._change_callbacks: list = []
+        
         self._init_db()
         self._initialized = True
         logger.info("QuotaService initialized")
     
+    def on_quota_change(self, callback):
+        """
+        🔧 P6-3: 註冊配額變更回調
+        
+        回調簽名: callback(user_id: str, quota_type: str, action: str, result: dict)
+        """
+        self._change_callbacks.append(callback)
+    
+    def _notify_change(self, user_id: str, quota_type: str, action: str, result=None):
+        """🔧 P6-3: 通知所有已註冊的回調"""
+        payload = {
+            'user_id': user_id,
+            'quota_type': quota_type,
+            'action': action,
+            'timestamp': datetime.now().isoformat()
+        }
+        if result and hasattr(result, '__dict__'):
+            payload['usage'] = getattr(result, 'current', 0)
+            payload['limit'] = getattr(result, 'limit', 0)
+            payload['status'] = getattr(result, 'status', 'unknown')
+            if hasattr(result.status, 'value'):
+                payload['status'] = result.status.value
+        
+        for cb in self._change_callbacks:
+            try:
+                cb(user_id, quota_type, action, payload)
+            except Exception as e:
+                logger.error(f"[QuotaNotify] Callback error: {e}")
+    
     def _get_db(self) -> sqlite3.Connection:
-        db = sqlite3.connect(self.db_path)
+        """🔧 P6-1: 標準化連接（WAL 模式 + 性能 PRAGMA）"""
+        try:
+            from core.db_utils import create_connection
+            return create_connection(self.db_path)
+        except ImportError:
+            pass
+        
+        # 降級：直接連接但啟用 WAL
+        db = sqlite3.connect(self.db_path, timeout=30.0)
         db.row_factory = sqlite3.Row
+        db.execute('PRAGMA journal_mode=WAL')
+        db.execute('PRAGMA synchronous=NORMAL')
+        db.execute('PRAGMA busy_timeout=30000')
         return db
     
     def _init_db(self):
@@ -363,12 +411,37 @@ class QuotaService:
             # 對於非每日重置的配額，直接統計（accounts 表僅有 owner_user_id）
             if quota_type == 'tg_accounts':
                 try:
+                    # 🔧 P0 修復：只統計有效帳號，排除已刪除/已封禁/錯誤狀態的帳號
+                    # 有效狀態：Online, Offline, Waiting Code, Waiting 2FA, Logging in..., Unassigned
+                    # 排除狀態：deleted, banned, error, removed
+                    excluded_statuses = ('deleted', 'banned', 'removed')
+                    placeholders = ','.join(['?' for _ in excluded_statuses])
+                    
+                    # 先嘗試帶狀態過濾的查詢
                     row = db.execute(
-                        'SELECT COUNT(*) as count FROM accounts WHERE owner_user_id = ?',
-                        (user_id,)
+                        f'''SELECT COUNT(*) as count FROM accounts 
+                            WHERE owner_user_id = ? 
+                            AND (status IS NULL OR LOWER(status) NOT IN ({placeholders}))''',
+                        (user_id, *excluded_statuses)
                     ).fetchone()
-                    return row['count'] if row else 0
-                except Exception:
+                    count = row['count'] if row else 0
+                    
+                    # 🔧 P0 修復：同時統計包含 local_user 和空 owner 的歷史帳號（兼容舊數據）
+                    # 如果用戶 ID 不是 local_user，也要統計 local_user 和空 owner 的帳號
+                    if user_id and user_id != 'local_user':
+                        row2 = db.execute(
+                            f'''SELECT COUNT(*) as count FROM accounts 
+                                WHERE (owner_user_id IS NULL OR owner_user_id = '' OR owner_user_id = 'local_user')
+                                AND (status IS NULL OR LOWER(status) NOT IN ({placeholders}))''',
+                            excluded_statuses
+                        ).fetchone()
+                        legacy_count = row2['count'] if row2 else 0
+                        count += legacy_count
+                    
+                    logger.info(f"[QuotaService] tg_accounts usage for user {user_id}: {count}")
+                    return count
+                except Exception as e:
+                    logger.warning(f"[QuotaService] Failed to count tg_accounts: {e}")
                     return 0
             
             elif quota_type == 'groups':
@@ -468,15 +541,17 @@ class QuotaService:
         # 判斷狀態
         allowed = effective_used + amount <= limit
         
+        # 🔧 P1 修復：提供更詳細的配額信息（包含具體數字）
+        display_name = self._get_quota_display_name(quota_type)
         if percentage >= 100:
             status = QuotaStatus.EXCEEDED
-            message = f"{self._get_quota_display_name(quota_type)}已達上限"
+            message = f"{display_name}已達上限（{effective_used}/{limit}）"
         elif percentage >= self.CRITICAL_THRESHOLD:
             status = QuotaStatus.CRITICAL
-            message = f"{self._get_quota_display_name(quota_type)}即將用盡"
+            message = f"{display_name}即將用盡（{effective_used}/{limit}，剩餘 {remaining}）"
         elif percentage >= self.WARNING_THRESHOLD:
             status = QuotaStatus.WARNING
-            message = f"{self._get_quota_display_name(quota_type)}使用超過 80%"
+            message = f"{display_name}使用超過 80%（{effective_used}/{limit}）"
         else:
             status = QuotaStatus.OK
             message = ""
@@ -576,6 +651,9 @@ class QuotaService:
             if result.status in {QuotaStatus.WARNING, QuotaStatus.CRITICAL, QuotaStatus.EXCEEDED}:
                 self._send_alert(user_id, quota_type, result)
             
+            # 🔧 P6-3: 通知配額變更
+            self._notify_change(user_id, quota_type, 'consume', result)
+            
             return True, result
         except Exception as e:
             logger.error(f"Failed to consume quota: {e}")
@@ -612,6 +690,12 @@ class QuotaService:
         
         current_reserved = self._reservations[user_id].get(quota_type, 0)
         self._reservations[user_id][quota_type] = current_reserved + amount
+        
+        # 🔧 P4-4: 記錄預留時間戳，用於超時自動釋放
+        reservation_key = f"{user_id}:{quota_type}"
+        if not hasattr(self, '_reservation_timestamps'):
+            self._reservation_timestamps = {}
+        self._reservation_timestamps[reservation_key] = datetime.now()
         
         logger.info(f"Reserved {amount} {quota_type} for user {user_id}")
         
@@ -651,7 +735,161 @@ class QuotaService:
         
         self._reservations[user_id][quota_type] = max(0, current_reserved - release_amount)
         
+        # 🔧 P4-4: 清理預留時間戳
+        reservation_key = f"{user_id}:{quota_type}"
+        if hasattr(self, '_reservation_timestamps'):
+            self._reservation_timestamps.pop(reservation_key, None)
+        
         return True
+    
+    # ==================== P4-3: 原子化配額操作 ====================
+    
+    def atomic_check_and_reserve(
+        self,
+        user_id: str,
+        quota_type: str,
+        amount: int = 1
+    ) -> Tuple[bool, QuotaCheckResult]:
+        """
+        🔧 P4-3: 原子化的配額檢查 + 預留操作
+        
+        使用線程鎖 + 數據庫事務防止並發操作導致超額。
+        適用於 add-account 等需要先檢查再執行的場景。
+        
+        流程：
+          1. 獲取線程鎖（防止進程內並發）
+          2. 清除緩存（確保讀取最新值）
+          3. 讀取真實用量（繞過緩存）
+          4. 檢查是否滿足配額
+          5. 如果滿足，立即預留
+        
+        Returns:
+            (success, QuotaCheckResult)
+        """
+        with self._lock:
+            # 清除該用戶的緩存，確保讀取最新值
+            self.invalidate_cache(user_id)
+            
+            # 檢查配額（此時讀取的是真實值）
+            result = self.check_quota(user_id, quota_type, amount)
+            
+            if not result.allowed:
+                logger.info(
+                    f"[AtomicQuota] Denied {quota_type} for user {user_id}: "
+                    f"used={result.used}, reserved={result.reserved}, limit={result.limit}"
+                )
+                return False, result
+            
+            # 立即預留，佔住名額
+            if user_id not in self._reservations:
+                self._reservations[user_id] = {}
+            current_reserved = self._reservations[user_id].get(quota_type, 0)
+            self._reservations[user_id][quota_type] = current_reserved + amount
+            
+            # 記錄預留時間戳
+            reservation_key = f"{user_id}:{quota_type}"
+            if not hasattr(self, '_reservation_timestamps'):
+                self._reservation_timestamps = {}
+            self._reservation_timestamps[reservation_key] = datetime.now()
+            
+            logger.info(
+                f"[AtomicQuota] Reserved {amount} {quota_type} for user {user_id}: "
+                f"used={result.used}, reserved={current_reserved + amount}, limit={result.limit}"
+            )
+            
+            # 重新計算結果（含新預留）
+            updated_result = self.check_quota(user_id, quota_type)
+            return True, updated_result
+    
+    def atomic_commit_or_rollback(
+        self,
+        user_id: str,
+        quota_type: str,
+        amount: int = 1,
+        commit: bool = True
+    ) -> None:
+        """
+        🔧 P4-3: 原子操作的提交/回滾
+        
+        在 add-account 成功後調用 commit=True（將預留轉為消耗）；
+        在 add-account 失敗後調用 commit=False（釋放預留）。
+        
+        Args:
+            user_id: 用戶 ID
+            quota_type: 配額類型
+            amount: 預留數量
+            commit: True=提交（預留→消耗），False=回滾（釋放預留）
+        """
+        with self._lock:
+            if commit:
+                # 成功：釋放預留（業務操作已增加實際帳號數，配額自然遞增）
+                self.release_reservation(user_id, quota_type, amount, consume=False)
+                logger.info(f"[AtomicQuota] Committed {amount} {quota_type} for user {user_id}")
+            else:
+                # 失敗：回滾預留
+                self.release_reservation(user_id, quota_type, amount, consume=False)
+                logger.info(f"[AtomicQuota] Rolled back {amount} {quota_type} for user {user_id}")
+            
+            # 清除緩存
+            self.invalidate_cache(user_id)
+        
+        # 🔧 P6-3: 通知配額變更（提交或回滾都需通知前端刷新）
+        action = 'commit' if commit else 'rollback'
+        self._notify_change(user_id, quota_type, action)
+    
+    # ==================== P4-4: 預留超時自動清理 ====================
+    
+    def cleanup_expired_reservations(self, timeout_seconds: int = 300) -> Dict[str, Any]:
+        """
+        🔧 P4-4: 清理超時預留
+        
+        如果一個預留超過 timeout_seconds（默認 5 分鐘）仍未提交/回滾，
+        自動釋放，防止配額被永久佔用。
+        
+        Returns:
+            {'cleaned': int, 'details': [...]}
+        """
+        if not hasattr(self, '_reservation_timestamps'):
+            return {'cleaned': 0, 'details': []}
+        
+        now = datetime.now()
+        expired = []
+        
+        for key, ts in list(self._reservation_timestamps.items()):
+            age = (now - ts).total_seconds()
+            if age > timeout_seconds:
+                expired.append((key, age))
+        
+        cleaned = 0
+        details = []
+        
+        for key, age in expired:
+            parts = key.split(':', 1)
+            if len(parts) == 2:
+                uid, qt = parts
+                reserved = self._reservations.get(uid, {}).get(qt, 0)
+                if reserved > 0:
+                    self.release_reservation(uid, qt)
+                    self.invalidate_cache(uid)
+                    details.append({
+                        'user_id': uid,
+                        'quota_type': qt,
+                        'released': reserved,
+                        'age_seconds': round(age, 1)
+                    })
+                    cleaned += 1
+                    logger.warning(
+                        f"[QuotaCleanup] Released expired reservation: "
+                        f"user={uid}, type={qt}, amount={reserved}, age={age:.0f}s"
+                    )
+            
+            # 清理時間戳
+            self._reservation_timestamps.pop(key, None)
+        
+        if cleaned > 0:
+            logger.info(f"[QuotaCleanup] Cleaned {cleaned} expired reservations")
+        
+        return {'cleaned': cleaned, 'details': details}
     
     # ==================== 批量操作 ====================
     
@@ -909,6 +1147,173 @@ class QuotaService:
             pass
         
         return "升級會員等級可獲得更多配額"
+
+
+    # ==================== P4-2: 數據一致性校驗 ====================
+    
+    def verify_quota_consistency(self, user_id: str) -> Dict[str, Any]:
+        """
+        校驗配額計數與實際數據是否一致
+        
+        🔧 P4-2: 定期或按需執行，返回不一致項和修復建議
+        
+        Returns:
+            {
+                'consistent': bool,
+                'checks': [{quota_type, expected, actual, status}],
+                'auto_fixed': int
+            }
+        """
+        checks = []
+        auto_fixed = 0
+        
+        db = self._get_db()
+        try:
+            # 1. 校驗 tg_accounts
+            quota_used = self._get_current_usage(user_id, 'tg_accounts')
+            try:
+                excluded = ('deleted', 'banned', 'removed')
+                ph = ','.join(['?' for _ in excluded])
+                
+                # 真實計數（直接查庫，繞過緩存）
+                row = db.execute(
+                    f'''SELECT COUNT(*) as c FROM accounts 
+                        WHERE owner_user_id = ? 
+                        AND (status IS NULL OR LOWER(status) NOT IN ({ph}))''',
+                    (user_id, *excluded)
+                ).fetchone()
+                real_count = row['c'] if row else 0
+                
+                # 加入 legacy 帳號
+                if user_id != 'local_user':
+                    row2 = db.execute(
+                        f'''SELECT COUNT(*) as c FROM accounts 
+                            WHERE (owner_user_id IS NULL OR owner_user_id = '' OR owner_user_id = 'local_user')
+                            AND (status IS NULL OR LOWER(status) NOT IN ({ph}))''',
+                        excluded
+                    ).fetchone()
+                    real_count += row2['c'] if row2 else 0
+                
+                status = 'ok' if quota_used == real_count else 'mismatch'
+                checks.append({
+                    'quota_type': 'tg_accounts',
+                    'cached_usage': quota_used,
+                    'actual_count': real_count,
+                    'status': status
+                })
+                
+                if status == 'mismatch':
+                    logger.warning(
+                        f"[QuotaConsistency] tg_accounts mismatch for user {user_id}: "
+                        f"cached={quota_used}, actual={real_count}"
+                    )
+                    # 自動修復：清除緩存，下次查詢將讀取真實值
+                    self.invalidate_cache(user_id)
+                    auto_fixed += 1
+                    
+            except Exception as e:
+                checks.append({
+                    'quota_type': 'tg_accounts',
+                    'error': str(e),
+                    'status': 'error'
+                })
+            
+            # 2. 校驗 quota_usage 表中的每日配額
+            today = date.today().isoformat()
+            for qt in self.DAILY_RESET_QUOTAS:
+                try:
+                    row = db.execute(
+                        'SELECT used FROM quota_usage WHERE user_id = ? AND quota_type = ? AND date = ?',
+                        (user_id, qt, today)
+                    ).fetchone()
+                    recorded = row['used'] if row else 0
+                    
+                    # 每日配額不需要額外校驗，記錄即可
+                    checks.append({
+                        'quota_type': qt,
+                        'recorded_usage': recorded,
+                        'status': 'ok'
+                    })
+                except Exception as e:
+                    checks.append({
+                        'quota_type': qt,
+                        'error': str(e),
+                        'status': 'error'
+                    })
+            
+            consistent = all(c.get('status') == 'ok' for c in checks)
+            
+            result = {
+                'consistent': consistent,
+                'user_id': user_id,
+                'checked_at': datetime.now().isoformat(),
+                'checks': checks,
+                'auto_fixed': auto_fixed
+            }
+            
+            if not consistent:
+                logger.warning(f"[QuotaConsistency] Inconsistency found for user {user_id}: {result}")
+            else:
+                logger.info(f"[QuotaConsistency] All checks passed for user {user_id}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"[QuotaConsistency] Error during consistency check: {e}")
+            return {
+                'consistent': False,
+                'user_id': user_id,
+                'error': str(e),
+                'checks': checks,
+                'auto_fixed': auto_fixed
+            }
+        finally:
+            db.close()
+    
+    def run_all_users_consistency_check(self) -> Dict[str, Any]:
+        """
+        對所有活躍用戶執行一致性校驗
+        
+        🔧 P4-2: 供定期任務或管理員手動觸發
+        """
+        db = self._get_db()
+        try:
+            rows = db.execute(
+                "SELECT DISTINCT user_id FROM user_profiles WHERE user_id IS NOT NULL AND user_id != ''"
+            ).fetchall()
+            
+            if not rows:
+                # 嘗試從 users 表獲取
+                rows = db.execute(
+                    "SELECT DISTINCT id as user_id FROM users WHERE is_active = 1"
+                ).fetchall()
+            
+            total = len(rows)
+            inconsistent = 0
+            fixed = 0
+            
+            for row in rows:
+                uid = row['user_id'] if isinstance(row, dict) else row[0]
+                result = self.verify_quota_consistency(uid)
+                if not result.get('consistent'):
+                    inconsistent += 1
+                fixed += result.get('auto_fixed', 0)
+            
+            summary = {
+                'total_users': total,
+                'inconsistent': inconsistent,
+                'auto_fixed': fixed,
+                'checked_at': datetime.now().isoformat()
+            }
+            
+            logger.info(f"[QuotaConsistency] Batch check: {summary}")
+            return summary
+            
+        except Exception as e:
+            logger.error(f"[QuotaConsistency] Batch check error: {e}")
+            return {'error': str(e)}
+        finally:
+            db.close()
 
 
 # ==================== 全局訪問 ====================

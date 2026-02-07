@@ -1152,7 +1152,9 @@ export class LoginComponent implements OnInit, OnDestroy {
     } catch (e: any) {
       // 記錄失敗嘗試
       this.security.recordLoginAttempt(false, this.email);
-      this.error.set(e.message || this.t('auth.loginFailed'));
+      const msg = e?.message || '';
+      const isJsonOrNetwork = /json|unexpected token|not valid json|fetch|network/i.test(msg);
+      this.error.set(isJsonOrNetwork ? this.t('auth.networkError') : (msg || this.t('auth.loginFailed')));
       this.checkLoginLimit();
     } finally {
       this.isLoading.set(false);

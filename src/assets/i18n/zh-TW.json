@@ -692,6 +692,7 @@
     "and": "和",
     "privacyPolicy": "隱私政策",
     "loginFailed": "登入失敗",
+    "networkError": "網絡錯誤，請稍後重試",
     "registerFailed": "註冊失敗",
     "weak": "弱",
     "fair": "一般",

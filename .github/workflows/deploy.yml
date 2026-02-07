@@ -35,7 +35,7 @@ jobs:
         run: npm ci --legacy-peer-deps
       
       - name: Build frontend (SaaS mode)
-        run: npm run build -- --configuration=saas
+        run: npm run build:saas
       
       - name: Setup SSH key
         run: |

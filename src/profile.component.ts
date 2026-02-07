@@ -42,14 +42,17 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
         </div>
       }
       
-      <!-- 用戶頭部信息 -->
+      <!-- 用戶頭部信息：上方顯示昵稱（顯示名稱），非用戶名 -->
       <div class="profile-header">
         <div class="avatar-section">
           <div class="avatar">
-            {{ (user()?.displayName || user()?.username)?.charAt(0).toUpperCase() || '?' }}
+            {{ (displayNameForHeader() || user()?.username)?.charAt(0).toUpperCase() || '?' }}
           </div>
           <div class="user-info">
-            <h2 class="username">{{ user()?.displayName || user()?.username || (isLoadingUser() ? '載入中...' : '未登入') }}</h2>
+            <h2 class="username">{{ displayNameForHeader() ?? (isLoadingUser() ? '載入中...' : (user() ? '未設置顯示名稱' : '未登入')) }}</h2>
+            @if (user()?.username) {
+              <p class="login-account text-sm opacity-80">登入帳號：{{ user()?.username }}</p>
+            }
             <p class="email">{{ user()?.email || '未設置郵箱' }}</p>
             <div class="membership-badge-wrapper flex items-center gap-2">
               <!-- 🔧 P1-2: 使用統一的會員等級徽章組件 -->
@@ -1310,6 +1313,14 @@ export class ProfileComponent implements OnInit, OnDestroy {
   // 計算屬性
   // 🔧 P0 修復：使用 MembershipService 作為會員等級的單一數據源
   user = computed(() => this.authService.user());
+  /** 頭部顯示的昵稱：僅當用戶單獨設置過顯示名稱（與用戶名不同）時返回，否則為 null，用於顯示「未設置顯示名稱」 */
+  displayNameForHeader = computed(() => {
+    const u = this.authService.user();
+    if (!u) return null;
+    const name = (u.displayName || (u as any).display_name)?.trim();
+    if (!name || name === u.username) return null;
+    return name;
+  });
   membershipLevel = computed(() => this.membershipService.level());
   membershipDaysLeft = computed(() => this.membershipService.daysRemaining());
   devices = computed(() => this.authService.devices());

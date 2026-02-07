@@ -1,1 +1,0 @@
-var e={production:!0,apiMode:"ipc",apiBaseUrl:"http://localhost:8000",wsUrl:"ws://localhost:8000/ws",features:{maxAccounts:10,aiEnabled:!0,teamFeatures:!1,apiAccess:!1,debug:!1},version:"2.1.1",buildDate:new Date().toISOString()};export{e as a};

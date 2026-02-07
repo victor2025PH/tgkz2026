@@ -692,6 +692,7 @@
     "and": "and",
     "privacyPolicy": "Privacy Policy",
     "loginFailed": "Login failed",
+    "networkError": "Network error, please try again later",
     "registerFailed": "Registration failed",
     "weak": "Weak",
     "fair": "Fair",

@@ -242,6 +242,41 @@ ls -la /app/data/backups/
 # 找到 pre-migration 備份，手動恢復
 ```
 
+### 4.6 502 Bad Gateway（/api、/health 返回 502）
+
+**原因**：Nginx 能收到請求，但上游 `api:8000` 無有效響應（API 容器未運行、崩潰或不可達）。
+
+**在部署機上執行（例如 SSH 到 165.154.210.154 後）：**
+
+```bash
+# 1. 進入項目目錄（與 deploy 腳本一致）
+cd /opt/tg-matrix
+
+# 2. 查看容器狀態（api 應為 Up）
+sudo docker compose ps
+
+# 3. 查看 API 容器最近日誌（看是否報錯、退出）
+sudo docker compose logs api --tail=100
+
+# 4. 若 api 未運行或反覆重啟，先重啟並查看日誌
+sudo docker compose up -d api
+sudo docker compose logs api -f
+# 無報錯後 Ctrl+C 退出
+
+# 5. 在服務器本機測試上游是否可達
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health
+# 應輸出 200
+
+# 6. 若仍 502，重建 API 鏡像並重啟（代碼或依賴變更後）
+sudo docker compose build --no-cache api
+sudo docker compose up -d --force-recreate api
+sleep 15
+sudo docker compose ps
+curl -s http://localhost:8000/health
+```
+
+**若域名 tgw.usdt2026.cc 指向其他機器**：在該機器上執行上述步驟，並確認該機已用本項目的 `docker-compose.yml` + `nginx.conf` 部署（Nginx 中 `upstream api_backend { server api:8000; }` 與 API 容器在同一 compose 網絡內）。
+
 ---
 
 ## 5. 備份與恢復

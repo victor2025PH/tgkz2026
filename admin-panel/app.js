@@ -101,8 +101,11 @@ createApp({
             title: '',
             message: '',
             icon: '⚠️',
-            type: 'normal',
-            onConfirm: () => {}
+            type: 'warning',
+            confirmText: '確定',
+            cancelText: '取消',
+            onConfirm: null,
+            onCancel: null
         });
         
         // 公告表單
@@ -283,12 +286,7 @@ createApp({
         const apiSortOrder = ref('asc');     // asc | desc
         const apiPage = ref(1);             // 當前頁
         const apiPageSize = ref(20);        // 每頁條數
-        // 確認對話框
-        const confirmDialog = reactive({
-            show: false, title: '', message: '', type: 'warning',
-            confirmText: '確定', cancelText: '取消',
-            onConfirm: null, onCancel: null
-        });
+        // confirmDialog 已在上方定義
         // 導出選項
         const showExportModal = ref(false);
         const exportOptions = reactive({
@@ -3728,11 +3726,7 @@ createApp({
             confirmDialog.show = true;
         };
         const showConfirmDialog = showConfirm;  // 別名，供支付配置等處調用
-        const closeConfirmDialog = () => { 
-            confirmDialog.show = false; 
-            confirmDialog.title = ''; 
-            confirmDialog.message = ''; 
-        };
+        // closeConfirmDialog 已在 P1 區塊定義
         const handleConfirmOk = () => {
             try { confirmDialog.onConfirm(); } catch (e) { console.error(e); }
             confirmDialog.show = false;

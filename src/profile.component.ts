@@ -1406,7 +1406,12 @@ export class ProfileComponent implements OnInit, OnDestroy {
       }
     } catch (error: any) {
       console.error('[Profile] Failed to load user:', error);
-      this.userLoadError.set(error.message || '加載失敗');
+      const msg = error?.message || '';
+      if (msg.startsWith('RATE_LIMITED')) {
+        this.userLoadError.set('請求過於頻繁，請稍後再試');
+      } else {
+        this.userLoadError.set(msg || '加載失敗');
+      }
     } finally {
       this.isLoadingUser.set(false);
       this.cdr.detectChanges();

@@ -100,10 +100,11 @@ DEFAULT_RULES = [
         window_seconds=60,
         burst=20
     ),
+    # 認證相關讀取（me/devices/usage-stats 等）單頁會並發多個請求，放寬以免正常用戶觸發 429
     RateLimitRule(
         name='ip_auth',
         scope=RateLimitScope.IP,
-        requests=10,
+        requests=60,
         window_seconds=60,
         path_pattern='/api/v1/auth/*'
     ),

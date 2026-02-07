@@ -541,6 +541,10 @@ export class AuthService implements OnDestroy {
       // 🔧 處理非 200 響應
       if (!response.ok) {
         console.warn(`[AuthService] fetchCurrentUser: HTTP ${response.status}`);
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After') || '60';
+          throw new Error(`RATE_LIMITED:${retryAfter}`);
+        }
         if (response.status === 401) {
           // Token 無效，清除認證狀態
           console.warn('[AuthService] Token invalid, clearing session');

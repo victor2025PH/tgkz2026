@@ -1563,7 +1563,8 @@ createApp({
                 showApiPoolModal.value = false;
                 await loadApiPool();
             } else {
-                showToast('添加失敗: ' + (result.message || result.error?.message), 'error');
+                const errMsg = result.message || result.error?.message || result.detail || JSON.stringify(result.error || result);
+                showToast('添加失敗: ' + errMsg, 'error');
             }
         };
         
@@ -1629,7 +1630,8 @@ createApp({
                     showToast('導入失敗，請檢查格式', 'error');
                 }
             } else {
-                showToast('導入失敗: ' + (result.message || result.error?.message), 'error');
+                const errMsg = result.message || result.error?.message || result.detail || JSON.stringify(result.error || result);
+                showToast('導入失敗: ' + errMsg, 'error');
             }
         };
         

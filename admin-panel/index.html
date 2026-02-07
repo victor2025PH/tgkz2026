@@ -3641,7 +3641,7 @@ api_id,api_hash,name
                             <div class="bg-gray-700 rounded-lg p-4">
                                 <h4 class="font-medium mb-2">👥 用戶數據</h4>
                                 <p class="text-gray-400 text-sm mb-3">導出所有用戶信息</p>
-                                <button @click="exportData('users')" 
+                                <button @click="exportCsvData('users')" 
                                         class="w-full bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors">
                                     導出 CSV
                                 </button>
@@ -3649,7 +3649,7 @@ api_id,api_hash,name
                             <div class="bg-gray-700 rounded-lg p-4">
                                 <h4 class="font-medium mb-2">💰 訂單數據</h4>
                                 <p class="text-gray-400 text-sm mb-3">導出近30天訂單</p>
-                                <button @click="exportData('orders')" 
+                                <button @click="exportCsvData('orders')" 
                                         class="w-full bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors">
                                     導出 CSV
                                 </button>
@@ -3657,7 +3657,7 @@ api_id,api_hash,name
                             <div class="bg-gray-700 rounded-lg p-4">
                                 <h4 class="font-medium mb-2">🎟️ 卡密數據</h4>
                                 <p class="text-gray-400 text-sm mb-3">導出未使用卡密</p>
-                                <button @click="exportData('licenses', 'unused')" 
+                                <button @click="exportCsvData('licenses', 'unused')" 
                                         class="w-full bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors">
                                     導出 CSV
                                 </button>

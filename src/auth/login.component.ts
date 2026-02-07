@@ -1106,7 +1106,25 @@ export class LoginComponent implements OnInit, OnDestroy {
   t(key: string): string {
     return this.i18n.t(key);
   }
-  
+
+  /** 安全解析 JSON，後端返回 HTML 時返回 null，避免拋出 "Unexpected token" */
+  private async parseJsonResponse(response: Response): Promise<Record<string, unknown> | null> {
+    const text = await response.text();
+    const t = text.trim();
+    if (t.startsWith('<') || !t) return null;
+    try {
+      return JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  private setErrorFromException(e: any, fallback: string): void {
+    const msg = e?.message || '';
+    const isJsonOrNetwork = /json|unexpected token|not valid json|fetch|network/i.test(msg);
+    this.error.set(isJsonOrNetwork ? this.t('auth.networkError') : (msg || fallback));
+  }
+
   async onSubmit() {
     if (!this.email || !this.password) return;
     
@@ -1150,11 +1168,8 @@ export class LoginComponent implements OnInit, OnDestroy {
         this.checkLoginLimit();
       }
     } catch (e: any) {
-      // 記錄失敗嘗試
       this.security.recordLoginAttempt(false, this.email);
-      const msg = e?.message || '';
-      const isJsonOrNetwork = /json|unexpected token|not valid json|fetch|network/i.test(msg);
-      this.error.set(isJsonOrNetwork ? this.t('auth.networkError') : (msg || this.t('auth.loginFailed')));
+      this.setErrorFromException(e, this.t('auth.loginFailed'));
       this.checkLoginLimit();
     } finally {
       this.isLoading.set(false);
@@ -1176,9 +1191,8 @@ export class LoginComponent implements OnInit, OnDestroy {
     try {
       // 1. 獲取 Google 配置
       const response = await fetch('/api/v1/oauth/google/config');
-      const config = await response.json();
-      
-      if (!config.success || !config.data?.enabled) {
+      const config = await this.parseJsonResponse(response);
+      if (!config?.success || !(config?.data as any)?.enabled) {
         this.error.set(this.t('auth.googleNotAvailable'));
         return;
       }
@@ -1188,7 +1202,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       
     } catch (e: any) {
       console.error('Google login error:', e);
-      this.error.set(this.t('auth.googleNotAvailable'));
+      this.setErrorFromException(e, this.t('auth.googleNotAvailable'));
     } finally {
       this.isLoading.set(false);
     }
@@ -1266,7 +1280,7 @@ export class LoginComponent implements OnInit, OnDestroy {
         this.error.set('Google 登入失敗：無效的認證數據');
       }
     } catch (e: any) {
-      this.error.set(e.message || 'Google 登入失敗');
+      this.setErrorFromException(e, 'Google 登入失敗');
     } finally {
       this.isLoading.set(false);
     }
@@ -1295,27 +1309,27 @@ export class LoginComponent implements OnInit, OnDestroy {
         body: JSON.stringify({ type: 'deep_link' })
       });
       
-      const result = await response.json();
-      
-      if (!result.success || !result.data) {
-        this.error.set(result.error || '無法生成登入連結');
+      const result = await this.parseJsonResponse(response);
+      if (!result?.success || !result?.data) {
+        this.error.set(result ? String(result.error || '無法生成登入連結') : this.t('auth.networkError'));
         this.deepLinkLoading.set(false);
         this.telegramLoading.set(false);
         return;
       }
       
-      const { token, deep_link_url, expires_in } = result.data;
-      this.deepLinkToken = token;
-      this.deepLinkCountdown.set(expires_in || 300);
+      const data = result.data as { token?: string; deep_link_url?: string; expires_in?: number };
+      const { token, deep_link_url, expires_in } = data;
+      this.deepLinkToken = token || '';
+      this.deepLinkCountdown.set(expires_in ?? 300);
       
-      console.log('[DeepLink] Token generated:', token.substring(0, 8) + '...');
+      console.log('[DeepLink] Token generated:', (token || '').substring(0, 8) + '...');
       
       // 2. 🆕 建立 WebSocket 連接（優先使用實時通知）
-      this.connectDeepLinkWebSocket(token);
+      this.connectDeepLinkWebSocket(token || '');
       
       // 3. 打開 Telegram Deep Link
       console.log('[DeepLink] Opening:', deep_link_url);
-      window.open(deep_link_url, '_blank');
+      window.open(deep_link_url || '', '_blank');
       
       // 4. 開始倒計時
       this.deepLinkCountdownInterval = setInterval(() => {
@@ -1333,7 +1347,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       
     } catch (e: any) {
       console.error('[DeepLink] Error:', e);
-      this.error.set(e.message || '登入失敗');
+      this.setErrorFromException(e, '登入失敗');
       this.deepLinkLoading.set(false);
       this.telegramLoading.set(false);
     }
@@ -1429,16 +1443,16 @@ export class LoginComponent implements OnInit, OnDestroy {
       try {
         console.log('[DeepLink Poll] Checking status...');
         const response = await fetch(`/api/v1/auth/login-token/${this.deepLinkToken}`);
-        const result = await response.json();
+        const result = await this.parseJsonResponse(response);
         
         console.log('[DeepLink Poll] Response:', result);
         
-        if (!result.success) {
+        if (!result || !result.success) {
           console.warn('[DeepLink Poll] Error:', result.error);
           return;
         }
         
-        const { status, access_token, refresh_token, user } = result.data || {};
+        const { status, access_token, refresh_token, user } = (result.data as Record<string, unknown>) || {};
         
         console.log('[DeepLink Poll] Status:', status, 'Has Token:', !!access_token);
         
@@ -1511,34 +1525,34 @@ export class LoginComponent implements OnInit, OnDestroy {
         body: JSON.stringify({ type: 'qr_code' })
       });
       
-      const result = await response.json();
-      
-      if (!result.success || !result.data) {
-        this.error.set(result.error || '無法生成二維碼');
+      const result = await this.parseJsonResponse(response);
+      if (!result?.success || !result?.data) {
+        this.error.set(result ? String(result.error || '無法生成二維碼') : this.t('auth.networkError'));
         this.qrCodeLoading.set(false);
         return;
       }
       
-      const { token, deep_link_url, expires_in, qr_image, qr_fallback_url, verify_code } = result.data;
-      this.qrToken = token;
-      this.qrCountdown.set(expires_in || 300);
+      const data = result.data as { token?: string; deep_link_url?: string; expires_in?: number; qr_image?: string; qr_fallback_url?: string; verify_code?: string };
+      const { token, deep_link_url, expires_in, qr_image, qr_fallback_url, verify_code } = data;
+      this.qrToken = token || '';
+      this.qrCountdown.set(expires_in ?? 300);
       
       // 🆕 保存驗證碼（老用戶備用）
       this.verifyCode.set(verify_code || null);
       
       // 優先使用後端生成的 QR Code
-      const qrDataUrl = qr_image || qr_fallback_url || this.generateQRCodeImage(deep_link_url);
+      const qrDataUrl = (qr_image || qr_fallback_url || this.generateQRCodeImage(deep_link_url || '')) as string;
       this.qrCodeUrl.set(qrDataUrl);
       
       // 3. 建立 WebSocket 連接
-      this.connectWebSocket(token);
+      this.connectWebSocket(token || '');
       
       // 4. 開始倒計時
       this.startQRCountdown();
       
     } catch (e: any) {
       console.error('[QRCode] Error:', e);
-      this.error.set(e.message || '生成二維碼失敗');
+      this.setErrorFromException(e, '生成二維碼失敗');
     } finally {
       this.qrCodeLoading.set(false);
     }
@@ -1815,7 +1829,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       
     } catch (e: any) {
       console.error('Telegram login error:', e);
-      this.error.set(e.message || 'Telegram 登入失敗');
+      this.setErrorFromException(e, 'Telegram 登入失敗');
     } finally {
       this.telegramLoading.set(false);
     }
@@ -1970,7 +1984,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       }
     } catch (e: any) {
       console.error('[TelegramAuth] Exception:', e);
-      this.error.set(e.message || this.t('auth.telegramLoginFailed'));
+        this.setErrorFromException(e, this.t('auth.telegramLoginFailed'));
     } finally {
       this.telegramLoading.set(false);
     }

@@ -1141,6 +1141,27 @@
                         </div>
                     </div>
                     
+                    <!-- 數據圖表面板 (P3) -->
+                    <div v-if="showChartsPanel" class="mb-6 glass-card rounded-2xl p-5">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                            <!-- 成功/失敗趨勢 -->
+                            <div class="bg-gray-800/50 rounded-xl p-4">
+                                <h4 class="text-xs font-medium text-gray-400 mb-3">📈 成功/失敗趨勢 (7日)</h4>
+                                <div style="height:200px;"><canvas id="apiTrendChart"></canvas></div>
+                            </div>
+                            <!-- 負載分佈 -->
+                            <div class="bg-gray-800/50 rounded-xl p-4">
+                                <h4 class="text-xs font-medium text-gray-400 mb-3">📊 帳號負載分佈</h4>
+                                <div style="height:200px;"><canvas id="apiLoadChart"></canvas></div>
+                            </div>
+                            <!-- 每日分配趨勢 -->
+                            <div class="bg-gray-800/50 rounded-xl p-4">
+                                <h4 class="text-xs font-medium text-gray-400 mb-3">📅 每日分配/釋放</h4>
+                                <div style="height:200px;"><canvas id="apiDailyTrendChart"></canvas></div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- 操作欄 -->
                     <div class="flex flex-wrap justify-between items-center mb-4 gap-3">
                         <div class="flex flex-wrap gap-3 items-center">
@@ -1201,6 +1222,27 @@
                                     class="bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
                                 📥 批量導入
                             </button>
+                            <!-- P3: 圖表/刷新/視圖 -->
+                            <div class="flex gap-1 ml-1 border-l border-gray-700 pl-2">
+                                <button @click="toggleChartsPanel" 
+                                        :class="showChartsPanel ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'"
+                                        class="px-2.5 py-2 rounded-lg text-sm transition-colors" title="數據圖表">
+                                    📈
+                                </button>
+                                <button @click="toggleViewMode"
+                                        class="bg-gray-700 hover:bg-gray-600 px-2.5 py-2 rounded-lg text-sm transition-colors"
+                                        :title="apiViewMode === 'table' ? '切換卡片視圖' : '切換表格視圖'">
+                                    {{ apiViewMode === 'table' ? '🃏' : '📋' }}
+                                </button>
+                                <div class="flex items-center gap-1">
+                                    <button @click="toggleAutoRefresh"
+                                            :class="autoRefreshEnabled ? 'bg-green-600 text-white' : 'bg-gray-700 hover:bg-gray-600'"
+                                            class="px-2.5 py-2 rounded-lg text-sm transition-colors" title="自動刷新">
+                                        🔄
+                                    </button>
+                                    <span v-if="autoRefreshEnabled" class="text-xs text-green-400 font-mono w-6 text-center">{{ autoRefreshCountdown }}s</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -1231,8 +1273,87 @@
                         </div>
                     </div>
                     
-                    <!-- API 列表 (增強版) -->
-                    <div class="glass-card rounded-2xl p-6 overflow-x-auto">
+                    <!-- ====== 卡片視圖 (P3) ====== -->
+                    <div v-if="apiViewMode === 'card'" class="mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            <div v-for="api in pagedApiPoolList" :key="api.api_id"
+                                 class="glass-card rounded-xl p-4 hover:border-blue-500/30 border border-transparent transition-all cursor-pointer relative"
+                                 @click="toggleApiDetail(api.api_id)">
+                                <!-- 選擇框 -->
+                                <div class="absolute top-3 right-3" @click.stop>
+                                    <input type="checkbox" :checked="selectedApis.includes(api.api_id)"
+                                           @change="toggleApiSelection(api.api_id)"
+                                           class="rounded border-gray-600 bg-gray-700 cursor-pointer">
+                                </div>
+                                <!-- 頂部：名稱 + 狀態 -->
+                                <div class="flex items-center gap-2 mb-3">
+                                    <span class="text-lg">🔑</span>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-medium text-sm truncate">{{ api.name }}</p>
+                                        <p class="text-[10px] text-gray-500 font-mono">{{ api.api_id }}</p>
+                                    </div>
+                                    <span :class="getApiStatusClass(api.status)"
+                                          class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium"
+                                          :style="{ background: api.status === 'available' ? 'rgba(34,197,94,0.15)' : api.status === 'full' ? 'rgba(234,179,8,0.15)' : api.status === 'banned' ? 'rgba(239,68,68,0.15)' : 'rgba(107,114,128,0.15)' }">
+                                        {{ getApiStatusText(api.status) }}
+                                    </span>
+                                </div>
+                                <!-- 帳號進度條 -->
+                                <div class="mb-3">
+                                    <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                                        <span>帳號</span>
+                                        <span class="font-mono">{{ api.current_accounts }}/{{ api.max_accounts }}</span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-1.5">
+                                        <div class="h-1.5 rounded-full transition-all"
+                                             :class="api.current_accounts >= api.max_accounts ? 'bg-red-500' : api.current_accounts > api.max_accounts * 0.7 ? 'bg-yellow-500' : 'bg-green-500'"
+                                             :style="{ width: Math.min(100, (api.current_accounts / Math.max(1, api.max_accounts)) * 100) + '%' }">
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 指標行 -->
+                                <div class="grid grid-cols-3 gap-2 text-center">
+                                    <div>
+                                        <p class="text-[10px] text-gray-500">成功率</p>
+                                        <p class="text-xs font-mono font-medium"
+                                           :class="(api.success_rate||0) >= healthThresholds.warningRate ? 'text-green-400' : (api.success_rate||0) >= healthThresholds.criticalRate ? 'text-yellow-400' : 'text-red-400'">
+                                            {{ (api.success_rate || 0).toFixed(0) }}%
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[10px] text-gray-500">優先級</p>
+                                        <p class="text-xs font-mono text-gray-300">{{ api.priority || 0 }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[10px] text-gray-500">生命週期</p>
+                                        <p class="text-xs font-medium"
+                                           :class="getApiLifecycle(api).recommendation === 'good' ? 'text-green-400' : getApiLifecycle(api).recommendation === 'monitor' ? 'text-yellow-400' : 'text-red-400'">
+                                            {{ getApiLifecycle(api).ageDays }}天
+                                        </p>
+                                    </div>
+                                </div>
+                                <!-- 底部操作 -->
+                                <div class="flex gap-1.5 mt-3 pt-2 border-t border-gray-700/50" @click.stop>
+                                    <button @click="openEditApiModal(api)" class="text-blue-400 hover:text-blue-300 text-[10px] px-1.5 py-0.5 rounded hover:bg-blue-900/30">✏️</button>
+                                    <button @click="toggleApiStatus(api)"
+                                            :class="api.status === 'disabled' ? 'text-green-400 hover:bg-green-900/30' : 'text-yellow-400 hover:bg-yellow-900/30'"
+                                            class="text-[10px] px-1.5 py-0.5 rounded">
+                                        {{ api.status === 'disabled' ? '✅' : '⏸️' }}
+                                    </button>
+                                    <button @click="deleteApiFromPool(api.api_id)" class="text-red-400 hover:text-red-300 text-[10px] px-1.5 py-0.5 rounded hover:bg-red-900/30">🗑️</button>
+                                    <span v-if="api.group_name" class="ml-auto text-[10px] text-blue-300/60 truncate max-w-[80px]">{{ api.group_name }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 卡片視圖空狀態 -->
+                        <div v-if="pagedApiPoolList.length === 0" class="text-center text-gray-500 py-12">
+                            <div v-if="apiSearchQuery">搜索「{{ apiSearchQuery }}」無結果</div>
+                            <div v-else>暫無 API 憑據</div>
+                        </div>
+                    </div>
+                    
+                    <!-- ====== 表格視圖 ====== -->
+                    <div v-if="apiViewMode === 'table'" class="glass-card rounded-2xl p-6 overflow-x-auto">
                         <table class="w-full">
                             <thead>
                                 <tr class="text-gray-400 text-xs uppercase tracking-wider">
@@ -1386,6 +1507,25 @@
                                                 </div>
                                             </div>
                                             
+                                            <!-- 生命週期指標 (P3) -->
+                                            <div class="mt-4 pt-4 border-t border-gray-700/50 flex flex-wrap gap-6 text-sm">
+                                                <div>
+                                                    <p class="text-gray-400 text-xs mb-1">📅 服役天數</p>
+                                                    <p class="font-mono text-white">{{ getApiLifecycle(api).ageDays }} 天</p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-gray-400 text-xs mb-1">⚡ 日均請求</p>
+                                                    <p class="font-mono text-white">{{ getApiLifecycle(api).intensity }}</p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-gray-400 text-xs mb-1">🔄 輪換建議</p>
+                                                    <p class="text-xs font-medium px-2 py-0.5 rounded-full inline-block"
+                                                       :class="getApiLifecycle(api).recommendation === 'good' ? 'bg-green-500/20 text-green-400' : getApiLifecycle(api).recommendation === 'monitor' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'">
+                                                        {{ getApiLifecycle(api).recText }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            
                                             <!-- 操作時間線 (P2) -->
                                             <div class="mt-4 pt-4 border-t border-gray-700/50">
                                                 <h4 class="text-xs font-medium text-gray-400 mb-3">📋 操作記錄</h4>
@@ -1428,44 +1568,45 @@
                             </tbody>
                         </table>
                         
-                        <!-- 分頁 + 統計底欄 -->
-                        <div class="mt-4 pt-3 border-t border-gray-700/50 flex flex-wrap justify-between items-center gap-3">
-                            <div class="flex items-center gap-3 text-xs text-gray-400">
-                                <span>共 {{ sortedApiPoolList.length }} 條</span>
-                                <span v-if="selectedApis.length > 0" class="text-blue-400">| 已選 {{ selectedApis.length }} 個</span>
-                                <div class="flex items-center gap-1">
-                                    <span>每頁</span>
-                                    <select v-model.number="apiPageSize" @change="apiPage = 1"
-                                            class="bg-gray-700 border border-gray-600 rounded px-2 py-0.5 text-xs">
-                                        <option :value="10">10</option>
-                                        <option :value="20">20</option>
-                                        <option :value="50">50</option>
-                                        <option :value="100">100</option>
-                                    </select>
-                                    <span>條</span>
-                                </div>
+                    </div>
+                    
+                    <!-- 分頁 + 統計底欄（共用） -->
+                    <div class="mt-4 flex flex-wrap justify-between items-center gap-3 text-xs text-gray-400">
+                        <div class="flex items-center gap-3">
+                            <span>共 {{ sortedApiPoolList.length }} 條</span>
+                            <span v-if="selectedApis.length > 0" class="text-blue-400">| 已選 {{ selectedApis.length }} 個</span>
+                            <div class="flex items-center gap-1">
+                                <span>每頁</span>
+                                <select v-model.number="apiPageSize" @change="apiPage = 1"
+                                        class="bg-gray-700 border border-gray-600 rounded px-2 py-0.5 text-xs">
+                                    <option :value="10">10</option>
+                                    <option :value="20">20</option>
+                                    <option :value="50">50</option>
+                                    <option :value="100">100</option>
+                                </select>
+                                <span>條</span>
                             </div>
-                            <!-- 分頁按鈕 -->
-                            <div v-if="totalApiPages > 1" class="flex items-center gap-1">
-                                <button @click="goToApiPage(apiPage - 1)" :disabled="apiPage <= 1"
-                                        class="px-2 py-1 rounded text-xs transition-colors"
-                                        :class="apiPage <= 1 ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 hover:bg-gray-700 hover:text-white'">
-                                    ‹ 上一頁
+                            <span v-if="autoRefreshEnabled" class="text-green-400">🔄 自動刷新中 ({{ autoRefreshCountdown }}s)</span>
+                        </div>
+                        <div v-if="totalApiPages > 1" class="flex items-center gap-1">
+                            <button @click="goToApiPage(apiPage - 1)" :disabled="apiPage <= 1"
+                                    class="px-2 py-1 rounded text-xs transition-colors"
+                                    :class="apiPage <= 1 ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 hover:bg-gray-700 hover:text-white'">
+                                ‹ 上一頁
+                            </button>
+                            <template v-for="p in apiPageNumbers" :key="p">
+                                <span v-if="p === '...'" class="px-1 text-gray-500 text-xs">...</span>
+                                <button v-else @click="goToApiPage(p)"
+                                        class="w-7 h-7 rounded text-xs font-medium transition-colors"
+                                        :class="p === apiPage ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'">
+                                    {{ p }}
                                 </button>
-                                <template v-for="p in apiPageNumbers" :key="p">
-                                    <span v-if="p === '...'" class="px-1 text-gray-500 text-xs">...</span>
-                                    <button v-else @click="goToApiPage(p)"
-                                            class="w-7 h-7 rounded text-xs font-medium transition-colors"
-                                            :class="p === apiPage ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'">
-                                        {{ p }}
-                                    </button>
-                                </template>
-                                <button @click="goToApiPage(apiPage + 1)" :disabled="apiPage >= totalApiPages"
-                                        class="px-2 py-1 rounded text-xs transition-colors"
-                                        :class="apiPage >= totalApiPages ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 hover:bg-gray-700 hover:text-white'">
-                                    下一頁 ›
-                                </button>
-                            </div>
+                            </template>
+                            <button @click="goToApiPage(apiPage + 1)" :disabled="apiPage >= totalApiPages"
+                                    class="px-2 py-1 rounded text-xs transition-colors"
+                                    :class="apiPage >= totalApiPages ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 hover:bg-gray-700 hover:text-white'">
+                                下一頁 ›
+                            </button>
                         </div>
                     </div>
                     
@@ -5084,6 +5225,6 @@ api_id,api_hash,name,source_phone,max_accounts
         </div>
     </div>
     
-    <script src="app.js?v=20260207-p2-enhance"></script>
+    <script src="app.js?v=20260207-p3-enhance"></script>
 </body>
 </html>

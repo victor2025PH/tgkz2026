@@ -70,13 +70,20 @@
             var el = document.getElementById('vue-loading');
             if (el) el.style.display = 'none';
         };
-        // 超時提示：如果 10 秒後 Vue 仍未掛載，顯示錯誤
+        // 全局錯誤捕獲：顯示具體錯誤信息幫助診斷
+        window.onerror = function(msg, url, line, col, err) {
+            var el = document.getElementById('vue-loading');
+            if (el) {
+                el.innerHTML = '<div style="text-align:center;max-width:600px;"><div style="font-size:3rem;margin-bottom:1rem;">⚠️</div><div style="margin-bottom:0.5rem;">頁面載入錯誤</div><div style="font-size:0.8rem;color:#ef4444;background:#1f2937;padding:1rem;border-radius:0.5rem;margin:1rem 0;text-align:left;word-break:break-all;">' + msg + '<br>File: ' + (url||'').split('/').pop() + ' Line: ' + line + '</div><button onclick="location.reload()" style="padding:0.5rem 1.5rem;background:#667eea;border:none;color:white;border-radius:0.5rem;cursor:pointer;">重新載入</button></div>';
+            }
+        };
+        // 超時提示：如果 15 秒後 Vue 仍未掛載，顯示錯誤
         setTimeout(function() {
             var el = document.getElementById('vue-loading');
             if (el && el.style.display !== 'none') {
-                el.innerHTML = '<div style="text-align:center;"><div style="font-size:3rem;margin-bottom:1rem;">⚠️</div><div style="margin-bottom:0.5rem;">頁面載入失敗</div><div style="font-size:0.85rem;color:#6b7280;">請按 Ctrl+Shift+R 強制刷新，或清除瀏覽器快取後重試</div><button onclick="location.reload()" style="margin-top:1rem;padding:0.5rem 1.5rem;background:#667eea;border:none;color:white;border-radius:0.5rem;cursor:pointer;">重新載入</button></div>';
+                el.innerHTML = '<div style="text-align:center;"><div style="font-size:3rem;margin-bottom:1rem;">⚠️</div><div style="margin-bottom:0.5rem;">頁面載入超時</div><div style="font-size:0.85rem;color:#6b7280;">請按 Ctrl+Shift+R 強制刷新</div><button onclick="location.reload()" style="margin-top:1rem;padding:0.5rem 1.5rem;background:#667eea;border:none;color:white;border-radius:0.5rem;cursor:pointer;">重新載入</button></div>';
             }
-        }, 10000);
+        }, 15000);
     </script>
     <div id="app" v-cloak>
         <!-- 側邊欄 -->

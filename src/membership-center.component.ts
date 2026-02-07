@@ -42,7 +42,9 @@ type MembershipTab = 'overview' | 'benefits' | 'upgrade' | 'history';
           <div class="level-info">
             <!-- 🔧 P1-2: 使用統一的會員等級徽章組件 -->
             <user-level-badge [level]="membershipLevel()" size="lg" />
-            @if (membershipExpires()) {
+            @if (membershipDaysLeft() === -1) {
+              <p class="expires-info">終身</p>
+            } @else if (membershipExpires()) {
               <p class="expires-info">
                 有效期至 {{ formatDate(membershipExpires()) }}
                 <span class="days-left">(剩餘 {{ membershipDaysLeft() }} 天)</span>

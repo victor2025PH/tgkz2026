@@ -57,7 +57,9 @@ type ProfileTab = 'account' | 'license' | 'devices' | 'usage' | 'invite';
             <div class="membership-badge-wrapper flex items-center gap-2">
               <!-- 🔧 P1-2: 使用統一的會員等級徽章組件 -->
               <user-level-badge [level]="membershipLevel()" size="md" />
-              @if (membershipDaysLeft() > 0) {
+              @if (membershipDaysLeft() === -1) {
+                <span class="expires text-xs opacity-70">· 終身</span>
+              } @else if (membershipDaysLeft() > 0) {
                 <span class="expires text-xs opacity-70">· 剩餘 {{ membershipDaysLeft() }} 天</span>
               }
             </div>

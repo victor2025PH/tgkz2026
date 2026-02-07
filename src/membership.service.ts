@@ -516,13 +516,12 @@ export class MembershipService {
       if (event.type === 'login' || event.type === 'user_update') {
         const user = event.payload?.user;
         if (user) {
-          // 從用戶數據中提取會員等級
           const tier = user.membershipLevel || user.subscription_tier || 'free';
           const level = this.tierToLevel(tier);
           const expires = user.membershipExpires || user.membership_expires;
-          
-          console.log(`[MembershipService] 🔄 收到 ${event.type} 事件，同步會員: ${level}`);
-          this.syncFromAuthService(level, expires);
+          const isLifetime = !!(user as { isLifetime?: boolean }).isLifetime;
+          console.log(`[MembershipService] 🔄 收到 ${event.type} 事件，同步會員: ${level}${isLifetime ? ' (終身)' : ''}`);
+          this.syncFromAuthService(level, expires, isLifetime);
         }
       } else if (event.type === 'logout') {
         // 登出時重置為青銅
@@ -566,8 +565,9 @@ export class MembershipService {
    * 
    * @param authLevel 從 AuthService 獲取的會員等級
    * @param authExpires 從 AuthService 獲取的過期時間
+   * @param isLifetime 後台標記為終身會員時為 true，前端顯示「終身」不顯示剩餘天數
    */
-  syncFromAuthService(authLevel: MembershipLevel, authExpires?: string): void {
+  syncFromAuthService(authLevel: MembershipLevel, authExpires?: string, isLifetime?: boolean): void {
     // Electron 模式下不同步（本地卡密優先）
     if (this.SKIP_LOGIN) {
       console.log('[MembershipService] Electron 模式，跳過 AuthService 同步');
@@ -578,16 +578,15 @@ export class MembershipService {
     const currentLevel = currentMembership?.level;
     
     // 🔧 修復：始終更新會員數據，確保 expiresAt 等屬性也被同步
-    // 即使等級相同，也需要確保完整的會員信息被設置
+    // 終身會員不設過期日（daysRemaining 為 -1，前端顯示「終身」）
     const levelConfig = MEMBERSHIP_CONFIG[authLevel];
     const newMembership: MembershipInfo = {
       level: authLevel,
       levelName: levelConfig?.name || '未知',
       levelIcon: levelConfig?.icon || '?',
-      // 🔧 修復：對於付費會員，如果沒有過期時間，設置為永久（100年）
-      expiresAt: authExpires 
-        ? new Date(authExpires) 
-        : (authLevel !== 'bronze' ? new Date(Date.now() + 365 * 100 * 24 * 60 * 60 * 1000) : undefined),
+      expiresAt: isLifetime
+        ? undefined
+        : (authExpires ? new Date(authExpires) : (authLevel !== 'bronze' ? new Date(Date.now() + 365 * 100 * 24 * 60 * 60 * 1000) : undefined)),
       activatedAt: currentMembership?.activatedAt || new Date(),
       machineId: this.getMachineId(),
       usage: currentMembership?.usage || this.getDefaultUsage(),

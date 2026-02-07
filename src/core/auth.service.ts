@@ -259,7 +259,10 @@ export class AuthService implements OnDestroy {
         })
       });
       
-      const result = await response.json();
+      const result = await this.parseJsonResponse(response);
+      if (!result) {
+        return { success: false, error: '網絡錯誤，請稍後重試' };
+      }
       
       if (result.success && result.data) {
         // 🆕 保存記住狀態
@@ -276,7 +279,9 @@ export class AuthService implements OnDestroy {
       
       return { success: false, error: result.error || '登入失敗' };
     } catch (e: any) {
-      return { success: false, error: e.message || '登入失敗' };
+      const msg = e?.message || '';
+      const isNetwork = msg.includes('JSON') || msg.includes('fetch') || msg.includes('network');
+      return { success: false, error: isNetwork ? '網絡錯誤，請稍後重試' : (e.message || '登入失敗') };
     } finally {
       this._isLoading.set(false);
     }
@@ -1257,6 +1262,20 @@ export class AuthService implements OnDestroy {
     }, refreshIn);
   }
   
+  /** 安全解析 JSON：若後端返回 HTML（如 502/404 頁）則返回 null，避免拋出 "Unexpected token" */
+  private async parseJsonResponse(response: Response): Promise<Record<string, unknown> | null> {
+    const text = await response.text();
+    const trimmed = text.trim();
+    if (trimmed.startsWith('<') || !trimmed) {
+      return null;
+    }
+    try {
+      return JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
   private getApiBaseUrl(): string {
     // 開發環境
     if (window.location.hostname === 'localhost' && window.location.port === '4200') {

@@ -36,7 +36,14 @@ async function refreshToken(): Promise<boolean> {
       body: JSON.stringify({ refresh_token: refreshTokenValue })
     });
     
-    const result = await response.json();
+    const text = await response.text();
+    let result: any;
+    try {
+      result = text.trim().startsWith('<') ? null : JSON.parse(text);
+    } catch {
+      result = null;
+    }
+    if (!result) return false;
     
     if (result.success && result.data) {
       localStorage.setItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN, result.data.access_token);

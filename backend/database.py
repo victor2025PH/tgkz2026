@@ -33,10 +33,11 @@ except ImportError:
 # 🆕 從 config 導入持久化數據庫路徑
 from config import DATABASE_DIR, DATABASE_PATH
 
-# 數據庫路徑 - 使用用戶數據目錄（打包後會從環境變量獲取）
-DB_PATH = DATABASE_DIR / "tgai_server.db"
-# 帳號管理數據庫路徑（TG-Matrix 主數據庫）
-ACCOUNTS_DB_PATH = DATABASE_PATH  # 使用 config.py 中的路徑
+# 數據庫路徑 - 統一使用 tgmatrix.db（合併 auth.db 後單一主庫）
+# 原 tgai_server.db 已合併到 tgmatrix.db，避免數據混亂
+DB_PATH = DATABASE_PATH
+# 帳號管理數據庫路徑（與主庫統一）
+ACCOUNTS_DB_PATH = DATABASE_PATH
 
 
 # ============ 會員等級配置 (價格單位: USDT) ============
@@ -1644,9 +1645,9 @@ class Database:
                 user_id = f"U{secrets.token_hex(8).upper()}"
                 invite_code = f"TG{secrets.token_hex(4).upper()}"
                 cursor.execute('''
-                    INSERT INTO users (user_id, machine_id, invite_code, membership_level, expires_at)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (user_id, machine_id, invite_code, license_data['level'], expires_at.isoformat()))
+                    INSERT INTO users (id, user_id, machine_id, invite_code, membership_level, expires_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (user_id, user_id, machine_id, invite_code, license_data['level'], expires_at.isoformat()))
         
         # 更新卡密狀態
         cursor.execute('''
@@ -1686,11 +1687,15 @@ class Database:
                     expires_at = ?,
                     is_lifetime = ?,
                     total_spent = total_spent + ?,
-                    last_active_at = ?
-                WHERE user_id = ?
+                    last_active_at = ?,
+                    subscription_tier = ?,
+                    subscription_expires = ?
+                WHERE user_id = ? OR id = ?
             ''', (new_level, new_expires.isoformat(), 
                   1 if license_data['duration_type'] == 'lifetime' else 0,
-                  license_data['price'], now.isoformat(), user_id))
+                  license_data['price'], now.isoformat(),
+                  new_level, new_expires.isoformat(),
+                  user_id, user_id))
         
         # 記錄激活
         cursor.execute('''

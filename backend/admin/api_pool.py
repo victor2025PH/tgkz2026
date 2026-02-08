@@ -1261,6 +1261,187 @@ class ApiPoolManager:
         finally:
             conn.close()
 
+    def link_allocation_to_account(
+        self,
+        account_phone: str,
+        account_id: str,
+        api_id: Optional[str] = None
+    ) -> Tuple[bool, str]:
+        """將分配記錄與帳號 ID 綁定（必要時補建分配）"""
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+
+            # 查找已有分配
+            cursor.execute('''
+                SELECT id, api_credential_id, api_id, account_id
+                FROM telegram_api_allocations
+                WHERE account_phone = ? AND status = 'active'
+            ''', (account_phone,))
+            alloc = cursor.fetchone()
+
+            target_cred_id = None
+            target_api_id = None
+            pool_row = None
+            if api_id:
+                cursor.execute('SELECT id, api_id, max_accounts, current_accounts, status FROM telegram_api_pool WHERE api_id = ?', (api_id,))
+                pool_row = cursor.fetchone()
+                if pool_row:
+                    target_cred_id = pool_row['id']
+                    target_api_id = pool_row['api_id']
+
+            if alloc:
+                updates = []
+                params = []
+                if account_id and alloc['account_id'] != account_id:
+                    updates.append("account_id = ?")
+                    params.append(account_id)
+                if target_cred_id and alloc['api_credential_id'] != target_cred_id:
+                    updates.append("api_credential_id = ?")
+                    params.append(target_cred_id)
+                    updates.append("api_id = ?")
+                    params.append(target_api_id)
+                if updates:
+                    params.append(alloc['id'])
+                    cursor.execute(f'''
+                        UPDATE telegram_api_allocations
+                        SET {", ".join(updates)}
+                        WHERE id = ?
+                    ''', params)
+                    conn.commit()
+                return True, "已綁定分配記錄"
+
+            # 沒有分配，嘗試補建
+            if not target_cred_id:
+                return False, "未找到可用的 API 憑據"
+
+            alloc_id = f"alloc_{uuid.uuid4().hex[:12]}"
+            now = datetime.now().isoformat()
+            cursor.execute('''
+                INSERT INTO telegram_api_allocations
+                (id, api_credential_id, api_id, account_phone, account_id, allocated_at, status)
+                VALUES (?, ?, ?, ?, ?, ?, 'active')
+            ''', (alloc_id, target_cred_id, target_api_id, account_phone, account_id, now))
+
+            new_count = (pool_row['current_accounts'] or 0) + 1
+            new_status = ApiPoolStatus.FULL.value if new_count >= (pool_row['max_accounts'] or 0) else ApiPoolStatus.AVAILABLE.value
+            cursor.execute('''
+                UPDATE telegram_api_pool
+                SET current_accounts = ?, status = ?, last_used = ?
+                WHERE id = ?
+            ''', (new_count, new_status, now, target_cred_id))
+
+            conn.commit()
+            return True, "已補建分配記錄"
+        except Exception as e:
+            logger.error(f"[ApiPoolManager] link_allocation_to_account error: {e}")
+            return False, f"綁定失敗: {str(e)}"
+        finally:
+            conn.close()
+
+    def sync_allocations_with_accounts(self) -> Dict[str, Any]:
+        """將既有帳號同步到 API 分配記錄並刷新池統計"""
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='accounts'")
+            if not cursor.fetchone():
+                return {"created": 0, "updated": 0, "skipped_no_pool": 0, "refreshed": 0, "message": "accounts 表不存在"}
+
+            cursor.execute('SELECT id, phone, apiId FROM accounts WHERE apiId IS NOT NULL AND apiId != "" AND phone IS NOT NULL AND phone != ""')
+            accounts = cursor.fetchall()
+
+            cursor.execute('SELECT id, api_id, max_accounts, status FROM telegram_api_pool')
+            pool_rows = cursor.fetchall()
+            pool_by_api_id = {row['api_id']: row for row in pool_rows}
+
+            created = 0
+            updated = 0
+            skipped_no_pool = 0
+
+            for acc in accounts:
+                account_id = acc['id']
+                phone = acc['phone']
+                api_id = acc['apiId']
+                pool_row = pool_by_api_id.get(api_id)
+                if not pool_row:
+                    skipped_no_pool += 1
+                    continue
+
+                cursor.execute('''
+                    SELECT id, api_credential_id, api_id, account_id
+                    FROM telegram_api_allocations
+                    WHERE account_phone = ? AND status = 'active'
+                ''', (phone,))
+                alloc = cursor.fetchone()
+
+                if alloc:
+                    updates = []
+                    params = []
+                    if alloc['account_id'] != account_id:
+                        updates.append("account_id = ?")
+                        params.append(account_id)
+                    if alloc['api_credential_id'] != pool_row['id'] or alloc['api_id'] != api_id:
+                        updates.append("api_credential_id = ?")
+                        params.append(pool_row['id'])
+                        updates.append("api_id = ?")
+                        params.append(api_id)
+                    if updates:
+                        params.append(alloc['id'])
+                        cursor.execute(f'''
+                            UPDATE telegram_api_allocations
+                            SET {", ".join(updates)}
+                            WHERE id = ?
+                        ''', params)
+                        updated += 1
+                else:
+                    alloc_id = f"alloc_{uuid.uuid4().hex[:12]}"
+                    now = datetime.now().isoformat()
+                    cursor.execute('''
+                        INSERT INTO telegram_api_allocations
+                        (id, api_credential_id, api_id, account_phone, account_id, allocated_at, status)
+                        VALUES (?, ?, ?, ?, ?, ?, 'active')
+                    ''', (alloc_id, pool_row['id'], api_id, phone, account_id, now))
+                    created += 1
+
+            # 重新計算 current_accounts 並刷新狀態
+            cursor.execute('''
+                SELECT api_credential_id, COUNT(*) as cnt
+                FROM telegram_api_allocations
+                WHERE status = 'active'
+                GROUP BY api_credential_id
+            ''')
+            counts = {row['api_credential_id']: row['cnt'] for row in cursor.fetchall()}
+
+            refreshed = 0
+            for row in pool_rows:
+                count = counts.get(row['id'], 0)
+                status = row['status']
+                if status in {ApiPoolStatus.DISABLED.value, ApiPoolStatus.BANNED.value}:
+                    new_status = status
+                else:
+                    new_status = ApiPoolStatus.FULL.value if count >= (row['max_accounts'] or 0) else ApiPoolStatus.AVAILABLE.value
+                cursor.execute('''
+                    UPDATE telegram_api_pool
+                    SET current_accounts = ?, status = ?
+                    WHERE id = ?
+                ''', (count, new_status, row['id']))
+                refreshed += 1
+
+            conn.commit()
+            return {
+                "created": created,
+                "updated": updated,
+                "skipped_no_pool": skipped_no_pool,
+                "refreshed": refreshed
+            }
+        except Exception as e:
+            logger.error(f"[ApiPoolManager] sync_allocations_with_accounts error: {e}")
+            return {"created": 0, "updated": 0, "skipped_no_pool": 0, "refreshed": 0, "error": str(e)}
+        finally:
+            conn.close()
+
     def get_allocation_history(
         self,
         account_phone: Optional[str] = None,

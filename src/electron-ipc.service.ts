@@ -560,8 +560,15 @@ export class ElectronIpcService implements OnDestroy {
           accountId: result.account_id || result.accountId,
           error: result.error || result.message,
           phone: result.phone,
-          codeExpired: result.code_expired || result.codeExpired
+          codeExpired: result.code_expired || result.codeExpired,
+          code: result.code,
+          detail: result.detail,
+          quota: result.quota,
+          upgradeSuggestion: result.upgrade_suggestion
         });
+      }
+      if (command === 'add-account' && result && result.success) {
+        this.triggerEvent('account-added', result);
       }
     }
     

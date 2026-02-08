@@ -3668,6 +3668,15 @@ class BackendService:
                 except Exception as e:
                     print(f"[Backend] Error updating API credential usage: {e}", file=sys.stderr)
             
+            # 🔧 同步 API 池分配（平台 API）
+            if payload.get('usePlatformApi') and api_id:
+                try:
+                    from admin.api_pool import get_api_pool_manager
+                    api_pool = get_api_pool_manager()
+                    api_pool.link_allocation_to_account(phone, str(account_id), api_id=api_id)
+                except Exception as e:
+                    print(f"[Backend] Error linking API allocation: {e}", file=sys.stderr)
+            
             await db.add_log(f"Account added: {payload.get('phone')}", "success")
             self.send_log(f"账户添加成功: {payload.get('phone')}", "success")
             

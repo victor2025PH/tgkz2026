@@ -259,3 +259,12 @@ sudo docker compose logs -f --tail=50
 
 **注意**：服務器使用 Docker Compose V2 (`docker compose`)，不是 V1 (`docker-compose`)
 
+---
+
+## 上傳並部署（Git + GitHub Actions）
+
+當用戶說「上傳並部署」「幫我上傳並布署」「提交並部署」等時：
+1. 只 stage 源代碼變更（`git add` 後端/前端源文件），**不要**加入 `dist/` 構建產物。
+2. 執行 `git commit -m "簡短描述"` 與 `git push origin main`。
+3. 推送後 GitHub Actions 會自動執行 Deploy to Production（構建前端、同步服務器、重啟容器）。
+4. 可簡短回覆：已提交並推送，Actions 會自動部署。

@@ -1254,6 +1254,9 @@
                             <li>• 配置代理供應商 API 後，系統會自動從供應商拉取可用代理 IP</li>
                             <li>• 同步的代理自動進入代理池，可在「代理池管理」頁面查看</li>
                             <li>• 支持 <span class="text-blue-400">Blurpath</span> 等主流代理供應商 API</li>
+                            <li>• <strong>Blurpath 填寫方式：</strong>「帳號」填 Blurpath 登錄郵箱，「密碼」填 Blurpath 登錄密碼</li>
+                            <li>• 系統會自動用帳號密碼獲取 API 授權令牌，無需手動複製 token</li>
+                            <li>• <span class="text-yellow-400">注意：</span>如果 Blurpath 帳號開啟了二步驗證（Email 或 Google），需先關閉或使用子帳號</li>
                             <li>• 已綁定帳號的代理不會被自動刪除，即使供應商端已移除</li>
                             <li>• 建議設置 30 分鐘自動同步間隔以保持代理池最新</li>
                         </ul>
@@ -1284,25 +1287,38 @@
 
                             <div>
                                 <label class="block text-sm text-gray-400 mb-1">API 地址</label>
-                                <input v-model="providerForm.api_base_url" type="text" placeholder="https://api.blurpath.com"
+                                <input v-model="providerForm.api_base_url" type="text" placeholder="https://blurpath.com/api"
                                        class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white">
+                                <p class="text-xs text-gray-500 mt-1">Blurpath 默認: https://blurpath.com/api</p>
                             </div>
 
                             <div>
-                                <label class="block text-sm text-gray-400 mb-1">API Key</label>
-                                <input v-model="providerForm.api_key" type="password" placeholder="輸入 API Key"
+                                <label class="block text-sm text-gray-400 mb-1">
+                                    {{ providerForm.provider_type === 'blurpath' ? 'Blurpath 帳號（Email）*' : 'API Key' }}
+                                </label>
+                                <input v-model="providerForm.api_key" type="text"
+                                       :placeholder="providerForm.provider_type === 'blurpath' ? '輸入 Blurpath 登錄郵箱' : '輸入 API Key'"
                                        class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white">
                                 <p v-if="providerForm.id && providerForm.api_key_masked" class="text-xs text-gray-500 mt-1">
                                     當前: {{ providerForm.api_key_masked }}（留空則不更新）
                                 </p>
+                                <p v-if="providerForm.provider_type === 'blurpath' && !providerForm.id" class="text-xs text-blue-400 mt-1">
+                                    即 Blurpath 網站的登錄郵箱地址
+                                </p>
                             </div>
 
                             <div>
-                                <label class="block text-sm text-gray-400 mb-1">API Secret</label>
-                                <input v-model="providerForm.api_secret" type="password" placeholder="輸入 API Secret"
+                                <label class="block text-sm text-gray-400 mb-1">
+                                    {{ providerForm.provider_type === 'blurpath' ? 'Blurpath 密碼 *' : 'API Secret' }}
+                                </label>
+                                <input v-model="providerForm.api_secret" type="password"
+                                       :placeholder="providerForm.provider_type === 'blurpath' ? '輸入 Blurpath 登錄密碼' : '輸入 API Secret'"
                                        class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white">
                                 <p v-if="providerForm.id && providerForm.api_secret_masked" class="text-xs text-gray-500 mt-1">
                                     當前: {{ providerForm.api_secret_masked }}（留空則不更新）
+                                </p>
+                                <p v-if="providerForm.provider_type === 'blurpath' && !providerForm.id" class="text-xs text-blue-400 mt-1">
+                                    即 Blurpath 網站的登錄密碼
                                 </p>
                             </div>
 

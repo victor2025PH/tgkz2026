@@ -979,7 +979,7 @@ createApp({
             providerForm.id = '';
             providerForm.name = '';
             providerForm.provider_type = 'blurpath';
-            providerForm.api_base_url = '';
+            providerForm.api_base_url = 'https://blurpath.com/api';
             providerForm.api_key = '';
             providerForm.api_secret = '';
             providerForm.api_key_masked = '';

@@ -484,6 +484,33 @@ class BackendService:
         self._cache.pop(cache_key, None)
         self._cache_timestamps.pop(cache_key, None)
     
+    async def _send_accounts_updated(self, owner_user_id: str = None):
+        """🔧 安全地獲取帳號並發送 accounts-updated 事件（多租戶安全）
+        
+        Args:
+            owner_user_id: 帳號擁有者 ID。如果未提供，嘗試從租戶上下文獲取。
+        """
+        # 嘗試獲取租戶 ID
+        tenant_id = owner_user_id
+        if not tenant_id:
+            try:
+                from core.tenant_context import get_current_tenant
+                t = get_current_tenant()
+                if t and t.user_id:
+                    tenant_id = t.user_id
+            except (ImportError, Exception):
+                pass
+        
+        # 獲取帳號（按租戶過濾）
+        accounts = await db.get_all_accounts(owner_user_id=tenant_id)
+        
+        # 清除緩存
+        self._cache.pop("accounts", None)
+        self._cache_timestamps.pop("accounts", None)
+        
+        # 發送事件（帶租戶 ID 過濾廣播）
+        self.send_event("accounts-updated", accounts, tenant_id=tenant_id)
+    
     # ==================== 配額檢查輔助方法 ====================
     
     async def check_quota(
@@ -2327,7 +2354,7 @@ class BackendService:
     # HTTP Server 引用（由 HttpApiServer 設置）
     _http_server = None
     
-    def send_event(self, event_name: str, payload: Any, message_id: Optional[str] = None):
+    def send_event(self, event_name: str, payload: Any, message_id: Optional[str] = None, tenant_id: str = None):
         """
         Send an event to Electron via stdout AND broadcast to WebSocket clients
         
@@ -2335,6 +2362,7 @@ class BackendService:
             event_name: Event name
             payload: Event payload
             message_id: Optional message ID for confirmation
+            tenant_id: Optional tenant ID for multi-tenant broadcast filtering
         """
         message = {
             "event": event_name,
@@ -2366,8 +2394,19 @@ class BackendService:
             if self._http_server and hasattr(self._http_server, 'broadcast'):
                 import asyncio
                 try:
+                    # 🔧 多租戶安全：獲取當前租戶 ID 用於過濾廣播
+                    broadcast_tenant_id = tenant_id
+                    if not broadcast_tenant_id:
+                        try:
+                            from core.tenant_context import get_current_tenant
+                            t = get_current_tenant()
+                            if t and t.user_id:
+                                broadcast_tenant_id = t.user_id
+                        except (ImportError, Exception):
+                            pass
+                    
                     loop = asyncio.get_running_loop()
-                    asyncio.ensure_future(self._http_server.broadcast(event_name, payload))
+                    asyncio.ensure_future(self._http_server.broadcast(event_name, payload, tenant_id=broadcast_tenant_id))
                 except RuntimeError:
                     # 如果沒有運行的事件循環，嘗試創建新任務
                     pass
@@ -2930,8 +2969,8 @@ class BackendService:
                 "isMonitoring": is_monitoring
             })
             
-            # 額外發送 accounts-updated 事件確保前端接收
-            self.send_event("accounts-updated", accounts)
+            # 額外發送 accounts-updated 事件確保前端接收（多租戶安全）
+            await self._send_accounts_updated()
             
             total_duration = time.time() - start_time
             print(f"[Backend] ✓ Initial state sent in {total_duration:.3f}s (parallel query: {parallel_duration:.3f}s)", file=sys.stderr)
@@ -3250,11 +3289,7 @@ class BackendService:
                     self.send_log(f"💡 帳號 {phone} 已登入，請在帳號管理中分配角色", "info")
             
             # 發送帳號列表更新事件
-            accounts = await db.get_all_accounts()
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
-            print(f"[Backend] Sent accounts-updated event with {len(accounts)} accounts", file=sys.stderr)
+            await self._send_accounts_updated()
             
         except Exception as e:
             print(f"[Backend] Error handling QR login account ready: {e}", file=sys.stderr)
@@ -3462,11 +3497,8 @@ class BackendService:
                         except Exception as e:
                             print(f"[Backend] Error updating API credential usage: {e}", file=sys.stderr)
                     
-                    # Send updated accounts list
-                    accounts = await db.get_all_accounts()
-                    self._cache.pop("accounts", None)
-                    self._cache_timestamps.pop("accounts", None)
-                    self.send_event("accounts-updated", accounts)
+                    # Send updated accounts list (🔧 多租戶安全)
+                    await self._send_accounts_updated(owner_user_id)
                     
                     # Automatically trigger login
                     print(f"[Backend] Auto-triggering login for existing account {phone} (ID: {existing_id})", file=sys.stderr)
@@ -3507,11 +3539,8 @@ class BackendService:
                         if update_data and existing_id:
                             await db.update_account(existing_id, update_data)
                             print(f"[Backend] Updated account data for {phone}", file=sys.stderr)
-                            # Only send accounts-updated if we actually updated something
-                            accounts = await db.get_all_accounts()
-                            self._cache.pop("accounts", None)
-                            self._cache_timestamps.pop("accounts", None)
-                            self.send_event("accounts-updated", accounts)
+                            # Only send accounts-updated if we actually updated something (🔧 多租戶安全)
+                            await self._send_accounts_updated(owner_user_id)
                     
                     # Return success - account exists and is in login process
                     # DO NOT send accounts-updated event if status is Waiting Code to prevent loop
@@ -3642,14 +3671,8 @@ class BackendService:
             await db.add_log(f"Account added: {payload.get('phone')}", "success")
             self.send_log(f"账户添加成功: {payload.get('phone')}", "success")
             
-            # Send updated accounts list
-            accounts = await db.get_all_accounts()
-            print(f"[Backend] Sending accounts-updated event with {len(accounts)} accounts", file=sys.stderr)
-            
-            # Invalidate cache
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            # Send updated accounts list (🔧 多租戶安全)
+            await self._send_accounts_updated(owner_user_id)
             
             # 🔧 P4-3: 帳號新增成功 → 提交配額預留
             if quota_reserved and owner_user_id:
@@ -3950,11 +3973,9 @@ class BackendService:
             
             # Update status to "Logging in..."
             await db.update_account(account_id, {"status": "Logging in..."})
-            accounts = await db.get_all_accounts()
-            # Invalidate cache
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            # 🔧 多租戶安全
+            _login_owner = account.get('owner_user_id')
+            await self._send_accounts_updated(_login_owner)
             
             self.send_log(f"Login initiated for account {phone}", "info")
             print(f"[Backend] Status updated to 'Logging in...', calling telegram_manager.login_account", file=sys.stderr)
@@ -4202,12 +4223,8 @@ class BackendService:
                             })
                             print(f"[Backend] Warmup progress updated for {phone}: Stage {stage_info.get('stage')} - {stage_info.get('stage_name')}, Days: {stage_info.get('days_completed')}", file=sys.stderr)
                     
-                    # 🔧 關鍵修復：登入成功後發送 accounts-updated 事件更新前端狀態
-                    accounts = await db.get_all_accounts()
-                    self._cache.pop("accounts", None)
-                    self._cache_timestamps.pop("accounts", None)
-                    self.send_event("accounts-updated", accounts)
-                    print(f"[Backend] Sent accounts-updated after successful login for {phone}", file=sys.stderr)
+                    # 🔧 關鍵修復：登入成功後發送 accounts-updated 事件更新前端狀態（多租戶安全）
+                    await self._send_accounts_updated(account.get('owner_user_id'))
                     
                     # 🆕 返回結果（HTTP API 模式需要）
                     return {
@@ -4276,10 +4293,7 @@ class BackendService:
                         "codeExpired": True
                     })
                     # Don't send duplicate error event below
-                    accounts = await db.get_all_accounts()
-                    self._cache.pop("accounts", None)
-                    self._cache_timestamps.pop("accounts", None)
-                    self.send_event("accounts-updated", accounts)
+                    await self._send_accounts_updated(account.get('owner_user_id'))
                     return {
                         "success": False,
                         "error": friendly_msg,
@@ -4302,10 +4316,7 @@ class BackendService:
                         "friendlyMessage": friendly_msg,
                         "codeExpired": True
                     })
-                    accounts = await db.get_all_accounts()
-                    self._cache.pop("accounts", None)
-                    self._cache_timestamps.pop("accounts", None)
-                    self.send_event("accounts-updated", accounts)
+                    await self._send_accounts_updated(account.get('owner_user_id'))
                     return {
                         "success": False,
                         "error": friendly_msg,
@@ -4347,10 +4358,7 @@ class BackendService:
                         "friendlyMessage": friendly_msg,
                         "codeExpired": True
                     })
-                    accounts = await db.get_all_accounts()
-                    self._cache.pop("accounts", None)
-                    self._cache_timestamps.pop("accounts", None)
-                    self.send_event("accounts-updated", accounts)
+                    await self._send_accounts_updated(account.get('owner_user_id'))
                     return {
                         "success": False,
                         "error": friendly_msg,
@@ -4381,11 +4389,7 @@ class BackendService:
                 }
             
             # Update accounts list
-            accounts = await db.get_all_accounts()
-            # Invalidate cache
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
         
         except Exception as e:
             import sys
@@ -4627,9 +4631,7 @@ class BackendService:
             self.send_log(f"帳號 {phone} 已綁定 IP: {binding.proxy_ip}", "success")
             
             # Refresh accounts list
-            accounts = await db.get_all_accounts()
-            self._cache.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             
         except Exception as e:
             import sys
@@ -4654,9 +4656,7 @@ class BackendService:
             self.send_event("ip-unbinding-success", {"accountId": account_id})
             
             # Refresh accounts list
-            accounts = await db.get_all_accounts()
-            self._cache.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             
         except Exception as e:
             import sys
@@ -4890,11 +4890,7 @@ class BackendService:
             self.send_event("account-status-updated", status_info)
             
             # Update accounts list
-            accounts = await db.get_all_accounts()
-            # Invalidate cache
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
         
         except Exception as e:
             self.send_log(f"Error checking account status: {str(e)}", "error")
@@ -4906,11 +4902,7 @@ class BackendService:
             updates = payload.get('updates', {})
             await db.update_account(account_id, updates)
             
-            accounts = await db.get_all_accounts()
-            # Invalidate cache
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             await db.add_log(f"Account {account_id} updated", "success")
         
         except Exception as e:
@@ -4983,10 +4975,7 @@ class BackendService:
             print(f"[Backend] Account {phone or account_id} updated: {list(update_data.keys())}", file=sys.stderr)
 
             # 刷新帳號列表
-            accounts = await db.get_all_accounts()
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             
             # 發送成功響應
             self.send_event("update-account-result", {"success": True})
@@ -5192,10 +5181,7 @@ class BackendService:
             print(f"[Backend] Account info synced for {phone}", file=sys.stderr)
             
             # 刷新帳號列表
-            accounts = await db.get_all_accounts()
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             
             # 發送成功結果
             self.send_event("sync-account-info-result", {
@@ -5251,10 +5237,7 @@ class BackendService:
             await db.update_account(account_id, {"status": "Offline"})
 
             # 刷新账户列表
-            accounts = await db.get_all_accounts()
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
 
             # 发送成功结果
             self.send_event("logout-account-result", {
@@ -5360,10 +5343,7 @@ class BackendService:
                     print(f"[Backend] Error updating account {account_id}: {e}", file=sys.stderr)
             
             # 刷新帳號列表
-            accounts = await db.get_all_accounts()
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             
             # 發送成功結果
             self.send_event("batch-update-accounts-result", {
@@ -5388,11 +5368,7 @@ class BackendService:
             role = payload.get('role')
             await db.bulk_update_accounts_role(account_ids, role)
             
-            accounts = await db.get_all_accounts()
-            # Invalidate cache
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             await db.add_log(f"Bulk assigned role '{role}' to {len(account_ids)} accounts", "success")
         
         except Exception as e:
@@ -5405,11 +5381,7 @@ class BackendService:
             group = payload.get('group')
             await db.bulk_update_accounts_group(account_ids, group)
             
-            accounts = await db.get_all_accounts()
-            # Invalidate cache
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             await db.add_log(f"Bulk assigned group '{group}' to {len(account_ids)} accounts", "success")
         
         except Exception as e:
@@ -5491,11 +5463,7 @@ class BackendService:
                         print(f"[Backend] Error deleting session files for {phone}: {e}", file=sys.stderr)
             
             # Update accounts list and send event
-            accounts = await db.get_all_accounts()
-            # Invalidate cache
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             
             await db.add_log(f"批量删除了 {len(deleted_phones)} 个账户", "success")
             self.send_log(f"已删除 {len(deleted_phones)} 个账户", "success")
@@ -5509,11 +5477,7 @@ class BackendService:
             except Exception as qe:
                 print(f"[Backend] Quota cache invalidation error: {qe}", file=sys.stderr)
             
-            accounts = await db.get_all_accounts()
-            # Invalidate cache
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             await db.add_log(f"Deleted {len(account_ids)} accounts", "success")
         
         except Exception as e:
@@ -5627,11 +5591,7 @@ class BackendService:
                     # The account is already deleted from database
             
             # 4. Update accounts list and send event
-            accounts = await db.get_all_accounts()
-            # Invalidate cache
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             
             await db.add_log(f"账户 {phone} (ID: {account_id}) 已完全删除", "success")
             self.send_log(f"账户 {phone} 已完全删除", "success")
@@ -7030,10 +6990,7 @@ class BackendService:
             self.send_event("one-click-start-result", results)
             
             # 🔧 關鍵修復：一鍵啟動完成後發送 accounts-updated 更新前端狀態
-            accounts = await db.get_all_accounts()
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             
             # 🔧 P0 修復：確保發送 monitoring-status-changed 事件同步前端狀態
             self.send_event("monitoring-status-changed", self.is_monitoring)
@@ -8209,11 +8166,7 @@ class BackendService:
             await db.add_log(f"Daily send counts reset for {len(accounts)} accounts", "info")
             
             # Send updated accounts
-            accounts = await db.get_all_accounts()
-            # Invalidate cache
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
         
         except Exception as e:
             self.send_log(f"Error resetting daily send counts: {str(e)}", "error")
@@ -8288,11 +8241,7 @@ class BackendService:
                     self.send_log(f"Error checking health for account {account.get('phone')}: {str(e)}", "error")
             
             # Send updated accounts
-            accounts = await db.get_all_accounts()
-            # Invalidate cache
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
         
         except Exception as e:
             self.send_log(f"Error checking all accounts health: {str(e)}", "error")
@@ -8655,7 +8604,8 @@ class BackendService:
         """獲取所有帳號列表"""
         try:
             accounts = await db.get_all_accounts()
-            self.send_event("accounts-updated", accounts)
+            # 🔧 多租戶安全：通過 _send_accounts_updated 發送，帶租戶過濾
+            await self._send_accounts_updated()
             # 同時返回數據給 HTTP 響應
             return {'success': True, 'accounts': accounts}
         except Exception as e:
@@ -11975,11 +11925,7 @@ class BackendService:
                     continue
             
             # Send updated accounts
-            accounts = await db.get_all_accounts()
-            # Invalidate cache
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             
             self.send_log(f"Imported {imported_count} accounts from Excel (skipped {skipped_count})", "success")
             await db.add_log(f"Imported {imported_count} accounts from Excel", "success")
@@ -12072,8 +12018,7 @@ class BackendService:
             
             if not session_files:
                 self.send_log("No session files found", "info")
-                accounts = await db.get_all_accounts()
-                self.send_event("accounts-updated", accounts)
+                await self._send_accounts_updated()
                 return
             
             # Get all existing accounts
@@ -12134,11 +12079,7 @@ class BackendService:
                     accounts_without_sessions.append(phone)
             
             # Send updated accounts
-            accounts = await db.get_all_accounts()
-            # Invalidate cache
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             
             # Log summary
             summary = f"Reloaded sessions: {len(session_files)} session files found, {imported_count} new accounts created, {updated_count} existing accounts updated"
@@ -12353,10 +12294,7 @@ class BackendService:
                     })
             
             # 刷新帳號列表
-            accounts = await db.get_all_accounts()
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
             
             self.send_log(
                 f"📊 Session 恢復完成: 成功 {results['success_count']}, 失敗 {results['fail_count']}", 
@@ -12570,10 +12508,7 @@ class BackendService:
                 return
             
             # Reload accounts
-            accounts = await db.get_all_accounts()
-            self._cache.pop("accounts", None)
-            self._cache_timestamps.pop("accounts", None)
-            self.send_event("accounts-updated", accounts)
+            await self._send_accounts_updated()
         
         except Exception as e:
             self.send_log(f"Error importing session: {str(e)}", "error")
@@ -12659,9 +12594,8 @@ class BackendService:
                 
                 self.send_log(f"✅ 帳號導入成功: {phone}", "success")
                 
-                # 刷新帳號列表
-                accounts = await db.get_all_accounts()
-                self.send_event("accounts-updated", accounts)
+                # 刷新帳號列表（多租戶安全）
+                await self._send_accounts_updated()
             else:
                 self.send_log(f"❌ 導入失敗: {result.get('error', '未知錯誤')}", "error")
             
@@ -12733,9 +12667,8 @@ class BackendService:
                 "success" if result.get('success_count', 0) > 0 else "warning"
             )
             
-            # 刷新帳號列表
-            accounts = await db.get_all_accounts()
-            self.send_event("accounts-updated", accounts)
+            # 刷新帳號列表（多租戶安全）
+            await self._send_accounts_updated()
             
             self.send_event("tdata-batch-result", result)
             
@@ -23274,9 +23207,8 @@ class BackendService:
             
             self.send_log(f"📥 TData 導入完成：成功 {result['success_count']} 個，失敗 {result['fail_count']} 個", "info")
             
-            # 刷新帳戶列表
-            all_accounts = await db.get_all_accounts()
-            self.send_event("accounts-updated", all_accounts)
+            # 刷新帳戶列表（多租戶安全）
+            await self._send_accounts_updated()
             
         except Exception as e:
             print(f"[Backend] Error importing TData: {e}", file=sys.stderr)

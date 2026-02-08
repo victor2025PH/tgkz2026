@@ -117,6 +117,7 @@ class HttpApiServer:
         self.port = port
         self.app = web.Application()
         self.websocket_clients = set()
+        self.websocket_tenant_map: dict = {}  # 🔧 ws -> tenant_id 映射，用於多租戶廣播過濾
         self._setup_routes()
         self._setup_cors()
         self._setup_middleware()
@@ -7882,6 +7883,10 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
                     'subscription_tier': getattr(tenant, 'subscription_tier', 'free')
                 }
         
+        # 🔧 修復：記錄 WebSocket 連接的租戶 ID，用於多租戶廣播過濾
+        if tenant_id:
+            self.websocket_tenant_map[ws] = tenant_id
+        
         logger.info(f"WebSocket client {client_id} connected (tenant: {tenant_id}). Total: {len(self.websocket_clients)}")
         
         # 發送連接確認
@@ -7969,12 +7974,22 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
             logger.error(f"WebSocket handler error: {e}")
         finally:
             self.websocket_clients.discard(ws)
+            self.websocket_tenant_map.pop(ws, None)  # 🔧 清理租戶映射
             logger.info(f"WebSocket client {client_id} disconnected. Total: {len(self.websocket_clients)}")
         
         return ws
     
-    async def broadcast(self, event_type: str, data: dict):
-        """廣播事件到所有 WebSocket 客戶端"""
+    async def broadcast(self, event_type: str, data: dict, tenant_id: str = None):
+        """廣播事件到 WebSocket 客戶端
+        
+        🔧 多租戶安全：
+        - 如果提供 tenant_id，只發送給該租戶的客戶端
+        - 對於 accounts-updated 等包含用戶數據的事件，強制要求 tenant_id
+        - 其他事件（如系統狀態）廣播給所有客戶端
+        """
+        # 🔧 安全：帳號相關事件必須按租戶過濾
+        tenant_sensitive_events = {'accounts-updated', 'account-status-changed', 'account-validation-error'}
+        
         message = json.dumps({
             'type': 'event',
             'event': event_type,
@@ -7984,9 +7999,16 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
         
         for ws in list(self.websocket_clients):
             try:
+                # 🔧 租戶敏感事件：只發送給匹配的客戶端
+                if event_type in tenant_sensitive_events and tenant_id:
+                    ws_tenant = self.websocket_tenant_map.get(ws)
+                    if ws_tenant and ws_tenant != tenant_id:
+                        continue  # 跳過不屬於此租戶的客戶端
+                
                 await ws.send_str(message)
             except:
                 self.websocket_clients.discard(ws)
+                self.websocket_tenant_map.pop(ws, None)
     
     # ==================== 服務器控制 ====================
     

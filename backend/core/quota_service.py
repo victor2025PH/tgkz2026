@@ -357,6 +357,10 @@ class QuotaService:
                 try:
                     qt = QuotaType(quota_type)
                     limit = service.get_quota(level, qt)
+                    # king 的 tg_accounts 必須為無限：若 level 誤回 1/2（舊部署或配置未載入）則強制 -1
+                    if quota_type == 'tg_accounts' and (tier or '').lower() == 'king' and limit != -1:
+                        logger.warning(f"[QuotaService] _get_quota_limit king tg_accounts level returned {limit}, forcing -1")
+                        limit = -1
                     self._update_cache(user_id, quota_type, limit)
                     logger.info(f"[QuotaService] _get_quota_limit user_id={user_id} {quota_type} tier={tier} limit={limit} source=level")
                     return limit
@@ -369,6 +373,9 @@ class QuotaService:
             limit = self._get_default_limit(quota_type)
             if quota_type == 'tg_accounts' and limit < 1:
                 limit = 1
+            # king 的 tg_accounts 走默認路徑時也強制無限
+            if quota_type == 'tg_accounts' and (tier or '').lower() == 'king':
+                limit = -1
             logger.info(f"[QuotaService] _get_quota_limit user_id={user_id} {quota_type} limit={limit} source=default")
             return limit
         finally:

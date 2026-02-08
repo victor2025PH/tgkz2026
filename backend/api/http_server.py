@@ -1465,6 +1465,7 @@ class HttpApiServer:
             
             data = user.to_dict()
             # 單庫合併後：auth 與 admin 共用 tgmatrix.db，直接從同一 users 表查 is_lifetime
+            # 擴展匹配：id/user_id 可能與後台不一致，後台可能用 username/nickname/telegram_id 標識
             is_lifetime = False
             try:
                 db_path = str(getattr(auth_service, 'db_path', '') or os.environ.get('DATABASE_PATH', ''))
@@ -1472,13 +1473,41 @@ class HttpApiServer:
                     conn = sqlite3.connect(db_path)
                     conn.row_factory = sqlite3.Row
                     try:
-                        row = conn.execute(
-                            "SELECT is_lifetime, membership_level, expires_at FROM users WHERE id = ? OR user_id = ?",
-                            (user.id, user.id)
-                        ).fetchone()
+                        # 優先 id/user_id，再嘗試 username/nickname/telegram_id/email
+                        params = [user.id, user.id]
+                        wheres = ["id = ?", "user_id = ?"]
+                        uid = getattr(user, 'id', None) or ''
+                        uname = (getattr(user, 'username', None) or '').strip()
+                        dname = (getattr(user, 'display_name', None) or '').strip()
+                        tid = (getattr(user, 'telegram_id', None) or '').strip()
+                        em = (getattr(user, 'email', None) or '').strip()
+                        if uname:
+                            wheres.append("(username = ? OR nickname = ?)")
+                            params.extend([uname, uname])
+                        if dname and dname != uname:
+                            wheres.append("nickname = ?")
+                            params.append(dname)
+                        if tid:
+                            wheres.append("telegram_id = ?")
+                            params.append(tid)
+                        if em:
+                            wheres.append("email = ?")
+                            params.append(em)
+                        q = "SELECT id, user_id, is_lifetime, membership_level, expires_at FROM users WHERE " + " OR ".join(wheres)
+                        row = conn.execute(q, params).fetchone()
                         if row:
                             if (row['is_lifetime'] or 0) == 1:
                                 is_lifetime = True
+                                # 同步 subscription_expires 為 NULL，避免前端誤算剩餘天數
+                                try:
+                                    pk = row.get('id') or row.get('user_id') or user.id
+                                    conn.execute(
+                                        "UPDATE users SET subscription_expires = NULL, subscription_tier = COALESCE(membership_level, subscription_tier) WHERE id = ? OR user_id = ?",
+                                        (pk, pk)
+                                    )
+                                    conn.commit()
+                                except Exception:
+                                    pass
                             elif not is_lifetime:
                                 level = (row.get('membership_level') or row.get('level') or '').lower()
                                 exp = row.get('expires_at')

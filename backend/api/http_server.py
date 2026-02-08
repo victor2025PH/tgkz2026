@@ -1505,6 +1505,13 @@ class HttpApiServer:
                                         row['id'], row['user_id'], row['is_lifetime'], row['membership_level'], row['expires_at'])
                             if (row['is_lifetime'] or 0) == 1:
                                 is_lifetime = True
+                            # 若為 king，清除配額緩存，確保 tg_accounts=-1 生效（修復 1/1 上限）
+                            if ((row['membership_level'] or '').lower() == 'king' or is_lifetime):
+                                try:
+                                    from core.quota_service import get_quota_service
+                                    get_quota_service().invalidate_cache(user.id)
+                                except Exception:
+                                    pass
                                 # 同步 subscription_expires 為 NULL，避免前端誤算剩餘天數
                                 try:
                                     pk = row['id'] or row['user_id'] or user.id

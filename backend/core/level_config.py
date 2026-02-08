@@ -223,14 +223,28 @@ class LevelConfigService:
     
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialize()
+            instance = super().__new__(cls)
+            try:
+                instance._initialize()
+            except Exception as e:
+                logger.error(f"LevelConfigService._initialize() failed: {e}")
+                # 不保存失敗的實例，下次重試
+                return instance
+            cls._instance = instance
         return cls._instance
     
     def _initialize(self):
         """從 MEMBERSHIP_LEVELS 初始化配置"""
         # 延遲導入避免循環引用
-        from ..database import MEMBERSHIP_LEVELS
+        # 兼容兩種環境：作為子包(..database)和作為頂層包(database)
+        try:
+            from ..database import MEMBERSHIP_LEVELS
+        except (ImportError, SystemError):
+            try:
+                from database import MEMBERSHIP_LEVELS
+            except ImportError:
+                MEMBERSHIP_LEVELS = {}
+                logger.error("Failed to import MEMBERSHIP_LEVELS from database")
         
         for level_id, config in MEMBERSHIP_LEVELS.items():
             try:

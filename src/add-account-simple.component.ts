@@ -1102,6 +1102,7 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
   verificationCode = '';
   twoFactorPassword = '';
   proxyMode = 'auto';
+  private pendingLoginPayload: any | null = null;
   codeStep = signal(false);
   isSending = signal(false);
   isVerifying = signal(false);
@@ -1129,6 +1130,7 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
   private resendTimer: any = null;
   private sendTimeout: any = null;
   private verifyTimeout: any = null;
+  private loginTimer: any = null;  // 🔧 延遲 login-account 計時器（add-account 失敗時取消）
   private ipcChannels: string[] = [];
 
   ngOnInit(): void {
@@ -1139,6 +1141,7 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
     if (this.resendTimer) clearInterval(this.resendTimer);
     if (this.sendTimeout) clearTimeout(this.sendTimeout);
     if (this.verifyTimeout) clearTimeout(this.verifyTimeout);
+    if (this.loginTimer) clearTimeout(this.loginTimer);
     this.ipcChannels.forEach(ch => this.ipcService.cleanup(ch));
   }
 
@@ -1196,10 +1199,16 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
     });
     this.ipcChannels.push('account-login-error');
 
-    // 🔧 P0 修復：監聽 account-added 事件中的配額錯誤
+    // 🔧 P0 修復：監聽 account-added 事件中的配額錯誤 + 成功後再登入
     this.ipcService.on('account-added', (result: any) => {
       if (result && !result.success && result.code === 'QUOTA_EXCEEDED') {
+        this.pendingLoginPayload = null;
         this.handleLoginError(result);
+        return;
+      }
+      if (result && result.success && this.pendingLoginPayload) {
+        this.ipcService.send('login-account', this.pendingLoginPayload);
+        this.pendingLoginPayload = null;
       }
     });
     this.ipcChannels.push('account-added');
@@ -1346,15 +1355,12 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
       usePlatformApi: true,  // 🆕 標記使用平台 API
       ownerUserId  // 🔧 P0: 確保配額檢查能找到正確用戶
     });
-
-    setTimeout(() => {
-      this.ipcService.send('login-account', {
-        phone: this.phoneNumber,
-        proxy: this.proxyMode === 'auto' ? 'auto' : null,
-        usePlatformApi: true,
-        ownerUserId
-      });
-    }, 500);
+    this.pendingLoginPayload = {
+      phone: this.phoneNumber,
+      proxy: this.proxyMode === 'auto' ? 'auto' : null,
+      usePlatformApi: true,
+      ownerUserId
+    };
 
     // 超時保護
     this.sendTimeout = setTimeout(() => {
@@ -1382,16 +1388,13 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
       proxy: this.proxyMode === 'auto' ? 'auto' : null,
       ownerUserId
     });
-
-    setTimeout(() => {
-      this.ipcService.send('login-account', {
-        phone: this.phoneNumber,
-        apiId: this.customApiId,
-        apiHash: this.customApiHash,
-        proxy: this.proxyMode === 'auto' ? 'auto' : null,
-        ownerUserId
-      });
-    }, 500);
+    this.pendingLoginPayload = {
+      phone: this.phoneNumber,
+      apiId: this.customApiId,
+      apiHash: this.customApiHash,
+      proxy: this.proxyMode === 'auto' ? 'auto' : null,
+      ownerUserId
+    };
 
     this.sendTimeout = setTimeout(() => {
       if (this.isSending()) {
@@ -1443,6 +1446,7 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
   private handleLoginError(result: any): void {
     this.isSending.set(false);
     this.isVerifying.set(false);
+    this.pendingLoginPayload = null;
     if (this.sendTimeout) {
       clearTimeout(this.sendTimeout);
       this.sendTimeout = null;

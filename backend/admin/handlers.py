@@ -1279,7 +1279,11 @@ class AdminHandlers:
         
         from .api_pool import get_api_pool_manager
         pool = get_api_pool_manager()
-        
+        try:
+            pool.sync_allocations_with_accounts()
+        except Exception:
+            pass
+
         apis = pool.list_apis(status=status, include_hash=include_hash)
         stats = pool.get_pool_stats()
         

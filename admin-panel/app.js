@@ -149,6 +149,7 @@ createApp({
             { id: 'users', name: '用戶管理', icon: '👥' },
             { id: 'apiPool', name: 'API 管理 (ID/Hash 池)', icon: '🔑' },
             { id: 'proxies', name: '代理池管理', icon: '🌐' },
+            { id: 'proxyProviders', name: '供應商對接', icon: '🔗' },
             { id: 'expiring', name: '即將到期', icon: '⏰', badge: null },
             { id: 'licenses', name: '卡密管理', icon: '🎟️' },
             { id: 'orders', name: '訂單管理', icon: '💰' },
@@ -190,6 +191,9 @@ createApp({
             proxy: { total: 0, available: 0, assigned: 0, testing: 0, failed: 0, healthPercent: 100 }
         });
         
+        // 🆕 供應商狀態（儀表盤用）
+        const dashboardProviders = ref([]);
+
         // 🆕 系統告警（儀表盤用）
         const systemAlerts = ref({
             alert_level: 'normal',
@@ -250,6 +254,33 @@ createApp({
             country: ''
         });
         const logsStats = ref({});
+        
+        // 🆕 代理供應商數據
+        const proxyProviders = ref([]);
+        const proxySyncLogs = ref([]);
+        const showProviderModal = ref(false);
+        const providerSyncing = ref(null);
+        const providerForm = reactive({
+            id: '',
+            name: '',
+            provider_type: 'blurpath',
+            api_base_url: '',
+            api_key: '',
+            api_secret: '',
+            api_key_masked: '',
+            api_secret_masked: '',
+            product_types: ['static_isp'],
+            sync_interval_minutes: 30,
+            is_active: true,
+        });
+        const syncLogProviderFilter = ref('');
+        const providerProductTypes = ref([
+            { value: 'static_isp', label: '靜態 ISP' },
+            { value: 'static_datacenter', label: '獨享數據中心' },
+            { value: 'dynamic_residential', label: '動態住宅' },
+            { value: 'unlimited_residential', label: '無限住宅' },
+            { value: 'socks5', label: 'Socks5' },
+        ]);
         
         // 🆕 API 對接池數據
         const apiPoolList = ref([]);
@@ -607,9 +638,10 @@ createApp({
                 levelDistribution.value = data.levelDistribution || {};
                 lastUpdate.value = new Date().toLocaleString('zh-TW');
                 
-                // 🆕 加載雙池健康度和告警
+                // 🆕 加載雙池健康度、告警和供應商狀態
                 await loadPoolHealthStats();
                 await loadSystemAlerts();
+                await loadDashboardProviders();
                 
                 setTimeout(initCharts, 100);
             }
@@ -922,6 +954,221 @@ createApp({
             return texts[status] || status;
         };
         
+        // ============ 🆕 代理供應商管理 ============
+
+        const loadProxyProviders = async () => {
+            const result = await apiRequest('/admin/proxy-providers');
+            if (result.success) {
+                proxyProviders.value = result.data?.providers || [];
+            }
+            await loadProxySyncLogs();
+        };
+
+        const loadProxySyncLogs = async () => {
+            let url = '/admin/proxy-sync-logs?limit=30';
+            if (syncLogProviderFilter.value) {
+                url += `&provider_id=${syncLogProviderFilter.value}`;
+            }
+            const result = await apiRequest(url);
+            if (result.success) {
+                proxySyncLogs.value = result.data?.logs || [];
+            }
+        };
+
+        const resetProviderForm = () => {
+            providerForm.id = '';
+            providerForm.name = '';
+            providerForm.provider_type = 'blurpath';
+            providerForm.api_base_url = '';
+            providerForm.api_key = '';
+            providerForm.api_secret = '';
+            providerForm.api_key_masked = '';
+            providerForm.api_secret_masked = '';
+            providerForm.product_types = ['static_isp'];
+            providerForm.sync_interval_minutes = 30;
+            providerForm.is_active = true;
+        };
+
+        const openAddProviderModal = () => {
+            resetProviderForm();
+            showProviderModal.value = true;
+        };
+
+        const openEditProviderModal = (prov) => {
+            providerForm.id = prov.id;
+            providerForm.name = prov.name;
+            providerForm.provider_type = prov.provider_type;
+            providerForm.api_base_url = prov.api_base_url || '';
+            providerForm.api_key = '';
+            providerForm.api_secret = '';
+            providerForm.api_key_masked = prov.api_key_masked || '';
+            providerForm.api_secret_masked = prov.api_secret_masked || '';
+            providerForm.product_types = prov.config?.product_types || ['static_isp'];
+            providerForm.sync_interval_minutes = prov.sync_interval_minutes || 30;
+            providerForm.is_active = prov.is_active;
+            showProviderModal.value = true;
+        };
+
+        const saveProxyProvider = async () => {
+            if (!providerForm.name.trim()) {
+                showToast('請輸入供應商名稱', 'error');
+                return;
+            }
+
+            const payload = {
+                name: providerForm.name,
+                provider_type: providerForm.provider_type,
+                api_base_url: providerForm.api_base_url,
+                sync_interval_minutes: providerForm.sync_interval_minutes,
+                is_active: providerForm.is_active,
+                config: {
+                    product_types: providerForm.product_types,
+                },
+            };
+
+            if (providerForm.api_key) payload.api_key = providerForm.api_key;
+            if (providerForm.api_secret) payload.api_secret = providerForm.api_secret;
+
+            let result;
+            if (providerForm.id) {
+                result = await apiRequest(`/admin/proxy-providers/${providerForm.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload),
+                });
+            } else {
+                result = await apiRequest('/admin/proxy-providers', {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                });
+            }
+
+            if (result.success) {
+                showToast(providerForm.id ? '供應商已更新' : '供應商已添加', 'success');
+                showProviderModal.value = false;
+                await loadProxyProviders();
+            } else {
+                showToast('操作失敗: ' + (result.data?.error || result.message), 'error');
+            }
+        };
+
+        const deleteProxyProvider = async (providerId, name) => {
+            if (!confirm(`確定要刪除供應商「${name}」嗎？\n已同步的代理將保留在代理池中。`)) return;
+            
+            const result = await apiRequest(`/admin/proxy-providers/${providerId}`, {
+                method: 'DELETE',
+            });
+            if (result.success) {
+                showToast('供應商已刪除', 'success');
+                await loadProxyProviders();
+            } else {
+                showToast('刪除失敗: ' + (result.data?.error || result.message), 'error');
+            }
+        };
+
+        const syncProxyProvider = async (providerId) => {
+            providerSyncing.value = providerId;
+            showToast('正在同步代理...', 'info');
+
+            const result = await apiRequest(`/admin/proxy-providers/${providerId}/sync`, {
+                method: 'POST',
+            });
+
+            providerSyncing.value = null;
+
+            if (result.success && result.data?.success) {
+                const d = result.data;
+                showToast(`同步完成！新增 ${d.added}，移除 ${d.removed}，更新 ${d.updated}（${d.duration_ms}ms）`, 'success');
+                await loadProxyProviders();
+            } else {
+                showToast('同步失敗: ' + (result.data?.error || result.message), 'error');
+                await loadProxySyncLogs();
+            }
+        };
+
+        const testProxyProvider = async (providerId) => {
+            showToast('正在測試連接...', 'info');
+            const result = await apiRequest(`/admin/proxy-providers/${providerId}/test`, {
+                method: 'POST',
+            });
+
+            if (result.success && result.data?.success) {
+                showToast(`連接成功！延遲: ${result.data.latency_ms}ms`, 'success');
+            } else {
+                showToast('連接失敗: ' + (result.data?.message || '無法連接'), 'error');
+            }
+        };
+
+        const refreshProviderBalance = async (providerId) => {
+            const result = await apiRequest(`/admin/proxy-providers/${providerId}/balance`);
+            if (result.success) {
+                const balances = result.data?.balances || [];
+                if (balances.length > 0) {
+                    const info = balances.map(b => `${b.balance_type}: ${b.remaining} ${b.unit}`).join(', ');
+                    showToast(`餘額信息: ${info}`, 'success');
+                } else {
+                    showToast('未獲取到餘額信息', 'info');
+                }
+                await loadProxyProviders();
+            }
+        };
+
+        const syncAllProviders = async () => {
+            const activeProviders = proxyProviders.value.filter(p => p.is_active);
+            if (activeProviders.length === 0) {
+                showToast('沒有活躍的供應商', 'info');
+                return;
+            }
+            providerSyncing.value = 'all';
+            showToast(`正在同步 ${activeProviders.length} 個供應商...`, 'info');
+
+            let totalAdded = 0, totalRemoved = 0, totalUpdated = 0, failCount = 0;
+            for (const prov of activeProviders) {
+                try {
+                    const result = await apiRequest(`/admin/proxy-providers/${prov.id}/sync`, { method: 'POST' });
+                    if (result.success && result.data?.success) {
+                        totalAdded += result.data.added || 0;
+                        totalRemoved += result.data.removed || 0;
+                        totalUpdated += result.data.updated || 0;
+                    } else {
+                        failCount++;
+                    }
+                } catch (e) { failCount++; }
+            }
+            providerSyncing.value = null;
+            showToast(
+                `全部同步完成！新增 ${totalAdded}，移除 ${totalRemoved}，更新 ${totalUpdated}` +
+                (failCount > 0 ? `，${failCount} 個失敗` : ''),
+                failCount > 0 ? 'warning' : 'success'
+            );
+            await loadProxyProviders();
+        };
+
+        const cleanupExpiredProxies = async () => {
+            // 先 dry run 看看
+            const dryResult = await apiRequest('/admin/proxies/cleanup-expired?dry_run=true');
+            if (!dryResult.success) {
+                showToast('檢查過期代理失敗', 'error');
+                return;
+            }
+            const total = dryResult.data?.total_expired || 0;
+            if (total === 0) {
+                showToast('沒有過期的代理', 'info');
+                return;
+            }
+            if (!confirm(`發現 ${total} 個過期代理，確定要清理嗎？`)) return;
+            
+            const result = await apiRequest('/admin/proxies/cleanup-expired', { method: 'POST' });
+            if (result.success) {
+                showToast(
+                    `清理完成：刪除 ${result.data?.removed || 0}，標記禁用 ${result.data?.marked_disabled || 0}`,
+                    'success'
+                );
+                await loadProxies();
+            } else {
+                showToast('清理失敗', 'error');
+            }
+        };
+
         // ============ 🆕 API 對接池管理 ============
         
         // 🆕 加載雙池健康度統計（用於儀表盤）
@@ -1018,6 +1265,18 @@ createApp({
             }
         };
         
+        // 🆕 加載供應商狀態（儀表盤用）
+        const loadDashboardProviders = async () => {
+            try {
+                const result = await apiRequest('/admin/proxy-providers');
+                if (result.success) {
+                    dashboardProviders.value = (result.data?.providers || []).filter(p => p.is_active);
+                }
+            } catch (e) {
+                console.error('加載供應商狀態失敗:', e);
+            }
+        };
+
         // 🆕 暫時忽略告警
         const dismissAlerts = () => {
             alertsDismissed.value = true;
@@ -4526,6 +4785,7 @@ createApp({
             else if (newPage === 'devices') await loadDevices();
             else if (newPage === 'logs') { await loadLogs(); await loadLogsStats(); }
             else if (newPage === 'proxies') await loadProxies();
+            else if (newPage === 'proxyProviders') await loadProxyProviders();
             else if (newPage === 'apiPool') { await loadApiPool(); }
             if (newPage !== 'apiPool') { stopAutoRefresh(); autoRefreshEnabled.value = false; }
             else if (newPage === 'admins') await loadAdmins();
@@ -4563,6 +4823,7 @@ createApp({
             menuItems,
             stats,
             dashboardPoolStats,
+            dashboardProviders,
             systemAlerts,
             capacityForecast,
             dismissAlerts,
@@ -4605,6 +4866,25 @@ createApp({
             releaseProxy,
             getProxyStatusClass,
             getProxyStatusText,
+            // 🆕 代理供應商
+            proxyProviders,
+            proxySyncLogs,
+            showProviderModal,
+            providerSyncing,
+            providerForm,
+            syncLogProviderFilter,
+            providerProductTypes,
+            loadProxyProviders,
+            loadProxySyncLogs,
+            openAddProviderModal,
+            openEditProviderModal,
+            saveProxyProvider,
+            deleteProxyProvider,
+            syncProxyProvider,
+            testProxyProvider,
+            refreshProviderBalance,
+            syncAllProviders,
+            cleanupExpiredProxies,
             // 🆕 API 對接池
             apiPoolList,
             apiPoolStats,

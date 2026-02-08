@@ -331,7 +331,12 @@ class ProxyPoolManager:
                     created_at=row['created_at'],
                     note=row['note']
                 )
-                proxies.append(proxy.to_dict())
+                d = proxy.to_dict()
+                # 🆕 擴展字段（供應商同步相關）
+                d["provider_id"] = row['provider_id'] if 'provider_id' in row.keys() else None
+                d["proxy_source"] = row['proxy_source'] if 'proxy_source' in row.keys() else None
+                d["expires_at"] = row['expires_at'] if 'expires_at' in row.keys() else None
+                proxies.append(d)
             
             # 統計
             cursor.execute('''
@@ -474,26 +479,111 @@ class ProxyPoolManager:
         finally:
             conn.close()
 
+    async def assign_proxy_to_account_with_fallback(
+        self,
+        account_id: str,
+        phone: str,
+        proxy_id: Optional[str] = None,
+        country: str = ""
+    ) -> Optional[StaticProxy]:
+        """
+        分配代理給帳號（帶動態代理回退）
+
+        優先從靜態代理池分配；池耗盡時向供應商請求動態代理。
+        """
+        # 先嘗試靜態池
+        result = self.assign_proxy_to_account(account_id, phone, proxy_id)
+        if result:
+            return result
+
+        # 靜態池耗盡，嘗試動態代理
+        logger.info(f"Static proxy pool exhausted for {phone}, requesting dynamic proxy...")
+        try:
+            from .proxy_sync import get_sync_service
+            svc = get_sync_service()
+            dynamic = await svc.request_dynamic_proxy(country=country)
+            if dynamic:
+                # 將動態代理臨時寫入 static_proxies 以統一管理
+                dynamic_proxy_id = f"proxy_dyn_{uuid.uuid4().hex[:8]}"
+                conn = self._get_connection()
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute('''
+                        INSERT INTO static_proxies
+                        (id, proxy_type, host, port, username, password, country,
+                         provider, status, assigned_account_id, assigned_phone,
+                         provider_id, proxy_source, note, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'assigned', ?, ?, ?, 'dynamic', 'dynamic_fallback', datetime('now'))
+                    ''', (
+                        dynamic_proxy_id,
+                        dynamic.get("proxy_type", "socks5"),
+                        dynamic["host"],
+                        dynamic["port"],
+                        dynamic.get("username"),
+                        dynamic.get("password"),
+                        dynamic.get("country", country),
+                        dynamic.get("provider_name", "dynamic"),
+                        account_id,
+                        phone,
+                        dynamic.get("provider_id"),
+                    ))
+                    conn.commit()
+
+                    # 安全轉換代理類型
+                    try:
+                        dyn_proxy_type = ProxyType(dynamic.get("proxy_type", "socks5"))
+                    except ValueError:
+                        dyn_proxy_type = ProxyType.SOCKS5
+
+                    return StaticProxy(
+                        id=dynamic_proxy_id,
+                        proxy_type=dyn_proxy_type,
+                        host=dynamic["host"],
+                        port=dynamic["port"],
+                        username=dynamic.get("username"),
+                        password=dynamic.get("password"),
+                        country=dynamic.get("country", country),
+                        provider=dynamic.get("provider_name", "dynamic"),
+                        status=ProxyStatus.ASSIGNED,
+                        assigned_account_id=account_id,
+                        assigned_phone=phone,
+                    )
+                finally:
+                    conn.close()
+        except Exception as e:
+            logger.error(f"Dynamic proxy fallback failed: {e}")
+
+        return None
+
     def release_proxy(self, account_id: str = None, phone: str = None) -> bool:
-        """釋放帳號的代理"""
+        """釋放帳號的代理（動態代理直接刪除，靜態代理回池）"""
         if not account_id and not phone:
             return False
         
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
-            
+
+            # 動態代理釋放時直接刪除
             if account_id:
+                cursor.execute('''
+                    DELETE FROM static_proxies
+                    WHERE assigned_account_id = ? AND proxy_source = 'dynamic'
+                ''', (account_id,))
                 cursor.execute('''
                     UPDATE static_proxies 
                     SET status = 'available', assigned_account_id = NULL, assigned_phone = NULL
-                    WHERE assigned_account_id = ?
+                    WHERE assigned_account_id = ? AND (proxy_source IS NULL OR proxy_source != 'dynamic')
                 ''', (account_id,))
             else:
                 cursor.execute('''
+                    DELETE FROM static_proxies
+                    WHERE assigned_phone = ? AND proxy_source = 'dynamic'
+                ''', (phone,))
+                cursor.execute('''
                     UPDATE static_proxies 
                     SET status = 'available', assigned_account_id = NULL, assigned_phone = NULL
-                    WHERE assigned_phone = ?
+                    WHERE assigned_phone = ? AND (proxy_source IS NULL OR proxy_source != 'dynamic')
                 ''', (phone,))
             
             conn.commit()

@@ -65,7 +65,11 @@ class AuthService:
     
     def __init__(self, db_path: str = None):
         if db_path is None:
-            db_path = os.environ.get('DATABASE_PATH', '/app/data/tgmatrix.db')
+            try:
+                from config import DATABASE_PATH
+                db_path = str(DATABASE_PATH)
+            except ImportError:
+                db_path = os.environ.get('DATABASE_PATH', '/app/data/tgmatrix.db')
         self.db_path = db_path
         self._init_db()
     
@@ -76,11 +80,11 @@ class AuthService:
         return db
     
     def _init_db(self):
-        """初始化數據庫表"""
+        """初始化數據庫表（與 merge_db_init 統一 schema 兼容）"""
         db = self._get_db()
         try:
             db.executescript('''
-                -- 用戶表
+                -- 用戶表（若 merge_db_init 已創建則跳過）
                 CREATE TABLE IF NOT EXISTS users (
                     id TEXT PRIMARY KEY,
                     email TEXT UNIQUE,
@@ -189,6 +193,8 @@ class AuthService:
             
             # 🆕 P2.2: 數據庫遷移 - 添加 Telegram 綁定字段
             self._migrate_telegram_fields(db)
+            # 合併遷移：添加 membership 相關列（兼容卡密系統）
+            self._migrate_membership_fields(db)
             
         finally:
             db.close()
@@ -237,6 +243,37 @@ class AuthService:
             
         except Exception as e:
             logger.warning(f"Telegram fields migration: {e}")
+
+    def _migrate_membership_fields(self, db):
+        """合併遷移：添加 membership 相關列（兼容卡密系統、get_current_user）"""
+        try:
+            cur = db.execute("PRAGMA table_info(users)")
+            cols = {r[1] for r in cur.fetchall()}
+            migrations = [
+                ('user_id', 'TEXT'),
+                ('membership_level', "TEXT DEFAULT 'bronze'"),
+                ('expires_at', 'TIMESTAMP'),
+                ('is_lifetime', 'INTEGER DEFAULT 0'),
+                ('invite_code', 'TEXT'),
+                ('invited_by', 'TEXT'),
+                ('total_invites', 'INTEGER DEFAULT 0'),
+                ('total_spent', 'REAL DEFAULT 0'),
+                ('balance', 'REAL DEFAULT 0'),
+                ('status', "TEXT DEFAULT 'active'"),
+                ('is_banned', 'INTEGER DEFAULT 0'),
+                ('nickname', 'TEXT'),
+            ]
+            for col_name, col_def in migrations:
+                if col_name not in cols:
+                    try:
+                        db.execute(f'ALTER TABLE users ADD COLUMN {col_name} {col_def}')
+                        db.commit()
+                        logger.info(f"Added column users.{col_name}")
+                    except Exception as e:
+                        if 'duplicate column' not in str(e).lower():
+                            logger.debug(f"Migration {col_name}: {e}")
+        except Exception as e:
+            logger.debug(f"Membership fields migration: {e}")
     
     # ==================== 用戶管理 ====================
     
@@ -284,11 +321,11 @@ class AuthService:
             
             db.execute('''
                 INSERT INTO users (
-                    id, email, username, password_hash, display_name,
+                    id, user_id, email, username, password_hash, display_name,
                     role, subscription_tier, max_accounts, max_api_calls
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                user.id, user.email, user.username, user.password_hash,
+                user.id, user.id, user.email, user.username, user.password_hash,
                 user.display_name, user.role.value, user.subscription_tier,
                 user.max_accounts, user.max_api_calls
             ))
@@ -395,12 +432,12 @@ class AuthService:
             
             db.execute('''
                 INSERT INTO users (
-                    id, email, username, password_hash, display_name, avatar_url,
+                    id, user_id, email, username, password_hash, display_name, avatar_url,
                     auth_provider, oauth_id, role, subscription_tier, 
                     max_accounts, max_api_calls, is_verified
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                user.id, user.email, user.username, user.password_hash,
+                user.id, user.id, user.email, user.username, user.password_hash,
                 user.display_name, user.avatar_url,
                 provider, provider_id,
                 user.role.value, user.subscription_tier,
@@ -660,12 +697,12 @@ class AuthService:
             # 插入用戶
             db.execute('''
                 INSERT INTO users (
-                    id, email, username, password_hash, display_name, avatar_url,
+                    id, user_id, email, username, password_hash, display_name, avatar_url,
                     auth_provider, oauth_id, telegram_id, telegram_username, telegram_first_name,
                     role, subscription_tier, max_accounts, max_api_calls, is_verified
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                user.id, user.email, user.username, user.password_hash,
+                user.id, user.id, user.email, user.username, user.password_hash,
                 user.display_name, user.avatar_url,
                 'telegram', telegram_id, telegram_id, username, first_name,
                 user.role.value, user.subscription_tier,

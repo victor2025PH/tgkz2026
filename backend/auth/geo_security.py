@@ -78,11 +78,18 @@ class GeoSecurityService:
     SUSPICIOUS_DISTANCE_KM = 500
     
     def __init__(self, db_path: str = None):
-        """初始化服務"""
-        self.db_path = db_path or os.environ.get(
-            'AUTH_DB_PATH',
-            os.path.join(os.path.dirname(__file__), '..', 'data', 'auth.db')
-        )
+        """初始化服務（統一使用 tgmatrix.db）"""
+        if db_path:
+            self.db_path = db_path
+        else:
+            try:
+                from config import DATABASE_PATH
+                self.db_path = str(DATABASE_PATH)
+            except ImportError:
+                self.db_path = os.environ.get(
+                    'DATABASE_PATH',
+                    os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
+                )
         self._init_db()
     
     def _get_db(self):

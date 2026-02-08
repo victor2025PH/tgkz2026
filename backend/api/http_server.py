@@ -23,6 +23,16 @@ from datetime import datetime
 from typing import Any, Dict, Optional, Callable
 from functools import wraps
 
+
+def _is_far_future(exp: str) -> bool:
+    """判斷過期日是否在 30 年後（視為終身）"""
+    try:
+        dt = datetime.fromisoformat(str(exp).replace('Z', '+00:00'))
+        return (dt - datetime.utcnow()).total_seconds() > 365 * 30 * 86400
+    except Exception:
+        return False
+
+
 # 添加父目錄到路徑
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -1454,85 +1464,30 @@ class HttpApiServer:
                 return self._json_response({'success': False, 'error': '無效的令牌'}, 401)
             
             data = user.to_dict()
-            # 若後台標記為終身會員（is_lifetime=1），則不返回過期日，前端顯示「終身」
+            # 單庫合併後：auth 與 admin 共用 tgmatrix.db，直接從同一 users 表查 is_lifetime
             is_lifetime = False
             try:
-                # 1) 從管理後台庫查（與後台「到期時間：終身」同源），用 id/user_id/email/nickname 多種方式匹配
-                conn = self._get_admin_db()
-                try:
+                db_path = str(getattr(auth_service, 'db_path', '') or os.environ.get('DATABASE_PATH', ''))
+                if db_path:
+                    conn = sqlite3.connect(db_path)
                     conn.row_factory = sqlite3.Row
-                    cursors_to_try = [
-                        ("SELECT is_lifetime FROM users WHERE user_id = ?", (user.id,)),
-                        ("SELECT is_lifetime FROM users WHERE id = ?", (user.id,)),
-                    ]
-                    # 認證庫與後台庫可能不是同一條記錄，用 email/用戶名/顯示名 匹配後台用戶
-                    email = (getattr(user, 'email', None) or '').strip()
-                    username = (getattr(user, 'username', None) or '').strip()
-                    display_name = (getattr(user, 'display_name', None) or '').strip()
-                    if email:
-                        cursors_to_try.append(("SELECT is_lifetime FROM users WHERE email = ?", (email,)))
-                    if username:
-                        cursors_to_try.append(("SELECT is_lifetime FROM users WHERE nickname = ?", (username,)))
-                    if display_name:
-                        cursors_to_try.append(("SELECT is_lifetime FROM users WHERE nickname = ?", (display_name,)))
-                    for q, p in cursors_to_try:
-                        try:
-                            row = conn.execute(q, p).fetchone()
-                            if row and (row['is_lifetime'] or 0) == 1:
+                    try:
+                        row = conn.execute(
+                            "SELECT is_lifetime, membership_level, expires_at FROM users WHERE id = ? OR user_id = ?",
+                            (user.id, user.id)
+                        ).fetchone()
+                        if row:
+                            if (row['is_lifetime'] or 0) == 1:
                                 is_lifetime = True
-                                break
-                        except Exception:
-                            continue
-                    # 若無 is_lifetime 列，則用 membership_level + expires_at 推斷：king 且過期日為空或極遠視為終身
-                    if not is_lifetime and (email or username or display_name or user.id):
-                        def _row_get(r, k, default=''):
-                            try:
-                                return r[k] or default
-                            except (KeyError, TypeError):
-                                return default
-                        for q, p in [
-                            ("SELECT membership_level, expires_at FROM users WHERE user_id = ?", (user.id,)),
-                            ("SELECT membership_level, expires_at FROM users WHERE id = ?", (user.id,)),
-                            ("SELECT membership_level, expires_at FROM users WHERE nickname = ?", (display_name or username or '',)),
-                        ]:
-                            if not p[0]:
-                                continue
-                            try:
-                                row = conn.execute(q, p).fetchone()
-                                if row:
-                                    level = (_row_get(row, 'membership_level') or _row_get(row, 'level') or '').lower()
-                                    exp = _row_get(row, 'expires_at')
-                                    if level == 'king':
-                                        if not exp:
-                                            is_lifetime = True
-                                            break
-                                        try:
-                                            ed = datetime.fromisoformat(str(exp).replace('Z', '+00:00'))
-                                            if (ed - datetime.utcnow()).total_seconds() > 365 * 30 * 86400:
-                                                is_lifetime = True
-                                                break
-                                        except Exception:
-                                            pass
-                            except Exception:
-                                continue
-                finally:
-                    conn.close()
+                            elif not is_lifetime:
+                                level = (row.get('membership_level') or row.get('level') or '').lower()
+                                exp = row.get('expires_at')
+                                if level == 'king' and (not exp or (exp and _is_far_future(exp))):
+                                    is_lifetime = True
+                    finally:
+                        conn.close()
             except Exception:
                 pass
-            if not is_lifetime:
-                try:
-                    db_path = getattr(auth_service, 'db_path', None) or os.environ.get('DATABASE_PATH', '')
-                    if db_path:
-                        conn = sqlite3.connect(db_path)
-                        conn.row_factory = sqlite3.Row
-                        row = conn.execute(
-                            "SELECT is_lifetime FROM users WHERE id = ? OR user_id = ?", (user.id, user.id)
-                        ).fetchone()
-                        conn.close()
-                        if row and (row['is_lifetime'] or 0) == 1:
-                            is_lifetime = True
-                except Exception:
-                    pass
             if not is_lifetime and data.get('subscription_expires'):
                 # fallback: 過期日在 30 年後視為終身（與卡密 36500 天一致）
                 try:

@@ -60,7 +60,21 @@ npm run build:saas
 # 將 dist/ 部署到 Nginx
 ```
 
-### 1.4 環境變量（必須設置）
+### 1.4 數據庫合併（首次部署或測試重置）
+
+測試階段若需重置數據庫，執行合併腳本統一 auth + tgmatrix 為單一主庫：
+
+```bash
+cd backend
+python -m scripts.merge_db_init --fresh
+```
+
+- `--fresh`：刪除現有 tgmatrix.db 並重建（完全重置，不保留數據）
+- 不加參數：增量初始化（若表已存在則跳過）
+
+合併後：auth.db 已廢棄，所有認證與會員數據統一存於 tgmatrix.db。
+
+### 1.5 環境變量（必須設置）
 
 | 變量 | 說明 | 預設 |
 |------|------|------|

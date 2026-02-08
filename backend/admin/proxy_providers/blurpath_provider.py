@@ -91,7 +91,7 @@ class BlurpathProvider(BaseProxyProvider):
             self.logger.error("Blurpath login failed: missing username (api_key) or password (api_secret)")
             return False
 
-        url = f"{self.api_base}/api/supplier/accountLogin"
+        url = f"{self.api_base}/api/supplier/passwordLogin"
         self.logger.info(f"Blurpath: logging in as {self.username}...")
 
         try:
@@ -330,7 +330,7 @@ class BlurpathProvider(BaseProxyProvider):
         if not login_ok:
             return {
                 "success": False,
-                "message": "登錄失敗：請檢查帳號（Email）和密碼是否正確",
+                "message": "登錄失敗：請確認已在 Blurpath 仪表盤「賬密授權」中創建子帳號，並使用子帳號的用戶名和密碼",
                 "latency_ms": login_latency,
             }
 

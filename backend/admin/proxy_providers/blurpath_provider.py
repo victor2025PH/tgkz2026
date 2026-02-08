@@ -119,6 +119,8 @@ class BlurpathProvider(BaseProxyProvider):
                             self.logger.error(f"Blurpath login: invalid JSON response: {body[:300]}")
                             return False
 
+                        self.logger.info(f"Blurpath login response keys: {list(data.keys()) if isinstance(data, dict) else type(data)}")
+
                         # 處理需要 2FA 驗證的情況
                         if data.get("emailCheck") or data.get("googCheck"):
                             self.logger.error(
@@ -127,14 +129,46 @@ class BlurpathProvider(BaseProxyProvider):
                             )
                             return False
 
-                        token = data.get("token")
+                        # 嘗試多種可能的 token 字段位置
+                        token = (
+                            data.get("token")
+                            or data.get("data", {}).get("token") if isinstance(data.get("data"), dict) else None
+                        ) or (
+                            data.get("access_token")
+                            or data.get("data", {}).get("access_token") if isinstance(data.get("data"), dict) else None
+                        )
+
+                        # 如果沒找到 token，嘗試在 data 中遍歷查找
+                        if not token and isinstance(data.get("data"), dict):
+                            for key in ("token", "access_token", "jwt", "auth_token", "bearer"):
+                                token = data["data"].get(key)
+                                if token:
+                                    break
+
+                        # Blurpath 可能返回 ret + msg 格式
+                        if not token and "ret" in data:
+                            # ret=0 通常表示成功，ret=1 表示失敗（或反之）
+                            # 記錄完整響應以便調試
+                            self.logger.warning(
+                                f"Blurpath login returned ret={data.get('ret')}, msg='{data.get('msg', '')}'. "
+                                f"Full response: {json.dumps(data, ensure_ascii=False)[:500]}"
+                            )
+                            # 如果 msg 包含 token 字符串
+                            msg = data.get("msg", "")
+                            if msg and len(msg) > 20:
+                                # msg 本身可能就是 token
+                                token = msg
+
                         if token:
                             self._token = token
                             self._token_obtained_at = time.time()
                             self.logger.info("Blurpath: login successful, token obtained")
                             return True
                         else:
-                            self.logger.error(f"Blurpath login: no token in response: {data}")
+                            self.logger.error(
+                                f"Blurpath login: no token found in response. "
+                                f"Full response: {json.dumps(data, ensure_ascii=False)[:500]}"
+                            )
                             return False
                     else:
                         self.logger.error(f"Blurpath login failed with status {resp.status}: {body[:300]}")

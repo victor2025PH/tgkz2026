@@ -242,24 +242,58 @@ class UserSchemaAdapter:
             if close_conn:
                 conn.close()
     
+    def _has_both_schemas(self) -> bool:
+        """檢查是否同時存在兩套 schema 的字段"""
+        columns = self.get_columns()
+        has_saas = 'subscription_tier' in columns and 'subscription_expires' in columns
+        has_license = 'membership_level' in columns and 'expires_at' in columns
+        return has_saas and has_license
+
     def get_update_expires_query(self, schema_type: SchemaType = None) -> tuple:
-        """獲取更新到期時間的查詢語句和 ID 字段名"""
+        """獲取更新到期時間的查詢語句和 ID 字段名
+        
+        🔧 修復：當兩套字段同時存在時，同步更新 subscription_expires 和 expires_at
+        """
         if schema_type is None:
             schema_type = self.detect_schema()
         
+        both = self._has_both_schemas()
+        
         if schema_type == SchemaType.SAAS:
-            return ('''
-                UPDATE users SET 
-                    subscription_expires = datetime(
-                        CASE WHEN subscription_expires > datetime('now') 
-                             THEN subscription_expires 
-                             ELSE datetime('now') 
-                        END,
-                        '+' || ? || ' days'
-                    ),
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ''', 'id')
+            if both:
+                # 同步更新兩套字段，需要兩個 days 參數
+                return ('''
+                    UPDATE users SET 
+                        subscription_expires = datetime(
+                            CASE WHEN subscription_expires > datetime('now') 
+                                 THEN subscription_expires 
+                                 ELSE datetime('now') 
+                            END,
+                            '+' || ? || ' days'
+                        ),
+                        expires_at = datetime(
+                            CASE WHEN COALESCE(expires_at, subscription_expires) > datetime('now') 
+                                 THEN COALESCE(expires_at, subscription_expires) 
+                                 ELSE datetime('now') 
+                            END,
+                            '+' || ? || ' days'
+                        ),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', 'id', True)
+            else:
+                return ('''
+                    UPDATE users SET 
+                        subscription_expires = datetime(
+                            CASE WHEN subscription_expires > datetime('now') 
+                                 THEN subscription_expires 
+                                 ELSE datetime('now') 
+                            END,
+                            '+' || ? || ' days'
+                        ),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', 'id', False)
         else:
             return ('''
                 UPDATE users SET 
@@ -272,17 +306,29 @@ class UserSchemaAdapter:
                     ),
                     updated_at = CURRENT_TIMESTAMP
                 WHERE user_id = ?
-            ''', 'user_id')
+            ''', 'user_id', False)
     
     def get_update_level_query(self, schema_type: SchemaType = None) -> tuple:
-        """獲取更新等級的查詢語句和 ID 字段名"""
+        """獲取更新等級的查詢語句和 ID 字段名
+        
+        🔧 修復：當兩套字段同時存在時，同步更新 subscription_tier 和 membership_level
+        """
         if schema_type is None:
             schema_type = self.detect_schema()
         
+        both = self._has_both_schemas()
+        
         if schema_type == SchemaType.SAAS:
-            return ('UPDATE users SET subscription_tier = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 'id')
+            if both:
+                # 返回第三個元素 True 表示需要兩個 level 參數
+                return ('UPDATE users SET subscription_tier = ?, membership_level = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 'id', True)
+            else:
+                return ('UPDATE users SET subscription_tier = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 'id', False)
         else:
-            return ('UPDATE users SET membership_level = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?', 'user_id')
+            if both:
+                return ('UPDATE users SET membership_level = ?, subscription_tier = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?', 'user_id', True)
+            else:
+                return ('UPDATE users SET membership_level = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?', 'user_id', False)
     
     def get_update_ban_query(self, schema_type: SchemaType = None) -> tuple:
         """獲取封禁/解封的查詢語句和 ID 字段名"""

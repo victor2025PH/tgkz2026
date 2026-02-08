@@ -1467,6 +1467,10 @@ class HttpApiServer:
             # 單庫合併後：auth 與 admin 共用 tgmatrix.db，直接從同一 users 表查 is_lifetime
             # 擴展匹配：id/user_id 可能與後台不一致，後台可能用 username/nickname/telegram_id 標識
             is_lifetime = False
+            row = None
+            logger.info("[auth/me] user.id=%s username=%s display_name=%s telegram_id=%s subscription_expires=%s",
+                        getattr(user, 'id', ''), getattr(user, 'username', ''), getattr(user, 'display_name', ''),
+                        getattr(user, 'telegram_id', ''), data.get('subscription_expires'))
             try:
                 db_path = str(getattr(auth_service, 'db_path', '') or os.environ.get('DATABASE_PATH', ''))
                 if db_path:
@@ -1496,6 +1500,8 @@ class HttpApiServer:
                         q = "SELECT id, user_id, is_lifetime, membership_level, expires_at FROM users WHERE " + " OR ".join(wheres) + " ORDER BY COALESCE(is_lifetime, 0) DESC, id LIMIT 1"
                         row = conn.execute(q, params).fetchone()
                         if row:
+                            logger.info("[auth/me] DB row: id=%s user_id=%s is_lifetime=%s membership_level=%s expires_at=%s",
+                                        row.get('id'), row.get('user_id'), row.get('is_lifetime'), row.get('membership_level'), row.get('expires_at'))
                             if (row['is_lifetime'] or 0) == 1:
                                 is_lifetime = True
                                 # 同步 subscription_expires 為 NULL，避免前端誤算剩餘天數
@@ -1515,8 +1521,13 @@ class HttpApiServer:
                                     is_lifetime = True
                     finally:
                         conn.close()
-            except Exception:
-                pass
+                else:
+                    logger.warning("[auth/me] db_path empty, skip is_lifetime lookup")
+            except Exception as ex:
+                logger.warning("[auth/me] is_lifetime lookup error: %s", ex)
+            if row is None:
+                logger.warning("[auth/me] no matching row in users for id=%s username=%s telegram_id=%s",
+                               getattr(user, 'id', ''), getattr(user, 'username', ''), getattr(user, 'telegram_id', ''))
             if not is_lifetime and data.get('subscription_expires'):
                 # fallback: 過期日在 30 年後視為終身（與卡密 36500 天一致）
                 try:
@@ -1533,6 +1544,7 @@ class HttpApiServer:
                 data['subscriptionExpires'] = None
                 data['membershipExpires'] = None
                 data['isLifetime'] = True
+            logger.info("[auth/me] final is_lifetime=%s for user %s", is_lifetime, getattr(user, 'username', user.id))
             return self._json_response({'success': True, 'data': data})
         except Exception as e:
             return self._json_response({'success': False, 'error': str(e)}, 500)

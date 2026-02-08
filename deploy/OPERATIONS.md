@@ -189,7 +189,35 @@ sqlite3 /app/data/tgmatrix.db "SELECT 1;"
 docker-compose logs api --tail=50
 ```
 
-### 4.2 數據庫鎖定 (Database Locked)
+### 4.2 調試 auth/me 終身會員 (is_lifetime)
+
+當前端顯示「剩餘27天」但後台顯示「終身」時，檢查 API 日誌與數據庫：
+
+```bash
+# 1. SSH 登錄服務器
+ssh ubuntu@165.154.210.154
+
+# 2. 進入項目目錄
+cd /opt/tg-matrix
+
+# 3. 實時查看 auth/me 日誌（讓 Vivian 無痕打開頁面觸發一次）
+sudo docker compose logs -f api 2>&1 | grep "\[auth/me\]"
+
+# 4. 查詢 Vivian 的 users 表記錄（按 username/nickname/telegram_id）
+sudo docker compose exec api python3 -c "
+import sqlite3
+conn = sqlite3.connect('/app/data/tgmatrix.db')
+conn.row_factory = sqlite3.Row
+cur = conn.execute(\"SELECT id, user_id, username, nickname, telegram_id, membership_level, expires_at, is_lifetime, subscription_expires FROM users WHERE username='dthb3' OR nickname='Vivian' OR telegram_id='8041810715'\")
+for r in cur.fetchall():
+    print(dict(r))
+conn.close()
+"
+```
+
+日誌關鍵字段：`user.id`（auth 用）、`DB row is_lifetime`、`no matching row`、`final is_lifetime`。
+
+### 4.3 數據庫鎖定 (Database Locked)
 
 ```bash
 # 1. 檢查 WAL 模式

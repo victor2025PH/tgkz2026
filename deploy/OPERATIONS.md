@@ -217,6 +217,25 @@ conn.close()
 
 日誌關鍵字段：`user.id`（auth 用）、`DB row is_lifetime`、`no matching row`、`final is_lifetime`。
 
+**若日誌報錯** `'sqlite3.Row' object has no attribute 'get'`：已修復，需部署最新後端（用 `row['列名']` 替代 `row.get()`）。
+
+**若數據庫中該用戶為 bronze/is_lifetime=0**：需在服務器上把該用戶改為終身後再刷新頁面：
+
+```bash
+# 按 username 或 telegram_id 將用戶改為終身（榮耀王者）
+sudo docker compose exec api python3 -c "
+import sqlite3
+conn = sqlite3.connect('/app/data/tgmatrix.db')
+conn.execute(\"\"\"
+  UPDATE users SET membership_level='king', is_lifetime=1, expires_at=NULL, subscription_expires=NULL, subscription_tier='king'
+  WHERE username='dthb3' OR telegram_id='8041810715'
+\"\"\")
+conn.commit()
+print('Updated', conn.total_changes(), 'row(s)')
+conn.close()
+"
+```
+
 ### 4.3 數據庫鎖定 (Database Locked)
 
 ```bash

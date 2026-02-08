@@ -1500,13 +1500,14 @@ class HttpApiServer:
                         q = "SELECT id, user_id, is_lifetime, membership_level, expires_at FROM users WHERE " + " OR ".join(wheres) + " ORDER BY COALESCE(is_lifetime, 0) DESC, id LIMIT 1"
                         row = conn.execute(q, params).fetchone()
                         if row:
+                            # sqlite3.Row 用 [] 取列，無 .get()
                             logger.info("[auth/me] DB row: id=%s user_id=%s is_lifetime=%s membership_level=%s expires_at=%s",
-                                        row.get('id'), row.get('user_id'), row.get('is_lifetime'), row.get('membership_level'), row.get('expires_at'))
+                                        row['id'], row['user_id'], row['is_lifetime'], row['membership_level'], row['expires_at'])
                             if (row['is_lifetime'] or 0) == 1:
                                 is_lifetime = True
                                 # 同步 subscription_expires 為 NULL，避免前端誤算剩餘天數
                                 try:
-                                    pk = row.get('id') or row.get('user_id') or user.id
+                                    pk = row['id'] or row['user_id'] or user.id
                                     conn.execute(
                                         "UPDATE users SET subscription_expires = NULL, subscription_tier = COALESCE(membership_level, subscription_tier) WHERE id = ? OR user_id = ?",
                                         (pk, pk)
@@ -1515,8 +1516,8 @@ class HttpApiServer:
                                 except Exception:
                                     pass
                             elif not is_lifetime:
-                                level = (row.get('membership_level') or row.get('level') or '').lower()
-                                exp = row.get('expires_at')
+                                level = (row['membership_level'] or '').lower()
+                                exp = row['expires_at']
                                 if level == 'king' and (not exp or (exp and _is_far_future(exp))):
                                     is_lifetime = True
                     finally:

@@ -516,14 +516,24 @@ class AdminHandlers:
             schema = self.adapter.detect_schema(conn)
             cursor = conn.cursor()
             
-            # 更新到期時間
-            query, id_field = self.adapter.get_update_expires_query(schema)
-            cursor.execute(query, (days, user_id))
+            # 更新到期時間（🔧 修復：同步 subscription_expires 和 expires_at）
+            result = self.adapter.get_update_expires_query(schema)
+            query, id_field = result[0], result[1]
+            dual = result[2] if len(result) > 2 else False
+            if dual:
+                cursor.execute(query, (days, days, user_id))
+            else:
+                cursor.execute(query, (days, user_id))
             
-            # 更新等級（如果指定）
+            # 更新等級（如果指定）（🔧 修復：同步 subscription_tier 和 membership_level）
             if new_level:
-                query, id_field = self.adapter.get_update_level_query(schema)
-                cursor.execute(query, (new_level, user_id))
+                result = self.adapter.get_update_level_query(schema)
+                query, id_field = result[0], result[1]
+                dual = result[2] if len(result) > 2 else False
+                if dual:
+                    cursor.execute(query, (new_level, new_level, user_id))
+                else:
+                    cursor.execute(query, (new_level, user_id))
             
             conn.commit()
             
@@ -1048,13 +1058,23 @@ class AdminHandlers:
                 duration = order.get('duration_days', order.get('duration', 30))
                 level = order.get('level', order.get('product_level', 'silver'))
                 
-                # 更新到期時間
-                query, id_field = self.adapter.get_update_expires_query(schema)
-                cursor.execute(query, (duration, user_id))
+                # 更新到期時間（🔧 修復：同步兩套字段）
+                result = self.adapter.get_update_expires_query(schema)
+                query, id_field = result[0], result[1]
+                dual = result[2] if len(result) > 2 else False
+                if dual:
+                    cursor.execute(query, (duration, duration, user_id))
+                else:
+                    cursor.execute(query, (duration, user_id))
                 
-                # 更新等級
-                query, id_field = self.adapter.get_update_level_query(schema)
-                cursor.execute(query, (level, user_id))
+                # 更新等級（🔧 修復：同步兩套字段）
+                result = self.adapter.get_update_level_query(schema)
+                query, id_field = result[0], result[1]
+                dual = result[2] if len(result) > 2 else False
+                if dual:
+                    cursor.execute(query, (level, level, user_id))
+                else:
+                    cursor.execute(query, (level, user_id))
             
             conn.commit()
             

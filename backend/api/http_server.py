@@ -1498,16 +1498,46 @@ class HttpApiServer:
                         if em:
                             wheres.append("email = ?")
                             params.append(em)
-                        q = "SELECT id, user_id, is_lifetime, membership_level, expires_at FROM users WHERE " + " OR ".join(wheres) + " ORDER BY COALESCE(is_lifetime, 0) DESC, id LIMIT 1"
+                        q = "SELECT id, user_id, is_lifetime, membership_level, subscription_tier, expires_at, subscription_expires FROM users WHERE " + " OR ".join(wheres) + " ORDER BY COALESCE(is_lifetime, 0) DESC, id LIMIT 1"
                         row = conn.execute(q, params).fetchone()
                         if row:
                             # sqlite3.Row 用 [] 取列，無 .get()
-                            logger.info("[auth/me] DB row: id=%s user_id=%s is_lifetime=%s membership_level=%s expires_at=%s",
-                                        row['id'], row['user_id'], row['is_lifetime'], row['membership_level'], row['expires_at'])
+                            db_membership = row['membership_level'] or ''
+                            db_sub_tier = row['subscription_tier'] or ''
+                            logger.info("[auth/me] DB row: id=%s user_id=%s is_lifetime=%s membership_level=%s subscription_tier=%s expires_at=%s",
+                                        row['id'], row['user_id'], row['is_lifetime'], db_membership, db_sub_tier, row['expires_at'])
+                            
+                            # 🔧 修復：同步兩套等級字段，防止不一致
+                            # 以 subscription_tier 為主（管理後台更新的是這個字段）
+                            effective_level = db_sub_tier or db_membership or 'bronze'
+                            if db_membership != effective_level or db_sub_tier != effective_level:
+                                try:
+                                    pk = row['id'] or row['user_id'] or user.id
+                                    conn.execute(
+                                        "UPDATE users SET membership_level = ?, subscription_tier = ? WHERE id = ? OR user_id = ?",
+                                        (effective_level, effective_level, pk, pk)
+                                    )
+                                    # 同步 expires_at 和 subscription_expires
+                                    db_exp = row['expires_at']
+                                    db_sub_exp = row['subscription_expires']
+                                    if db_sub_exp and not db_exp:
+                                        conn.execute("UPDATE users SET expires_at = ? WHERE id = ? OR user_id = ?", (db_sub_exp, pk, pk))
+                                    elif db_exp and not db_sub_exp:
+                                        conn.execute("UPDATE users SET subscription_expires = ? WHERE id = ? OR user_id = ?", (db_exp, pk, pk))
+                                    conn.commit()
+                                    logger.info("[auth/me] Synced level fields: %s → membership_level=%s, subscription_tier=%s", pk, effective_level, effective_level)
+                                except Exception as sync_err:
+                                    logger.warning("[auth/me] Failed to sync level fields: %s", sync_err)
+                            
+                            # 🔧 修復：確保返回數據使用正確的等級
+                            data['subscription_tier'] = effective_level
+                            data['subscriptionTier'] = effective_level
+                            data['membershipLevel'] = effective_level
+                            
                             if (row['is_lifetime'] or 0) == 1:
                                 is_lifetime = True
                             # 若為 king，清除配額緩存，確保 tg_accounts=-1 生效（修復 1/1 上限）
-                            if ((row['membership_level'] or '').lower() == 'king' or is_lifetime):
+                            if (effective_level.lower() == 'king' or is_lifetime):
                                 try:
                                     from core.quota_service import get_quota_service
                                     get_quota_service().invalidate_cache(user.id)
@@ -1524,8 +1554,8 @@ class HttpApiServer:
                                 except Exception:
                                     pass
                             elif not is_lifetime:
-                                level = (row['membership_level'] or '').lower()
-                                exp = row['expires_at']
+                                level = effective_level.lower()
+                                exp = row['expires_at'] or row['subscription_expires']
                                 if level == 'king' and (not exp or (exp and _is_far_future(exp))):
                                     is_lifetime = True
                     finally:
@@ -8447,8 +8477,14 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
             cursor.execute("PRAGMA table_info(users)")
             columns = [col[1] for col in cursor.fetchall()]
             
-            if 'subscription_expires' in columns:
-                # auth/service.py 格式
+            # 🔧 修復：同時更新兩套字段（subscription_expires/expires_at, subscription_tier/membership_level）
+            has_sub_expires = 'subscription_expires' in columns
+            has_expires_at = 'expires_at' in columns
+            has_sub_tier = 'subscription_tier' in columns
+            has_mem_level = 'membership_level' in columns
+            
+            if has_sub_expires:
+                # auth/service.py 格式 - 更新 subscription_expires
                 cursor.execute('''
                     UPDATE users SET 
                         subscription_expires = datetime(
@@ -8462,11 +8498,22 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
                     WHERE id = ?
                 ''', (days, user_id))
                 
+                # 同步到 expires_at（如果存在）
+                if has_expires_at:
+                    cursor.execute('''
+                        UPDATE users SET 
+                            expires_at = subscription_expires
+                        WHERE id = ?
+                    ''', (user_id,))
+                
                 # 如果指定了新等級
                 if new_level:
                     cursor.execute('UPDATE users SET subscription_tier = ? WHERE id = ?', (new_level, user_id))
+                    # 同步到 membership_level（如果存在）
+                    if has_mem_level:
+                        cursor.execute('UPDATE users SET membership_level = ? WHERE id = ?', (new_level, user_id))
             else:
-                # database.py 格式
+                # database.py 格式 - 更新 expires_at
                 cursor.execute('''
                     UPDATE users SET 
                         expires_at = datetime(
@@ -8482,6 +8529,9 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
                 
                 if new_level:
                     cursor.execute('UPDATE users SET membership_level = ? WHERE user_id = ?', (new_level, user_id))
+                    # 同步到 subscription_tier（如果存在）
+                    if has_sub_tier:
+                        cursor.execute('UPDATE users SET subscription_tier = ? WHERE user_id = ?', (new_level, user_id))
             
             conn.commit()
             conn.close()

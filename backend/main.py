@@ -3397,7 +3397,12 @@ class BackendService:
                         "account_data": payload,
                         "error_type": "duplicate"
                     })
-                    return
+                    return {
+                        "success": False,
+                        "error": error_msg,
+                        "code": "DUPLICATE_ACCOUNT",
+                        "phone": phone
+                    }
                 
                 # OPTIMIZATION: If account exists with "error" or "Offline" status, 
                 # automatically trigger login instead of showing "account already exists" error
@@ -3471,7 +3476,12 @@ class BackendService:
                     }))
                     
                     # Return success with a message indicating auto-login was triggered
-                    return
+                    return {
+                        "success": True,
+                        "account_id": existing_id,
+                        "phone": phone,
+                        "message": f"账户 {phone} 已存在，自动触发登录..."
+                    }
                 
                 # Check if account has stuck status (Logging in... or Waiting Code)
                 if existing_status in ['Logging in...', 'Waiting Code', 'Waiting 2FA']:
@@ -3501,7 +3511,12 @@ class BackendService:
                     
                     # Return success - account exists and is in login process
                     # DO NOT send accounts-updated event if status is Waiting Code to prevent loop
-                    return
+                    return {
+                        "success": True,
+                        "account_id": existing_id,
+                        "phone": phone,
+                        "message": f"账户 {phone} 正在登录中（状态: {existing_status}）"
+                    }
                 
                 # If account exists with other statuses (Online, Offline, error), show error
                 error_msg = f"账户已存在: 电话号码 {phone} 已经在系统中（状态: {existing_status}）。如需更新账户信息，请使用更新功能。"
@@ -3512,7 +3527,12 @@ class BackendService:
                     "account_data": payload,
                     "error_type": "duplicate"
                 })
-                return
+                return {
+                    "success": False,
+                    "error": error_msg,
+                    "code": "DUPLICATE_ACCOUNT",
+                    "phone": phone
+                }
             
             # Check if session file exists (but account not in database)
             from config import SESSIONS_DIR
@@ -3858,7 +3878,11 @@ class BackendService:
                 error_msg = f"Account {account_id} not found"
                 print(f"[Backend] {error_msg}", file=sys.stderr)
                 self.send_log(error_msg, "error")
-                return
+                return {
+                    "success": False,
+                    "error": error_msg,
+                    "phone": payload.get('phone', '')
+                }
             
             phone = account.get('phone')
             current_status = account.get('status', 'Offline')
@@ -3873,7 +3897,14 @@ class BackendService:
                     status_result = await self.telegram_manager.check_account_status(phone)
                     if status_result.get('online'):
                         print(f"[Backend] Account {phone} verified online", file=sys.stderr)
-                        return  # Already online, nothing to do
+                        return {
+                            "success": True,
+                            "status": "Online",
+                            "logged_in": True,
+                            "phone": phone,
+                            "account_id": account_id,
+                            "message": f"帳號 {phone} 已在線"
+                        }
                 except Exception as e:
                     print(f"[Backend] Error checking account status: {e}, will proceed with login", file=sys.stderr)
             
@@ -3883,16 +3914,24 @@ class BackendService:
                 if phone in self.telegram_manager.login_callbacks:
                     existing_hash = self.telegram_manager.login_callbacks[phone].get("phone_code_hash")
                     if existing_hash:
+                        existing_send_type = self.telegram_manager.login_callbacks[phone].get("send_type", "app")
                         print(f"[Backend] Account {phone} already waiting for code, returning existing hash", file=sys.stderr)
                         self.send_event("login-requires-code", {
                             "accountId": account_id,
                             "phone": phone,
                             "phoneCodeHash": existing_hash,
-                            "sendType": self.telegram_manager.login_callbacks[phone].get("send_type", "app"),
+                            "sendType": existing_send_type,
                             "message": "验证码已发送，请在 Telegram 应用中查看",
                             "canRetrySMS": False
                         })
-                        return
+                        return {
+                            "success": True,
+                            "requires_code": True,
+                            "phone": phone,
+                            "phone_code_hash": existing_hash,
+                            "send_type": existing_send_type,
+                            "message": "验证码已发送，请在 Telegram 应用中查看"
+                        }
                 print(f"[Backend] Account {phone} status is 'Waiting Code' but no callback found, will resend code", file=sys.stderr)
             
             # Update status to "Logging in..."
@@ -4225,7 +4264,13 @@ class BackendService:
                     self._cache.pop("accounts", None)
                     self._cache_timestamps.pop("accounts", None)
                     self.send_event("accounts-updated", accounts)
-                    return
+                    return {
+                        "success": False,
+                        "error": friendly_msg,
+                        "phone": phone,
+                        "code_expired": True,
+                        "codeExpired": True
+                    }
                 elif "hash mismatch" in error_message.lower() or "hash" in error_message.lower() and "mismatch" in error_message.lower():
                     friendly_msg = f'账户 {phone} 登录失败：验证码哈希不匹配。这通常是因为客户端被重新创建。请点击"重新发送"获取新的验证码。'
                     # Non-recoverable error: State: Logging in... -> Offline (need to restart)
@@ -4245,7 +4290,13 @@ class BackendService:
                     self._cache.pop("accounts", None)
                     self._cache_timestamps.pop("accounts", None)
                     self.send_event("accounts-updated", accounts)
-                    return
+                    return {
+                        "success": False,
+                        "error": friendly_msg,
+                        "phone": phone,
+                        "code_expired": True,
+                        "codeExpired": True
+                    }
                 elif "Invalid 2FA password" in error_message or "2FA" in error_message and "password" in error_message.lower():
                     friendly_msg = f"帳號 {phone} 登入失敗：二步驗證密碼錯誤。請檢查密碼後重試。"
                 elif "2FA verification timeout" in error_message or ("2FA" in error_message and "timeout" in error_message.lower()):
@@ -4284,7 +4335,13 @@ class BackendService:
                     self._cache.pop("accounts", None)
                     self._cache_timestamps.pop("accounts", None)
                     self.send_event("accounts-updated", accounts)
-                    return
+                    return {
+                        "success": False,
+                        "error": friendly_msg,
+                        "phone": phone,
+                        "code_expired": True,
+                        "codeExpired": True
+                    }
                 else:
                     friendly_msg = f"账户 {phone} 登录失败：{error_message}"
                 
@@ -4321,6 +4378,11 @@ class BackendService:
             print(f"[Backend] {error_msg}", file=sys.stderr)
             traceback.print_exc(file=sys.stderr)
             self.send_log(error_msg, "error")
+            return {
+                "success": False,
+                "error": f"登录失败：{str(e)}",
+                "phone": payload.get('phone', '') if isinstance(payload, dict) else ''
+            }
     
     # ===================== QR Code Login Handlers =====================
     

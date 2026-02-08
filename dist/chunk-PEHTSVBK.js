@@ -1,0 +1,1 @@
+import{a}from"./chunk-AFMXKCQD.js";import"./chunk-SJSUUKGP.js";import"./chunk-36YFMG3E.js";import"./chunk-B6NL44GT.js";import"./chunk-N7GMY4UM.js";import"./chunk-YLSLTE5F.js";export{a as WalletOrdersComponent};

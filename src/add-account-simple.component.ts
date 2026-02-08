@@ -1204,6 +1204,19 @@ export class AddAccountSimpleComponent implements OnInit, OnDestroy {
     });
     this.ipcChannels.push('account-added');
 
+    // 🔧 修復：監聽 account-validation-error 事件（重複帳號等驗證錯誤）
+    this.ipcService.on('account-validation-error', (result: any) => {
+      this.isSending.set(false);
+      if (this.sendTimeout) {
+        clearTimeout(this.sendTimeout);
+        this.sendTimeout = null;
+      }
+      const errors = result.errors || [];
+      const errorMsg = errors.length > 0 ? errors[0] : '帳號驗證失敗';
+      this.toast.error(errorMsg);
+    });
+    this.ipcChannels.push('account-validation-error');
+
     // TData 掃描結果
     this.ipcService.on('tdata-scan-result', (result: any) => {
       this.isScanningTdata.set(false);

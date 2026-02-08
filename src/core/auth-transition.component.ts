@@ -8,7 +8,7 @@
  * 4. 提升品牌感
  */
 
-import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, ChangeDetectorRef, NgZone, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { AuthEventsService, AuthEvent } from './auth-events.service';
@@ -21,7 +21,7 @@ export type TransitionType = 'login' | 'logout' | 'session_expired' | 'none';
   imports: [CommonModule],
   template: `
     @if (show()) {
-      <div class="transition-overlay" [class]="'type-' + type()">
+      <div class="transition-overlay" [class]="'type-' + type()" (click)="onOverlayClick()">
         <div class="transition-content">
           @switch (type()) {
             @case ('login') {
@@ -161,6 +161,8 @@ export type TransitionType = 'login' | 'logout' | 'session_expired' | 'none';
 })
 export class AuthTransitionComponent implements OnInit, OnDestroy {
   private authEvents = inject(AuthEventsService);
+  private cdr = inject(ChangeDetectorRef);
+  private ngZone = inject(NgZone);
   private subscription: Subscription | null = null;
   
   // 狀態
@@ -168,6 +170,7 @@ export class AuthTransitionComponent implements OnInit, OnDestroy {
   type = signal<TransitionType>('none');
   
   private hideTimer: any = null;
+  private safetyTimer: any = null;  // 🔧 安全計時器，確保遮罩不會永久卡住
   
   ngOnInit(): void {
     // 訂閱認證事件
@@ -178,44 +181,82 @@ export class AuthTransitionComponent implements OnInit, OnDestroy {
   
   ngOnDestroy(): void {
     this.subscription?.unsubscribe();
+    this.clearTimers();
+  }
+  
+  private clearTimers(): void {
     if (this.hideTimer) {
       clearTimeout(this.hideTimer);
+      this.hideTimer = null;
     }
+    if (this.safetyTimer) {
+      clearTimeout(this.safetyTimer);
+      this.safetyTimer = null;
+    }
+  }
+  
+  /** 🔧 安全隱藏方法：確保 Angular 變更檢測被觸發 */
+  private safeHide(): void {
+    this.show.set(false);
+    // 🔧 強制觸發變更檢測（修復 OnPush 父組件下 signal 可能不刷新的問題）
+    try {
+      this.cdr.markForCheck();
+      this.cdr.detectChanges();
+    } catch {
+      // 組件可能已銷毀，忽略
+    }
+  }
+
+  /** 🔧 點擊遮罩立即關閉（防止卡死） */
+  onOverlayClick(): void {
+    this.clearTimers();
+    this.safeHide();
   }
   
   private handleEvent(event: AuthEvent): void {
     // 清除之前的定時器
-    if (this.hideTimer) {
-      clearTimeout(this.hideTimer);
-    }
+    this.clearTimers();
+    
+    let delay = 0;
     
     switch (event.type) {
       case 'login':
         this.type.set('login');
         this.show.set(true);
-        // 1.5 秒後自動隱藏
-        this.hideTimer = setTimeout(() => {
-          this.show.set(false);
-        }, 1500);
+        delay = 1500;
         break;
         
       case 'logout':
         this.type.set('logout');
         this.show.set(true);
-        // 1 秒後自動隱藏
-        this.hideTimer = setTimeout(() => {
-          this.show.set(false);
-        }, 1000);
+        delay = 1000;
         break;
         
       case 'session_expired':
         this.type.set('session_expired');
         this.show.set(true);
-        // 2 秒後自動隱藏
-        this.hideTimer = setTimeout(() => {
-          this.show.set(false);
-        }, 2000);
+        delay = 2000;
         break;
+        
+      default:
+        return;
     }
+    
+    // 🔧 使用 NgZone.run 確保 setTimeout 回調在 Angular Zone 內執行
+    this.hideTimer = setTimeout(() => {
+      this.ngZone.run(() => {
+        this.safeHide();
+      });
+    }, delay);
+    
+    // 🔧 安全兜底：最多 5 秒後強制隱藏，防止任何原因導致的卡死
+    this.safetyTimer = setTimeout(() => {
+      if (this.show()) {
+        console.warn('[AuthTransition] Safety timeout: force hiding overlay');
+        this.ngZone.run(() => {
+          this.safeHide();
+        });
+      }
+    }, 5000);
   }
 }

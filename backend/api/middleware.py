@@ -617,6 +617,9 @@ async def quota_check_middleware(request, handler):
     try:
         from core.quota_service import get_quota_service, QuotaExceededException
         service = get_quota_service()
+        # 添加 TG 帳號時強制刷新該用戶配額緩存，避免未先請求 auth/me 導致仍用舊 limit
+        if quota_type == 'tg_accounts':
+            service.invalidate_cache(tenant.user_id)
         result = service.check_quota(tenant.user_id, quota_type, quota_amount)
         
         # 🔧 P2: 將檢查結果附加到請求，後續處理器可用此跳過重複檢查

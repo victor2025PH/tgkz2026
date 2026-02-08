@@ -324,7 +324,10 @@ class QuotaService:
         
         db = self._get_db()
         try:
-            # 1. 檢查自定義配額（表可能尚未創建，容錯）
+            # 先取 tier，用於 king 的 tg_accounts 不採信自定義配額
+            tier = self._get_user_tier(user_id)
+            
+            # 1. 檢查自定義配額（管理員調整）；king 的 tg_accounts 強制用等級 -1，不覆蓋
             try:
                 row = db.execute('''
                     SELECT custom_value, expires_at FROM user_custom_quotas 
@@ -336,13 +339,16 @@ class QuotaService:
             if row:
                 expires_at = row['expires_at']
                 if expires_at is None or datetime.fromisoformat(expires_at) > datetime.now():
-                    limit = row['custom_value']
-                    self._update_cache(user_id, quota_type, limit)
-                    return limit
+                    # king 的 tg_accounts 不採用自定義，避免舊記錄覆蓋無限配額
+                    if quota_type == 'tg_accounts' and (tier or '').lower() == 'king':
+                        logger.info(f"[QuotaService] _get_quota_limit user_id={user_id} tg_accounts: ignore custom (tier=king), use level")
+                    else:
+                        limit = row['custom_value']
+                        self._update_cache(user_id, quota_type, limit)
+                        logger.info(f"[QuotaService] _get_quota_limit user_id={user_id} {quota_type} limit={limit} source=custom")
+                        return limit
             
             # 2. 從等級配置獲取
-            tier = self._get_user_tier(user_id)
-            
             try:
                 from .level_config import get_level_config_service, MembershipLevel, QuotaType
                 service = get_level_config_service()
@@ -352,6 +358,7 @@ class QuotaService:
                     qt = QuotaType(quota_type)
                     limit = service.get_quota(level, qt)
                     self._update_cache(user_id, quota_type, limit)
+                    logger.info(f"[QuotaService] _get_quota_limit user_id={user_id} {quota_type} tier={tier} limit={limit} source=level")
                     return limit
                 except ValueError:
                     pass
@@ -362,6 +369,7 @@ class QuotaService:
             limit = self._get_default_limit(quota_type)
             if quota_type == 'tg_accounts' and limit < 1:
                 limit = 1
+            logger.info(f"[QuotaService] _get_quota_limit user_id={user_id} {quota_type} limit={limit} source=default")
             return limit
         finally:
             db.close()

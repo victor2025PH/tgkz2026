@@ -3267,8 +3267,11 @@ class BackendService:
         try:
             import sys
             import re as re_module
+            import logging
+            _logger = logging.getLogger('backend.add_account')
             
             owner_user_id = payload.get('ownerUserId')
+            _logger.info(f"[add-account] START phone={payload.get('phone')}, proxy={payload.get('proxy')}, usePlatformApi={payload.get('usePlatformApi')}, ownerUserId={owner_user_id}")
             
             # 🔧 P4-3: 使用原子化的配額檢查 + 預留操作（防止並發超額）
             quota_reserved = False  # 追蹤預留狀態，用於後續 commit/rollback
@@ -3374,6 +3377,7 @@ class BackendService:
             
             # Check if account already exists in database
             existing_account = await db.get_account_by_phone(phone)
+            _logger.info(f"[add-account] phone={phone}, existing_account={'YES id=' + str(existing_account.get('id')) + ' status=' + existing_account.get('status', '?') if existing_account else 'NO'}")
             if existing_account:
                 # 🔧 P4-3: 帳號已存在，不需要消耗新配額，回滾預留
                 if quota_reserved and owner_user_id:
@@ -3613,6 +3617,7 @@ class BackendService:
             payload['status'] = 'Offline'
             
             account_id = await db.add_account(payload)
+            _logger.info(f"[add-account] SUCCESS account_id={account_id}, phone={phone}")
             print(f"[Backend] Account added successfully with ID: {account_id}", file=sys.stderr)
             
             # Double-check: ensure status is Offline (in case of any issues)
@@ -3698,6 +3703,8 @@ class BackendService:
         except ValueError as e:
             # Handle specific errors like duplicate phone number
             import sys
+            import logging as _log2
+            _log2.getLogger('backend.add_account').error(f"[add-account] ValueError: {e}")
             # 🔧 P4-3: 帳號新增失敗 → 回滾配額預留
             if quota_reserved and owner_user_id:
                 try:
@@ -3729,6 +3736,8 @@ class BackendService:
                     print(f"[Backend] Quota rollback error: {qe}", file=sys.stderr)
             
             error_msg = str(e)
+            import logging as _log3
+            _log3.getLogger('backend.add_account').error(f"[add-account] Exception: {error_msg}")
             print(f"[Backend] Exception adding account: {error_msg}", file=sys.stderr)
             import traceback
             traceback.print_exc(file=sys.stderr)
@@ -3845,6 +3854,9 @@ class BackendService:
         """Handle login-account command with Pyrogram"""
         try:
             import sys
+            import logging
+            _logger = logging.getLogger('backend.login_account')
+            _logger.info(f"[login-account] START payload_keys={list(payload.keys()) if isinstance(payload, dict) else type(payload)}, phone={payload.get('phone') if isinstance(payload, dict) else 'N/A'}")
             print(f"[Backend] handle_login_account called with payload: {payload}", file=sys.stderr)
             
             # Payload can be account_id (int) or dict with account_id and login details
@@ -3876,16 +3888,18 @@ class BackendService:
             
             if not account:
                 error_msg = f"Account {account_id} not found"
+                _logger.warning(f"[login-account] ACCOUNT NOT FOUND account_id={account_id}, phone={payload.get('phone') if isinstance(payload, dict) else 'N/A'}")
                 print(f"[Backend] {error_msg}", file=sys.stderr)
                 self.send_log(error_msg, "error")
                 return {
                     "success": False,
                     "error": error_msg,
-                    "phone": payload.get('phone', '')
+                    "phone": payload.get('phone', '') if isinstance(payload, dict) else ''
                 }
             
             phone = account.get('phone')
             current_status = account.get('status', 'Offline')
+            _logger.info(f"[login-account] FOUND account_id={account_id}, phone={phone}, status={current_status}, apiId={account.get('apiId')}, hasApiHash={'yes' if account.get('apiHash') else 'no'}")
             print(f"[Backend] Found account: {phone}, API ID: {account.get('apiId')}, API Hash: {'***' if account.get('apiHash') else 'None'}", file=sys.stderr)
             
             # CRITICAL: If account is already Online and no verification code is being submitted,
@@ -3976,6 +3990,7 @@ class BackendService:
                 })
                 print(f"[Backend] Generated and saved device fingerprint for {phone}: {device_model} ({platform})", file=sys.stderr)
             
+            _logger.info(f"[login-account] CALLING telegram_manager.login_account phone={phone}, proxy={account.get('proxy')}, apiId={account.get('apiId')}")
             result = await self.telegram_manager.login_account(
                 phone=phone,
                 api_id=account.get('apiId'),
@@ -3992,6 +4007,7 @@ class BackendService:
                 platform=platform
             )
             
+            _logger.info(f"[login-account] RESULT success={result.get('success')}, requires_code={result.get('requires_code')}, requires_2fa={result.get('requires_2fa')}, status={result.get('status')}, message={str(result.get('message', ''))[:100]}")
             print(f"[Backend] login_account result: success={result.get('success')}, requires_code={result.get('requires_code')}, requires_2fa={result.get('requires_2fa')}", file=sys.stderr)
             
             if result.get('success'):

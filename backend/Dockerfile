@@ -21,8 +21,11 @@ COPY . .
 # 創建必要目錄
 RUN mkdir -p /app/sessions /app/logs /app/data
 
+# 🔧 修復：禁用 Python 輸出緩衝，確保 Docker logs 能即時看到 stderr 日誌
+ENV PYTHONUNBUFFERED=1
+
 # 暴露端口
 EXPOSE 8000
 
 # 啟動命令 - 使用 Web 服務器模式
-CMD ["python", "web_server.py"]
+CMD ["python", "-u", "web_server.py"]

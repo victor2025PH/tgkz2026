@@ -5063,6 +5063,311 @@ class AdminHandlers:
         
         return success_response(data=stats)
 
+    # ==================== 代理供應商管理 ====================
+
+    @handle_exception
+    async def list_proxy_providers(self, request: web.Request) -> web.Response:
+        """列出所有代理供應商"""
+        admin = self._verify_token(request)
+        if not admin:
+            raise AdminError(ErrorCode.AUTH_INVALID_TOKEN, message="無效的認證令牌")
+
+        from .proxy_sync import get_sync_service
+        svc = get_sync_service()
+        providers = svc.list_providers()
+        return success_response(data={"providers": providers})
+
+    @handle_exception
+    async def get_proxy_provider(self, request: web.Request) -> web.Response:
+        """獲取單個供應商詳情"""
+        admin = self._verify_token(request)
+        if not admin:
+            raise AdminError(ErrorCode.AUTH_INVALID_TOKEN, message="無效的認證令牌")
+
+        provider_id = request.match_info.get('provider_id')
+        if not provider_id:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="缺少供應商 ID")
+
+        from .proxy_sync import get_sync_service
+        svc = get_sync_service()
+        provider = svc.get_provider(provider_id)
+        if not provider:
+            raise AdminError(ErrorCode.RESOURCE_NOT_FOUND, message="供應商不存在")
+
+        return success_response(data=provider)
+
+    @handle_exception
+    async def add_proxy_provider(self, request: web.Request) -> web.Response:
+        """新增代理供應商"""
+        admin = self._verify_token(request)
+        if not admin:
+            raise AdminError(ErrorCode.AUTH_INVALID_TOKEN, message="無效的認證令牌")
+
+        data = await request.json()
+        ip_address = request.headers.get('X-Forwarded-For', request.remote)
+
+        name = data.get('name', '').strip()
+        provider_type = data.get('provider_type', 'blurpath').strip()
+        api_base_url = data.get('api_base_url', '').strip()
+        api_key = data.get('api_key', '').strip()
+        api_secret = data.get('api_secret', '').strip()
+        config = data.get('config', {})
+        sync_interval = data.get('sync_interval_minutes', 30)
+        is_active = data.get('is_active', True)
+
+        if not name:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="缺少供應商名稱")
+
+        from .proxy_sync import get_sync_service
+        svc = get_sync_service()
+        result = svc.add_provider(
+            name=name,
+            provider_type=provider_type,
+            api_base_url=api_base_url,
+            api_key=api_key,
+            api_secret=api_secret,
+            config=config,
+            sync_interval_minutes=sync_interval,
+            is_active=is_active,
+        )
+
+        if result.get("success"):
+            await audit_log(
+                action=AuditAction.SETTINGS_CHANGE,
+                admin_id=admin.get('id', 'unknown'),
+                target_id=result.get('id'),
+                details=f"新增代理供應商: {name} ({provider_type})",
+                ip_address=ip_address,
+            )
+
+        return success_response(data=result)
+
+    @handle_exception
+    async def update_proxy_provider(self, request: web.Request) -> web.Response:
+        """更新代理供應商"""
+        admin = self._verify_token(request)
+        if not admin:
+            raise AdminError(ErrorCode.AUTH_INVALID_TOKEN, message="無效的認證令牌")
+
+        provider_id = request.match_info.get('provider_id')
+        if not provider_id:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="缺少供應商 ID")
+
+        data = await request.json()
+        ip_address = request.headers.get('X-Forwarded-For', request.remote)
+
+        from .proxy_sync import get_sync_service
+        svc = get_sync_service()
+        result = svc.update_provider(provider_id, data)
+
+        if result.get("success"):
+            await audit_log(
+                action=AuditAction.SETTINGS_CHANGE,
+                admin_id=admin.get('id', 'unknown'),
+                target_id=provider_id,
+                details=f"更新代理供應商配置: {list(data.keys())}",
+                ip_address=ip_address,
+            )
+
+        return success_response(data=result)
+
+    @handle_exception
+    async def delete_proxy_provider(self, request: web.Request) -> web.Response:
+        """刪除代理供應商"""
+        admin = self._verify_token(request)
+        if not admin:
+            raise AdminError(ErrorCode.AUTH_INVALID_TOKEN, message="無效的認證令牌")
+
+        provider_id = request.match_info.get('provider_id')
+        if not provider_id:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="缺少供應商 ID")
+
+        ip_address = request.headers.get('X-Forwarded-For', request.remote)
+
+        from .proxy_sync import get_sync_service
+        svc = get_sync_service()
+        result = svc.delete_provider(provider_id)
+
+        if result.get("success"):
+            await audit_log(
+                action=AuditAction.SETTINGS_CHANGE,
+                admin_id=admin.get('id', 'unknown'),
+                target_id=provider_id,
+                details=f"刪除代理供應商: {provider_id}",
+                ip_address=ip_address,
+            )
+
+        return success_response(data=result)
+
+    @handle_exception
+    async def test_proxy_provider(self, request: web.Request) -> web.Response:
+        """測試供應商 API 連接"""
+        admin = self._verify_token(request)
+        if not admin:
+            raise AdminError(ErrorCode.AUTH_INVALID_TOKEN, message="無效的認證令牌")
+
+        provider_id = request.match_info.get('provider_id')
+        if not provider_id:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="缺少供應商 ID")
+
+        from .proxy_sync import get_sync_service
+        svc = get_sync_service()
+        result = await svc.test_provider_connection(provider_id)
+        return success_response(data=result)
+
+    @handle_exception
+    async def sync_proxy_provider(self, request: web.Request) -> web.Response:
+        """手動觸發供應商同步"""
+        admin = self._verify_token(request)
+        if not admin:
+            raise AdminError(ErrorCode.AUTH_INVALID_TOKEN, message="無效的認證令牌")
+
+        provider_id = request.match_info.get('provider_id')
+        if not provider_id:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="缺少供應商 ID")
+
+        ip_address = request.headers.get('X-Forwarded-For', request.remote)
+
+        from .proxy_sync import get_sync_service
+        svc = get_sync_service()
+        result = await svc.sync_provider(provider_id, sync_type="manual")
+
+        status_text = "成功" if result.get("success") else "失敗"
+        await audit_log(
+            action=AuditAction.SETTINGS_CHANGE,
+            admin_id=admin.get('id', 'unknown'),
+            target_id=provider_id,
+            details=f"手動同步代理供應商({status_text}): +{result.get('added', 0)} -{result.get('removed', 0)} ~{result.get('updated', 0)}",
+            ip_address=ip_address,
+        )
+
+        return success_response(data=result)
+
+    @handle_exception
+    async def get_proxy_provider_balance(self, request: web.Request) -> web.Response:
+        """查詢供應商餘額"""
+        admin = self._verify_token(request)
+        if not admin:
+            raise AdminError(ErrorCode.AUTH_INVALID_TOKEN, message="無效的認證令牌")
+
+        provider_id = request.match_info.get('provider_id')
+        if not provider_id:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="缺少供應商 ID")
+
+        from .proxy_sync import get_sync_service
+        svc = get_sync_service()
+        balances = await svc.get_provider_balance(provider_id)
+        return success_response(data={"balances": balances})
+
+    @handle_exception
+    async def get_proxy_sync_logs(self, request: web.Request) -> web.Response:
+        """獲取同步日誌"""
+        admin = self._verify_token(request)
+        if not admin:
+            raise AdminError(ErrorCode.AUTH_INVALID_TOKEN, message="無效的認證令牌")
+
+        provider_id = request.query.get('provider_id')
+        limit = int(request.query.get('limit', '50'))
+
+        from .proxy_sync import get_sync_service
+        svc = get_sync_service()
+        logs = svc.get_sync_logs(provider_id=provider_id, limit=limit)
+        return success_response(data={"logs": logs})
+
+    @handle_exception
+    async def get_proxy_provider_whitelist(self, request: web.Request) -> web.Response:
+        """獲取供應商 IP 白名單"""
+        admin = self._verify_token(request)
+        if not admin:
+            raise AdminError(ErrorCode.AUTH_INVALID_TOKEN, message="無效的認證令牌")
+
+        provider_id = request.match_info.get('provider_id')
+        if not provider_id:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="缺少供應商 ID")
+
+        from .proxy_sync import get_sync_service
+        svc = get_sync_service()
+        whitelist = await svc.get_provider_whitelist(provider_id)
+        return success_response(data={"whitelist": whitelist})
+
+    @handle_exception
+    async def manage_proxy_provider_whitelist(self, request: web.Request) -> web.Response:
+        """管理供應商 IP 白名單（添加/移除）"""
+        admin = self._verify_token(request)
+        if not admin:
+            raise AdminError(ErrorCode.AUTH_INVALID_TOKEN, message="無效的認證令牌")
+
+        provider_id = request.match_info.get('provider_id')
+        if not provider_id:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="缺少供應商 ID")
+
+        data = await request.json()
+        action = data.get('action', 'add')  # add / remove
+        ip = data.get('ip', '').strip()
+
+        if not ip:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="缺少 IP 地址")
+
+        from .proxy_sync import get_sync_service
+        svc = get_sync_service()
+
+        if action == 'add':
+            ok = await svc.add_provider_whitelist_ip(provider_id, ip)
+        elif action == 'remove':
+            ok = await svc.remove_provider_whitelist_ip(provider_id, ip)
+        else:
+            raise AdminError(ErrorCode.VALIDATION_REQUIRED_FIELD, message="action 必須為 add 或 remove")
+
+        return success_response(data={"success": ok, "action": action, "ip": ip})
+
+    @handle_exception
+    async def cleanup_expired_proxies(self, request: web.Request) -> web.Response:
+        """清理過期代理"""
+        admin = self._verify_token(request)
+        if not admin:
+            raise AdminError(ErrorCode.AUTH_INVALID_TOKEN, message="無效的認證令牌")
+
+        dry_run = request.query.get('dry_run', 'false').lower() == 'true'
+        ip_address = request.headers.get('X-Forwarded-For', request.remote)
+
+        from .proxy_sync import get_sync_service
+        svc = get_sync_service()
+        result = svc.cleanup_expired_proxies(dry_run=dry_run)
+
+        if not dry_run:
+            await audit_log(
+                action=AuditAction.SETTINGS_CHANGE,
+                admin_id=admin.get('id', 'unknown'),
+                target_id='proxy_cleanup',
+                details=f"清理過期代理: 刪除 {result['removed']}，標記 {result['marked_disabled']}",
+                ip_address=ip_address,
+            )
+
+        return success_response(data=result)
+
+    @handle_exception
+    async def request_dynamic_proxy(self, request: web.Request) -> web.Response:
+        """請求動態代理"""
+        admin = self._verify_token(request)
+        if not admin:
+            raise AdminError(ErrorCode.AUTH_INVALID_TOKEN, message="無效的認證令牌")
+
+        data = await request.json()
+        provider_id = data.get('provider_id')
+        country = data.get('country', '')
+        session_id = data.get('session_id', '')
+
+        from .proxy_sync import get_sync_service
+        svc = get_sync_service()
+        result = await svc.request_dynamic_proxy(
+            provider_id=provider_id, country=country, session_id=session_id
+        )
+
+        if result:
+            return success_response(data=result)
+        else:
+            return success_response(data=None, message="無法獲取動態代理")
+
 
 # 全局實例
 admin_handlers = AdminHandlers()

@@ -314,6 +314,44 @@
                         </div>
                     </div>
                     
+                    <!-- 🆕 供應商狀態卡片 -->
+                    <div v-if="dashboardProviders.length > 0" class="mt-6">
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold">🔗 代理供應商狀態</h3>
+                                <button @click="currentPage = 'proxyProviders'" class="text-blue-400 hover:text-blue-300 text-sm">
+                                    管理供應商 →
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div v-for="dp in dashboardProviders" :key="dp.id"
+                                     class="bg-gray-700/50 rounded-lg p-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div class="flex items-center gap-2">
+                                            <span :class="dp.is_active ? 'text-green-400' : 'text-red-400'" class="text-lg">●</span>
+                                            <span class="font-medium">{{ dp.name }}</span>
+                                        </div>
+                                        <span class="text-xs text-gray-500">{{ dp.provider_type }}</span>
+                                    </div>
+                                    <div v-if="dp.balance_info && dp.balance_info.length" class="space-y-1">
+                                        <div v-for="b in dp.balance_info" :key="b.balance_type" class="flex justify-between text-sm">
+                                            <span class="text-gray-400">
+                                                {{ b.balance_type === 'traffic' ? '流量' : b.balance_type === 'credits' ? '餘額' : b.balance_type === 'time' ? '時間' : b.balance_type === 'ip_count' ? 'IP數' : b.balance_type }}
+                                            </span>
+                                            <span :class="b.remaining < (b.total * 0.1 || 5) ? 'text-red-400 font-bold' : 'text-green-400'">
+                                                {{ typeof b.remaining === 'number' ? (b.balance_type === 'traffic' ? b.remaining.toFixed(2) : b.remaining) : b.remaining }} {{ b.unit }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div v-else class="text-sm text-gray-500">尚無餘額數據</div>
+                                    <div class="text-xs text-gray-500 mt-2">
+                                        同步: {{ dp.last_sync_at || '從未' }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- 🆕 系統告警中心 -->
                     <div v-if="systemAlerts.alerts && systemAlerts.alerts.length > 0" class="mt-6">
                         <div class="bg-gray-800 rounded-xl p-6">
@@ -1011,6 +1049,8 @@
                                                 <p class="font-medium">{{ proxy.host }}:{{ proxy.port }}</p>
                                                 <p class="text-sm text-gray-400" v-if="proxy.country || proxy.provider">
                                                     {{ proxy.country || '' }} {{ proxy.provider || '' }}
+                                                    <span v-if="proxy.proxy_source === 'api_sync'" class="ml-1 px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">API</span>
+                                                    <span v-else-if="proxy.proxy_source === 'dynamic'" class="ml-1 px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs">動態</span>
                                                 </p>
                                             </div>
                                         </div>
@@ -1064,6 +1104,241 @@
                             <li>• 建議使用 <span class="text-blue-400">靜態ISP代理</span> 以獲得最高信任度</li>
                             <li>• 支持格式：<code class="bg-gray-700 px-1 rounded">socks5://user:pass@host:port</code> 或 <code class="bg-gray-700 px-1 rounded">host:port</code></li>
                         </ul>
+                    </div>
+                </div>
+                
+                <!-- ==================== 代理供應商管理 ==================== -->
+                <div v-if="currentPage === 'proxyProviders'">
+                    <!-- 操作欄 -->
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="flex gap-3">
+                            <button @click="syncAllProviders()" :disabled="providerSyncing === 'all'"
+                                    class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                                {{ providerSyncing === 'all' ? '同步中...' : '🔄 同步全部' }}
+                            </button>
+                            <button @click="cleanupExpiredProxies()"
+                                    class="bg-yellow-600/80 hover:bg-yellow-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                                🧹 清理過期代理
+                            </button>
+                        </div>
+                        <span class="text-sm text-gray-400">
+                            活躍供應商: {{ proxyProviders.filter(p => p.is_active).length }} / {{ proxyProviders.length }}
+                        </span>
+                    </div>
+
+                    <!-- 供應商連接卡片 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                        <div v-for="prov in proxyProviders" :key="prov.id"
+                             class="bg-gray-800 rounded-xl p-5 border border-gray-700 hover:border-purple-500/50 transition-all">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-2xl">🔗</span>
+                                    <div>
+                                        <h3 class="font-semibold">{{ prov.name }}</h3>
+                                        <span class="text-xs text-gray-400">{{ prov.provider_type }}</span>
+                                    </div>
+                                </div>
+                                <span :class="prov.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'"
+                                      class="px-2 py-1 rounded-full text-xs font-medium">
+                                    {{ prov.is_active ? '已連接' : '已停用' }}
+                                </span>
+                            </div>
+                            <!-- 餘額信息 -->
+                            <div v-if="prov.balance_info && prov.balance_info.length" class="mb-3 space-y-1">
+                                <div v-for="b in prov.balance_info" :key="b.balance_type" class="flex justify-between text-sm">
+                                    <span class="text-gray-400">
+                                        {{ b.balance_type === 'traffic' ? '剩餘流量' : b.balance_type === 'time' ? '剩餘時間' : b.balance_type === 'ip_count' ? 'IP 數量' : b.balance_type === 'credits' ? '帳戶餘額' : b.balance_type }}
+                                    </span>
+                                    <span :class="b.remaining < (b.total * 0.1 || 5) ? 'text-red-400 font-bold' : 'text-green-400'" class="font-medium">
+                                        {{ typeof b.remaining === 'number' ? (b.balance_type === 'traffic' ? b.remaining.toFixed(2) : b.remaining) : b.remaining }} {{ b.unit }}
+                                    </span>
+                                </div>
+                            </div>
+                            <!-- 同步信息 -->
+                            <div class="text-xs text-gray-500 mb-3">
+                                <span v-if="prov.last_sync_at">最後同步: {{ prov.last_sync_at }}</span>
+                                <span v-else>尚未同步</span>
+                                <span class="mx-1">|</span>
+                                <span>間隔: {{ prov.sync_interval_minutes }}分鐘</span>
+                            </div>
+                            <!-- 操作按鈕 -->
+                            <div class="flex gap-2 flex-wrap">
+                                <button @click="syncProxyProvider(prov.id)"
+                                        :disabled="providerSyncing === prov.id"
+                                        class="bg-blue-600/80 hover:bg-blue-600 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50">
+                                    {{ providerSyncing === prov.id ? '同步中...' : '🔄 同步' }}
+                                </button>
+                                <button @click="testProxyProvider(prov.id)"
+                                        class="bg-green-600/80 hover:bg-green-600 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                                    🔌 測試連接
+                                </button>
+                                <button @click="refreshProviderBalance(prov.id)"
+                                        class="bg-yellow-600/80 hover:bg-yellow-600 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                                    💰 餘額
+                                </button>
+                                <button @click="openEditProviderModal(prov)"
+                                        class="bg-gray-600/80 hover:bg-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                                    ✏️ 編輯
+                                </button>
+                                <button @click="deleteProxyProvider(prov.id, prov.name)"
+                                        class="bg-red-600/80 hover:bg-red-600 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                                    🗑 刪除
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 添加供應商卡片 -->
+                        <div @click="openAddProviderModal()"
+                             class="bg-gray-800/50 rounded-xl p-5 border-2 border-dashed border-gray-600 hover:border-purple-500 cursor-pointer transition-all flex flex-col items-center justify-center min-h-[200px]">
+                            <span class="text-4xl mb-2">➕</span>
+                            <p class="text-gray-400 font-medium">添加代理供應商</p>
+                            <p class="text-xs text-gray-500 mt-1">支持 Blurpath 等主流供應商</p>
+                        </div>
+                    </div>
+
+                    <!-- 同步日誌 -->
+                    <div class="glass-card rounded-2xl p-6 mb-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold">📋 同步日誌</h3>
+                            <div class="flex gap-3 items-center">
+                                <select v-model="syncLogProviderFilter" @change="loadProxySyncLogs()"
+                                        class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1 text-sm">
+                                    <option value="">全部供應商</option>
+                                    <option v-for="p in proxyProviders" :key="p.id" :value="p.id">{{ p.name }}</option>
+                                </select>
+                                <button @click="loadProxySyncLogs()" class="text-blue-400 hover:text-blue-300 text-sm">刷新</button>
+                            </div>
+                        </div>
+                        <table class="w-full">
+                            <thead>
+                                <tr class="text-gray-400 text-sm">
+                                    <th class="text-left px-4 py-3 font-medium">時間</th>
+                                    <th class="text-left px-4 py-3 font-medium">供應商</th>
+                                    <th class="text-left px-4 py-3 font-medium">類型</th>
+                                    <th class="text-left px-4 py-3 font-medium">新增</th>
+                                    <th class="text-left px-4 py-3 font-medium">移除</th>
+                                    <th class="text-left px-4 py-3 font-medium">更新</th>
+                                    <th class="text-left px-4 py-3 font-medium">耗時</th>
+                                    <th class="text-left px-4 py-3 font-medium">狀態</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="log in proxySyncLogs" :key="log.id" class="border-t border-gray-700 text-sm">
+                                    <td class="px-4 py-3 text-gray-400">{{ log.created_at }}</td>
+                                    <td class="px-4 py-3">{{ log.provider_name || log.provider_id }}</td>
+                                    <td class="px-4 py-3">
+                                        <span :class="log.sync_type === 'manual' ? 'text-blue-400' : log.sync_type === 'scheduled' ? 'text-green-400' : 'text-yellow-400'">
+                                            {{ log.sync_type === 'manual' ? '手動' : log.sync_type === 'scheduled' ? '定時' : '按需' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-green-400">+{{ log.added_count }}</td>
+                                    <td class="px-4 py-3 text-red-400">-{{ log.removed_count }}</td>
+                                    <td class="px-4 py-3 text-yellow-400">~{{ log.updated_count }}</td>
+                                    <td class="px-4 py-3 text-gray-400">{{ log.duration_ms }}ms</td>
+                                    <td class="px-4 py-3">
+                                        <span v-if="!log.error_message" class="text-green-400">✅</span>
+                                        <span v-else class="text-red-400" :title="log.error_message">❌</span>
+                                    </td>
+                                </tr>
+                                <tr v-if="proxySyncLogs.length === 0">
+                                    <td colspan="8" class="px-4 py-8 text-center text-gray-500">暫無同步記錄</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 使用說明 -->
+                    <div class="glass-card rounded-xl p-4">
+                        <h4 class="font-medium mb-2">📖 使用說明</h4>
+                        <ul class="text-sm text-gray-400 space-y-1">
+                            <li>• 配置代理供應商 API 後，系統會自動從供應商拉取可用代理 IP</li>
+                            <li>• 同步的代理自動進入代理池，可在「代理池管理」頁面查看</li>
+                            <li>• 支持 <span class="text-blue-400">Blurpath</span> 等主流代理供應商 API</li>
+                            <li>• 已綁定帳號的代理不會被自動刪除，即使供應商端已移除</li>
+                            <li>• 建議設置 30 分鐘自動同步間隔以保持代理池最新</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 供應商配置模態框 -->
+                <div v-if="showProviderModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                     @click.self="showProviderModal = false" @keydown.escape="showProviderModal = false">
+                    <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                        <h3 class="text-lg font-semibold mb-4">{{ providerForm.id ? '編輯供應商' : '添加代理供應商' }}</h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">供應商名稱 *</label>
+                                <input v-model="providerForm.name" type="text" placeholder="如：Blurpath"
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">供應商類型</label>
+                                <select v-model="providerForm.provider_type"
+                                        class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white">
+                                    <option value="blurpath">Blurpath</option>
+                                    <option value="custom">自定義</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">API 地址</label>
+                                <input v-model="providerForm.api_base_url" type="text" placeholder="https://api.blurpath.com"
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">API Key</label>
+                                <input v-model="providerForm.api_key" type="password" placeholder="輸入 API Key"
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white">
+                                <p v-if="providerForm.id && providerForm.api_key_masked" class="text-xs text-gray-500 mt-1">
+                                    當前: {{ providerForm.api_key_masked }}（留空則不更新）
+                                </p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">API Secret</label>
+                                <input v-model="providerForm.api_secret" type="password" placeholder="輸入 API Secret"
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white">
+                                <p v-if="providerForm.id && providerForm.api_secret_masked" class="text-xs text-gray-500 mt-1">
+                                    當前: {{ providerForm.api_secret_masked }}（留空則不更新）
+                                </p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">產品類型</label>
+                                <div class="flex flex-wrap gap-2">
+                                    <label v-for="pt in providerProductTypes" :key="pt.value" class="flex items-center gap-1 text-sm cursor-pointer">
+                                        <input type="checkbox" :value="pt.value" v-model="providerForm.product_types"
+                                               class="rounded bg-gray-700 border-gray-600">
+                                        <span>{{ pt.label }}</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1">自動同步間隔（分鐘）</label>
+                                <input v-model.number="providerForm.sync_interval_minutes" type="number" min="5" max="1440"
+                                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white">
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" v-model="providerForm.is_active" class="rounded bg-gray-700 border-gray-600">
+                                <label class="text-sm text-gray-300">啟用自動同步</label>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button @click="showProviderModal = false"
+                                    class="px-4 py-2 bg-gray-600 rounded-lg hover:bg-gray-500 transition-colors">
+                                取消
+                            </button>
+                            <button @click="saveProxyProvider()"
+                                    class="px-4 py-2 gradient-bg rounded-lg hover:opacity-90 transition-opacity font-medium">
+                                {{ providerForm.id ? '保存修改' : '添加供應商' }}
+                            </button>
+                        </div>
                     </div>
                 </div>
                 

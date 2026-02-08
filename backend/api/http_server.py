@@ -561,6 +561,20 @@ class HttpApiServer:
             self.app.router.add_post('/api/admin/proxies/assign', admin_handlers.assign_proxy)
             self.app.router.add_post('/api/admin/proxies/release', admin_handlers.release_proxy)
             self.app.router.add_get('/api/admin/proxies/account', admin_handlers.get_account_proxy)
+            # 🆕 代理供應商管理
+            self.app.router.add_get('/api/admin/proxy-providers', admin_handlers.list_proxy_providers)
+            self.app.router.add_post('/api/admin/proxy-providers', admin_handlers.add_proxy_provider)
+            self.app.router.add_get('/api/admin/proxy-providers/{provider_id}', admin_handlers.get_proxy_provider)
+            self.app.router.add_put('/api/admin/proxy-providers/{provider_id}', admin_handlers.update_proxy_provider)
+            self.app.router.add_delete('/api/admin/proxy-providers/{provider_id}', admin_handlers.delete_proxy_provider)
+            self.app.router.add_post('/api/admin/proxy-providers/{provider_id}/test', admin_handlers.test_proxy_provider)
+            self.app.router.add_post('/api/admin/proxy-providers/{provider_id}/sync', admin_handlers.sync_proxy_provider)
+            self.app.router.add_get('/api/admin/proxy-providers/{provider_id}/balance', admin_handlers.get_proxy_provider_balance)
+            self.app.router.add_get('/api/admin/proxy-providers/{provider_id}/whitelist', admin_handlers.get_proxy_provider_whitelist)
+            self.app.router.add_post('/api/admin/proxy-providers/{provider_id}/whitelist', admin_handlers.manage_proxy_provider_whitelist)
+            self.app.router.add_get('/api/admin/proxy-sync-logs', admin_handlers.get_proxy_sync_logs)
+            self.app.router.add_post('/api/admin/proxies/cleanup-expired', admin_handlers.cleanup_expired_proxies)
+            self.app.router.add_post('/api/admin/proxies/dynamic', admin_handlers.request_dynamic_proxy)
             # API 對接池管理
             self.app.router.add_get('/api/admin/api-pool', admin_handlers.list_api_pool)
             self.app.router.add_post('/api/admin/api-pool', admin_handlers.add_api_to_pool)
@@ -8920,6 +8934,15 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
         logger.info(f"  Admin Panel API: http://{self.host}:{self.port}/api/admin/")
         logger.info(f"  WebSocket: ws://{self.host}:{self.port}/ws")
         logger.info(f"=" * 50)
+        
+        # 🆕 初始化代理同步服務並啟動自動同步
+        try:
+            from admin.proxy_sync import get_sync_service
+            sync_svc = get_sync_service()
+            await sync_svc.start_auto_sync()
+            logger.info("  ✅ Proxy sync service initialized, auto-sync started")
+        except Exception as e:
+            logger.warning(f"  ⚠️ Proxy sync service init failed (non-fatal): {e}")
         
         return runner
 

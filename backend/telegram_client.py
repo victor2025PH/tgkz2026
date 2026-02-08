@@ -769,8 +769,27 @@ class TelegramClientManager:
                             effective_proxy = assigned.to_url()
                             print(f"[TelegramClient] Auto-assigned proxy for {phone}: {assigned.host}:{assigned.port}", file=sys.stderr)
                         else:
-                            print(f"[TelegramClient] No available proxy in pool for {phone}", file=sys.stderr)
-                            effective_proxy = None
+                            # 🆕 Phase 2: 靜態池耗盡，嘗試從供應商獲取動態代理
+                            print(f"[TelegramClient] Static pool exhausted for {phone}, trying dynamic proxy...", file=sys.stderr)
+                            try:
+                                from admin.proxy_sync import get_sync_service
+                                sync_svc = get_sync_service()
+                                dynamic = await sync_svc.request_dynamic_proxy(country='')
+                                if dynamic:
+                                    auth = ""
+                                    if dynamic.get("username") and dynamic.get("password"):
+                                        auth = f"{dynamic['username']}:{dynamic['password']}@"
+                                    effective_proxy = f"{dynamic.get('proxy_type', 'socks5')}://{auth}{dynamic['host']}:{dynamic['port']}"
+                                    print(f"[TelegramClient] Dynamic proxy obtained for {phone}: {dynamic['host']}:{dynamic['port']} (provider: {dynamic.get('provider_name', 'unknown')})", file=sys.stderr)
+                                else:
+                                    print(f"[TelegramClient] No dynamic proxy available for {phone}", file=sys.stderr)
+                                    effective_proxy = None
+                            except ImportError:
+                                print(f"[TelegramClient] Proxy sync module not available for dynamic fallback", file=sys.stderr)
+                                effective_proxy = None
+                            except Exception as de:
+                                print(f"[TelegramClient] Dynamic proxy fallback error: {de}", file=sys.stderr)
+                                effective_proxy = None
                 except ImportError:
                     print(f"[TelegramClient] Proxy pool module not available", file=sys.stderr)
                 except Exception as e:

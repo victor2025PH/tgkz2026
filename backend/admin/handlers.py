@@ -5132,13 +5132,17 @@ class AdminHandlers:
         )
 
         if result.get("success"):
-            await audit_log(
-                action=AuditAction.SETTINGS_CHANGE,
-                admin_id=admin.get('id', 'unknown'),
-                target_id=result.get('id'),
-                details=f"新增代理供應商: {name} ({provider_type})",
-                ip_address=ip_address,
-            )
+            try:
+                audit_log.log(
+                    action=AuditAction.SYSTEM_CONFIG_CHANGE,
+                    admin_id=admin.get('admin_id', admin.get('id', 0)),
+                    admin_username=admin.get('username', 'unknown'),
+                    resource_type="proxy_provider",
+                    resource_id=str(result.get('id', '')),
+                    description=f"新增代理供應商: {name} ({provider_type})",
+                )
+            except Exception as e:
+                logger.warning(f"Audit log failed: {e}")
 
         return success_response(data=result)
 
@@ -5161,13 +5165,17 @@ class AdminHandlers:
         result = svc.update_provider(provider_id, data)
 
         if result.get("success"):
-            await audit_log(
-                action=AuditAction.SETTINGS_CHANGE,
-                admin_id=admin.get('id', 'unknown'),
-                target_id=provider_id,
-                details=f"更新代理供應商配置: {list(data.keys())}",
-                ip_address=ip_address,
-            )
+            try:
+                audit_log.log(
+                    action=AuditAction.SYSTEM_CONFIG_CHANGE,
+                    admin_id=admin.get('admin_id', admin.get('id', 0)),
+                    admin_username=admin.get('username', 'unknown'),
+                    resource_type="proxy_provider",
+                    resource_id=str(provider_id),
+                    description=f"更新代理供應商配置: {list(data.keys())}",
+                )
+            except Exception as e:
+                logger.warning(f"Audit log failed: {e}")
 
         return success_response(data=result)
 
@@ -5189,13 +5197,17 @@ class AdminHandlers:
         result = svc.delete_provider(provider_id)
 
         if result.get("success"):
-            await audit_log(
-                action=AuditAction.SETTINGS_CHANGE,
-                admin_id=admin.get('id', 'unknown'),
-                target_id=provider_id,
-                details=f"刪除代理供應商: {provider_id}",
-                ip_address=ip_address,
-            )
+            try:
+                audit_log.log(
+                    action=AuditAction.SYSTEM_CONFIG_CHANGE,
+                    admin_id=admin.get('admin_id', admin.get('id', 0)),
+                    admin_username=admin.get('username', 'unknown'),
+                    resource_type="proxy_provider",
+                    resource_id=str(provider_id),
+                    description=f"刪除代理供應商: {provider_id}",
+                )
+            except Exception as e:
+                logger.warning(f"Audit log failed: {e}")
 
         return success_response(data=result)
 
@@ -5233,13 +5245,17 @@ class AdminHandlers:
         result = await svc.sync_provider(provider_id, sync_type="manual")
 
         status_text = "成功" if result.get("success") else "失敗"
-        await audit_log(
-            action=AuditAction.SETTINGS_CHANGE,
-            admin_id=admin.get('id', 'unknown'),
-            target_id=provider_id,
-            details=f"手動同步代理供應商({status_text}): +{result.get('added', 0)} -{result.get('removed', 0)} ~{result.get('updated', 0)}",
-            ip_address=ip_address,
-        )
+        try:
+            audit_log.log(
+                action=AuditAction.SYSTEM_CONFIG_CHANGE,
+                admin_id=admin.get('admin_id', admin.get('id', 0)),
+                admin_username=admin.get('username', 'unknown'),
+                resource_type="proxy_provider",
+                resource_id=str(provider_id),
+                description=f"手動同步代理供應商({status_text}): +{result.get('added', 0)} -{result.get('removed', 0)} ~{result.get('updated', 0)}",
+            )
+        except Exception as e:
+            logger.warning(f"Audit log failed: {e}")
 
         return success_response(data=result)
 
@@ -5335,13 +5351,17 @@ class AdminHandlers:
         result = svc.cleanup_expired_proxies(dry_run=dry_run)
 
         if not dry_run:
-            await audit_log(
-                action=AuditAction.SETTINGS_CHANGE,
-                admin_id=admin.get('id', 'unknown'),
-                target_id='proxy_cleanup',
-                details=f"清理過期代理: 刪除 {result['removed']}，標記 {result['marked_disabled']}",
-                ip_address=ip_address,
-            )
+            try:
+                audit_log.log(
+                    action=AuditAction.SYSTEM_CONFIG_CHANGE,
+                    admin_id=admin.get('admin_id', admin.get('id', 0)),
+                    admin_username=admin.get('username', 'unknown'),
+                    resource_type="proxy_cleanup",
+                    resource_id="proxy_cleanup",
+                    description=f"清理過期代理: 刪除 {result['removed']}，標記 {result['marked_disabled']}",
+                )
+            except Exception as e:
+                logger.warning(f"Audit log failed: {e}")
 
         return success_response(data=result)
 

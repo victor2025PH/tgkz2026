@@ -1457,12 +1457,25 @@ class HttpApiServer:
             # 若後台標記為終身會員（is_lifetime=1），則不返回過期日，前端顯示「終身」
             is_lifetime = False
             try:
-                # 1) 從管理後台庫查（有 user_id / is_lifetime），與後台「到期時間：終身」同源
+                # 1) 從管理後台庫查（與後台「到期時間：終身」同源），用 id/user_id/email/nickname 多種方式匹配
                 conn = self._get_admin_db()
                 try:
                     conn.row_factory = sqlite3.Row
-                    for q, p in [("SELECT is_lifetime FROM users WHERE user_id = ?", (user.id,)),
-                                ("SELECT is_lifetime FROM users WHERE id = ?", (user.id,))]:
+                    cursors_to_try = [
+                        ("SELECT is_lifetime FROM users WHERE user_id = ?", (user.id,)),
+                        ("SELECT is_lifetime FROM users WHERE id = ?", (user.id,)),
+                    ]
+                    # 認證庫與後台庫可能不是同一條記錄，用 email/用戶名/顯示名 匹配後台用戶
+                    email = (getattr(user, 'email', None) or '').strip()
+                    username = (getattr(user, 'username', None) or '').strip()
+                    display_name = (getattr(user, 'display_name', None) or '').strip()
+                    if email:
+                        cursors_to_try.append(("SELECT is_lifetime FROM users WHERE email = ?", (email,)))
+                    if username:
+                        cursors_to_try.append(("SELECT is_lifetime FROM users WHERE nickname = ?", (username,)))
+                    if display_name:
+                        cursors_to_try.append(("SELECT is_lifetime FROM users WHERE nickname = ?", (display_name,)))
+                    for q, p in cursors_to_try:
                         try:
                             row = conn.execute(q, p).fetchone()
                             if row and (row['is_lifetime'] or 0) == 1:
@@ -1470,6 +1483,38 @@ class HttpApiServer:
                                 break
                         except Exception:
                             continue
+                    # 若無 is_lifetime 列，則用 membership_level + expires_at 推斷：king 且過期日為空或極遠視為終身
+                    if not is_lifetime and (email or username or display_name or user.id):
+                        def _row_get(r, k, default=''):
+                            try:
+                                return r[k] or default
+                            except (KeyError, TypeError):
+                                return default
+                        for q, p in [
+                            ("SELECT membership_level, expires_at FROM users WHERE user_id = ?", (user.id,)),
+                            ("SELECT membership_level, expires_at FROM users WHERE id = ?", (user.id,)),
+                            ("SELECT membership_level, expires_at FROM users WHERE nickname = ?", (display_name or username or '',)),
+                        ]:
+                            if not p[0]:
+                                continue
+                            try:
+                                row = conn.execute(q, p).fetchone()
+                                if row:
+                                    level = (_row_get(row, 'membership_level') or _row_get(row, 'level') or '').lower()
+                                    exp = _row_get(row, 'expires_at')
+                                    if level == 'king':
+                                        if not exp:
+                                            is_lifetime = True
+                                            break
+                                        try:
+                                            ed = datetime.fromisoformat(str(exp).replace('Z', '+00:00'))
+                                            if (ed - datetime.utcnow()).total_seconds() > 365 * 30 * 86400:
+                                                is_lifetime = True
+                                                break
+                                        except Exception:
+                                            pass
+                            except Exception:
+                                continue
                 finally:
                     conn.close()
             except Exception:

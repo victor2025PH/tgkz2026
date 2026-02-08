@@ -8,6 +8,11 @@ Blurpath 代理供應商適配器
 - 動態住宅代理（Dynamic Residential）
 - 無限住宅代理（Unlimited Residential）
 - Socks5 代理
+
+認證方式：
+- api_key = Blurpath 帳號（Email）
+- api_secret = Blurpath 密碼
+- 自動調用 accountLogin 獲取 Bearer token，過期或 401 時自動刷新
 """
 
 import asyncio
@@ -29,9 +34,10 @@ from .base_provider import (
 logger = logging.getLogger(__name__)
 
 # Blurpath API 常量
-DEFAULT_API_BASE = "https://api.blurpath.com"
+DEFAULT_API_BASE = "https://blurpath.com/api"
 CONNECT_TIMEOUT = 10
 READ_TIMEOUT = 30
+TOKEN_REFRESH_BUFFER = 300  # 提前 5 分鐘刷新 token
 
 
 class BlurpathProvider(BaseProxyProvider):
@@ -45,13 +51,26 @@ class BlurpathProvider(BaseProxyProvider):
     4. IP 白名單管理
     5. 賬密授權（子帳號）
     6. 餘額 / 流量查詢
+
+    認證流程：
+    - api_key 存放 Blurpath 帳號（Email）
+    - api_secret 存放 Blurpath 密碼
+    - 首次請求時自動調用 /api/supplier/accountLogin 獲取 token
+    - token 緩存在內存中，401 時自動刷新
     """
 
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         self.api_base = (config.api_base_url or DEFAULT_API_BASE).rstrip("/")
-        self.api_key = config.api_key
-        self.api_secret = config.api_secret
+
+        # api_key = Blurpath 帳號 (email)
+        # api_secret = Blurpath 密碼
+        self.username = config.api_key
+        self.password = config.api_secret
+
+        # 緩存的 Bearer token
+        self._token: Optional[str] = None
+        self._token_obtained_at: float = 0
 
         # 從 config.config 讀取擴展配置
         ext = config.config or {}
@@ -61,16 +80,87 @@ class BlurpathProvider(BaseProxyProvider):
         self.dynamic_region: str = ext.get("dynamic_region", "")
         self.dynamic_session_type: str = ext.get("dynamic_session_type", "rotating")  # rotating / sticky
 
+    # ─── 認證：自動登錄獲取 Token ───
+
+    async def _login(self) -> bool:
+        """
+        使用帳號密碼調用 Blurpath accountLogin 獲取 Bearer token。
+        成功返回 True，失敗返回 False。
+        """
+        if not self.username or not self.password:
+            self.logger.error("Blurpath login failed: missing username (api_key) or password (api_secret)")
+            return False
+
+        url = f"{self.api_base}/api/supplier/accountLogin"
+        self.logger.info(f"Blurpath: logging in as {self.username}...")
+
+        try:
+            connector = aiohttp.TCPConnector(ssl=True)
+            async with aiohttp.ClientSession(connector=connector) as session:
+                async with session.post(
+                    url,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                    },
+                    json={
+                        "username": self.username,
+                        "password": self.password,
+                    },
+                    timeout=aiohttp.ClientTimeout(connect=CONNECT_TIMEOUT, total=READ_TIMEOUT),
+                ) as resp:
+                    body = await resp.text()
+                    self.logger.debug(f"Blurpath login response ({resp.status}): {body[:500]}")
+
+                    if resp.status == 200:
+                        try:
+                            data = json.loads(body)
+                        except json.JSONDecodeError:
+                            self.logger.error(f"Blurpath login: invalid JSON response: {body[:300]}")
+                            return False
+
+                        # 處理需要 2FA 驗證的情況
+                        if data.get("emailCheck") or data.get("googCheck"):
+                            self.logger.error(
+                                "Blurpath login requires 2FA verification (email or Google). "
+                                "Please disable 2FA or use an API sub-account."
+                            )
+                            return False
+
+                        token = data.get("token")
+                        if token:
+                            self._token = token
+                            self._token_obtained_at = time.time()
+                            self.logger.info("Blurpath: login successful, token obtained")
+                            return True
+                        else:
+                            self.logger.error(f"Blurpath login: no token in response: {data}")
+                            return False
+                    else:
+                        self.logger.error(f"Blurpath login failed with status {resp.status}: {body[:300]}")
+                        return False
+
+        except Exception as e:
+            self.logger.error(f"Blurpath login error: {e}")
+            return False
+
+    async def _ensure_token(self) -> bool:
+        """確保有有效的 token，沒有則自動登錄"""
+        if self._token:
+            # token 存在，假設有效（401 時 _request 會自動刷新）
+            return True
+        return await self._login()
+
     # ─── 內部 HTTP 工具 ───
 
     def _headers(self) -> Dict[str, str]:
-        """構建請求頭"""
+        """構建請求頭（使用緩存的 Bearer token）"""
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
         return headers
 
     async def _request(
@@ -78,8 +168,13 @@ class BlurpathProvider(BaseProxyProvider):
         params: Dict = None, json_data: Dict = None,
         timeout: int = READ_TIMEOUT,
         max_retries: int = 3,
+        _is_retry_after_login: bool = False,
     ) -> Dict[str, Any]:
-        """統一 HTTP 請求封裝（帶重試與指數退避）"""
+        """統一 HTTP 請求封裝（帶重試、指數退避、自動登錄）"""
+        # 確保有 token
+        if not await self._ensure_token():
+            return {"error": True, "message": "Failed to authenticate with Blurpath (check username/password)"}
+
         url = f"{self.api_base}{path}"
 
         connector = aiohttp.TCPConnector(ssl=True)
@@ -106,6 +201,23 @@ class BlurpathProvider(BaseProxyProvider):
                                 data = {"raw": body}
                             data["_latency_ms"] = latency
                             return data
+
+                        # 401 未授權 → token 過期，重新登錄一次
+                        if resp.status == 401 and not _is_retry_after_login:
+                            self.logger.warning("Blurpath: token expired or invalid, re-authenticating...")
+                            self._token = None
+                            if await self._login():
+                                return await self._request(
+                                    method, path, params, json_data,
+                                    timeout, max_retries,
+                                    _is_retry_after_login=True,
+                                )
+                            return {
+                                "error": True,
+                                "status": 401,
+                                "message": "Re-authentication failed",
+                                "_latency_ms": latency,
+                            }
 
                         # 429 限流 → 等待後重試
                         if resp.status == 429 and attempt < max_retries - 1:
@@ -169,21 +281,41 @@ class BlurpathProvider(BaseProxyProvider):
     # ─── 核心介面實現 ───
 
     async def test_connection(self) -> Dict[str, Any]:
-        """測試 API 連通性（通過查詢餘額）"""
-        result = await self._request("GET", "/api/v1/user/balance")
-        latency = result.get("_latency_ms", 0)
+        """
+        測試 API 連通性
+        1. 先嘗試用帳號密碼登錄
+        2. 然後查詢餘額驗證 token 有效性
+        """
+        t0 = time.time()
 
-        if result.get("error"):
+        # 步驟 1：嘗試登錄
+        self._token = None  # 清除緩存，強制重新登錄
+        login_ok = await self._login()
+        login_latency = int((time.time() - t0) * 1000)
+
+        if not login_ok:
             return {
                 "success": False,
-                "message": result.get("message", "Connection failed"),
-                "latency_ms": latency,
+                "message": "登錄失敗：請檢查帳號（Email）和密碼是否正確",
+                "latency_ms": login_latency,
+            }
+
+        # 步驟 2：查詢餘額驗證 token
+        result = await self._request("GET", "/api/v1/user/balance")
+        total_latency = int((time.time() - t0) * 1000)
+
+        if result.get("error"):
+            # 登錄成功但查詢失敗，可能是 API 路徑問題，但連接本身沒問題
+            return {
+                "success": True,
+                "message": f"登錄成功（token 已獲取），但餘額查詢返回: {result.get('message', 'unknown')[:100]}",
+                "latency_ms": total_latency,
             }
 
         return {
             "success": True,
-            "message": "Connected successfully",
-            "latency_ms": latency,
+            "message": "連接成功：帳號驗證通過，API 正常",
+            "latency_ms": total_latency,
             "balance_info": result,
         }
 

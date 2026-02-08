@@ -1349,10 +1349,42 @@ class Database:
             )
         ''')
         
+        # ============ 自動補全缺失的列 ============
+        # 🔧 修復：確保 users 表中有 machine_id 列（舊數據庫可能缺少）
+        try:
+            cursor.execute("PRAGMA table_info(users)")
+            existing_cols = {row[1] for row in cursor.fetchall()}
+            
+            users_missing_cols = {
+                'machine_id': 'TEXT',
+                'phone': 'TEXT',
+                'nickname': 'TEXT',
+                'avatar': 'TEXT',
+                'status': "TEXT DEFAULT 'active'",
+                'is_banned': 'INTEGER DEFAULT 0',
+                'ban_reason': 'TEXT',
+                'balance': 'REAL DEFAULT 0',
+                'last_active_at': 'TIMESTAMP',
+            }
+            for col_name, col_def in users_missing_cols.items():
+                if col_name not in existing_cols:
+                    try:
+                        cursor.execute(f'ALTER TABLE users ADD COLUMN {col_name} {col_def}')
+                        print(f"[Database] Added missing column: users.{col_name}", file=sys.stderr)
+                    except Exception:
+                        pass  # 列可能已存在（並發情況）
+            conn.commit()
+        except Exception as e:
+            print(f"[Database] Column migration warning: {e}", file=sys.stderr)
+        
         # ============ 創建索引 ============
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_invite_code ON users(invite_code)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_machine_id ON users(machine_id)')
+        # 🔧 修復：安全創建 machine_id 索引
+        try:
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_machine_id ON users(machine_id)')
+        except Exception:
+            pass  # 如果列不存在，跳過索引創建
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_level ON users(membership_level)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_licenses_key ON licenses(license_key)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_licenses_status ON licenses(status)')

@@ -282,16 +282,21 @@ class QuotaService:
     # ==================== 配額限制獲取 ====================
     
     def _get_user_tier(self, user_id: str) -> str:
-        """獲取用戶等級"""
+        """獲取用戶等級（優先 users.membership_level，與後台/卡密一致）"""
         db = self._get_db()
         try:
+            # 1. 優先從 users 表取 membership_level（與 auth/me、後台一致）
             row = db.execute('''
-                SELECT subscription_tier FROM user_profiles WHERE user_id = ?
-                UNION
-                SELECT subscription_tier FROM users WHERE id = ?
+                SELECT COALESCE(membership_level, subscription_tier) AS tier FROM users WHERE id = ? OR user_id = ?
             ''', (user_id, user_id)).fetchone()
-            return row['subscription_tier'] if row else 'bronze'
-        except:
+            if row and row['tier']:
+                return (row['tier'] or '').strip().lower() or 'bronze'
+            # 2. 兼容：user_profiles
+            row = db.execute('SELECT subscription_tier FROM user_profiles WHERE user_id = ?', (user_id,)).fetchone()
+            if row and row['subscription_tier']:
+                return (row['subscription_tier'] or '').strip().lower() or 'bronze'
+            return 'bronze'
+        except Exception:
             return 'bronze'
         finally:
             db.close()

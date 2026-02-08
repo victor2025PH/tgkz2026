@@ -27,6 +27,7 @@
 import { Injectable, signal, computed, WritableSignal, inject, OnDestroy } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { AuthEventsService } from './core/auth-events.service';
+import { AuthService } from './core/auth.service';
 
 // ============ 類型定義 ============
 
@@ -495,11 +496,32 @@ export class MembershipService {
   
   // 🆕 事件訂閱管理
   private authEventsService = inject(AuthEventsService);
+  private authService = inject(AuthService, { optional: true });
   private eventSubscription: Subscription | null = null;
   
   constructor() {
     this.loadMembership();
     this.subscribeToAuthEvents();
+    // 🔧 延遲同步：若 AuthService 已載入用戶（emit 早於訂閱），立即同步 isLifetime
+    if (!this.SKIP_LOGIN) {
+      setTimeout(() => this.syncFromAuthIfReady(), 0);
+    }
+  }
+  
+  /** 若 AuthService 已有用戶，立即同步（處理「訂閱晚於 emit」的情況） */
+  private syncFromAuthIfReady(): void {
+    try {
+      const auth = this.authService;
+      const u = auth?.user?.();
+      if (u) {
+        const level = this.tierToLevel(u.membershipLevel || u.subscription_tier || 'free');
+        const expires = u.membershipExpires || u.subscription_expires;
+        const isLifetime = !!(u as { isLifetime?: boolean }).isLifetime;
+        this.syncFromAuthService(level, expires, isLifetime);
+      }
+    } catch {
+      // AuthService 可能尚未就緒，忽略
+    }
   }
   
   /**

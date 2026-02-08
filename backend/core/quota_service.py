@@ -290,13 +290,19 @@ class QuotaService:
                 SELECT COALESCE(membership_level, subscription_tier) AS tier FROM users WHERE id = ? OR user_id = ?
             ''', (user_id, user_id)).fetchone()
             if row and row['tier']:
-                return (row['tier'] or '').strip().lower() or 'bronze'
+                tier = (row['tier'] or '').strip().lower() or 'bronze'
+                logger.info(f"[QuotaService] _get_user_tier user_id={user_id} tier={tier} (from users)")
+                return tier
             # 2. 兼容：user_profiles
             row = db.execute('SELECT subscription_tier FROM user_profiles WHERE user_id = ?', (user_id,)).fetchone()
             if row and row['subscription_tier']:
-                return (row['subscription_tier'] or '').strip().lower() or 'bronze'
+                tier = (row['subscription_tier'] or '').strip().lower() or 'bronze'
+                logger.info(f"[QuotaService] _get_user_tier user_id={user_id} tier={tier} (from user_profiles)")
+                return tier
+            logger.info(f"[QuotaService] _get_user_tier user_id={user_id} tier=bronze (default)")
             return 'bronze'
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[QuotaService] _get_user_tier user_id={user_id} error={e}, fallback=bronze")
             return 'bronze'
         finally:
             db.close()
@@ -524,6 +530,8 @@ class QuotaService:
         limit = self._get_quota_limit(user_id, quota_type)
         used = self._get_current_usage(user_id, quota_type)
         reserved = self._get_reserved(user_id, quota_type)
+        if quota_type == 'tg_accounts':
+            logger.info(f"[QuotaService] check_quota tg_accounts user_id={user_id} limit={limit} used={used} reserved={reserved}")
         
         # 無限配額
         if limit == -1:

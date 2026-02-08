@@ -1493,7 +1493,7 @@ class HttpApiServer:
                         if em:
                             wheres.append("email = ?")
                             params.append(em)
-                        q = "SELECT id, user_id, is_lifetime, membership_level, expires_at FROM users WHERE " + " OR ".join(wheres)
+                        q = "SELECT id, user_id, is_lifetime, membership_level, expires_at FROM users WHERE " + " OR ".join(wheres) + " ORDER BY COALESCE(is_lifetime, 0) DESC, id LIMIT 1"
                         row = conn.execute(q, params).fetchone()
                         if row:
                             if (row['is_lifetime'] or 0) == 1:

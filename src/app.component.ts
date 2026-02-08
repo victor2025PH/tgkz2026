@@ -6277,11 +6277,13 @@ export class AppComponent implements OnDestroy, OnInit {
             membership: this.authService.membershipLevel()
           });
           
-          // 🔧 P2: 同步到 MembershipService（確保數據一致性）
+          // 🔧 P2: 同步到 MembershipService（確保數據一致性，含 isLifetime 終身會員）
           if (this.membershipService.isSaaSMode()) {
-            const level = this.authService.membershipLevel() as MembershipLevel;
-            const expires = this.authService.user()?.membershipExpires;
-            this.membershipService.syncFromAuthService(level, expires);
+            const u = this.authService.user();
+            const level = (this.authService.membershipLevel() || 'bronze') as MembershipLevel;
+            const expires = u?.membershipExpires || u?.subscription_expires;
+            const isLifetime = !!(u as { isLifetime?: boolean })?.isLifetime;
+            this.membershipService.syncFromAuthService(level, expires, isLifetime);
           }
           
           // 強制變更檢測

@@ -398,36 +398,57 @@ class AdminHandlers:
             cursor.execute('SELECT COUNT(*) as count FROM users')
             total = cursor.fetchone()['count']
             
-            # 檢查 wallets 表是否存在
+            # 檢查 wallets/user_wallets 表是否存在
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wallets'")
             has_wallets = cursor.fetchone() is not None
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_wallets'")
+            has_user_wallets = cursor.fetchone() is not None
             
             # 構建查詢（帶錢包信息的 LEFT JOIN）
+            # 構建錢包選擇字段
+            wallet_select = '''
+                NULL as wallet_balance,
+                NULL as wallet_bonus,
+                NULL as wallet_frozen,
+                NULL as wallet_consumed,
+                NULL as wallet_status
+            '''
+            if has_wallets:
+                wallet_select = '''
+                    w.main_balance as wallet_balance,
+                    w.bonus_balance as wallet_bonus,
+                    w.frozen_balance as wallet_frozen,
+                    w.total_consumed as wallet_consumed,
+                    w.status as wallet_status
+                '''
+            elif has_user_wallets:
+                wallet_select = '''
+                    w.balance as wallet_balance,
+                    w.bonus_balance as wallet_bonus,
+                    w.frozen_balance as wallet_frozen,
+                    w.total_consumed as wallet_consumed,
+                    w.status as wallet_status
+                '''
+
             if schema == SchemaType.SAAS:
                 id_field = 'u.id'
-                user_query = '''
+                user_query = f'''
                     SELECT u.*, 
-                           w.main_balance as wallet_balance,
-                           w.bonus_balance as wallet_bonus,
-                           w.frozen_balance as wallet_frozen,
-                           w.total_consumed as wallet_consumed,
-                           w.status as wallet_status
+                           {wallet_select}
                     FROM users u
                 '''
             else:
                 id_field = 'u.user_id'
-                user_query = '''
+                user_query = f'''
                     SELECT u.*, 
-                           w.main_balance as wallet_balance,
-                           w.bonus_balance as wallet_bonus,
-                           w.frozen_balance as wallet_frozen,
-                           w.total_consumed as wallet_consumed,
-                           w.status as wallet_status
+                           {wallet_select}
                     FROM users u
                 '''
             
             if has_wallets:
                 user_query += f' LEFT JOIN wallets w ON {id_field} = w.user_id'
+            elif has_user_wallets:
+                user_query += f' LEFT JOIN user_wallets w ON {id_field} = w.user_id'
             
             user_query += ' ORDER BY u.created_at DESC LIMIT ? OFFSET ?'
             

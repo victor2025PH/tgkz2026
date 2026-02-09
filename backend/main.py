@@ -8610,9 +8610,23 @@ class BackendService:
     # ==================== Monitoring Management Handlers ====================
     
     async def handle_get_accounts(self):
-        """獲取所有帳號列表"""
+        """獲取所有帳號列表（含每個帳號綁定的代理/IP 顯示用）"""
         try:
             accounts = await db.get_all_accounts()
+            # 為每個帳號附加當前綁定的代理顯示（host:port），便於在 UI 查看 IP
+            try:
+                from admin.proxy_pool import get_proxy_pool
+                pool = get_proxy_pool()
+                for a in accounts:
+                    phone = a.get('phone')
+                    if not phone:
+                        a['proxyDisplay'] = None
+                        continue
+                    px = pool.get_proxy_for_account(phone=phone)
+                    a['proxyDisplay'] = f"{px.host}:{px.port}" if px else None
+            except Exception as _e:
+                for a in accounts:
+                    a['proxyDisplay'] = a.get('proxyDisplay', None)
             # 🔧 多租戶安全：通過 _send_accounts_updated 發送，帶租戶過濾
             await self._send_accounts_updated()
             # 同時返回數據給 HTTP 響應

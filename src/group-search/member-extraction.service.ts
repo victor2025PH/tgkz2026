@@ -177,12 +177,16 @@ export class MemberExtractionService {
     this._extractionProgress.set({ current: 0, total: group.membersCount, percent: 0 });
     
     try {
+      // 🆕 Phase2: 補全關鍵字段（resourceId, username, telegramId）
       const request: MemberExtractionRequest = {
         groupId: group.id,
+        resourceId: group.id,  // 後端期望 resourceId
+        telegramId: group.id,  // GroupBasicInfo.id 通常就是 telegramId
+        username: group.username || undefined,
         filters,
         limit: actualLimit,
         offset: 0
-      };
+      } as any;
       
       // 監聽進度更新
       const progressHandler = (data: any) => {

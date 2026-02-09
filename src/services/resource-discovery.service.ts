@@ -320,11 +320,16 @@ export class ResourceDiscoveryService {
       return;
     }
     
+    // 🆕 Phase2: 補全所有關鍵字段（之前缺少 resourceId, telegramId, username, phone）
     this.ipc.send('extract-members', {
-      groupId: resource.id,
-      groupTitle: resource.title,
+      resourceId: resource.id,
+      groupId: resource.id,  // 保持向後兼容
+      telegramId: resource.telegram_id || null,
+      username: resource.username || null,
+      groupName: resource.title,
+      phone: (resource as any).joined_phone || (resource as any).joined_by_phone || null,
       limit,
-      accountId: this._selectedAccountId()
+      offset: 0
     });
     
     this.toast.info(`正在提取成員...`);

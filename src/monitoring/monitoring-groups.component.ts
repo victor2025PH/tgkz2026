@@ -646,16 +646,18 @@ export class MonitoringGroupsComponent implements OnInit {
     });
     this.listeners.push(cleanup2);
     
-    // 🆕 監聽成員提取進度
-    const cleanup3 = this.ipcService.on('members-extraction-progress', (data: { resourceId: number, extracted: number, total: number, status: string }) => {
+    // 🆕 監聽成員提取進度 — Phase2: 支持 auto_joining 狀態顯示
+    const cleanup3 = this.ipcService.on('members-extraction-progress', (data: { resourceId: number, extracted: number, total: number, status: string, message?: string }) => {
       const selected = this.selectedGroup();
       if (selected && String(selected.id) === String(data.resourceId)) {
+        // 🆕 Phase2: 使用 message 字段提供更詳細的進度信息
+        const displayStatus = data.message || data.status || '正在提取...';
         this.extractionProgress.set({
           isExtracting: true,
           groupId: String(data.resourceId),
           extracted: data.extracted,
           total: data.total,
-          status: data.status
+          status: displayStatus
         });
       }
     });
@@ -699,7 +701,10 @@ export class MonitoringGroupsComponent implements OnInit {
           }
         }, 10000);
       } else if (data.error) {
-        // 提取失敗
+        // 🆕 Phase2: 提取失敗 — 顯示結構化錯誤信息
+        const errorDetails = (data as any).error_details;
+        const errorCode = (data as any).error_code || '';
+        
         this.extractionProgress.set({
           isExtracting: false,
           groupId: '',
@@ -707,6 +712,22 @@ export class MonitoringGroupsComponent implements OnInit {
           total: 0,
           status: ''
         });
+        
+        // 根據錯誤碼顯示不同提示
+        if (errorCode === 'E4001_NOT_SYNCED' && errorDetails) {
+          if (errorDetails.action === 'retry_later') {
+            this.toastService.warning(`⏳ ${errorDetails.reason || '已加入群組，等待同步'}\n${errorDetails.suggestion || '請等待後重試'}`, 8000);
+          } else {
+            this.toastService.error(`⚠️ ${errorDetails.reason || data.error}\n${errorDetails.suggestion || '請先加入群組'}`, 8000);
+          }
+        } else if (errorCode === 'E4002_ADMIN_REQUIRED') {
+          this.toastService.warning(`🔒 ${errorDetails?.reason || '成員列表受限'}\n${errorDetails?.suggestion || '可嘗試監控群組消息'}`, 8000);
+        } else if (errorCode === 'E4003_RATE_LIMITED') {
+          const wait = errorDetails?.retry_after_seconds || 120;
+          this.toastService.warning(`⏳ Telegram 速率限制，請等待 ${wait} 秒`, 5000);
+        } else {
+          this.toastService.error(`❌ 提取失敗: ${data.error}`, 5000);
+        }
       }
     });
     this.listeners.push(cleanup4);
@@ -1134,18 +1155,17 @@ export class MonitoringGroupsComponent implements OnInit {
       return;
     }
     
-    // 發送提取命令（帶篩選條件）
+    // 發送提取命令（帶篩選條件）— 🆕 Phase2: 補全 phone 字段
     this.ipcService.send('extract-members', {
       chatId: chatId,
-      telegramId: group.telegramId,  // 🔧 FIX: 額外傳遞 telegramId
+      telegramId: group.telegramId,
       username: username,
       resourceId: group.id,
       groupName: group.name,
-      // 🆕 傳遞篩選配置
+      phone: group.accountPhone || null,  // 🆕 Phase2: 傳遞帳號，避免後端盲選
       limit: config.limit === -1 ? undefined : config.limit,
       filters: {
         bots: !config.filters.excludeBots,
-        // 🔧 FIX: 傳遞 onlineStatus 字符串，確保後端正確解析
         onlineStatus: config.filters.onlineStatus || 'all',
         offline: config.filters.onlineStatus === 'offline',
         online: config.filters.onlineStatus === 'online',

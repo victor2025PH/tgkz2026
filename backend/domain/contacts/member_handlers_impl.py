@@ -540,9 +540,59 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
         chat_id = payload.get('chatId')
         username = payload.get('username')
         phone = payload.get('phone')
-        resource_id = payload.get('resourceId') or payload.get('groupId')  # 🆕 Phase2: 兼容 groupId 別名
-        group_name = payload.get('groupName') or payload.get('groupTitle') or ''  # 🆕 Phase2: 用於日誌
+        resource_id = payload.get('resourceId') or payload.get('groupId')
+        group_name = payload.get('groupName') or payload.get('groupTitle') or ''
         limit = payload.get('limit', 100)
+        
+        # 🆕 Phase5: 每日提取配額檢查（防止過度使用被 Telegram 封號）
+        DAILY_EXTRACT_LIMIT = 5000  # 每日最多提取 5000 人
+        daily_quota = None
+        try:
+            from database import db as quota_db
+            await quota_db.connect()
+            today_count_row = await quota_db.fetch_one(
+                """SELECT COALESCE(SUM(extracted_count), 0) as total 
+                   FROM member_extraction_logs 
+                   WHERE status = 'success' AND date(created_at) = date('now')""",
+                ()
+            )
+            today_extracted = 0
+            if today_count_row:
+                today_extracted = today_count_row.get('total') if hasattr(today_count_row, 'get') else today_count_row[0]
+                today_extracted = today_extracted or 0
+            
+            remaining = max(0, DAILY_EXTRACT_LIMIT - today_extracted)
+            daily_quota = {
+                "used": today_extracted,
+                "limit": DAILY_EXTRACT_LIMIT,
+                "remaining": remaining
+            }
+            
+            if remaining <= 0:
+                self.send_log(f"⚠️ 今日提取配額已用完 ({today_extracted}/{DAILY_EXTRACT_LIMIT})", "warning")
+                self.send_event("members-extracted", {
+                    "resourceId": resource_id,
+                    "success": False,
+                    "error": f"今日提取配額已達上限 ({DAILY_EXTRACT_LIMIT} 人)，明天將自動重置",
+                    "error_code": "E4005_QUOTA_EXCEEDED",
+                    "error_details": {
+                        "code": "E4005",
+                        "reason": f"今日已提取 {today_extracted} 人，達到每日上限 {DAILY_EXTRACT_LIMIT}",
+                        "suggestion": "請明天再試，或升級帳戶提高配額",
+                        "action": "quota_exceeded",
+                        "daily_quota": daily_quota
+                    },
+                    "members": [], "extracted": 0, "total": 0
+                })
+                return
+            
+            # 自動限制 limit 不超過剩餘配額
+            if limit > remaining:
+                limit = remaining
+                self.send_log(f"⚠️ 已調整提取上限為 {limit}（今日剩餘配額）", "info")
+                
+        except Exception as quota_err:
+            print(f"[Backend] Quota check error (non-fatal): {quota_err}", file=sys.stderr)
         
         # 🆕 Phase: Payload 自動補全 — 5 個前端入口 payload 不一致，從 DB 填充缺失字段
         if resource_id and (not telegram_id or not username or not phone):
@@ -1243,7 +1293,75 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
             except Exception:
                 pass
         
-        # 發送完成事件 — 🆕 Phase3: 包含同步統計 + 歷史對比
+        # 🆕 Phase5: 智能分析 — 分析群組特徵並生成建議
+        insights = None
+        if result.get('success') and 'filtered_members' in dir() and filtered_members:
+            try:
+                import re as _re
+                total = len(filtered_members)
+                online_cnt = sum(1 for m in filtered_members if m.get('online_status') in ('online', 'recently'))
+                premium_cnt = sum(1 for m in filtered_members if m.get('is_premium'))
+                username_cnt = sum(1 for m in filtered_members if m.get('username'))
+                bot_cnt = sum(1 for m in filtered_members if m.get('is_bot'))
+                chinese_cnt = 0
+                for m in filtered_members:
+                    name = (m.get('first_name', '') or '') + (m.get('last_name', '') or '')
+                    if _re.search(r'[\u4e00-\u9fff]', name):
+                        chinese_cnt += 1
+                
+                # 評級分布
+                level_dist = {'S': 0, 'A': 0, 'B': 0, 'C': 0, 'D': 0}
+                for m in filtered_members:
+                    lv = m.get('value_level', 'C')
+                    if lv in level_dist:
+                        level_dist[lv] += 1
+                
+                high_value = level_dist['S'] + level_dist['A']
+                
+                # 生成建議
+                recommendations = []
+                if total > 0:
+                    chinese_pct = round(chinese_cnt / total * 100)
+                    premium_pct = round(premium_cnt / total * 100)
+                    online_pct = round(online_cnt / total * 100)
+                    username_pct = round(username_cnt / total * 100)
+                    
+                    if chinese_pct >= 50:
+                        recommendations.append(f"🇨🇳 {chinese_pct}% 華人用戶，適合中文內容營銷")
+                    elif chinese_pct >= 20:
+                        recommendations.append(f"🌏 {chinese_pct}% 華人用戶，建議中英雙語推送")
+                    
+                    if premium_pct >= 30:
+                        recommendations.append(f"⭐ {premium_pct}% Premium 用戶，群組質量較高")
+                    
+                    if online_pct >= 40:
+                        recommendations.append(f"🟢 {online_pct}% 近期活躍，建議立即發送營銷消息")
+                    elif online_pct < 15:
+                        recommendations.append(f"⚠️ 僅 {online_pct}% 近期活躍，群組活躍度較低")
+                    
+                    if username_pct < 30:
+                        recommendations.append(f"📛 僅 {username_pct}% 有用戶名，私信觸達率有限")
+                    
+                    if high_value >= 10:
+                        recommendations.append(f"💎 {high_value} 個 S/A 級高價值用戶，建議優先觸達")
+                    
+                    if bot_cnt > total * 0.1:
+                        recommendations.append(f"🤖 {round(bot_cnt / total * 100)}% 是 Bot，建議開啟排除 Bot 篩選")
+                
+                insights = {
+                    "chinesePercent": round(chinese_cnt / max(total, 1) * 100),
+                    "premiumPercent": round(premium_cnt / max(total, 1) * 100),
+                    "onlinePercent": round(online_cnt / max(total, 1) * 100),
+                    "usernamePercent": round(username_cnt / max(total, 1) * 100),
+                    "botPercent": round(bot_cnt / max(total, 1) * 100),
+                    "highValueCount": high_value,
+                    "valueLevelDistribution": level_dist,
+                    "recommendations": recommendations
+                }
+            except Exception as insight_err:
+                print(f"[Backend] Insight analysis error: {insight_err}", file=sys.stderr)
+        
+        # 發送完成事件 — 🆕 Phase5: 包含智能分析
         extraction_event = {
             "resourceId": resource_id,
             "telegramId": str(telegram_id) if telegram_id else None,
@@ -1257,14 +1375,16 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
             "error_details": result.get('error_details'),
             "limit_warning": result.get('limit_warning'),
             "usedPhone": current_phone if 'current_phone' in locals() else phone,
-            # 🆕 Phase3: 同步統計
             "syncStats": {
                 "new": sync_stats.get('new', 0) if 'sync_stats' in locals() else 0,
                 "updated": sync_stats.get('updated', 0) if 'sync_stats' in locals() else 0,
                 "duplicate": sync_stats.get('duplicate', 0) if 'sync_stats' in locals() else 0
             } if result.get('success') else None,
-            # 🆕 Phase3: 上次提取記錄
-            "lastExtraction": last_extraction
+            "lastExtraction": last_extraction,
+            # 🆕 Phase5: 智能分析
+            "insights": insights,
+            # 🆕 Phase5: 配額信息
+            "dailyQuota": daily_quota if 'daily_quota' in locals() else None
         }
         self.send_event("members-extracted", extraction_event)
         

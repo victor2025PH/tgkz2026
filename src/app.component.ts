@@ -3600,6 +3600,17 @@ export class AppComponent implements OnDestroy, OnInit {
         this.toastService.warning(`⚠️ 無法確定群組標識\n\n${details.suggestion || '請先通過搜索發現獲取群組信息'}`, 5000);
         break;
         
+      // 🆕 Phase5: 配額超限
+      case 'E4005_QUOTA_EXCEEDED': {
+        const quota = (details as any).daily_quota;
+        this.toastService.warning(
+          `📊 今日提取配額已達上限\n\n已提取 ${quota?.used || '?'} / ${quota?.limit || '?'} 人\n明天將自動重置`,
+          10000
+        );
+        this.memberListProgress.update(p => ({ ...p, status: '今日配額已用完' }));
+        break;
+      }
+        
       default:
         // 其他錯誤
         this.toastService.error(`❌ 提取失敗: ${data.error}`);
@@ -9422,7 +9433,14 @@ export class AppComponent implements OnDestroy, OnInit {
       limit_warning?: { total_in_group?: number, api_limit?: number, extracted?: number, suggestion?: string, message?: string },
       syncStats?: { new?: number, updated?: number, duplicate?: number },
       lastExtraction?: { lastCount?: number, lastNewCount?: number, lastTime?: string },
-      usedPhone?: string
+      usedPhone?: string,
+      insights?: { 
+        chinesePercent?: number, premiumPercent?: number, onlinePercent?: number,
+        usernamePercent?: number, botPercent?: number, highValueCount?: number,
+        valueLevelDistribution?: Record<string, number>,
+        recommendations?: string[] 
+      },
+      dailyQuota?: { used?: number, limit?: number, remaining?: number }
     }) => {
       this.memberListLoading.set(false);
       if (data.success && data.members) {
@@ -9464,6 +9482,26 @@ export class AppComponent implements OnDestroy, OnInit {
           this.calculateAndShowExtractionSummary(newMembers);
         } else {
           this.toastService.info('沒有更多新成員');
+        }
+        
+        // 🆕 Phase5: 顯示智能分析建議
+        if (data.insights?.recommendations?.length) {
+          setTimeout(() => {
+            for (const rec of data.insights!.recommendations!.slice(0, 3)) {
+              this.toastService.info(rec, 6000);
+            }
+          }, 2000);
+        }
+        
+        // 🆕 Phase5: 顯示每日配額提醒
+        if (data.dailyQuota) {
+          const q = data.dailyQuota;
+          const pct = Math.round(((q.used || 0) / (q.limit || 5000)) * 100);
+          if (pct >= 90) {
+            this.toastService.warning(`⚠️ 今日提取配額即將用完：${q.used}/${q.limit} (${pct}%)`, 8000);
+          } else if (pct >= 70) {
+            this.toastService.info(`📊 今日提取配額：${q.used}/${q.limit} (剩餘 ${q.remaining})`, 5000);
+          }
         }
 
         // 🆕 Phase4: 大群組上限提醒 + 消息歷史提取建議

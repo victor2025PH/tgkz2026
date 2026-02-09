@@ -290,29 +290,70 @@ class MemberExtractionService:
             return OnlineStatus.HIDDEN.value, None, 0.5
     
     def _calculate_value_level(self, member: ExtractedMember) -> str:
-        """計算成員價值等級"""
-        score = member.activity_score
+        """
+        🆕 Phase5: 統一價值評分算法（0-100 分制，與前端對齊）
         
-        # Bot 降級
+        評分維度:
+        - 在線活躍度: 0-25 分
+        - Premium 帳號: +30 分
+        - 有用戶名: +15 分
+        - 華人用戶: +10 分 (本地化營銷價值)
+        - 有頭像: +5 分
+        - Bot: -50 分
+        - 活躍度分數加成: 0-20 分
+        """
+        import re
+        
+        score = 0
+        
+        # Bot 直接降級
         if member.is_bot:
             return MemberValueLevel.D.value
         
-        # Premium 用戶加分
+        # 在線狀態加分 (0-25)
+        status = member.online_status
+        if status == 'online':
+            score += 25
+        elif status == 'recently':
+            score += 20
+        elif status == 'last_week':
+            score += 10
+        elif status == 'last_month':
+            score += 5
+        # long_ago / hidden = 0
+        
+        # Premium 用戶加分 (+30)
         if member.is_premium:
-            score += 0.1
+            score += 30
         
-        # 有用戶名加分
+        # 有用戶名加分 (+15)
         if member.username:
-            score += 0.05
+            score += 15
         
-        # 根據分數判定等級
-        if score >= 0.9:
+        # 華人用戶加分 (+10)
+        name = (member.first_name or '') + (member.last_name or '')
+        if re.search(r'[\u4e00-\u9fff]', name):
+            score += 10
+        
+        # 有頭像加分 (+5) — 通過 has_photo 屬性
+        if getattr(member, 'has_photo', False):
+            score += 5
+        
+        # 活躍度分數加成 (0-20) — activity_score 是 0-1 浮點數
+        if member.activity_score and member.activity_score > 0:
+            score += min(int(member.activity_score * 20), 20)
+        
+        # 存儲數字分數供前端使用
+        member.activity_score = score / 100.0
+        
+        # 評級（與前端 calculateMemberValueLevel 完全一致）
+        if score >= 70:
             return MemberValueLevel.S.value
-        elif score >= 0.7:
+        elif score >= 50:
             return MemberValueLevel.A.value
-        elif score >= 0.5:
+        elif score >= 30:
             return MemberValueLevel.B.value
-        elif score >= 0.3:
+        elif score >= 10:
             return MemberValueLevel.C.value
         else:
             return MemberValueLevel.D.value

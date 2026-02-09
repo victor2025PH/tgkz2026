@@ -449,6 +449,7 @@ class MessageQueue:
         self.queues: Dict[str, List[QueuedMessage]] = {}  # phone -> queue
         self.rate_limiters: Dict[str, RateLimiter] = {}  # phone -> rate limiter
         self.processing: Dict[str, bool] = {}  # phone -> is processing
+        self._wake_events: Dict[str, asyncio.Event] = {}  # 🆕 Phase2: 事件驅動喚醒
         self.paused: Dict[str, bool] = {}  # phone -> is paused
         self.lock = asyncio.Lock()
         self.stats: Dict[str, Dict[str, Any]] = {}  # phone -> stats
@@ -620,6 +621,11 @@ class MessageQueue:
                     # Log error but don't fail the operation
                     print(f"Error saving message to database: {e}")
             
+            # 🆕 Phase2: 確保 wake event 存在並喚醒 worker
+            if phone not in self._wake_events:
+                self._wake_events[phone] = asyncio.Event()
+            self._wake_events[phone].set()  # 立即喚醒休眠的 worker
+            
             # Start worker if not running
             if phone not in self.workers or self.workers[phone].done():
                 self.workers[phone] = asyncio.create_task(self._process_queue(phone))
@@ -655,8 +661,16 @@ class MessageQueue:
                     continue
                 
                 if not message:
-                    # No ready messages, wait a bit
-                    await asyncio.sleep(0.5)  # Reduced wait time for better responsiveness
+                    # 🔧 Phase2: 事件驅動 — 空閒時休眠等待喚醒（最多 10s），add_message 會立即喚醒
+                    wake_event = self._wake_events.get(phone)
+                    if wake_event:
+                        wake_event.clear()
+                        try:
+                            await asyncio.wait_for(wake_event.wait(), timeout=10.0)
+                        except asyncio.TimeoutError:
+                            pass  # 超時後再次檢查隊列
+                    else:
+                        await asyncio.sleep(5)
                     continue
                 
                 # 检查是否应该现在发送（队列优化）

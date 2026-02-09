@@ -41,7 +41,7 @@ class AlertRule:
     message_template: str
     enabled: bool = True
     cooldown_seconds: int = 300  # 5 minutes default cooldown
-    check_interval_seconds: int = 60  # Check every minute
+    check_interval_seconds: int = 180  # 🔧 Phase2: 60s→180s 降低 CPU
 
 
 @dataclass

@@ -732,7 +732,8 @@ export class SmartOpsComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadAllData();
-    this.refreshInterval = setInterval(() => this.loadAllData(), 15000);
+    // 🔧 Phase2: 15s→60s 降低 CPU 開銷
+    this.refreshInterval = setInterval(() => this.loadAllData(), 60000);
   }
 
   ngOnDestroy(): void {

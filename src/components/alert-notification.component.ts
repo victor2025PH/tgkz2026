@@ -364,8 +364,8 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
     // 订阅实时告警事件
     this.subscribeToEvents();
     
-    // 备用轮询（降低频率，作为后备）
-    this.pollInterval = setInterval(() => this.loadAlerts(), 30000);
+    // 🔧 Phase2: 備用輪詢 30s→90s（主要靠 realtime events，輪詢僅作兜底）
+    this.pollInterval = setInterval(() => this.loadAlerts(), 90000);
     
     // 🔧 Fix: 点击外部区域关闭面板（使用保存的引用）
     document.addEventListener('click', this.boundOnDocumentClick);

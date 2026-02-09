@@ -15,6 +15,7 @@ import { ToastService } from '../toast.service';
 import { ElectronIpcService } from '../electron-ipc.service';
 import { AccountManagementService } from '../services';
 import { DialogService } from '../services/dialog.service';
+import { OperationHistoryService } from '../services/operation-history.service';
 
 // 資源類型定義
 export interface DiscoveredResource {
@@ -71,6 +72,12 @@ export interface Account {
               <span class="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-lg">
                 {{ savedCount() }} 已收藏
               </span>
+              <!-- Phase3: 操作歷史快捷按鈕 -->
+              <button (click)="showOperationHistory.set(!showOperationHistory())"
+                      class="px-3 py-1 rounded-lg text-sm transition-all"
+                      [class]="showOperationHistory() ? 'bg-purple-500/30 text-purple-300 ring-1 ring-purple-500/50' : 'bg-slate-700/30 text-slate-400 hover:bg-slate-600/30'">
+                📋 {{ opHistory.todayRecords().length }} 操作
+              </button>
             </div>
           </div>
           
@@ -119,6 +126,46 @@ export interface Account {
         </div>
       </div>
       
+      <!-- Phase3: 操作歷史面板 (可摺疊) -->
+      @if (showOperationHistory()) {
+        <div class="flex-shrink-0 border-b border-purple-500/20 bg-purple-900/10 animate-slideDown">
+          <div class="px-6 py-3">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-3 text-sm">
+                <span class="text-purple-400 font-medium">📋 今日操作記錄</span>
+                <span class="px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs">
+                  ✅ {{ opHistory.statsByType().join.success + opHistory.statsByType().monitor.success + opHistory.statsByType().extract.success }}
+                </span>
+                <span class="px-2 py-0.5 bg-red-500/20 text-red-400 rounded text-xs">
+                  ❌ {{ opHistory.statsByType().join.failed + opHistory.statsByType().monitor.failed + opHistory.statsByType().extract.failed }}
+                </span>
+              </div>
+              <button (click)="showOperationHistory.set(false)" 
+                      class="text-slate-400 hover:text-white text-sm px-2">✕</button>
+            </div>
+            <div class="max-h-32 overflow-y-auto space-y-1">
+              @for (record of opHistory.todayRecords().slice(0, 10); track record.id) {
+                <div class="flex items-center gap-2 text-xs py-1 px-2 rounded bg-slate-800/30">
+                  <span>{{ opHistory.getStatusIcon(record.status) }}</span>
+                  <span class="text-slate-400 w-14 flex-shrink-0">{{ opHistory.getTypeLabel(record.type) }}</span>
+                  <span class="text-slate-300 truncate flex-1">{{ record.resourceTitle || record.resourceUsername || '未知' }}</span>
+                  @if (record.memberCount) {
+                    <span class="text-cyan-400 flex-shrink-0">{{ record.memberCount }}人</span>
+                  }
+                  @if (record.errorMessage) {
+                    <span class="text-red-400 truncate max-w-[200px]" [title]="record.errorMessage">{{ record.errorMessage }}</span>
+                  }
+                  <span class="text-slate-500 flex-shrink-0">{{ formatTime(record.timestamp) }}</span>
+                </div>
+              }
+              @if (opHistory.todayRecords().length === 0) {
+                <div class="text-center text-slate-500 py-2 text-xs">今天還沒有操作記錄</div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- 搜索欄區域 -->
       <div class="flex-shrink-0 px-6 py-4 border-b border-slate-700/30 bg-slate-800/30">
         <!-- 搜索輸入 -->
@@ -1113,6 +1160,15 @@ export interface Account {
     ::-webkit-scrollbar-thumb:hover {
       background: rgba(100, 116, 139, 0.5);
     }
+    
+    /* Phase3: 操作歷史面板滑入動畫 */
+    .animate-slideDown {
+      animation: slideDown 0.2s ease-out;
+    }
+    @keyframes slideDown {
+      from { max-height: 0; opacity: 0; overflow: hidden; }
+      to { max-height: 200px; opacity: 1; }
+    }
   `]
 })
 export class SearchDiscoveryComponent implements OnInit, OnDestroy {
@@ -1120,6 +1176,10 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   private ipc = inject(ElectronIpcService);
   private accountService = inject(AccountManagementService);
   private dialogService = inject(DialogService);
+  opHistory = inject(OperationHistoryService);
+  
+  // 🆕 Phase3: 操作歷史面板開關
+  showOperationHistory = signal(false);
   
   // 🔧 P0: 注入群組管理服務用於打開加入對話框
   private groupService: any = null;  // 延遲注入避免循環依賴
@@ -1767,6 +1827,12 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     } catch (e) {
       console.warn('[SearchDiscovery] 保存搜索歷史失敗:', e);
     }
+  }
+  
+  // 🆕 Phase3: 格式化時間戳 (操作歷史用)
+  formatTime(timestamp: number): string {
+    const d = new Date(timestamp);
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
   }
   
   // 🆕 鍵盤事件處理

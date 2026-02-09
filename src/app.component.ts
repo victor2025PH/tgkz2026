@@ -9342,7 +9342,8 @@ export class AppComponent implements OnDestroy, OnInit {
       total?: number, 
       error?: string,
       error_code?: string,
-      error_details?: { reason?: string, suggestion?: string, can_auto_join?: boolean, alternative?: string, attempts?: number }
+      error_details?: { reason?: string, suggestion?: string, can_auto_join?: boolean, alternative?: string, attempts?: number },
+      limit_warning?: { total_in_group?: number, api_limit?: number, extracted?: number, suggestion?: string, message?: string }
     }) => {
       this.memberListLoading.set(false);
       if (data.success && data.members) {
@@ -9361,6 +9362,17 @@ export class AppComponent implements OnDestroy, OnInit {
           this.calculateAndShowExtractionSummary(newMembers);
         } else {
           this.toastService.info('沒有更多新成員');
+        }
+
+        // 🆕 Phase3: 大群組上限提醒
+        if (data.limit_warning) {
+          const w = data.limit_warning;
+          this.toastService.warning(
+            `⚠️ 此群組有 ${(w.total_in_group || 0).toLocaleString()} 成員，` +
+            `Telegram 限制最多提取 ${(w.api_limit || 10000).toLocaleString()}。` +
+            `建議使用「監控群組消息」持續收集活躍用戶。`,
+            8000
+          );
         }
       } else if (data.error) {
         // 顯示結構化錯誤信息

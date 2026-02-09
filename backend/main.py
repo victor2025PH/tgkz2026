@@ -409,6 +409,32 @@ def check_router_available():
         return False
 
 
+# ============================================================
+# 🆕 Phase 3: 命令別名註冊表 (Command Alias Registry)
+# ============================================================
+# 解決前端命令名 ≠ 後端 handler 方法名的問題
+# 格式: { 'frontend-command-name': ('module.path', 'function_name') }
+# 所有別名在此集中管理，避免散落在 551 個 handler 方法中
+# ============================================================
+COMMAND_ALIAS_REGISTRY: Dict[str, tuple] = {
+    # === 監控群組相關 ===
+    'add-monitored-group':      ('domain.groups.handlers_impl', 'handle_add_monitored_group'),
+    'remove-monitored-group':   ('domain.groups.handlers_impl', 'handle_remove_group'),
+    'pause-monitored-group':    ('domain.automation.monitoring_handlers_impl', 'handle_pause_monitoring'),
+    'resume-monitored-group':   ('domain.automation.monitoring_handlers_impl', 'handle_resume_monitoring'),
+    
+    # === 加入群組相關 ===
+    'join-and-monitor':         ('domain.groups.handlers_impl', 'handle_join_and_monitor_resource'),
+    'join-resource':            ('domain.groups.handlers_impl', 'handle_join_resource'),
+    
+    # === 預留擴展點 (新增別名只需在此添加一行) ===
+}
+
+# 未知命令追蹤器 — 用於診斷前端發送了哪些未註冊的命令
+_unknown_command_counter: Dict[str, int] = {}
+_UNKNOWN_CMD_LOG_THRESHOLD = 3  # 同一未知命令每 N 次才記一次日誌
+
+
 # 🆕 Phase 8: 使用統一的日誌脫敏工具（延遲導入）
 def get_mask_phone():
     from core.logging import mask_phone
@@ -1023,6 +1049,9 @@ class BackendService:
             except Exception as e:
                 print(f"[Backend] ⚠ Command router initialization failed: {e}", file=sys.stderr)
         
+        # 🆕 Phase3: 啟動時驗證命令別名註冊表
+        self._validate_command_alias_registry()
+        
         # Register private message handlers for already logged-in Sender accounts
         await self._register_existing_sender_handlers()
         
@@ -1311,6 +1340,30 @@ class BackendService:
         except Exception as e:
             import sys
             print(f"[Backend] Error in consistency check: {e}", file=sys.stderr)
+    
+    def _validate_command_alias_registry(self):
+        """Phase3: 啟動時驗證命令別名註冊表中的所有條目"""
+        import importlib
+        valid = 0
+        invalid = 0
+        for cmd, (module_path, func_name) in COMMAND_ALIAS_REGISTRY.items():
+            try:
+                mod = importlib.import_module(module_path)
+                fn = getattr(mod, func_name, None)
+                if fn and callable(fn):
+                    valid += 1
+                else:
+                    invalid += 1
+                    print(f"[Backend] ⚠ Alias registry: {cmd} → {module_path}.{func_name} NOT FOUND", file=sys.stderr)
+            except ImportError as ie:
+                invalid += 1
+                print(f"[Backend] ⚠ Alias registry: {cmd} → module {module_path} IMPORT ERROR: {ie}", file=sys.stderr)
+        
+        total = len(COMMAND_ALIAS_REGISTRY)
+        print(f"[Backend] ✓ Command alias registry: {valid}/{total} valid, {invalid} invalid", file=sys.stderr)
+        
+        if invalid > 0:
+            print(f"[Backend] ⚠ {invalid} alias entries have broken targets! Check above for details.", file=sys.stderr)
     
     async def _register_existing_sender_handlers(self):
         """為已登錄的發送帳號註冊私信處理器"""
@@ -2752,14 +2805,30 @@ class BackendService:
                         print(f"[Backend] Audit log batch error: {ae}", file=sys.stderr)
                 return
             
+            # 🆕 Phase3: 命令別名註冊表 — 在 getattr 之前優先匹配
+            if command in COMMAND_ALIAS_REGISTRY:
+                module_path, func_name = COMMAND_ALIAS_REGISTRY[command]
+                try:
+                    import importlib
+                    mod = importlib.import_module(module_path)
+                    alias_handler = getattr(mod, func_name, None)
+                    if alias_handler and callable(alias_handler):
+                        print(f"[Backend] ✓ Alias registry: {command} → {module_path}.{func_name}", file=sys.stderr)
+                        if payload is not None:
+                            result = await alias_handler(self, payload)
+                        else:
+                            result = await alias_handler(self)
+                        return result
+                    else:
+                        print(f"[Backend] ⚠ Alias registry: {func_name} not found in {module_path}", file=sys.stderr)
+                except Exception as alias_err:
+                    print(f"[Backend] ⚠ Alias registry error for {command}: {alias_err}", file=sys.stderr)
+            
             # 🆕 Phase 7: 動態回退機制 - 替代巨型 if-elif 鏈
             # 將命令名轉換為方法名: add-account -> handle_add_account, batch-send:start -> handle_batch_send_start
             # 🔧 P0: 同時處理 - 和 : 符號
             method_name = 'handle_' + command.replace('-', '_').replace(':', '_')
             handler = getattr(self, method_name, None)
-            
-            # 🔧 P0: 添加回退日誌
-            print(f"[Backend] Fallback: looking for {method_name}, found={handler is not None}", file=sys.stderr)
             
             if handler is not None and callable(handler):
                 # 特殊處理 graceful-shutdown
@@ -2785,7 +2854,11 @@ class BackendService:
                     result = await handler()
                 return result  # 🔧 FIX: Return the handler result
             else:
-                # 命令未找到
+                # 🆕 Phase3: 追蹤未知命令
+                _unknown_command_counter[command] = _unknown_command_counter.get(command, 0) + 1
+                count = _unknown_command_counter[command]
+                if count <= _UNKNOWN_CMD_LOG_THRESHOLD or count % 10 == 0:
+                    print(f"[Backend] ⚠ Unknown command: {command} (count: {count})", file=sys.stderr)
                 self.send_log(f"Unknown command: {command}", "warning")
                 return None
             
@@ -3474,6 +3547,24 @@ class BackendService:
     async def handle_get_system_status(self):
         from domain.automation.monitoring_handlers_impl import handle_get_system_status as _handle_get_system_status
         return await _handle_get_system_status(self)
+
+    async def handle_get_command_diagnostics(self, payload=None):
+        """Phase3: 命令診斷 — 返回別名註冊表狀態和未知命令統計"""
+        diagnostics = {
+            'alias_registry': {
+                'total': len(COMMAND_ALIAS_REGISTRY),
+                'aliases': {cmd: f"{mod}.{fn}" for cmd, (mod, fn) in COMMAND_ALIAS_REGISTRY.items()}
+            },
+            'unknown_commands': dict(sorted(
+                _unknown_command_counter.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )[:20]),  # Top 20 unknown commands
+            'unknown_total': sum(_unknown_command_counter.values()),
+            'router_available': ROUTER_AVAILABLE
+        }
+        self.send_event("command-diagnostics", diagnostics)
+        return diagnostics
 
     async def handle_learn_from_history(self, payload=None):
         from domain.ai.knowledge_handlers_impl import handle_learn_from_history as _handle_learn_from_history

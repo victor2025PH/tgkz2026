@@ -23,6 +23,68 @@ from service_locator import (
     jiso_search_service,
     resource_discovery
 )
+
+
+async def select_best_account(telegram_manager, db_conn, operation: str = 'join', 
+                                preferred_role: str = None) -> Optional[str]:
+    """
+    Phase3: 智能帳號選擇 — 根據操作類型和帳號角色選擇最佳帳號
+    
+    操作優先級：
+    - join/monitor: 優先 Explorer > Listener > Unassigned > Sender
+    - extract: 優先用已加入群組的帳號 (由調用方處理), 回退 Listener > Explorer > any
+    - search: 優先 Explorer > any
+    
+    Returns:
+        最佳帳號 phone, 或 None
+    """
+    connected = {
+        p: c for p, c in telegram_manager.clients.items()
+        if c and c.is_connected
+    }
+    if not connected:
+        return None
+    
+    # 如果只有一個帳號，直接用
+    if len(connected) == 1:
+        return list(connected.keys())[0]
+    
+    # 從 DB 獲取角色信息
+    try:
+        await db_conn.connect()
+        accounts = await db_conn.fetch_all(
+            "SELECT phone, role FROM accounts WHERE phone IN ({}) AND status = 'Online'".format(
+                ','.join(['?' for _ in connected])
+            ),
+            tuple(connected.keys())
+        )
+        role_map = {a['phone']: a.get('role', 'Unassigned') for a in accounts} if accounts else {}
+    except Exception:
+        role_map = {}
+    
+    # 根據操作定義角色優先級
+    if operation in ('join', 'monitor'):
+        role_priority = ['Explorer', 'Listener', 'Unassigned', 'Sender']
+    elif operation == 'extract':
+        role_priority = ['Listener', 'Explorer', 'Unassigned', 'Sender']
+    elif operation == 'search':
+        role_priority = ['Explorer', 'Unassigned', 'Listener', 'Sender']
+    else:
+        role_priority = ['Unassigned', 'Listener', 'Explorer', 'Sender']
+    
+    # 如果指定了首選角色，放到最前面
+    if preferred_role and preferred_role in role_priority:
+        role_priority.remove(preferred_role)
+        role_priority.insert(0, preferred_role)
+    
+    # 按優先級選擇
+    for role in role_priority:
+        for phone in connected:
+            if role_map.get(phone, 'Unassigned') == role:
+                return phone
+    
+    # 兜底：返回第一個可用的
+    return list(connected.keys())[0]
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -1271,17 +1333,12 @@ async def handle_join_and_monitor_resource(self, payload: Dict[str, Any]):
         else:
             raise ValueError("需要 username 或 telegramId")
         
-        # 🔧 P0: 獲取可用的帳號 phone
+        # 🆕 Phase3: 智能帳號選擇 — 優先使用 Explorer/Listener 角色
         if not phone:
-            # 自動選擇一個已連接的帳號
-            connected_accounts = [
-                p for p, c in self.telegram_manager.clients.items()
-                if c and c.is_connected
-            ]
-            if not connected_accounts:
+            phone = await select_best_account(self.telegram_manager, db, operation='join')
+            if not phone:
                 raise ValueError("沒有可用的已連接帳號，請先連接一個帳號")
-            phone = connected_accounts[0]
-            self.send_log(f"📱 使用帳號: {phone[:4]}****", "info")
+            self.send_log(f"📱 智能選擇帳號: {phone[:4]}****", "info")
         
         # 🔧 P0: 使用 TelegramManager.join_group 方法（正確的方法）
         self.send_log(f"🚀 正在加入: {title}", "info")
@@ -1467,16 +1524,12 @@ async def handle_join_resource(self, payload: Dict[str, Any]):
         else:
             raise ValueError("需要 username 或 telegramId")
         
-        # 獲取可用帳號
+        # 🆕 Phase3: 智能帳號選擇
         if not phone:
-            connected_accounts = [
-                p for p, c in self.telegram_manager.clients.items()
-                if c and c.is_connected
-            ]
-            if not connected_accounts:
+            phone = await select_best_account(self.telegram_manager, db, operation='join')
+            if not phone:
                 raise ValueError("沒有可用的已連接帳號，請先連接一個帳號")
-            phone = connected_accounts[0]
-            self.send_log(f"📱 自動選擇帳號: {phone[:4]}****", "info")
+            self.send_log(f"📱 智能選擇帳號: {phone[:4]}****", "info")
         
         # 加入群組
         self.send_log(f"🚀 正在加入: {title}", "info")

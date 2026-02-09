@@ -670,8 +670,8 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
                     joined_at_str = resource.get('joined_at') if hasattr(resource, 'get') else (resource[2] if len(resource) > 2 else None)
                     print(f"[Backend] Found joined_by_phone={joined_phone}, joined_at={joined_at_str}", file=sys.stderr)
                     
-                    # 🆕 P1 優化：智能延遲 - 如果加入時間不到 30 秒，自動等待
-                    if joined_at_str:
+                    # 🆕 Phase3: 自適應智能等待 — 先嘗試解析群組，失敗再等待
+                    if joined_at_str and joined_phone and joined_phone in self.telegram_manager.clients:
                         try:
                             from datetime import datetime
                             if isinstance(joined_at_str, str):
@@ -680,22 +680,38 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
                                 joined_at = joined_at_str
                             
                             time_since_join = (datetime.now() - joined_at.replace(tzinfo=None)).total_seconds()
-                            MIN_WAIT_AFTER_JOIN = 30  # 最少等待 30 秒
                             
-                            if time_since_join < MIN_WAIT_AFTER_JOIN:
-                                wait_time = int(MIN_WAIT_AFTER_JOIN - time_since_join) + 1
-                                self.send_log(f"⏳ 剛加入群組 ({int(time_since_join)}s)，等待 Telegram 同步 ({wait_time}s)...", "info")
-                                self.send_event("members-extraction-progress", {
-                                    "resourceId": resource_id,
-                                    "status": "waiting",
-                                    "message": f"等待群組同步 ({wait_time}s)...",
-                                    "extracted": 0,
-                                    "total": 0
-                                })
-                                await asyncio.sleep(wait_time)
-                                self.send_log(f"✓ 同步等待完成，開始提取", "info")
+                            # 只在最近 120 秒內加入的群組才需要智能等待
+                            if time_since_join < 120:
+                                # 先嘗試直接解析群組實體 — 如果成功說明已同步
+                                test_client = self.telegram_manager.clients.get(joined_phone)
+                                if test_client and test_client.is_connected:
+                                    try:
+                                        test_target = effective_chat_id
+                                        test_chat = await test_client.get_chat(test_target)
+                                        if test_chat:
+                                            # 解析成功 — 無需等待
+                                            self.send_log(f"✓ 群組已同步 (加入 {int(time_since_join)}s 前)", "info")
+                                            print(f"[Backend] Smart wait: chat resolved immediately after {int(time_since_join)}s", file=sys.stderr)
+                                    except Exception as resolve_err:
+                                        resolve_err_str = str(resolve_err)
+                                        if 'PEER_ID_INVALID' in resolve_err_str or 'not found' in resolve_err_str.lower():
+                                            # 解析失敗 — 需要等待，但用自適應延遲
+                                            adaptive_wait = min(max(5, int(15 - time_since_join / 8)), 20)
+                                            self.send_log(f"⏳ 群組同步中 (加入 {int(time_since_join)}s 前)，等待 {adaptive_wait}s...", "info")
+                                            self.send_event("members-extraction-progress", {
+                                                "resourceId": resource_id,
+                                                "status": "waiting",
+                                                "message": f"等待群組同步 ({adaptive_wait}s)...",
+                                                "extracted": 0,
+                                                "total": 0
+                                            })
+                                            await asyncio.sleep(adaptive_wait)
+                                            self.send_log(f"✓ 同步等待完成", "info")
+                                        else:
+                                            print(f"[Backend] Smart wait: unexpected error: {resolve_err}", file=sys.stderr)
                         except Exception as dt_err:
-                            print(f"[Backend] Error parsing joined_at: {dt_err}", file=sys.stderr)
+                            print(f"[Backend] Error in smart wait: {dt_err}", file=sys.stderr)
                     
                     if joined_phone and joined_phone in self.telegram_manager.clients:
                         phone = joined_phone
@@ -723,11 +739,38 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
                 except Exception as e:
                     print(f"[Backend] Error fetching phone from monitored_groups: {e}", file=sys.stderr)
             
-            # 3. 回退：使用第一個可用的客戶端，但發出明確警告
+            # 3. 🆕 Phase3: 智能角色回退 — 優先 Listener > Explorer > any
             if not phone and self.telegram_manager.clients:
-                phone = list(self.telegram_manager.clients.keys())[0]
-                print(f"[Backend] ⚠ Using default phone (fallback): {phone}", file=sys.stderr)
-                self.send_log(f"⚠️ 未找到已加入群組的帳號，嘗試使用帳號 {phone[:4]}****", "warning")
+                try:
+                    from database import db as _db
+                    await _db.connect()
+                    connected_phones = [p for p, c in self.telegram_manager.clients.items() if c and c.is_connected]
+                    if connected_phones:
+                        accounts = await _db.fetch_all(
+                            "SELECT phone, role FROM accounts WHERE phone IN ({}) AND status = 'Online'".format(
+                                ','.join(['?' for _ in connected_phones])
+                            ),
+                            tuple(connected_phones)
+                        )
+                        role_map = {a['phone']: a.get('role', 'Unassigned') for a in accounts} if accounts else {}
+                        
+                        # 優先 Listener（監控號通常已加入群組）
+                        for pref_role in ['Listener', 'Explorer', 'Unassigned', 'Sender']:
+                            for p in connected_phones:
+                                if role_map.get(p, 'Unassigned') == pref_role:
+                                    phone = p
+                                    break
+                            if phone:
+                                break
+                except Exception as role_err:
+                    print(f"[Backend] Role-based selection failed: {role_err}", file=sys.stderr)
+                
+                if not phone:
+                    phone = list(self.telegram_manager.clients.keys())[0]
+                
+                role_info = role_map.get(phone, '未知') if 'role_map' in locals() else '未知'
+                print(f"[Backend] ⚠ Using fallback phone: {phone} (role: {role_info})", file=sys.stderr)
+                self.send_log(f"⚠️ 未找到已加入群組的帳號，使用 {phone[:4]}**** (角色: {role_info})", "warning")
                 self.send_log(f"💡 如提取失敗，請先使用該帳號加入此群組", "info")
         
         self.send_log(f"🔍 開始提取成員: {chat_id} (帳號: {phone})", "info")
@@ -869,6 +912,23 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
             
             self.send_log(f"✅ 提取完成: {len(filtered_members)} 成員 (總計: {len(members)})", "success")
             
+            # 🆕 Phase3: 大群組上限提醒 — Telegram API 最多返回 10,000 成員
+            total_in_group = result.get('total_members', 0)
+            if total_in_group > 10000:
+                extracted_count = len(filtered_members)
+                self.send_log(
+                    f"⚠️ 此群組有 {total_in_group:,} 成員，Telegram 限制最多提取 10,000。"
+                    f"已提取 {extracted_count:,}，建議使用「監控群組消息」方式持續收集活躍用戶。",
+                    "warning"
+                )
+                result['limit_warning'] = {
+                    'total_in_group': total_in_group,
+                    'api_limit': 10000,
+                    'extracted': extracted_count,
+                    'suggestion': 'monitor_messages',
+                    'message': f'此群組有 {total_in_group:,} 成員，Telegram API 限制最多提取 10,000。建議結合「監控消息」收集更多活躍用戶。'
+                }
+            
             # 🆕 自動同步到統一聯繫人表
             try:
                 from unified_contacts import get_unified_contacts_manager
@@ -892,7 +952,7 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
             self.send_log(f"❌ 提取失敗: {result['error']}", "error")
         
         # 發送完成事件 - 🔧 修復：包含詳細錯誤信息
-        self.send_event("members-extracted", {
+        extraction_event = {
             "resourceId": resource_id,
             "success": result.get('success', False),
             "members": result.get('members', []),
@@ -901,8 +961,10 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
             "onlineCount": result.get('online_count', 0),
             "error": result.get('error'),
             "error_code": result.get('error_code'),  # 🆕 錯誤代碼
-            "error_details": result.get('error_details')  # 🆕 詳細錯誤信息
-        })
+            "error_details": result.get('error_details'),  # 🆕 詳細錯誤信息
+            "limit_warning": result.get('limit_warning')  # 🆕 Phase3: 大群組上限提醒
+        }
+        self.send_event("members-extracted", extraction_event)
         
     except Exception as e:
         import traceback

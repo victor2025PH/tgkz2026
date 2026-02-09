@@ -45,8 +45,8 @@ try:
 except ImportError:
     LEGACY_PROXY_AVAILABLE = False
 
-# 導入核心模塊
-from core import init_event_bus, get_event_bus
+# 導入核心模塊 — 🔧 Phase4: 修復導入路徑 (core 未導出 event_bus)
+from core.event_bus import init_event_bus, get_event_bus
 from core.logging import get_logger
 
 logger = get_logger('RouterIntegration')

@@ -9364,19 +9364,59 @@ export class AppComponent implements OnDestroy, OnInit {
           this.toastService.info('沒有更多新成員');
         }
 
-        // 🆕 Phase3: 大群組上限提醒
+        // 🆕 Phase4: 大群組上限提醒 + 消息歷史提取建議
         if (data.limit_warning) {
           const w = data.limit_warning;
           this.toastService.warning(
             `⚠️ 此群組有 ${(w.total_in_group || 0).toLocaleString()} 成員，` +
             `Telegram 限制最多提取 ${(w.api_limit || 10000).toLocaleString()}。` +
-            `建議使用「監控群組消息」持續收集活躍用戶。`,
-            8000
+            `可使用「提取活躍用戶」從消息歷史中補充發現更多用戶。`,
+            10000
           );
+          // 自動觸發消息歷史提取（補充 10K 之外的活躍用戶）
+          if (data.resourceId) {
+            setTimeout(() => {
+              this.ipcService.send('extract-active-users', {
+                resourceId: data.resourceId,
+                telegramId: data.telegramId,
+                messageLimit: 2000
+              });
+              this.toastService.info('📊 正在從消息歷史中補充提取活躍用戶...', 5000);
+            }, 2000);  // 2秒後自動啟動
+          }
         }
       } else if (data.error) {
         // 顯示結構化錯誤信息
         this.handleMemberExtractionError(data);
+      }
+    });
+
+    // 🆕 Phase4: 活躍用戶提取完成事件
+    this.ipcService.on('active-users-extracted', (data: {
+      success: boolean, resourceId?: number, members?: any[], extracted?: number,
+      unique_users?: number, messages_scanned?: number, new_members?: number, error?: string
+    }) => {
+      if (data.success) {
+        const newCount = data.new_members || 0;
+        if (newCount > 0) {
+          this.toastService.success(
+            `📊 活躍用戶提取完成：掃描 ${data.messages_scanned} 條消息，` +
+            `發現 ${data.unique_users} 用戶 (新增 ${newCount})`,
+            6000
+          );
+          // 追加到現有成員列表
+          if (data.members) {
+            const existingIds = new Set(this.memberListData().map(m => m.user_id));
+            const newMembers = data.members.filter(m => !existingIds.has(m.user_id));
+            if (newMembers.length > 0) {
+              this.memberListData.update(current => [...current, ...newMembers]);
+            }
+          }
+        } else {
+          this.toastService.info(`📊 消息歷史中未發現新用戶 (掃描 ${data.messages_scanned} 條消息)`);
+        }
+      } else if (data.error) {
+        this.toastService.warning(`活躍用戶提取失敗: ${data.error}`);
       }
     });
 

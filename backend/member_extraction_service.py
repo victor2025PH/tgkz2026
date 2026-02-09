@@ -391,6 +391,13 @@ class MemberExtractionService:
         self.log(f"🔍 開始提取成員: {chat_id} (帳號: {phone})")
         
         try:
+            # 🆕 Phase4: 主動等待 — 使用 flood_handler 檢查冷卻期
+            try:
+                from flood_wait_handler import flood_handler
+                await flood_handler.wait_before_operation(phone, 'get_participants')
+            except Exception as fw_err:
+                self.log(f"⚠ flood_handler check skipped: {fw_err}", "warning")
+            
             # 🆕 P1 優化：預延遲確保 Telegram 同步
             pre_delay = self.config.get('pre_extraction_delay', 0)
             if pre_delay > 0:
@@ -632,6 +639,12 @@ class MemberExtractionService:
             
         except FloodWait as e:
             wait_time = int(e.value * self.config['flood_wait_multiplier'])
+            # 🆕 Phase4: 記錄 FloodWait 到全局 handler（跨操作共享冷卻期）
+            try:
+                from flood_wait_handler import flood_handler
+                flood_handler.record_flood_wait(phone, wait_time)
+            except Exception:
+                pass
             self.log(f"⏳ 頻率限制，等待 {wait_time} 秒", "warning")
             result['error'] = f'頻率限制，需等待 {wait_time} 秒'
             result['error_code'] = 'FLOOD_WAIT'
@@ -732,6 +745,195 @@ class MemberExtractionService:
                 result['error_details'] = {
                     'suggestion': '請稍後重試或聯繫支持'
                 }
+            return result
+    
+    # ==================== Phase4: 消息歷史補充提取 ====================
+    
+    async def extract_active_from_history(
+        self,
+        chat_id: str,
+        phone: str = None,
+        message_limit: int = 2000,
+        save_to_db: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Phase4: 從群組消息歷史中提取活躍用戶
+        
+        與 extract_members (使用 get_chat_members API) 互補:
+        - get_chat_members: 返回所有成員，上限 10,000
+        - get_chat_history: 遍歷最近消息，提取消息作者
+        
+        適用場景:
+        1. 群組成員超過 10,000，需要發現活躍用戶
+        2. CHAT_ADMIN_REQUIRED 時無法使用 get_chat_members
+        3. 需要按活躍度（發言頻率）排序
+        
+        Returns:
+            提取結果，包含 members 列表
+        """
+        result = {
+            'success': False,
+            'chat_id': chat_id,
+            'chat_title': '',
+            'method': 'history',
+            'messages_scanned': 0,
+            'unique_users': 0,
+            'extracted': 0,
+            'new_members': 0,
+            'updated_members': 0,
+            'duration_ms': 0,
+            'error': None
+        }
+        
+        start_time = time.time()
+        
+        # 獲取客戶端
+        if phone and phone in self._clients:
+            client = self._clients[phone]
+        else:
+            phone, client = self._get_available_client()
+        
+        if not client:
+            result['error'] = '沒有可用的帳號'
+            return result
+        
+        # Phase4: 主動等待
+        try:
+            from flood_wait_handler import flood_handler
+            await flood_handler.wait_before_operation(phone, 'get_chat')
+        except Exception:
+            pass
+        
+        self.log(f"🔍 開始從消息歷史提取活躍用戶: {chat_id}")
+        
+        try:
+            chat = await client.get_chat(chat_id)
+            result['chat_title'] = sanitize_text(chat.title) if chat.title else str(chat_id)
+            
+            # 已提取的用戶 ID 集合（避免與 get_chat_members 結果重複）
+            existing_user_ids = set()
+            try:
+                existing = await db.fetch_all(
+                    "SELECT user_id FROM extracted_members WHERE source_chat_id = ?",
+                    (str(chat.id),)
+                )
+                if existing:
+                    existing_user_ids = {row['user_id'] if isinstance(row, dict) else row[0] for row in existing}
+            except Exception:
+                pass
+            
+            # 遍歷消息歷史
+            user_activity: Dict[str, Dict] = {}  # user_id -> {info, message_count, last_seen}
+            msg_count = 0
+            
+            async for message in client.get_chat_history(chat.id, limit=message_limit):
+                msg_count += 1
+                
+                if not message.from_user:
+                    continue
+                
+                user = message.from_user
+                if user.is_bot:
+                    continue
+                
+                uid = str(user.id)
+                
+                if uid not in user_activity:
+                    user_activity[uid] = {
+                        'user_id': uid,
+                        'username': user.username,
+                        'first_name': getattr(user, 'first_name', '') or '',
+                        'last_name': getattr(user, 'last_name', '') or '',
+                        'is_premium': getattr(user, 'is_premium', False),
+                        'message_count': 0,
+                        'last_seen': None,
+                        'is_new': uid not in existing_user_ids
+                    }
+                
+                user_activity[uid]['message_count'] += 1
+                msg_date = message.date
+                if msg_date:
+                    if not user_activity[uid]['last_seen'] or msg_date > user_activity[uid]['last_seen']:
+                        user_activity[uid]['last_seen'] = msg_date
+                
+                # 進度更新
+                if msg_count % 200 == 0:
+                    self._emit_progress(
+                        str(chat.id), len(user_activity), 0,
+                        start_time=start_time
+                    )
+                
+                # 批次延遲（避免頻率限制）
+                if msg_count % 500 == 0:
+                    await asyncio.sleep(1)
+            
+            result['messages_scanned'] = msg_count
+            result['unique_users'] = len(user_activity)
+            
+            # 排序：按消息數量降序（最活躍的在前面）
+            sorted_users = sorted(
+                user_activity.values(), 
+                key=lambda u: u['message_count'], 
+                reverse=True
+            )
+            
+            # 保存新用戶到 DB
+            new_count = 0
+            for user_data in sorted_users:
+                if not user_data['is_new']:
+                    continue
+                
+                if save_to_db:
+                    try:
+                        member = ExtractedMember(
+                            user_id=user_data['user_id'],
+                            username=user_data['username'],
+                            first_name=user_data['first_name'],
+                            last_name=user_data['last_name'],
+                            is_premium=user_data['is_premium'],
+                            online_status='recently',  # 在歷史中出現說明有活動
+                            source_chat_id=str(chat.id),
+                            source_chat_title=result['chat_title'],
+                            activity_score=min(100, user_data['message_count'] * 10),
+                            value_level='high' if user_data['message_count'] >= 5 else 'medium'
+                        )
+                        n, _ = await self._save_members_batch([member])
+                        new_count += n
+                    except Exception as save_err:
+                        self.log(f"⚠ Save error for {user_data['user_id']}: {save_err}", "warning")
+            
+            result['success'] = True
+            result['extracted'] = len(sorted_users)
+            result['new_members'] = new_count
+            result['duration_ms'] = int((time.time() - start_time) * 1000)
+            result['members'] = [
+                {
+                    'user_id': u['user_id'],
+                    'username': u['username'],
+                    'first_name': u['first_name'],
+                    'last_name': u['last_name'],
+                    'full_name': f"{u['first_name']} {u['last_name']}".strip(),
+                    'is_premium': u['is_premium'],
+                    'message_count': u['message_count'],
+                    'last_seen': u['last_seen'].isoformat() if u['last_seen'] else None,
+                    'is_new': u['is_new'],
+                    'activity_score': min(100, u['message_count'] * 10),
+                    'source': 'history'
+                }
+                for u in sorted_users
+            ]
+            
+            self.log(
+                f"✅ 歷史提取完成: 掃描 {msg_count} 條消息，"
+                f"發現 {len(user_activity)} 個用戶 (新增 {new_count})"
+            )
+            
+            return result
+            
+        except Exception as e:
+            result['error'] = str(e)
+            result['duration_ms'] = int((time.time() - start_time) * 1000)
+            self.log(f"❌ 歷史提取失敗: {e}", "error")
             return result
     
     async def _save_members_batch(self, members: List[ExtractedMember]) -> Tuple[int, int]:

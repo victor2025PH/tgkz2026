@@ -347,6 +347,14 @@ except Exception as _audit_err:
     _stub_mod.get_audit_service = get_audit_service
     sys.modules["core.audit_service"] = _stub_mod
 
+# 🆕 Phase4: 導出事件總線（修復 router_integration 等模塊的導入問題）
+from .event_bus import (
+    EventBus,
+    EventPriority,
+    init_event_bus,
+    get_event_bus
+)
+
 from .security_alert import (
     SecurityAlertService,
     AlertType,
@@ -614,5 +622,11 @@ __all__ = [
     'AlertSeverity',
     'AlertStatus',
     'SecurityAlert',
-    'get_security_alert_service'
+    'get_security_alert_service',
+    
+    # 🆕 Phase4: 事件總線
+    'EventBus',
+    'EventPriority',
+    'init_event_bus',
+    'get_event_bus'
 ]

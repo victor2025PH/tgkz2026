@@ -2122,6 +2122,13 @@ class TelegramClientManager:
                     "chat_type": str(chat.type)
                 }
             
+            # 🆕 Phase4: 加入前主動等待 — 避免 FLOOD_WAIT
+            try:
+                from flood_wait_handler import flood_handler
+                await flood_handler.wait_before_operation(phone, 'join_chat')
+            except Exception as fw_err:
+                print(f"[TelegramClient] flood_handler pre-wait skipped: {fw_err}", file=sys.stderr)
+            
             # Try to join the group/channel
             print(f"[TelegramClient] Attempting to join {group_id}...", file=sys.stderr)
             try:
@@ -2159,6 +2166,12 @@ class TelegramClientManager:
                 }
                 
         except FloodWait as e:
+            # 🆕 Phase4: 記錄 FloodWait 冷卻期到全局 handler
+            try:
+                from flood_wait_handler import flood_handler
+                flood_handler.record_flood_wait(phone, e.value)
+            except Exception:
+                pass
             error_msg = f"请等待 {e.value} 秒后再试"
             if self.event_callback:
                 self.event_callback("log-entry", {

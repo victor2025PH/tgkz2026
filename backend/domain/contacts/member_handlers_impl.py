@@ -247,6 +247,7 @@ async def handle_collect_users_from_history_advanced(self, payload: Dict[str, An
     
     try:
         from database import db
+from config import config
         await db.connect()
         
         chat_id = str(telegram_id) if telegram_id else str(group_id)

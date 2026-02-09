@@ -408,8 +408,11 @@ def check_router_available():
         ROUTER_AVAILABLE = False
         return False
 
-# 🔧 Phase4: 立即執行檢測（修復 ROUTER_AVAILABLE 永遠為 False）
-check_router_available()
+# 🔧 Phase4: 嘗試立即檢測（模塊加載時）
+try:
+    check_router_available()
+except Exception as _router_err:
+    print(f"[Backend] Early router check failed: {_router_err}", file=sys.stderr)
 
 
 # ============================================================
@@ -1062,6 +1065,12 @@ class BackendService:
         
         parallel_init_duration = time.time() - parallel_init_start
         print(f"[Backend] ✓ Parallel subsystem initialization completed in {parallel_init_duration:.3f}s", file=sys.stderr)
+        
+        # 🆕 Phase4: 重試路由器檢測（如果早期檢測失敗）
+        if not ROUTER_AVAILABLE:
+            check_router_available()
+            if ROUTER_AVAILABLE:
+                print("[Backend] ✓ Router available after retry", file=sys.stderr)
         
         # 🆕 Phase 2: 初始化命令路由器
         if ROUTER_AVAILABLE:

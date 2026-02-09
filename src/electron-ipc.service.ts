@@ -26,7 +26,13 @@ export type Unsubscribe = () => void;
 export class ElectronIpcService implements OnDestroy {
   private ipcRenderer?: IpcRenderer;
   
-  // 追蹤所有監聽器
+  // 🔧 Phase5: 生產環境日誌控制（減少 console.log 對性能的影響）
+  private readonly _isDebug = !!(window.location.hostname === 'localhost');
+  private _log(...args: any[]): void {
+    if (this._isDebug) console.log(...args);
+  }
+  
+  // 追蹤所有監聯器
   private listeners: ListenerInfo[] = [];
   
   // 頻道到監聽器的映射
@@ -371,14 +377,14 @@ export class ElectronIpcService implements OnDestroy {
   send(channel: string, ...args: any[]): void {
     if (this.ipcRenderer) {
       // Electron 模式
-      console.log(`[IPC Service] → Sending '${channel}':`, args);
+      this._log(`[IPC] → '${channel}'`);
       this.ipcRenderer.send(channel, ...args);
     } else if (this.isWebMode) {
       // 🆕 Web 模式：使用 HTTP API
-      console.log(`[Web Mode] → Sending '${channel}':`, args);
+      this._log(`[Web] → '${channel}'`);
       this.httpSend(channel, args[0] || {});
     } else {
-      console.log(`[Browser Mode] IPC Send to '${channel}':`, ...args);
+      this._log(`[Browser] → '${channel}'`);
     }
   }
   
@@ -480,7 +486,7 @@ export class ElectronIpcService implements OnDestroy {
         body = JSON.stringify({ command, payload });
       }
       
-      console.log(`[Web Mode] ${method} ${url}`, config ? '(registry)' : '(fallback)', `timeout=${timeout/1000}s`);
+      this._log(`[Web Mode] ${method} ${url}`, config ? '(registry)' : '(fallback)', `timeout=${timeout/1000}s`);
       
       // 構建請求頭
       const headers: HeadersInit = {
@@ -538,7 +544,7 @@ export class ElectronIpcService implements OnDestroy {
       }
       
       const result = await response.json();
-      console.log(`[Web Mode] Response for '${command}':`, result);
+      this._log(`[Web Mode] Response for '${command}':`, result);
       
       // 首次成功響應確認連接
       if (!this.httpConnected) {
@@ -1346,8 +1352,7 @@ export class ElectronIpcService implements OnDestroy {
   
   // 🔧 Phase3: 事件去重機制（防止 WS + HTTP 雙重觸發）
   private _eventDedupCache = new Map<string, number>();
-  private readonly EVENT_DEDUP_WINDOW_MS = 500; // 500ms 內同一事件只觸發一次
-  // 需要去重的操作類事件（狀態查詢類不需要去重）
+  private readonly EVENT_DEDUP_WINDOW_MS = 500;
   private readonly DEDUP_EVENTS = new Set([
     'monitored-group-added', 'group-added', 'group-removed',
     'resource-status-updated', 'groups-updated',
@@ -1360,12 +1365,50 @@ export class ElectronIpcService implements OnDestroy {
     'settings-saved', 'backup-created', 'backup-restored',
   ]);
 
+  // 🔧 Phase5: 高頻進度事件節流（限制觸發頻率，減少 Angular 變更檢測）
+  private _throttleCache = new Map<string, { lastFired: number; pendingPayload: any; timerId: any }>();
+  private readonly THROTTLE_INTERVAL_MS = 200; // 最多 5fps
+  private readonly THROTTLE_EVENTS = new Set([
+    'batch-send:progress', 'members-extraction-progress',
+    'one-click-start-progress', 'batch-extraction-progress',
+    'history-collection-progress', 'loading-progress',
+    'batch-refresh-member-count-progress', 'export-progress',
+  ]);
+
   /**
    * 🆕 觸發事件（帶去重保護）
    * 操作類事件：500ms 內同一事件名 + 相同 payload 指紋只觸發一次
    * 狀態/數據類事件：不去重，確保每次都能更新前端
    */
   private triggerEvent(eventName: string, payload: any): void {
+    // 🔧 Phase5: 高頻進度事件節流
+    if (this.THROTTLE_EVENTS.has(eventName)) {
+      const now = Date.now();
+      const cached = this._throttleCache.get(eventName);
+      
+      if (cached && (now - cached.lastFired) < this.THROTTLE_INTERVAL_MS) {
+        // 還在節流窗口內 → 緩存最新 payload，窗口結束時觸發
+        cached.pendingPayload = payload;
+        if (!cached.timerId) {
+          cached.timerId = setTimeout(() => {
+            const c = this._throttleCache.get(eventName);
+            if (c && c.pendingPayload) {
+              this._dispatchToListeners(eventName, c.pendingPayload);
+              c.lastFired = Date.now();
+              c.pendingPayload = null;
+            }
+            if (c) c.timerId = null;
+          }, this.THROTTLE_INTERVAL_MS);
+        }
+        return;
+      }
+      
+      // 窗口外 → 立即觸發並記錄時間
+      this._throttleCache.set(eventName, { lastFired: now, pendingPayload: null, timerId: null });
+      this._dispatchToListeners(eventName, payload);
+      return;
+    }
+
     // 🔧 Phase3: 操作類事件去重
     if (this.DEDUP_EVENTS.has(eventName)) {
       const fingerprint = `${eventName}:${JSON.stringify(payload || {}).substring(0, 200)}`;
@@ -1388,6 +1431,11 @@ export class ElectronIpcService implements OnDestroy {
       }
     }
     
+    this._dispatchToListeners(eventName, payload);
+  }
+
+  /** 🔧 Phase5: 統一的監聽器派發（供 triggerEvent 和節流回調共用） */
+  private _dispatchToListeners(eventName: string, payload: any): void {
     const listeners = this.webListeners.get(eventName);
     if (listeners && listeners.size > 0) {
       this.ngZone.run(() => {

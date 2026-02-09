@@ -324,7 +324,7 @@ export class ResourceDiscoveryService {
     this.ipc.send('extract-members', {
       resourceId: resource.id,
       groupId: resource.id,  // 保持向後兼容
-      telegramId: resource.telegram_id || null,
+      telegramId: (resource as any).telegram_id || resource.accessHash || null,
       username: resource.username || null,
       groupName: resource.title,
       phone: (resource as any).joined_phone || (resource as any).joined_by_phone || null,

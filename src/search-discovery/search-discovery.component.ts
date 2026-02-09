@@ -432,6 +432,10 @@ export interface Account {
                           class="px-2 py-1 text-xs bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded transition-all">
                     👥 批量提取成員
                   </button>
+                  <button (click)="batchAddToMonitoring()" 
+                          class="px-2 py-1 text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded transition-all">
+                    📡 批量監控
+                  </button>
                 </div>
               }
             </div>
@@ -1933,6 +1937,20 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       }
     });
     
+    // 🔧 Phase7-2: 監聽批量添加監控結果
+    const cleanup8b = this.ipc.on('batch-add-monitored-result', (data: any) => {
+      // 清除所有 loading 狀態
+      this.monitoringResourceIds.set(new Set());
+      if (data.success) {
+        let msg = `批量添加完成: ${data.added} 個成功`;
+        if (data.skipped) msg += `, ${data.skipped} 已存在`;
+        if (data.failed) msg += `, ${data.failed} 失敗`;
+        this.toast.success(msg);
+      } else {
+        this.toast.error(`批量添加失敗: ${data.error || '未知錯誤'}`);
+      }
+    });
+    
     // 🔧 Phase4: 監聽監控群組列表 → 交叉比對修正搜索結果中的狀態
     const cleanup9 = this.ipc.on('get-groups-result', (data: any) => {
       const groups = data.groups;
@@ -1972,7 +1990,7 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       }
     });
     
-    this.ipcCleanup.push(cleanup1, cleanup2a, cleanup2, cleanup3, cleanup4, cleanup5, cleanup6, cleanup7, cleanup8, cleanup9);
+    this.ipcCleanup.push(cleanup1, cleanup2a, cleanup2, cleanup3, cleanup4, cleanup5, cleanup6, cleanup7, cleanup8, cleanup8b, cleanup9);
   }
   
   // 🔧 P0: 加載搜索歷史
@@ -2616,6 +2634,54 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   
   // 選中數量
   selectedCount = computed(() => this.selectedForBatch().size);
+
+  // 🔧 Phase7-2: 批量添加到監控列表
+  batchAddToMonitoring(): void {
+    const selected = this.filteredResources().filter(r => 
+      this.selectedForBatch().has(r.telegram_id || String(r.id))
+    );
+    
+    // 過濾掉已在監控中的
+    const toAdd = selected.filter(r => r.status !== 'monitoring');
+    
+    if (toAdd.length === 0) {
+      this.toast.info('選中的資源已全部在監控列表中');
+      return;
+    }
+    
+    // 構建批量數據
+    const groups = toAdd.map(r => ({
+      url: r.username ? `https://t.me/${r.username}` : (r.invite_link || `tg://resolve?id=${r.telegram_id}`),
+      name: r.title || r.username || '',
+      telegramId: r.telegram_id,
+      username: r.username,
+      resourceId: r.id,
+      phone: r.joined_phone || this.mergedSelectedAccount()?.phone,
+    }));
+    
+    // 設置所有 loading 狀態
+    this.monitoringResourceIds.update(ids => {
+      const newIds = new Set(ids);
+      toAdd.forEach(r => newIds.add(r.id));
+      return newIds;
+    });
+    
+    // 發送批量命令
+    this.ipc.send('batch-add-monitored-groups', { groups });
+    
+    this.toast.info(`📡 正在批量添加 ${toAdd.length} 個群組到監控列表...`);
+    
+    // 超時清除 loading
+    setTimeout(() => {
+      this.monitoringResourceIds.update(ids => {
+        const newIds = new Set(ids);
+        toAdd.forEach(r => newIds.delete(r.id));
+        return newIds;
+      });
+    }, 60000);
+    
+    this.clearSelection();
+  }
   
   // 🆕 Phase4: 批量提取選中群組的成員
   batchExtractSelected(): void {

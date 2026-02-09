@@ -2302,6 +2302,170 @@ async def handle_join_and_monitor_with_account(self, payload: Dict[str, Any]):
             "error": friendly_error
         })
 
+async def handle_batch_add_monitored_groups(self, payload: Dict[str, Any]):
+    """🔧 Phase7-2: 批量添加群組到監控列表"""
+    try:
+        groups = payload.get('groups', [])
+        if not groups:
+            self.send_event("batch-add-monitored-result", {"success": False, "error": "空的群組列表"})
+            return
+        
+        self.send_log(f"📡 開始批量添加 {len(groups)} 個群組到監控列表...", "info")
+        
+        results = {"added": 0, "failed": 0, "skipped": 0, "errors": []}
+        
+        for i, group_data in enumerate(groups):
+            try:
+                # 復用 handle_add_monitored_group 的邏輯
+                await handle_add_monitored_group(self, group_data)
+                results["added"] += 1
+            except Exception as e:
+                err_msg = str(e)
+                if "已存在" in err_msg or "already" in err_msg.lower():
+                    results["skipped"] += 1
+                else:
+                    results["failed"] += 1
+                    results["errors"].append(f"{group_data.get('name', '?')}: {err_msg}")
+            
+            # 每個群組之間等一下，避免觸發 FloodWait
+            if i < len(groups) - 1:
+                await asyncio.sleep(1)
+        
+        msg = f"✅ 批量添加完成: {results['added']} 成功"
+        if results["skipped"]:
+            msg += f", {results['skipped']} 已存在"
+        if results["failed"]:
+            msg += f", {results['failed']} 失敗"
+        
+        self.send_log(msg, "success" if results["failed"] == 0 else "warning")
+        
+        self.send_event("batch-add-monitored-result", {
+            "success": True,
+            **results
+        })
+        
+        # 刷新群組列表
+        try:
+            from domain.automation.monitoring_handlers_impl import handle_get_monitored_groups
+            await handle_get_monitored_groups(self)
+        except Exception:
+            pass
+        
+    except Exception as e:
+        print(f"[Backend] 批量添加群組失敗: {e}", file=sys.stderr)
+        self.send_event("batch-add-monitored-result", {
+            "success": False,
+            "error": str(e)
+        })
+
+
+async def handle_batch_reassign_accounts(self, payload: Dict[str, Any]):
+    """🔧 Phase7-2: 批量重分配群組的監控帳號"""
+    try:
+        group_ids = payload.get('groupIds', [])
+        new_phone = payload.get('phone')
+        
+        if not group_ids or not new_phone:
+            self.send_event("batch-reassign-result", {"success": False, "error": "缺少參數"})
+            return
+        
+        # 驗證帳號
+        client = self.telegram_manager.get_client(new_phone)
+        if not client or not client.is_connected:
+            self.send_event("batch-reassign-result", {
+                "success": False,
+                "error": f"帳號 {new_phone[:4]}**** 未連接"
+            })
+            return
+        
+        updated = 0
+        for gid in group_ids:
+            try:
+                await db.execute(
+                    "UPDATE monitored_groups SET phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (new_phone, gid)
+                )
+                updated += 1
+            except Exception:
+                pass
+        
+        self.send_log(f"✅ 已將 {updated}/{len(group_ids)} 個群組切換到帳號 {new_phone[:4]}****", "success")
+        self.send_event("batch-reassign-result", {
+            "success": True,
+            "updated": updated,
+            "total": len(group_ids)
+        })
+        
+        # 刷新
+        try:
+            from domain.automation.monitoring_handlers_impl import handle_get_monitored_groups
+            await handle_get_monitored_groups(self)
+        except Exception:
+            pass
+        
+    except Exception as e:
+        self.send_event("batch-reassign-result", {"success": False, "error": str(e)})
+
+
+async def handle_batch_bind_keywords(self, payload: Dict[str, Any]):
+    """🔧 Phase7-2: 批量綁定關鍵詞集到群組"""
+    try:
+        group_ids = payload.get('groupIds', [])
+        keyword_set_ids = payload.get('keywordSetIds', [])
+        mode = payload.get('mode', 'append')  # 'append' 追加 | 'replace' 替換
+        
+        if not group_ids or not keyword_set_ids:
+            self.send_event("batch-bind-keywords-result", {"success": False, "error": "缺少參數"})
+            return
+        
+        import json
+        updated = 0
+        
+        for gid in group_ids:
+            try:
+                if mode == 'replace':
+                    new_ids = keyword_set_ids
+                else:
+                    # 追加模式：讀取現有的再合併
+                    row = await db.fetch_one(
+                        "SELECT keyword_set_ids FROM monitored_groups WHERE id = ?", (gid,)
+                    )
+                    existing = []
+                    if row and row.get('keyword_set_ids'):
+                        try:
+                            existing = json.loads(row['keyword_set_ids'])
+                        except Exception:
+                            pass
+                    # 合併去重
+                    merged = list(dict.fromkeys(existing + keyword_set_ids))
+                    new_ids = merged
+                
+                await db.execute(
+                    "UPDATE monitored_groups SET keyword_set_ids = ?, is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (json.dumps(new_ids), gid)
+                )
+                updated += 1
+            except Exception as e:
+                print(f"[BatchBind] 群組 {gid} 綁定失敗: {e}", file=sys.stderr)
+        
+        self.send_log(f"✅ 已為 {updated}/{len(group_ids)} 個群組綁定 {len(keyword_set_ids)} 個詞集", "success")
+        self.send_event("batch-bind-keywords-result", {
+            "success": True,
+            "updated": updated,
+            "total": len(group_ids)
+        })
+        
+        # 刷新
+        try:
+            from domain.automation.monitoring_handlers_impl import handle_get_monitored_groups
+            await handle_get_monitored_groups(self)
+        except Exception:
+            pass
+        
+    except Exception as e:
+        self.send_event("batch-bind-keywords-result", {"success": False, "error": str(e)})
+
+
 async def handle_get_account_recommendations(self, payload: Dict[str, Any]):
     """🔧 Phase6-3: 獲取帳號推薦列表（含負載/健康/冷卻狀態）"""
     try:

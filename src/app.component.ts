@@ -2,7 +2,8 @@
 import { ChangeDetectionStrategy, Component, signal, WritableSignal, computed, inject, OnDestroy, effect, OnInit, ChangeDetectorRef, NgZone, HostListener, ViewChild } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { VIEW_ROUTE_MAP } from './app.routes';
 import { filter } from 'rxjs/operators';
 // 路由動畫改用 CSS 過渡效果，不再使用 Angular animations
 import { TelegramAccount, KeywordConfig, MonitoredGroup, CapturedLead, LogEntry, GenerationState, MessageTemplate, LeadStatus, Interaction, OnlineStatus, AccountRole, Attachment, KeywordSet, AutomationCampaign, CampaignTrigger, CampaignAction, AccountStatus, QueueStatus, QueueMessage, Alert } from './models';
@@ -45,10 +46,7 @@ import { AuthService } from './core/auth.service';
 // ProfileComponent, MembershipCenterComponent - 移至路由視圖
 import { QrLoginComponent } from './qr-login.component';
 // AccountCardListComponent, ApiCredentialManagerComponent - 移至路由視圖
-// 🔧 P0: 恢復 AddAccountPageComponent 導入，用於 @switch 視圖切換
-import { AddAccountPageComponent } from './add-account-page.component';
-// 🆕 簡化版添加帳號組件（零配置登錄）
-import { AddAccountSimpleComponent } from './add-account-simple.component';
+// 🔧 Phase7-1: AddAccountPageComponent / AddAccountSimpleComponent 已移至 Router lazy-load
 import { Account } from './account-card-list.component';
 // 類型導入（用於信號和狀態）
 import { AccountQueueStatus } from './queue-progress.component';
@@ -103,42 +101,9 @@ import {
   DialogService
 } from './services';
 
-// 🆕 視圖組件導入（用於 @switch 視圖切換）
-import { DashboardViewComponent } from './views/dashboard-view.component';
-import { AccountsViewComponent } from './views/accounts-view.component';
-import { SettingsViewComponent } from './views/settings-view.component';
-import { LeadsViewComponent } from './views/leads-view.component';
-import { AutomationViewComponent } from './views/automation-view.component';
-import { ResourceDiscoveryViewComponent } from './views/resource-discovery-view.component';
-import { AiCenterViewComponent } from './views/ai-center-view.component';
-import { MultiRoleViewComponent } from './views/multi-role-view.component';
-import { AnalyticsViewComponent } from './views/analytics-view.component';
-import { MonitoringViewComponent } from './views/monitoring-view.component';
-// RuntimeLogsViewComponent 已移除
-import { ApiCredentialsViewComponent } from './views/api-credentials-view.component';
-
-// 🆕 Phase P0: 補全缺失的視圖組件
-import { MembershipCenterComponent } from './membership-center.component';
-import { ProfileComponent } from './profile.component';
-import { ResourceCenterComponent } from './manual-mode/resource-center.component';
-import { SearchDiscoveryComponent } from './search-discovery/search-discovery.component';
-import { AiMarketingAssistantComponent } from './ai-assistant/ai-marketing-assistant.component';
-import { AiTeamHubComponent } from './multi-role/ai-team-hub.component';
-import { MemberDatabaseComponent } from './member-database/member-database.component';
-// 🆕 知識大腦獨立組件
-import { AIBrainComponent } from './ai-center/ai-brain.component';
-import { KnowledgeGapsComponent } from './ai-center/knowledge-gaps.component';
-import { KnowledgeManageComponent } from './ai-center/knowledge-manage.component';
+// 🔧 Phase7-1: 視圖組件已全部移除 — 透過 Router lazy-load
+// 保留的僅為模板直接使用的類型引用
 import { RAGBrainService } from './services/rag-brain.service';
-// 🆕 P2: 營銷報表組件
-import { MarketingReportComponent } from './components/marketing-report.component';
-// 🆕 錢包視圖組件
-import { WalletViewComponent } from './views/wallet-view.component';
-import { WalletRechargeComponent } from './views/wallet-recharge.component';
-import { WalletWithdrawComponent } from './views/wallet-withdraw.component';
-import { WalletTransactionsComponent } from './views/wallet-transactions.component';
-import { WalletOrdersComponent } from './views/wallet-orders.component';
-import { WalletAnalyticsComponent } from './views/wallet-analytics.component';
 
 // 視圖類型定義
 type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'resource-discovery' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps' | 'settings' | 'analytics' | 'analytics-center' | 'marketing-report' | 'profile' | 'membership-center' | 'wallet' | 'wallet-recharge' | 'wallet-withdraw' | 'wallet-transactions' | 'wallet-orders' | 'wallet-analytics' | 'monitoring' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules' | 'collected-users';
@@ -161,26 +126,7 @@ interface SuccessOverlayConfig {
   imports: [
     // 核心模組
     CommonModule, FormsModule, RouterOutlet,
-    // 🆕 視圖組件（用於 @switch 視圖切換）
-    DashboardViewComponent, AccountsViewComponent, SettingsViewComponent,
-    LeadsViewComponent, AutomationViewComponent, ResourceDiscoveryViewComponent,
-    AiCenterViewComponent, MultiRoleViewComponent, AnalyticsViewComponent,
-    MonitoringViewComponent,
-    // 🔧 P0: 添加帳號頁面組件
-    AddAccountPageComponent,
-    // 🆕 簡化版添加帳號組件（零配置登錄）
-    AddAccountSimpleComponent,
-    // 🆕 Phase P0: 補全缺失的視圖組件
-    MembershipCenterComponent, ProfileComponent, ResourceCenterComponent,
-    SearchDiscoveryComponent, AiMarketingAssistantComponent, AiTeamHubComponent,
-    MemberDatabaseComponent, ApiCredentialsViewComponent,
-    // 🆕 錢包視圖
-    WalletViewComponent, WalletRechargeComponent, WalletWithdrawComponent,
-    WalletTransactionsComponent, WalletOrdersComponent, WalletAnalyticsComponent,
-    // 🆕 知識大腦獨立組件
-    AIBrainComponent, KnowledgeGapsComponent, KnowledgeManageComponent, KnowledgeManageComponent,
-    // 🆕 P2: 營銷報表
-    MarketingReportComponent,
+    // 🔧 Phase7-1: 視圖組件已移除 — 全部透過 Router lazy-load
     // 通用組件（模板中使用）
     ToastComponent, GlobalConfirmDialogComponent, GlobalInputDialogComponent, ProgressDialogComponent,
     // 🔧 P8-1: 離線狀態指示器
@@ -6338,6 +6284,22 @@ export class AppComponent implements OnDestroy, OnInit {
     // 🆕 加載保存的側邊欄分組狀態
     this.loadSidebarGroupsState();
     
+    // 🔧 Phase7-1: 監聽 Router 導航事件 → 同步 currentView（支援瀏覽器前進/後退）
+    this.router.events.subscribe(event => {
+      if (event instanceof NavigationEnd) {
+        const url = event.urlAfterRedirects || event.url;
+        // 反查 VIEW_ROUTE_MAP: 找出對應的 view 名稱
+        // 優先精確匹配，但 currentView 可能已由 changeView() 設定
+        const viewEntry = Object.entries(VIEW_ROUTE_MAP).find(([, route]) => route === url);
+        if (viewEntry) {
+          const viewName = viewEntry[0] as View;
+          if (this.currentView() !== viewName) {
+            this.currentView.set(viewName);
+          }
+        }
+      }
+    });
+
     // 🆕 監聽視圖切換事件（從子組件觸發）
     window.addEventListener('changeView', (event: Event) => {
       const customEvent = event as CustomEvent;
@@ -10065,20 +10027,17 @@ export class AppComponent implements OnDestroy, OnInit {
     // 🔧 P0: 先同步到 NavBridgeService，讓子組件的 effect 能捕獲變化
     this.navBridge.navigateTo(view as any);
     
-    // 然後更新本地視圖（觸發 @switch 重新渲染）
+    // 🔧 Phase7-1: 使用 Router 導航（替代 @switch）
+    const routePath = VIEW_ROUTE_MAP[view];
+    if (routePath) {
+      this.router.navigate([routePath]);
+    }
+    
+    // 保留 currentView 信號用於側邊欄高亮
     this.currentView.set(view);
     
     // 🔧 P8-5: 審計追蹤
     this.auditTracker.trackViewChange(previousView, view);
-    
-    // 🆕 切換到資源中心時自動同步 leads 數據
-    if (view === 'resources') {
-      const currentLeads = this.leads();
-      if (currentLeads.length > 0) {
-        this.syncLeadsToResourceCenter(currentLeads);
-        console.log('[changeView] Synced leads to resource center:', currentLeads.length);
-      }
-    }
     
     // 🔧 P8-3: 移動端選擇後自動關閉側邊欄
     this.onMobileNavSelect();

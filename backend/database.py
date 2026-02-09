@@ -3735,6 +3735,19 @@ class Database:
         import sys
         
         try:
+            # 🔧 Phase7 修復: 將歷史數據歸屬當前用戶
+            try:
+                from core.tenant_filter import get_owner_user_id, should_apply_tenant_filter
+                if should_apply_tenant_filter('keyword_sets'):
+                    _ks_owner = get_owner_user_id()
+                    if _ks_owner and _ks_owner != 'local_user':
+                        await self.execute(
+                            "UPDATE keyword_sets SET owner_user_id = ? WHERE owner_user_id IS NULL OR owner_user_id = '' OR owner_user_id = 'local_user'",
+                            (_ks_owner,)
+                        )
+            except ImportError:
+                pass
+            
             # 🆕 P1: 應用租戶過濾
             query = 'SELECT * FROM keyword_sets ORDER BY created_at DESC'
             try:
@@ -3996,33 +4009,41 @@ class Database:
             telegram_id = ''
             account_phone = ''
         
+        # 🔧 Phase7 修復: 獲取 owner_user_id 用於多租戶隔離
+        try:
+            from core.tenant_filter import get_owner_user_id
+            owner_id = get_owner_user_id()
+        except ImportError:
+            owner_id = 'local_user'
+        
         try:
             # 檢查群組是否已存在
             existing = await self.get_group_by_url(url)
             
             if existing:
-                # 更新現有群組的關鍵詞集綁定
+                # 更新現有群組的關鍵詞集綁定 + 修復 owner_user_id
                 keyword_set_ids_json = json.dumps(keyword_set_ids) if keyword_set_ids else '[]'
                 await self.execute('''
                     UPDATE monitored_groups 
-                    SET name = ?, keyword_set_ids = ?, updated_at = CURRENT_TIMESTAMP
+                    SET name = ?, keyword_set_ids = ?, owner_user_id = COALESCE(owner_user_id, ?), updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
-                ''', (name, keyword_set_ids_json, existing['id']))
+                ''', (name, keyword_set_ids_json, owner_id, existing['id']))
                 return existing['id']
             else:
-                # 新增群組
+                # 新增群組（包含 owner_user_id）
                 keyword_set_ids_json = json.dumps(keyword_set_ids) if keyword_set_ids else '[]'
                 first_keyword_set_id = keyword_set_ids[0] if keyword_set_ids else None
                 return await self.execute_insert('''
-                    INSERT INTO monitored_groups (name, link, telegram_id, keyword_set_id, keyword_set_ids, account_phone)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO monitored_groups (name, link, telegram_id, keyword_set_id, keyword_set_ids, account_phone, owner_user_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     name,
                     url,
                     telegram_id,
                     first_keyword_set_id,
                     keyword_set_ids_json,
-                    account_phone
+                    account_phone,
+                    owner_id
                 ))
         except Exception as e:
             import sys
@@ -4033,10 +4054,24 @@ class Database:
         """獲取所有監控群組
         
         🆕 P1: 添加租戶過濾，只返回當前用戶的群組
+        🔧 Phase7: 自動修復 NULL owner_user_id 的歷史數據
         """
         import sys
         await self._ensure_keyword_tables()
         try:
+            # 🔧 Phase7 修復: 將歷史數據（NULL 或 'local_user'）歸屬當前用戶
+            try:
+                from core.tenant_filter import get_owner_user_id, should_apply_tenant_filter
+                if should_apply_tenant_filter('monitored_groups'):
+                    owner_id = get_owner_user_id()
+                    if owner_id and owner_id != 'local_user':
+                        await self.execute(
+                            "UPDATE monitored_groups SET owner_user_id = ? WHERE owner_user_id IS NULL OR owner_user_id = '' OR owner_user_id = 'local_user'",
+                            (owner_id,)
+                        )
+            except ImportError:
+                pass
+            
             # 🆕 P1: 應用租戶過濾
             query = 'SELECT * FROM monitored_groups ORDER BY created_at DESC'
             try:
@@ -4236,6 +4271,12 @@ class Database:
         import sys
         print(f"[Database] add_trigger_rule called with data: {rule_data}", file=sys.stderr)
         await self._ensure_keyword_tables()
+        # 🔧 Phase7: 獲取 owner_user_id
+        try:
+            from core.tenant_filter import get_owner_user_id
+            owner_id = get_owner_user_id()
+        except ImportError:
+            owner_id = 'local_user'
         try:
             print(f"[Database] Executing INSERT for trigger rule: {rule_data.get('name')}", file=sys.stderr)
             return await self.execute_insert('''
@@ -4244,8 +4285,8 @@ class Database:
                     source_type, source_group_ids, keyword_set_ids, conditions,
                     response_type, response_config,
                     sender_type, sender_account_ids, delay_min, delay_max, daily_limit,
-                    auto_add_lead, notify_me
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    auto_add_lead, notify_me, owner_user_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 rule_data.get('name', ''),
                 rule_data.get('description', ''),
@@ -4263,7 +4304,8 @@ class Database:
                 rule_data.get('delayMax', 120),
                 rule_data.get('dailyLimit', 50),
                 1 if rule_data.get('autoAddLead', True) else 0,
-                1 if rule_data.get('notifyMe', False) else 0
+                1 if rule_data.get('notifyMe', False) else 0,
+                owner_id
             ))
         except Exception as e:
             print(f"Error adding trigger rule: {e}")
@@ -4381,14 +4423,21 @@ class Database:
     async def add_template(self, template_data: Dict) -> int:
         """添加消息模板"""
         await self._ensure_keyword_tables()
+        # 🔧 Phase7: 獲取 owner_user_id
+        try:
+            from core.tenant_filter import get_owner_user_id
+            owner_id = get_owner_user_id()
+        except ImportError:
+            owner_id = 'local_user'
         try:
             return await self.execute_insert('''
-                INSERT INTO message_templates (name, content, category)
-                VALUES (?, ?, ?)
+                INSERT INTO message_templates (name, content, category, owner_user_id)
+                VALUES (?, ?, ?, ?)
             ''', (
                 template_data.get('name', ''),
                 template_data.get('content', ''),
-                template_data.get('category', 'general')
+                template_data.get('category', 'general'),
+                owner_id
             ))
         except Exception as e:
             print(f"Error adding template: {e}")
@@ -5545,20 +5594,28 @@ class Database:
             import json
             variables_str = json.dumps(variables)
             
+            # 🔧 Phase7: 獲取 owner_user_id
+            try:
+                from core.tenant_filter import get_owner_user_id
+                owner_id = get_owner_user_id()
+            except ImportError:
+                owner_id = 'local_user'
+            
             if template_id:
-                # 更新
+                # 更新 + 修復 NULL owner_user_id
                 await self._connection.execute(
                     """UPDATE chat_templates 
-                       SET name=?, category=?, content=?, variables=?, is_active=?, updated_at=CURRENT_TIMESTAMP
+                       SET name=?, category=?, content=?, variables=?, is_active=?, 
+                           owner_user_id=COALESCE(owner_user_id, ?), updated_at=CURRENT_TIMESTAMP
                        WHERE id=?""",
-                    (name, category, content, variables_str, 1 if is_active else 0, template_id)
+                    (name, category, content, variables_str, 1 if is_active else 0, owner_id, template_id)
                 )
             else:
-                # 新增
+                # 新增（含 owner_user_id）
                 cursor = await self._connection.execute(
-                    """INSERT INTO chat_templates (name, category, content, variables, is_active)
-                       VALUES (?, ?, ?, ?, ?)""",
-                    (name, category, content, variables_str, 1 if is_active else 0)
+                    """INSERT INTO chat_templates (name, category, content, variables, is_active, owner_user_id)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (name, category, content, variables_str, 1 if is_active else 0, owner_id)
                 )
                 template_id = cursor.lastrowid
             
@@ -6046,13 +6103,19 @@ class Database:
                 if isinstance(source_groups, list):
                     source_groups = json.dumps(source_groups)
                 
+                # 🔧 Phase7: 獲取 owner_user_id
+                try:
+                    from core.tenant_filter import get_owner_user_id
+                    _cu_owner_id = get_owner_user_id()
+                except ImportError:
+                    _cu_owner_id = 'local_user'
                 return await self.execute_insert('''
                     INSERT INTO collected_users (
                         telegram_id, username, first_name, last_name, bio,
                         has_photo, is_premium, is_verified, is_bot,
                         source_groups, collected_by, message_count, groups_count,
-                        last_message_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        last_message_at, owner_user_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     telegram_id,
                     user_data.get('username', ''),
@@ -6067,7 +6130,8 @@ class Database:
                     user_data.get('collected_by', ''),
                     1,
                     1,
-                    user_data.get('last_message_at')
+                    user_data.get('last_message_at'),
+                    _cu_owner_id
                 ))
         except Exception as e:
             import sys

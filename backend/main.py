@@ -453,6 +453,11 @@ COMMAND_ALIAS_REGISTRY: Dict[str, tuple] = {
     'get-account-recommendations': ('domain.groups.handlers_impl', 'handle_get_account_recommendations'),
     'reassign-group-account':      ('domain.groups.handlers_impl', 'handle_reassign_group_account'),
     
+    # === Phase7-2: 批量操作 ===
+    'batch-add-monitored-groups':  ('domain.groups.handlers_impl', 'handle_batch_add_monitored_groups'),
+    'batch-reassign-accounts':     ('domain.groups.handlers_impl', 'handle_batch_reassign_accounts'),
+    'batch-bind-keywords':         ('domain.groups.handlers_impl', 'handle_batch_bind_keywords'),
+    
     # === Phase6-1: 數據庫性能統計 ===
     'get-db-performance':          ('api.handlers.system_handlers_impl', 'handle_get_db_performance'),
     

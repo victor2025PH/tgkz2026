@@ -97,6 +97,14 @@ import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, Collectio
               <div class="text-xs text-slate-400">已綁定詞集</div>
             </div>
           </div>
+          <!-- 🔧 Phase5: 配置完成度提示 -->
+          @if (stateService.groups().length > 0 && stateService.groupsWithKeywords().length < stateService.groups().length) {
+            <div class="mt-2 text-[10px] text-amber-400/80">
+              ⚠ {{ stateService.groups().length - stateService.groupsWithKeywords().length }} 個群組未綁定詞集
+            </div>
+          } @else if (stateService.groups().length > 0) {
+            <div class="mt-2 text-[10px] text-emerald-400/80">✓ 全部已配置</div>
+          }
         </div>
       </div>
 

@@ -16,6 +16,10 @@ from database import db
 import re
 from error_handler import handle_error, AppError, ErrorType
 from validators import validate_group_url, GroupValidator, ValidationError
+
+# 🔧 Phase5: Membership check 結果緩存（避免重複 Telegram API 調用）
+_membership_cache: Dict[str, Dict[str, Any]] = {}  # url -> {"result": ..., "expires": timestamp}
+_MEMBERSHIP_CACHE_TTL = 300  # 5 分鐘
 from service_locator import (
     get_group_poller,
     get_init_group_poller,
@@ -583,37 +587,55 @@ async def handle_add_group(self, payload: Dict[str, Any]):
         
         # ========== 新增：預檢查監控號入群狀態 ==========
         membership_status = None
-        accounts = await db.get_all_accounts()
-        listener_accounts = [a for a in accounts if a.get('role') == 'Listener' and a.get('status') == 'Online']
         
-        if listener_accounts:
-            # Check if any listener account is in this group
-            for account in listener_accounts:
-                phone = account.get('phone')
-                try:
-                    check_result = await self.telegram_manager.check_group_membership(phone, url)
-                    if check_result.get("is_member"):
-                        membership_status = {
-                            "is_member": True,
-                            "account": phone,
-                            "chat_title": check_result.get("chat_title"),
-                            "members_count": check_result.get("members_count", 0)
-                        }
-                        # 更新群組成員數到數據庫
-                        members_count = check_result.get("members_count", 0)
-                        if members_count > 0:
-                            await db.update_group_member_count(url, members_count)
-                        break
-                    elif check_result.get("can_join"):
-                        membership_status = {
-                            "is_member": False,
-                            "can_join": True,
-                            "is_private": check_result.get("is_private", False),
-                            "reason": check_result.get("reason")
-                        }
-                except Exception as e:
-                    import sys
-                    print(f"[Backend] Error checking membership for {url}: {e}", file=sys.stderr)
+        # 🔧 Phase5: 先查緩存
+        cached = _membership_cache.get(url)
+        if cached and cached.get("expires", 0) > time.time():
+            membership_status = cached.get("result")
+            print(f"[Backend] Membership cache HIT for {url}", file=sys.stderr)
+        else:
+            accounts = await db.get_all_accounts()
+            listener_accounts = [a for a in accounts if a.get('role') == 'Listener' and a.get('status') == 'Online']
+            
+            if listener_accounts:
+                for account in listener_accounts:
+                    phone = account.get('phone')
+                    try:
+                        check_result = await self.telegram_manager.check_group_membership(phone, url)
+                        if check_result.get("is_member"):
+                            membership_status = {
+                                "is_member": True,
+                                "account": phone,
+                                "chat_title": check_result.get("chat_title"),
+                                "members_count": check_result.get("members_count", 0)
+                            }
+                            members_count = check_result.get("members_count", 0)
+                            if members_count > 0:
+                                await db.update_group_member_count(url, members_count)
+                            break
+                        elif check_result.get("can_join"):
+                            membership_status = {
+                                "is_member": False,
+                                "can_join": True,
+                                "is_private": check_result.get("is_private", False),
+                                "reason": check_result.get("reason")
+                            }
+                    except Exception as e:
+                        print(f"[Backend] Error checking membership for {url}: {e}", file=sys.stderr)
+            
+            # 🔧 Phase5: 寫入緩存
+            if membership_status:
+                _membership_cache[url] = {
+                    "result": membership_status,
+                    "expires": time.time() + _MEMBERSHIP_CACHE_TTL
+                }
+            
+            # 清理過期緩存（防止內存洩漏）
+            if len(_membership_cache) > 100:
+                now = time.time()
+                expired = [k for k, v in _membership_cache.items() if v.get("expires", 0) < now]
+                for k in expired:
+                    del _membership_cache[k]
         
         # Send membership status event
         if membership_status:

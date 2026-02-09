@@ -704,32 +704,66 @@ CREATE TABLE IF NOT EXISTS message_queue (
 
 -- ============================================================
 -- 索引定義
+-- 🔧 Phase6-1: 全面索引優化 — 基於查詢模式分析
 -- ============================================================
 
+-- accounts 表（高頻: phone/status 查詢、角色篩選）
 CREATE INDEX IF NOT EXISTS idx_accounts_phone ON accounts(phone);
 CREATE INDEX IF NOT EXISTS idx_accounts_status ON accounts(status);
 CREATE INDEX IF NOT EXISTS idx_accounts_telegram_id ON accounts(telegram_id);
+CREATE INDEX IF NOT EXISTS idx_accounts_role ON accounts(role);
+CREATE INDEX IF NOT EXISTS idx_accounts_status_role ON accounts(status, role);
 
+-- monitored_groups 表（高頻: is_active 篩選、chat_id/link 查詢）
+CREATE INDEX IF NOT EXISTS idx_mg_chat_id ON monitored_groups(chat_id);
+CREATE INDEX IF NOT EXISTS idx_mg_is_active ON monitored_groups(is_active);
+
+-- leads 表（高頻: user_id/status 篩選、source_chat_id 來源查詢）
 CREATE INDEX IF NOT EXISTS idx_leads_user_id ON leads(user_id);
 CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
 CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);
+CREATE INDEX IF NOT EXISTS idx_leads_username ON leads(username);
+CREATE INDEX IF NOT EXISTS idx_leads_source_chat_id ON leads(source_chat_id);
+CREATE INDEX IF NOT EXISTS idx_leads_status_created ON leads(status, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_unified_contacts_user_id ON unified_contacts(user_id);
 
+-- campaigns + targets（高頻: status 篩選、campaign_id + status 聯合查詢）
 CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);
 CREATE INDEX IF NOT EXISTS idx_campaign_targets_campaign_id ON campaign_targets(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_targets_status ON campaign_targets(status);
+CREATE INDEX IF NOT EXISTS idx_campaign_targets_composite ON campaign_targets(campaign_id, status);
 
 CREATE INDEX IF NOT EXISTS idx_trigger_rules_is_active ON trigger_rules(is_active);
 
+-- logs 表
 CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_logs_type ON logs(type);
 
+-- message_queue 表（高頻: status 篩選、account_id 查詢、排程查詢）
 CREATE INDEX IF NOT EXISTS idx_message_queue_status ON message_queue(status);
 CREATE INDEX IF NOT EXISTS idx_message_queue_scheduled_at ON message_queue(scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_message_queue_account_id ON message_queue(account_id);
+CREATE INDEX IF NOT EXISTS idx_mq_status_scheduled ON message_queue(status, scheduled_at);
 
+-- discovered_resources 表（高頻: status/username/resource_id 查詢）
 CREATE INDEX IF NOT EXISTS idx_discovered_resources_status ON discovered_resources(status);
+CREATE INDEX IF NOT EXISTS idx_discovered_resources_username ON discovered_resources(username);
+CREATE INDEX IF NOT EXISTS idx_discovered_resources_resource_id ON discovered_resources(resource_id);
+CREATE INDEX IF NOT EXISTS idx_discovered_resources_score ON discovered_resources(score);
+
+-- extracted_members 表（高頻: user_id/source_chat_id 查詢、時間排序）
 CREATE INDEX IF NOT EXISTS idx_extracted_members_user_id ON extracted_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_extracted_members_source ON extracted_members(source_chat_id);
+CREATE INDEX IF NOT EXISTS idx_extracted_members_extracted_at ON extracted_members(extracted_at);
+
+-- member_extraction_logs 表
+CREATE INDEX IF NOT EXISTS idx_mel_chat_id ON member_extraction_logs(chat_id);
+CREATE INDEX IF NOT EXISTS idx_mel_created_at ON member_extraction_logs(created_at);
+
+-- resource_join_queue 表
+CREATE INDEX IF NOT EXISTS idx_rjq_status ON resource_join_queue(status);
+CREATE INDEX IF NOT EXISTS idx_rjq_resource_id ON resource_join_queue(resource_id);
 
 -- ============================================================
 -- Schema 元數據

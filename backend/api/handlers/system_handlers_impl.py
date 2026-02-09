@@ -166,6 +166,38 @@ async def handle_get_background_tasks(self, payload: Dict[str, Any]):
         })
 
 
+async def handle_get_db_performance(self, payload: Dict[str, Any]):
+    """🔧 Phase6-1: 獲取數據庫性能統計（慢查詢 + 表統計）"""
+    try:
+        from core.db_operations import get_slow_query_log, get_query_stats
+        
+        slow_queries = get_slow_query_log()
+        stats = get_query_stats()
+        
+        # 排序：按慢查詢數量降序
+        sorted_stats = sorted(
+            stats.items(),
+            key=lambda x: x[1].get("slow_count", 0),
+            reverse=True
+        )
+        
+        self.send_event("db-performance-result", {
+            "success": True,
+            "slowQueries": slow_queries[-50:],  # 最近 50 條慢查詢
+            "tableStats": [
+                {"table": t, **s} for t, s in sorted_stats
+            ],
+            "totalSlowQueries": len(slow_queries),
+            "thresholdMs": 100
+        })
+        
+    except Exception as e:
+        self.send_event("db-performance-result", {
+            "success": False,
+            "error": str(e)
+        })
+
+
 async def handle_recalculate_scores(self, payload: Dict[str, Any]):
     """重新計算成員評分"""
     try:

@@ -112,35 +112,45 @@
 <!-- 全局命令面板 (Cmd+K) -->
 <app-command-palette (navigate)="handleCommandNavigation($event)"></app-command-palette>
 
-<!-- 批量發送對話框 - 🔧 P0: 統一使用 DialogService 狀態 -->
-<app-batch-send-dialog
-  [isOpen]="dialogService.showBatchMessageDialog()"
-  [targets]="dialogService.batchSendTargets()"
-  (closeDialog)="dialogService.closeBatchSend()"
-  (sendComplete)="handleBatchSendComplete($event)">
-</app-batch-send-dialog>
+<!-- 🔧 Phase6-2: 對話框使用 @defer 懶加載 — 首次打開時加載，減少初始包大小 -->
+<!-- 批量發送對話框 -->
+@defer (when dialogService.showBatchMessageDialog()) {
+  <app-batch-send-dialog
+    [isOpen]="dialogService.showBatchMessageDialog()"
+    [targets]="dialogService.batchSendTargets()"
+    (closeDialog)="dialogService.closeBatchSend()"
+    (sendComplete)="handleBatchSendComplete($event)">
+  </app-batch-send-dialog>
+}
 
-<!-- 批量拉群對話框 - 🔧 P0: 統一使用 DialogService 狀態 -->
-<app-batch-invite-dialog
-  [isOpen]="dialogService.showBatchInviteDialog()"
-  [targets]="dialogService.batchInviteTargets()"
-  [accounts]="accounts()"
-  (closeDialog)="dialogService.closeBatchInvite()"
-  (inviteComplete)="handleBatchInviteComplete($event)">
-</app-batch-invite-dialog>
+<!-- 批量拉群對話框 -->
+@defer (when dialogService.showBatchInviteDialog()) {
+  <app-batch-invite-dialog
+    [isOpen]="dialogService.showBatchInviteDialog()"
+    [targets]="dialogService.batchInviteTargets()"
+    [accounts]="accounts()"
+    (closeDialog)="dialogService.closeBatchInvite()"
+    (inviteComplete)="handleBatchInviteComplete($event)">
+  </app-batch-invite-dialog>
+}
 
-<!-- 成員提取配置對話框 - 🔧 P0: 統一使用 DialogService 狀態 -->
-<app-member-extraction-dialog
-  [isOpen]="dialogService.showMemberExtractionDialog() || showMemberExtractionDialog()"
-  [group]="dialogService.memberExtractionGroup() || memberExtractionGroup()"
-  (closeDialog)="closeMemberExtractionDialogUnified()"
-  (startExtractionEvent)="handleMemberExtractionStart($event)"
-  (memberCountRefreshed)="handleMemberCountRefreshed($event)">
-</app-member-extraction-dialog>
+<!-- 成員提取配置對話框 -->
+@defer (when dialogService.showMemberExtractionDialog() || showMemberExtractionDialog()) {
+  <app-member-extraction-dialog
+    [isOpen]="dialogService.showMemberExtractionDialog() || showMemberExtractionDialog()"
+    [group]="dialogService.memberExtractionGroup() || memberExtractionGroup()"
+    (closeDialog)="closeMemberExtractionDialogUnified()"
+    (startExtractionEvent)="handleMemberExtractionStart($event)"
+    (memberCountRefreshed)="handleMemberCountRefreshed($event)">
+  </app-member-extraction-dialog>
+}
 
+<!-- 🔧 Phase6-2: 會員/支付組件延遲加載 -->
 <app-membership-dialog></app-membership-dialog>
-<app-payment></app-payment>
-<app-upgrade-prompt></app-upgrade-prompt>
+@defer (on idle) {
+  <app-payment></app-payment>
+  <app-upgrade-prompt></app-upgrade-prompt>
+}
 
 <!-- QR 掃碼登入彈窗 -->
 @if (showQrLoginDialog()) {

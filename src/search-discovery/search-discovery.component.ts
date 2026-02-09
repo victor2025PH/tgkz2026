@@ -2305,7 +2305,7 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
         return;
       }
       this.toast.info('🚀 未加入群組，正在自動加入並提取成員...');
-      this.ipcService.send('join-and-extract', {
+      this.ipc.send('join-and-extract', {
         resourceId: resource.id,
         telegramId: resource.telegram_id,
         username: resource.username,

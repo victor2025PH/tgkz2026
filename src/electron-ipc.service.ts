@@ -100,6 +100,9 @@ export class ElectronIpcService implements OnDestroy {
     this.connectWebSocket();
   }
   
+  // 🔧 Phase3: 追蹤是否曾經成功連接過（區分首次連接 vs 重連）
+  private _wsHasConnectedBefore = false;
+
   // 🆕 心跳機制
   private wsHeartbeatTimer: any = null;
   private readonly WS_HEARTBEAT_INTERVAL = 30000; // 30 秒
@@ -137,10 +140,12 @@ export class ElectronIpcService implements OnDestroy {
       this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
-        console.log('[Web Mode] ✅ WebSocket connected');
+        const isReconnect = this._wsHasConnectedBefore;
+        console.log(`[Web Mode] ✅ WebSocket connected${isReconnect ? ' (reconnect)' : ' (initial)'}`);
         this.wsConnected = true;
         this.wsReconnectAttempts = 0;
         this.wsLastPong = Date.now();
+        this._wsHasConnectedBefore = true;
         
         // 🆕 啟動心跳
         this.startHeartbeat();
@@ -159,7 +164,12 @@ export class ElectronIpcService implements OnDestroy {
         }
         
         // 觸發連接成功事件
-        this.triggerEvent('websocket-connected', { timestamp: Date.now() });
+        this.triggerEvent('websocket-connected', { timestamp: Date.now(), isReconnect });
+        
+        // 🔧 Phase3: 重連後自動恢復狀態（補回斷連期間丟失的事件）
+        if (isReconnect) {
+          this.refreshStateAfterReconnect();
+        }
       };
       
       this.ws.onmessage = (event) => {
@@ -177,19 +187,8 @@ export class ElectronIpcService implements OnDestroy {
           const eventName = message.event || message.type;
           const payload = message.data || message.payload || message;
           
-          // 觸發監聽器
-          const listeners = this.webListeners.get(eventName);
-          if (listeners) {
-            this.ngZone.run(() => {
-              listeners.forEach(listener => {
-                try {
-                  listener(payload);
-                } catch (e) {
-                  console.error(`[Web Mode] Listener error for ${eventName}:`, e);
-                }
-              });
-            });
-          }
+          // 🔧 Phase3: 統一走 triggerEvent（享受去重保護和統一日誌）
+          this.triggerEvent(eventName, payload);
         } catch (e) {
           console.error('[Web Mode] WebSocket message parse error:', e);
         }
@@ -214,6 +213,37 @@ export class ElectronIpcService implements OnDestroy {
     }
   }
   
+  /**
+   * 🔧 Phase3: WebSocket 重連後自動刷新狀態
+   * 補回斷連期間丟失的事件，確保前端數據與後端同步
+   */
+  private refreshStateAfterReconnect(): void {
+    console.log('[Web Mode] 🔄 Refreshing state after reconnect...');
+    
+    // 延遲 500ms 發送，確保 WebSocket 已完全就緒
+    setTimeout(() => {
+      // 核心狀態恢復：獲取所有關鍵數據
+      const refreshCommands = [
+        'get-initial-state',
+        'get-monitored-groups',
+        'get-accounts',
+        'get-monitoring-status',
+        'get-keyword-sets',
+        'get-queue-status',
+      ];
+      
+      for (const cmd of refreshCommands) {
+        try {
+          this.httpSend(cmd, {});
+        } catch (e) {
+          console.error(`[Web Mode] Failed to refresh ${cmd}:`, e);
+        }
+      }
+      
+      console.log(`[Web Mode] ✅ Sent ${refreshCommands.length} refresh commands`);
+    }, 500);
+  }
+
   /**
    * 🆕 啟動心跳機制
    */
@@ -385,11 +415,44 @@ export class ElectronIpcService implements OnDestroy {
     this.connectWebSocket();
   }
   
+  // 🔧 Phase3: 根據命令類型設置不同的 HTTP 超時時間
+  private getCommandTimeout(command: string): number {
+    // 長操作：需要 Telegram API 交互（加群、提取成員、批量操作等）
+    const longCommands = [
+      'add-monitored-group', 'add-group', 'join-group', 'leave-group',
+      'join-and-monitor-with-account', 'join-and-monitor-resource',
+      'batch-join-and-monitor', 'batch-join-resources',
+      'extract-members', 'batch-extract-members',
+      'batch-send:start', 'send-message', 'send-group-message',
+      'start-monitoring', 'stop-monitoring',
+      'create-backup', 'restore-backup',
+      'search-resources', 'search-jiso',
+    ];
+    
+    // 中等操作：數據庫查詢 + 少量 API 交互
+    const mediumCommands = [
+      'get-initial-state', 'get-leads-paginated', 'search-leads',
+      'generate-ai-response', 'test-ai-connection',
+      'search-rag', 'search-vector-memories',
+      'import-session', 'export-session',
+    ];
+    
+    if (longCommands.includes(command)) return 120000;  // 2 分鐘
+    if (mediumCommands.includes(command)) return 30000;  // 30 秒
+    return 15000;  // 默認 15 秒（快速讀取命令）
+  }
+
   /**
    * 🆕 Web 模式：通過 HTTP 發送命令
    * 使用命令註冊表驅動，支持 RESTful 和通用命令端點
+   * 🔧 Phase3: 支持智能超時（根據命令類型）
    */
   private async httpSend(command: string, payload: any): Promise<void> {
+    // 🔧 Phase3: 創建 AbortController 用於超時控制
+    const timeout = this.getCommandTimeout(command);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
     try {
       // 獲取命令配置
       const config = getCommandConfig(command);
@@ -417,7 +480,7 @@ export class ElectronIpcService implements OnDestroy {
         body = JSON.stringify({ command, payload });
       }
       
-      console.log(`[Web Mode] ${method} ${url}`, config ? '(registry)' : '(fallback)', { command, payload });
+      console.log(`[Web Mode] ${method} ${url}`, config ? '(registry)' : '(fallback)', `timeout=${timeout/1000}s`);
       
       // 構建請求頭
       const headers: HeadersInit = {
@@ -426,11 +489,6 @@ export class ElectronIpcService implements OnDestroy {
       
       // 添加認證頭（SaaS 模式）- 動態從 localStorage 讀取
       const token = this.authToken || localStorage.getItem('tgm_access_token');
-      console.log(`[Web Mode] Token check for ${command}:`, {
-        hasAuthToken: !!this.authToken,
-        hasLocalStorageToken: !!localStorage.getItem('tgm_access_token'),
-        tokenPrefix: token ? token.substring(0, 30) + '...' : 'NONE'
-      });
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       } else {
@@ -440,6 +498,7 @@ export class ElectronIpcService implements OnDestroy {
       const fetchOptions: RequestInit = {
         method,
         headers,
+        signal: controller.signal,  // 🔧 Phase3: 超時信號
       };
       
       if (body) {
@@ -512,20 +571,31 @@ export class ElectronIpcService implements OnDestroy {
       this.handleResponseEvents(command, result);
       
     } catch (error: any) {
-      console.error(`[Web Mode] HTTP send error for '${command}':`, error);
+      // 🔧 Phase3: 區分超時錯誤和其他網絡錯誤
+      const isTimeout = error.name === 'AbortError';
+      const errorMsg = isTimeout 
+        ? `請求超時（${timeout/1000}秒），操作可能仍在後端執行` 
+        : (error.message || '網絡連接錯誤');
       
-      // 觸發連接錯誤事件
-      this.triggerEvent('connection-error', {
-        error: error.message || '網絡連接錯誤',
-        message: '無法連接到服務器，請檢查網絡連接',
-        command
-      });
+      console.error(`[Web Mode] HTTP ${isTimeout ? 'TIMEOUT' : 'ERROR'} for '${command}':`, errorMsg);
+      
+      // 超時不觸發 connection-error（後端可能仍在正常運行）
+      if (!isTimeout) {
+        this.triggerEvent('connection-error', {
+          error: errorMsg,
+          message: '無法連接到服務器，請檢查網絡連接',
+          command
+        });
+      }
       
       // 觸發命令特定的錯誤事件
       this.handleResponseEvents(command, {
         success: false,
-        error: error.message || '網絡錯誤'
+        error: errorMsg,
+        isTimeout
       });
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
   
@@ -1227,6 +1297,17 @@ export class ElectronIpcService implements OnDestroy {
         error: result.error
       });
     }
+    
+    // 🔧 Phase3: 全局錯誤邊界 - 任何命令失敗時觸發 ipc-command-error
+    // 前端可以全局監聽此事件做統一的錯誤提示
+    if (result.success === false && result.error) {
+      this.triggerEvent('ipc-command-error', {
+        command,
+        error: result.error,
+        isTimeout: result.isTimeout || false,
+        timestamp: Date.now()
+      });
+    }
   }
   
   /**
@@ -1256,18 +1337,59 @@ export class ElectronIpcService implements OnDestroy {
       'update-ai-chat-settings', 'list-backups', 'create-backup', 'restore-backup',
       'delete-backup', 'import-session', 'export-session', 'get-logs', 'clear-logs',
       'get-alerts', 'acknowledge-alert', 'resolve-alert', 'get-api-credentials',
-      'add-api-credential', 'remove-api-credential', 'get-system-status', 'get-initial-state'
+      'add-api-credential', 'remove-api-credential', 'get-system-status', 'get-initial-state',
+      'batch-send:start', 'search-groups', 'get-trigger-rules', 'get-chat-templates',
+      'get-group-collected-stats', 'batch-refresh-member-counts'
     ];
     return handledCommands.includes(command);
   }
   
+  // 🔧 Phase3: 事件去重機制（防止 WS + HTTP 雙重觸發）
+  private _eventDedupCache = new Map<string, number>();
+  private readonly EVENT_DEDUP_WINDOW_MS = 500; // 500ms 內同一事件只觸發一次
+  // 需要去重的操作類事件（狀態查詢類不需要去重）
+  private readonly DEDUP_EVENTS = new Set([
+    'monitored-group-added', 'group-added', 'group-removed',
+    'resource-status-updated', 'groups-updated',
+    'account-added', 'account-updated', 'account-disconnected',
+    'login-success', 'login-error', 'login-requires-code', 'login-requires-2fa',
+    'batch-send:complete', 'members-extracted',
+    'join-and-monitor-complete', 'join-and-monitor-result',
+    'keyword-added', 'keyword-removed',
+    'lead-added', 'lead-deleted', 'lead-status-updated',
+    'settings-saved', 'backup-created', 'backup-restored',
+  ]);
+
   /**
-   * 🆕 手動觸發事件
+   * 🆕 觸發事件（帶去重保護）
+   * 操作類事件：500ms 內同一事件名 + 相同 payload 指紋只觸發一次
+   * 狀態/數據類事件：不去重，確保每次都能更新前端
    */
   private triggerEvent(eventName: string, payload: any): void {
+    // 🔧 Phase3: 操作類事件去重
+    if (this.DEDUP_EVENTS.has(eventName)) {
+      const fingerprint = `${eventName}:${JSON.stringify(payload || {}).substring(0, 200)}`;
+      const now = Date.now();
+      const lastTrigger = this._eventDedupCache.get(fingerprint);
+      
+      if (lastTrigger && (now - lastTrigger) < this.EVENT_DEDUP_WINDOW_MS) {
+        console.log(`[Web Mode] ⏭ Dedup: '${eventName}' (within ${this.EVENT_DEDUP_WINDOW_MS}ms window)`);
+        return;
+      }
+      
+      this._eventDedupCache.set(fingerprint, now);
+      
+      // 定期清理過期的指紋（避免內存洩漏）
+      if (this._eventDedupCache.size > 200) {
+        const cutoff = now - this.EVENT_DEDUP_WINDOW_MS * 2;
+        for (const [key, time] of this._eventDedupCache) {
+          if (time < cutoff) this._eventDedupCache.delete(key);
+        }
+      }
+    }
+    
     const listeners = this.webListeners.get(eventName);
     if (listeners && listeners.size > 0) {
-      console.log(`[Web Mode] Triggering event '${eventName}':`, payload);
       this.ngZone.run(() => {
         listeners.forEach(listener => {
           try {

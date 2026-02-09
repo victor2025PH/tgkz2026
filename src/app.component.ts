@@ -6901,6 +6901,29 @@ export class AppComponent implements OnDestroy, OnInit {
       }
     });
     
+    // 🔧 Phase3: 全局 IPC 錯誤邊界 - 捕獲所有未被特定組件處理的命令錯誤
+    this.ipcService.on('ipc-command-error', (data: { command: string; error: string; isTimeout: boolean }) => {
+      // 排除已被特定組件處理的命令（避免重複 toast）
+      const silentCommands = [
+        'get-system-status', 'get-initial-state', 'get-accounts', 
+        'get-monitored-groups', 'get-keyword-sets', 'get-queue-status',
+        'get-monitoring-status', 'get-logs', 'get-alerts',
+        'add-monitored-group', 'add-group',  // 搜索頁已處理
+        'batch-send:start',                   // 批量發送對話框已處理
+      ];
+      
+      if (silentCommands.includes(data.command)) return;
+      
+      // 超時提示用較溫和的方式
+      if (data.isTimeout) {
+        console.warn(`[App] Command timeout: ${data.command}`, data.error);
+        this.toastService.warning(`操作超時：${data.error}`, 5000);
+      } else {
+        console.error(`[App] Command error: ${data.command}`, data.error);
+        this.toastService.error(`操作失敗 (${data.command}): ${data.error}`, 5000);
+      }
+    });
+    
     // 🆕 P1 優化：監聽連接模式變更（WebSocket ↔ HTTP 輪詢）
     this.ipcService.on('connection-mode-changed', (data: { mode: 'websocket' | 'polling' }) => {
       console.log('[Frontend] Connection mode changed:', data.mode);

@@ -3039,11 +3039,19 @@ class BackendService:
                 self.send_event("keyword-sets-updated", {"keywordSets": []})
     
     async def send_groups_update(self):
-        """Send only monitored groups update to frontend"""
+        """Send monitored groups update to frontend
+        🔧 修復：同時發送兩個事件名，確保所有前端監聽器都能收到
+        - get-groups-result: monitoring-state.service.ts 主監聽器（字段: groups）
+        - groups-updated: 舊事件名，保持向後兼容（字段: monitoredGroups + groups）
+        """
         try:
             groups = await db.get_all_groups()
-            self.send_event("groups-updated", {"monitoredGroups": groups})
+            # 🔧 核心修復：發送前端實際監聽的事件名和字段
+            self.send_event("get-groups-result", {"groups": groups})
+            # 保持向後兼容（其他組件可能監聽此事件）
+            self.send_event("groups-updated", {"monitoredGroups": groups, "groups": groups})
         except Exception as e:
+            import sys
             print(f"[Backend] Error sending groups update: {e}", file=sys.stderr)
     
     async def send_templates_update(self):

@@ -291,15 +291,36 @@ export class MonitoringStateService implements OnDestroy {
     });
     this.listeners.push(cleanup2);
     
-    // 監聽 groups 更新
+    // 監聽 groups 更新（主事件）
     const cleanup3 = this.ipcService.on('get-groups-result', (data: any) => {
       if (data.groups) {
+        console.log('[StateService] get-groups-result received:', data.groups.length, 'groups');
         this.updateGroups(data.groups);
       }
     });
     this.listeners.push(cleanup3);
     
-    // 監聽 keyword-sets 更新
+    // 🔧 修復：監聽 groups-updated 事件（添加/刪除群組後觸發）
+    const cleanup3b = this.ipcService.on('groups-updated', (data: any) => {
+      const groups = data.groups || data.monitoredGroups;
+      if (groups && Array.isArray(groups)) {
+        console.log('[StateService] groups-updated received:', groups.length, 'groups');
+        this.updateGroups(groups);
+      }
+    });
+    this.listeners.push(cleanup3b);
+    
+    // 🔧 修復：監聽添加/移除群組的操作結果事件
+    const cleanup3c = this.ipcService.on('monitored-group-added', (data: any) => {
+      if (data.success) {
+        console.log('[StateService] monitored-group-added, refreshing...');
+        // 操作成功後主動請求最新列表（保底機制）
+        this.ipcService.send('get-monitored-groups', {});
+      }
+    });
+    this.listeners.push(cleanup3c);
+    
+    // 監聯 keyword-sets 更新
     const cleanup4 = this.ipcService.on('get-keyword-sets-result', (data: any) => {
       if (data.keywordSets) {
         this.updateKeywordSets(data.keywordSets);

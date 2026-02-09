@@ -978,6 +978,9 @@ class HttpApiServer:
         if self.backend_service:
             try:
                 result = await self.backend_service.handle_command(command, payload)
+                # 兼容不返回值的 handler（只靠 send_event 推送）
+                if result is None:
+                    return {'success': True}
                 return result
             except Exception as e:
                 logger.error(f"Command execution error: {command} - {e}")

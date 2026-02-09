@@ -645,12 +645,51 @@ class MemberExtractionService:
                 flood_handler.record_flood_wait(phone, wait_time)
             except Exception:
                 pass
-            self.log(f"⏳ 頻率限制，等待 {wait_time} 秒", "warning")
+            
+            # 🆕 Phase5-P2: 嘗試帳號輪換 — 如果有其他可用帳號，自動切換
+            rotation_attempted = False
+            try:
+                from flood_wait_handler import flood_handler as fh
+                alt_accounts = fh.get_available_accounts(self.telegram_manager.clients, 'get_participants')
+                for alt_phone, alt_cooldown in alt_accounts:
+                    if alt_phone == phone or alt_cooldown > 0:
+                        continue
+                    # 有可用的替代帳號 → 使用它重試
+                    self.log(f"🔄 帳號 {phone[:4]}**** FloodWait {wait_time}s → 輪換到 {alt_phone[:4]}****", "info")
+                    rotation_attempted = True
+                    # 遞迴調用，但用新帳號
+                    alt_result = await self.extract_members(
+                        chat_id=effective_chat_id,
+                        phone=alt_phone,
+                        save_to_db=self.config.get('auto_save', True),
+                        emit_progress=True
+                    )
+                    if alt_result.get('members_count', 0) > 0:
+                        self.log(f"✓ 帳號輪換成功: {alt_phone[:4]}**** 提取 {alt_result.get('members_count', 0)} 成員", "success")
+                        alt_result['rotated_from'] = phone
+                        alt_result['rotation_reason'] = f"FloodWait {wait_time}s"
+                        return alt_result
+                    elif alt_result.get('error_code') == 'FLOOD_WAIT':
+                        self.log(f"帳號 {alt_phone[:4]}**** 也被限速", "warning")
+                        continue
+                    else:
+                        # 非 FloodWait 錯誤（例如帳號未加入群組），回退原始錯誤
+                        break
+            except Exception as rotation_err:
+                import sys
+                print(f"[MemberExtract] Account rotation error: {rotation_err}", file=sys.stderr)
+            
+            if rotation_attempted:
+                self.log(f"⏳ 帳號輪換失敗，所有帳號都被限速", "warning")
+            else:
+                self.log(f"⏳ 頻率限制，等待 {wait_time} 秒", "warning")
+            
             result['error'] = f'頻率限制，需等待 {wait_time} 秒'
             result['error_code'] = 'FLOOD_WAIT'
             result['error_details'] = {
                 'wait_seconds': wait_time,
-                'suggestion': '請稍後重試，或使用其他帳號'
+                'suggestion': '所有帳號暫時被限速，請稍後重試' if rotation_attempted else '請稍後重試，或使用其他帳號',
+                'rotation_attempted': rotation_attempted
             }
             return result
             

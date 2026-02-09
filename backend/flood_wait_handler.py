@@ -97,6 +97,55 @@ class FloodWaitHandler:
         self._flood_wait_until[phone] = time.time() + wait_seconds
         print(f"[FloodWait] 帳號 {phone} 被限速，冷卻 {wait_seconds}s", file=sys.stderr)
     
+    def is_account_available(self, phone: str) -> bool:
+        """檢查帳號是否可用（不在 FloodWait 冷卻期）"""
+        flood_until = self._flood_wait_until.get(phone, 0)
+        return flood_until <= time.time()
+    
+    def get_remaining_cooldown(self, phone: str) -> float:
+        """獲取帳號剩餘冷卻時間（秒），0 表示可用"""
+        flood_until = self._flood_wait_until.get(phone, 0)
+        remaining = flood_until - time.time()
+        return max(0, remaining)
+    
+    def get_available_accounts(self, clients: dict, operation: str = 'default') -> list:
+        """
+        從已連接帳號中篩選出不在 FloodWait 冷卻期的帳號
+        
+        Args:
+            clients: {phone: Client} 已連接的 Telegram 客戶端
+            operation: 操作類型（用於日誌）
+        
+        Returns:
+            可用帳號列表 [(phone, remaining_cooldown)]，按冷卻時間升序排列
+        """
+        now = time.time()
+        available = []
+        cooling = []
+        
+        for phone, client in clients.items():
+            if not client or not hasattr(client, 'is_connected') or not client.is_connected:
+                continue
+            
+            flood_until = self._flood_wait_until.get(phone, 0)
+            remaining = flood_until - now
+            
+            if remaining <= 0:
+                available.append((phone, 0.0))
+            else:
+                cooling.append((phone, remaining))
+        
+        if cooling:
+            print(
+                f"[FloodWait] 帳號可用狀態 ({operation}): "
+                f"{len(available)} 可用, {len(cooling)} 冷卻中 "
+                f"[{', '.join(f'{p[:4]}****({r:.0f}s)' for p, r in cooling)}]",
+                file=sys.stderr
+            )
+        
+        # 先返回可用帳號，再返回冷卻中的（按剩餘時間排序）
+        return available + sorted(cooling, key=lambda x: x[1])
+    
     async def execute_with_retry(
         self,
         func: Callable,
@@ -160,6 +209,111 @@ class FloodWaitHandler:
                     raise
         
         raise last_exception
+    
+    async def execute_with_rotation(
+        self,
+        func_factory: Callable,
+        clients: dict,
+        operation: str = 'default',
+        preferred_phone: str = None,
+        on_rotation: Callable = None,
+        max_retries_per_account: int = 1,
+    ) -> Any:
+        """
+        智能帳號輪換執行 — 當一個帳號觸發 FloodWait 時自動切換到下一個可用帳號
+        
+        Args:
+            func_factory: 接受 (client, phone) 返回協程的工廠函數
+                          例: lambda client, phone: client.join_chat(chat_id)
+            clients: {phone: Client} 已連接的 Telegram 客戶端
+            operation: 操作類型
+            preferred_phone: 優先使用的帳號
+            on_rotation: 輪換時的回調 (old_phone, new_phone, wait_time)
+            max_retries_per_account: 每個帳號的最大重試次數
+        
+        Returns:
+            (result, used_phone) — 操作結果和實際使用的帳號
+        
+        Raises:
+            所有帳號都失敗時拋出最後的異常
+        """
+        # 獲取可用帳號列表
+        account_list = self.get_available_accounts(clients, operation)
+        
+        if not account_list:
+            raise RuntimeError(f"沒有可用的已連接帳號執行 {operation}")
+        
+        # 如果有優先帳號且可用，放到最前面
+        if preferred_phone:
+            account_list = sorted(
+                account_list,
+                key=lambda x: (0 if x[0] == preferred_phone else 1, x[1])
+            )
+        
+        last_exception = None
+        attempted_phones = []
+        
+        for phone, cooldown in account_list:
+            # 如果帳號在冷卻中且還有其他可用帳號，跳過
+            if cooldown > 0 and len([a for a in account_list if a[1] == 0]) > 0:
+                continue
+            
+            client = clients.get(phone)
+            if not client or not hasattr(client, 'is_connected') or not client.is_connected:
+                continue
+            
+            attempted_phones.append(phone)
+            
+            for attempt in range(max_retries_per_account + 1):
+                try:
+                    await self.wait_before_operation(phone, operation)
+                    result = await func_factory(client, phone)
+                    
+                    if len(attempted_phones) > 1:
+                        print(
+                            f"[FloodWait] ✓ 帳號輪換成功: {phone[:4]}**** "
+                            f"(嘗試了 {len(attempted_phones)} 個帳號)",
+                            file=sys.stderr
+                        )
+                    
+                    return result, phone
+                    
+                except Exception as e:
+                    last_exception = e
+                    wait_time = self.get_wait_time_from_error(e)
+                    
+                    if wait_time is not None:
+                        # FloodWait — 記錄冷卻並嘗試下一個帳號
+                        self.record_flood_wait(phone, wait_time)
+                        
+                        if on_rotation:
+                            try:
+                                on_rotation(phone, None, wait_time)
+                            except Exception:
+                                pass
+                        
+                        print(
+                            f"[FloodWait] 帳號 {phone[:4]}**** 被限速 {wait_time}s，嘗試輪換...",
+                            file=sys.stderr
+                        )
+                        break  # 跳出重試循環，嘗試下一個帳號
+                    else:
+                        # 非 FloodWait 錯誤
+                        if attempt < max_retries_per_account:
+                            await asyncio.sleep(1)
+                        else:
+                            raise
+        
+        # 所有帳號都失敗了
+        total_attempted = len(attempted_phones)
+        if last_exception:
+            print(
+                f"[FloodWait] ✗ 所有帳號都失敗 ({total_attempted} 個)，"
+                f"最後錯誤: {last_exception}",
+                file=sys.stderr
+            )
+            raise last_exception
+        raise RuntimeError(f"沒有可用帳號完成 {operation}")
 
 
 # 全局單例

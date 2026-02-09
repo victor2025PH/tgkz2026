@@ -436,6 +436,13 @@ COMMAND_ALIAS_REGISTRY: Dict[str, tuple] = {
     # === Phase4: 消息歷史提取 ===
     'extract-active-users':     ('domain.contacts.member_handlers_impl', 'handle_extract_active_users'),
     
+    # === Phase5-P0: colon 格式命令別名 ===
+    # 前端用 alerts:get, 後端 handler 是 handle_get_alerts (getattr 轉換不匹配)
+    'alerts:get':               ('api.handlers.analytics_handlers_impl', 'handle_get_alerts'),
+    'alerts:resolve':           ('api.handlers.analytics_handlers_impl', 'handle_resolve_alert'),
+    'alerts:clear':             ('api.handlers.analytics_handlers_impl', 'handle_clear_all_alerts'),
+    'alerts:mark-read':         ('api.handlers.analytics_handlers_impl', 'handle_acknowledge_alert'),
+    
     # === 預留擴展點 (新增別名只需在此添加一行) ===
 }
 
@@ -446,10 +453,19 @@ _UNKNOWN_CMD_LOG_THRESHOLD = 3  # 同一未知命令每 N 次才記一次日誌
 # 🆕 Phase4: 命令執行度量（成功/失敗/耗時）
 _command_metrics: Dict[str, Dict] = {}  # {command: {success: int, failed: int, total_ms: float, last_error: str}}
 
+# 🆕 Phase5: 路由方式追蹤 — 統計每個命令通過哪種方式路由
+_routing_stats: Dict[str, int] = {
+    'router': 0,     # CommandRouter 處理
+    'alias': 0,      # Alias Registry 處理  
+    'getattr': 0,    # getattr 動態查找
+    'if_elif': 0,    # 顯式 if-elif 鏈
+    'unknown': 0     # 未知命令
+}
+
 def _record_command_metric(command: str, success: bool, duration_ms: float, error: str = None):
     """記錄命令執行結果"""
     if command not in _command_metrics:
-        _command_metrics[command] = {'success': 0, 'failed': 0, 'total_ms': 0.0, 'count': 0, 'last_error': None}
+        _command_metrics[command] = {'success': 0, 'failed': 0, 'total_ms': 0.0, 'count': 0, 'last_error': None, 'route': 'unknown'}
     m = _command_metrics[command]
     m['count'] += 1
     m['total_ms'] += duration_ms
@@ -458,6 +474,12 @@ def _record_command_metric(command: str, success: bool, duration_ms: float, erro
     else:
         m['failed'] += 1
         m['last_error'] = error
+
+def _record_routing(route_type: str, command: str):
+    """記錄路由方式"""
+    _routing_stats[route_type] = _routing_stats.get(route_type, 0) + 1
+    if command in _command_metrics:
+        _command_metrics[command]['route'] = route_type
 
 
 # 🆕 Phase 8: 使用統一的日誌脫敏工具（延遲導入）
@@ -2657,21 +2679,17 @@ class BackendService:
             # 🆕 Phase 7: 使用命令路由器處理所有命令
             if ROUTER_AVAILABLE:
                 try:
-                    # 🔧 P0: 添加命令路由日誌
-                    print(f"[Backend] Processing command via router: {command}", file=sys.stderr)
                     handled, result = await try_route_command(command, payload, request_id)
                     if handled:
-                        print(f"[Backend] ✓ Command handled by router: {command}", file=sys.stderr)
-                        return result  # 🔧 FIX: Return the result from router
-                    else:
-                        print(f"[Backend] Command not handled by router, using fallback: {command}", file=sys.stderr)
+                        _record_routing('router', command)
+                        return result
                 except Exception as router_error:
                     # 路由器錯誤，使用動態回退機制
                     print(f"[Backend] Router error for {command}: {router_error}, using fallback", file=sys.stderr)
             
             # 🔧 P0: 顯式處理知識庫命令（繞過路由器問題）
             if command == 'add-knowledge-base':
-                print(f"[Backend] 🔧 Direct handling add-knowledge-base", file=sys.stderr)
+                _record_routing('if_elif', command)
                 await self.handle_add_knowledge_base(payload or {})
                 return
             elif command == 'add-knowledge-item':
@@ -2847,7 +2865,7 @@ class BackendService:
                     mod = importlib.import_module(module_path)
                     alias_handler = getattr(mod, func_name, None)
                     if alias_handler and callable(alias_handler):
-                        print(f"[Backend] ✓ Alias registry: {command} → {module_path}.{func_name}", file=sys.stderr)
+                        _record_routing('alias', command)
                         if payload is not None:
                             result = await alias_handler(self, payload)
                         else:
@@ -2882,13 +2900,15 @@ class BackendService:
                     accepts_payload = True
                 
                 # 調用處理器並返回結果
+                _record_routing('getattr', command)
                 if payload is not None and accepts_payload:
                     result = await handler(payload)
                 else:
                     result = await handler()
-                return result  # 🔧 FIX: Return the handler result
+                return result
             else:
                 # 🆕 Phase3: 追蹤未知命令
+                _record_routing('unknown', command)
                 _unknown_command_counter[command] = _unknown_command_counter.get(command, 0) + 1
                 count = _unknown_command_counter[command]
                 if count <= _UNKNOWN_CMD_LOG_THRESHOLD or count % 10 == 0:
@@ -3647,6 +3667,28 @@ class BackendService:
                 }
                 for cmd, m in top_slow
             ],
+            # 🆕 Phase5: 路由方式統計
+            'routing_stats': dict(_routing_stats),
+            'routing_coverage': {
+                'router_pct': round(_routing_stats.get('router', 0) / max(1, total_commands) * 100, 1),
+                'alias_pct': round(_routing_stats.get('alias', 0) / max(1, total_commands) * 100, 1),
+                'getattr_pct': round(_routing_stats.get('getattr', 0) / max(1, total_commands) * 100, 1),
+                'if_elif_pct': round(_routing_stats.get('if_elif', 0) / max(1, total_commands) * 100, 1),
+                'unknown_pct': round(_routing_stats.get('unknown', 0) / max(1, total_commands) * 100, 1),
+                'explicit_route_pct': round(
+                    (_routing_stats.get('router', 0) + _routing_stats.get('alias', 0) + _routing_stats.get('if_elif', 0)) 
+                    / max(1, total_commands) * 100, 1
+                )  # router + alias + if_elif = 顯式路由百分比
+            },
+            # Per-command route breakdown (top 30 most called)
+            'per_command_routes': {
+                cmd: m.get('route', 'unknown')
+                for cmd, m in sorted(
+                    _command_metrics.items(),
+                    key=lambda x: x[1]['count'],
+                    reverse=True
+                )[:30]
+            },
             # 🆕 Phase4: FloodWait 狀態
             'flood_wait_status': {}
         }
@@ -4612,6 +4654,10 @@ class BackendService:
     async def handle_resolve_alert(self, payload=None):
         from api.handlers.analytics_handlers_impl import handle_resolve_alert as _handle_resolve_alert
         return await _handle_resolve_alert(self, payload)
+
+    async def handle_clear_all_alerts(self, payload=None):
+        from api.handlers.analytics_handlers_impl import handle_clear_all_alerts as _handle_clear_all_alerts
+        return await _handle_clear_all_alerts(self, payload)
 
     async def handle_migration_status(self, payload=None):
         from api.handlers.migration_handlers_impl import handle_migration_status as _handle_migration_status

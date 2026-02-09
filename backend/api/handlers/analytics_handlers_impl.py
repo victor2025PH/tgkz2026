@@ -137,8 +137,15 @@ async def handle_get_account_sending_comparison(self, payload: Dict[str, Any]):
         self.send_log(f"Error getting account sending comparison: {str(e)}", "error")
 
 async def handle_get_alerts(self, payload: Dict[str, Any]):
-    """Handle get-alerts command"""
+    """Handle get-alerts / alerts:get command
+    
+    兼容兩種調用方式:
+    1. send('get-alerts') → 通過 send_event 推送結果
+    2. invoke('alerts:get') → 直接返回結果 (request-response)
+    """
     try:
+        if payload is None:
+            payload = {}
         limit = payload.get('limit', 50)
         level = payload.get('level')  # Optional: 'info', 'warning', 'error', 'critical'
         unresolved_only = payload.get('unresolvedOnly', False)
@@ -148,46 +155,103 @@ async def handle_get_alerts(self, payload: Dict[str, Any]):
         else:
             alerts = await db.get_recent_alerts(limit, level)
         
-        self.send_event("alerts-loaded", {"alerts": alerts, "count": len(alerts)})
+        # 計算摘要
+        active_alerts = [a for a in alerts if isinstance(a, dict) and a.get('status') != 'resolved'] if alerts else []
+        summary = {
+            'total': len(alerts) if alerts else 0,
+            'active': len(active_alerts),
+            'critical': len([a for a in active_alerts if isinstance(a, dict) and a.get('level') == 'critical']),
+            'warning': len([a for a in active_alerts if isinstance(a, dict) and a.get('level') == 'warning']),
+            'info': len([a for a in active_alerts if isinstance(a, dict) and a.get('level') in ('info', None)]),
+        }
+        
+        result = {
+            "success": True,
+            "data": {
+                "summary": summary,
+                "active": active_alerts[:20],
+                "recent": alerts[:limit] if alerts else []
+            }
+        }
+        
+        # 兼容 send() 模式：仍然推送事件
+        self.send_event("alerts-loaded", {"alerts": alerts, "count": len(alerts) if alerts else 0})
+        
+        # 兼容 invoke() 模式：返回結構化結果
+        return result
     except Exception as e:
         handle_error(e, {"command": "get-alerts", "payload": payload})
         self.send_log(f"Error getting alerts: {str(e)}", "error")
+        return {"success": False, "error": str(e)}
 
 async def handle_acknowledge_alert(self, payload: Dict[str, Any]):
-    """Handle acknowledge-alert command"""
+    """Handle acknowledge-alert / alerts:mark-read command"""
     try:
-        alert_id = payload.get('alertId')
+        if payload is None:
+            payload = {}
+        alert_id = payload.get('alertId') or payload.get('id')
         if not alert_id:
             self.send_log("Alert ID required", "error")
-            return
+            return {"success": False, "error": "Alert ID required"}
         
         await db.acknowledge_alert(alert_id)
         self.send_log(f"Alert {alert_id} acknowledged", "success")
         
         # Send updated alerts
         alerts = await db.get_recent_alerts(50)
-        self.send_event("alerts-loaded", {"alerts": alerts, "count": len(alerts)})
+        self.send_event("alerts-loaded", {"alerts": alerts, "count": len(alerts) if alerts else 0})
+        return {"success": True}
     except Exception as e:
         handle_error(e, {"command": "acknowledge-alert", "payload": payload})
         self.send_log(f"Error acknowledging alert: {str(e)}", "error")
+        return {"success": False, "error": str(e)}
 
 async def handle_resolve_alert(self, payload: Dict[str, Any]):
-    """Handle resolve-alert command"""
+    """Handle resolve-alert / alerts:resolve command"""
     try:
-        alert_id = payload.get('alertId')
+        if payload is None:
+            payload = {}
+        alert_id = payload.get('alertId') or payload.get('id')
         if not alert_id:
             self.send_log("Alert ID required", "error")
-            return
+            return {"success": False, "error": "Alert ID required"}
         
         await db.resolve_alert(alert_id)
         self.send_log(f"Alert {alert_id} resolved", "success")
         
         # Send updated alerts
         alerts = await db.get_recent_alerts(50)
-        self.send_event("alerts-loaded", {"alerts": alerts, "count": len(alerts)})
+        self.send_event("alerts-loaded", {"alerts": alerts, "count": len(alerts) if alerts else 0})
+        return {"success": True}
     except Exception as e:
         handle_error(e, {"command": "resolve-alert", "payload": payload})
         self.send_log(f"Error resolving alert: {str(e)}", "error")
+        return {"success": False, "error": str(e)}
+
+async def handle_clear_all_alerts(self, payload: Dict[str, Any]):
+    """Handle alerts:clear command — 清除所有告警"""
+    try:
+        if payload is None:
+            payload = {}
+        # 獲取所有未解決的告警並逐一 resolve
+        alerts = await db.get_unresolved_alerts(500)
+        cleared = 0
+        if alerts:
+            for a in alerts:
+                try:
+                    alert_id = a.get('id') if isinstance(a, dict) else getattr(a, 'id', None)
+                    if alert_id:
+                        await db.resolve_alert(alert_id)
+                        cleared += 1
+                except Exception:
+                    pass
+        self.send_log(f"已清除 {cleared} 條告警", "success")
+        self.send_event("alerts-loaded", {"alerts": [], "count": 0})
+        return {"success": True, "cleared": cleared}
+    except Exception as e:
+        handle_error(e, {"command": "alerts:clear", "payload": payload})
+        self.send_log(f"Error clearing alerts: {str(e)}", "error")
+        return {"success": False, "error": str(e)}
 
 async def handle_get_high_value_groups(self, payload: Dict[str, Any]):
     """獲取高價值群組"""

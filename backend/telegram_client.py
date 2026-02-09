@@ -2204,6 +2204,90 @@ class TelegramClientManager:
                 })
             return {"success": False, "error": error_msg}
     
+    async def join_group_with_rotation(self, preferred_phone: str, group_url: str,
+                                       on_rotation_log: callable = None) -> Dict[str, Any]:
+        """
+        🆕 Phase5-P2: 智能帳號輪換加群 — FloodWait 時自動切換帳號
+        
+        Args:
+            preferred_phone: 優先使用的帳號
+            group_url: 群組 URL / username / 邀請連結
+            on_rotation_log: 輪換日誌回調 (msg, level)
+        
+        Returns:
+            Dict with success status, used_phone, and chat info
+        """
+        import sys
+        
+        # 如果只有一個帳號，直接用原始方法
+        if len(self.clients) <= 1:
+            result = await self.join_group(preferred_phone, group_url)
+            result['used_phone'] = preferred_phone
+            return result
+        
+        try:
+            from flood_wait_handler import flood_handler
+        except ImportError:
+            result = await self.join_group(preferred_phone, group_url)
+            result['used_phone'] = preferred_phone
+            return result
+        
+        def log(msg, level='info'):
+            if on_rotation_log:
+                try:
+                    on_rotation_log(msg, level)
+                except Exception:
+                    pass
+            print(f"[JoinRotation] {msg}", file=sys.stderr)
+        
+        # 嘗試用首選帳號
+        result = await self.join_group(preferred_phone, group_url)
+        
+        if result.get('success'):
+            result['used_phone'] = preferred_phone
+            return result
+        
+        # 檢查是否是 FloodWait
+        flood_wait_time = result.get('flood_wait')
+        if not flood_wait_time:
+            # 非 FloodWait 錯誤（被封禁、連結過期等），不需要輪換
+            result['used_phone'] = preferred_phone
+            return result
+        
+        # FloodWait → 嘗試輪換到其他帳號
+        log(f"帳號 {preferred_phone[:4]}**** FloodWait {flood_wait_time}s，啟動輪換...", "warning")
+        
+        available_accounts = flood_handler.get_available_accounts(self.clients, 'join_chat')
+        
+        for alt_phone, cooldown in available_accounts:
+            if alt_phone == preferred_phone:
+                continue  # 跳過剛失敗的帳號
+            if cooldown > 0:
+                continue  # 跳過冷卻中的帳號
+            
+            log(f"嘗試帳號 {alt_phone[:4]}****...", "info")
+            alt_result = await self.join_group(alt_phone, group_url)
+            
+            if alt_result.get('success'):
+                log(f"✓ 帳號輪換成功: {alt_phone[:4]}****", "success")
+                alt_result['used_phone'] = alt_phone
+                alt_result['rotated_from'] = preferred_phone
+                alt_result['rotation_reason'] = f"FloodWait {flood_wait_time}s"
+                return alt_result
+            
+            if alt_result.get('flood_wait'):
+                log(f"帳號 {alt_phone[:4]}**** 也被限速 {alt_result['flood_wait']}s", "warning")
+                continue
+            
+            # 非 FloodWait 錯誤（被封禁等），停止輪換
+            log(f"帳號 {alt_phone[:4]}**** 失敗: {alt_result.get('error')}", "error")
+            break
+        
+        # 所有帳號都失敗
+        log(f"所有帳號都無法加入群組 {group_url}", "error")
+        result['used_phone'] = preferred_phone
+        return result
+    
     async def check_group_membership(self, phone: str, group_url: str) -> Dict[str, Any]:
         """
         Check if an account is a member of a group WITHOUT trying to join

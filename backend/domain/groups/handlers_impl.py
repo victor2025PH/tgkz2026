@@ -26,14 +26,17 @@ from service_locator import (
 
 
 async def select_best_account(telegram_manager, db_conn, operation: str = 'join', 
-                                preferred_role: str = None) -> Optional[str]:
+                                preferred_role: str = None,
+                                exclude_flood_wait: bool = True) -> Optional[str]:
     """
-    Phase3: 智能帳號選擇 — 根據操作類型和帳號角色選擇最佳帳號
+    Phase3+5: 智能帳號選擇 — 結合角色優先級 + FloodWait 冷卻狀態
     
     操作優先級：
     - join/monitor: 優先 Explorer > Listener > Unassigned > Sender
     - extract: 優先用已加入群組的帳號 (由調用方處理), 回退 Listener > Explorer > any
     - search: 優先 Explorer > any
+    
+    Phase5 增強: 自動排除 FloodWait 冷卻中的帳號
     
     Returns:
         最佳帳號 phone, 或 None
@@ -44,6 +47,43 @@ async def select_best_account(telegram_manager, db_conn, operation: str = 'join'
     }
     if not connected:
         return None
+    
+    # 🆕 Phase5: 排除 FloodWait 冷卻中的帳號
+    if exclude_flood_wait:
+        try:
+            from flood_wait_handler import flood_handler
+            available_phones = set()
+            cooling_phones = {}
+            for phone in connected:
+                remaining = flood_handler.get_remaining_cooldown(phone)
+                if remaining <= 0:
+                    available_phones.add(phone)
+                else:
+                    cooling_phones[phone] = remaining
+            
+            if cooling_phones:
+                import sys
+                print(
+                    f"[SmartSelect] {operation}: 排除 {len(cooling_phones)} 個冷卻帳號 "
+                    f"[{', '.join(f'{p[:4]}****({r:.0f}s)' for p, r in cooling_phones.items())}]",
+                    file=sys.stderr
+                )
+            
+            # 如果有可用帳號，只從可用帳號中選；否則回退到全部
+            if available_phones:
+                connected = {p: c for p, c in connected.items() if p in available_phones}
+            else:
+                # 所有帳號都在冷卻中 → 選冷卻時間最短的
+                shortest_phone = min(cooling_phones, key=cooling_phones.get) if cooling_phones else None
+                if shortest_phone:
+                    import sys
+                    print(
+                        f"[SmartSelect] 所有帳號冷卻中，選擇最快可用: {shortest_phone[:4]}**** ({cooling_phones[shortest_phone]:.0f}s)",
+                        file=sys.stderr
+                    )
+                    return shortest_phone
+        except ImportError:
+            pass
     
     # 如果只有一個帳號，直接用
     if len(connected) == 1:
@@ -1340,9 +1380,18 @@ async def handle_join_and_monitor_resource(self, payload: Dict[str, Any]):
                 raise ValueError("沒有可用的已連接帳號，請先連接一個帳號")
             self.send_log(f"📱 智能選擇帳號: {phone[:4]}****", "info")
         
-        # 🔧 P0: 使用 TelegramManager.join_group 方法（正確的方法）
+        # 🔧 P0+P5: 使用帳號輪換加群（FloodWait 時自動切換帳號）
         self.send_log(f"🚀 正在加入: {title}", "info")
-        join_result = await self.telegram_manager.join_group(phone, group_url)
+        join_result = await self.telegram_manager.join_group_with_rotation(
+            phone, group_url,
+            on_rotation_log=lambda msg, level: self.send_log(f"🔄 {msg}", level)
+        )
+        
+        # 如果使用了不同的帳號，更新 phone
+        actual_phone = join_result.get('used_phone', phone)
+        if actual_phone != phone:
+            self.send_log(f"🔄 帳號輪換: {phone[:4]}**** → {actual_phone[:4]}****", "info")
+            phone = actual_phone
         
         if join_result.get('success'):
             self.send_log(f"✅ 已加入群組: {title}", "success")
@@ -1531,9 +1580,18 @@ async def handle_join_resource(self, payload: Dict[str, Any]):
                 raise ValueError("沒有可用的已連接帳號，請先連接一個帳號")
             self.send_log(f"📱 智能選擇帳號: {phone[:4]}****", "info")
         
-        # 加入群組
+        # 🆕 Phase5-P2: 使用帳號輪換加群
         self.send_log(f"🚀 正在加入: {title}", "info")
-        join_result = await self.telegram_manager.join_group(phone, group_url)
+        join_result = await self.telegram_manager.join_group_with_rotation(
+            phone, group_url,
+            on_rotation_log=lambda msg, level: self.send_log(f"🔄 {msg}", level)
+        )
+        
+        # 如果使用了不同的帳號，更新 phone
+        actual_phone = join_result.get('used_phone', phone)
+        if actual_phone != phone:
+            self.send_log(f"🔄 帳號輪換: {phone[:4]}**** → {actual_phone[:4]}****", "info")
+            phone = actual_phone
         
         if join_result.get('success'):
             self.send_log(f"✅ 已加入群組: {title}", "success")

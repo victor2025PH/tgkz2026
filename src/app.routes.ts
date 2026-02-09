@@ -232,13 +232,24 @@ export const routes: Routes = [
  * 視圖名稱到路由路徑的映射
  * 🆕 重構：添加新模塊路由，保持舊路由兼容
  */
+/**
+ * 🔧 Phase7-1: 完整的視圖→路由映射表
+ * changeView() 使用此表進行 Router 導航
+ * NavBridgeService 負責子標籤切換
+ */
 export const VIEW_ROUTE_MAP: Record<string, string> = {
-  // 核心
+  // ============ 核心 ============
   'dashboard': '/dashboard',
   'accounts': '/accounts',
+  'add-account': '/accounts',
+  'add-account-advanced': '/accounts',
+  'api-credentials': '/accounts',
   'settings': '/settings',
+  'user-settings': '/user-settings',
+  'profile': '/user-settings',
+  'membership-center': '/upgrade',
   
-  // 🆕 錢包系統
+  // ============ 錢包系統 ============
   'wallet': '/wallet',
   'wallet-transactions': '/wallet/transactions',
   'wallet-recharge': '/wallet/recharge',
@@ -246,52 +257,71 @@ export const VIEW_ROUTE_MAP: Record<string, string> = {
   'wallet-analytics': '/wallet/analytics',
   'wallet-withdraw': '/wallet/withdraw',
   
-  // 🆕 營銷任務中心（核心入口）
+  // ============ 營銷任務中心 ============
   'marketing-hub': '/marketing-hub',
   'marketing-tasks': '/marketing-hub',
   'marketing-monitor': '/marketing-hub',
+  'marketing-report': '/marketing-hub',
+  'ai-assistant': '/marketing-hub',
+  'ai-team': '/marketing-hub',
+  'ads': '/automation',
+  'campaigns': '/automation',
   
-  // 🆕 角色資源庫
+  // ============ 角色資源庫 ============
   'role-library': '/role-library',
   'role-store': '/role-library',
   'my-roles': '/role-library',
   'scene-templates': '/role-library',
   'script-editor': '/role-library',
+  'multi-role': '/role-library',
   
-  // 🆕 智能引擎
+  // ============ 智能引擎 ============
   'ai-engine': '/ai-engine',
+  'ai-center': '/ai-engine',
   'ai-models': '/ai-engine',
   'ai-brain': '/ai-engine',
   'ai-persona': '/ai-engine',
+  'knowledge-brain': '/ai-engine',
+  'knowledge-gaps': '/ai-engine',
+  'knowledge-manage': '/ai-engine',
   
-  // 觸發監控
+  // ============ 觸發監控 ============
   'automation': '/automation',
+  'monitoring': '/monitoring',
+  'monitoring-accounts': '/monitoring',
   'monitoring-groups': '/monitoring',
   'keyword-sets': '/monitoring',
   'trigger-rules': '/monitoring',
   'chat-templates': '/monitoring',
   'collected-users': '/monitoring',
   
-  // 客戶管理
+  // ============ 資源發現 ============
+  'resource-discovery': '/resource-discovery',
+  'resources': '/resource-discovery',
+  'resource-center': '/resource-discovery',
+  'search-discovery': '/resource-discovery',
+  
+  // ============ 客戶管理 ============
   'leads': '/leads',
   'lead-nurturing': '/leads',
   'member-database': '/leads',
   'user-tracking': '/leads',
+  'nurturing-analytics': '/analytics',
   
-  // 數據分析
+  // ============ 數據分析 ============
   'analytics': '/analytics',
   'analytics-center': '/analytics',
-  'search-discovery': '/resource-discovery',
   
-  // 系統
-  'monitoring': '/monitoring',
+  // ============ 系統/兼容 ============
   'performance': '/settings',
   'alerts': '/settings',
-  
-  // 舊路由（兼容）
-  'ai-center': '/ai-engine',
-  'multi-role': '/role-library',
-  'smart-marketing': '/marketing-hub'
+  'runtime-logs': '/settings',
+  'logs': '/settings',
+  'smart-marketing': '/marketing-hub',
+  'billing': '/billing',
+  'upgrade': '/upgrade',
+  'quota': '/quota',
+  'payment': '/payment',
 };
 
 /**

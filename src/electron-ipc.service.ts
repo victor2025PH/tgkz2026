@@ -775,6 +775,16 @@ export class ElectronIpcService implements OnDestroy {
     if (command === 'get-account-recommendations') {
       this.triggerEvent('account-recommendations-result', result);
     }
+    // 🔧 Phase7-2: 批量操作結果
+    if (command === 'batch-add-monitored-groups') {
+      this.triggerEvent('batch-add-monitored-result', result);
+    }
+    if (command === 'batch-reassign-accounts') {
+      this.triggerEvent('batch-reassign-result', result);
+    }
+    if (command === 'batch-bind-keywords') {
+      this.triggerEvent('batch-bind-keywords-result', result);
+    }
     
     if (command === 'reassign-group-account') {
       this.triggerEvent('group-account-reassigned', result);
@@ -1360,7 +1370,8 @@ export class ElectronIpcService implements OnDestroy {
       'add-api-credential', 'remove-api-credential', 'get-system-status', 'get-initial-state',
       'batch-send:start', 'search-groups', 'get-trigger-rules', 'get-chat-templates',
       'get-group-collected-stats', 'batch-refresh-member-counts',
-      'get-account-recommendations', 'reassign-group-account', 'get-db-performance'
+      'get-account-recommendations', 'reassign-group-account', 'get-db-performance',
+      'batch-add-monitored-groups', 'batch-reassign-accounts', 'batch-bind-keywords'
     ];
     return handledCommands.includes(command);
   }

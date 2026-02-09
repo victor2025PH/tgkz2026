@@ -153,16 +153,90 @@ import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, Collectio
             </div>
           }
           
+          <!-- 🔧 Phase7-2: 批量操作面板 -->
+          @if (stateService.groups().length > 0) {
+            <div class="px-4 py-2 border-b border-slate-700/30 flex items-center justify-between bg-slate-800/30">
+              <div class="flex items-center gap-3">
+                <span class="text-slate-400 text-xs">批量操作:</span>
+                <button (click)="selectAllGroups()" class="text-xs text-cyan-400 hover:text-cyan-300 transition-colors">全選</button>
+                <button (click)="invertGroupSelection()" class="text-xs text-slate-400 hover:text-slate-200 transition-colors">反選</button>
+                @if (selectedBatchCount() > 0) {
+                  <button (click)="clearGroupSelection()" class="text-xs text-rose-400 hover:text-rose-300 transition-colors">取消</button>
+                }
+              </div>
+              @if (selectedBatchCount() > 0) {
+                <div class="flex items-center gap-2">
+                  <span class="text-cyan-400 text-xs font-medium">✓ 已選 {{ selectedBatchCount() }} 個群組</span>
+                  <button (click)="showBatchAccountPicker.set(!showBatchAccountPicker())"
+                          class="px-2 py-1 text-xs bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded transition-all"
+                          [disabled]="isBatchOperating()">
+                    🔄 批量切換帳號
+                  </button>
+                  <button (click)="showBatchKeywordPicker.set(!showBatchKeywordPicker())"
+                          class="px-2 py-1 text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded transition-all"
+                          [disabled]="isBatchOperating()">
+                    🔑 批量綁定詞集
+                  </button>
+                </div>
+              }
+            </div>
+            <!-- 批量帳號選擇下拉 -->
+            @if (showBatchAccountPicker() && selectedBatchCount() > 0) {
+              <div class="px-4 py-3 border-b border-slate-700/30 bg-slate-900/80">
+                <div class="text-xs text-slate-400 mb-2">選擇帳號:</div>
+                <div class="flex flex-wrap gap-2">
+                  @for (acc of stateService.accounts(); track acc.phone) {
+                    <button (click)="batchReassignAccount(acc.phone)"
+                            class="px-3 py-1.5 text-xs rounded-lg border transition-all"
+                            [class.bg-cyan-500/20]="acc.isConnected"
+                            [class.text-cyan-400]="acc.isConnected"
+                            [class.border-cyan-500/30]="acc.isConnected"
+                            [class.bg-slate-700/50]="!acc.isConnected"
+                            [class.text-slate-500]="!acc.isConnected"
+                            [class.border-slate-600]="!acc.isConnected"
+                            [disabled]="!acc.isConnected || isBatchOperating()">
+                      {{ acc.isConnected ? '🟢' : '⚫' }} {{ acc.phone }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+            <!-- 批量詞集選擇下拉 -->
+            @if (showBatchKeywordPicker() && selectedBatchCount() > 0) {
+              <div class="px-4 py-3 border-b border-slate-700/30 bg-slate-900/80">
+                <div class="text-xs text-slate-400 mb-2">選擇詞集 (點擊即綁定):</div>
+                <div class="flex flex-wrap gap-2">
+                  @for (ks of stateService.keywordSets(); track ks.id) {
+                    <button (click)="batchBindKeywords([ks.id])"
+                            class="px-3 py-1.5 text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-lg hover:bg-purple-500/30 transition-all"
+                            [disabled]="isBatchOperating()">
+                      🔑 {{ ks.name }} ({{ ks.keywords?.length || 0 }})
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          }
+
           <!-- 🔧 網格佈局 - 修復溢出問題 -->
           <div class="flex-1 overflow-y-auto p-4">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               @for (group of stateService.groups(); track group.id) {
                 <!-- 🔧 添加 overflow-hidden 防止內容溢出 -->
                 <div (click)="openGroupDetail(group)"
-                     class="p-4 bg-slate-800/60 rounded-xl hover:bg-slate-700/80 transition-all cursor-pointer group border border-slate-700/50 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/10 overflow-hidden">
+                     class="p-4 bg-slate-800/60 rounded-xl hover:bg-slate-700/80 transition-all cursor-pointer group border border-slate-700/50 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/10 overflow-hidden"
+                     [class.ring-2]="isGroupSelected(group.id)"
+                     [class.ring-cyan-500/50]="isGroupSelected(group.id)">
                   
-                  <!-- 頭部：頭像 + 名稱 + 類型標籤 -->
+                  <!-- 頭部：複選框 + 頭像 + 名稱 + 類型標籤 -->
                   <div class="flex items-start gap-3 mb-3">
+                    <!-- 🔧 Phase7-2: 批量選擇複選框 -->
+                    <div class="flex-shrink-0 pt-1">
+                      <input type="checkbox"
+                             [checked]="isGroupSelected(group.id)"
+                             (click)="toggleGroupSelect(group.id, $event)"
+                             class="w-4 h-4 rounded border-slate-500 bg-slate-700 text-cyan-500 focus:ring-cyan-500/30 cursor-pointer">
+                    </div>
                     <!-- 頭像 - 固定尺寸 -->
                     <div class="w-11 h-11 rounded-xl flex items-center justify-center text-xl font-bold flex-shrink-0 border"
                          [class.bg-gradient-to-br]="true"
@@ -709,6 +783,13 @@ export class MonitoringGroupsComponent implements OnInit {
   accountRecommendations = signal<any[]>([]);
   isLoadingRecommendations = signal(false);
   isReassigning = signal(false);
+
+  // 🔧 Phase7-2: 批量選擇
+  selectedGroupIds = signal<Set<string>>(new Set());
+  showBatchKeywordPicker = signal(false);
+  showBatchAccountPicker = signal(false);
+  selectedBatchCount = computed(() => this.selectedGroupIds().size);
+  isBatchOperating = signal(false);
 
   // 計算可綁定的詞集
   availableKeywordSets = computed(() => {
@@ -1423,5 +1504,88 @@ export class MonitoringGroupsComponent implements OnInit {
       // 刷新數據
       setTimeout(() => this.stateService.refresh(), 500);
     }
+  }
+
+  // ============ 🔧 Phase7-2: 批量操作 ============
+  
+  toggleGroupSelect(groupId: string, event: Event) {
+    event.stopPropagation(); // 防止觸發群組詳情
+    this.selectedGroupIds.update(ids => {
+      const next = new Set(ids);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  }
+
+  isGroupSelected(groupId: string): boolean {
+    return this.selectedGroupIds().has(groupId);
+  }
+
+  selectAllGroups() {
+    const allIds = this.stateService.groups().map(g => g.id);
+    this.selectedGroupIds.set(new Set(allIds));
+  }
+
+  clearGroupSelection() {
+    this.selectedGroupIds.set(new Set());
+    this.showBatchKeywordPicker.set(false);
+    this.showBatchAccountPicker.set(false);
+  }
+
+  invertGroupSelection() {
+    const current = this.selectedGroupIds();
+    const all = this.stateService.groups().map(g => g.id);
+    const inverted = new Set(all.filter(id => !current.has(id)));
+    this.selectedGroupIds.set(inverted);
+  }
+
+  // 批量切換帳號
+  batchReassignAccount(phone: string) {
+    const ids = Array.from(this.selectedGroupIds());
+    if (ids.length === 0) return;
+
+    this.isBatchOperating.set(true);
+    this.ipcService.send('batch-reassign-accounts', { groupIds: ids, phone });
+
+    const cleanup = this.ipcService.on('batch-reassign-result', (data: any) => {
+      cleanup();
+      this.isBatchOperating.set(false);
+      if (data.success) {
+        this.toastService.success(`已將 ${data.updated} 個群組切換到指定帳號`);
+        this.clearGroupSelection();
+        this.stateService.refresh();
+      } else {
+        this.toastService.error(`批量切換失敗: ${data.error}`);
+      }
+    });
+
+    setTimeout(() => { cleanup(); this.isBatchOperating.set(false); }, 30000);
+  }
+
+  // 批量綁定關鍵詞
+  batchBindKeywords(keywordSetIds: string[], mode: 'append' | 'replace' = 'append') {
+    const ids = Array.from(this.selectedGroupIds());
+    if (ids.length === 0 || keywordSetIds.length === 0) return;
+
+    this.isBatchOperating.set(true);
+    this.ipcService.send('batch-bind-keywords', { groupIds: ids, keywordSetIds, mode });
+
+    const cleanup = this.ipcService.on('batch-bind-keywords-result', (data: any) => {
+      cleanup();
+      this.isBatchOperating.set(false);
+      if (data.success) {
+        this.toastService.success(`已為 ${data.updated} 個群組綁定詞集`);
+        this.clearGroupSelection();
+        this.stateService.refresh();
+      } else {
+        this.toastService.error(`批量綁定失敗: ${data.error}`);
+      }
+    });
+
+    setTimeout(() => { cleanup(); this.isBatchOperating.set(false); }, 30000);
   }
 }

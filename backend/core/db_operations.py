@@ -28,6 +28,7 @@
 
 import sqlite3
 import logging
+import time
 from typing import Optional, Dict, Any, List, Union, Tuple
 from datetime import datetime
 from contextlib import contextmanager
@@ -36,6 +37,66 @@ from .tenant_schema import is_system_table, is_tenant_table, TENANT_TABLES
 from .tenant_database import get_tenant_db_manager, LOCAL_USER_ID
 
 logger = logging.getLogger(__name__)
+
+# ============ 🔧 Phase6-1: 慢查詢日誌 ============
+
+# 慢查詢閾值（毫秒）
+SLOW_QUERY_THRESHOLD_MS = 100
+
+# 慢查詢日誌存儲（環形緩衝區，保留最近 200 條）
+_slow_query_log: List[Dict[str, Any]] = []
+_SLOW_QUERY_MAX_LOG = 200
+_query_stats: Dict[str, Dict[str, Any]] = {}  # table -> {count, total_ms, max_ms, slow_count}
+
+
+def _record_query(table: str, sql: str, duration_ms: float):
+    """記錄查詢統計和慢查詢"""
+    # 更新統計
+    if table not in _query_stats:
+        _query_stats[table] = {"count": 0, "total_ms": 0.0, "max_ms": 0.0, "slow_count": 0}
+    stats = _query_stats[table]
+    stats["count"] += 1
+    stats["total_ms"] += duration_ms
+    if duration_ms > stats["max_ms"]:
+        stats["max_ms"] = duration_ms
+    
+    # 慢查詢日誌
+    if duration_ms >= SLOW_QUERY_THRESHOLD_MS:
+        stats["slow_count"] += 1
+        entry = {
+            "table": table,
+            "sql": sql[:200],  # 截斷避免過長
+            "duration_ms": round(duration_ms, 2),
+            "timestamp": datetime.now().isoformat()
+        }
+        _slow_query_log.append(entry)
+        # 環形緩衝區
+        if len(_slow_query_log) > _SLOW_QUERY_MAX_LOG:
+            _slow_query_log.pop(0)
+        logger.warning(f"[SlowQuery] {duration_ms:.1f}ms | {table} | {sql[:100]}")
+
+
+def get_slow_query_log() -> List[Dict[str, Any]]:
+    """獲取慢查詢日誌"""
+    return list(_slow_query_log)
+
+
+def get_query_stats() -> Dict[str, Dict[str, Any]]:
+    """獲取查詢統計"""
+    result = {}
+    for table, stats in _query_stats.items():
+        avg = stats["total_ms"] / stats["count"] if stats["count"] > 0 else 0
+        result[table] = {
+            **stats,
+            "avg_ms": round(avg, 2)
+        }
+    return result
+
+
+def reset_query_stats():
+    """重置查詢統計"""
+    _query_stats.clear()
+    _slow_query_log.clear()
 
 
 class QueryBuilder:
@@ -164,9 +225,12 @@ class QueryBuilder:
     def all(self) -> List[Dict[str, Any]]:
         """執行查詢並返回所有結果"""
         sql, params = self._build_select_sql()
+        t0 = time.perf_counter()
         cursor = self.conn.cursor()
         cursor.execute(sql, params)
-        return [dict(row) for row in cursor.fetchall()]
+        rows = [dict(row) for row in cursor.fetchall()]
+        _record_query(self.table, sql, (time.perf_counter() - t0) * 1000)
+        return rows
     
     def first(self) -> Optional[Dict[str, Any]]:
         """執行查詢並返回第一個結果"""
@@ -195,17 +259,21 @@ class QueryBuilder:
         else:
             raise ValueError(f"Cannot execute {self.operation}")
         
+        t0 = time.perf_counter()
         cursor = self.conn.cursor()
         cursor.execute(sql, params)
         self.conn.commit()
+        _record_query(self.table, sql, (time.perf_counter() - t0) * 1000)
         return cursor.rowcount
     
     def insert_and_get_id(self) -> int:
         """執行 INSERT 並返回新記錄的 ID"""
         sql, params = self._build_insert_sql()
+        t0 = time.perf_counter()
         cursor = self.conn.cursor()
         cursor.execute(sql, params)
         self.conn.commit()
+        _record_query(self.table, sql, (time.perf_counter() - t0) * 1000)
         return cursor.lastrowid
 
 
@@ -400,12 +468,15 @@ class TenantDB:
             results = db.raw('accounts', "SELECT * FROM accounts WHERE status = ?", ('Online',))
         """
         conn = self._get_conn_for_table(table)
+        t0 = time.perf_counter()
         cursor = conn.cursor()
         if params:
             cursor.execute(sql, params)
         else:
             cursor.execute(sql)
-        return [dict(row) for row in cursor.fetchall()]
+        rows = [dict(row) for row in cursor.fetchall()]
+        _record_query(table, sql, (time.perf_counter() - t0) * 1000)
+        return rows
     
     def execute_raw(self, table: str, sql: str, params: tuple = None) -> int:
         """
@@ -415,12 +486,14 @@ class TenantDB:
             db.execute_raw('accounts', "UPDATE accounts SET status = ?", ('Offline',))
         """
         conn = self._get_conn_for_table(table)
+        t0 = time.perf_counter()
         cursor = conn.cursor()
         if params:
             cursor.execute(sql, params)
         else:
             cursor.execute(sql)
         conn.commit()
+        _record_query(table, sql, (time.perf_counter() - t0) * 1000)
         return cursor.rowcount
 
 

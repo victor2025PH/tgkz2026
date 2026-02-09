@@ -771,6 +771,20 @@ export class ElectronIpcService implements OnDestroy {
       });
     }
     
+    // 🔧 Phase6-3: 帳號推薦 + 重分配
+    if (command === 'get-account-recommendations') {
+      this.triggerEvent('account-recommendations-result', result);
+    }
+    
+    if (command === 'reassign-group-account') {
+      this.triggerEvent('group-account-reassigned', result);
+    }
+    
+    // 🔧 Phase6-1: 數據庫性能
+    if (command === 'get-db-performance') {
+      this.triggerEvent('db-performance-result', result);
+    }
+    
     if (command === 'join-group') {
       this.triggerEvent('group-joined', {
         success: result.success !== false,
@@ -1345,7 +1359,8 @@ export class ElectronIpcService implements OnDestroy {
       'get-alerts', 'acknowledge-alert', 'resolve-alert', 'get-api-credentials',
       'add-api-credential', 'remove-api-credential', 'get-system-status', 'get-initial-state',
       'batch-send:start', 'search-groups', 'get-trigger-rules', 'get-chat-templates',
-      'get-group-collected-stats', 'batch-refresh-member-counts'
+      'get-group-collected-stats', 'batch-refresh-member-counts',
+      'get-account-recommendations', 'reassign-group-account', 'get-db-performance'
     ];
     return handledCommands.includes(command);
   }
@@ -1355,6 +1370,7 @@ export class ElectronIpcService implements OnDestroy {
   private readonly EVENT_DEDUP_WINDOW_MS = 500;
   private readonly DEDUP_EVENTS = new Set([
     'monitored-group-added', 'group-added', 'group-removed',
+    'group-account-reassigned',
     'resource-status-updated', 'groups-updated',
     'account-added', 'account-updated', 'account-disconnected',
     'login-success', 'login-error', 'login-requires-code', 'login-requires-2fa',

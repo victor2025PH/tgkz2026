@@ -339,10 +339,16 @@ import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, Collectio
                 </div>
               </div>
 
-              <!-- 帳號信息 -->
+              <!-- 🔧 Phase6-3: 帳號信息 + 智能推薦切換 -->
               <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                <h4 class="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
-                  <span>📱</span> 監控帳號
+                <h4 class="text-sm font-medium text-slate-300 mb-3 flex items-center justify-between">
+                  <span class="flex items-center gap-2">
+                    <span>📱</span> 監控帳號
+                  </span>
+                  <button (click)="toggleAccountSelector()"
+                          class="text-xs text-cyan-400 hover:text-cyan-300 transition-colors px-2 py-1 rounded hover:bg-cyan-500/10">
+                    {{ showAccountSelector() ? '收起' : '切換帳號' }}
+                  </button>
                 </h4>
                 @if (selectedGroup()!.accountPhone) {
                   <div class="flex items-center gap-3 p-3 bg-slate-700/30 rounded-lg">
@@ -365,6 +371,64 @@ import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, Collectio
                 } @else {
                   <div class="text-center py-4 text-slate-500 text-sm bg-slate-700/30 rounded-lg">
                     <p>尚未分配監控帳號</p>
+                    <button (click)="toggleAccountSelector()"
+                            class="mt-2 text-xs text-cyan-400 hover:text-cyan-300">
+                      + 選擇帳號
+                    </button>
+                  </div>
+                }
+
+                <!-- 🔧 Phase6-3: 帳號推薦選擇器 -->
+                @if (showAccountSelector()) {
+                  <div class="mt-3 space-y-2 border-t border-slate-700/50 pt-3">
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-xs text-slate-400">智能推薦排序（負載 + 健康度 + 角色）</span>
+                      @if (isLoadingRecommendations()) {
+                        <span class="text-xs text-cyan-400 animate-pulse">加載中...</span>
+                      }
+                    </div>
+                    @for (rec of accountRecommendations(); track rec.phone) {
+                      <button (click)="reassignGroupAccount(rec.phone)"
+                              [disabled]="isReassigning() || rec.phone === selectedGroup()!.accountPhone"
+                              class="w-full flex items-center gap-3 p-2.5 rounded-lg transition-all text-left"
+                              [class]="rec.phone === selectedGroup()!.accountPhone 
+                                ? 'bg-cyan-500/10 border border-cyan-500/30 cursor-default' 
+                                : rec.isConnected 
+                                  ? 'bg-slate-700/30 hover:bg-slate-700/50 border border-transparent hover:border-slate-600/50 cursor-pointer' 
+                                  : 'bg-slate-800/30 border border-transparent opacity-50 cursor-not-allowed'">
+                        <!-- 推薦分數指示器 -->
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                             [class]="rec.recommendScore >= 70 ? 'bg-emerald-500/20 text-emerald-400' 
+                                     : rec.recommendScore >= 40 ? 'bg-amber-500/20 text-amber-400' 
+                                     : 'bg-red-500/20 text-red-400'">
+                          {{ rec.recommendScore }}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                          <div class="text-sm text-white truncate">
+                            {{ rec.username || rec.firstName || rec.phone }}
+                            @if (rec.phone === selectedGroup()!.accountPhone) {
+                              <span class="text-[10px] text-cyan-400 ml-1">當前</span>
+                            }
+                          </div>
+                          <div class="text-[10px] text-slate-500 truncate">
+                            {{ rec.reasons.join(' · ') }}
+                          </div>
+                        </div>
+                        <div class="flex flex-col items-end gap-0.5">
+                          <span class="text-[10px] px-1.5 py-0.5 rounded"
+                                [class]="rec.isConnected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'">
+                            {{ rec.isConnected ? '在線' : '離線' }}
+                          </span>
+                          <span class="text-[10px] text-slate-500">{{ rec.groupLoad }}群</span>
+                        </div>
+                      </button>
+                    } @empty {
+                      @if (!isLoadingRecommendations()) {
+                        <div class="text-center text-xs text-slate-500 py-3">
+                          暫無可用帳號
+                        </div>
+                      }
+                    }
                   </div>
                 }
               </div>
@@ -640,6 +704,12 @@ export class MonitoringGroupsComponent implements OnInit {
     return estimated;
   });
 
+  // 🔧 Phase6-3: 智能帳號推薦
+  showAccountSelector = signal(false);
+  accountRecommendations = signal<any[]>([]);
+  isLoadingRecommendations = signal(false);
+  isReassigning = signal(false);
+
   // 計算可綁定的詞集
   availableKeywordSets = computed(() => {
     const selected = this.selectedGroup();
@@ -850,6 +920,70 @@ export class MonitoringGroupsComponent implements OnInit {
   isSenderAccount(phone: string): boolean {
     const account = this.stateService.accounts().find(a => a.phone === phone);
     return account?.isSender ?? false;
+  }
+
+  // 🔧 Phase6-3: 切換帳號選擇器 + 加載推薦列表
+  toggleAccountSelector() {
+    const newState = !this.showAccountSelector();
+    this.showAccountSelector.set(newState);
+    if (newState) {
+      this.loadAccountRecommendations();
+    }
+  }
+
+  loadAccountRecommendations() {
+    this.isLoadingRecommendations.set(true);
+    
+    const cleanup = this.ipcService.on('account-recommendations-result', (data: any) => {
+      this.isLoadingRecommendations.set(false);
+      if (data.success && data.accounts) {
+        this.accountRecommendations.set(data.accounts);
+      }
+      cleanup();
+    });
+    this.ipcService.send('get-account-recommendations', {});
+    
+    // 超時保護
+    setTimeout(() => {
+      if (this.isLoadingRecommendations()) {
+        this.isLoadingRecommendations.set(false);
+      }
+    }, 10000);
+  }
+
+  reassignGroupAccount(newPhone: string) {
+    const group = this.selectedGroup();
+    if (!group || this.isReassigning()) return;
+    
+    this.isReassigning.set(true);
+    
+    const cleanup = this.ipcService.on('group-account-reassigned', (data: any) => {
+      this.isReassigning.set(false);
+      if (data.success) {
+        this.toastService.success(`已切換監控帳號到 ${newPhone.slice(0, 4)}****`);
+        // 更新本地狀態
+        this.selectedGroup.set({ ...group, accountPhone: newPhone });
+        this.showAccountSelector.set(false);
+        // 刷新列表
+        this.stateService.loadAll(true);
+      } else {
+        this.toastService.error(data.error || '切換失敗');
+      }
+      cleanup();
+    });
+    
+    this.ipcService.send('reassign-group-account', {
+      groupId: group.id,
+      phone: newPhone
+    });
+    
+    // 超時保護
+    setTimeout(() => {
+      if (this.isReassigning()) {
+        this.isReassigning.set(false);
+        this.toastService.warning('操作超時，請重試');
+      }
+    }, 15000);
   }
 
   refreshData() {

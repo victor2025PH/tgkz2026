@@ -23,46 +23,62 @@ except ImportError:
 class DatabaseOptimizer:
     """數據庫優化器"""
     
-    # 推薦的索引配置
+    # 🔧 Phase6-1: 推薦的索引配置 — 基於實際查詢模式分析
     RECOMMENDED_INDEXES = [
         # accounts 表
         ("idx_accounts_phone", "accounts", "phone"),
         ("idx_accounts_status", "accounts", "status"),
         ("idx_accounts_role", "accounts", "role"),
+        ("idx_accounts_telegram_id", "accounts", "telegram_id"),
         
-        # messages 表（如果存在）
-        ("idx_messages_user_id", "messages", "user_id"),
-        ("idx_messages_created_at", "messages", "created_at"),
-        ("idx_messages_account_phone", "messages", "account_phone"),
+        # monitored_groups 表（修正為實際表名）
+        ("idx_mg_chat_id", "monitored_groups", "chat_id"),
+        ("idx_mg_is_active", "monitored_groups", "is_active"),
         
-        # chat_history 表
-        ("idx_chat_history_user_id", "chat_history", "user_id"),
-        ("idx_chat_history_account_phone", "chat_history", "account_phone"),
-        ("idx_chat_history_timestamp", "chat_history", "timestamp"),
+        # discovered_resources 表
+        ("idx_discovered_resources_status", "discovered_resources", "status"),
+        ("idx_discovered_resources_username", "discovered_resources", "username"),
+        ("idx_discovered_resources_resource_id", "discovered_resources", "resource_id"),
+        ("idx_discovered_resources_score", "discovered_resources", "score"),
         
-        # user_profiles 表
-        ("idx_user_profiles_telegram_id", "user_profiles", "telegram_id"),
-        ("idx_user_profiles_updated_at", "user_profiles", "updated_at"),
+        # extracted_members 表
+        ("idx_extracted_members_user_id", "extracted_members", "user_id"),
+        ("idx_extracted_members_source", "extracted_members", "source_chat_id"),
+        ("idx_extracted_members_extracted_at", "extracted_members", "extracted_at"),
         
-        # keyword_sets 表
-        ("idx_keyword_sets_account_phone", "keyword_sets", "account_phone"),
+        # leads 表
+        ("idx_leads_user_id", "leads", "user_id"),
+        ("idx_leads_status", "leads", "status"),
+        ("idx_leads_created_at", "leads", "created_at"),
+        ("idx_leads_username", "leads", "username"),
+        ("idx_leads_source_chat_id", "leads", "source_chat_id"),
+        
+        # message_queue 表
+        ("idx_message_queue_status", "message_queue", "status"),
+        ("idx_message_queue_scheduled_at", "message_queue", "scheduled_at"),
+        ("idx_message_queue_account_id", "message_queue", "account_id"),
+        
+        # campaign_targets 表
+        ("idx_campaign_targets_campaign_id", "campaign_targets", "campaign_id"),
+        ("idx_campaign_targets_status", "campaign_targets", "status"),
         
         # trigger_rules 表
-        ("idx_trigger_rules_account_phone", "trigger_rules", "account_phone"),
         ("idx_trigger_rules_is_active", "trigger_rules", "is_active"),
         
-        # monitoring_groups 表
-        ("idx_monitoring_groups_account_phone", "monitoring_groups", "account_phone"),
-        ("idx_monitoring_groups_is_monitoring", "monitoring_groups", "is_monitoring"),
-        
-        # marketing_tasks 表
-        ("idx_marketing_tasks_status", "marketing_tasks", "status"),
-        ("idx_marketing_tasks_created_at", "marketing_tasks", "created_at"),
+        # logs 表
+        ("idx_logs_created_at", "logs", "created_at"),
+        ("idx_logs_type", "logs", "type"),
         
         # unified_contacts 表
-        ("idx_unified_contacts_telegram_id", "unified_contacts", "telegram_id"),
-        ("idx_unified_contacts_source_group", "unified_contacts", "source_group"),
-        ("idx_unified_contacts_created_at", "unified_contacts", "created_at"),
+        ("idx_unified_contacts_user_id", "unified_contacts", "user_id"),
+        
+        # member_extraction_logs 表
+        ("idx_mel_chat_id", "member_extraction_logs", "chat_id"),
+        ("idx_mel_created_at", "member_extraction_logs", "created_at"),
+        
+        # resource_join_queue 表
+        ("idx_rjq_status", "resource_join_queue", "status"),
+        ("idx_rjq_resource_id", "resource_join_queue", "resource_id"),
     ]
     
     # 數據保留策略（天數）

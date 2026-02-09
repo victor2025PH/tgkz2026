@@ -449,6 +449,13 @@ COMMAND_ALIAS_REGISTRY: Dict[str, tuple] = {
     'alerts:clear':             ('api.handlers.analytics_handlers_impl', 'handle_clear_all_alerts'),
     'alerts:mark-read':         ('api.handlers.analytics_handlers_impl', 'handle_acknowledge_alert'),
     
+    # === Phase6-3: 智能帳號推薦 + 重分配 ===
+    'get-account-recommendations': ('domain.groups.handlers_impl', 'handle_get_account_recommendations'),
+    'reassign-group-account':      ('domain.groups.handlers_impl', 'handle_reassign_group_account'),
+    
+    # === Phase6-1: 數據庫性能統計 ===
+    'get-db-performance':          ('api.handlers.system_handlers_impl', 'handle_get_db_performance'),
+    
     # === 預留擴展點 (新增別名只需在此添加一行) ===
 }
 

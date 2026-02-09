@@ -152,6 +152,7 @@ export class SmartPreloadingStrategy implements PreloadingStrategy {
   // 業務路由（空閒時 — 中頻訪問）
   private idleRoutes = new Set([
     'leads', 'automation', 'monitoring',
+    'resource-discovery',
     'marketing-hub', 'role-library', 'ai-engine',
     'analytics', 'billing', 'upgrade'
   ]);

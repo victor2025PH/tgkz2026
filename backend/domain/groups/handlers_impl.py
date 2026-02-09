@@ -29,18 +29,33 @@ from service_locator import (
 )
 
 
+async def _get_group_load_map(db_conn) -> Dict[str, int]:
+    """🔧 Phase6-3: 獲取每個帳號綁定的群組數量（負載分佈）"""
+    try:
+        await db_conn.connect()
+        rows = await db_conn.fetch_all(
+            "SELECT phone, COUNT(*) as cnt FROM monitored_groups "
+            "WHERE phone IS NOT NULL AND phone != '' AND is_active = 1 "
+            "GROUP BY phone"
+        )
+        return {r['phone']: r['cnt'] for r in rows} if rows else {}
+    except Exception:
+        return {}
+
+
 async def select_best_account(telegram_manager, db_conn, operation: str = 'join', 
                                 preferred_role: str = None,
                                 exclude_flood_wait: bool = True) -> Optional[str]:
     """
-    Phase3+5: 智能帳號選擇 — 結合角色優先級 + FloodWait 冷卻狀態
+    Phase3+5+6: 智能帳號選擇 — 角色優先級 + FloodWait + 負載均衡
     
     操作優先級：
     - join/monitor: 優先 Explorer > Listener > Unassigned > Sender
-    - extract: 優先用已加入群組的帳號 (由調用方處理), 回退 Listener > Explorer > any
+    - extract: 優先 Listener > Explorer > Unassigned > Sender
     - search: 優先 Explorer > any
     
-    Phase5 增強: 自動排除 FloodWait 冷卻中的帳號
+    Phase5: 排除 FloodWait 冷卻中的帳號
+    Phase6-3: 同角色帳號間按群組負載數量選最少的（負載均衡）
     
     Returns:
         最佳帳號 phone, 或 None
@@ -52,7 +67,7 @@ async def select_best_account(telegram_manager, db_conn, operation: str = 'join'
     if not connected:
         return None
     
-    # 🆕 Phase5: 排除 FloodWait 冷卻中的帳號
+    # Phase5: 排除 FloodWait 冷卻中的帳號
     if exclude_flood_wait:
         try:
             from flood_wait_handler import flood_handler
@@ -66,21 +81,17 @@ async def select_best_account(telegram_manager, db_conn, operation: str = 'join'
                     cooling_phones[phone] = remaining
             
             if cooling_phones:
-                import sys
                 print(
                     f"[SmartSelect] {operation}: 排除 {len(cooling_phones)} 個冷卻帳號 "
                     f"[{', '.join(f'{p[:4]}****({r:.0f}s)' for p, r in cooling_phones.items())}]",
                     file=sys.stderr
                 )
             
-            # 如果有可用帳號，只從可用帳號中選；否則回退到全部
             if available_phones:
                 connected = {p: c for p, c in connected.items() if p in available_phones}
             else:
-                # 所有帳號都在冷卻中 → 選冷卻時間最短的
                 shortest_phone = min(cooling_phones, key=cooling_phones.get) if cooling_phones else None
                 if shortest_phone:
-                    import sys
                     print(
                         f"[SmartSelect] 所有帳號冷卻中，選擇最快可用: {shortest_phone[:4]}**** ({cooling_phones[shortest_phone]:.0f}s)",
                         file=sys.stderr
@@ -89,7 +100,6 @@ async def select_best_account(telegram_manager, db_conn, operation: str = 'join'
         except ImportError:
             pass
     
-    # 如果只有一個帳號，直接用
     if len(connected) == 1:
         return list(connected.keys())[0]
     
@@ -97,14 +107,19 @@ async def select_best_account(telegram_manager, db_conn, operation: str = 'join'
     try:
         await db_conn.connect()
         accounts = await db_conn.fetch_all(
-            "SELECT phone, role FROM accounts WHERE phone IN ({}) AND status = 'Online'".format(
+            "SELECT phone, role, health_score FROM accounts WHERE phone IN ({}) AND status = 'Online'".format(
                 ','.join(['?' for _ in connected])
             ),
             tuple(connected.keys())
         )
         role_map = {a['phone']: a.get('role', 'Unassigned') for a in accounts} if accounts else {}
+        health_map = {a['phone']: a.get('health_score', 100) for a in accounts} if accounts else {}
     except Exception:
         role_map = {}
+        health_map = {}
+    
+    # 🔧 Phase6-3: 獲取每個帳號的群組負載
+    group_load = await _get_group_load_map(db_conn)
     
     # 根據操作定義角色優先級
     if operation in ('join', 'monitor'):
@@ -116,19 +131,140 @@ async def select_best_account(telegram_manager, db_conn, operation: str = 'join'
     else:
         role_priority = ['Unassigned', 'Listener', 'Explorer', 'Sender']
     
-    # 如果指定了首選角色，放到最前面
     if preferred_role and preferred_role in role_priority:
         role_priority.remove(preferred_role)
         role_priority.insert(0, preferred_role)
     
-    # 按優先級選擇
+    # 🔧 Phase6-3: 同角色帳號間，選群組數最少 + 健康分最高的
     for role in role_priority:
-        for phone in connected:
-            if role_map.get(phone, 'Unassigned') == role:
-                return phone
+        candidates = [p for p in connected if role_map.get(p, 'Unassigned') == role]
+        if candidates:
+            # 按 (群組負載升序, 健康分降序) 排序
+            candidates.sort(key=lambda p: (
+                group_load.get(p, 0),              # 群組數越少越好
+                -(health_map.get(p, 100) or 100)   # 健康分越高越好
+            ))
+            best = candidates[0]
+            load_info = group_load.get(best, 0)
+            print(
+                f"[SmartSelect] {operation}: 選擇 {best[:4]}**** (role={role}, groups={load_info}, "
+                f"health={health_map.get(best, 100):.0f})",
+                file=sys.stderr
+            )
+            return best
     
-    # 兜底：返回第一個可用的
     return list(connected.keys())[0]
+
+
+async def get_account_recommendations(telegram_manager, db_conn) -> List[Dict[str, Any]]:
+    """
+    🔧 Phase6-3: 獲取帳號推薦列表（含負載和狀態信息）
+    
+    為前端帳號選擇 UI 提供數據源
+    """
+    recommendations = []
+    
+    try:
+        await db_conn.connect()
+        accounts = await db_conn.fetch_all(
+            "SELECT id, phone, role, status, health_score, username, first_name "
+            "FROM accounts ORDER BY id"
+        )
+        if not accounts:
+            return []
+        
+        group_load = await _get_group_load_map(db_conn)
+        
+        # FloodWait 狀態
+        flood_status = {}
+        try:
+            from flood_wait_handler import flood_handler
+            for a in accounts:
+                phone = a['phone']
+                remaining = flood_handler.get_remaining_cooldown(phone)
+                flood_status[phone] = remaining
+        except ImportError:
+            pass
+        
+        # 連接狀態
+        connected_set = set()
+        if hasattr(telegram_manager, 'clients'):
+            connected_set = {p for p, c in telegram_manager.clients.items() if c and c.is_connected}
+        
+        for a in accounts:
+            phone = a['phone']
+            is_connected = phone in connected_set
+            flood_remaining = flood_status.get(phone, 0)
+            load = group_load.get(phone, 0)
+            health = a.get('health_score', 100) or 100
+            
+            # 計算綜合推薦分數 (0~100)
+            score = 0
+            reasons = []
+            
+            if not is_connected:
+                score = 0
+                reasons.append('離線')
+            else:
+                score = 60
+                reasons.append('在線')
+                
+                # 角色加分
+                role = a.get('role', 'Unassigned')
+                if role in ('Listener', 'Explorer'):
+                    score += 15
+                    reasons.append(f'角色:{role}')
+                elif role == 'Unassigned':
+                    score += 5
+                
+                # 負載減分
+                if load == 0:
+                    score += 15
+                    reasons.append('無群組負載')
+                elif load <= 3:
+                    score += 10
+                    reasons.append(f'低負載({load}群)')
+                elif load <= 8:
+                    score += 5
+                    reasons.append(f'中負載({load}群)')
+                else:
+                    reasons.append(f'高負載({load}群)')
+                
+                # 健康分加分
+                if health >= 90:
+                    score += 10
+                elif health >= 70:
+                    score += 5
+                elif health < 50:
+                    score -= 10
+                    reasons.append('健康低')
+                
+                # FloodWait 減分
+                if flood_remaining > 0:
+                    score -= 20
+                    reasons.append(f'冷卻中({flood_remaining:.0f}s)')
+            
+            recommendations.append({
+                'phone': phone,
+                'username': a.get('username', ''),
+                'firstName': a.get('first_name', ''),
+                'role': a.get('role', 'Unassigned'),
+                'status': 'connected' if is_connected else a.get('status', 'Offline'),
+                'isConnected': is_connected,
+                'healthScore': round(health, 1),
+                'groupLoad': load,
+                'floodWaitRemaining': round(flood_remaining, 0),
+                'recommendScore': max(0, min(100, score)),
+                'reasons': reasons
+            })
+        
+        # 按推薦分降序排列
+        recommendations.sort(key=lambda x: -x['recommendScore'])
+        
+    except Exception as e:
+        print(f"[SmartSelect] 獲取帳號推薦失敗: {e}", file=sys.stderr)
+    
+    return recommendations
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -2165,6 +2301,79 @@ async def handle_join_and_monitor_with_account(self, payload: Dict[str, Any]):
             "success": False,
             "error": friendly_error
         })
+
+async def handle_get_account_recommendations(self, payload: Dict[str, Any]):
+    """🔧 Phase6-3: 獲取帳號推薦列表（含負載/健康/冷卻狀態）"""
+    try:
+        recommendations = await get_account_recommendations(self.telegram_manager, db)
+        self.send_event("account-recommendations-result", {
+            "success": True,
+            "accounts": recommendations
+        })
+    except Exception as e:
+        print(f"[Backend] 獲取帳號推薦失敗: {e}", file=sys.stderr)
+        self.send_event("account-recommendations-result", {
+            "success": False,
+            "error": str(e),
+            "accounts": []
+        })
+
+
+async def handle_reassign_group_account(self, payload: Dict[str, Any]):
+    """🔧 Phase6-3: 重新分配群組的監控帳號"""
+    try:
+        group_id = payload.get('groupId')
+        new_phone = payload.get('phone')
+        
+        if not group_id or not new_phone:
+            self.send_event("group-account-reassigned", {
+                "success": False,
+                "error": "缺少群組 ID 或帳號電話"
+            })
+            return
+        
+        # 驗證帳號是否在線
+        client = self.telegram_manager.get_client(new_phone)
+        if not client or not client.is_connected:
+            self.send_event("group-account-reassigned", {
+                "success": False,
+                "error": f"帳號 {new_phone[:4]}**** 未連接，請先登入"
+            })
+            return
+        
+        # 更新數據庫
+        await db.execute(
+            "UPDATE monitored_groups SET phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (new_phone, group_id)
+        )
+        
+        # 獲取群組名稱
+        group = await db.fetch_one("SELECT name FROM monitored_groups WHERE id = ?", (group_id,))
+        group_name = group['name'] if group else f'ID:{group_id}'
+        
+        self.send_log(f"✅ 已將群組「{group_name}」的監控帳號切換到 {new_phone[:4]}****", "success")
+        
+        self.send_event("group-account-reassigned", {
+            "success": True,
+            "groupId": group_id,
+            "phone": new_phone,
+            "message": f"已切換監控帳號"
+        })
+        
+        # 通知前端刷新群組列表
+        try:
+            from domain.automation.monitoring_handlers_impl import handle_get_monitored_groups
+            await handle_get_monitored_groups(self)
+        except Exception:
+            pass
+        
+    except Exception as e:
+        print(f"[Backend] 重新分配帳號失敗: {e}", file=sys.stderr)
+        self.send_event("group-account-reassigned", {
+            "success": False,
+            "error": str(e)
+        })
+
 
 async def handle_get_admin_groups(self, payload: Dict[str, Any]):
     """獲取用戶作為管理員的群組列表"""

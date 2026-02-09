@@ -478,7 +478,10 @@ def _record_command_metric(command: str, success: bool, duration_ms: float, erro
 def _record_routing(route_type: str, command: str):
     """記錄路由方式"""
     _routing_stats[route_type] = _routing_stats.get(route_type, 0) + 1
-    if command in _command_metrics:
+    # 確保 metric 條目已存在（可能在 _record_command_metric 之前調用）
+    if command not in _command_metrics:
+        _command_metrics[command] = {'success': 0, 'failed': 0, 'total_ms': 0.0, 'count': 0, 'last_error': None, 'route': route_type}
+    else:
         _command_metrics[command]['route'] = route_type
 
 

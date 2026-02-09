@@ -666,20 +666,25 @@ export class ElectronIpcService implements OnDestroy {
     
     // ==================== 群組相關 ====================
     if (command === 'get-monitored-groups') {
-      this.triggerEvent('monitored-groups-updated', {
-        groups: result.groups || result.data || result
-      });
+      // 🔧 修復：同時觸發兩個事件名，確保所有監聽器都能收到
+      const groups = result.groups || result.data || result;
+      this.triggerEvent('monitored-groups-updated', { groups });
+      this.triggerEvent('get-groups-result', { groups });
     }
     
-    if (command === 'add-group') {
+    if (command === 'add-group' || command === 'add-monitored-group') {
       this.triggerEvent('group-added', {
         success: result.success !== false,
         group: result.group || result.data,
         error: result.error
       });
+      // 🔧 修復：添加群組成功後，觸發列表刷新事件
+      if (result.success !== false) {
+        this.triggerEvent('monitored-group-added', { success: true });
+      }
     }
     
-    if (command === 'remove-group') {
+    if (command === 'remove-group' || command === 'remove-monitored-group') {
       this.triggerEvent('group-removed', {
         success: result.success !== false,
         groupId: result.groupId || result.group_id,

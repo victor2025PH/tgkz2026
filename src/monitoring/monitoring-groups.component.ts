@@ -611,7 +611,8 @@ export class MonitoringGroupsComponent implements OnInit {
   });
 
   ngOnInit() {
-    this.stateService.loadAll();
+    // 🔧 修復：進入監控頁時強制刷新，確保數據最新
+    this.stateService.loadAll(true);
     this.setupListeners();
   }
 

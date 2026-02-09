@@ -733,9 +733,7 @@ async def handle_add_monitored_group(self, payload: Dict[str, Any]):
                         (username.lstrip('@'),)
                     )
                 
-                self.send_log(f"✅ 已將群組添加到監控列表: {name or url}", "success")
-                
-                # 發送狀態更新事件，前端可刷新列表
+                # 發送狀態更新事件
                 self.send_event("resource-status-updated", {
                     "resourceId": resource_id,
                     "telegramId": telegram_id,
@@ -743,7 +741,7 @@ async def handle_add_monitored_group(self, payload: Dict[str, Any]):
                     "newStatus": "monitoring"
                 })
                 
-                # 🆕 Phase2: 自動同步到 unified_contacts
+                # 自動同步到 unified_contacts
                 try:
                     from unified_contacts import get_unified_contacts_manager
                     manager = get_unified_contacts_manager(db)
@@ -755,14 +753,30 @@ async def handle_add_monitored_group(self, payload: Dict[str, Any]):
             except Exception as db_err:
                 print(f"[Backend] Error updating resource status: {db_err}", file=sys.stderr)
         
+        # 🔧 核心修復：發送明確的操作完成事件
+        self.send_log(f"✅ 已將群組添加到監控列表: {name or url}", "success")
+        self.send_event("monitored-group-added", {
+            "success": True,
+            "name": name or url,
+            "url": url,
+            "telegramId": telegram_id,
+            "username": username
+        })
+        
+        # 🔧 保底：確保前端收到最新群組列表
+        await self.send_groups_update()
+        
+        return {"success": True, "message": f"已添加監控群組: {name or url}"}
+        
     except Exception as e:
         import traceback
         print(f"[Backend] Error in handle_add_monitored_group: {traceback.format_exc()}", file=sys.stderr)
         self.send_log(f"❌ 添加監控群組失敗: {str(e)}", "error")
-        self.send_event("group-added", {
+        self.send_event("monitored-group-added", {
             "success": False,
             "error": str(e)
         })
+        return {"success": False, "error": str(e)}
 
 
 async def handle_search_groups(self, payload: Dict[str, Any]):

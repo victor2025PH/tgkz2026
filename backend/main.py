@@ -1047,8 +1047,9 @@ class BackendService:
             
             # 🆕 P2: 數據庫健康守護
             try:
+                import os as _os
                 from services.db_health_guard import get_db_health_guard
-                data_dir = os.environ.get('DATA_DIR', '/app/data')
+                data_dir = _os.environ.get('DATA_DIR', '/app/data')
                 self._db_health_guard = get_db_health_guard(data_dir)
                 await self._db_health_guard.start()
             except Exception as e:

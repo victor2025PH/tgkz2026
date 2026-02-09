@@ -273,6 +273,32 @@ export class OperationHistoryService {
         });
       })
     );
+    
+    // 🔧 Phase4: 監聽監控群組添加結果
+    this.cleanupFns.push(
+      this.ipc.on('monitored-group-added', (data: any) => {
+        this.addRecord('monitor', {
+          resourceTitle: data.name,
+          resourceUsername: data.username,
+          success: data.success === true,
+          errorMessage: data.error,
+          details: data.success
+            ? `已添加「${data.name || data.username || ''}」到監控列表`
+            : `添加失敗: ${data.error || '未知錯誤'}`
+        });
+      })
+    );
+    
+    // 🔧 Phase4: 監聽群組移除事件
+    this.cleanupFns.push(
+      this.ipc.on('group-removed', (data: any) => {
+        this.addRecord('remove', {
+          success: data.success !== false,
+          details: data.success !== false ? '已移除群組' : `移除失敗: ${data.error}`,
+          errorMessage: data.error
+        });
+      })
+    );
   }
 
   private loadFromStorage(): void {

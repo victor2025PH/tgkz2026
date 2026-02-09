@@ -232,20 +232,49 @@ import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, Collectio
                   </div>
                 </div>
               } @empty {
-                <div class="col-span-full text-center py-16 text-slate-400">
-                  <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-slate-800/50 flex items-center justify-center">
-                    <span class="text-4xl">👥</span>
+                <!-- 🔧 Phase4: 增強空狀態引導 -->
+                <div class="col-span-full text-center py-12 text-slate-400">
+                  <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-teal-500/5 border border-emerald-500/20 flex items-center justify-center">
+                    <span class="text-4xl">📡</span>
                   </div>
-                  <h3 class="text-lg font-medium text-white mb-2">還沒有監控群組</h3>
-                  <p class="text-sm mb-6 text-slate-500">添加群組開始監控關鍵詞</p>
+                  <h3 class="text-xl font-semibold text-white mb-2">還沒有監控群組</h3>
+                  <p class="text-sm mb-8 text-slate-500 max-w-md mx-auto">
+                    監控群組可以自動監聽關鍵詞、提取成員、收集潛在客戶
+                  </p>
+                  
+                  <!-- 步驟引導 -->
+                  <div class="max-w-lg mx-auto mb-8">
+                    <div class="flex items-start gap-4 text-left mb-4">
+                      <div class="w-8 h-8 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center flex-shrink-0 text-sm font-bold">1</div>
+                      <div>
+                        <div class="text-sm text-white font-medium">搜索並發現群組</div>
+                        <div class="text-xs text-slate-500">在「搜索發現」中搜索 Telegram 群組或頻道</div>
+                      </div>
+                    </div>
+                    <div class="flex items-start gap-4 text-left mb-4">
+                      <div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0 text-sm font-bold">2</div>
+                      <div>
+                        <div class="text-sm text-white font-medium">點擊「📡 監控」按鈕</div>
+                        <div class="text-xs text-slate-500">在搜索結果中，點擊群組旁的監控按鈕即可添加</div>
+                      </div>
+                    </div>
+                    <div class="flex items-start gap-4 text-left">
+                      <div class="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center flex-shrink-0 text-sm font-bold">3</div>
+                      <div>
+                        <div class="text-sm text-white font-medium">綁定關鍵詞集開始監控</div>
+                        <div class="text-xs text-slate-500">為群組綁定關鍵詞集，系統自動匹配潛在客戶</div>
+                      </div>
+                    </div>
+                  </div>
+                  
                   <div class="flex items-center justify-center gap-3">
-                    <button (click)="showQuickAddDialog.set(true)"
-                            class="px-5 py-2.5 bg-cyan-500 text-white rounded-xl hover:bg-cyan-600 transition-colors">
-                      + 快速添加群組
-                    </button>
                     <button (click)="navigateToResourceCenter()"
-                            class="px-5 py-2.5 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600 transition-colors">
-                      搜索發現 →
+                            class="px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-emerald-500 text-white rounded-xl hover:from-cyan-600 hover:to-emerald-600 transition-all shadow-lg shadow-cyan-500/20 font-medium">
+                      🔍 前往搜索發現
+                    </button>
+                    <button (click)="showQuickAddDialog.set(true)"
+                            class="px-5 py-2.5 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600 transition-colors border border-slate-600">
+                      + 手動添加 URL
                     </button>
                   </div>
                 </div>

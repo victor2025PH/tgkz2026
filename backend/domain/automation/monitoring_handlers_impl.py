@@ -1316,10 +1316,27 @@ async def handle_get_system_status(self):
         self.send_event("system-status", {'error': str(e)})
 
 async def handle_get_monitored_groups(self):
-    """獲取所有監控群組列表"""
+    """獲取所有監控群組列表（附帶健康狀態）"""
     try:
         groups = await db.get_all_monitored_groups()
-        self.send_event("get-groups-result", {"groups": groups})
+        
+        # 🔧 Phase4: 附帶健康摘要（幫助前端顯示配置進度）
+        health = {
+            "totalGroups": len(groups),
+            "withKeywords": 0,
+            "withAccount": 0,
+            "active": 0,
+        }
+        for g in groups:
+            kw_ids = g.get('keyword_set_ids') or g.get('linkedKeywordSets') or []
+            if kw_ids and len(kw_ids) > 0:
+                health["withKeywords"] += 1
+            if g.get('account_phone') or g.get('accountPhone'):
+                health["withAccount"] += 1
+            if g.get('is_active', True):
+                health["active"] += 1
+        
+        self.send_event("get-groups-result", {"groups": groups, "health": health})
     except Exception as e:
         self.send_log(f"❌ 獲取監控群組失敗: {e}", "error")
         self.send_event("get-groups-result", {"groups": [], "error": str(e)})

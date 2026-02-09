@@ -523,16 +523,16 @@ class MessageQueue:
         async def worker_loop():
             while self._running:
                 try:
-                    # 檢查併發限制
+                    # 🔧 Phase2: 並發限制檢查 0.1s→2s，空閒 1s→5s
                     if self._active_tasks[queue] >= self._concurrency[queue]:
-                        await asyncio.sleep(0.1)
+                        await asyncio.sleep(2)
                         continue
                     
                     # 獲取任務
                     tasks = self.get_pending_tasks(queue, limit=1)
                     
                     if not tasks:
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(5)
                         continue
                     
                     task = tasks[0]

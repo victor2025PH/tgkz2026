@@ -519,8 +519,8 @@ export class SystemAlertsComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadAlerts();
-    // 每 15 秒自动刷新
-    this.refreshInterval = setInterval(() => this.loadAlerts(), 15000);
+    // 🔧 Phase2: 15s→60s 降低 CPU 開銷
+    this.refreshInterval = setInterval(() => this.loadAlerts(), 60000);
   }
 
   ngOnDestroy(): void {

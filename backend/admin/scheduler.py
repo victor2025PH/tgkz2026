@@ -203,6 +203,10 @@ class TaskScheduler:
         """調度器主循環"""
         logger.info("[TaskScheduler] Scheduler loop started")
         
+        # 🔧 Phase2: 啟動時隨機延遲，避免和其他 scheduler 同時觸發
+        import random
+        await asyncio.sleep(random.uniform(3, 20))
+        
         while self._running:
             now = datetime.now()
             
@@ -214,8 +218,8 @@ class TaskScheduler:
                     if task.status != TaskStatus.RUNNING:
                         asyncio.create_task(self._execute_task(task))
             
-            # 每 30 秒檢查一次
-            await asyncio.sleep(30)
+            # 🔧 Phase2: 30s→90s 降低 CPU
+            await asyncio.sleep(90)
         
         logger.info("[TaskScheduler] Scheduler loop stopped")
     

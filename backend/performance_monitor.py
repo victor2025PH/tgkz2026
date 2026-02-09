@@ -49,7 +49,7 @@ class PerformanceMonitor:
     def __init__(
         self,
         max_history: int = 1000,
-        collection_interval: float = 30.0,  # 🆕 性能優化：從 5 秒增加到 30 秒
+        collection_interval: float = 60.0,  # 🔧 Phase2: 30s→60s 進一步降低 CPU
         event_callback: Optional[Callable[[str, Any], None]] = None
     ):
         """
@@ -419,7 +419,7 @@ _performance_monitor: Optional[PerformanceMonitor] = None
 
 def init_performance_monitor(
     event_callback: Optional[Callable[[str, Any], None]] = None,
-    collection_interval: float = 30.0  # 優化：默認 30 秒，減少事件發送頻率
+    collection_interval: float = 60.0  # 🔧 Phase2: 30s→60s 降低 CPU
 ) -> PerformanceMonitor:
     """Initialize the global performance monitor"""
     global _performance_monitor

@@ -592,8 +592,8 @@ class SystemMonitor:
                 # 每分鐘保存一次歷史
                 await self._save_metrics_history(metrics)
                 
-                # 等待 60 秒
-                await asyncio.sleep(60)
+                # 🔧 Phase2: 60s→120s 降低 CPU
+                await asyncio.sleep(120)
             except asyncio.CancelledError:
                 break
             except Exception as e:

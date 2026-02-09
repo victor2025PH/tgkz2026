@@ -512,8 +512,8 @@ class MonitoringService:
         while self._running:
             try:
                 self.system_metrics.collect()
-                # 🆕 性能優化：將收集間隔從 10 秒增加到 30 秒
-                await asyncio.sleep(30)
+                # 🔧 Phase2: 30s→60s 進一步降低 CPU（指標採集不需太頻繁）
+                await asyncio.sleep(60)
             except asyncio.CancelledError:
                 break
             except Exception as e:

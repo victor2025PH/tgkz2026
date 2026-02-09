@@ -25,12 +25,12 @@ class WalletScheduler:
         self._tasks: Dict[str, asyncio.Task] = {}
         self._task_configs: Dict[str, Dict[str, Any]] = {
             'expire_orders': {
-                'interval': 60,           # 每分鐘
+                'interval': 300,          # 🔧 Phase2: 60s→300s 降低 CPU
                 'enabled': True,
                 'description': '過期訂單清理'
             },
             'usdt_watcher': {
-                'interval': 30,           # 每30秒
+                'interval': 120,          # 🔧 Phase2: 30s→120s 降低 CPU
                 'enabled': True,
                 'description': 'USDT 交易監聯'
             },
@@ -86,6 +86,11 @@ class WalletScheduler:
             return
         
         async def task_loop():
+            # 🔧 Phase2: 啟動時隨機延遲 1~15s，避免多個 scheduler 同時觸發
+            import random
+            jitter = random.uniform(1, 15)
+            await asyncio.sleep(jitter)
+            
             while self._running:
                 try:
                     await handler()

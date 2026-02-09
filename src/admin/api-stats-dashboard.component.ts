@@ -716,8 +716,8 @@ export class ApiStatsDashboardComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadDashboard();
-    // 每 30 秒自动刷新
-    this.refreshInterval = setInterval(() => this.loadDashboard(), 30000);
+    // 🔧 Phase2: 30s→60s 降低輪詢頻率
+    this.refreshInterval = setInterval(() => this.loadDashboard(), 60000);
   }
 
   ngOnDestroy(): void {

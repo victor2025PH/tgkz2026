@@ -1811,6 +1811,141 @@ async def handle_join_and_extract(self, payload: Dict[str, Any]):
         })
 
 
+async def handle_batch_extract_members(self, payload: Dict[str, Any]):
+    """
+    🆕 Phase4: 批量提取多個群組的成員
+    
+    串行執行避免 FloodWait，每個群組完成後發送進度事件。
+    前端已有 openBatchMemberExtractDialog() 發送此命令。
+    """
+    import sys
+    print(f"[Backend] handle_batch_extract_members called", file=sys.stderr)
+    
+    resource_ids = payload.get('resourceIds', [])
+    limit_per_group = payload.get('limit', 100)
+    safe_mode = payload.get('safeMode', True)
+    
+    if not resource_ids:
+        self.send_event("batch-members-extracted", {
+            "success": False, "error": "未提供群組 ID 列表"
+        })
+        return
+    
+    total_groups = len(resource_ids)
+    completed = 0
+    failed = 0
+    total_members = 0
+    results = []
+    
+    self.send_log(f"🚀 開始批量提取 {total_groups} 個群組的成員", "info")
+    self.send_event("batch-extraction-progress", {
+        "status": "starting",
+        "totalGroups": total_groups,
+        "completed": 0,
+        "currentGroup": "",
+        "totalMembers": 0
+    })
+    
+    from database import db as batch_db
+    await batch_db.connect()
+    
+    for i, rid in enumerate(resource_ids):
+        try:
+            # 查詢群組信息
+            resource = await batch_db.fetch_one(
+                "SELECT id, telegram_id, username, title, joined_by_phone, status FROM discovered_resources WHERE id = ?",
+                (rid,)
+            )
+            
+            if not resource:
+                self.send_log(f"⚠️ [{i+1}/{total_groups}] 群組 ID={rid} 不存在，跳過", "warning")
+                failed += 1
+                continue
+            
+            title = resource.get('title') if hasattr(resource, 'get') else resource[3]
+            telegram_id = resource.get('telegram_id') if hasattr(resource, 'get') else resource[1]
+            username = resource.get('username') if hasattr(resource, 'get') else resource[2]
+            phone = resource.get('joined_by_phone') if hasattr(resource, 'get') else resource[4]
+            status = resource.get('status') if hasattr(resource, 'get') else resource[5]
+            
+            self.send_log(f"📦 [{i+1}/{total_groups}] 正在提取: {title}", "info")
+            self.send_event("batch-extraction-progress", {
+                "status": "extracting",
+                "totalGroups": total_groups,
+                "completed": completed,
+                "currentGroup": title or str(rid),
+                "currentIndex": i + 1,
+                "totalMembers": total_members
+            })
+            
+            # 構建提取 payload
+            extract_payload = {
+                'resourceId': rid,
+                'telegramId': telegram_id,
+                'username': username,
+                'phone': phone,
+                'groupName': title,
+                'limit': limit_per_group,
+                'chatId': telegram_id
+            }
+            
+            # 對未加入的群組使用 join-and-extract
+            if status not in ('joined', 'monitoring') and (username or telegram_id):
+                self.send_log(f"  ↳ 未加入，嘗試自動加入...", "info")
+                await handle_join_and_extract(self, extract_payload)
+            else:
+                await handle_extract_members(self, extract_payload)
+            
+            # 統計（members-extracted 事件已由上面的函數發送）
+            completed += 1
+            
+            # 從最近的提取日誌獲取本次提取數量
+            try:
+                last_log = await batch_db.fetch_one(
+                    """SELECT extracted_count FROM member_extraction_logs 
+                       WHERE chat_id = ? ORDER BY created_at DESC LIMIT 1""",
+                    (str(telegram_id or rid),)
+                )
+                if last_log:
+                    cnt = last_log.get('extracted_count') if hasattr(last_log, 'get') else last_log[0]
+                    total_members += (cnt or 0)
+            except Exception:
+                pass
+            
+            results.append({
+                "resourceId": rid,
+                "title": title,
+                "success": True
+            })
+            
+            # 安全模式：群組間等待避免 FloodWait
+            if safe_mode and i < total_groups - 1:
+                wait = 8 if total_groups > 5 else 5
+                self.send_log(f"  ↳ 等待 {wait}s 避免速率限制...", "info")
+                await asyncio.sleep(wait)
+                
+        except Exception as e:
+            failed += 1
+            self.send_log(f"❌ [{i+1}/{total_groups}] {title if 'title' in dir() else rid} 失敗: {e}", "error")
+            results.append({
+                "resourceId": rid,
+                "title": title if 'title' in dir() else str(rid),
+                "success": False,
+                "error": str(e)
+            })
+    
+    # 發送最終結果
+    self.send_log(f"✅ 批量提取完成: {completed}/{total_groups} 成功，共 {total_members} 成員", "success")
+    self.send_event("batch-members-extracted", {
+        "success": failed < total_groups,
+        "totalGroups": total_groups,
+        "completed": completed,
+        "failed": failed,
+        "totalMembers": total_members,
+        "results": results
+    })
+
+
 async def handle_deduplicate_members(self, payload: Dict[str, Any]):
     """去重成員數據"""
     import sys

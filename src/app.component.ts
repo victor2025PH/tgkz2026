@@ -3986,6 +3986,55 @@ export class AppComponent implements OnDestroy, OnInit {
     this.toastService.success(`📥 已導出 ${members.length} 個成員`);
   }
   
+  // 🆕 Phase4: 一鍵複製用戶名列表
+  copyMemberUsernames(onlySelected: boolean = false) {
+    const members = onlySelected 
+      ? this.memberListData().filter(m => this.selectedMemberIds().includes(m.user_id))
+      : this.getFilteredMembers();
+    
+    const usernames = members
+      .filter(m => m.username)
+      .map(m => `@${m.username}`);
+    
+    if (usernames.length === 0) {
+      this.toastService.warning('沒有可複製的用戶名');
+      return;
+    }
+    
+    navigator.clipboard.writeText(usernames.join('\n')).then(() => {
+      this.toastService.success(`📋 已複製 ${usernames.length} 個用戶名`);
+    }).catch(() => {
+      // 降級方案
+      const textarea = document.createElement('textarea');
+      textarea.value = usernames.join('\n');
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      this.toastService.success(`📋 已複製 ${usernames.length} 個用戶名`);
+    });
+  }
+  
+  // 🆕 Phase4: 複製用戶 ID 列表
+  copyMemberIds(onlySelected: boolean = false) {
+    const members = onlySelected 
+      ? this.memberListData().filter(m => this.selectedMemberIds().includes(m.user_id))
+      : this.getFilteredMembers();
+    
+    const ids = members.map(m => m.user_id);
+    
+    if (ids.length === 0) {
+      this.toastService.warning('沒有可複製的用戶 ID');
+      return;
+    }
+    
+    navigator.clipboard.writeText(ids.join('\n')).then(() => {
+      this.toastService.success(`📋 已複製 ${ids.length} 個用戶 ID`);
+    }).catch(() => {
+      this.toastService.error('複製失敗');
+    });
+  }
+
   // 🆕 選擇高價值成員（S/A 級）
   selectHighValueMembers() {
     const members = this.memberListData();
@@ -9473,10 +9522,34 @@ export class AppComponent implements OnDestroy, OnInit {
       }
     });
 
-    // 批量成員提取完成事件
-    this.ipcService.on('batch-members-extracted', (data: { success: boolean, totalGroups?: number, totalMembers?: number, error?: string }) => {
-      if (data.success) {
-        this.toastService.success(`✅ 批量提取完成：${data.totalGroups} 個群組，共 ${data.totalMembers} 個成員`);
+    // 🆕 Phase4: 批量提取進度事件
+    this.ipcService.on('batch-extraction-progress', (data: { 
+      status: string, totalGroups: number, completed: number, 
+      currentGroup?: string, currentIndex?: number, totalMembers?: number 
+    }) => {
+      if (data.status === 'extracting' && data.currentGroup) {
+        this.toastService.info(
+          `📦 [${data.currentIndex || data.completed + 1}/${data.totalGroups}] 正在提取: ${data.currentGroup}`,
+          3000
+        );
+      }
+    });
+
+    // 批量成員提取完成事件 — 🆕 Phase4: 增強結果顯示
+    this.ipcService.on('batch-members-extracted', (data: { 
+      success: boolean, totalGroups?: number, completed?: number, 
+      failed?: number, totalMembers?: number, error?: string,
+      results?: Array<{ resourceId: number, title: string, success: boolean, error?: string }>
+    }) => {
+      if (data.success || (data.completed && data.completed > 0)) {
+        const failInfo = data.failed ? `，${data.failed} 個失敗` : '';
+        this.toastService.success(
+          `✅ 批量提取完成：${data.completed}/${data.totalGroups} 個群組成功${failInfo}，共 ${data.totalMembers || 0} 個成員`,
+          8000
+        );
+        // 刷新資源列表和統計
+        this.loadResources();
+        this.refreshResourceStats();
       } else {
         this.toastService.error(`批量提取失敗: ${data.error}`);
       }

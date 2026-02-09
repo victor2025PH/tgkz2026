@@ -9360,7 +9360,7 @@ export class AppComponent implements OnDestroy, OnInit {
       });
     });
 
-    // 成員提取完成事件
+    // 成員提取完成事件 — 🆕 Phase3: 支持 syncStats + lastExtraction
     this.ipcService.on('members-extracted', (data: { 
       success: boolean, 
       resourceId?: number, 
@@ -9370,7 +9370,10 @@ export class AppComponent implements OnDestroy, OnInit {
       error?: string,
       error_code?: string,
       error_details?: { reason?: string, suggestion?: string, can_auto_join?: boolean, alternative?: string, attempts?: number },
-      limit_warning?: { total_in_group?: number, api_limit?: number, extracted?: number, suggestion?: string, message?: string }
+      limit_warning?: { total_in_group?: number, api_limit?: number, extracted?: number, suggestion?: string, message?: string },
+      syncStats?: { new?: number, updated?: number, duplicate?: number },
+      lastExtraction?: { lastCount?: number, lastNewCount?: number, lastTime?: string },
+      usedPhone?: string
     }) => {
       this.memberListLoading.set(false);
       if (data.success && data.members) {
@@ -9383,6 +9386,29 @@ export class AppComponent implements OnDestroy, OnInit {
           extracted: this.memberListData().length,
           status: `已提取 ${this.memberListData().length} 個成員`
         }));
+        
+        // 🆕 Phase3: 顯示同步統計（新增/已有/更新）
+        if (data.syncStats) {
+          const s = data.syncStats;
+          if (s.new && s.new > 0) {
+            this.toastService.success(
+              `📊 資源中心同步：新增 ${s.new} 個聯繫人` + 
+              (s.updated ? `，更新 ${s.updated} 個` : ''),
+              5000
+            );
+          }
+        }
+        
+        // 🆕 Phase3: 顯示與上次提取的對比
+        if (data.lastExtraction?.lastCount) {
+          const last = data.lastExtraction;
+          const diff = (data.members?.length || 0) - (last.lastCount || 0);
+          if (diff > 0) {
+            this.toastService.info(`📈 比上次多提取 ${diff} 人`, 4000);
+          } else if (diff < 0) {
+            this.toastService.info(`📉 比上次少 ${Math.abs(diff)} 人（可能有成員退群）`, 4000);
+          }
+        }
         
         // 🆕 計算並顯示提取結果摘要
         if (newMembers.length > 0) {

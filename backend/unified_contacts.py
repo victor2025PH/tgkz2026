@@ -939,6 +939,115 @@ class UnifiedContactsManager:
             print(f"[UnifiedContacts] Sync from lead error: {e}", file=sys.stderr)
             return False
     
+    async def sync_members_batch(self, members: List[Dict], source_chat_id: str = '', source_chat_title: str = '') -> Dict[str, int]:
+        """
+        🆕 Phase3: 增量同步 — 只同步剛提取的成員到 unified_contacts
+        比 sync_from_sources() 快 10-100 倍（不掃描全表）
+        
+        Args:
+            members: 提取到的成員列表
+            source_chat_id: 來源群組 ID
+            source_chat_title: 來源群組名稱
+            
+        Returns:
+            {new: int, updated: int, duplicate: int, errors: int}
+        """
+        await self.initialize()
+        stats = {'new': 0, 'updated': 0, 'duplicate': 0, 'errors': 0}
+        now = datetime.now().isoformat()
+        
+        for member in members:
+            try:
+                telegram_id = str(member.get('user_id', '') or member.get('telegram_id', ''))
+                if not telegram_id:
+                    continue
+                
+                first_name = (member.get('first_name', '') or '')
+                last_name = (member.get('last_name', '') or '')
+                display_name = f"{first_name} {last_name}".strip() or member.get('username') or telegram_id
+                
+                tags = member.get('tags', '[]')
+                if isinstance(tags, list):
+                    tags = json.dumps(tags)
+                
+                # 查找已有記錄
+                existing = await self.db.fetch_one(
+                    'SELECT id, updated_at FROM unified_contacts WHERE telegram_id = ?',
+                    (telegram_id,)
+                )
+                
+                if existing:
+                    # 更新現有記錄（僅更新活躍度和最後在線時間等動態字段）
+                    await self.db.execute('''
+                        UPDATE unified_contacts SET
+                            username = COALESCE(?, username),
+                            display_name = COALESCE(?, display_name),
+                            first_name = COALESCE(NULLIF(?, ''), first_name),
+                            last_name = COALESCE(NULLIF(?, ''), last_name),
+                            source_id = COALESCE(?, source_id),
+                            source_name = COALESCE(?, source_name),
+                            is_bot = ?,
+                            is_premium = ?,
+                            last_seen = COALESCE(?, last_seen),
+                            updated_at = ?,
+                            synced_at = ?
+                        WHERE telegram_id = ?
+                    ''', (
+                        member.get('username'),
+                        display_name,
+                        first_name,
+                        last_name,
+                        source_chat_id or member.get('source_chat_id'),
+                        source_chat_title or member.get('source_chat_title'),
+                        member.get('is_bot', 0),
+                        member.get('is_premium', 0),
+                        member.get('last_online'),
+                        now, now,
+                        telegram_id
+                    ))
+                    stats['updated'] += 1
+                else:
+                    # 插入新聯繫人
+                    await self.db.execute('''
+                        INSERT INTO unified_contacts (
+                            telegram_id, username, display_name, first_name, last_name,
+                            contact_type, source_type, source_id, source_name,
+                            status, tags, activity_score, value_level,
+                            is_bot, is_premium, is_verified, last_seen,
+                            created_at, updated_at, synced_at, captured_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        telegram_id,
+                        member.get('username'),
+                        display_name,
+                        first_name, last_name,
+                        'user', 'member',
+                        source_chat_id or member.get('source_chat_id'),
+                        source_chat_title or member.get('source_chat_title'),
+                        'new',
+                        tags,
+                        member.get('activity_score', 0.5),
+                        member.get('value_level', 'C'),
+                        member.get('is_bot', 0),
+                        member.get('is_premium', 0),
+                        member.get('is_verified', 0),
+                        member.get('last_online'),
+                        now, now, now, now
+                    ))
+                    stats['new'] += 1
+                    
+            except Exception as e:
+                stats['errors'] += 1
+                if stats['errors'] <= 3:
+                    print(f"[UnifiedContacts] sync_members_batch error: {e}", file=sys.stderr)
+        
+        stats['duplicate'] = len(members) - stats['new'] - stats['updated'] - stats['errors']
+        if stats['duplicate'] < 0:
+            stats['duplicate'] = 0
+            
+        print(f"[UnifiedContacts] sync_members_batch: {stats}", file=sys.stderr)
+        return stats
+
     async def update_status_with_sync(self, telegram_ids: List[str], new_status: str, sync_to_leads: bool = True) -> Dict[str, int]:
         """
         更新狀態並同步到 leads 表

@@ -171,6 +171,7 @@ export class MemberManagementService {
       resourceId: target.id,
       telegramId: target.telegram_id,
       username: target.username,
+      phone: (target as any).joined_phone || (target as any).joined_by_phone || null,  // 🆕 Phase2: 補全 phone
       limit: 200,
       offset: 0
     });
@@ -189,6 +190,7 @@ export class MemberManagementService {
       resourceId: resource.id,
       telegramId: resource.telegram_id,
       username: resource.username,
+      phone: (resource as any).joined_phone || (resource as any).joined_by_phone || null,  // 🆕 Phase2: 補全 phone
       limit: 200,
       offset: currentCount
     });

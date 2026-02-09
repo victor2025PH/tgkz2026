@@ -275,9 +275,15 @@ export class GroupManagementService {
     const dialog = this._postJoinDialog();
     if (!dialog.resource) return;
     
+    // 🆕 Phase2: 補全所有關鍵字段（之前只傳了 resourceId + phone）
     this.ipc.send('extract-members', {
       resourceId: dialog.resource.id,
-      phone: dialog.phone
+      telegramId: dialog.resource.telegram_id || dialog.resource.telegramId || null,
+      username: dialog.resource.username || null,
+      groupName: dialog.resource.title || dialog.resource.name || null,
+      phone: dialog.phone,
+      limit: 200,
+      offset: 0
     });
     
     this.closePostJoinDialog();

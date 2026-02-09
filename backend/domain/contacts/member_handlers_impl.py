@@ -540,7 +540,8 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
         chat_id = payload.get('chatId')
         username = payload.get('username')
         phone = payload.get('phone')
-        resource_id = payload.get('resourceId')
+        resource_id = payload.get('resourceId') or payload.get('groupId')  # 🆕 Phase2: 兼容 groupId 別名
+        group_name = payload.get('groupName') or payload.get('groupTitle') or ''  # 🆕 Phase2: 用於日誌
         limit = payload.get('limit', 100)
         
         # 🆕 Phase: Payload 自動補全 — 5 個前端入口 payload 不一致，從 DB 填充缺失字段
@@ -1022,6 +1023,96 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
                 'members': [],
                 'extracted': 0
             }
+        
+        # 🆕 Phase2: 自動加入並重試 — 當所有帳號都返回 PEER_ID_INVALID 時
+        if not result.get('success') and result.get('error_code') == 'E4001_NOT_SYNCED':
+            can_join = bool(username or (telegram_id and str(telegram_id).lstrip('-').isdigit()))
+            if can_join:
+                self.send_log(f"🚀 所有帳號均無法訪問群組，嘗試自動加入...", "info")
+                self.send_event("members-extraction-progress", {
+                    "resourceId": resource_id,
+                    "status": "auto_joining",
+                    "message": "帳號未加入群組，正在自動加入...",
+                    "extracted": 0, "total": 0
+                })
+                
+                try:
+                    # 構建加入 URL
+                    if username:
+                        join_url = f"https://t.me/{username.lstrip('@')}"
+                    else:
+                        join_url = str(telegram_id)
+                    
+                    # 選擇最佳帳號加入
+                    from domain.groups.handlers_impl import select_best_account
+                    join_phone = await select_best_account(self.telegram_manager, db, operation='join')
+                    if not join_phone:
+                        join_phone = current_phone
+                    
+                    # 加入群組
+                    join_result = await self.telegram_manager.join_group(join_phone, join_url)
+                    
+                    if join_result.get('success') or 'already' in str(join_result.get('error', '')).lower():
+                        self.send_log(f"✅ 帳號 {join_phone[:4]}**** 已加入群組", "success")
+                        
+                        # 更新 discovered_resources
+                        try:
+                            from database import db as _join_db
+                            await _join_db.connect()
+                            if resource_id:
+                                tg_id = str(join_result.get('chat_id', '')) or str(telegram_id or '')
+                                await _join_db.execute(
+                                    """UPDATE discovered_resources 
+                                       SET status = 'joined', joined_by_phone = ?, joined_at = CURRENT_TIMESTAMP,
+                                           telegram_id = COALESCE(telegram_id, ?)
+                                       WHERE id = ?""",
+                                    (join_phone, tg_id, resource_id)
+                                )
+                        except Exception as db_err:
+                            print(f"[Backend] Auto-join DB update error: {db_err}", file=sys.stderr)
+                        
+                        # 等待 Telegram 同步
+                        self.send_log(f"⏳ 等待 5 秒讓 Telegram 同步...", "info")
+                        await asyncio.sleep(5)
+                        
+                        # 最終重試提取
+                        self.send_event("members-extraction-progress", {
+                            "resourceId": resource_id,
+                            "status": "retrying",
+                            "message": "加入成功，正在重新提取...",
+                            "extracted": 0, "total": 0
+                        })
+                        
+                        final_result = await member_extraction_service.extract_members(
+                            chat_id=chat_id,
+                            phone=join_phone,
+                            limit=limit,
+                            filter_bots=filter_bots,
+                            filter_offline=filter_offline,
+                            online_status=online_status,
+                            save_to_db=True
+                        )
+                        
+                        if final_result.get('success'):
+                            result = final_result
+                            current_phone = join_phone
+                            self.send_log(f"✅ 自動加入後提取成功！", "success")
+                        else:
+                            # 加入成功但提取仍失敗，更新錯誤信息
+                            result['error'] = f"已加入群組但提取仍失敗：{final_result.get('error', '未知錯誤')}"
+                            result['error_details']['suggestion'] = '帳號已成功加入群組，請等待 30 秒後手動重試'
+                            result['error_details']['action'] = 'retry_later'
+                            result['error_details']['retry_after_seconds'] = 30
+                            self.send_log(f"⚠️ 已加入但提取失敗：{final_result.get('error_code', '')}", "warning")
+                    else:
+                        join_error = join_result.get('error', '加入失敗')
+                        self.send_log(f"❌ 自動加入失敗: {join_error}", "error")
+                        result['error_details']['suggestion'] = f'自動加入失敗（{join_error}），請手動加入後重試'
+                        result['error_details']['can_auto_join'] = False
+                        
+                except Exception as auto_join_err:
+                    print(f"[Backend] Auto-join error: {auto_join_err}", file=sys.stderr)
+                    self.send_log(f"❌ 自動加入異常: {auto_join_err}", "error")
         
         if result['success']:
             members = result.get('members', [])

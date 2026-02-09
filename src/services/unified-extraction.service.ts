@@ -365,12 +365,14 @@ export class UnifiedExtractionService {
       }
     }
     
-    // 發送提取命令
+    // 發送提取命令 — 🆕 Phase2: 補全 telegramId + phone
     this.ipc.send('extract-members', {
       chatId: chatId || group.url,
       username: chatId,
+      telegramId: (group as any).telegramId || null,  // 🆕 Phase2
       resourceId: group.id,
       groupName: group.name,
+      phone: (group as any).accountPhone || (group as any).joined_phone || null,  // 🆕 Phase2
       limit: config.limit === -1 ? undefined : config.limit,
       filters: {
         bots: !config.filters.excludeBots,

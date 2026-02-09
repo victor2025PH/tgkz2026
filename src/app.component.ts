@@ -3548,15 +3548,39 @@ export class AppComponent implements OnDestroy, OnInit {
         this.toastService.error(`❌ ${data.error}\n\n${details.suggestion || '請刷新資源列表'}`);
         break;
         
-      // 🆕 Phase2: 結構化錯誤碼支持
-      case 'E4001_NOT_SYNCED':
-        this.showExtractionErrorWithAction(
-          '⚠️ 群組同步未完成',
-          details.reason || '帳號剛加入群組，Telegram 服務器尚未同步完成',
-          details.suggestion || '請等待 30 秒後再試',
-          undefined
-        );
+      // 🆕 Phase2: 結構化錯誤碼支持 — 現在後端會自動嘗試加入，此錯誤表示最終失敗
+      case 'E4001_NOT_SYNCED': {
+        const triedPhones = (details as any).tried_phones || [];
+        const actionType = (details as any).action;
+        
+        if (actionType === 'retry_later') {
+          // 後端已自動加入成功但提取仍失敗 → 引導用戶等待後重試
+          this.showExtractionErrorWithAction(
+            '⏳ 已加入群組，等待同步',
+            details.reason || '帳號已成功加入群組，Telegram 正在同步',
+            details.suggestion || '請等待 30 秒後重新提取',
+            undefined
+          );
+        } else if (actionType === 'auto_join' && details.can_auto_join) {
+          // 後端自動加入也失敗了 → 引導手動加入
+          this.showExtractionErrorWithAction(
+            '⚠️ 帳號未加入群組',
+            details.reason || '所有帳號均無法訪問此群組',
+            (triedPhones.length > 1 
+              ? `已嘗試 ${triedPhones.length} 個帳號。` 
+              : '') + (details.suggestion || '請手動加入群組後重試'),
+            'join'
+          );
+        } else {
+          this.showExtractionErrorWithAction(
+            '⚠️ 提取失敗',
+            details.reason || '無法訪問群組成員列表',
+            details.suggestion || '請確認帳號已加入此群組',
+            undefined
+          );
+        }
         break;
+      }
         
       case 'E4002_ADMIN_REQUIRED':
         this.showExtractionErrorWithAction(
@@ -9325,12 +9349,14 @@ export class AppComponent implements OnDestroy, OnInit {
       }
     });
 
-    // 成員提取進度事件
-    this.ipcService.on('members-extraction-progress', (data: { resourceId: number, extracted: number, total: number, status: string }) => {
+    // 成員提取進度事件 — 🆕 Phase2: 支持 auto_joining 狀態 + message 字段
+    this.ipcService.on('members-extraction-progress', (data: { resourceId: number, extracted: number, total: number, status: string, message?: string }) => {
+      // 使用 message 字段（更詳細的進度描述），回退到 status
+      const displayStatus = data.message || data.status;
       this.memberListProgress.set({
         extracted: data.extracted,
         total: data.total,
-        status: data.status
+        status: displayStatus
       });
     });
 

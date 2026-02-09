@@ -25,7 +25,7 @@ export interface DiscoveredResource {
   description?: string;
   member_count: number;
   resource_type: 'group' | 'channel' | 'supergroup';
-  status: 'discovered' | 'pending' | 'joined' | 'monitoring' | 'failed';
+  status: 'discovered' | 'pending' | 'joined' | 'monitoring' | 'paused' | 'failed';
   overall_score?: number;
   is_saved?: boolean;
   invite_link?: string;
@@ -317,10 +317,11 @@ export interface Account {
               <!-- 加入狀態 -->
               <div>
                 <label class="text-xs text-slate-400 mb-1 block">加入狀態</label>
-                <select [value]="filterJoinStatus()"
+                <select [value]="filterJoinStatus()" 
                         (change)="filterJoinStatus.set($any($event.target).value)"
                         class="w-full bg-slate-700/50 border border-slate-600 rounded py-1.5 px-2 text-white text-sm">
                   <option value="all">全部狀態</option>
+                  <option value="monitoring">監控中</option>
                   <option value="joined">已加入</option>
                   <option value="not_joined">未加入</option>
                 </select>
@@ -489,10 +490,18 @@ export interface Account {
                         {{ resource.resource_type === 'channel' ? '📢 頻道' : '👥 群組' }}
                       </span>
                       
-                      <!-- 🔧 P1: 已加入標記 -->
-                      @if (resource.status === 'joined' || resource.status === 'monitoring') {
+                      <!-- 🔧 P1: 統一狀態標識 -->
+                      @if (resource.status === 'monitoring') {
                         <span class="px-2 py-0.5 text-xs rounded-full font-medium bg-green-500/30 text-green-300 flex-shrink-0">
-                          ✅ 已加入
+                          ● 監控中
+                        </span>
+                      } @else if (resource.status === 'joined') {
+                        <span class="px-2 py-0.5 text-xs rounded-full font-medium bg-blue-500/30 text-blue-300 flex-shrink-0">
+                          ● 已加入
+                        </span>
+                      } @else if (resource.status === 'paused') {
+                        <span class="px-2 py-0.5 text-xs rounded-full font-medium bg-yellow-500/30 text-yellow-300 flex-shrink-0">
+                          ● 已暫停
                         </span>
                       }
                       
@@ -598,8 +607,10 @@ export interface Account {
                       }
                       
                       <!-- 狀態標記 -->
-                      @if (resource.status === 'joined' || resource.status === 'monitoring') {
-                        <span class="px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs">✓ 已加入</span>
+                      @if (resource.status === 'monitoring') {
+                        <span class="px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs">● 監控中</span>
+                      } @else if (resource.status === 'joined' || resource.status === 'paused') {
+                        <span class="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">✓ 已加入</span>
                       }
                     </div>
                   </div>
@@ -854,12 +865,14 @@ export interface Account {
                     <div class="text-slate-500 text-xs">相關度</div>
                   </div>
                   <div class="text-center p-3 bg-slate-800/50 rounded-lg">
-                    <div class="text-2xl font-bold" [class]="(resource.status === 'joined' || resource.status === 'monitoring') ? 'text-green-400' : 'text-slate-400'">
-                      {{ (resource.status === 'joined' || resource.status === 'monitoring') ? '✓' : '—' }}
+                    <div class="text-2xl font-bold" [class]="resource.status === 'monitoring' ? 'text-green-400' : resource.status === 'joined' ? 'text-blue-400' : resource.status === 'paused' ? 'text-yellow-400' : 'text-slate-400'">
+                      {{ (resource.status === 'joined' || resource.status === 'monitoring' || resource.status === 'paused') ? '✓' : '—' }}
                     </div>
                     <div class="text-slate-500 text-sm">
                       @if (resource.status === 'monitoring') {
-                        已加入·監控中
+                        監控中
+                      } @else if (resource.status === 'paused') {
+                        已暫停
                       } @else if (resource.status === 'joined') {
                         已加入
                       } @else if (resource.status === 'joining') {
@@ -1260,12 +1273,14 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       result = result.filter(r => r.discovery_source === sourceFilter);
     }
     
-    // 🆕 加入狀態篩選
+    // 🆕 加入狀態篩選（統一 4 態：discovered/joined/monitoring/paused）
     const joinStatus = this.filterJoinStatus();
-    if (joinStatus === 'joined') {
-      result = result.filter(r => r.status === 'joined' || r.status === 'monitoring');
+    if (joinStatus === 'monitoring') {
+      result = result.filter(r => r.status === 'monitoring');
+    } else if (joinStatus === 'joined') {
+      result = result.filter(r => r.status === 'joined' || r.status === 'monitoring' || r.status === 'paused');
     } else if (joinStatus === 'not_joined') {
-      result = result.filter(r => r.status !== 'joined' && r.status !== 'monitoring');
+      result = result.filter(r => r.status !== 'joined' && r.status !== 'monitoring' && r.status !== 'paused');
     }
     
     // 🆕 只顯示有 ID 的結果

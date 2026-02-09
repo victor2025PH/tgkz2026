@@ -108,11 +108,43 @@ import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, Collectio
               <span>👥</span> 監控群組
               <span class="text-xs text-slate-500">({{ stateService.groups().length }})</span>
             </h3>
-            <button (click)="navigateToResourceCenter()"
-                    class="text-sm text-cyan-400 hover:text-cyan-300">
-              + 添加群組
-            </button>
+            <div class="flex items-center gap-2">
+              <button (click)="showQuickAddDialog.set(true)"
+                      class="text-sm px-3 py-1.5 bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 rounded-lg transition-colors border border-cyan-500/30">
+                + 快速添加
+              </button>
+              <button (click)="navigateToResourceCenter()"
+                      class="text-sm text-slate-400 hover:text-cyan-300 transition-colors">
+                搜索發現 →
+              </button>
+            </div>
           </div>
+          
+          <!-- 🆕 P2: 快速添加群組對話框 -->
+          @if (showQuickAddDialog()) {
+            <div class="p-4 border-b border-slate-700/50 bg-slate-800/80">
+              <div class="flex items-center gap-3">
+                <input type="text"
+                       [(ngModel)]="quickAddUrl"
+                       (keydown.enter)="quickAddGroup()"
+                       placeholder="輸入群組鏈接，如 https://t.me/groupname 或 @groupname"
+                       class="flex-1 px-4 py-2.5 bg-slate-700/80 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
+                <button (click)="quickAddGroup()"
+                        [disabled]="isQuickAdding() || !quickAddUrl.trim()"
+                        class="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-600 disabled:text-slate-400 text-white rounded-lg text-sm transition-colors whitespace-nowrap">
+                  {{ isQuickAdding() ? '加入中...' : '加入並監控' }}
+                </button>
+                <button (click)="showQuickAddDialog.set(false)"
+                        class="px-3 py-2.5 text-slate-400 hover:text-white transition-colors">
+                  ✕
+                </button>
+              </div>
+              <p class="text-xs text-slate-500 mt-2">
+                支持格式：t.me/groupname、@groupname、邀請鏈接 https://t.me/+xxxxx
+              </p>
+            </div>
+          }
+          
           <!-- 🔧 網格佈局 - 修復溢出問題 -->
           <div class="flex-1 overflow-y-auto p-4">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -205,11 +237,17 @@ import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, Collectio
                     <span class="text-4xl">👥</span>
                   </div>
                   <h3 class="text-lg font-medium text-white mb-2">還沒有監控群組</h3>
-                  <p class="text-sm mb-6 text-slate-500">請在資源中心搜索並添加群組</p>
-                  <button (click)="navigateToResourceCenter()"
-                          class="px-5 py-2.5 bg-cyan-500/20 text-cyan-400 rounded-xl hover:bg-cyan-500/30 transition-colors border border-cyan-500/30">
-                    + 添加第一個群組
-                  </button>
+                  <p class="text-sm mb-6 text-slate-500">添加群組開始監控關鍵詞</p>
+                  <div class="flex items-center justify-center gap-3">
+                    <button (click)="showQuickAddDialog.set(true)"
+                            class="px-5 py-2.5 bg-cyan-500 text-white rounded-xl hover:bg-cyan-600 transition-colors">
+                      + 快速添加群組
+                    </button>
+                    <button (click)="navigateToResourceCenter()"
+                            class="px-5 py-2.5 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600 transition-colors">
+                      搜索發現 →
+                    </button>
+                  </div>
                 </div>
               }
             </div>
@@ -905,9 +943,65 @@ export class MonitoringGroupsComponent implements OnInit {
     }, 5000);
   }
 
+  // 🆕 P2: 快速添加群組
+  showQuickAddDialog = signal(false);
+  quickAddUrl = '';
+  isQuickAdding = signal(false);
+
+  quickAddGroup() {
+    const url = this.quickAddUrl.trim();
+    if (!url) return;
+    
+    this.isQuickAdding.set(true);
+    
+    // 解析輸入：支持 @username、t.me/username、完整 URL
+    let username = '';
+    let groupUrl = url;
+    
+    if (url.startsWith('@')) {
+      username = url.substring(1);
+      groupUrl = `https://t.me/${username}`;
+    } else if (url.match(/^[a-zA-Z0-9_]+$/)) {
+      username = url;
+      groupUrl = `https://t.me/${username}`;
+    } else {
+      const match = url.match(/t\.me\/([^/?\s]+)/);
+      if (match) {
+        username = match[1].startsWith('+') ? '' : match[1];
+      }
+    }
+    
+    // 發送加入命令
+    this.ipcService.send('join-and-monitor-resource', {
+      username: username,
+      telegramId: '',
+      title: username || url,
+      resourceId: 0
+    });
+    
+    // 監聽結果
+    const handler = (result: any) => {
+      this.isQuickAdding.set(false);
+      if (result.success) {
+        this.toastService.success(`已添加群組到監控: ${result.username || username || url}`);
+        this.quickAddUrl = '';
+        this.showQuickAddDialog.set(false);
+        this.refreshData();
+      } else {
+        this.toastService.error(`添加失敗: ${result.error || '未知錯誤'}`);
+      }
+    };
+    this.ipcService.once('join-and-monitor-complete', handler);
+    
+    // 超時保護
+    setTimeout(() => {
+      this.isQuickAdding.set(false);
+    }, 30000);
+  }
+
   navigateToResourceCenter() {
-    this.configAction.emit('goto-resource-center');
-    this.toastService.info('請在「資源中心」搜索並添加群組');
+    this.configAction.emit('goto-search-discovery');
+    this.toastService.info('請在「搜索發現」中搜索群組並點擊加入');
   }
 
   handleConfigAction(action: string) {

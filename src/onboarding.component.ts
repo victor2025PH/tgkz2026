@@ -228,8 +228,23 @@ export class OnboardingComponent implements OnInit {
       actionTarget: 'search-discovery'
     },
     {
+      id: 'monitoring-setup',
+      title: '第三步：监控与关键词',
+      description: '为已加入的群组设置关键词监控，自动捕捉潜在客户',
+      icon: '📡',
+      targetSelector: '[data-tour="monitoring-center"]',
+      position: 'right',
+      tips: [
+        '监控中心统一管理所有群组',
+        '绑定关键词集，自动匹配消息',
+        '系统内置行业预设关键词（加密货币、电商等）'
+      ],
+      actionLabel: '去设置监控',
+      actionTarget: 'automation'
+    },
+    {
       id: 'ai-marketing',
-      title: '第三步：AI 智能营销',
+      title: '第四步：AI 智能营销',
       description: '让 AI 帮您制定营销策略，自动执行营销任务',
       icon: '🤖',
       targetSelector: '[data-tour="ai-assistant"]',
@@ -249,9 +264,9 @@ export class OnboardingComponent implements OnInit {
       icon: '🚀',
       position: 'center',
       tips: [
+        '添加账号 → 搜索群组 → 设置监控 → 获得 Lead',
         '仪表盘查看整体数据',
-        '有问题随时点击右上角 ❓ 帮助',
-        '祝您营销顺利！'
+        '有问题随时点击右上角 ❓ 帮助'
       ]
     }
   ];

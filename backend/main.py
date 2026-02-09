@@ -1044,6 +1044,16 @@ class BackendService:
             except Exception as e:
                 import sys
                 print(f"[Backend] Background consistency check error: {e}", file=sys.stderr)
+            
+            # 🆕 P2: 數據庫健康守護
+            try:
+                from services.db_health_guard import get_db_health_guard
+                data_dir = os.environ.get('DATA_DIR', '/app/data')
+                self._db_health_guard = get_db_health_guard(data_dir)
+                await self._db_health_guard.start()
+            except Exception as e:
+                import sys
+                print(f"[Backend] DB Health Guard start error: {e}", file=sys.stderr)
         
         # 創建後台任務（不等待完成）
         asyncio.create_task(background_startup_tasks())
@@ -2342,6 +2352,13 @@ class BackendService:
             await self.telegram_manager.disconnect_all()
         except Exception as e:
             print(f"[Backend] Error disconnecting clients: {e}", file=sys.stderr)
+        
+        # 🆕 P2: 停止數據庫健康守護
+        try:
+            if hasattr(self, '_db_health_guard') and self._db_health_guard:
+                await self._db_health_guard.stop()
+        except Exception as e:
+            print(f"[Backend] Error stopping DB health guard: {e}", file=sys.stderr)
         
         # Try to log shutdown (only if database is still connected)
         try:
@@ -25010,45 +25027,56 @@ class BackendService:
                     import sys
                     print(f"[Backend] Error getting member count: {chat_err}", file=sys.stderr)
                 
-                # 檢查是否已在監控列表
-                existing = await db.fetch_one(
-                    "SELECT id FROM monitored_groups WHERE link LIKE ?",
-                    (f"%{username}%" if username else f"%{telegram_id}%",)
-                )
-                
-                # 🆕 檢測是否可以提取成員（頻道默認不可提取）
+                # 🔧 P0-FIX: 使用精確匹配 + 事務包裹所有 DB 寫入
                 can_extract = 1 if resource_type != 'channel' else 0
+                group_link = f"https://t.me/{username}" if username else str(telegram_id or '')
                 
-                if not existing:
-                    # 🔧 P0: 添加到監控群組（包含 phone、成員數、群組類型）
-                    await db._connection.execute("""
-                        INSERT INTO monitored_groups (link, name, phone, keyword_set_ids, is_active, member_count, telegram_id, resource_type, can_extract_members, created_at)
-                        VALUES (?, ?, ?, '[]', 1, ?, ?, ?, ?, datetime('now'))
-                    """, (f"https://t.me/{username}" if username else telegram_id, title, phone, members_count, chat_telegram_id, resource_type, can_extract))
-                    await db._connection.commit()
-                    type_label = {'channel': '頻道', 'supergroup': '超級群', 'group': '群組'}.get(resource_type, '群組')
-                    self.send_log(f"✅ 已添加到監控: {title} ({type_label}，{members_count} 成員，帳號: {phone[:4]}****)", "success")
-                else:
-                    # 🔧 P0: 更新成員數、phone 和群組類型
-                    await db._connection.execute("""
-                        UPDATE monitored_groups 
-                        SET member_count = ?, telegram_id = COALESCE(telegram_id, ?), phone = COALESCE(phone, ?),
-                            resource_type = ?, can_extract_members = ?
-                        WHERE link LIKE ?
-                    """, (members_count, chat_telegram_id, phone, resource_type, can_extract, f"%{username}%" if username else f"%{telegram_id}%"))
-                    await db._connection.commit()
-                    self.send_log(f"ℹ️ 群組已在監控列表中，已更新", "info")
-                
-                # 🆕 同步更新 discovered_resources（包含 joined_by_phone）
-                if resource_id:
-                    await db.execute(
-                        """UPDATE discovered_resources 
-                           SET status = 'joined', member_count = ?, resource_type = ?, 
-                               joined_by_phone = ?, joined_at = CURRENT_TIMESTAMP,
-                               telegram_id = COALESCE(telegram_id, ?)
-                           WHERE id = ?""",
-                        (members_count, resource_type, phone, chat_telegram_id, resource_id)
-                    )
+                try:
+                    await db.begin_transaction()
+                    
+                    existing = None
+                    if chat_telegram_id:
+                        existing = await db.fetch_one(
+                            "SELECT id FROM monitored_groups WHERE telegram_id = ?",
+                            (str(chat_telegram_id),)
+                        )
+                    if not existing and username:
+                        existing = await db.fetch_one(
+                            "SELECT id FROM monitored_groups WHERE link = ?",
+                            (group_link,)
+                        )
+                    
+                    tg_id_str = str(chat_telegram_id) if chat_telegram_id else None
+                    
+                    if not existing:
+                        await db.execute("""
+                            INSERT INTO monitored_groups (link, name, phone, keyword_set_ids, is_active, member_count, telegram_id, resource_type, can_extract_members, created_at)
+                            VALUES (?, ?, ?, '[]', 1, ?, ?, ?, ?, datetime('now'))
+                        """, (group_link, title, phone, members_count, tg_id_str, resource_type, can_extract), auto_commit=False)
+                        type_label = {'channel': '頻道', 'supergroup': '超級群', 'group': '群組'}.get(resource_type, '群組')
+                        self.send_log(f"✅ 已添加到監控: {title} ({type_label}，{members_count} 成員，帳號: {phone[:4]}****)", "success")
+                    else:
+                        await db.execute("""
+                            UPDATE monitored_groups 
+                            SET member_count = ?, telegram_id = COALESCE(telegram_id, ?), phone = COALESCE(phone, ?),
+                                resource_type = ?, can_extract_members = ?
+                            WHERE id = ?
+                        """, (members_count, tg_id_str, phone, resource_type, can_extract, existing['id']), auto_commit=False)
+                        self.send_log(f"ℹ️ 群組已在監控列表中，已更新", "info")
+                    
+                    if resource_id:
+                        await db.execute(
+                            """UPDATE discovered_resources 
+                               SET status = 'joined', member_count = ?, resource_type = ?, 
+                                   joined_by_phone = ?, joined_at = CURRENT_TIMESTAMP,
+                                   telegram_id = COALESCE(telegram_id, ?)
+                               WHERE id = ?""",
+                            (members_count, resource_type, phone, tg_id_str, resource_id), auto_commit=False)
+                    
+                    await db.commit_transaction()
+                except Exception as db_err:
+                    await db.rollback_transaction()
+                    raise Exception(f"數據庫寫入失敗: {db_err}")
                 
                 # 🔧 P0: 返回更完整的信息給前端
                 self.send_event("join-and-monitor-complete", {
@@ -25451,62 +25479,75 @@ class BackendService:
                     else:
                         raise join_error
             
-            # 設置監控
-            if auto_enable or keywords:
-                new_status = 'monitoring'
-                keywords_str = ','.join(keywords) if keywords else ''
+            # 🔧 P0-FIX: 始終將群組添加到 monitored_groups（不再依賴 auto_enable 條件）
+            # is_active 根據是否有關鍵詞/auto_enable 決定
+            is_active = 1 if (auto_enable or keywords or keyword_set_ids) else 0
+            new_status = 'monitoring' if is_active else 'joined'
+            keywords_str = ','.join(keywords) if keywords else ''
+            
+            # 🔧 P0-FIX: 使用事務包裹所有 DB 寫入 + 精確匹配替代 LIKE
+            import json
+            keyword_set_ids_json = json.dumps(keyword_set_ids) if keyword_set_ids else '[]'
+            group_link = f"https://t.me/{username}" if username else invite_link
+            
+            try:
+                await db.begin_transaction()
                 
+                # 更新 discovered_resources
                 await db.execute(
                     """UPDATE discovered_resources 
-                       SET status = ?, monitoring_keywords = ?, monitoring_enabled = 1 
+                       SET status = ?, monitoring_keywords = ?, monitoring_enabled = ? 
                        WHERE id = ?""",
-                    (new_status, keywords_str, resource_id)
-                )
-                await db._connection.commit()
-                
-                # 添加到 monitored_groups 表
-                existing = await db.fetch_all(
-                    "SELECT id FROM monitored_groups WHERE link LIKE ? OR name = ?",
-                    (f"%{username}%" if username else f"%{title}%", title)
+                    (new_status, keywords_str, 1 if is_active else 0, resource_id), auto_commit=False
                 )
                 
-                # 🔧 FIX: 將 keyword_set_ids 序列化為 JSON 字符串
-                import json
-                keyword_set_ids_json = json.dumps(keyword_set_ids) if keyword_set_ids else '[]'
+                # 精確查找：優先用 telegram_id，其次用 link
+                existing = None
+                if telegram_id:
+                    existing = await db.fetch_one(
+                        "SELECT id FROM monitored_groups WHERE telegram_id = ?",
+                        (str(telegram_id),)
+                    )
+                if not existing and username:
+                    existing = await db.fetch_one(
+                        "SELECT id FROM monitored_groups WHERE link = ?",
+                        (group_link,)
+                    )
                 
                 if not existing:
-                    # 🆕 插入時包含成員數、telegram_id 和關鍵詞集 ID
                     await db.execute(
-                        """INSERT INTO monitored_groups (name, link, phone, is_active, keywords, keyword_set_ids, member_count, telegram_id, last_active)
-                           VALUES (?, ?, ?, 1, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
-                        (title, f"https://t.me/{username}" if username else invite_link, phone, keywords_str, keyword_set_ids_json, members_count, telegram_id)
+                        """INSERT INTO monitored_groups (name, link, phone, is_active, keywords, keyword_set_ids, member_count, telegram_id, resource_type, last_active, created_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
+                        (title, group_link, phone, is_active, keywords_str, keyword_set_ids_json, members_count, telegram_id, resource.get('resource_type', 'group') if resource else 'group'), auto_commit=False
                     )
-                    await db._connection.commit()
                     bound_msg = f", 綁定 {len(keyword_set_ids)} 個詞集" if keyword_set_ids else ""
-                    self.send_log(f"✅ 已添加到監控列表: {title} ({members_count} 成員{bound_msg})", "success")
+                    active_msg = "監控中" if is_active else "已加入（待配置關鍵詞）"
+                    self.send_log(f"✅ 已添加到監控列表: {title} ({members_count} 成員{bound_msg}) [{active_msg}]", "success")
                 else:
-                    # 🆕 更新時也同步成員數和關鍵詞集 ID
-                    # 🔧 FIX: 只有在傳入 keyword_set_ids 時才更新
                     if keyword_set_ids:
                         await db.execute(
                             """UPDATE monitored_groups 
-                               SET keywords = ?, keyword_set_ids = ?, phone = ?, is_active = 1, member_count = ?, telegram_id = COALESCE(telegram_id, ?)
-                               WHERE link LIKE ? OR name = ?""",
-                            (keywords_str, keyword_set_ids_json, phone, members_count, telegram_id, f"%{username}%" if username else f"%{title}%", title)
+                               SET keywords = ?, keyword_set_ids = ?, phone = ?, is_active = ?, member_count = ?, telegram_id = COALESCE(telegram_id, ?)
+                               WHERE id = ?""",
+                            (keywords_str, keyword_set_ids_json, phone, is_active, members_count, telegram_id, existing['id']), auto_commit=False
                         )
                     else:
                         await db.execute(
                             """UPDATE monitored_groups 
-                               SET keywords = ?, phone = ?, is_active = 1, member_count = ?, telegram_id = COALESCE(telegram_id, ?)
-                               WHERE link LIKE ? OR name = ?""",
-                            (keywords_str, phone, members_count, telegram_id, f"%{username}%" if username else f"%{title}%", title)
+                               SET phone = ?, is_active = ?, member_count = ?, telegram_id = COALESCE(telegram_id, ?)
+                               WHERE id = ?""",
+                            (phone, is_active, members_count, telegram_id, existing['id']), auto_commit=False
                         )
-                    await db._connection.commit()
                     bound_msg = f", 綁定 {len(keyword_set_ids)} 個詞集" if keyword_set_ids else ""
                     self.send_log(f"✅ 已更新監控設置: {title} ({members_count} 成員{bound_msg})", "success")
                 
-                if keywords:
-                    self.send_log(f"🔍 監控關鍵詞: {', '.join(keywords)}", "info")
+                await db.commit_transaction()
+            except Exception as db_err:
+                await db.rollback_transaction()
+                raise Exception(f"數據庫寫入失敗: {db_err}")
+            
+            if keywords:
+                self.send_log(f"🔍 監控關鍵詞: {', '.join(keywords)}", "info")
             
             self.send_event("join-and-monitor-with-account-complete", {
                 "success": True,

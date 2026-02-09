@@ -145,6 +145,21 @@ export interface KeywordSetData {
             <p class="mt-1.5 text-xs text-slate-500">
               💡 提示: 用逗號分隔可批量添加，例如: 詢價, 價格, 多少錢
             </p>
+            
+            <!-- 行業預設模板 -->
+            <div class="mt-3">
+              <label class="block text-xs text-slate-500 mb-2">📦 快速填充行業模板</label>
+              <div class="flex flex-wrap gap-1.5">
+                @for (tpl of presetTemplates; track tpl.name) {
+                  <button (click)="applyTemplate(tpl.keywords)"
+                          class="px-2.5 py-1 bg-slate-700/60 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-300 
+                                 text-xs rounded-lg border border-slate-600/50 hover:border-cyan-500/30 transition-all"
+                          [title]="tpl.keywords.join(', ')">
+                    {{ tpl.icon }} {{ tpl.name }}
+                  </button>
+                }
+              </div>
+            </div>
           </div>
           
           <!-- 匹配模式 -->
@@ -215,6 +230,16 @@ export class KeywordSetEditorComponent implements OnInit {
   editMatchMode: 'exact' | 'fuzzy' | 'regex' = 'fuzzy';
   newKeyword = '';
   
+  // 行業預設關鍵詞模板
+  presetTemplates = [
+    { name: '加密貨幣', icon: '💰', keywords: ['USDT', 'BTC', 'ETH', '出U', '收U', '交易', '匯率', '代購', 'OTC', '換匯', '虛擬幣', '數字貨幣'] },
+    { name: '電商代購', icon: '🛒', keywords: ['代購', '代發', '價格', '報價', '批發', '一手貨源', '工廠直銷', '微商', '進貨', '分銷'] },
+    { name: '遊戲交易', icon: '🎮', keywords: ['代練', '遊戲幣', '賬號', '裝備', '充值', '金幣', '鑽石', '出號', '回收', '遊戲代付'] },
+    { name: '金融投資', icon: '📈', keywords: ['理財', '投資', '收益', '返利', '保本', '基金', '股票', '期貨', '外匯', '分紅'] },
+    { name: '社交營銷', icon: '📢', keywords: ['引流', '拉人', '推廣', '漲粉', '活躍', '群發', '私信', '精準客戶', '營銷', '獲客'] },
+    { name: 'IT 技術', icon: '💻', keywords: ['開發', '接單', '外包', '定制', '程序員', 'APP', '小程序', '網站', '軟件', '系統'] },
+  ];
+  
   // 計算屬性
   previewKeywords = computed(() => this.data().keywords.slice(0, 3));
   
@@ -270,6 +295,18 @@ export class KeywordSetEditorComponent implements OnInit {
   
   removeKeyword(index: number) {
     this.editKeywords.splice(index, 1);
+  }
+  
+  applyTemplate(keywords: string[]) {
+    for (const kw of keywords) {
+      if (!this.editKeywords.some(k => k.text.toLowerCase() === kw.toLowerCase())) {
+        this.editKeywords.push({
+          id: `kw-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          text: kw,
+          isNew: true
+        });
+      }
+    }
   }
   
   saveEdit() {

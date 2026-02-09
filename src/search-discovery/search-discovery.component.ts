@@ -2295,18 +2295,25 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       return;
     }
     
-    // 🆕 P1 優化：前置條件檢查 - 如果未加入群組，引導用戶先加入
-    if (resource.status !== 'joined' && resource.status !== 'monitoring') {
-      this.toast.warning('📥 提取成員需要先加入群組。請點擊「加入」按鈕。', 5000);
-      return;
-    }
-    
     // 🔧 修復：確保使用已加入帳號
     const joinedPhone = resource.joined_phone || this.mergedSelectedAccount()?.phone;
     
-    // 🆕 P1 優化：如果沒有可用帳號，提示
-    if (!joinedPhone) {
-      this.toast.warning('⚠️ 未找到已加入此群組的帳號，提取可能失敗。建議先選擇帳號重新加入。', 5000);
+    // 🆕 Phase3: 未加入群組 → 使用 join-and-extract 一鍵命令
+    if (resource.status !== 'joined' && resource.status !== 'monitoring') {
+      if (!joinedPhone) {
+        this.toast.warning('⚠️ 沒有可用帳號，請先登錄一個 Telegram 帳號。', 5000);
+        return;
+      }
+      this.toast.info('🚀 未加入群組，正在自動加入並提取成員...');
+      this.ipcService.send('join-and-extract', {
+        resourceId: resource.id,
+        telegramId: resource.telegram_id,
+        username: resource.username,
+        groupName: resource.title,
+        phone: joinedPhone,
+        limit: 200
+      });
+      return;
     }
     
     // 🔧 修復：使用 DialogService 打開成員提取配置對話框

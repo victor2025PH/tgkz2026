@@ -1161,32 +1161,92 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
                     'message': f'此群組有 {total_in_group:,} 成員，Telegram API 限制最多提取 10,000。建議結合「監控消息」收集更多活躍用戶。'
                 }
             
-            # 🆕 自動同步到統一聯繫人表
+            # 🆕 Phase3: 增量同步到 unified_contacts（替代全表掃描）
+            sync_stats = {'new': 0, 'updated': 0, 'duplicate': 0}
             try:
                 from unified_contacts import get_unified_contacts_manager
                 from database import db as sync_db
                 await sync_db.connect()
                 manager = get_unified_contacts_manager(sync_db)
-                sync_stats = await manager.sync_from_sources()
-                print(f"[Backend] Auto-synced to unified_contacts: {sync_stats}", file=sys.stderr)
-                self.send_log(f"✅ 已同步到資源中心: 新增 {sync_stats['synced']}，更新 {sync_stats['updated']}", "info")
-                # 🆕 Phase2: 通知前端資源中心刷新
+                
+                # 使用增量同步 — 只處理剛提取的成員（性能提升 10-100x）
+                chat_title = result.get('chat_title', group_name or '')
+                sync_stats = await manager.sync_members_batch(
+                    members=filtered_members,
+                    source_chat_id=str(chat_id or telegram_id or ''),
+                    source_chat_title=chat_title
+                )
+                print(f"[Backend] Incremental sync: {sync_stats}", file=sys.stderr)
+                
+                if sync_stats['new'] > 0:
+                    self.send_log(f"✅ 資源中心: 新增 {sync_stats['new']}，更新 {sync_stats['updated']}", "info")
+                elif sync_stats['updated'] > 0:
+                    self.send_log(f"♻️ 資源中心: 更新 {sync_stats['updated']} 個已有聯繫人", "info")
+                
                 self.send_event("unified-contacts:updated", {
                     "reason": "extract-members",
-                    "synced": sync_stats.get('synced', 0),
-                    "updated": sync_stats.get('updated', 0)
+                    "new": sync_stats.get('new', 0),
+                    "updated": sync_stats.get('updated', 0),
+                    "total_extracted": len(filtered_members)
                 })
             except Exception as sync_err:
-                import traceback
-                traceback.print_exc(file=sys.stderr)
-                print(f"[Backend] Auto-sync error: {sync_err}", file=sys.stderr)
+                print(f"[Backend] Incremental sync error: {sync_err}", file=sys.stderr)
+            
+            # 🆕 Phase3: 記錄提取歷史到 member_extraction_logs
+            try:
+                from database import db as log_db
+                await log_db.connect()
+                await log_db.execute('''
+                    INSERT INTO member_extraction_logs 
+                    (chat_id, chat_title, total_members, extracted_count, online_count, 
+                     recently_count, new_count, updated_count, duration_ms, account_phone, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    str(chat_id or telegram_id or ''),
+                    result.get('chat_title', group_name or ''),
+                    result.get('total_members', 0),
+                    len(filtered_members),
+                    result.get('online_count', 0),
+                    result.get('recently_count', 0),
+                    sync_stats.get('new', 0),
+                    sync_stats.get('updated', 0),
+                    0,  # duration_ms — 可後續補充
+                    current_phone if 'current_phone' in locals() else phone,
+                    'success'
+                ))
+                print(f"[Backend] Extraction log recorded", file=sys.stderr)
+            except Exception as log_err:
+                print(f"[Backend] Extraction log error: {log_err}", file=sys.stderr)
         else:
             self.send_log(f"❌ 提取失敗: {result['error']}", "error")
         
-        # 發送完成事件 - 🔧 修復：包含詳細錯誤信息
+        # 🆕 Phase3: 查詢上次提取記錄（用於前端顯示增量信息）
+        last_extraction = None
+        if result.get('success'):
+            try:
+                from database import db as hist_db
+                await hist_db.connect()
+                chat_id_str = str(chat_id or telegram_id or '')
+                last_log = await hist_db.fetch_one(
+                    """SELECT extracted_count, new_count, created_at 
+                       FROM member_extraction_logs 
+                       WHERE chat_id = ? AND status = 'success'
+                       ORDER BY created_at DESC LIMIT 1 OFFSET 1""",
+                    (chat_id_str,)
+                )
+                if last_log:
+                    last_extraction = {
+                        "lastCount": last_log.get('extracted_count') if hasattr(last_log, 'get') else last_log[0],
+                        "lastNewCount": last_log.get('new_count') if hasattr(last_log, 'get') else last_log[1],
+                        "lastTime": last_log.get('created_at') if hasattr(last_log, 'get') else last_log[2]
+                    }
+            except Exception:
+                pass
+        
+        # 發送完成事件 — 🆕 Phase3: 包含同步統計 + 歷史對比
         extraction_event = {
             "resourceId": resource_id,
-            "telegramId": str(telegram_id) if telegram_id else None,  # 🆕 回傳 telegramId 供前端使用
+            "telegramId": str(telegram_id) if telegram_id else None,
             "success": result.get('success', False),
             "members": result.get('members', []),
             "extracted": result.get('extracted', 0),
@@ -1196,7 +1256,15 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
             "error_code": result.get('error_code'),
             "error_details": result.get('error_details'),
             "limit_warning": result.get('limit_warning'),
-            "usedPhone": current_phone if 'current_phone' in locals() else phone  # 🆕 回傳實際使用的帳號
+            "usedPhone": current_phone if 'current_phone' in locals() else phone,
+            # 🆕 Phase3: 同步統計
+            "syncStats": {
+                "new": sync_stats.get('new', 0) if 'sync_stats' in locals() else 0,
+                "updated": sync_stats.get('updated', 0) if 'sync_stats' in locals() else 0,
+                "duplicate": sync_stats.get('duplicate', 0) if 'sync_stats' in locals() else 0
+            } if result.get('success') else None,
+            # 🆕 Phase3: 上次提取記錄
+            "lastExtraction": last_extraction
         }
         self.send_event("members-extracted", extraction_event)
         
@@ -1613,6 +1681,133 @@ async def handle_export_members(self, payload: Dict[str, Any]):
         self.send_event("members-exported", {
             "success": False,
             "error": str(e)
+        })
+
+
+async def handle_join_and_extract(self, payload: Dict[str, Any]):
+    """
+    🆕 Phase3: 一鍵加入群組並提取成員
+    
+    前端只需發送一個命令，後端自動完成：
+    1. 加入群組
+    2. 等待 Telegram 同步
+    3. 提取成員
+    4. 同步到 unified_contacts
+    """
+    import sys
+    print(f"[Backend] handle_join_and_extract called: {list(payload.keys())}", file=sys.stderr)
+    
+    resource_id = payload.get('resourceId') or payload.get('groupId')
+    telegram_id = payload.get('telegramId')
+    username = payload.get('username')
+    phone = payload.get('phone')
+    group_name = payload.get('groupName') or payload.get('groupTitle') or ''
+    limit = payload.get('limit', 200)
+    
+    try:
+        # Step 1: 構建加入 URL
+        if username:
+            join_url = f"https://t.me/{username.lstrip('@')}"
+        elif telegram_id:
+            join_url = str(telegram_id)
+        else:
+            self.send_event("members-extracted", {
+                "resourceId": resource_id,
+                "success": False,
+                "error": "缺少群組標識（username 或 telegramId）",
+                "members": [], "extracted": 0, "total": 0
+            })
+            return
+        
+        # Step 2: 選擇帳號
+        if not phone:
+            from database import db as _jae_db
+            await _jae_db.connect()
+            from domain.groups.handlers_impl import select_best_account
+            phone = await select_best_account(self.telegram_manager, _jae_db, operation='join')
+        
+        if not phone:
+            self.send_event("members-extracted", {
+                "resourceId": resource_id,
+                "success": False,
+                "error": "沒有可用的在線帳號",
+                "members": [], "extracted": 0, "total": 0
+            })
+            return
+        
+        # Step 3: 加入群組
+        self.send_event("members-extraction-progress", {
+            "resourceId": resource_id,
+            "status": "joining",
+            "message": f"正在加入群組 {group_name or username or ''}...",
+            "extracted": 0, "total": 0
+        })
+        
+        join_result = await self.telegram_manager.join_group(phone, join_url)
+        
+        if not join_result.get('success') and 'already' not in str(join_result.get('error', '')).lower():
+            self.send_event("members-extracted", {
+                "resourceId": resource_id,
+                "success": False,
+                "error": f"加入群組失敗: {join_result.get('error', '未知錯誤')}",
+                "members": [], "extracted": 0, "total": 0
+            })
+            return
+        
+        # Step 4: 更新數據庫
+        actual_chat_id = join_result.get('chat_id', telegram_id)
+        try:
+            from database import db as _jae_db2
+            await _jae_db2.connect()
+            if resource_id:
+                await _jae_db2.execute(
+                    """UPDATE discovered_resources 
+                       SET status = 'joined', joined_by_phone = ?, joined_at = CURRENT_TIMESTAMP,
+                           telegram_id = COALESCE(telegram_id, ?)
+                       WHERE id = ?""",
+                    (phone, str(actual_chat_id or ''), resource_id)
+                )
+        except Exception as db_err:
+            print(f"[Backend] join-and-extract DB update error: {db_err}", file=sys.stderr)
+        
+        self.send_log(f"✅ 已加入群組 {group_name}", "success")
+        
+        # Step 5: 等待同步
+        self.send_event("members-extraction-progress", {
+            "resourceId": resource_id,
+            "status": "syncing",
+            "message": "已加入群組，等待 Telegram 同步...",
+            "extracted": 0, "total": 0
+        })
+        import asyncio
+        await asyncio.sleep(5)
+        
+        # Step 6: 調用 extract-members（復用已有邏輯）
+        extract_payload = {
+            'resourceId': resource_id,
+            'telegramId': str(actual_chat_id or telegram_id or ''),
+            'username': username,
+            'phone': phone,
+            'groupName': group_name,
+            'limit': limit,
+            'chatId': str(actual_chat_id or telegram_id or '')
+        }
+        # 合併前端傳入的額外參數（filters 等）
+        for key in ['filters', 'autoSave', 'skipDuplicates']:
+            if key in payload:
+                extract_payload[key] = payload[key]
+        
+        await handle_extract_members(self, extract_payload)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        self.send_log(f"❌ 加入並提取失敗: {e}", "error")
+        self.send_event("members-extracted", {
+            "resourceId": resource_id,
+            "success": False,
+            "error": str(e),
+            "members": [], "extracted": 0, "total": 0
         })
 
 

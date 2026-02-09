@@ -532,18 +532,49 @@ import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, Collectio
                   </div>
                 </div>
                 
-                <!-- 主要操作按鈕 - 突出顯示 -->
-                <button (click)="openHistoryCollectionDialog()"
-                        [disabled]="monitoredMessagesCount() === 0"
-                        class="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:from-slate-600 disabled:to-slate-700">
-                  <span class="text-base">🔄</span>
-                  <span>開始收集用戶</span>
-                  @if (monitoredMessagesCount() > 0) {
+                <!-- 🔧 Phase8: 三態主操作按鈕 -->
+                @if (!selectedGroup()!.accountPhone) {
+                  <!-- 態1: 無帳號 → 引導分配 -->
+                  <button (click)="toggleAccountSelector()"
+                          class="w-full px-4 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20">
+                    <span class="text-base">⚠️</span>
+                    <span>需要先分配監控帳號</span>
+                  </button>
+                } @else if (monitoredMessagesCount() === 0 && !isCollectingFromHistory()) {
+                  <!-- 態2: 有帳號但無本地消息 → 直接從 Telegram 收集 -->
+                  <button (click)="collectFromHistory()"
+                          class="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20">
+                    <span class="text-base">📥</span>
+                    <span>從 Telegram 拉取歷史用戶</span>
+                  </button>
+                  <div class="mt-2 p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                    <p class="text-[10px] text-blue-400/80 text-center">
+                      無需等待監控累積，直接從群組歷史消息中收集活躍用戶
+                    </p>
+                  </div>
+                } @else if (isCollectingFromHistory()) {
+                  <!-- 收集中 -->
+                  <button disabled
+                          class="w-full px-4 py-3 bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 opacity-80">
+                    <span class="text-base animate-spin">🔄</span>
+                    <span>正在收集用戶...</span>
+                  </button>
+                } @else {
+                  <!-- 態3: 有消息 → 進階收集（彈窗配置） -->
+                  <button (click)="openHistoryCollectionDialog()"
+                          class="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20">
+                    <span class="text-base">🔄</span>
+                    <span>開始收集用戶</span>
                     <span class="px-2 py-0.5 bg-white/20 rounded-full text-xs">
                       可收集 ~{{ estimatedNewUsers() }} 人
                     </span>
-                  }
-                </button>
+                  </button>
+                  <div class="mt-2 p-2 bg-slate-800/30 rounded-lg">
+                    <p class="text-[10px] text-slate-500 text-center">
+                      從 {{ monitoredMessagesCount() | number }} 條消息中提取活躍用戶，無需管理員權限
+                    </p>
+                  </div>
+                }
                 
                 <!-- 次要操作 -->
                 <div class="flex gap-2 mt-3">
@@ -561,31 +592,6 @@ import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, Collectio
                     <span>刷新</span>
                   </button>
                 </div>
-                
-                <!-- 提示信息 -->
-                @if (monitoredMessagesCount() === 0) {
-                  <div class="mt-3 p-3 bg-slate-800/50 rounded-lg">
-                    <p class="text-xs text-slate-400 flex items-start gap-2">
-                      <span class="text-amber-400">💡</span>
-                      <span>開啟群組監控後，系統會自動記錄消息。累積一定消息後即可收集發言用戶。</span>
-                    </p>
-                  </div>
-                } @else {
-                  <div class="mt-3 p-2 bg-slate-800/30 rounded-lg">
-                    <p class="text-[10px] text-slate-500 text-center">
-                      從 {{ monitoredMessagesCount() | number }} 條消息中提取活躍用戶，無需管理員權限
-                    </p>
-                  </div>
-                }
-                
-                @if (!selectedGroup()!.accountPhone) {
-                  <div class="mt-3 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                    <p class="text-xs text-amber-400 flex items-center gap-2">
-                      <span>⚠️</span>
-                      <span>需要分配監控帳號才能收集用戶</span>
-                    </p>
-                  </div>
-                }
               </div>
 
               <!-- 綁定的詞集 -->

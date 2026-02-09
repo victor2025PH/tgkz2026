@@ -458,6 +458,11 @@ COMMAND_ALIAS_REGISTRY: Dict[str, tuple] = {
     'batch-reassign-accounts':     ('domain.groups.handlers_impl', 'handle_batch_reassign_accounts'),
     'batch-bind-keywords':         ('domain.groups.handlers_impl', 'handle_batch_bind_keywords'),
     
+    # === Phase8: 用戶收集（統一入口） ===
+    'get-group-collected-stats':   ('api.handlers.analytics_handlers_impl', 'handle_get_group_collected_stats'),
+    'collect-users-from-history':  ('domain.contacts.member_handlers_impl', 'handle_collect_users_from_history'),
+    'get-history-collection-stats':('api.handlers.analytics_handlers_impl', 'handle_get_history_collection_stats'),
+    
     # === Phase6-1: 數據庫性能統計 ===
     'get-db-performance':          ('api.handlers.system_handlers_impl', 'handle_get_db_performance'),
     

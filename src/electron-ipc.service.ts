@@ -775,6 +775,16 @@ export class ElectronIpcService implements OnDestroy {
     if (command === 'get-account-recommendations') {
       this.triggerEvent('account-recommendations-result', result);
     }
+    // 🔧 Phase8: 用戶收集相關
+    if (command === 'get-group-collected-stats') {
+      this.triggerEvent('group-collected-stats', result);
+    }
+    if (command === 'collect-users-from-history') {
+      this.triggerEvent('collect-from-history-result', result);
+    }
+    if (command === 'get-history-collection-stats') {
+      this.triggerEvent('history-collection-stats', result);
+    }
     // 🔧 Phase7-2: 批量操作結果
     if (command === 'batch-add-monitored-groups') {
       this.triggerEvent('batch-add-monitored-result', result);
@@ -1371,7 +1381,8 @@ export class ElectronIpcService implements OnDestroy {
       'batch-send:start', 'search-groups', 'get-trigger-rules', 'get-chat-templates',
       'get-group-collected-stats', 'batch-refresh-member-counts',
       'get-account-recommendations', 'reassign-group-account', 'get-db-performance',
-      'batch-add-monitored-groups', 'batch-reassign-accounts', 'batch-bind-keywords'
+      'batch-add-monitored-groups', 'batch-reassign-accounts', 'batch-bind-keywords',
+      'get-group-collected-stats', 'collect-users-from-history', 'get-history-collection-stats'
     ];
     return handledCommands.includes(command);
   }

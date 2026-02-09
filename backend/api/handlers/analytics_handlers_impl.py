@@ -389,9 +389,8 @@ async def handle_analyze_time_effectiveness(self, payload: Dict[str, Any]):
         self.send_event("time-analysis", {"success": False, "error": str(e)})
 
 async def handle_get_group_collected_stats(self, payload: Dict[str, Any]):
-    """🆕 獲取群組已收集用戶統計"""
+    """🔧 Phase8: 獲取群組可收集用戶統計（統一查詢 discussion_messages + chat_history 兩個數據源）"""
     import sys
-    print(f"[Backend] handle_get_group_collected_stats: {payload}", file=sys.stderr)
     
     group_id = payload.get('groupId')
     telegram_id = payload.get('telegramId')
@@ -402,46 +401,73 @@ async def handle_get_group_collected_stats(self, payload: Dict[str, Any]):
         
         collected_users = 0
         monitored_messages = 0
+        chat_history_messages = 0
         
         if telegram_id:
             telegram_id_str = str(telegram_id)
-            # 🔧 修復：查詢 discussion_messages 表（群組監控消息的正確位置）
-            try:
-                messages_result = await db.fetch_one(
-                    "SELECT COUNT(*) as count FROM discussion_messages WHERE discussion_id = ?",
-                    (telegram_id_str,)
-                )
-                if messages_result:
-                    monitored_messages = messages_result['count'] if isinstance(messages_result, dict) else (messages_result[0] if messages_result else 0)
-                
-                users_result = await db.fetch_one(
-                    "SELECT COUNT(DISTINCT user_id) as count FROM discussion_messages WHERE discussion_id = ? AND user_id IS NOT NULL AND user_id != ''",
-                    (telegram_id_str,)
-                )
-                if users_result:
-                    collected_users = users_result['count'] if isinstance(users_result, dict) else (users_result[0] if users_result else 0)
-                
-                print(f"[Backend] Stats from discussion_messages: messages={monitored_messages}, users={collected_users}", file=sys.stderr)
-            except Exception as dm_err:
-                print(f"[Backend] discussion_messages query failed: {dm_err}, trying collected_users", file=sys.stderr)
+            # 生成常見的 telegram_id 變體（解決 -100 前綴不一致問題）
+            tid_variants = {telegram_id_str}
+            bare_id = telegram_id_str.lstrip('-')
+            if bare_id.startswith('100'):
+                tid_variants.add(bare_id[3:])
+                tid_variants.add(f"-{bare_id}")
+            else:
+                tid_variants.add(f"-100{bare_id}")
+                tid_variants.add(f"100{bare_id}")
             
-            # 🆕 同時查詢 collected_users 表（從歷史消息收集的用戶）
-            try:
-                cu_result = await db.fetch_one(
-                    "SELECT COUNT(*) as count FROM collected_users WHERE source_group = ? OR source_group = ?",
-                    (telegram_id_str, f"-100{telegram_id_str.lstrip('-')}")
-                )
-                if cu_result:
-                    cu_count = cu_result['count'] if isinstance(cu_result, dict) else (cu_result[0] if cu_result else 0)
-                    if cu_count > collected_users:
-                        collected_users = cu_count
-                        print(f"[Backend] Updated collected_users from collected_users table: {collected_users}", file=sys.stderr)
-            except Exception:
-                pass  # 表可能不存在
+            # 數據源 1: discussion_messages（實時監控捕獲）
+            for tid in tid_variants:
+                try:
+                    result = await db.fetch_one(
+                        "SELECT COUNT(*) as msg_count, COUNT(DISTINCT user_id) as user_count FROM discussion_messages WHERE discussion_id = ? AND user_id IS NOT NULL AND user_id != ''",
+                        (tid,)
+                    )
+                    if result:
+                        mc = result['msg_count'] if isinstance(result, dict) else 0
+                        uc = result['user_count'] if isinstance(result, dict) else 0
+                        if mc > monitored_messages:
+                            monitored_messages = mc
+                        if uc > collected_users:
+                            collected_users = uc
+                except Exception:
+                    pass
+            
+            # 數據源 2: chat_history（歷史消息 — 收集 handler 實際查詢的表）
+            for tid in tid_variants:
+                try:
+                    result = await db.fetch_one(
+                        "SELECT COUNT(*) as msg_count, COUNT(DISTINCT sender_id) as user_count FROM chat_history WHERE chat_id = ? AND sender_id IS NOT NULL AND sender_id != ''",
+                        (tid,)
+                    )
+                    if result:
+                        mc = result['msg_count'] if isinstance(result, dict) else 0
+                        uc = result['user_count'] if isinstance(result, dict) else 0
+                        chat_history_messages = max(chat_history_messages, mc)
+                        if uc > collected_users:
+                            collected_users = uc
+                except Exception:
+                    pass
+            
+            # 合併：取兩個數據源的最大值
+            monitored_messages = max(monitored_messages, chat_history_messages)
+            
+            # 數據源 3: collected_users 表（已收集的用戶數）
+            cu_count = 0
+            for tid in tid_variants:
+                try:
+                    cu_result = await db.fetch_one(
+                        "SELECT COUNT(*) as count FROM collected_users WHERE source_group = ?",
+                        (tid,)
+                    )
+                    if cu_result:
+                        c = cu_result['count'] if isinstance(cu_result, dict) else 0
+                        cu_count = max(cu_count, c)
+                except Exception:
+                    pass
         
         self.send_event("group-collected-stats", {
             "groupId": group_id,
-            "collectedUsers": collected_users,
+            "collectedUsers": cu_count if cu_count > 0 else collected_users,
             "monitoredMessages": monitored_messages
         })
         

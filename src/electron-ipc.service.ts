@@ -811,6 +811,15 @@ export class ElectronIpcService implements OnDestroy {
       });
     }
     
+    // 🔧 批量發送：HTTP 錯誤時通知前端對話框恢復狀態
+    if (command === 'batch-send:start' && !result.success) {
+      this.triggerEvent('batch-send:complete', {
+        success: 0,
+        failed: 0,
+        error: result.error || 'HTTP 請求失敗'
+      });
+    }
+    
     // ==================== 線索管理相關 ====================
     if (command === 'get-leads' || command === 'get-leads-paginated') {
       this.triggerEvent('leads-updated', {

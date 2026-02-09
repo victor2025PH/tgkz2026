@@ -9338,6 +9338,7 @@ export class AppComponent implements OnDestroy, OnInit {
     this.ipcService.on('members-extracted', (data: { 
       success: boolean, 
       resourceId?: number, 
+      telegramId?: string,
       members?: any[], 
       total?: number, 
       error?: string,

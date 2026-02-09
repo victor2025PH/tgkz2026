@@ -5413,6 +5413,14 @@ class Database:
             print(f"Error resolving alert: {e}", file=sys.stderr)
             return False
     
+    async def get_recent_alerts(self, limit: int = 50, level: Optional[str] = None) -> List[Dict[str, Any]]:
+        """獲取最近告警（包括已解決）"""
+        return await self.get_alerts(limit=limit, level=level, include_resolved=True)
+    
+    async def get_unresolved_alerts(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """獲取未解決告警"""
+        return await self.get_alerts(limit=limit, include_resolved=False)
+    
     async def get_alerts(
         self,
         limit: int = 50,

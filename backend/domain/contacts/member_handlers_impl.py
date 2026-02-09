@@ -611,7 +611,22 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
         print(f"[Backend] Filters: bots={filter_bots}, offline={filter_offline}, chinese={chinese_only}", file=sys.stderr)
         
         if not effective_chat_id:
-            raise ValueError("群組 ID 不能為空。對於私有群組，需要先獲取其 Telegram ID。")
+            self.send_event("members-extracted", {
+                "resourceId": resource_id,
+                "success": False,
+                "error": "群組 ID 不能為空。對於私有群組，需要先獲取其 Telegram ID。",
+                "error_code": "E4004_NO_CHAT_ID",
+                "error_details": {
+                    "code": "E4004",
+                    "reason": "無法確定群組標識",
+                    "suggestion": "請先通過搜索發現或手動輸入群組鏈接來獲取群組信息",
+                    "action": "go_to_search"
+                },
+                "members": [],
+                "extracted": 0,
+                "total": 0
+            })
+            return
         
         chat_id = effective_chat_id
         
@@ -775,15 +790,38 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
                     else:
                         # 最後一次重試也失敗
                         result['error'] = f"群組同步未完成。{result.get('error', '')}"
+                        result['error_code'] = 'E4001_NOT_SYNCED'
                         result['error_details'] = {
+                            'code': 'E4001',
                             'reason': '帳號剛加入群組，Telegram 服務器尚未同步完成',
                             'suggestion': '請等待 30 秒後再試，或重新加入群組',
+                            'action': 'retry_later',
+                            'retry_after_seconds': 30,
                             'attempts': attempt + 1,
                             'can_auto_join': False
                         }
                         break
                 else:
-                    # 其他錯誤不重試
+                    # 其他錯誤不重試 — 附加結構化錯誤碼
+                    if not result.get('error_code'):
+                        err_msg = result.get('error', '')
+                        if 'CHAT_ADMIN_REQUIRED' in err_msg or '管理員' in err_msg:
+                            result['error_code'] = 'E4002_ADMIN_REQUIRED'
+                            result['error_details'] = {
+                                'code': 'E4002',
+                                'reason': '群組限制了成員列表訪問權限',
+                                'suggestion': '可嘗試使用「監控群組消息」方式收集活躍用戶',
+                                'action': 'suggest_monitor'
+                            }
+                        elif 'FLOOD' in err_msg.upper():
+                            result['error_code'] = 'E4003_RATE_LIMITED'
+                            result['error_details'] = {
+                                'code': 'E4003',
+                                'reason': 'Telegram 速率限制，請求過於頻繁',
+                                'suggestion': '請等待幾分鐘後再試',
+                                'action': 'retry_later',
+                                'retry_after_seconds': 120
+                            }
                     break
                     
             except Exception as retry_err:
@@ -834,12 +872,18 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
             # 🆕 自動同步到統一聯繫人表
             try:
                 from unified_contacts import get_unified_contacts_manager
-                from database import db as sync_db  # 🔧 修復：確保正確導入
+                from database import db as sync_db
                 await sync_db.connect()
                 manager = get_unified_contacts_manager(sync_db)
                 sync_stats = await manager.sync_from_sources()
                 print(f"[Backend] Auto-synced to unified_contacts: {sync_stats}", file=sys.stderr)
                 self.send_log(f"✅ 已同步到資源中心: 新增 {sync_stats['synced']}，更新 {sync_stats['updated']}", "info")
+                # 🆕 Phase2: 通知前端資源中心刷新
+                self.send_event("unified-contacts:updated", {
+                    "reason": "extract-members",
+                    "synced": sync_stats.get('synced', 0),
+                    "updated": sync_stats.get('updated', 0)
+                })
             except Exception as sync_err:
                 import traceback
                 traceback.print_exc(file=sys.stderr)

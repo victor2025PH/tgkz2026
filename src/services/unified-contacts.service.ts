@@ -229,6 +229,14 @@ export class UnifiedContactsService {
       }
     });
     
+    // 🆕 Phase2: 監聽自動同步事件（後端加入/監控/提取後自動觸發）
+    this.ipc.on('unified-contacts:updated', (data: any) => {
+      console.log('[UnifiedContacts] Auto-sync triggered by:', data?.reason);
+      // 自動刷新聯繫人列表和統計
+      this.loadContacts();
+      this.loadStats();
+    });
+    
     // 監聽更新結果
     this.ipc.on('unified-contacts:update-result', (data: any) => {
       console.log('[UnifiedContacts] Update result:', data);

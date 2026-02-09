@@ -640,6 +640,16 @@ async def handle_add_monitored_group(self, payload: Dict[str, Any]):
                     "username": username,
                     "newStatus": "monitoring"
                 })
+                
+                # 🆕 Phase2: 自動同步到 unified_contacts
+                try:
+                    from unified_contacts import get_unified_contacts_manager
+                    manager = get_unified_contacts_manager(db)
+                    await manager.sync_from_sources()
+                    self.send_event("unified-contacts:updated", {"reason": "add-monitored-group"})
+                except Exception as sync_err:
+                    print(f"[Backend] Auto-sync after add-monitored-group failed: {sync_err}", file=sys.stderr)
+                    
             except Exception as db_err:
                 print(f"[Backend] Error updating resource status: {db_err}", file=sys.stderr)
         
@@ -1389,6 +1399,17 @@ async def handle_join_and_monitor_resource(self, payload: Dict[str, Any]):
                 await db.rollback_transaction()
                 raise Exception(f"數據庫寫入失敗: {db_err}")
             
+            # 🆕 Phase2: 自動同步到 unified_contacts
+            try:
+                from unified_contacts import get_unified_contacts_manager
+                sync_db = db
+                manager = get_unified_contacts_manager(sync_db)
+                await manager.sync_from_sources()
+                self.send_event("unified-contacts:updated", {"reason": "join-and-monitor"})
+            except Exception as sync_err:
+                import sys as _sys
+                print(f"[Backend] Auto-sync after join-and-monitor failed: {sync_err}", file=_sys.stderr)
+            
             # 🔧 P0: 返回更完整的信息給前端
             self.send_event("join-and-monitor-complete", {
                 "success": True,
@@ -1399,7 +1420,7 @@ async def handle_join_and_monitor_resource(self, payload: Dict[str, Any]):
                 "monitored": True,
                 "memberCount": members_count,
                 "phone": phone,
-                "status": "joined"  # 🆕 返回新狀態
+                "status": "joined"
             })
         else:
             # 🆕 獲取更友好的錯誤信息
@@ -1416,6 +1437,140 @@ async def handle_join_and_monitor_resource(self, payload: Dict[str, Any]):
             "success": False,
             "error": friendly_error
         })
+
+async def handle_join_resource(self, payload: Dict[str, Any]):
+    """
+    僅加入群組（不添加到監控列表）
+    更新 discovered_resources 狀態 + 自動同步到 unified_contacts
+    
+    與 join-and-monitor-resource 的區別：
+    - 不寫入 monitored_groups 表
+    - 不啟動關鍵詞監控
+    - 但會更新 discovered_resources 和 unified_contacts
+    """
+    import sys
+    try:
+        resource_id = payload.get('resourceId')
+        username = payload.get('username')
+        telegram_id = payload.get('telegramId')
+        title = payload.get('title', '')
+        phone = payload.get('phone')
+        
+        if not username and not telegram_id:
+            raise ValueError("需要 username 或 telegramId")
+        
+        # 構建群組 URL
+        if username:
+            group_url = f"https://t.me/{username.lstrip('@')}"
+        elif telegram_id:
+            group_url = str(telegram_id)
+        else:
+            raise ValueError("需要 username 或 telegramId")
+        
+        # 獲取可用帳號
+        if not phone:
+            connected_accounts = [
+                p for p, c in self.telegram_manager.clients.items()
+                if c and c.is_connected
+            ]
+            if not connected_accounts:
+                raise ValueError("沒有可用的已連接帳號，請先連接一個帳號")
+            phone = connected_accounts[0]
+            self.send_log(f"📱 自動選擇帳號: {phone[:4]}****", "info")
+        
+        # 加入群組
+        self.send_log(f"🚀 正在加入: {title}", "info")
+        join_result = await self.telegram_manager.join_group(phone, group_url)
+        
+        if join_result.get('success'):
+            self.send_log(f"✅ 已加入群組: {title}", "success")
+            
+            from database import db
+            await db.connect()
+            
+            # 獲取群組信息
+            members_count = 0
+            chat_telegram_id = None
+            resource_type = 'group'
+            try:
+                client = None
+                if phone and phone in self.telegram_manager.clients:
+                    client = self.telegram_manager.clients[phone]
+                    if client and not client.is_connected:
+                        client = None
+                
+                if not client:
+                    for c in self.telegram_manager._clients.values():
+                        if c and c.is_connected:
+                            client = c
+                            break
+                
+                if client:
+                    chat_target = username or telegram_id
+                    if chat_target:
+                        try:
+                            chat_info = await client.get_chat(chat_target)
+                            if chat_info:
+                                members_count = getattr(chat_info, 'members_count', 0) or 0
+                                chat_telegram_id = chat_info.id
+                                from pyrogram.enums import ChatType
+                                if chat_info.type == ChatType.CHANNEL:
+                                    resource_type = 'channel'
+                                elif chat_info.type == ChatType.SUPERGROUP:
+                                    resource_type = 'supergroup'
+                        except Exception as e:
+                            print(f"[Backend] join-resource get_chat error: {e}", file=sys.stderr)
+            except Exception as chat_err:
+                print(f"[Backend] Error getting member count: {chat_err}", file=sys.stderr)
+            
+            # 僅更新 discovered_resources（不寫入 monitored_groups）
+            tg_id_str = str(chat_telegram_id) if chat_telegram_id else None
+            if resource_id:
+                await db.execute(
+                    """UPDATE discovered_resources 
+                       SET status = 'joined', member_count = ?, resource_type = ?, 
+                           joined_by_phone = ?, joined_at = CURRENT_TIMESTAMP,
+                           telegram_id = COALESCE(telegram_id, ?)
+                       WHERE id = ?""",
+                    (members_count, resource_type, phone, tg_id_str, resource_id))
+            
+            # 🆕 自動同步到 unified_contacts
+            try:
+                from unified_contacts import get_unified_contacts_manager
+                sync_db = db
+                manager = get_unified_contacts_manager(sync_db)
+                await manager.sync_from_sources()
+                self.send_log(f"🔄 已同步到資源中心", "info")
+                self.send_event("unified-contacts:updated", {"reason": "join-resource"})
+            except Exception as sync_err:
+                print(f"[Backend] Auto-sync after join-resource failed: {sync_err}", file=sys.stderr)
+            
+            # 發送完成事件（兼容 join-and-monitor-complete 格式）
+            self.send_event("join-and-monitor-complete", {
+                "success": True,
+                "resourceId": resource_id,
+                "telegramId": telegram_id,
+                "username": username,
+                "joined": True,
+                "monitored": False,  # 區別：未加入監控
+                "memberCount": members_count,
+                "phone": phone,
+                "status": "joined"
+            })
+        else:
+            raw_error = join_result.get('error', '加入失敗')
+            raise Exception(raw_error)
+            
+    except Exception as e:
+        error_str = str(e)
+        friendly_error = self._get_friendly_join_error(error_str)
+        
+        self.send_log(f"❌ 加入失敗: {friendly_error}", "error")
+        self.send_event("join-and-monitor-complete", {
+            "success": False,
+            "error": friendly_error
+        })
+
 
 async def handle_join_and_monitor_with_account(self, payload: Dict[str, Any]):
     """使用指定帳號加入並監控群組"""

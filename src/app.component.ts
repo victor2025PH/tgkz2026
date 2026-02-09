@@ -3548,6 +3548,34 @@ export class AppComponent implements OnDestroy, OnInit {
         this.toastService.error(`❌ ${data.error}\n\n${details.suggestion || '請刷新資源列表'}`);
         break;
         
+      // 🆕 Phase2: 結構化錯誤碼支持
+      case 'E4001_NOT_SYNCED':
+        this.showExtractionErrorWithAction(
+          '⚠️ 群組同步未完成',
+          details.reason || '帳號剛加入群組，Telegram 服務器尚未同步完成',
+          details.suggestion || '請等待 30 秒後再試',
+          undefined
+        );
+        break;
+        
+      case 'E4002_ADMIN_REQUIRED':
+        this.showExtractionErrorWithAction(
+          '🔒 成員列表受限',
+          details.reason || '群組限制了成員列表訪問權限',
+          details.suggestion || '可嘗試使用「監控群組消息」方式收集活躍用戶',
+          'monitor'
+        );
+        break;
+        
+      case 'E4003_RATE_LIMITED':
+        const retrySeconds = (details as any).retry_after_seconds || 120;
+        this.toastService.warning(`⏳ Telegram 速率限制\n\n請等待 ${retrySeconds} 秒後再試`, retrySeconds > 60 ? 10000 : 5000);
+        break;
+        
+      case 'E4004_NO_CHAT_ID':
+        this.toastService.warning(`⚠️ 無法確定群組標識\n\n${details.suggestion || '請先通過搜索發現獲取群組信息'}`, 5000);
+        break;
+        
       default:
         // 其他錯誤
         this.toastService.error(`❌ 提取失敗: ${data.error}`);

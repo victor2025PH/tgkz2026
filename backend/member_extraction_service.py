@@ -416,9 +416,30 @@ class MemberExtractionService:
                     chat = None
             
             if not chat:
-                # 獲取群組信息
-                chat = await client.get_chat(chat_id)
-                # 緩存成功解析的 peer
+                # 獲取群組信息 — 🆕 支持自動 -100 前綴（正整數 ID → Pyrogram 超級群組格式）
+                try:
+                    chat = await client.get_chat(chat_id)
+                except (PeerIdInvalid, ChannelInvalid) as resolve_err:
+                    # 正整數 > 10^9 通常是超級群組的原始 Telegram ID
+                    # Pyrogram 內部使用 -100 前綴格式（例: 3431196868 → -1003431196868）
+                    chat_id_int = None
+                    if isinstance(chat_id, int) and chat_id > 1000000000:
+                        chat_id_int = chat_id
+                    elif isinstance(chat_id, str) and chat_id.isdigit() and int(chat_id) > 1000000000:
+                        chat_id_int = int(chat_id)
+                    
+                    if chat_id_int:
+                        alt_id = int(f"-100{chat_id_int}")
+                        self.log(f"🔄 PeerIdInvalid({chat_id}) → 嘗試超級群組格式: {alt_id}", "info")
+                        try:
+                            chat = await client.get_chat(alt_id)
+                            chat_id = alt_id  # 更新 chat_id 供後續 get_chat_members 使用
+                        except Exception:
+                            raise resolve_err  # -100 也失敗，拋出原始錯誤
+                    else:
+                        raise resolve_err
+                
+                # 緩存成功解析的 peer（用實際解析成功的 chat_id）
                 self._cache_peer(phone, str(chat_id), {
                     'chat_id': chat.id,
                     'title': chat.title,
@@ -846,7 +867,22 @@ class MemberExtractionService:
         self.log(f"🔍 開始從消息歷史提取活躍用戶: {chat_id}")
         
         try:
-            chat = await client.get_chat(chat_id)
+            # 🆕 支持自動 -100 前綴
+            try:
+                chat = await client.get_chat(chat_id)
+            except (PeerIdInvalid, ChannelInvalid):
+                chat_id_int = None
+                if isinstance(chat_id, int) and chat_id > 1000000000:
+                    chat_id_int = chat_id
+                elif isinstance(chat_id, str) and chat_id.isdigit() and int(chat_id) > 1000000000:
+                    chat_id_int = int(chat_id)
+                if chat_id_int:
+                    alt_id = int(f"-100{chat_id_int}")
+                    self.log(f"🔄 PeerIdInvalid → 嘗試: {alt_id}", "info")
+                    chat = await client.get_chat(alt_id)
+                    chat_id = alt_id
+                else:
+                    raise
             result['chat_title'] = sanitize_text(chat.title) if chat.title else str(chat_id)
             
             # 已提取的用戶 ID 集合（避免與 get_chat_members 結果重複）

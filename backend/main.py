@@ -408,6 +408,9 @@ def check_router_available():
         ROUTER_AVAILABLE = False
         return False
 
+# 🔧 Phase4: 立即執行檢測（修復 ROUTER_AVAILABLE 永遠為 False）
+check_router_available()
+
 
 # ============================================================
 # 🆕 Phase 3: 命令別名註冊表 (Command Alias Registry)

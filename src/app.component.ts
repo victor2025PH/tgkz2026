@@ -14199,6 +14199,9 @@ export class AppComponent implements OnDestroy, OnInit {
       case 'goto-resource-center':
         this.currentView.set('resource-center');
         break;
+      case 'goto-search-discovery':
+        this.currentView.set('search-discovery');
+        break;
       case 'goto-accounts':
         this.currentView.set('monitoring-accounts');
         break;

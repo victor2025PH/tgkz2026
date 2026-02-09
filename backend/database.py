@@ -3177,8 +3177,14 @@ class Database:
             print(f"Error in fetch_one: {e}")
             return None
     
-    async def execute(self, query: str, params: tuple = None) -> int:
-        """異步執行 SQL 語句並返回影響的行數"""
+    async def execute(self, query: str, params: tuple = None, auto_commit: bool = True) -> int:
+        """異步執行 SQL 語句並返回影響的行數
+        
+        Args:
+            query: SQL 語句
+            params: 參數元組
+            auto_commit: 是否自動提交（在事務中應設為 False）
+        """
         import sys
         import os
         # 🆕 只在 DEBUG 模式下打印日志，避免日志過多
@@ -3195,7 +3201,8 @@ class Database:
                     cursor.execute(query, params)
                 else:
                     cursor.execute(query)
-                conn.commit()
+                if auto_commit:
+                    conn.commit()
                 affected = cursor.rowcount
                 conn.close()
                 return affected
@@ -3208,12 +3215,28 @@ class Database:
                 cursor = await self._connection.execute(query, params)
             else:
                 cursor = await self._connection.execute(query)
-            await self._connection.commit()
+            if auto_commit:
+                await self._connection.commit()
             return cursor.rowcount
         except Exception as e:
             # 只在真正出錯時打印錯誤日志
             print(f"[Database] execute ERROR: {e}", file=sys.stderr)
             return 0
+
+    async def begin_transaction(self):
+        """開始一個數據庫事務"""
+        await self.connect()
+        await self._connection.execute("BEGIN IMMEDIATE")
+    
+    async def commit_transaction(self):
+        """提交當前事務"""
+        if self._connection:
+            await self._connection.commit()
+    
+    async def rollback_transaction(self):
+        """回滾當前事務"""
+        if self._connection:
+            await self._connection.rollback()
     
     async def execute_insert(self, query: str, params: tuple = None) -> int:
         """異步執行 INSERT 語句並返回新插入行的 ID"""
@@ -3423,6 +3446,7 @@ class Database:
                     name TEXT NOT NULL,
                     link TEXT,
                     telegram_id TEXT,
+                    resource_id INTEGER,
                     keyword_set_id INTEGER,
                     keyword_set_ids TEXT DEFAULT '[]',
                     account_phone TEXT,
@@ -3432,10 +3456,12 @@ class Database:
                     member_count INTEGER DEFAULT 0,
                     resource_type TEXT DEFAULT 'group',
                     can_extract_members INTEGER DEFAULT 1,
+                    sync_status TEXT DEFAULT 'synced',
                     last_active TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (keyword_set_id) REFERENCES keyword_sets(id) ON DELETE SET NULL
+                    FOREIGN KEY (keyword_set_id) REFERENCES keyword_sets(id) ON DELETE SET NULL,
+                    FOREIGN KEY (resource_id) REFERENCES discovered_resources(id) ON DELETE SET NULL
                 )
             ''')
             

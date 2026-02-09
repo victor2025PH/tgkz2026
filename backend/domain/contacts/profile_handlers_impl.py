@@ -44,75 +44,7 @@ async def handle_get_user_memories(self, payload: Dict[str, Any]):
         })
 
 
-async def handle_get_user_tags(self, payload: Dict[str, Any]):
-    """🆕 Phase1: 獲取用戶標籤"""
-    user_id = payload.get('userId', '')
-    
-    try:
-        from auto_tagging_service import get_tagging_service
-        service = get_tagging_service()
-        
-        tags = await service.get_user_tags(user_id)
-        
-        self.send_event("user-tags", {
-            "success": True,
-            "data": tags
-        })
-    except Exception as e:
-        print(f"[Backend] Error getting user tags: {e}", file=sys.stderr)
-        self.send_event("user-tags", {
-            "success": False,
-            "error": str(e)
-        })
 
-
-async def handle_add_user_tag(self, payload: Dict[str, Any]):
-    """🆕 Phase1: 手動添加用戶標籤"""
-    user_id = payload.get('userId', '')
-    tag_name = payload.get('tagName', '')
-    category = payload.get('category', 'custom')
-    
-    try:
-        from auto_tagging_service import get_tagging_service, TagCategory
-        service = get_tagging_service()
-        
-        cat = TagCategory(category) if category in [e.value for e in TagCategory] else TagCategory.CUSTOM
-        await service.add_manual_tag(user_id, tag_name, cat)
-        
-        self.send_event("user-tag-added", {
-            "success": True,
-            "tagName": tag_name
-        })
-        self.send_log(f"已為用戶 {user_id} 添加標籤: {tag_name}", "success")
-    except Exception as e:
-        print(f"[Backend] Error adding user tag: {e}", file=sys.stderr)
-        self.send_event("user-tag-added", {
-            "success": False,
-            "error": str(e)
-        })
-
-
-async def handle_remove_user_tag(self, payload: Dict[str, Any]):
-    """🆕 Phase1: 移除用戶標籤"""
-    user_id = payload.get('userId', '')
-    tag_id = payload.get('tagId', '')
-    
-    try:
-        from auto_tagging_service import get_tagging_service
-        service = get_tagging_service()
-        
-        await service.remove_tag(user_id, tag_id)
-        
-        self.send_event("user-tag-removed", {
-            "success": True,
-            "tagId": tag_id
-        })
-    except Exception as e:
-        print(f"[Backend] Error removing user tag: {e}", file=sys.stderr)
-        self.send_event("user-tag-removed", {
-            "success": False,
-            "error": str(e)
-        })
 
 
 async def handle_get_users_by_tag(self, payload: Dict[str, Any]):

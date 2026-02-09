@@ -12,11 +12,21 @@ from typing import Any, Dict, List, Optional
 
 from service_context import get_service_context
 
+from database import db
+import re
+from error_handler import handle_error, AppError, ErrorType
+from validators import validate_group_url, GroupValidator, ValidationError
+from service_locator import (
+    get_group_poller,
+    get_init_group_poller,
+    group_search_service,
+    jiso_search_service,
+    resource_discovery
+)
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
 # This is a transitional pattern - later, replace self.xxx with ctx.xxx
-
 
 async def handle_create_group(self, payload: Dict[str, Any]):
     """創建新的 Telegram 群組"""
@@ -150,7 +160,6 @@ async def handle_create_group(self, payload: Dict[str, Any]):
             "error": friendly_error
         })
 
-
 # ==================== 🔧 群聊協作：群組管理方法 ====================
 
 async def handle_group_invite_user(self, payload: Dict[str, Any]):
@@ -246,7 +255,6 @@ async def handle_group_invite_user(self, payload: Dict[str, Any]):
         self.send_event("group:invite-user-result", result)
         return result
 
-
 async def handle_group_add_member(self, payload: Dict[str, Any]):
     """添加成員到群組（邀請其他帳號）"""
     import sys
@@ -304,7 +312,6 @@ async def handle_group_add_member(self, payload: Dict[str, Any]):
         self.send_event("group:add-member-result", result)
         return result
 
-
 async def handle_group_send_msg(self, payload: Dict[str, Any]):
     """在群組中發送消息（群聊協作用）"""
     import sys
@@ -352,7 +359,6 @@ async def handle_group_send_msg(self, payload: Dict[str, Any]):
         import traceback
         print(f"[GroupCollab] 發送消息異常: {traceback.format_exc()}", file=sys.stderr)
         return {"success": False, "error": str(e)}
-
 
 async def handle_group_monitor_messages(self, payload: Dict[str, Any]):
     """
@@ -429,7 +435,6 @@ async def handle_group_monitor_messages(self, payload: Dict[str, Any]):
         import traceback
         print(f"[GroupCollab] 啟動群組監控失敗: {traceback.format_exc()}", file=sys.stderr)
         return {"success": False, "error": str(e)}
-
 
 async def handle_add_group(self, payload: Dict[str, Any]):
     """Handle add-group command"""
@@ -556,7 +561,6 @@ async def handle_add_group(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_log(f"Error adding group: {str(e)}", "error")
         handle_error(e, {"command": "add-group", "payload": payload})
-
 
 async def handle_search_groups(self, payload: Dict[str, Any]):
     """
@@ -956,7 +960,6 @@ async def handle_search_groups(self, payload: Dict[str, Any]):
             "groups": []
         })
 
-
 async def handle_join_group(self, payload: Dict[str, Any]):
     """Handle join-group command - manually join a group with a specific account"""
     import sys
@@ -1021,7 +1024,6 @@ async def handle_join_group(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
 async def handle_remove_group(self, payload: Dict[str, Any]):
     """Handle remove-group command - 移除監控群組"""
     try:
@@ -1082,7 +1084,6 @@ async def handle_remove_group(self, payload: Dict[str, Any]):
         traceback.print_exc()
         self.send_log(f"❌ 移除群組失敗: {str(e)}", "error")
         self.send_event("remove-group-result", {"success": False, "error": str(e)})
-
 
 async def handle_leave_group(self, payload: Dict[str, Any]):
     """從 Telegram 退出群組"""
@@ -1148,7 +1149,6 @@ async def handle_leave_group(self, payload: Dict[str, Any]):
             "success": False,
             "error": str(e)
         })
-
 
 async def handle_join_and_monitor_resource(self, payload: Dict[str, Any]):
     """加入群組並添加到監控"""
@@ -1326,7 +1326,6 @@ async def handle_join_and_monitor_resource(self, payload: Dict[str, Any]):
             "error": friendly_error
         })
 
-
 async def handle_join_and_monitor_with_account(self, payload: Dict[str, Any]):
     """使用指定帳號加入並監控群組"""
     try:
@@ -1471,9 +1470,7 @@ async def handle_join_and_monitor_with_account(self, payload: Dict[str, Any]):
                     raise ValueError("缺少加入方式：請提供群組 username 或邀請鏈接")
                 
                 self.send_log(f"📝 資源不存在，正在創建新資源...", "info")
-                # 使用 resource_discovery 添加資源
-                from resource_discovery import ResourceDiscovery
-                resource_discovery = ResourceDiscovery()
+                # 使用 resource_discovery 添加資源（來自 service_locator）
                 
                 # 生成有效的 telegram_id
                 valid_telegram_id = username or f"invite_{int(time.time())}"
@@ -1757,7 +1754,6 @@ async def handle_join_and_monitor_with_account(self, payload: Dict[str, Any]):
             "success": False,
             "error": friendly_error
         })
-
 
 async def handle_get_admin_groups(self, payload: Dict[str, Any]):
     """獲取用戶作為管理員的群組列表"""

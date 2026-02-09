@@ -14,6 +14,10 @@ from service_context import get_service_context
 from database import db
 from config import config
 
+from error_handler import handle_error, AppError, ErrorType
+from message_queue import MessagePriority
+from service_locator import get_SpintaxGenerator
+
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -465,6 +469,7 @@ async def handle_validate_spintax(self, payload: Dict[str, Any]):
     """驗證 Spintax 語法"""
     try:
         content = payload.get('content', '')
+        SpintaxGenerator = get_SpintaxGenerator()
         result = SpintaxGenerator.preview_variants(content, 5)
         result['success'] = result.get('valid', False)
         

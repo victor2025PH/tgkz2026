@@ -13,6 +13,8 @@ from typing import Any, Dict, List, Optional
 from service_context import get_service_context
 from database import db
 
+import re
+from service_locator import resource_discovery, jiso_search_service, get_DiscoveredResource
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -205,6 +207,7 @@ async def handle_search_jiso(self, payload: Dict[str, Any]):
                         has_real_link = bool(item.get("link") or (username and not username.startswith("jiso_")))
                         
                         # 创建 DiscoveredResource 对象
+                        DiscoveredResource = get_DiscoveredResource()
                         resource = DiscoveredResource(
                             telegram_id=username or f"jiso_{saved_count}",
                             username=username if not username.startswith("jiso_") else "",  # jiso_ 開頭不是真實 username

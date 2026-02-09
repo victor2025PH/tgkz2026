@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from service_context import get_service_context
 from database import db
 
+from service_locator import ai_auto_chat, get_knowledge_search_engine, get_document_manager
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -104,41 +105,6 @@ async def handle_learn_from_history(self, payload: Dict[str, Any]):
         })
 
 
-async def handle_get_knowledge_stats(self):
-    """獲取知識庫統計"""
-    try:
-        from knowledge_learner import knowledge_learner
-        await knowledge_learner.initialize(use_neural=False)
-        
-        stats = await knowledge_learner.get_statistics()
-        self.send_event("knowledge-stats", stats)
-        
-    except Exception as e:
-        self.send_event("knowledge-stats", {'error': str(e)})
-
-
-async def handle_search_knowledge(self, payload: Dict[str, Any]):
-    """搜索知識庫"""
-    try:
-        from knowledge_learner import knowledge_learner
-        await knowledge_learner.initialize(use_neural=False)
-        
-        query = payload.get('query', '')
-        limit = payload.get('limit', 5)
-        
-        results = await knowledge_learner.search_knowledge(query, limit)
-        
-        self.send_event("knowledge-search-result", {
-            'success': True,
-            'query': query,
-            'results': results
-        })
-        
-    except Exception as e:
-        self.send_event("knowledge-search-result", {
-            'success': False,
-            'error': str(e)
-        })
 
 
 async def handle_get_knowledge_gaps(self, payload: Dict[str, Any]):
@@ -168,6 +134,7 @@ async def handle_get_knowledge_gaps(self, payload: Dict[str, Any]):
 async def handle_init_knowledge_base(self):
     """Initialize knowledge base"""
     try:
+        search_engine = get_knowledge_search_engine()
         await search_engine.initialize()
         stats = await search_engine.get_stats()
         
@@ -187,6 +154,7 @@ async def handle_init_knowledge_base(self):
 async def handle_get_knowledge_stats(self):
     """Get knowledge base statistics"""
     try:
+        search_engine = get_knowledge_search_engine()
         stats = await search_engine.get_stats()
         self.send_event("knowledge-stats", {
             "success": True,
@@ -208,6 +176,7 @@ async def handle_add_document(self, payload: Dict[str, Any]):
         tags = payload.get('tags', [])
         content = payload.get('content')  # For direct text input
         
+        document_manager = get_document_manager()
         if content and title:
             result = await document_manager.add_document_from_text(
                 title=title,
@@ -633,6 +602,7 @@ async def handle_get_documents(self, payload: Dict[str, Any]):
     """Get all documents"""
     try:
         category = payload.get('category')
+        document_manager = get_document_manager()
         documents = await document_manager.get_all_documents(category)
         
         self.send_event("documents-list", {
@@ -650,6 +620,7 @@ async def handle_delete_document(self, payload: Dict[str, Any]):
     """Delete a document"""
     try:
         doc_id = payload.get('id')
+        document_manager = get_document_manager()
         await document_manager.delete_document(doc_id)
         
         self.send_event("document-deleted", {"success": True, "id": doc_id})
@@ -670,6 +641,7 @@ async def handle_search_knowledge(self, payload: Dict[str, Any]):
         include_videos = payload.get('includeVideos', True)
         limit = payload.get('limit', 10)
         
+        search_engine = get_knowledge_search_engine()
         results = await search_engine.search(
             query=query,
             include_docs=include_docs,

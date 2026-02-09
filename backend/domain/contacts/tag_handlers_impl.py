@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from service_context import get_service_context
 
+from service_locator import member_extraction_service, get_batch_ops
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -107,28 +108,6 @@ async def handle_batch_remove_tag(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
-async def handle_get_all_tags(self):
-    """獲取所有標籤"""
-    try:
-        batch_ops = get_batch_ops()
-        if not batch_ops:
-            self.send_event("all-tags", {
-                "success": False,
-                "error": "批量操作系統未初始化"
-            })
-            return
-        
-        result = await batch_ops.get_all_tags()
-        
-        self.send_event("all-tags", result)
-        
-    except Exception as e:
-        self.send_log(f"獲取標籤列表失敗: {str(e)}", "error")
-        self.send_event("all-tags", {
-            "success": False,
-            "error": str(e)
-        })
 
 
 async def handle_create_tag(self, payload: Dict[str, Any]):

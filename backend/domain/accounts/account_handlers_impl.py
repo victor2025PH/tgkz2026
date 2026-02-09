@@ -14,6 +14,12 @@ from service_context import get_service_context
 from database import db
 from config import config
 
+import os
+import gc
+from error_handler import handle_error, AppError, ErrorType
+from validators import validate_account, AccountValidator, ValidationError
+from pathlib import Path
+from service_locator import get_DeviceFingerprintGenerator, get_ProxyManager, get_WarmupManager
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -931,7 +937,8 @@ async def handle_login_account(self, payload: Any):
                 
                 if warmup_enabled and not warmup_start_date:
                     # Start Warmup (datetime 已在文件頂部全局導入)
-                    warmup_info = WarmupManager.start_warmup(account_id, datetime.now())
+                    _WarmupManager = get_WarmupManager()
+                    warmup_info = _WarmupManager.start_warmup(account_id, datetime.now())
                     
                     await db.update_account(account_id, {
                         'warmupStartDate': warmup_info['warmup_start_date'],
@@ -948,7 +955,8 @@ async def handle_login_account(self, payload: Any):
                     print(f"[Backend] Warmup started for {phone}: Stage {stage_info.get('stage')} - {stage_info.get('stage_name')}", file=sys.stderr)
                 elif warmup_enabled and warmup_start_date:
                     # Update Warmup progress
-                    warmup_progress = WarmupManager.get_warmup_progress(account)
+                    _WarmupManager = get_WarmupManager()
+                    warmup_progress = _WarmupManager.get_warmup_progress(account)
                     if warmup_progress.get('enabled') and warmup_progress.get('stage'):
                         stage_info = warmup_progress['stage']
                         await db.update_account(account_id, {

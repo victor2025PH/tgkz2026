@@ -12,11 +12,21 @@ from typing import Any, Dict, List, Optional
 
 from service_context import get_service_context
 
+from database import db
+import re
+from service_locator import (
+    ai_auto_chat,
+    auto_funnel,
+    connection_monitor,
+    group_join_service,
+    group_search_service,
+    private_message_handler,
+    private_message_poller
+)
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
 # This is a transitional pattern - later, replace self.xxx with ctx.xxx
-
 
 async def handle_start_monitoring(self):
     """Handle start-monitoring command with Pyrogram"""
@@ -465,7 +475,6 @@ async def handle_start_monitoring(self):
         traceback.print_exc(file=sys.stderr)
         return {"success": False, "error": str(e), "reason": "exception", "isMonitoring": False}
 
-
 async def handle_stop_monitoring(self):
     """Handle stop-monitoring command"""
     try:
@@ -498,25 +507,6 @@ async def handle_stop_monitoring(self):
     except Exception as e:
         self.send_log(f"Error stopping monitoring: {str(e)}", "error")
         return {"success": False, "error": str(e), "isMonitoring": self.is_monitoring}
-
-
-async def handle_get_monitoring_status(self):
-    """Handle get-monitoring-status command - 返回當前監控狀態"""
-    import sys
-    print(f"[Backend] handle_get_monitoring_status called, is_monitoring={self.is_monitoring}", file=sys.stderr)
-    
-    # 發送 monitoring-status 事件
-    self.send_event("monitoring-status", {
-        "isMonitoring": self.is_monitoring,
-        "active": self.is_monitoring
-    })
-    
-    return {
-        "success": True,
-        "isMonitoring": self.is_monitoring,
-        "active": self.is_monitoring
-    }
-
 
 async def handle_one_click_start(self, payload: Dict[str, Any] = None):
     """
@@ -1194,7 +1184,6 @@ async def handle_one_click_start(self, payload: Dict[str, Any] = None):
         })
         self.send_log(f"一鍵啟動失敗: {e}", "error")
 
-
 async def handle_one_click_stop(self):
     """
     一鍵停止：停止監控 → 關閉 AI
@@ -1246,7 +1235,6 @@ async def handle_one_click_stop(self):
             'success': False,
             'error': str(e)
         })
-
 
 async def handle_get_system_status(self):
     """
@@ -1327,7 +1315,6 @@ async def handle_get_system_status(self):
         print(f"[Backend] 獲取系統狀態錯誤: {e}", file=sys.stderr)
         self.send_event("system-status", {'error': str(e)})
 
-
 async def handle_get_monitored_groups(self):
     """獲取所有監控群組列表"""
     try:
@@ -1336,7 +1323,6 @@ async def handle_get_monitored_groups(self):
     except Exception as e:
         self.send_log(f"❌ 獲取監控群組失敗: {e}", "error")
         self.send_event("get-groups-result", {"groups": [], "error": str(e)})
-
 
 async def handle_pause_monitoring(self, payload: Dict[str, Any]):
     """暫停監控群組"""
@@ -1358,7 +1344,6 @@ async def handle_pause_monitoring(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_log(f"❌ 暫停監控失敗: {e}", "error")
 
-
 async def handle_resume_monitoring(self, payload: Dict[str, Any]):
     """恢復監控群組"""
     try:
@@ -1378,7 +1363,6 @@ async def handle_resume_monitoring(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_log(f"❌ 恢復監控失敗: {e}", "error")
-
 
 # ==================== Monitoring Status Handlers ====================
 
@@ -1453,7 +1437,6 @@ async def handle_get_monitoring_status(self):
             "success": False,
             "error": str(e)
         })
-
 
 async def handle_check_monitoring_health(self):
     """檢查監控健康狀態"""
@@ -1538,7 +1521,6 @@ async def handle_check_monitoring_health(self):
             "error": str(e)
         })
 
-
 async def handle_analyze_group_link(self, payload: Dict[str, Any]):
     """分析群組鏈接"""
     try:
@@ -1618,7 +1600,6 @@ async def handle_analyze_group_link(self, payload: Dict[str, Any]):
             "success": False,
             "error": str(e)
         })
-
 
 async def handle_get_group_monitoring_status(self, payload: Dict[str, Any]):
     """🆕 獲取群組監控狀態"""

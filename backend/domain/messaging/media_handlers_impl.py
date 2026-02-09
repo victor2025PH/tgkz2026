@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from service_context import get_service_context
+from service_locator import get_media_manager
 
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
@@ -29,6 +30,7 @@ async def handle_add_media(self, payload: Dict[str, Any]):
         tags = payload.get('tags', [])
         description = payload.get('description')
         
+        media_manager = get_media_manager()
         if media_type == 'image':
             result = await media_manager.add_image(
                 file_path=file_path,
@@ -64,6 +66,7 @@ async def handle_get_media(self, payload: Dict[str, Any]):
         media_type = payload.get('mediaType')
         category = payload.get('category')
         
+        media_manager = get_media_manager()
         media = await media_manager.get_all_media(media_type, category)
         
         self.send_event("media-list", {
@@ -81,6 +84,7 @@ async def handle_delete_media(self, payload: Dict[str, Any]):
     """Delete a media resource"""
     try:
         media_id = payload.get('id')
+        media_manager = get_media_manager()
         await media_manager.delete_media(media_id)
         
         self.send_event("media-deleted", {"success": True, "id": media_id})

@@ -12,11 +12,18 @@ from typing import Any, Dict, List, Optional
 
 from service_context import get_service_context
 
+from service_locator import (
+    get_ad_analytics,
+    get_ad_broadcaster,
+    get_ad_manager,
+    get_ad_scheduler,
+    get_ad_template_manager,
+    scheduler
+)
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
 # This is a transitional pattern - later, replace self.xxx with ctx.xxx
-
 
 # ==================== Ad System Handlers (廣告發送系統) ====================
 
@@ -44,7 +51,6 @@ async def handle_create_ad_template(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("ad-template-created", {"success": False, "error": str(e)})
 
-
 async def handle_update_ad_template(self, payload: Dict[str, Any]):
     """更新廣告模板"""
     try:
@@ -62,7 +68,6 @@ async def handle_update_ad_template(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("ad-template-updated", {"success": False, "error": str(e)})
-
 
 async def handle_delete_ad_template(self, payload: Dict[str, Any]):
     """刪除廣告模板"""
@@ -83,7 +88,6 @@ async def handle_delete_ad_template(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("ad-template-deleted", {"success": False, "error": str(e)})
 
-
 async def handle_get_ad_templates(self, payload: Dict[str, Any]):
     """獲取廣告模板列表"""
     try:
@@ -103,7 +107,6 @@ async def handle_get_ad_templates(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("ad-templates", {"success": False, "error": str(e)})
 
-
 async def handle_toggle_ad_template_status(self, payload: Dict[str, Any]):
     """切換廣告模板狀態"""
     try:
@@ -119,7 +122,6 @@ async def handle_toggle_ad_template_status(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("ad-template-toggled", {"success": False, "error": str(e)})
-
 
 async def handle_preview_ad_template(self, payload: Dict[str, Any]):
     """預覽廣告模板變體"""
@@ -138,7 +140,6 @@ async def handle_preview_ad_template(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("ad-template-preview", {"success": False, "error": str(e)})
-
 
 async def handle_create_ad_schedule(self, payload: Dict[str, Any]):
     """創建廣告計劃"""
@@ -173,7 +174,6 @@ async def handle_create_ad_schedule(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("ad-schedule-created", {"success": False, "error": str(e)})
 
-
 async def handle_update_ad_schedule(self, payload: Dict[str, Any]):
     """更新廣告計劃"""
     try:
@@ -197,7 +197,6 @@ async def handle_update_ad_schedule(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("ad-schedule-updated", {"success": False, "error": str(e)})
 
-
 async def handle_delete_ad_schedule(self, payload: Dict[str, Any]):
     """刪除廣告計劃"""
     try:
@@ -220,7 +219,6 @@ async def handle_delete_ad_schedule(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("ad-schedule-deleted", {"success": False, "error": str(e)})
 
-
 async def handle_get_ad_schedules(self, payload: Dict[str, Any]):
     """獲取廣告計劃列表"""
     try:
@@ -239,7 +237,6 @@ async def handle_get_ad_schedules(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("ad-schedules", {"success": False, "error": str(e)})
-
 
 async def handle_toggle_ad_schedule_status(self, payload: Dict[str, Any]):
     """切換廣告計劃狀態"""
@@ -262,7 +259,6 @@ async def handle_toggle_ad_schedule_status(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("ad-schedule-toggled", {"success": False, "error": str(e)})
 
-
 async def handle_run_ad_schedule_now(self, payload: Dict[str, Any]):
     """立即執行廣告計劃"""
     try:
@@ -278,7 +274,6 @@ async def handle_run_ad_schedule_now(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("ad-schedule-run-result", {"success": False, "error": str(e)})
-
 
 async def handle_send_ad_now(self, payload: Dict[str, Any]):
     """立即發送廣告"""
@@ -299,7 +294,6 @@ async def handle_send_ad_now(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("ad-send-result", {"success": False, "error": str(e)})
-
 
 async def handle_get_ad_send_logs(self, payload: Dict[str, Any]):
     """獲取廣告發送記錄"""
@@ -322,7 +316,6 @@ async def handle_get_ad_send_logs(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("ad-send-logs", {"success": False, "error": str(e)})
 
-
 async def handle_get_ad_overview_stats(self, payload: Dict[str, Any]):
     """獲取廣告總覽統計"""
     try:
@@ -338,7 +331,6 @@ async def handle_get_ad_overview_stats(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("ad-overview-stats", {"success": False, "error": str(e)})
-
 
 async def handle_get_ad_template_stats(self, payload: Dict[str, Any]):
     """獲取模板統計"""
@@ -356,7 +348,6 @@ async def handle_get_ad_template_stats(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("ad-template-stats", {"success": False, "error": str(e)})
 
-
 async def handle_get_ad_schedule_stats(self, payload: Dict[str, Any]):
     """獲取計劃統計"""
     try:
@@ -372,7 +363,6 @@ async def handle_get_ad_schedule_stats(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("ad-schedule-stats", {"success": False, "error": str(e)})
-
 
 async def handle_get_ad_account_stats(self, payload: Dict[str, Any]):
     """獲取帳號統計"""
@@ -390,7 +380,6 @@ async def handle_get_ad_account_stats(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("ad-account-stats", {"success": False, "error": str(e)})
 
-
 async def handle_get_ad_group_stats(self, payload: Dict[str, Any]):
     """獲取群組統計"""
     try:
@@ -406,7 +395,6 @@ async def handle_get_ad_group_stats(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("ad-group-stats", {"success": False, "error": str(e)})
-
 
 async def handle_get_ad_daily_stats(self, payload: Dict[str, Any]):
     """獲取每日統計"""

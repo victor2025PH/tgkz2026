@@ -454,7 +454,8 @@ type SortOption = 'relevance' | 'members' | 'activity' | 'growth';
             <app-group-detail 
               [group]="selectedGroup()!"
               (back)="currentView.set('search')"
-              (extractMembers)="goToMembers()">
+              (extractMembers)="goToMembers()"
+              (joinAndMonitor)="joinAndMonitorGroup()">
             </app-group-detail>
           </div>
         }
@@ -634,6 +635,12 @@ export class GroupSearchComponent implements OnInit, OnDestroy {
   
   goToMembers(): void {
     this.currentView.set('members');
+  }
+  
+  joinAndMonitorGroup(): void {
+    const group = this.selectedGroup();
+    if (!group) return;
+    this.searchService.joinAndMonitorGroup(group);
   }
   
   // ============ 歷史操作 ============

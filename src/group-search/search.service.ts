@@ -590,4 +590,24 @@ export class GroupSearchService {
       return false;
     }
   }
+
+  /**
+   * 加入並監控群組
+   * 發送 add-monitored-group 命令，將群組添加到監控列表
+   */
+  joinAndMonitorGroup(group: GroupBasicInfo): void {
+    const url = group.username 
+      ? `https://t.me/${group.username}` 
+      : (group.inviteLink || '');
+    
+    this.ipcService.send('add-monitored-group', {
+      url: url,
+      name: group.title,
+      telegramId: group.id,
+      username: group.username,
+      keywordSetIds: []
+    });
+    
+    this.toastService.info(`📡 正在將「${group.title}」添加到監控列表...`);
+  }
 }

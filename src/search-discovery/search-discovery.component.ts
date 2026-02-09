@@ -617,7 +617,21 @@ export interface Account {
                   
                   <!-- 操作按鈕 -->
                   <div class="flex-shrink-0 flex flex-col gap-2" (click)="$event.stopPropagation()">
-                    @if (resource.status === 'joined' || resource.status === 'monitoring') {
+                    @if (resource.status === 'monitoring') {
+                      <!-- 監控中狀態 -->
+                      <div class="flex flex-col items-center">
+                        <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm text-center">
+                          ✅ 已加入
+                        </span>
+                        <span class="px-4 py-1.5 bg-emerald-500/15 text-emerald-400 rounded-lg text-xs text-center mt-1">
+                          📡 監控中
+                        </span>
+                        @if (resource.joined_phone) {
+                          <span class="text-xs text-slate-500 mt-1">{{ resource.joined_phone.slice(0, 7) }}***</span>
+                        }
+                      </div>
+                    } @else if (resource.status === 'joined') {
+                      <!-- 已加入但未監控 -->
                       <div class="flex flex-col items-center">
                         <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm text-center">
                           ✅ 已加入
@@ -626,15 +640,25 @@ export interface Account {
                           <span class="text-xs text-slate-500 mt-1">{{ resource.joined_phone.slice(0, 7) }}***</span>
                         }
                       </div>
+                      <button (click)="addToMonitoring(resource)" 
+                              class="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-sm transition-all">
+                        📡 加入監控
+                      </button>
                     } @else if (isJoining(resource)) {
                       <button disabled
                               class="px-4 py-2 bg-slate-600 text-slate-300 rounded-lg text-sm font-medium cursor-wait flex items-center gap-1">
                         <span class="animate-spin">⏳</span> 加入中...
                       </button>
                     } @else {
+                      <!-- 未加入：顯示加入和加入並監控兩個選項 -->
                       <button (click)="openJoinDialog(resource)" 
                               class="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg text-sm font-medium transition-all shadow-lg shadow-cyan-500/20">
                         🚀 加入
+                      </button>
+                      <button (click)="addToMonitoring(resource)" 
+                              class="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-sm transition-all"
+                              title="直接添加到監控群組列表">
+                        📡 監控
                       </button>
                     }
                     
@@ -647,7 +671,7 @@ export interface Account {
                       } @else {
                         <button disabled
                                 class="px-4 py-2 bg-slate-500/20 text-slate-500 rounded-lg text-sm cursor-not-allowed"
-                                title="需要先加入群組">
+                                title="需要先加入群組才能提取成員">
                           👥 成員
                         </button>
                       }
@@ -940,12 +964,34 @@ export interface Account {
                         class="px-4 py-2 bg-slate-700 text-slate-300 hover:bg-slate-600 rounded-lg">
                   關閉
                 </button>
+                
                 @if (resource.status !== 'joined' && resource.status !== 'monitoring') {
+                  <!-- 未加入：加入 + 加入並監控 -->
+                  <button (click)="addToMonitoring(resource); closeDetail()"
+                          class="px-5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg font-medium transition-all">
+                    📡 監控
+                  </button>
                   <button (click)="openJoinDialog(resource); closeDetail()"
                           class="px-6 py-2 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg font-medium transition-all shadow-lg shadow-cyan-500/20">
                     🚀 加入群組
                   </button>
+                } @else if (resource.status === 'joined') {
+                  <!-- 已加入未監控：加入監控 + 提取成員 -->
+                  <button (click)="addToMonitoring(resource); closeDetail()"
+                          class="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-all">
+                    📡 加入監控
+                  </button>
+                  @if (resource.resource_type !== 'channel') {
+                    <button (click)="extractMembers(resource); closeDetail()"
+                            class="px-6 py-2 bg-purple-500 hover:bg-purple-400 text-white rounded-lg font-medium transition-all">
+                      👥 提取成員
+                    </button>
+                  }
                 } @else {
+                  <!-- 監控中：顯示狀態 + 提取成員 -->
+                  <span class="px-4 py-2 bg-emerald-500/15 text-emerald-400 rounded-lg text-sm font-medium">
+                    📡 監控中
+                  </span>
                   @if (resource.resource_type !== 'channel') {
                     <button (click)="extractMembers(resource); closeDetail()"
                             class="px-6 py-2 bg-purple-500 hover:bg-purple-400 text-white rounded-lg font-medium transition-all">
@@ -1666,7 +1712,37 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       }
     });
     
-    this.ipcCleanup.push(cleanup1, cleanup2a, cleanup2, cleanup3, cleanup4, cleanup5);
+    // 🆕 監聽資源狀態更新事件（監控添加成功後）
+    const cleanup6 = this.ipc.on('resource-status-updated', (data: any) => {
+      const currentResources = this._internalResources();
+      const updatedResources = currentResources.map(r => {
+        const isMatch = 
+          (data.resourceId && r.id === data.resourceId) ||
+          (data.username && r.username === data.username) ||
+          (data.telegramId && r.telegram_id === data.telegramId);
+        
+        if (isMatch && data.newStatus) {
+          return { ...r, status: data.newStatus as any };
+        }
+        return r;
+      });
+      this._internalResources.set(updatedResources);
+      this.saveSearchResults();
+      
+      // 顯示狀態更新的 toast 提示
+      if (data.newStatus === 'monitoring') {
+        this.toast.success('📡 已成功添加到監控列表');
+      }
+    });
+    
+    // 🆕 監聽群組添加失敗事件
+    const cleanup7 = this.ipc.on('group-added', (data: any) => {
+      if (data && data.success === false && data.error) {
+        this.toast.error(`添加監控失敗: ${data.error}`);
+      }
+    });
+    
+    this.ipcCleanup.push(cleanup1, cleanup2a, cleanup2, cleanup3, cleanup4, cleanup5, cleanup6, cleanup7);
   }
   
   // 🔧 P0: 加載搜索歷史
@@ -2117,6 +2193,34 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     return this.joiningResourceIds().has(resource.id);
   }
   
+  // 🆕 添加到監控列表
+  addToMonitoring(resource: DiscoveredResource): void {
+    console.log('[SearchDiscovery] 添加到監控:', resource.title);
+    
+    if (!resource.username && !resource.telegram_id) {
+      this.toast.warning('無法監控：缺少群組標識');
+      return;
+    }
+    
+    // 構建監控群組 URL
+    const url = resource.username 
+      ? `https://t.me/${resource.username}` 
+      : (resource.invite_link || `tg://resolve?id=${resource.telegram_id}`);
+    
+    // 發送 add-monitored-group 命令
+    this.ipc.send('add-monitored-group', {
+      url: url,
+      name: resource.title || resource.username || '',
+      telegramId: resource.telegram_id,
+      username: resource.username,
+      resourceId: resource.id,
+      phone: resource.joined_phone || this.mergedSelectedAccount()?.phone,
+      keywordSetIds: []
+    });
+    
+    this.toast.info(`📡 正在將「${resource.title || resource.username}」添加到監控列表...`);
+  }
+
   extractMembers(resource: DiscoveredResource): void {
     console.log('[SearchDiscovery] 打開提取成員對話框:', resource.title);
     
@@ -2125,18 +2229,28 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       return;
     }
     
+    // 🆕 P1 優化：前置條件檢查 - 如果未加入群組，引導用戶先加入
+    if (resource.status !== 'joined' && resource.status !== 'monitoring') {
+      this.toast.warning('📥 提取成員需要先加入群組。請點擊「加入」按鈕。', 5000);
+      return;
+    }
+    
     // 🔧 修復：確保使用已加入帳號
     const joinedPhone = resource.joined_phone || this.mergedSelectedAccount()?.phone;
     
+    // 🆕 P1 優化：如果沒有可用帳號，提示
+    if (!joinedPhone) {
+      this.toast.warning('⚠️ 未找到已加入此群組的帳號，提取可能失敗。建議先選擇帳號重新加入。', 5000);
+    }
+    
     // 🔧 修復：使用 DialogService 打開成員提取配置對話框
-    // 將 DiscoveredResource 轉換為對話框期望的格式（ExtractionGroupInfo）
     const groupInfo = {
       id: String(resource.id || resource.telegram_id || ''),
       name: resource.title || '未知群組',
       url: resource.username ? `https://t.me/${resource.username}` : '',
-      telegramId: resource.telegram_id || '',  // 🔧 添加 Telegram ID
-      memberCount: resource.member_count || 0,  // 🔧 使用駝峰命名
-      accountPhone: joinedPhone,  // 🔧 添加帳號信息
+      telegramId: resource.telegram_id || '',
+      memberCount: resource.member_count || 0,
+      accountPhone: joinedPhone,
       resourceType: resource.resource_type || 'group'
     };
     

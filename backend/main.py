@@ -436,6 +436,9 @@ COMMAND_ALIAS_REGISTRY: Dict[str, tuple] = {
     # === Phase3: 一鍵加入並提取 ===
     'join-and-extract':         ('domain.contacts.member_handlers_impl', 'handle_join_and_extract'),
     
+    # === Phase4: 批量提取 ===
+    'batch-extract-members':    ('domain.contacts.member_handlers_impl', 'handle_batch_extract_members'),
+    
     # === Phase4: 消息歷史提取 ===
     'extract-active-users':     ('domain.contacts.member_handlers_impl', 'handle_extract_active_users'),
     

@@ -427,6 +427,10 @@ export interface Account {
                           class="px-2 py-1 text-xs bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded transition-all">
                     📋 複製ID
                   </button>
+                  <button (click)="batchExtractSelected()" 
+                          class="px-2 py-1 text-xs bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded transition-all">
+                    👥 批量提取成員
+                  </button>
                 </div>
               }
             </div>
@@ -2411,6 +2415,36 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   // 選中數量
   selectedCount = computed(() => this.selectedForBatch().size);
   
+  // 🆕 Phase4: 批量提取選中群組的成員
+  batchExtractSelected(): void {
+    const selected = this.filteredResources().filter(r => 
+      this.selectedForBatch().has(r.telegram_id || String(r.id))
+    );
+    
+    if (selected.length === 0) {
+      this.toast.warning('請先選擇群組');
+      return;
+    }
+    
+    // 收集資源 ID
+    const resourceIds = selected.map(r => r.id).filter(id => id);
+    
+    if (resourceIds.length === 0) {
+      this.toast.warning('選中的群組缺少有效 ID');
+      return;
+    }
+    
+    this.toast.info(`🚀 開始批量提取 ${resourceIds.length} 個群組的成員...`);
+    
+    this.ipc.send('batch-extract-members', {
+      resourceIds: resourceIds,
+      limit: 100,
+      safeMode: true
+    });
+    
+    this.clearSelection();
+  }
+
   batchSave(): void {
     const unsaved = this.filteredResources().filter(r => !r.is_saved);
     if (unsaved.length === 0) {

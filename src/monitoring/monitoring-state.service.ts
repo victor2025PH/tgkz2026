@@ -431,24 +431,38 @@ export class MonitoringStateService implements OnDestroy {
       return;
     }
     
+    // 🔧 Phase2: 強制刷新時立即執行，不走 debounce
+    if (force) {
+      if (this._loadAllTimeout) {
+        clearTimeout(this._loadAllTimeout);
+        this._loadAllTimeout = null;
+      }
+      this._executeLoad();
+      return;
+    }
+    
     // 🔧 性能優化：防抖動，300ms 內的多次調用合併為一次
     if (this._loadAllTimeout) {
       clearTimeout(this._loadAllTimeout);
     }
     
     this._loadAllTimeout = setTimeout(() => {
-      this._isLoading.set(true);
-      this._lastLoadTime = Date.now();
-      console.log('[StateService] Loading all data...');
-      this.ipcService.send('get-initial-state');
-      // 🔧 FIX: 明確請求所有需要的數據，不依賴 initial-state 包含全部
-      this.ipcService.send('get-monitored-groups', {});  // 🆕 添加監控群組請求
-      this.ipcService.send('get-trigger-rules', {});
-      this.ipcService.send('get-chat-templates', {});
-      this.ipcService.send('get-keyword-sets', {});
-      this._isInitialLoadDone = true;
-      this._loadAllTimeout = null;
+      this._executeLoad();
     }, 300);
+  }
+  
+  private _executeLoad() {
+    this._isLoading.set(true);
+    this._lastLoadTime = Date.now();
+    console.log('[StateService] Loading all data...');
+    this.ipcService.send('get-initial-state');
+    // 🔧 FIX: 明確請求所有需要的數據，不依賴 initial-state 包含全部
+    this.ipcService.send('get-monitored-groups', {});
+    this.ipcService.send('get-trigger-rules', {});
+    this.ipcService.send('get-chat-templates', {});
+    this.ipcService.send('get-keyword-sets', {});
+    this._isInitialLoadDone = true;
+    this._loadAllTimeout = null;
   }
   
   refresh() {

@@ -772,6 +772,23 @@ export class MonitoringGroupsComponent implements OnInit {
       }
     });
     this.listeners.push(cleanup6);
+    
+    // 🔧 Phase2: 監聽群組添加/移除事件 → 自動刷新列表
+    const cleanup7 = this.ipcService.on('monitored-group-added', (data: any) => {
+      if (data.success) {
+        console.log('[MonitoringGroups] 新群組已添加，刷新列表');
+        this.stateService.loadAll(true);
+      }
+    });
+    this.listeners.push(cleanup7);
+    
+    const cleanup8 = this.ipcService.on('group-removed', (data: any) => {
+      if (data.success !== false) {
+        console.log('[MonitoringGroups] 群組已移除，刷新列表');
+        this.stateService.loadAll(true);
+      }
+    });
+    this.listeners.push(cleanup8);
   }
 
   // 帳號相關方法

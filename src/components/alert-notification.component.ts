@@ -47,11 +47,13 @@ interface AlertNotification {
       }
     </div>
 
-    <!-- 告警徽章（显示未读数量） -->
-    @if (unreadCount() > 0) {
-      <div class="alert-badge" (click)="togglePanel()">
+    <!-- 告警徽章（显示未读数量）或面板打开时保持可见 -->
+    @if (unreadCount() > 0 || showPanel()) {
+      <div class="alert-badge" [class.panel-open]="showPanel()" (click)="togglePanel()">
         <span class="badge-icon">🔔</span>
-        <span class="badge-count">{{ unreadCount() }}</span>
+        @if (unreadCount() > 0) {
+          <span class="badge-count">{{ unreadCount() > 99 ? '99+' : unreadCount() }}</span>
+        }
       </div>
     }
 
@@ -211,6 +213,12 @@ interface AlertNotification {
       50% { transform: scale(1.05); }
     }
 
+    .alert-badge.panel-open {
+      background: rgba(59, 130, 246, 0.9);
+      box-shadow: 0 2px 10px rgba(59, 130, 246, 0.4);
+      animation: none;
+    }
+
     .badge-icon {
       font-size: 1rem;
     }
@@ -347,6 +355,7 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
 
   // 🔧 Fix: 保存绑定的函数引用，确保 removeEventListener 能正确移除
   private boundOnDocumentClick = this.onDocumentClick.bind(this);
+  private toggleDebounce = false;
 
   ngOnInit(): void {
     // 初始加载
@@ -604,7 +613,18 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
   }
 
   togglePanel(): void {
-    this.showPanel.update(v => !v);
+    // 防抖：避免快速双击导致面板闪烁
+    if (this.toggleDebounce) return;
+    this.toggleDebounce = true;
+    setTimeout(() => this.toggleDebounce = false, 200);
+    
+    const wasOpen = this.showPanel();
+    this.showPanel.set(!wasOpen);
+    
+    // 打开面板时自动标记已读（延迟 1 秒，让用户看到数字变化）
+    if (!wasOpen && this.unreadCount() > 0) {
+      setTimeout(() => this.markAllRead(), 1000);
+    }
   }
 
   closePanel(): void {

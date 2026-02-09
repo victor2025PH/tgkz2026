@@ -539,8 +539,14 @@ export class SystemAlertsComponent implements OnInit, OnDestroy {
 
       if (result?.success) {
         this.summary.set(result.data?.summary || null);
-        this.activeAlerts.set(result.data?.active || []);
-        this.historyAlerts.set(result.data?.recent || []);
+        // 🔧 Fix: 映射 DB 原始字段，確保 timestamp 正確解析
+        const mapAlert = (a: any) => ({
+          ...a,
+          timestamp: this.parseTimestamp(a.created_at || a.timestamp),
+          type: a.alert_type || a.type || 'system',
+        });
+        this.activeAlerts.set((result.data?.active || []).map(mapAlert));
+        this.historyAlerts.set((result.data?.recent || []).map(mapAlert));
         this.applyFilter();
       }
     } catch (e) {
@@ -628,11 +634,28 @@ export class SystemAlertsComponent implements OnInit, OnDestroy {
     return types[type] || type;
   }
 
+  /**
+   * 🔧 Fix: 安全解析時間戳 — 支持 Unix timestamp、ISO 字符串、數據庫格式
+   */
+  private parseTimestamp(value: any): number {
+    if (!value) return Date.now() / 1000;
+    if (typeof value === 'number' && value > 1577836800 && value < 4102444800) return value;
+    if (typeof value === 'string') {
+      const parsed = new Date(value.replace(' ', 'T'));
+      if (!isNaN(parsed.getTime())) return parsed.getTime() / 1000;
+    }
+    if (typeof value === 'number' && value > 1577836800000) return value / 1000;
+    return Date.now() / 1000;
+  }
+
   formatTime(timestamp: number): string {
+    if (!timestamp || isNaN(timestamp)) return '';
     const date = new Date(timestamp * 1000);
+    if (isNaN(date.getTime())) return '';
     const now = new Date();
     const diff = (now.getTime() - date.getTime()) / 1000;
 
+    if (diff < 0) return '刚刚';
     if (diff < 60) return '刚刚';
     if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;

@@ -345,6 +345,9 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
   private pollInterval: any;
   private dismissTimeouts: Map<string, any> = new Map();
 
+  // 🔧 Fix: 保存绑定的函数引用，确保 removeEventListener 能正确移除
+  private boundOnDocumentClick = this.onDocumentClick.bind(this);
+
   ngOnInit(): void {
     // 初始加载
     this.loadAlerts();
@@ -355,8 +358,8 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
     // 备用轮询（降低频率，作为后备）
     this.pollInterval = setInterval(() => this.loadAlerts(), 30000);
     
-    // 点击其他地方关闭面板
-    document.addEventListener('click', this.closePanel.bind(this));
+    // 🔧 Fix: 点击外部区域关闭面板（使用保存的引用）
+    document.addEventListener('click', this.boundOnDocumentClick);
   }
 
   ngOnDestroy(): void {
@@ -366,10 +369,26 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
     }
-    document.removeEventListener('click', this.closePanel.bind(this));
+    // 🔧 Fix: 使用同一个函数引用移除，避免内存泄漏
+    document.removeEventListener('click', this.boundOnDocumentClick);
     
     // 清理所有超时
     this.dismissTimeouts.forEach(timeout => clearTimeout(timeout));
+  }
+
+  /**
+   * 🔧 Fix: 点击外部关闭面板 — 排除铃铛和面板自身的点击
+   */
+  private onDocumentClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement;
+    if (!target) return;
+    
+    // 如果点击的是铃铛(.alert-badge)或面板(.quick-panel)内部，不关闭
+    if (target.closest('.alert-badge') || target.closest('.quick-panel')) {
+      return;
+    }
+    
+    this.showPanel.set(false);
   }
 
   /**
@@ -441,15 +460,26 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
 
   async loadAlerts(): Promise<void> {
     try {
-      const result = await this.ipcService.invoke('alerts:get', {}) as { success?: boolean; data?: { active?: AlertNotification[] } } | undefined;
+      const result = await this.ipcService.invoke('alerts:get', {}) as { success?: boolean; data?: { active?: any[] } } | undefined;
 
       if (result?.success) {
-        const active = result.data?.active || [];
+        const rawActive = result.data?.active || [];
+        
+        // 🔧 Fix: 将后端 DB 原始字段映射为 AlertNotification 接口
+        const active: AlertNotification[] = rawActive.map((a: any) => ({
+          id: String(a.id || a.alert_id || Math.random()),
+          type: a.alert_type || a.type || 'system',
+          level: this.mapLevel(a.level),
+          title: a.title || this.generateTitle(a.alert_type || a.type, a.level),
+          message: a.message || '',
+          timestamp: this.parseTimestamp(a.created_at || a.timestamp),
+          dismissed: !!(a.acknowledged || a.dismissed || a.resolved),
+        }));
         
         // 检查是否有新告警（仅在非实时模式下显示通知）
         if (!this.isConnected()) {
           const currentIds = new Set(this.allNotifications().map(n => n.id));
-          const newAlerts = active.filter((a: AlertNotification) => !currentIds.has(a.id));
+          const newAlerts = active.filter(a => !currentIds.has(a.id));
           
           for (const alert of newAlerts) {
             this.showNotification(alert);
@@ -458,11 +488,68 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
         
         // 更新列表
         this.allNotifications.set(active);
-        this.unreadCount.set(active.filter((a: AlertNotification) => !a.dismissed).length);
+        this.unreadCount.set(active.filter(a => !a.dismissed).length);
       }
     } catch (e) {
       console.error('Load alerts failed:', e);
     }
+  }
+
+  /**
+   * 🔧 Fix: 将后端 level 映射到前端支持的级别
+   */
+  private mapLevel(level: string): 'info' | 'warning' | 'critical' | 'urgent' {
+    const map: Record<string, 'info' | 'warning' | 'critical' | 'urgent'> = {
+      'info': 'info',
+      'warning': 'warning',
+      'error': 'critical',
+      'critical': 'urgent',
+    };
+    return map[level] || 'warning';
+  }
+
+  /**
+   * 🔧 Fix: 从 alert_type 生成可读标题
+   */
+  private generateTitle(alertType: string, level: string): string {
+    const titles: Record<string, string> = {
+      'cpu_high': 'CPU 使用率过高',
+      'memory_high': '内存使用率过高',
+      'disk_space_low': '磁盘空间不足',
+      'error_rate': '错误率过高',
+      'connection_disconnected': '连接断开',
+      'account_health': '账号健康异常',
+      'performance_degraded': '性能下降',
+      'queue_length': '队列积压',
+    };
+    return titles[alertType] || `系统告警 (${level || 'warning'})`;
+  }
+
+  /**
+   * 🔧 Fix: 安全解析时间戳 — 支持 Unix timestamp、ISO 字符串、数据库格式
+   */
+  private parseTimestamp(value: any): number {
+    if (!value) return Date.now() / 1000;
+    
+    // 已经是合理的 Unix 秒时间戳（>2020-01-01 且 <2100-01-01）
+    if (typeof value === 'number' && value > 1577836800 && value < 4102444800) {
+      return value;
+    }
+    
+    // 字符串格式: "2026-02-09 06:02:37" 或 ISO 格式
+    if (typeof value === 'string') {
+      const parsed = new Date(value.replace(' ', 'T'));
+      if (!isNaN(parsed.getTime())) {
+        return parsed.getTime() / 1000;
+      }
+    }
+    
+    // 毫秒时间戳
+    if (typeof value === 'number' && value > 1577836800000) {
+      return value / 1000;
+    }
+    
+    return Date.now() / 1000;
   }
 
   showNotification(alert: AlertNotification): void {
@@ -517,7 +604,7 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
   }
 
   togglePanel(): void {
-    this.showPanel.set(!this.showPanel());
+    this.showPanel.update(v => !v);
   }
 
   closePanel(): void {
@@ -552,10 +639,15 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
   }
 
   formatTime(timestamp: number): string {
+    if (!timestamp || isNaN(timestamp)) return '';
+    
     const date = new Date(timestamp * 1000);
+    if (isNaN(date.getTime())) return '';
+    
     const now = new Date();
     const diff = (now.getTime() - date.getTime()) / 1000;
 
+    if (diff < 0) return '刚刚';  // 时区差异容错
     if (diff < 60) return '刚刚';
     if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;

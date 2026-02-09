@@ -505,25 +505,49 @@ async def handle_predict_send_time(self, payload: Dict[str, Any]):
 
 
 async def handle_batch_send_start(self, payload: Dict[str, Any]):
-    """開始批量發送 - 支持多模板和發送策略"""
+    """開始批量發送 - 🔧 修復：作為後台任務運行，立即返回 HTTP 響應"""
     import sys
     import asyncio
+    
+    targets = payload.get('targets', [])
+    if not targets:
+        self.send_event("batch-send:complete", {
+            "success": 0, "failed": 0,
+            "error": "沒有選擇發送目標"
+        })
+        return {'success': False, 'error': '沒有選擇發送目標'}
+    
+    print(f"[BatchSend] 收到批量發送請求: {len(targets)} 個目標", file=sys.stderr)
+    
+    # 🔧 核心修復：啟動後台任務，立即返回 HTTP 響應
+    # 這解決了 HTTP 超時導致前端卡住的問題
+    self._batch_send_active = True
+    self._batch_send_cancelled = False
+    
+    asyncio.ensure_future(_batch_send_worker(self, payload))
+    
+    return {'success': True, 'message': f'批量發送已啟動: {len(targets)} 個目標'}
+
+
+async def _batch_send_worker(self, payload: Dict[str, Any]):
+    """🔧 後台批量發送 worker - 獨立於 HTTP 請求運行"""
+    import sys
     import random
     
+    targets = payload.get('targets', [])
+    message_template = payload.get('message', '')
+    messages = payload.get('messages', [])
+    send_strategy = payload.get('sendStrategy', 'random')
+    attachments = payload.get('attachments', [])
+    cfg = payload.get('config', {})
+    
+    min_interval = cfg.get('minInterval', 30)
+    max_interval = cfg.get('maxInterval', 60)
+    account_rotation = cfg.get('accountRotation', True)
+    
+    is_multi_template = len(messages) > 1
+    
     try:
-        targets = payload.get('targets', [])
-        message_template = payload.get('message', '')
-        messages = payload.get('messages', [])  # 多模板列表
-        send_strategy = payload.get('sendStrategy', 'random')  # random/rotate/sequential
-        attachments = payload.get('attachments', [])
-        config = payload.get('config', {})
-        
-        min_interval = config.get('minInterval', 30)
-        max_interval = config.get('maxInterval', 60)
-        account_rotation = config.get('accountRotation', True)
-        
-        # 判斷是否多模板模式
-        is_multi_template = len(messages) > 1
         if is_multi_template:
             print(f"[BatchSend] 多模板模式: {len(messages)} 個模板, 策略: {send_strategy}", file=sys.stderr)
             self.send_log(f"📨 開始批量發送: {len(targets)} 個目標, {len(messages)} 個模板 ({send_strategy})", "info")
@@ -531,16 +555,11 @@ async def handle_batch_send_start(self, payload: Dict[str, Any]):
             print(f"[BatchSend] 開始批量發送: {len(targets)} 個目標", file=sys.stderr)
             self.send_log(f"📨 開始批量發送: {len(targets)} 個目標", "info")
         
-        self._batch_send_active = True
-        self._batch_send_cancelled = False
-        
-        # 獲取可用帳號（檢查 Online 狀態）
+        # 獲取可用帳號（檢查 Online 狀態 + 已連接的客戶端）
         accounts = await db.get_all_accounts()
         available_accounts = [a for a in accounts if a.get('status') in ('Online', 'active')]
         
-        # 額外檢查：從 TelegramManager 獲取實際連接的客戶端
         if not available_accounts:
-            # 嘗試從 TelegramManager 獲取已連接的帳號
             connected_phones = list(self.telegram_manager.clients.keys()) if hasattr(self.telegram_manager, 'clients') else []
             if connected_phones:
                 available_accounts = [a for a in accounts if a.get('phone') in connected_phones]
@@ -554,25 +573,36 @@ async def handle_batch_send_start(self, payload: Dict[str, Any]):
             error_msg = "沒有可用的發送帳號，請先登入帳號"
             self.send_log(f"⚠️ {error_msg}", "warning")
             self.send_event("batch-send:complete", {
-                "success": 0, 
+                "success": 0,
                 "failed": len(targets),
                 "error": error_msg,
                 "failureReasons": {"no_account": len(targets)}
             })
+            self._batch_send_active = False
             return
         
         success_count = 0
         failed_count = 0
-        failure_reasons = {}  # 記錄失敗原因統計
-        failed_targets = []   # 記錄失敗的目標（用於重試）
+        failure_reasons = {}
+        failed_targets = []
         
         for idx, target in enumerate(targets):
             if self._batch_send_cancelled:
                 print(f"[BatchSend] 用戶取消", file=sys.stderr)
-                # 記錄剩餘未發送的為取消
                 remaining = len(targets) - idx
                 failure_reasons['cancelled'] = failure_reasons.get('cancelled', 0) + remaining
                 break
+            
+            # 提取目標信息
+            user_id = target.get('telegramId')
+            username = target.get('username', '')
+            first_name = target.get('firstName', target.get('first_name', ''))
+            last_name = target.get('lastName', target.get('last_name', ''))
+            display_name = target.get('displayName', target.get('name', first_name or username or '朋友'))
+            full_name = f"{first_name} {last_name}".strip() or display_name
+            group_name = target.get('groupName', target.get('sourceGroup', target.get('source', '')))
+            keyword = target.get('keyword', target.get('triggeredKeyword', target.get('matchedKeyword', '')))
+            source = target.get('source', target.get('sourceType', ''))
             
             try:
                 # 選擇帳號
@@ -582,24 +612,12 @@ async def handle_batch_send_start(self, payload: Dict[str, Any]):
                     account = available_accounts[0]
                 
                 phone = account.get('phone')
-                user_id = target.get('telegramId')
-                username = target.get('username', '')
-                first_name = target.get('firstName', target.get('first_name', ''))
-                last_name = target.get('lastName', target.get('last_name', ''))
-                display_name = target.get('displayName', target.get('name', first_name or username or '朋友'))
-                full_name = f"{first_name} {last_name}".strip() or display_name
-                
-                # 從 target 獲取來源信息（用於 {groupName}, {keyword}, {source} 變量）
-                group_name = target.get('groupName', target.get('sourceGroup', target.get('source', '')))
-                keyword = target.get('keyword', target.get('triggeredKeyword', target.get('matchedKeyword', '')))
-                source = target.get('source', target.get('sourceType', ''))
                 
                 # 驗證目標用戶 ID
                 if not user_id:
-                    raise ValueError("目標用戶 ID 為空")
+                    raise ValueError(f"目標用戶 ID 為空 (username={username})")
                 
                 # 時間相關變量
-                from datetime import datetime
                 now = datetime.now()
                 hour = now.hour
                 if 5 <= hour < 12:
@@ -616,25 +634,21 @@ async def handle_batch_send_start(self, payload: Dict[str, Any]):
                 days = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日']
                 date_str = f"{now.month}月{now.day}日"
                 time_str = now.strftime('%H:%M')
-                day_str = days[now.weekday()]  # weekday() 返回 0-6（週一到週日）
+                day_str = days[now.weekday()]
                 
-                # 選擇消息模板（支持多模板模式 + P14-2: A/B 測試集成）
-                ab_test_id = config.get('abTestId')  # 前端傳入的 A/B 測試 ID
-                ab_variant_idx = None  # 記錄選中的變體索引
+                # 選擇消息模板
+                ab_test_id = cfg.get('abTestId')
+                ab_variant_idx = None
                 
                 if ab_test_id:
-                    # P14-2: A/B 測試模式 — 由 ABTestManager 選擇變體
                     try:
                         from core.template_ab_test import get_ab_test_manager
                         ab_mgr = get_ab_test_manager()
                         variant = ab_mgr.select_template(ab_test_id)
                         if variant and messages:
                             ab_variant_idx = variant.get('variant_index', 0)
-                            # 使用變體對應的模板索引
                             tmpl_idx = min(ab_variant_idx, len(messages) - 1)
                             selected_template = messages[tmpl_idx]
-                            print(f"[BatchSend] A/B 測試: test={ab_test_id}, variant={ab_variant_idx}, "
-                                  f"template={variant.get('template_name', '?')}", file=sys.stderr)
                         else:
                             selected_template = messages[0] if messages else message_template
                     except Exception as ab_err:
@@ -642,22 +656,16 @@ async def handle_batch_send_start(self, payload: Dict[str, Any]):
                         selected_template = messages[0] if messages else message_template
                 elif is_multi_template and messages:
                     if send_strategy == 'random':
-                        # 隨機選擇一個模板
                         selected_template = random.choice(messages)
                     elif send_strategy == 'rotate':
-                        # 輪轉選擇
                         selected_template = messages[idx % len(messages)]
-                    else:  # sequential
-                        # 順序選擇
+                    else:
                         selected_template = messages[idx % len(messages)]
-                    print(f"[BatchSend] 多模板模式: 用戶 {idx+1} 使用模板 #{messages.index(selected_template)+1}", file=sys.stderr)
                 else:
                     selected_template = message_template
                 
-                # 替換變量 - 支持駝峰式和下劃線兩種格式
+                # 替換變量
                 message = selected_template
-                
-                # 基本用戶信息變量（支持兩種格式）
                 message = message.replace('{firstName}', first_name)
                 message = message.replace('{first_name}', first_name)
                 message = message.replace('{lastName}', last_name)
@@ -667,35 +675,35 @@ async def handle_batch_send_start(self, payload: Dict[str, Any]):
                 message = message.replace('{name}', display_name)
                 message = message.replace('{fullName}', full_name)
                 message = message.replace('{full_name}', full_name)
-                
-                # 來源信息變量（新增）
                 message = message.replace('{groupName}', group_name)
                 message = message.replace('{group_name}', group_name)
                 message = message.replace('{keyword}', keyword)
                 message = message.replace('{source}', source)
-                
-                # 時間相關變量
                 message = message.replace('{greeting}', greeting)
                 message = message.replace('{date}', date_str)
                 message = message.replace('{time}', time_str)
                 message = message.replace('{day}', day_str)
                 
-                print(f"[BatchSend] 變量替換完成: {selected_template[:50]}... -> {message[:50]}...", file=sys.stderr)
+                print(f"[BatchSend] 發送 {idx + 1}/{len(targets)}: {phone} -> {user_id} ({username})", file=sys.stderr)
                 
-                print(f"[BatchSend] 發送 {idx + 1}/{len(targets)}: {phone} -> {user_id}", file=sys.stderr)
-                
-                # 發送消息
-                await self.message_queue.add_message(
+                # 🔧 核心修復：直接調用 telegram_manager.send_message
+                # 不再通過 message_queue（隊列是異步的，無法得到即時反饋）
+                send_result = await self.telegram_manager.send_message(
                     phone=phone,
-                    user_id=user_id,
+                    user_id=str(user_id),
                     text=message,
                     attachment=attachments[0] if attachments else None,
-                    target_username=username
+                    source_group=group_name or None,
+                    target_username=username or None
                 )
                 
-                success_count += 1
+                if send_result.get('success'):
+                    success_count += 1
+                    print(f"[BatchSend] ✓ 發送成功: {user_id}", file=sys.stderr)
+                else:
+                    raise Exception(send_result.get('error', '發送失敗'))
                 
-                # P14-2: 記錄 A/B 測試發送結果（成功）
+                # A/B 測試記錄
                 if ab_test_id and ab_variant_idx is not None:
                     try:
                         from core.template_ab_test import get_ab_test_manager
@@ -708,10 +716,9 @@ async def handle_batch_send_start(self, payload: Dict[str, Any]):
                 
             except Exception as e:
                 error_str = str(e).lower()
-                print(f"[BatchSend] 發送失敗 ({user_id}): {e}", file=sys.stderr)
+                print(f"[BatchSend] ✗ 發送失敗 ({user_id}): {e}", file=sys.stderr)
                 failed_count += 1
                 
-                # P14-2: 記錄 A/B 測試發送結果（失敗）
                 if ab_test_id and ab_variant_idx is not None:
                     try:
                         from core.template_ab_test import get_ab_test_manager
@@ -743,25 +750,25 @@ async def handle_batch_send_start(self, payload: Dict[str, Any]):
                     'error': str(e)
                 })
             
-            # 更新進度（帶詳細信息）
+            # 🔧 立即發送進度事件
             self.send_event("batch-send:progress", {
                 "sent": idx + 1,
                 "success": success_count,
                 "failed": failed_count,
                 "total": len(targets),
-                "currentTarget": display_name or username or user_id,
+                "currentTarget": display_name or username or str(user_id),
                 "failureReasons": failure_reasons
             })
             
-            # 間隔
+            # 間隔（只在還有下一個目標時）
             if idx < len(targets) - 1 and not self._batch_send_cancelled:
                 interval = random.randint(min_interval, max_interval)
+                print(f"[BatchSend] 等待 {interval}s 再發送下一條...", file=sys.stderr)
                 await asyncio.sleep(interval)
         
-        # 完成 - 生成詳細報告
+        # 完成
         self._batch_send_active = False
         
-        # 構建失敗原因摘要
         reason_summary = []
         reason_labels = {
             'privacy_restricted': '隱私限制',
@@ -781,7 +788,7 @@ async def handle_batch_send_start(self, payload: Dict[str, Any]):
             "failed": failed_count,
             "failureReasons": failure_reasons,
             "failureSummary": ", ".join(reason_summary) if reason_summary else None,
-            "failedTargets": failed_targets[:10]  # 只返回前10個失敗目標
+            "failedTargets": failed_targets[:10]
         })
         
         if failed_count > 0:
@@ -794,7 +801,10 @@ async def handle_batch_send_start(self, payload: Dict[str, Any]):
         import traceback
         traceback.print_exc(file=sys.stderr)
         self._batch_send_active = False
-        self.send_event("batch-send:complete", {"success": 0, "failed": len(targets)})
+        self.send_event("batch-send:complete", {
+            "success": 0, "failed": len(targets),
+            "error": str(e)
+        })
         self.send_log(f"❌ 批量發送錯誤: {e}", "error")
 
 

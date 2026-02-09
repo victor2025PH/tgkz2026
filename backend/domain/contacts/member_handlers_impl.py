@@ -543,6 +543,29 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
         resource_id = payload.get('resourceId')
         limit = payload.get('limit', 100)
         
+        # 🆕 Phase: Payload 自動補全 — 5 個前端入口 payload 不一致，從 DB 填充缺失字段
+        if resource_id and (not telegram_id or not username or not phone):
+            try:
+                from database import db as _autofill_db
+                await _autofill_db.connect()
+                full_resource = await _autofill_db.fetch_one(
+                    "SELECT telegram_id, username, title, joined_by_phone FROM discovered_resources WHERE id = ?",
+                    (resource_id,)
+                )
+                if full_resource:
+                    db_tg_id = full_resource.get('telegram_id') if hasattr(full_resource, 'get') else full_resource[0]
+                    db_username = full_resource.get('username') if hasattr(full_resource, 'get') else full_resource[1]
+                    db_phone = full_resource.get('joined_by_phone') if hasattr(full_resource, 'get') else full_resource[3]
+                    if not telegram_id and db_tg_id:
+                        telegram_id = db_tg_id
+                    if not username and db_username:
+                        username = db_username
+                    if not phone and db_phone:
+                        phone = db_phone
+                    print(f"[Backend] ✓ Payload auto-filled: telegramId={telegram_id}, username={username}, phone={phone}", file=sys.stderr)
+            except Exception as autofill_err:
+                print(f"[Backend] Payload auto-fill error: {autofill_err}", file=sys.stderr)
+        
         # 從 filters 獲取過濾選項
         filters = payload.get('filters', {})
         filter_bots = filters.get('bots', True) if filters else payload.get('filterBots', True)
@@ -649,12 +672,32 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
                     )
                     print(f"[Backend] Query by resource_id={resource_id}: found={resource is not None}", file=sys.stderr)
                 
-                # 1b. 按 telegram_id 查詢
+                # 1b. 按 telegram_id 查詢 — 🆕 嘗試兩種格式（原始 ID + -100 前綴）
                 if not resource and telegram_id:
+                    tid_str = str(telegram_id)
                     resource = await db.fetch_one(
                         "SELECT joined_by_phone, telegram_id, joined_at FROM discovered_resources WHERE telegram_id = ?",
-                        (str(telegram_id),)
+                        (tid_str,)
                     )
+                    # 🆕 如果沒找到，嘗試 -100 前綴（超級群組 ID 格式轉換）
+                    if not resource and tid_str.lstrip('-').isdigit():
+                        tid_int = int(tid_str)
+                        if tid_int > 1000000000:
+                            alt_tid = f"-100{tid_int}"
+                            resource = await db.fetch_one(
+                                "SELECT joined_by_phone, telegram_id, joined_at FROM discovered_resources WHERE telegram_id = ?",
+                                (alt_tid,)
+                            )
+                            if resource:
+                                print(f"[Backend] ✓ Found with -100 prefix: {alt_tid}", file=sys.stderr)
+                        elif tid_str.startswith('-100') and len(tid_str) > 4:
+                            original_tid = tid_str[4:]
+                            resource = await db.fetch_one(
+                                "SELECT joined_by_phone, telegram_id, joined_at FROM discovered_resources WHERE telegram_id = ?",
+                                (original_tid,)
+                            )
+                            if resource:
+                                print(f"[Backend] ✓ Found with original ID: {original_tid}", file=sys.stderr)
                     print(f"[Backend] Query by telegram_id={telegram_id}: found={resource is not None}", file=sys.stderr)
                 
                 # 1c. 按 username 查詢
@@ -721,16 +764,37 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
             except Exception as e:
                 print(f"[Backend] Error fetching joined_by_phone: {e}", file=sys.stderr)
             
-            # 2. 嘗試從 monitored_groups 獲取 phone
+            # 2. 嘗試從 monitored_groups 獲取 phone — 🆕 兼容兩種 telegram_id 格式
             if not phone:
                 try:
-                    # 通過 telegram_id 或 username 查詢
                     chat_id_str = str(effective_chat_id)
-                    group = await db.fetch_one(
-                        """SELECT phone FROM monitored_groups 
-                           WHERE telegram_id = ? OR link LIKE ? OR name LIKE ?""",
-                        (chat_id_str, f"%{chat_id_str}%", f"%{username}%" if username else "")
-                    )
+                    # 🆕 構建可能的 telegram_id 格式列表
+                    tid_variants = [chat_id_str]
+                    if chat_id_str.lstrip('-').isdigit():
+                        tid_int = int(chat_id_str)
+                        if tid_int > 1000000000:
+                            tid_variants.append(f"-100{tid_int}")
+                        elif chat_id_str.startswith('-100') and len(chat_id_str) > 4:
+                            tid_variants.append(chat_id_str[4:])
+                    
+                    group = None
+                    for tid in tid_variants:
+                        group = await db.fetch_one(
+                            """SELECT phone FROM monitored_groups 
+                               WHERE telegram_id = ? OR link LIKE ?""",
+                            (tid, f"%{tid}%")
+                        )
+                        if group:
+                            break
+                    
+                    # 也嘗試用 username 匹配
+                    if not group and username:
+                        group = await db.fetch_one(
+                            """SELECT phone FROM monitored_groups 
+                               WHERE link LIKE ? OR name LIKE ?""",
+                            (f"%{username}%", f"%{username}%")
+                        )
+                    
                     if group:
                         group_phone = group.get('phone') if hasattr(group, 'get') else group[0]
                         if group_phone and group_phone in self.telegram_manager.clients:
@@ -779,6 +843,59 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
         member_extraction_service.set_clients(self.telegram_manager.clients)
         member_extraction_service.set_event_callback(self.send_event)
         
+        # 🆕 清除結果緩存（強制重新提取，不返回舊數據）
+        member_extraction_service.clear_result_cache(str(chat_id))
+        # 也清除 -100 前綴格式的緩存
+        if isinstance(chat_id, int) and chat_id > 0:
+            member_extraction_service.clear_result_cache(str(int(f"-100{chat_id}")))
+        
+        # 🆕 預驗證：快速檢查帳號是否可以訪問此群組
+        pre_check_passed = False
+        if phone and phone in self.telegram_manager.clients:
+            test_client = self.telegram_manager.clients[phone]
+            if test_client and test_client.is_connected:
+                try:
+                    # 快速 get_chat 驗證（member_extraction_service 內部會處理 -100 前綴）
+                    test_target = chat_id
+                    try:
+                        await test_client.get_chat(test_target)
+                        pre_check_passed = True
+                    except Exception as pre_err:
+                        pre_err_str = str(pre_err)
+                        if 'PEER_ID_INVALID' in pre_err_str or 'ChannelInvalid' in pre_err_str:
+                            # 嘗試 -100 前綴
+                            if isinstance(test_target, int) and test_target > 1000000000:
+                                try:
+                                    alt_target = int(f"-100{test_target}")
+                                    await test_client.get_chat(alt_target)
+                                    pre_check_passed = True
+                                    chat_id = alt_target  # 更新 chat_id
+                                    self.send_log(f"✓ 使用超級群組 ID 格式: {alt_target}", "info")
+                                except Exception:
+                                    pass
+                        elif 'PEER_ID_INVALID' not in pre_err_str:
+                            # 其他非 PeerIdInvalid 錯誤，可能仍然可用
+                            pre_check_passed = True
+                    
+                    if not pre_check_passed:
+                        # 當前帳號無法訪問，嘗試找一個可以的
+                        self.send_log(f"⚠️ 帳號 {phone[:4]}**** 無法訪問群組，嘗試其他帳號...", "warning")
+                        for alt_phone, alt_client in self.telegram_manager.clients.items():
+                            if alt_phone == phone or not alt_client or not alt_client.is_connected:
+                                continue
+                            try:
+                                test_target_2 = chat_id if isinstance(chat_id, int) and chat_id < 0 else (int(f"-100{chat_id}") if isinstance(chat_id, int) and chat_id > 1000000000 else chat_id)
+                                await alt_client.get_chat(test_target_2)
+                                phone = alt_phone
+                                chat_id = test_target_2
+                                pre_check_passed = True
+                                self.send_log(f"✓ 切換到帳號 {phone[:4]}**** (可訪問群組)", "info")
+                                break
+                            except Exception:
+                                continue
+                except Exception as pre_check_err:
+                    print(f"[Backend] Pre-check error (non-fatal): {pre_check_err}", file=sys.stderr)
+        
         # 發送開始事件
         self.send_event("members-extraction-progress", {
             "resourceId": resource_id,
@@ -787,16 +904,17 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
             "total": 0
         })
         
-        # 🆕 P0 修復：智能重試機制
+        # 🆕 智能重試機制 — 現在會嘗試不同帳號 + 自動 -100 前綴（在 extraction_service 層處理）
         MAX_RETRIES = 3
-        RETRY_DELAYS = [3, 5, 8]  # 每次重試的延遲秒數
+        RETRY_DELAYS = [2, 4, 6]
         result = None
         last_error = None
+        tried_phones = {phone}  # 記錄已嘗試的帳號，避免重複
+        current_phone = phone
         
         for attempt in range(MAX_RETRIES):
             try:
                 if attempt > 0:
-                    # 重試前發送進度通知
                     self.send_event("members-extraction-progress", {
                         "resourceId": resource_id,
                         "status": "retrying",
@@ -804,44 +922,58 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
                         "extracted": 0,
                         "total": 0
                     })
-                    self.send_log(f"🔄 群組同步中，{RETRY_DELAYS[attempt-1]} 秒後重試 (第 {attempt + 1} 次)...", "info")
-                    await asyncio.sleep(RETRY_DELAYS[attempt-1])
+                    await asyncio.sleep(RETRY_DELAYS[attempt - 1])
+                    
+                    # 🆕 第 2 次及之後：嘗試切換到其他帳號
+                    if self.telegram_manager.clients:
+                        for alt_phone, alt_client in self.telegram_manager.clients.items():
+                            if alt_phone not in tried_phones and alt_client and alt_client.is_connected:
+                                self.send_log(f"🔄 切換帳號: {current_phone[:4]}**** → {alt_phone[:4]}****", "info")
+                                current_phone = alt_phone
+                                tried_phones.add(alt_phone)
+                                break
                 
-                # 提取成員 - 🔧 修復：傳遞 online_status 參數
+                # 提取成員（member_extraction_service 內部已自動處理 -100 前綴）
                 result = await member_extraction_service.extract_members(
                     chat_id=chat_id,
-                    phone=phone,
+                    phone=current_phone,
                     limit=limit,
                     filter_bots=filter_bots,
                     filter_offline=filter_offline,
-                    online_status=online_status,  # 🔧 添加在線狀態過濾
+                    online_status=online_status,
                     save_to_db=True
                 )
                 
-                # 檢查是否需要重試的錯誤
                 if result.get('success'):
-                    break  # 成功，跳出重試循環
+                    if attempt > 0:
+                        self.send_log(f"✓ 第 {attempt + 1} 次重試成功 (帳號: {current_phone[:4]}****)", "success")
+                    break
                 
                 error_code = result.get('error_code', '')
-                if error_code in ['PEER_ID_INVALID', 'NOT_PARTICIPANT', 'USER_NOT_PARTICIPANT']:
+                if error_code in ['PEER_ID_INVALID', 'NOT_PARTICIPANT', 'USER_NOT_PARTICIPANT', 'CHANNEL_PRIVATE']:
                     last_error = result.get('error')
-                    print(f"[Backend] Retryable error: {error_code}, attempt {attempt + 1}/{MAX_RETRIES}", file=sys.stderr)
+                    print(f"[Backend] Retryable error: {error_code}, attempt {attempt + 1}/{MAX_RETRIES}, phone={current_phone}", file=sys.stderr)
                     
-                    if attempt < MAX_RETRIES - 1:
-                        # 還有重試機會，繼續循環
-                        continue
-                    else:
-                        # 最後一次重試也失敗
-                        result['error'] = f"群組同步未完成。{result.get('error', '')}"
+                    if attempt >= MAX_RETRIES - 1:
+                        # 所有重試都失敗 — 提供精確的錯誤信息
+                        actual_reason = {
+                            'PEER_ID_INVALID': '當前帳號未加入此群組，或群組 ID 無法解析',
+                            'NOT_PARTICIPANT': '帳號不是此群組的成員',
+                            'USER_NOT_PARTICIPANT': '帳號不是此群組的成員',
+                            'CHANNEL_PRIVATE': '這是私有群組，需要先加入'
+                        }.get(error_code, '帳號無法訪問此群組')
+                        
+                        result['error'] = f"提取失敗：{actual_reason}"
                         result['error_code'] = 'E4001_NOT_SYNCED'
                         result['error_details'] = {
                             'code': 'E4001',
-                            'reason': '帳號剛加入群組，Telegram 服務器尚未同步完成',
-                            'suggestion': '請等待 30 秒後再試，或重新加入群組',
-                            'action': 'retry_later',
-                            'retry_after_seconds': 30,
+                            'reason': actual_reason,
+                            'suggestion': '請先使用「加入群組」功能，確保帳號已加入此群組後再提取',
+                            'action': 'auto_join',
+                            'retry_after_seconds': 10,
                             'attempts': attempt + 1,
-                            'can_auto_join': False
+                            'tried_phones': list(tried_phones),
+                            'can_auto_join': True
                         }
                         break
                 else:
@@ -857,14 +989,13 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
                                 'action': 'suggest_monitor'
                             }
                         elif 'FLOOD' in err_msg.upper():
-                            # 🆕 Phase4: 從 flood_handler 提取精確等待時間
                             actual_wait = 120
                             try:
                                 from flood_wait_handler import flood_handler as _fh
                                 parsed_wait = _fh.get_wait_time_from_error(Exception(err_msg))
                                 if parsed_wait:
                                     actual_wait = parsed_wait
-                                    _fh.record_flood_wait(phone, actual_wait)
+                                    _fh.record_flood_wait(current_phone, actual_wait)
                             except Exception:
                                 pass
                             result['error_code'] = 'E4003_RATE_LIMITED'
@@ -964,15 +1095,17 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
         # 發送完成事件 - 🔧 修復：包含詳細錯誤信息
         extraction_event = {
             "resourceId": resource_id,
+            "telegramId": str(telegram_id) if telegram_id else None,  # 🆕 回傳 telegramId 供前端使用
             "success": result.get('success', False),
             "members": result.get('members', []),
             "extracted": result.get('extracted', 0),
             "total": result.get('total', 0),
             "onlineCount": result.get('online_count', 0),
             "error": result.get('error'),
-            "error_code": result.get('error_code'),  # 🆕 錯誤代碼
-            "error_details": result.get('error_details'),  # 🆕 詳細錯誤信息
-            "limit_warning": result.get('limit_warning')  # 🆕 Phase3: 大群組上限提醒
+            "error_code": result.get('error_code'),
+            "error_details": result.get('error_details'),
+            "limit_warning": result.get('limit_warning'),
+            "usedPhone": current_phone if 'current_phone' in locals() else phone  # 🆕 回傳實際使用的帳號
         }
         self.send_event("members-extracted", extraction_event)
         

@@ -673,15 +673,18 @@ export class ElectronIpcService implements OnDestroy {
     }
     
     if (command === 'add-group' || command === 'add-monitored-group') {
+      const isSuccess = result.success !== false;
       this.triggerEvent('group-added', {
-        success: result.success !== false,
+        success: isSuccess,
         group: result.group || result.data,
         error: result.error
       });
-      // 🔧 修復：添加群組成功後，觸發列表刷新事件
-      if (result.success !== false) {
-        this.triggerEvent('monitored-group-added', { success: true });
-      }
+      // 🔧 Phase2: 無論成功失敗都觸發 monitored-group-added（讓搜索頁清除 loading）
+      this.triggerEvent('monitored-group-added', {
+        success: isSuccess,
+        name: result.name || result.message,
+        error: result.error
+      });
     }
     
     if (command === 'remove-group' || command === 'remove-monitored-group') {
@@ -1234,7 +1237,8 @@ export class ElectronIpcService implements OnDestroy {
       'login-account', 'add-account', 'get-accounts', 'update-account', 'update-account-data',
       'delete-account', 'remove-account', 'connect-account', 'disconnect-account', 'logout-account',
       'check-account-status', 'start-monitoring', 'stop-monitoring', 'get-monitoring-status',
-      'one-click-start', 'one-click-stop', 'get-monitored-groups', 'add-group', 'remove-group',
+      'one-click-start', 'one-click-stop', 'get-monitored-groups', 'add-group', 'add-monitored-group',
+      'remove-group', 'remove-monitored-group',
       'join-group', 'leave-group', 'join-and-monitor-with-account', 'join-and-monitor-resource',
       'batch-join-and-monitor', 'batch-join-resources', 'get-keyword-sets', 'add-keyword-set',
       'add-keyword', 'remove-keyword', 'get-queue-status', 'get-queue-messages', 'clear-queue',

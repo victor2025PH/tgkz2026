@@ -691,10 +691,17 @@ export interface Account {
                           <span class="text-xs text-slate-500 mt-1">{{ resource.joined_phone.slice(0, 7) }}***</span>
                         }
                       </div>
-                      <button (click)="addToMonitoring(resource)" 
-                              class="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-sm transition-all">
-                        📡 加入監控
-                      </button>
+                      @if (isAddingMonitor(resource)) {
+                        <button disabled
+                                class="px-4 py-2 bg-emerald-500/10 text-emerald-400/60 rounded-lg text-sm cursor-wait flex items-center gap-1">
+                          <span class="animate-spin">⏳</span> 添加中...
+                        </button>
+                      } @else {
+                        <button (click)="addToMonitoring(resource)" 
+                                class="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-sm transition-all">
+                          📡 加入監控
+                        </button>
+                      }
                     } @else if (isJoining(resource)) {
                       <button disabled
                               class="px-4 py-2 bg-slate-600 text-slate-300 rounded-lg text-sm font-medium cursor-wait flex items-center gap-1">
@@ -706,11 +713,19 @@ export interface Account {
                               class="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg text-sm font-medium transition-all shadow-lg shadow-cyan-500/20">
                         🚀 加入
                       </button>
-                      <button (click)="addToMonitoring(resource)" 
-                              class="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-sm transition-all"
-                              title="直接添加到監控群組列表">
-                        📡 監控
-                      </button>
+                      @if (isAddingMonitor(resource)) {
+                        <button disabled
+                                class="px-4 py-2 bg-emerald-500/10 text-emerald-400/60 rounded-lg text-sm cursor-wait flex items-center gap-1"
+                                title="正在添加到監控列表...">
+                          <span class="animate-spin">⏳</span> 監控中...
+                        </button>
+                      } @else {
+                        <button (click)="addToMonitoring(resource)" 
+                                class="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-sm transition-all"
+                                title="直接添加到監控群組列表">
+                          📡 監控
+                        </button>
+                      }
                     }
                     
                     @if (resource.resource_type !== 'channel') {
@@ -1326,6 +1341,9 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   // 🔧 P0: 加入中的資源 ID 列表（用於顯示 Loading 狀態）
   joiningResourceIds = signal<Set<number>>(new Set());
   
+  // 🔧 Phase2: 正在添加監控的資源 ID 列表
+  monitoringResourceIds = signal<Set<number>>(new Set());
+  
   // 🆕 高級篩選狀態
   showAdvancedFilter = signal(false);
   filterMemberMin = signal<number | null>(null);
@@ -1786,27 +1804,71 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
           (data.telegramId && r.telegram_id === data.telegramId);
         
         if (isMatch && data.newStatus) {
+          // 🔧 Phase2: 清除對應資源的 monitoring loading 狀態
+          if (data.newStatus === 'monitoring') {
+            this.monitoringResourceIds.update(ids => {
+              const newIds = new Set(ids);
+              newIds.delete(r.id);
+              return newIds;
+            });
+          }
           return { ...r, status: data.newStatus as any };
         }
         return r;
       });
       this._internalResources.set(updatedResources);
       this.saveSearchResults();
-      
-      // 顯示狀態更新的 toast 提示
-      if (data.newStatus === 'monitoring') {
-        this.toast.success('📡 已成功添加到監控列表');
-      }
     });
     
     // 🆕 監聽群組添加失敗事件
     const cleanup7 = this.ipc.on('group-added', (data: any) => {
       if (data && data.success === false && data.error) {
         this.toast.error(`添加監控失敗: ${data.error}`);
+        // 清除所有 monitoring loading 狀態（因為不知道具體是哪個資源的失敗）
+        this.monitoringResourceIds.set(new Set());
       }
     });
     
-    this.ipcCleanup.push(cleanup1, cleanup2a, cleanup2, cleanup3, cleanup4, cleanup5, cleanup6, cleanup7);
+    // 🔧 Phase2: 監聽監控群組添加結果（成功/失敗閉環，幂等防重複）
+    const cleanup8 = this.ipc.on('monitored-group-added', (data: any) => {
+      if (data.success) {
+        // 成功：更新資源狀態 + 清除 loading
+        let alreadyUpdated = false;
+        const currentResources = this._internalResources();
+        const updatedResources = currentResources.map(r => {
+          const isMatch = 
+            (data.telegramId && r.telegram_id === data.telegramId) ||
+            (data.username && r.username === data.username);
+          if (isMatch) {
+            // 幂等：如果已經是 monitoring 狀態，跳過 toast
+            if (r.status === 'monitoring') {
+              alreadyUpdated = true;
+            }
+            this.monitoringResourceIds.update(ids => {
+              const newIds = new Set(ids);
+              newIds.delete(r.id);
+              return newIds;
+            });
+            return { ...r, status: 'monitoring' as any };
+          }
+          return r;
+        });
+        this._internalResources.set(updatedResources);
+        this.saveSearchResults();
+        // 只在首次收到成功事件時顯示 toast（避免 WS + HTTP 雙重觸發）
+        if (!alreadyUpdated) {
+          this.toast.success(`📡 已成功添加到監控列表: ${data.name || ''}`);
+        }
+      } else {
+        // 失敗：清除所有 loading + 顯示錯誤（只在有 loading 中的資源時顯示）
+        if (this.monitoringResourceIds().size > 0) {
+          this.monitoringResourceIds.set(new Set());
+          this.toast.error(`❌ 添加監控失敗: ${data.error || '未知錯誤'}`);
+        }
+      }
+    });
+    
+    this.ipcCleanup.push(cleanup1, cleanup2a, cleanup2, cleanup3, cleanup4, cleanup5, cleanup6, cleanup7, cleanup8);
   }
   
   // 🔧 P0: 加載搜索歷史
@@ -2263,14 +2325,38 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     return this.joiningResourceIds().has(resource.id);
   }
   
-  // 🆕 添加到監控列表
+  // 🔧 Phase2: 檢查資源是否正在添加監控中
+  isAddingMonitor(resource: DiscoveredResource): boolean {
+    return this.monitoringResourceIds().has(resource.id);
+  }
+
+  // 🔧 Phase2: 添加到監控列表（帶 Loading 狀態閉環）
   addToMonitoring(resource: DiscoveredResource): void {
     console.log('[SearchDiscovery] 添加到監控:', resource.title);
+    
+    // 已在監控中 → 跳過
+    if (resource.status === 'monitoring') {
+      this.toast.info('此群組已在監控列表中');
+      return;
+    }
+    
+    // 防重複點擊
+    if (this.monitoringResourceIds().has(resource.id)) {
+      this.toast.info('正在添加中，請稍候...');
+      return;
+    }
     
     if (!resource.username && !resource.telegram_id) {
       this.toast.warning('無法監控：缺少群組標識');
       return;
     }
+    
+    // 設置 Loading 狀態
+    this.monitoringResourceIds.update(ids => {
+      const newIds = new Set(ids);
+      newIds.add(resource.id);
+      return newIds;
+    });
     
     // 構建監控群組 URL
     const url = resource.username 
@@ -2289,6 +2375,18 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     });
     
     this.toast.info(`📡 正在將「${resource.title || resource.username}」添加到監控列表...`);
+    
+    // 🔧 Phase2: 安全超時 - 30 秒後自動清除 loading 狀態（防止後端無響應卡死）
+    setTimeout(() => {
+      if (this.monitoringResourceIds().has(resource.id)) {
+        this.monitoringResourceIds.update(ids => {
+          const newIds = new Set(ids);
+          newIds.delete(resource.id);
+          return newIds;
+        });
+        console.warn('[SearchDiscovery] 監控添加超時，已清除 loading 狀態:', resource.title);
+      }
+    }, 30000);
   }
 
   extractMembers(resource: DiscoveredResource): void {

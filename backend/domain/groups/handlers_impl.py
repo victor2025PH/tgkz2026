@@ -539,7 +539,7 @@ async def handle_group_monitor_messages(self, payload: Dict[str, Any]):
         return {"success": False, "error": str(e)}
 
 async def handle_add_group(self, payload: Dict[str, Any]):
-    """Handle add-group command"""
+    """Handle add-group command. Returns {'success': True/False, 'error': ...} for caller inspection."""
     try:
         url = payload.get('url')
         name = payload.get('name', url)  # Use URL as name if not provided
@@ -550,7 +550,7 @@ async def handle_add_group(self, payload: Dict[str, Any]):
         quota_check = await self.check_quota('groups', 1, owner_user_id)
         if not quota_check.get('allowed', True):
             self.send_quota_exceeded_error('group-added', 'groups', quota_check.get('result', {}))
-            return
+            return {'success': False, 'error': '群組配額已用完'}
         
         # Validate group URL
         is_valid, error = validate_group_url(url)
@@ -564,7 +564,7 @@ async def handle_add_group(self, payload: Dict[str, Any]):
                 AppError(ErrorType.VALIDATION_ERROR, error, {"url": url}),
                 {"command": "add-group", "payload": payload}
             )
-            return
+            return {'success': False, 'error': error}
         
         # Validate group name (optional)
         if name:
@@ -579,7 +579,7 @@ async def handle_add_group(self, payload: Dict[str, Any]):
                     AppError(ErrorType.VALIDATION_ERROR, error, {"name": name}),
                     {"command": "add-group", "payload": payload}
                 )
-                return
+                return {'success': False, 'error': error}
         
         # ========== 新增：預檢查監控號入群狀態 ==========
         membership_status = None
@@ -653,6 +653,7 @@ async def handle_add_group(self, payload: Dict[str, Any]):
             group_id = await db.add_group(url, group_title, keyword_set_ids)
             await db.add_log(f"Group '{group_title}' added", "success")
         await self.send_groups_update()
+        return {'success': True, 'group_title': group_title}
     
     except ValidationError as e:
         self.send_log(f"Validation error: {e.message}", "error")
@@ -660,9 +661,11 @@ async def handle_add_group(self, payload: Dict[str, Any]):
             "errors": [e.message],
             "field": e.field
         })
+        return {'success': False, 'error': e.message}
     except Exception as e:
         self.send_log(f"Error adding group: {str(e)}", "error")
         handle_error(e, {"command": "add-group", "payload": payload})
+        return {'success': False, 'error': str(e)}
 
 async def handle_add_monitored_group(self, payload: Dict[str, Any]):
     """
@@ -692,11 +695,13 @@ async def handle_add_monitored_group(self, payload: Dict[str, Any]):
             elif telegram_id:
                 url = f"tg://resolve?id={telegram_id}"
             else:
-                self.send_event("group-added", {
+                error_msg = "缺少群組標識（URL、username 或 telegram_id）"
+                self.send_event("monitored-group-added", {
                     "success": False,
-                    "error": "缺少群組標識（URL、username 或 telegram_id）"
+                    "error": error_msg
                 })
-                return
+                self.send_log(f"❌ {error_msg}", "error")
+                return {"success": False, "error": error_msg}
         
         # 構建 add-group 格式的 payload
         add_group_payload = {
@@ -709,9 +714,21 @@ async def handle_add_monitored_group(self, payload: Dict[str, Any]):
         }
         
         # 調用已有的 add-group 處理邏輯
-        await handle_add_group(self, add_group_payload)
+        add_result = await handle_add_group(self, add_group_payload) or {}
         
-        # 同時更新 discovered_resources 的狀態為 monitoring
+        # 🔧 Phase2: 根據 handle_add_group 的返回值決定後續操作
+        if not add_result.get('success', False):
+            error_msg = add_result.get('error', '添加群組失敗')
+            self.send_log(f"❌ 添加監控群組失敗: {error_msg}", "error")
+            self.send_event("monitored-group-added", {
+                "success": False,
+                "error": error_msg,
+                "name": name or url,
+                "url": url
+            })
+            return {"success": False, "error": error_msg}
+        
+        # ✅ handle_add_group 成功 → 更新 discovered_resources 狀態
         if resource_id or telegram_id or username:
             try:
                 from database import db
@@ -753,11 +770,12 @@ async def handle_add_monitored_group(self, payload: Dict[str, Any]):
             except Exception as db_err:
                 print(f"[Backend] Error updating resource status: {db_err}", file=sys.stderr)
         
-        # 🔧 核心修復：發送明確的操作完成事件
-        self.send_log(f"✅ 已將群組添加到監控列表: {name or url}", "success")
+        # 🔧 Phase2: 發送明確的操作完成事件（只在 add_group 成功後）
+        display_name = add_result.get('group_title') or name or url
+        self.send_log(f"✅ 已將群組添加到監控列表: {display_name}", "success")
         self.send_event("monitored-group-added", {
             "success": True,
-            "name": name or url,
+            "name": display_name,
             "url": url,
             "telegramId": telegram_id,
             "username": username
@@ -766,7 +784,7 @@ async def handle_add_monitored_group(self, payload: Dict[str, Any]):
         # 🔧 保底：確保前端收到最新群組列表
         await self.send_groups_update()
         
-        return {"success": True, "message": f"已添加監控群組: {name or url}"}
+        return {"success": True, "message": f"已添加監控群組: {display_name}"}
         
     except Exception as e:
         import traceback

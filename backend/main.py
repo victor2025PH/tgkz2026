@@ -1055,6 +1055,17 @@ class BackendService:
             except Exception as e:
                 import sys
                 print(f"[Backend] DB Health Guard start error: {e}", file=sys.stderr)
+            
+            # 🆕 代理供應商自動同步（Phase 2）
+            try:
+                from admin.proxy_sync import get_sync_service
+                proxy_sync_svc = get_sync_service()
+                await proxy_sync_svc.start_auto_sync()
+                import sys
+                print("[Backend] ✓ Proxy provider auto-sync started", file=sys.stderr)
+            except Exception as e:
+                import sys
+                print(f"[Backend] Proxy auto-sync start error: {e}", file=sys.stderr)
         
         # 創建後台任務（不等待完成）
         asyncio.create_task(background_startup_tasks())
@@ -3452,10 +3463,6 @@ class BackendService:
         from domain.automation.monitoring_handlers_impl import handle_stop_monitoring as _handle_stop_monitoring
         return await _handle_stop_monitoring(self)
 
-    async def handle_get_monitoring_status(self):
-        from domain.automation.monitoring_handlers_impl import handle_get_monitoring_status as _handle_get_monitoring_status
-        return await _handle_get_monitoring_status(self)
-
     async def handle_one_click_start(self, payload=None):
         from domain.automation.monitoring_handlers_impl import handle_one_click_start as _handle_one_click_start
         return await _handle_one_click_start(self, payload)
@@ -3472,1038 +3479,6 @@ class BackendService:
         from domain.ai.knowledge_handlers_impl import handle_learn_from_history as _handle_learn_from_history
         return await _handle_learn_from_history(self, payload)
 
-    async def handle_get_knowledge_stats(self):
-        from domain.ai.knowledge_handlers_impl import handle_get_knowledge_stats as _handle_get_knowledge_stats
-        return await _handle_get_knowledge_stats(self)
-
-    async def handle_search_knowledge(self, payload=None):
-        from domain.ai.knowledge_handlers_impl import handle_search_knowledge as _handle_search_knowledge
-        return await _handle_search_knowledge(self, payload)
-
-    async def _handle_ai_auto_greeting(self, lead_data: Dict[str, Any], lead_id: int):
-        """Handle AI auto greeting for new leads based on settings"""
-        import sys
-        print(f"[Backend] _handle_ai_auto_greeting called for lead_id={lead_id}, user={lead_data.get('username')}", file=sys.stderr)
-        self.send_log(f"[AI] 開始處理自動問候 (Lead ID: {lead_id}, User: @{lead_data.get('username')})", "info")
-        
-        try:
-            # Get AI settings
-            settings = await db.get_ai_settings()
-            print(f"[Backend] AI settings loaded: {settings}", file=sys.stderr)
-            
-            if not settings:
-                self.send_log("[AI] AI 設置未配置，跳過自動問候", "warning")
-                return
-            
-            # 使用正確的數據庫字段名稱 (整數 0/1)
-            enabled = settings.get('auto_chat_enabled', 0) == 1
-            auto_greeting = settings.get('auto_greeting', 0) == 1
-            mode = settings.get('auto_chat_mode', 'semi')
-            
-            self.send_log(f"[AI] 設置檢查 - 啟用: {enabled}, 自動問候: {auto_greeting}, 模式: {mode}", "info")
-            
-            if not enabled:
-                self.send_log("[AI] AI 自動聊天未啟用，跳過自動問候", "info")
-                return
-            
-            if not auto_greeting:
-                self.send_log("[AI] 自動問候未啟用，跳過自動問候", "info")
-                return
-            
-            user_id = str(lead_data.get('user_id', ''))
-            username = lead_data.get('username', '')
-            first_name = lead_data.get('first_name', '')
-            source_group = lead_data.get('source_group_url') or lead_data.get('source_group', '')
-            
-            # 使用帳號輪換器自動選擇發送帳號
-            sender_phone = ''
-            if self.message_queue.account_rotator:
-                selected_account = await self.message_queue.account_rotator.select_account()
-                if selected_account:
-                    sender_phone = selected_account.get('phone', '')
-                    self.send_log(f"[AI] 帳號輪換選擇: {sender_phone} (負載均衡)", "info")
-            
-            # 回退到舊邏輯（如果輪換器未初始化或無可用帳號）
-            if not sender_phone:
-                accounts = await db.get_all_accounts()
-                
-                # First try to find an online sender account
-                for acc in accounts:
-                    role = str(acc.get('role', '')).lower()
-                    status = str(acc.get('status', '')).lower()
-                    if role == 'sender' and status == 'online':
-                        sender_phone = acc.get('phone', '')
-                        self.send_log(f"[AI] 找到發送帳號: {sender_phone}", "info")
-                        break
-                
-                # If no sender, use any online account
-                if not sender_phone:
-                    for acc in accounts:
-                        status = str(acc.get('status', '')).lower()
-                        if status == 'online':
-                            sender_phone = acc.get('phone', '')
-                            self.send_log(f"[AI] 使用在線帳號: {sender_phone}", "info")
-                            break
-                
-                # Fallback to the monitoring account
-                if not sender_phone:
-                    sender_phone = lead_data.get('account_phone', '')
-            
-            if not sender_phone:
-                self.send_log("[AI] 沒有可用的發送帳號，跳過自動問候", "warning")
-                return
-            
-            self.send_log(f"[AI] 準備發送問候給 @{username or first_name}，使用帳號: {sender_phone}", "info")
-            
-            # Generate greeting using AI (傳遞觸發關鍵詞用於個性化問候)
-            triggered_keyword = lead_data.get('triggered_keyword', '')
-            greeting = await ai_auto_chat.handle_auto_greeting(
-                user_id=user_id,
-                username=username,
-                account_phone=sender_phone,
-                source_group=source_group,
-                first_name=first_name,
-                triggered_keyword=triggered_keyword
-            )
-            
-            if not greeting:
-                self.send_log(f"[AI] 未能生成問候消息", "warning")
-                return
-            
-            self.send_log(f"[AI] 生成問候: {greeting[:50]}...", "info")
-            
-            if mode == 'full':
-                # Full auto mode: Send immediately using self.message_queue
-                from message_queue import MessagePriority
-                
-                # 🔧 FIX: 添加 source_group 和 target_username 參數，解決 PEER_ID_INVALID 問題
-                message_id = await self.message_queue.add_message(
-                    phone=sender_phone,
-                    user_id=user_id,
-                    text=greeting,
-                    source_group=source_group,  # 🆕 來源群組，用於解析用戶
-                    target_username=username,   # 🆕 用戶名作為備選
-                    priority=MessagePriority.HIGH  # High priority for greeting
-                )
-                
-                self.send_log(f"[AI] ✓ 已自動發送問候給 @{username or first_name} (消息ID: {message_id}, 群組: {source_group})", "success")
-                await db.add_interaction(lead_id, 'AI Auto Greeting', greeting)
-                
-                # Update lead status to "已聯繫"
-                await db.update_lead(lead_id, {'status': 'Contacted'})
-                self.send_event("leads-updated", await db.get_all_leads())
-                
-            elif mode == 'semi':
-                # Semi-auto mode: Send to frontend for confirmation
-                self.send_event("ai-greeting-suggestion", {
-                    "leadId": lead_id,
-                    "userId": user_id,
-                    "username": username,
-                    "firstName": first_name,
-                    "sourceGroup": source_group,
-                    "suggestedGreeting": greeting,
-                    "accountPhone": sender_phone
-                })
-                self.send_log(f"[AI] 已生成問候建議給 @{username or first_name}，等待確認", "info")
-            
-        except Exception as e:
-            import traceback
-            import sys
-            error_details = traceback.format_exc()
-            error_msg = f"[AI] Error in auto greeting: {e}\n{error_details}"
-            print(error_msg, file=sys.stderr)
-            self.send_log(f"AI 自動問候出錯: {str(e)}", "error")
-            await db.add_log(f"AI auto greeting error: {str(e)}", "error")
-    
-    async def execute_matching_campaigns(self, lead_id: int, lead_data: Dict[str, Any]):
-        """Execute campaigns that match the captured lead"""
-        try:
-            # Get all active campaigns
-            campaigns = await db.get_all_campaigns()
-            # 支持兩種字段名：isActive (前端格式) 和 is_active (數據庫格式)
-            active_campaigns = [c for c in campaigns if c.get('isActive') or c.get('is_active')]
-            
-            if not active_campaigns:
-                self.send_log(f"[活動] 沒有啟用的活動，跳過執行。關鍵詞: {lead_data.get('triggered_keyword')}", "info")
-                return
-            
-            self.send_log(f"[活動] 檢查 {len(active_campaigns)} 個啟用的活動，關鍵詞: {lead_data.get('triggered_keyword')}", "info")
-            
-            # Get lead details
-            lead = await db.get_lead(lead_id)
-            if not lead:
-                return
-            
-            source_group_id = None
-            # Find source group ID from URL (prefer source_group_url, fallback to source_group)
-            monitored_groups = await db.get_all_monitored_groups()
-            group_url_to_match = lead_data.get('source_group_url') or lead_data.get('source_group')
-            
-            for group in monitored_groups:
-                # Try matching by URL first
-                if group_url_to_match and str(group.get('url')) == str(group_url_to_match):
-                    source_group_id = group.get('id')
-                    self.send_log(f"找到匹配的群組: {group.get('url')} (ID: {source_group_id})", "info")
-                    break
-            
-            if not source_group_id:
-                self.send_log(f"警告: 無法找到匹配的群組，URL: {group_url_to_match}", "warning")
-            
-            # Get keyword set IDs that matched
-            keyword_set_ids = []
-            keyword_sets = await db.get_all_keyword_sets()
-            triggered_keyword = lead_data.get('triggered_keyword', '')
-            
-            self.send_log(f"[活動] 查找匹配的關鍵詞集，觸發關鍵詞: '{triggered_keyword}'", "info")
-            
-            for ks in keyword_sets:
-                for keyword in ks.get('keywords', []):
-                    keyword_text = keyword.get('keyword', '')
-                    is_regex = keyword.get('isRegex', False)
-                    
-                    # 檢查匹配（支持正則）
-                    matched = False
-                    if is_regex:
-                        try:
-                            import re
-                            pattern = re.compile(keyword_text, re.IGNORECASE)
-                            matched = bool(pattern.search(triggered_keyword))
-                        except:
-                            matched = keyword_text.lower() in triggered_keyword.lower()
-                    else:
-                        matched = keyword_text.lower() in triggered_keyword.lower()
-                    
-                    if matched:
-                        keyword_set_ids.append(ks.get('id'))
-                        self.send_log(f"[活動] 關鍵詞 '{keyword_text}' 匹配，關鍵詞集ID: {ks.get('id')}", "info")
-                        break
-            
-            # Check each campaign
-            for campaign in active_campaigns:
-                trigger = campaign.get('trigger', {})
-                source_group_ids = trigger.get('sourceGroupIds', [])
-                campaign_keyword_set_ids = trigger.get('keywordSetIds', [])
-                
-                # 詳細日誌
-                self.send_log(f"[活動檢查] 活動: {campaign.get('name')}, 來源群組IDs: {source_group_ids}, 關鍵詞集IDs: {campaign_keyword_set_ids}", "info")
-                self.send_log(f"[活動檢查] Lead來源群組ID: {source_group_id}, Lead關鍵詞集IDs: {keyword_set_ids}", "info")
-                
-                # Check if campaign matches
-                # If no source groups specified, match all groups
-                matches_source = not source_group_ids or (source_group_id and source_group_id in source_group_ids)
-                # If no keyword sets specified, match all keywords
-                matches_keyword = not campaign_keyword_set_ids or any(ks_id in campaign_keyword_set_ids for ks_id in keyword_set_ids)
-                
-                self.send_log(f"[活動檢查] 匹配結果: 來源群組={matches_source}, 關鍵詞={matches_keyword}", "info")
-                
-                if matches_source and matches_keyword:
-                    self.send_log(f"✓✓✓ 活動匹配成功: {campaign.get('name')}，開始執行", "success")
-                    # Execute campaign
-                    await self.execute_campaign(campaign, lead_id, lead_data)
-                else:
-                    self.send_log(f"✗ 活動不匹配: {campaign.get('name')} (來源群組: {matches_source}, 關鍵詞: {matches_keyword})", "info")
-        
-        except Exception as e:
-            self.send_log(f"Error executing matching campaigns: {str(e)}", "error")
-    
-    async def execute_campaign(self, campaign: Dict[str, Any], lead_id: int, lead_data: Dict[str, Any]):
-        """Execute a single campaign for a lead"""
-        try:
-            import random
-            
-            # Get action from campaign (actions is a list)
-            actions = campaign.get('actions', [])
-            if actions and len(actions) > 0:
-                action = actions[0]
-            else:
-                # Fallback to direct campaign fields (for backward compatibility)
-                action = {
-                    'templateId': campaign.get('actionTemplateId'),
-                    'minDelaySeconds': campaign.get('actionMinDelaySeconds', 30),
-                    'maxDelaySeconds': campaign.get('actionMaxDelaySeconds', 120)
-                }
-            
-            template_id = action.get('templateId')
-            
-            if not template_id:
-                self.send_log(f"Campaign {campaign.get('name')} has no template", "warning")
-                return
-            
-            # Get template
-            templates = await db.get_all_templates()
-            template = next((t for t in templates if t.get('id') == template_id), None)
-            
-            if not template or not template.get('isActive'):
-                self.send_log(f"模板 ID {template_id} 不存在或未激活。请检查模板设置。", "warning")
-                return
-            
-            # Generate message from template
-            message = await self.generate_message_from_template(template, lead_data)
-            
-            if not message:
-                self.send_log(f"Failed to generate message for campaign {campaign.get('name')}", "error")
-                return
-            
-            # Calculate delay
-            min_delay = action.get('minDelaySeconds', 30)
-            max_delay = action.get('maxDelaySeconds', 120)
-            delay = random.randint(min_delay, max_delay)
-            
-            # Schedule message sending using queue
-            scheduled_time = datetime.now() + timedelta(seconds=delay)
-            
-            # Get sender accounts
-            accounts = await db.get_all_accounts()
-            sender_accounts = [a for a in accounts if a.get('role') == 'Sender' and a.get('status') == 'Online']
-            
-            if not sender_accounts:
-                self.send_log(f"No online sender accounts available for campaign '{campaign.get('name')}'", "warning")
-                await db.add_interaction(lead_id, 'Campaign Failed', "No online sender accounts available")
-                return
-            
-            # Select account (round-robin or random)
-            selected_account = random.choice(sender_accounts)
-            
-            # Add to message queue with scheduled time
-            try:
-                # 🔧 FIX: 獲取 source_group 和 username，解決 PEER_ID_INVALID 問題
-                source_group = lead_data.get('source_group_url') or lead_data.get('source_group', '')
-                target_username = lead_data.get('username', '')
-                
-                message_id = await self.message_queue.add_message(
-                    phone=selected_account.get('phone'),
-                    user_id=str(lead_data.get('user_id')),
-                    text=message,
-                    source_group=source_group,      # 🆕 來源群組
-                    target_username=target_username, # 🆕 用戶名備選
-                    priority=MessagePriority.NORMAL,
-                    scheduled_at=scheduled_time,
-                    callback=self._on_message_sent_callback(lead_id)
-                )
-                
-                # Update lead with campaign
-                await db.update_lead(lead_id, {'campaignId': campaign.get('id')})
-                await db.add_interaction(lead_id, 'Campaign Triggered', f"Campaign '{campaign.get('name')}' triggered, message queued (ID: {message_id})")
-                
-                self.send_log(f"Campaign '{campaign.get('name')}' triggered for lead {lead_id}, message queued (ID: {message_id}, group: {source_group})", "info")
-            except Exception as e:
-                self.send_log(f"Error queueing campaign message: {str(e)}", "error")
-                await db.add_interaction(lead_id, 'Campaign Failed', f"Failed to queue message: {str(e)}")
-        
-        except Exception as e:
-            self.send_log(f"Error executing campaign: {str(e)}", "error")
-    
-    # ============== 觸發規則執行引擎 ==============
-    
-    async def execute_matching_trigger_rules(self, lead_id: int, lead_data: Dict[str, Any]):
-        """執行匹配的觸發規則"""
-        try:
-            import sys
-            print(f"[TriggerRules] ========== 開始檢查觸發規則 ==========", file=sys.stderr)
-            
-            # 獲取所有啟用的觸發規則
-            rules = await db.get_active_trigger_rules()
-            
-            if not rules:
-                self.send_log(f"[觸發規則] 沒有啟用的觸發規則", "info")
-                return
-            
-            self.send_log(f"[觸發規則] 檢查 {len(rules)} 個觸發規則", "info")
-            
-            # 獲取來源群組 ID
-            monitored_groups = await db.get_all_monitored_groups()
-            group_url_to_match = lead_data.get('source_group_url') or lead_data.get('source_group')
-            source_group_id = None
-            
-            for group in monitored_groups:
-                if group_url_to_match and str(group.get('url')) == str(group_url_to_match):
-                    source_group_id = group.get('id')
-                    break
-            
-            # 獲取匹配的關鍵詞集 ID
-            keyword_sets = await db.get_all_keyword_sets()
-            triggered_keyword = lead_data.get('triggered_keyword', '')
-            matched_keyword_set_ids = []
-            
-            for ks in keyword_sets:
-                for keyword in ks.get('keywords', []):
-                    keyword_text = keyword.get('keyword', '')
-                    is_regex = keyword.get('isRegex', False)
-                    
-                    matched = False
-                    if is_regex:
-                        try:
-                            import re
-                            pattern = re.compile(keyword_text, re.IGNORECASE)
-                            matched = bool(pattern.search(triggered_keyword))
-                        except:
-                            matched = keyword_text.lower() in triggered_keyword.lower()
-                    else:
-                        matched = keyword_text.lower() in triggered_keyword.lower()
-                    
-                    if matched:
-                        matched_keyword_set_ids.append(ks.get('id'))
-                        break
-            
-            print(f"[TriggerRules] 來源群組ID: {source_group_id}, 匹配的關鍵詞集IDs: {matched_keyword_set_ids}", file=sys.stderr)
-            
-            # 按優先級排序（優先級高的先執行）
-            rules.sort(key=lambda r: r.get('priority', 2), reverse=True)
-            
-            # 檢查每個規則
-            executed_rule = None
-            for rule in rules:
-                rule_name = rule.get('name', '未命名規則')
-                rule_id = rule.get('id')
-                
-                # 獲取規則配置
-                source_type = rule.get('source_type', 'all')
-                source_group_ids = rule.get('source_group_ids', [])
-                keyword_set_ids = rule.get('keyword_set_ids', [])
-                
-                # 檢查來源群組匹配
-                matches_source = True
-                if source_type == 'specific' and source_group_ids:
-                    matches_source = source_group_id in source_group_ids
-                
-                # 檢查關鍵詞集匹配（必須有匹配）
-                matches_keyword = any(ks_id in keyword_set_ids for ks_id in matched_keyword_set_ids)
-                
-                self.send_log(f"[觸發規則] 檢查 '{rule_name}': 來源={matches_source}, 關鍵詞={matches_keyword}", "info")
-                
-                if matches_source and matches_keyword:
-                    # 檢查額外條件
-                    conditions = rule.get('conditions', {})
-                    conditions_met = await self._check_trigger_conditions(conditions, lead_data)
-                    
-                    if conditions_met:
-                        self.send_log(f"✓✓✓ 觸發規則匹配成功: {rule_name}，開始執行", "success")
-                        await self.execute_trigger_rule(rule, lead_id, lead_data)
-                        executed_rule = rule
-                        # 只執行第一個匹配的規則（優先級最高的）
-                        break
-                    else:
-                        self.send_log(f"[觸發規則] '{rule_name}' 條件未滿足，跳過", "info")
-            
-            if not executed_rule:
-                self.send_log(f"[觸發規則] 沒有匹配的觸發規則", "info")
-            
-            print(f"[TriggerRules] ========== 觸發規則檢查完成 ==========", file=sys.stderr)
-            
-        except Exception as e:
-            import traceback
-            error_details = traceback.format_exc()
-            print(f"[TriggerRules] Error: {e}\n{error_details}", file=sys.stderr)
-            self.send_log(f"執行觸發規則出錯: {str(e)}", "error")
-    
-    async def _check_trigger_conditions(self, conditions: Dict, lead_data: Dict) -> bool:
-        """檢查觸發條件是否滿足"""
-        try:
-            # 如果沒有額外條件，默認滿足
-            if not conditions:
-                return True
-            
-            # 檢查時間範圍
-            time_range = conditions.get('timeRange')
-            if time_range and time_range.get('enabled'):
-                from datetime import datetime
-                now = datetime.now()
-                current_hour = now.hour
-                start_hour = time_range.get('start', 0)
-                end_hour = time_range.get('end', 24)
-                
-                if not (start_hour <= current_hour < end_hour):
-                    self.send_log(f"[條件檢查] 不在工作時間範圍內 ({start_hour}:00 - {end_hour}:00)", "info")
-                    return False
-            
-            # 檢查是否只針對新成員
-            if conditions.get('newMemberOnly'):
-                # 檢查用戶是否是新成員（這裡簡化為檢查是否是新 Lead）
-                user_id = lead_data.get('user_id')
-                existing_lead, _ = await db.check_lead_and_dnc(user_id)
-                if existing_lead:
-                    self.send_log(f"[條件檢查] 用戶已存在，不是新成員", "info")
-                    return False
-            
-            # 檢查是否排除管理員
-            if conditions.get('excludeAdmin'):
-                # 這裡需要從消息中獲取用戶是否是管理員的信息
-                # 簡化處理，暫時跳過
-                pass
-            
-            # 檢查每用戶只觸發一次
-            if conditions.get('oncePerUser'):
-                user_id = lead_data.get('user_id')
-                existing_lead, _ = await db.check_lead_and_dnc(user_id)
-                if existing_lead and existing_lead.get('status') != 'New':
-                    self.send_log(f"[條件檢查] 用戶已被聯繫過，每用戶只觸發一次", "info")
-                    return False
-            
-            return True
-            
-        except Exception as e:
-            self.send_log(f"檢查觸發條件出錯: {str(e)}", "error")
-            return True  # 出錯時默認滿足條件
-    
-    async def execute_trigger_rule(self, rule: Dict, lead_id: int, lead_data: Dict):
-        """執行單個觸發規則"""
-        import sys
-        import random
-        
-        rule_id = rule.get('id')
-        rule_name = rule.get('name', '未命名規則')
-        response_type = rule.get('response_type', 'ai_chat')
-        response_config = rule.get('response_config', {})
-        
-        print(f"[TriggerRules] 執行規則: {rule_name} (ID: {rule_id}), 響應類型: {response_type}", file=sys.stderr)
-        self.send_log(f"[觸發規則] 執行規則: {rule_name}, 響應類型: {response_type}", "info")
-        
-        success = False
-        
-        try:
-            # 根據響應類型執行不同的操作
-            if response_type == 'ai_chat':
-                # AI 智能對話
-                success = await self._execute_ai_chat_response(rule, lead_id, lead_data)
-                
-            elif response_type == 'template':
-                # 固定模板
-                success = await self._execute_template_response(rule, lead_id, lead_data)
-                
-            elif response_type == 'script':
-                # 執行腳本
-                success = await self._execute_script_response(rule, lead_id, lead_data)
-                
-            elif response_type == 'record_only':
-                # 僅記錄
-                success = await self._execute_record_only_response(rule, lead_id, lead_data)
-            
-            else:
-                self.send_log(f"[觸發規則] 未知的響應類型: {response_type}", "warning")
-                success = False
-            
-            # 更新規則統計
-            await db.increment_trigger_rule_stats(rule_id, success)
-            
-            # 執行額外操作
-            await self._execute_additional_actions(rule, lead_id, lead_data)
-            
-            # 發送執行結果事件
-            self.send_event("trigger-rule-executed", {
-                "ruleId": rule_id,
-                "ruleName": rule_name,
-                "leadId": lead_id,
-                "success": success,
-                "responseType": response_type
-            })
-            
-        except Exception as e:
-            import traceback
-            error_details = traceback.format_exc()
-            print(f"[TriggerRules] 執行規則失敗: {e}\n{error_details}", file=sys.stderr)
-            self.send_log(f"[觸發規則] 執行失敗: {str(e)}", "error")
-            await db.increment_trigger_rule_stats(rule_id, False)
-    
-    async def _execute_ai_chat_response(self, rule: Dict, lead_id: int, lead_data: Dict) -> bool:
-        """執行 AI 對話響應"""
-        try:
-            import sys
-            
-            response_config = rule.get('response_config', {})
-            ai_mode = response_config.get('aiMode', 'global')  # global 或 semi
-            
-            self.send_log(f"[觸發規則] 使用 AI 對話模式: {ai_mode}", "info")
-            
-            # 獲取 AI 設置
-            settings = await db.get_ai_settings()
-            if not settings:
-                self.send_log("[觸發規則] AI 設置未配置", "warning")
-                return False
-            
-            # 調用 AI 自動問候
-            await self._handle_ai_auto_greeting(lead_data, lead_id)
-            return True
-            
-        except Exception as e:
-            self.send_log(f"[觸發規則] AI 對話響應失敗: {str(e)}", "error")
-            return False
-    
-    async def _execute_template_response(self, rule: Dict, lead_id: int, lead_data: Dict) -> bool:
-        """執行模板響應"""
-        try:
-            import random
-            
-            response_config = rule.get('response_config', {})
-            template_id = response_config.get('templateId')
-            
-            if not template_id:
-                self.send_log("[觸發規則] 未配置模板 ID", "warning")
-                return False
-            
-            # 獲取模板
-            templates = await db.get_all_templates()
-            template = next((t for t in templates if t.get('id') == template_id), None)
-            
-            if not template:
-                self.send_log(f"[觸發規則] 模板 ID {template_id} 不存在", "warning")
-                return False
-            
-            # 生成消息
-            # 支持 content 字段（chat_templates 表）和 prompt 字段（舊格式）
-            message_content = template.get('content') or template.get('prompt', '')
-            
-            # 變量替換
-            message = await self.generate_message_from_template({'prompt': message_content}, lead_data)
-            
-            if not message:
-                self.send_log("[觸發規則] 生成消息失敗", "error")
-                return False
-            
-            # 計算延遲
-            delay_min = rule.get('delay_min', 30)
-            delay_max = rule.get('delay_max', 120)
-            delay = random.randint(delay_min, delay_max)
-            
-            # 獲取發送帳號
-            sender_phone = await self._get_sender_account_for_rule(rule)
-            if not sender_phone:
-                self.send_log("[觸發規則] 沒有可用的發送帳號", "warning")
-                return False
-            
-            # 加入消息隊列
-            scheduled_time = datetime.now() + timedelta(seconds=delay)
-            
-            # 🔧 FIX: 獲取 source_group 和 username，解決 PEER_ID_INVALID 問題
-            source_group = lead_data.get('source_group_url') or lead_data.get('source_group', '')
-            target_username = lead_data.get('username', '')
-            
-            message_id = await self.message_queue.add_message(
-                phone=sender_phone,
-                user_id=str(lead_data.get('user_id')),
-                text=message,
-                source_group=source_group,      # 🆕 來源群組
-                target_username=target_username, # 🆕 用戶名備選
-                priority=MessagePriority.NORMAL,
-                scheduled_at=scheduled_time,
-                callback=self._on_message_sent_callback(lead_id)
-            )
-            
-            template_name = template.get('name', '未命名模板')
-            self.send_log(f"[觸發規則] ✓ 已排程發送消息 (模板: {template_name}, 延遲: {delay}秒, 群組: {source_group})", "success")
-            await db.add_interaction(lead_id, 'Trigger Rule', f"規則 '{rule.get('name')}' 觸發，使用模板 '{template_name}'")
-            
-            return True
-            
-        except Exception as e:
-            self.send_log(f"[觸發規則] 模板響應失敗: {str(e)}", "error")
-            return False
-    
-    async def _execute_script_response(self, rule: Dict, lead_id: int, lead_data: Dict) -> bool:
-        """執行腳本響應"""
-        try:
-            response_config = rule.get('response_config', {})
-            script_id = response_config.get('scriptId')
-            
-            if not script_id:
-                self.send_log("[觸發規則] 未配置腳本 ID", "warning")
-                return False
-            
-            # TODO: 實現腳本執行邏輯
-            self.send_log(f"[觸發規則] 腳本執行功能尚未實現 (Script ID: {script_id})", "warning")
-            await db.add_interaction(lead_id, 'Trigger Rule', f"規則 '{rule.get('name')}' 觸發，腳本執行待實現")
-            
-            return False
-            
-        except Exception as e:
-            self.send_log(f"[觸發規則] 腳本響應失敗: {str(e)}", "error")
-            return False
-    
-    async def _execute_record_only_response(self, rule: Dict, lead_id: int, lead_data: Dict) -> bool:
-        """僅記錄響應"""
-        try:
-            rule_name = rule.get('name', '未命名規則')
-            
-            self.send_log(f"[觸發規則] ✓ 已記錄 (規則: {rule_name})", "success")
-            await db.add_interaction(lead_id, 'Trigger Rule', f"規則 '{rule_name}' 觸發，僅記錄不響應")
-            
-            # 如果配置了通知
-            if rule.get('notify_me'):
-                self.send_event("trigger-rule-notification", {
-                    "ruleId": rule.get('id'),
-                    "ruleName": rule_name,
-                    "leadId": lead_id,
-                    "username": lead_data.get('username'),
-                    "keyword": lead_data.get('triggered_keyword'),
-                    "message": "關鍵詞匹配，僅記錄"
-                })
-            
-            return True
-            
-        except Exception as e:
-            self.send_log(f"[觸發規則] 記錄響應失敗: {str(e)}", "error")
-            return False
-    
-    async def _get_sender_account_for_rule(self, rule: Dict) -> str:
-        """為規則獲取發送帳號"""
-        try:
-            sender_type = rule.get('sender_type', 'auto')
-            sender_account_ids = rule.get('sender_account_ids', [])
-            
-            accounts = await db.get_all_accounts()
-            sender_accounts = [a for a in accounts if a.get('role') == 'Sender' and a.get('status') == 'Online']
-            
-            if not sender_accounts:
-                return None
-            
-            if sender_type == 'specific' and sender_account_ids:
-                # 從指定帳號中選擇
-                specific_accounts = [a for a in sender_accounts if a.get('id') in sender_account_ids]
-                if specific_accounts:
-                    import random
-                    return random.choice(specific_accounts).get('phone')
-            
-            # 自動選擇（使用帳號輪換器或隨機選擇）
-            if self.message_queue.account_rotator:
-                selected_account = await self.message_queue.account_rotator.select_account()
-                if selected_account:
-                    return selected_account.get('phone')
-            
-            # 回退到隨機選擇
-            import random
-            return random.choice(sender_accounts).get('phone')
-            
-        except Exception as e:
-            self.send_log(f"獲取發送帳號失敗: {str(e)}", "error")
-            return None
-    
-    async def _execute_additional_actions(self, rule: Dict, lead_id: int, lead_data: Dict):
-        """執行額外操作"""
-        try:
-            # 自動添加到潛在客戶
-            if rule.get('auto_add_lead'):
-                # Lead 已經在 on_lead_captured 中添加，這裡只需更新標籤
-                await db.update_lead(lead_id, {
-                    'tags': f"auto,trigger-rule-{rule.get('id')}"
-                })
-            
-            # 發送通知
-            if rule.get('notify_me'):
-                self.send_event("trigger-rule-notification", {
-                    "ruleId": rule.get('id'),
-                    "ruleName": rule.get('name'),
-                    "leadId": lead_id,
-                    "username": lead_data.get('username'),
-                    "keyword": lead_data.get('triggered_keyword'),
-                    "message": f"觸發規則 '{rule.get('name')}' 已執行"
-                })
-                
-        except Exception as e:
-            self.send_log(f"執行額外操作失敗: {str(e)}", "error")
-    
-    # ============== 觸發規則執行引擎結束 ==============
-    
-    async def generate_message_from_template(self, template: Dict[str, Any], lead_data: Dict[str, Any]) -> str:
-        """Generate message from template using variable substitution"""
-        try:
-            import datetime
-            import random
-            
-            prompt = template.get('prompt', '')
-            
-            # 用戶信息變量
-            username = lead_data.get('username', '')
-            first_name = lead_data.get('first_name', '')
-            last_name = lead_data.get('last_name', '')
-            name = first_name or username or 'User'  # 優先使用名字
-            
-            # 觸發信息變量
-            keyword = lead_data.get('triggered_keyword', '')
-            user_message = lead_data.get('user_message', lead_data.get('message', ''))
-            source_group = lead_data.get('source_group', '')
-            group_name = lead_data.get('group_name', source_group)
-            
-            # 時間變量
-            now = datetime.datetime.now()
-            current_time = now.strftime('%H:%M')
-            current_date = now.strftime('%Y年%m月%d日')
-            
-            # 隨機表情
-            random_emojis = ['😊', '🌟', '💫', '✨', '🎉', '👋', '💪', '🔥', '❤️', '🙌', '😄', '🤝']
-            random_emoji = random.choice(random_emojis)
-            
-            # 變量替換
-            message = prompt
-            message = message.replace('{username}', username or 'User')
-            message = message.replace('{firstName}', first_name)
-            message = message.replace('{lastName}', last_name)
-            message = message.replace('{name}', name)
-            message = message.replace('{keyword}', keyword)
-            message = message.replace('{message}', user_message)
-            message = message.replace('{sourceGroup}', source_group)
-            message = message.replace('{groupName}', group_name)
-            message = message.replace('{triggeredKeyword}', keyword)  # 兼容舊變量
-            message = message.replace('{time}', current_time)
-            message = message.replace('{date}', current_date)
-            message = message.replace('{random}', random_emoji)
-            
-            # 清理未替換的變量（用空字符串替換）
-            import re
-            message = re.sub(r'\{[^}]+\}', '', message)
-            
-            return message.strip()
-        
-        except Exception as e:
-            self.send_log(f"Error generating message from template: {str(e)}", "error")
-            return None
-    
-    async def send_campaign_message_after_delay(self, campaign: Dict[str, Any], lead_id: int, lead_data: Dict[str, Any], message: str, delay: int):
-        """Send campaign message after delay"""
-        try:
-            import asyncio
-            
-            # Wait for delay
-            await asyncio.sleep(delay)
-            
-            # Get sender accounts
-            accounts = await db.get_all_accounts()
-            sender_accounts = [a for a in accounts if a.get('role') == 'Sender' and a.get('status') == 'Online']
-            
-            if not sender_accounts:
-                self.send_log(f"No online sender accounts available for campaign '{campaign.get('name')}'", "warning")
-                await db.add_interaction(lead_id, 'Campaign Failed', "No online sender accounts available")
-                return
-            
-            # Select account (round-robin or random)
-            import random
-            selected_account = random.choice(sender_accounts)
-            
-            # Check daily send limit (已互動用戶不受限額限制)
-            user_id = lead_data.get('user_id')
-            has_interacted = await self._user_has_interacted(user_id)
-            
-            if not has_interacted:
-                # 未互動用戶需要檢查限額
-                if selected_account.get('dailySendCount', 0) >= selected_account.get('dailySendLimit', 50):
-                    self.send_log(f"Account {selected_account.get('phone')} reached daily send limit", "warning")
-                    # Try another account
-                    available_accounts = [a for a in sender_accounts if a.get('dailySendCount', 0) < a.get('dailySendLimit', 50)]
-                    if available_accounts:
-                        selected_account = random.choice(available_accounts)
-                    else:
-                        await db.add_interaction(lead_id, 'Campaign Failed', "All sender accounts reached daily limit")
-                        return
-            else:
-                # 已互動用戶不受限額限制
-                self.send_log(f"User {user_id} has interacted before, exempt from daily limit", "info")
-            
-            # Send message
-            user_id = lead_data.get('user_id')
-            result = await self.telegram_manager.send_message(
-                phone=selected_account.get('phone'),
-                user_id=user_id,
-                text=message
-            )
-            
-            if result.get('success'):
-                # Update daily send count (已互動用戶不計入限額)
-                if not has_interacted:
-                    await db.update_account(selected_account.get('id'), {
-                        'dailySendCount': selected_account.get('dailySendCount', 0) + 1
-                    })
-                
-                # Update lead
-                await db.update_lead_status(lead_id, 'Contacted')
-                await db.update_lead(lead_id, {'assignedTemplateId': campaign.get('actions', [{}])[0].get('templateId')})
-                await db.add_interaction(lead_id, 'Message Sent', f"Message sent via campaign '{campaign.get('name')}'")
-                
-                self.send_log(f"Campaign message sent to lead {lead_id} via account {selected_account.get('phone')}", "success")
-                
-                # Send event
-                self.send_event("message-sent", {
-                    "leadId": lead_id,
-                    "campaignId": campaign.get('id'),
-                    "success": True
-                })
-            else:
-                error_msg = result.get('error', 'Unknown error')
-                await db.add_interaction(lead_id, 'Campaign Failed', f"Failed to send message: {error_msg}")
-                self.send_log(f"Failed to send campaign message: {error_msg}", "error")
-        
-        except Exception as e:
-            self.send_log(f"Error sending campaign message: {str(e)}", "error")
-    
-    async def daily_reset_task(self):
-        """Background task to reset daily send counts at midnight"""
-        try:
-            while self.running:
-                now = datetime.now()
-                # Calculate next midnight
-                next_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                if next_midnight <= now:
-                    next_midnight = next_midnight + timedelta(days=1)
-                
-                # Wait until midnight
-                wait_seconds = (next_midnight - now).total_seconds()
-                await asyncio.sleep(wait_seconds)
-                
-                # Reset daily send counts
-                if self.running:
-                    await self.reset_daily_send_counts()
-                    self.last_reset_date = datetime.now().date()
-                    
-                    # 🔧 P10-3: 每日備份驗證
-                    try:
-                        from core.backup_verifier import verify_backup_on_schedule
-                        db_path = os.environ.get('DATABASE_PATH', os.environ.get('DB_PATH', ''))
-                        if db_path:
-                            backup_dir = str(Path(db_path).parent / 'backups')
-                        else:
-                            backup_dir = os.path.join(os.path.dirname(__file__), 'data', 'backups')
-                        verify_backup_on_schedule(backup_dir)
-                    except Exception as bv_err:
-                        print(f"[Backend] Backup verification error: {bv_err}", file=sys.stderr)
-        
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            self.send_log(f"Error in daily reset task: {str(e)}", "error")
-    
-    async def reset_daily_send_counts(self):
-        """Reset daily send counts for all accounts"""
-        try:
-            accounts = await db.get_all_accounts()
-            for account in accounts:
-                await db.update_account(account.get('id'), {'dailySendCount': 0})
-            
-            self.send_log(f"Daily send counts reset for {len(accounts)} accounts", "info")
-            await db.add_log(f"Daily send counts reset for {len(accounts)} accounts", "info")
-            
-            # Send updated accounts
-            await self._send_accounts_updated()
-        
-        except Exception as e:
-            self.send_log(f"Error resetting daily send counts: {str(e)}", "error")
-    
-    async def account_health_monitor_task(self):
-        """Background task to periodically check account health and status"""
-        try:
-            while self.running:
-                # Wait 5 minutes between checks
-                await asyncio.sleep(300)  # 5 minutes
-                
-                if not self.running:
-                    break
-                
-                # Check all online accounts
-                await self.check_all_accounts_health()
-        
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            self.send_log(f"Error in account health monitor task: {str(e)}", "error")
-    
-    async def check_all_accounts_health(self):
-        """Check health and status of all accounts"""
-        try:
-            accounts = await db.get_all_accounts()
-            online_accounts = [a for a in accounts if a.get('status') == 'Online']
-            
-            if not online_accounts:
-                return
-            
-            self.send_log(f"Checking health for {len(online_accounts)} online accounts", "info")
-            
-            for account in online_accounts:
-                try:
-                    # Check account status
-                    phone = account.get('phone')
-                    status_result = await self.telegram_manager.check_account_status(phone)
-                    
-                    # Calculate health score (原有方法)
-                    health_score = await self.calculate_health_score(account, status_result)
-                    
-                    # 增强的健康分析（账户健康监控增强）
-                    if self.enhanced_health_monitor:
-                        health_analysis = await self.enhanced_health_monitor.analyze_account_health(
-                            account.get('id'),
-                            account
-                        )
-                        
-                        # 使用增强的健康分析结果更新健康分数
-                        if health_analysis.get('ban_risk_score') is not None:
-                            # 根据封禁风险调整健康分数
-                            ban_risk = health_analysis.get('ban_risk_score', 0.0)
-                            adjusted_score = health_score * (1.0 - ban_risk * 0.5)  # 封禁风险越高，健康分数越低
-                            health_score = max(0, min(100, int(adjusted_score)))
-                        
-                        # 发送健康分析事件
-                        self.send_event("account-health-analysis", {
-                            "account_id": account.get('id'),
-                            "phone": phone,
-                            **health_analysis
-                        })
-                    
-                    # Update account
-                    updates = {
-                        'status': status_result.get('status', account.get('status')),
-                        'healthScore': health_score
-                    }
-                    await db.update_account(account.get('id'), updates)
-                
-                except Exception as e:
-                    self.send_log(f"Error checking health for account {account.get('phone')}: {str(e)}", "error")
-            
-            # Send updated accounts
-            await self._send_accounts_updated()
-        
-        except Exception as e:
-            self.send_log(f"Error checking all accounts health: {str(e)}", "error")
-    
-    async def queue_cleanup_task(self):
-        """Background task to clean up old queue messages"""
-        while self.running:
-            try:
-                await asyncio.sleep(3600)  # Run every hour
-                await db.cleanup_old_queue_messages(days=7)
-            except Exception as e:
-                self.send_log(f"Error cleaning up queue messages: {str(e)}", "error")
-                await asyncio.sleep(60)
-    
-    async def calculate_health_score(self, account: Dict[str, Any], status_result: Dict[str, Any]) -> int:
-        """Calculate health score for an account"""
-        try:
-            base_score = 100
-            
-            # Status penalty
-            status = status_result.get('status', 'Offline')
-            if status == 'Banned':
-                return 0
-            elif status == 'Proxy Error':
-                base_score -= 30
-            elif status == 'Offline':
-                base_score -= 20
-            elif status != 'Online':
-                base_score -= 10
-            
-            # Daily send limit penalty
-            daily_send_count = account.get('dailySendCount', 0)
-            daily_send_limit = account.get('dailySendLimit', 50)
-            if daily_send_limit > 0:
-                send_ratio = daily_send_count / daily_send_limit
-                if send_ratio >= 1.0:
-                    base_score -= 20  # Reached limit
-                elif send_ratio >= 0.8:
-                    base_score -= 10  # Near limit
-            
-            # Ensure score is between 0 and 100
-            health_score = max(0, min(100, base_score))
-            
-            return int(health_score)
-        
-        except Exception as e:
-            self.send_log(f"Error calculating health score: {str(e)}", "error")
-            return account.get('healthScore', 100)
-    
     async def handle_save_settings(self, payload=None):
         from api.handlers.settings_handlers_impl import handle_save_settings as _handle_save_settings
         return await _handle_save_settings(self, payload)
@@ -5193,6 +4168,16 @@ class BackendService:
         from domain.automation.monitoring_handlers_impl import handle_resume_monitoring as _handle_resume_monitoring
         return await _handle_resume_monitoring(self, payload)
 
+    async def handle_pause_monitored_group(self, payload=None):
+        """pause-monitored-group 別名 → pause-monitoring"""
+        from domain.automation.monitoring_handlers_impl import handle_pause_monitoring as _handle_pause_monitoring
+        return await _handle_pause_monitoring(self, payload)
+
+    async def handle_resume_monitored_group(self, payload=None):
+        """resume-monitored-group 別名 → resume-monitoring"""
+        from domain.automation.monitoring_handlers_impl import handle_resume_monitoring as _handle_resume_monitoring
+        return await _handle_resume_monitoring(self, payload)
+
     async def handle_add_keyword_set(self, payload=None):
         from domain.automation.keyword_handlers_impl import handle_add_keyword_set as _handle_add_keyword_set
         return await _handle_add_keyword_set(self, payload)
@@ -5213,6 +4198,11 @@ class BackendService:
         from domain.groups.handlers_impl import handle_add_group as _handle_add_group
         return await _handle_add_group(self, payload)
 
+    async def handle_add_monitored_group(self, payload=None):
+        """add-monitored-group 的別名路由 → 統一使用 add-group 處理"""
+        from domain.groups.handlers_impl import handle_add_monitored_group as _handle_add_monitored_group
+        return await _handle_add_monitored_group(self, payload)
+
     async def handle_search_groups(self, payload=None):
         from domain.groups.handlers_impl import handle_search_groups as _handle_search_groups
         return await _handle_search_groups(self, payload)
@@ -5222,6 +4212,11 @@ class BackendService:
         return await _handle_join_group(self, payload)
 
     async def handle_remove_group(self, payload=None):
+        from domain.groups.handlers_impl import handle_remove_group as _handle_remove_group
+        return await _handle_remove_group(self, payload)
+
+    async def handle_remove_monitored_group(self, payload=None):
+        """remove-monitored-group 別名 → remove-group"""
         from domain.groups.handlers_impl import handle_remove_group as _handle_remove_group
         return await _handle_remove_group(self, payload)
 
@@ -5514,18 +4509,6 @@ class BackendService:
     async def handle_get_user_memories(self, payload=None):
         from domain.contacts.profile_handlers_impl import handle_get_user_memories as _handle_get_user_memories
         return await _handle_get_user_memories(self, payload)
-
-    async def handle_get_user_tags(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_get_user_tags as _handle_get_user_tags
-        return await _handle_get_user_tags(self, payload)
-
-    async def handle_add_user_tag(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_add_user_tag as _handle_add_user_tag
-        return await _handle_add_user_tag(self, payload)
-
-    async def handle_remove_user_tag(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_remove_user_tag as _handle_remove_user_tag
-        return await _handle_remove_user_tag(self, payload)
 
     async def handle_get_users_by_tag(self, payload=None):
         from domain.contacts.profile_handlers_impl import handle_get_users_by_tag as _handle_get_users_by_tag
@@ -6030,10 +5013,6 @@ class BackendService:
     async def handle_rag_get_stats(self, payload=None):
         from domain.ai.rag_handlers_impl import handle_rag_get_stats as _handle_rag_get_stats
         return await _handle_rag_get_stats(self, payload)
-
-    async def handle_rag_add_knowledge(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_add_knowledge as _handle_rag_add_knowledge
-        return await _handle_rag_add_knowledge(self, payload)
 
     async def handle_rag_record_feedback(self, payload=None):
         from domain.ai.rag_handlers_impl import handle_rag_record_feedback as _handle_rag_record_feedback
@@ -6779,10 +5758,6 @@ class BackendService:
         from domain.search.search_handlers_impl import handle_cleanup_search_history as _handle_cleanup_search_history
         return await _handle_cleanup_search_history(self, payload)
 
-    async def handle_get_all_tags(self):
-        from domain.contacts.tag_handlers_impl import handle_get_all_tags as _handle_get_all_tags
-        return await _handle_get_all_tags(self)
-
     async def handle_create_tag(self, payload=None):
         from domain.contacts.tag_handlers_impl import handle_create_tag as _handle_create_tag
         return await _handle_create_tag(self, payload)
@@ -7446,6 +6421,7 @@ class BackendService:
         from domain.search.resource_handlers_impl import handle_add_resource_manually as _handle_add_resource_manually
         return await _handle_add_resource_manually(self, payload)
 
+    async def handle_save_resource(self, payload=None):
         from domain.search.resource_handlers_impl import handle_save_resource as _handle_save_resource
         return await _handle_save_resource(self, payload)
 
@@ -7484,6 +6460,11 @@ class BackendService:
     async def handle_batch_join_resources(self, payload=None):
         from domain.search.resource_handlers_impl import handle_batch_join_resources as _handle_batch_join_resources
         return await _handle_batch_join_resources(self, payload)
+
+    async def handle_join_and_monitor(self, payload=None):
+        """join-and-monitor 別名 → join-and-monitor-resource"""
+        from domain.groups.handlers_impl import handle_join_and_monitor_resource as _handle_join_and_monitor_resource
+        return await _handle_join_and_monitor_resource(self, payload)
 
     async def handle_join_and_monitor_resource(self, payload=None):
         from domain.groups.handlers_impl import handle_join_and_monitor_resource as _handle_join_and_monitor_resource
@@ -7786,10 +6767,6 @@ class BackendService:
             )
         return self._ai_team_executor
     
-    async def handle_ai_team_start_execution(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_start_execution as _handle_ai_team_start_execution
-        return await _handle_ai_team_start_execution(self, payload)
-
     async def handle_ai_team_pause_execution(self, payload=None):
         from domain.ai.team_handlers_impl import handle_ai_team_pause_execution as _handle_ai_team_pause_execution
         return await _handle_ai_team_pause_execution(self, payload)

@@ -84,6 +84,10 @@ import { GroupBasicInfo, GroupDetailInfo, GroupStats } from './search.types';
                           class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg transition-colors flex items-center gap-2">
                     ➕ 加入群組
                   </button>
+                  <button (click)="joinAndMonitor.emit()"
+                          class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors flex items-center gap-2 text-white">
+                    📡 加入並監控
+                  </button>
                   <button (click)="toggleFavorite()"
                           class="px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
                           [class]="isFavorite() ? 'bg-yellow-500/20 text-yellow-400' : 'bg-slate-700 hover:bg-slate-600'">
@@ -205,6 +209,7 @@ export class GroupDetailComponent implements OnInit {
   @Input({ required: true }) group!: GroupBasicInfo;
   @Output() back = new EventEmitter<void>();
   @Output() extractMembers = new EventEmitter<void>();
+  @Output() joinAndMonitor = new EventEmitter<void>();
   
   private searchService = inject(GroupSearchService);
   membershipService = inject(MembershipService);

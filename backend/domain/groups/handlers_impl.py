@@ -562,6 +562,97 @@ async def handle_add_group(self, payload: Dict[str, Any]):
         self.send_log(f"Error adding group: {str(e)}", "error")
         handle_error(e, {"command": "add-group", "payload": payload})
 
+async def handle_add_monitored_group(self, payload: Dict[str, Any]):
+    """
+    處理 add-monitored-group 命令
+    從搜索發現頁面直接添加群組到監控列表
+    
+    支持兩種場景：
+    1. 傳入 url → 調用 handle_add_group
+    2. 傳入 telegram_id / username → 轉換為 url 後調用 handle_add_group
+    """
+    import sys
+    print(f"[Backend] handle_add_monitored_group called with payload: {payload}", file=sys.stderr)
+    
+    try:
+        url = payload.get('url') or payload.get('link')
+        name = payload.get('name') or payload.get('title')
+        telegram_id = payload.get('telegramId') or payload.get('telegram_id')
+        username = payload.get('username')
+        keyword_set_ids = payload.get('keywordSetIds', [])
+        phone = payload.get('phone')
+        resource_id = payload.get('resourceId')
+        
+        # 構建 URL（如果沒有直接提供）
+        if not url:
+            if username:
+                url = f"https://t.me/{username.lstrip('@')}"
+            elif telegram_id:
+                url = f"tg://resolve?id={telegram_id}"
+            else:
+                self.send_event("group-added", {
+                    "success": False,
+                    "error": "缺少群組標識（URL、username 或 telegram_id）"
+                })
+                return
+        
+        # 構建 add-group 格式的 payload
+        add_group_payload = {
+            'url': url,
+            'name': name or url,
+            'keywordSetIds': keyword_set_ids,
+            'ownerUserId': payload.get('ownerUserId'),
+            'phone': phone,
+            'telegramId': telegram_id,
+        }
+        
+        # 調用已有的 add-group 處理邏輯
+        await handle_add_group(self, add_group_payload)
+        
+        # 同時更新 discovered_resources 的狀態為 monitoring
+        if resource_id or telegram_id or username:
+            try:
+                from database import db
+                await db.connect()
+                
+                if resource_id:
+                    await db.execute(
+                        "UPDATE discovered_resources SET status = 'monitoring' WHERE id = ?",
+                        (resource_id,)
+                    )
+                elif telegram_id:
+                    await db.execute(
+                        "UPDATE discovered_resources SET status = 'monitoring' WHERE telegram_id = ?",
+                        (str(telegram_id),)
+                    )
+                elif username:
+                    await db.execute(
+                        "UPDATE discovered_resources SET status = 'monitoring' WHERE username = ?",
+                        (username.lstrip('@'),)
+                    )
+                
+                self.send_log(f"✅ 已將群組添加到監控列表: {name or url}", "success")
+                
+                # 發送狀態更新事件，前端可刷新列表
+                self.send_event("resource-status-updated", {
+                    "resourceId": resource_id,
+                    "telegramId": telegram_id,
+                    "username": username,
+                    "newStatus": "monitoring"
+                })
+            except Exception as db_err:
+                print(f"[Backend] Error updating resource status: {db_err}", file=sys.stderr)
+        
+    except Exception as e:
+        import traceback
+        print(f"[Backend] Error in handle_add_monitored_group: {traceback.format_exc()}", file=sys.stderr)
+        self.send_log(f"❌ 添加監控群組失敗: {str(e)}", "error")
+        self.send_event("group-added", {
+            "success": False,
+            "error": str(e)
+        })
+
+
 async def handle_search_groups(self, payload: Dict[str, Any]):
     """
     🔧 P0: 處理 search-groups 命令 - 搜索 Telegram 群組/頻道

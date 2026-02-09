@@ -12,6 +12,9 @@ from typing import Any, Dict, List, Optional
 
 from service_context import get_service_context
 
+from database import db
+import re
+from service_locator import member_extraction_service
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -247,7 +250,7 @@ async def handle_collect_users_from_history_advanced(self, payload: Dict[str, An
     
     try:
         from database import db
-from config import config
+        from config import config
         await db.connect()
         
         chat_id = str(telegram_id) if telegram_id else str(group_id)

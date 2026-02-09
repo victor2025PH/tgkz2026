@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional
 
 from service_context import get_service_context
 
+from database import db
+from service_locator import group_search_service, resource_discovery, get_DiscoveredResource
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -354,6 +356,7 @@ async def handle_get_resource_stats(self, payload: Dict[str, Any] = None):
 async def handle_add_resource_manually(self, payload: Dict[str, Any]):
     """手動添加資源"""
     try:
+        DiscoveredResource = get_DiscoveredResource()
         resource = DiscoveredResource(
             resource_type=payload.get('type', 'group'),
             telegram_id=payload.get('telegramId', ''),

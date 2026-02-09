@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from service_context import get_service_context
 from database import db
 
+from service_locator import ai_auto_chat
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -115,24 +116,6 @@ async def handle_get_smart_system_stats(self, payload: Dict[str, Any]):
         print(f"[Backend] Error getting smart system stats: {e}", file=sys.stderr)
         self.send_event("smart-system-stats", stats)
 
-
-async def handle_ai_team_start_execution(self, payload: Dict[str, Any]):
-    """啟動 AI 團隊執行任務"""
-    import sys
-    
-    try:
-        executor = self.get_ai_team_executor()
-        success = await executor.start_execution(payload)
-        
-        if success:
-            goal = payload.get('goal', '')
-            self.send_log(f"🤖 AI 團隊開始執行: {goal[:50]}...", "info")
-        
-    except Exception as e:
-        print(f"[AITeam] 啟動失敗: {e}", file=sys.stderr)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
-        self.send_log(f"❌ AI 團隊啟動失敗: {e}", "error")
 
 
 async def handle_ai_team_pause_execution(self, payload: Dict[str, Any]):

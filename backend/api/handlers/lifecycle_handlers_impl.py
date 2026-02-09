@@ -14,6 +14,7 @@ from service_context import get_service_context
 from database import db
 from core.logging import mask_phone
 
+from service_locator import scheduler
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -299,6 +300,23 @@ async def handle_get_initial_state(self):
         print(f"[Backend] ★★★ ERROR in handle_get_initial_state: {str(e)} ★★★", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
         self.send_log(f"Error getting initial state: {str(e)}", "error")
+        return {
+            "success": False,
+            "error": str(e),
+            "accounts": [],
+            "keywordSets": [],
+            "monitoredGroups": [],
+            "campaigns": [],
+            "messageTemplates": [],
+            "chatTemplates": [],
+            "triggerRules": [],
+            "leads": [],
+            "leadsTotal": 0,
+            "leadsHasMore": False,
+            "logs": [],
+            "settings": {},
+            "isMonitoring": False
+        }
 
 
 async def handle_graceful_shutdown(self):

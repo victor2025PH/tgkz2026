@@ -13,6 +13,9 @@ from typing import Any, Dict, List, Optional
 from service_context import get_service_context
 from database import db
 
+import os
+import re
+from service_locator import ai_auto_chat, get_knowledge_search_engine
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -138,45 +141,6 @@ async def handle_rag_get_stats(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
-async def handle_rag_add_knowledge(self, payload: Dict[str, Any]):
-    """添加知識到 RAG"""
-    import sys
-    print(f"[Backend] 🧠 RAG Add Knowledge: {payload}", file=sys.stderr)
-    
-    try:
-        from telegram_rag_system import telegram_rag, KnowledgeType
-        
-        knowledge_type = payload.get('knowledgeType', 'qa')
-        question = payload.get('question', '')
-        answer = payload.get('answer', '')
-        context = payload.get('context', '')
-        
-        try:
-            kt = KnowledgeType(knowledge_type)
-        except:
-            kt = KnowledgeType.QA
-        
-        knowledge_id = await telegram_rag.add_manual_knowledge(
-            knowledge_type=kt,
-            question=question,
-            answer=answer,
-            context=context
-        )
-        
-        self.send_event("rag-knowledge-added", {
-            "success": knowledge_id is not None,
-            "knowledgeId": knowledge_id,
-            "knowledgeType": knowledge_type
-        })
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc(file=sys.stderr)
-        self.send_event("rag-knowledge-added", {
-            "success": False,
-            "error": str(e)
-        })
 
 
 async def handle_rag_record_feedback(self, payload: Dict[str, Any]):
@@ -1614,6 +1578,7 @@ async def handle_get_rag_context(self, payload: Dict[str, Any]):
         max_chunks = payload.get('maxChunks', 3)
         max_tokens = payload.get('maxTokens', 2000)
         
+        search_engine = get_knowledge_search_engine()
         context = await search_engine.build_rag_context(
             query=query,
             max_chunks=max_chunks,

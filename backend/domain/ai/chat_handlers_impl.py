@@ -13,6 +13,8 @@ from typing import Any, Dict, List, Optional
 from service_context import get_service_context
 from database import db
 
+import re
+from service_locator import ai_auto_chat, ai_context
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -278,8 +280,6 @@ async def handle_generate_ai_strategy(self, payload: Dict[str, Any]):
         
         # 嘗試使用 AI 生成策略
         try:
-            from ai_context import ai_context
-            
             prompt = f"""
             根據用戶的營銷需求，生成詳細的營銷策略。
 

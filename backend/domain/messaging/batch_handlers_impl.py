@@ -12,11 +12,18 @@ from typing import Any, Dict, List, Optional
 
 from service_context import get_service_context
 
+from database import db
+import re
+from service_locator import (
+    get_batch_ops,
+    group_search_service,
+    marketing_outreach_service,
+    resource_discovery
+)
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
 # This is a transitional pattern - later, replace self.xxx with ctx.xxx
-
 
 async def handle_undo_batch_operation(self, payload: Dict[str, Any]):
     """撤銷批量操作"""
@@ -54,7 +61,6 @@ async def handle_undo_batch_operation(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
 async def handle_get_batch_operation_history(self, payload: Dict[str, Any]):
     """獲取批量操作歷史"""
     try:
@@ -80,7 +86,6 @@ async def handle_get_batch_operation_history(self, payload: Dict[str, Any]):
             "success": False,
             "error": str(e)
         })
-
 
 async def handle_add_to_join_queue(self, payload: Dict[str, Any]):
     """添加資源到加入隊列"""
@@ -109,7 +114,6 @@ async def handle_add_to_join_queue(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
 async def handle_process_join_queue(self, payload: Dict[str, Any]):
     """處理加入隊列"""
     try:
@@ -131,7 +135,6 @@ async def handle_process_join_queue(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
 async def handle_batch_join_and_monitor(self, payload: Dict[str, Any]):
     """批量加入並監控"""
     try:
@@ -144,7 +147,7 @@ async def handle_batch_join_and_monitor(self, payload: Dict[str, Any]):
         
         # 獲取資源詳情
         from database import db
-from config import config
+        from config import config
         await db.connect()
         
         success_count = 0
@@ -188,7 +191,6 @@ from config import config
             "success": False,
             "error": str(e)
         })
-
 
 # ==================== 營銷觸達處理器 ====================
 
@@ -237,7 +239,6 @@ async def handle_send_bulk_messages(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
 async def handle_batch_invite_to_group(self, payload: Dict[str, Any]):
     """批量邀請入群"""
     try:
@@ -282,7 +283,6 @@ async def handle_batch_invite_to_group(self, payload: Dict[str, Any]):
             "success": False,
             "error": str(e)
         })
-
 
 async def handle_batch_invite_start(self, payload: Dict[str, Any]):
     """開始批量拉群"""
@@ -509,7 +509,6 @@ async def handle_batch_invite_start(self, payload: Dict[str, Any]):
             "skipped": 0
         })
         self.send_log(f"❌ 批量拉群錯誤: {e}", "error")
-
 
 async def handle_batch_invite_cancel(self, payload: Dict[str, Any]):
     """取消批量拉群"""

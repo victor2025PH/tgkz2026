@@ -12,11 +12,19 @@ from typing import Any, Dict, List, Optional
 
 from service_context import get_service_context
 
+from database import db
+from error_handler import handle_error, AppError, ErrorType
+from service_locator import (
+    get_cache_manager,
+    get_multi_channel_stats,
+    get_user_analytics,
+    get_user_tracker,
+    member_extraction_service
+)
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
 # This is a transitional pattern - later, replace self.xxx with ctx.xxx
-
 
 async def handle_get_account_health_report(self, payload: Dict[str, Any]):
     """Handle get-account-health-report command - 獲取帳號健康報告"""
@@ -29,7 +37,6 @@ async def handle_get_account_health_report(self, payload: Dict[str, Any]):
     
     except Exception as e:
         self.send_log(f"Error getting account health report: {str(e)}", "error")
-
 
 async def handle_get_performance_summary(self):
     """Handle get-performance-summary command"""
@@ -56,7 +63,6 @@ async def handle_get_performance_summary(self):
         app_error = handle_error(e, {"command": "get-performance-summary"})
         self.send_log(f"Error getting performance summary: {str(app_error)}", "error")
         self.send_event("performance-summary", {})
-
 
 async def handle_get_performance_metrics(self, payload: Dict[str, Any]):
     """Handle get-performance-metrics command"""
@@ -107,7 +113,6 @@ async def handle_get_performance_metrics(self, payload: Dict[str, Any]):
         self.send_log(f"Error getting performance metrics: {str(app_error)}", "error")
         self.send_event("performance-metrics", {"metrics": []})
 
-
 async def handle_get_sending_stats(self, payload: Dict[str, Any]):
     """Handle get-sending-stats command"""
     try:
@@ -120,7 +125,6 @@ async def handle_get_sending_stats(self, payload: Dict[str, Any]):
         handle_error(e, {"command": "get-sending-stats", "payload": payload})
         self.send_log(f"Error getting sending stats: {str(e)}", "error")
 
-
 async def handle_get_account_sending_comparison(self, payload: Dict[str, Any]):
     """Handle get-account-sending-comparison command"""
     try:
@@ -131,7 +135,6 @@ async def handle_get_account_sending_comparison(self, payload: Dict[str, Any]):
     except Exception as e:
         handle_error(e, {"command": "get-account-sending-comparison", "payload": payload})
         self.send_log(f"Error getting account sending comparison: {str(e)}", "error")
-
 
 async def handle_get_alerts(self, payload: Dict[str, Any]):
     """Handle get-alerts command"""
@@ -149,7 +152,6 @@ async def handle_get_alerts(self, payload: Dict[str, Any]):
     except Exception as e:
         handle_error(e, {"command": "get-alerts", "payload": payload})
         self.send_log(f"Error getting alerts: {str(e)}", "error")
-
 
 async def handle_acknowledge_alert(self, payload: Dict[str, Any]):
     """Handle acknowledge-alert command"""
@@ -169,7 +171,6 @@ async def handle_acknowledge_alert(self, payload: Dict[str, Any]):
         handle_error(e, {"command": "acknowledge-alert", "payload": payload})
         self.send_log(f"Error acknowledging alert: {str(e)}", "error")
 
-
 async def handle_resolve_alert(self, payload: Dict[str, Any]):
     """Handle resolve-alert command"""
     try:
@@ -188,7 +189,6 @@ async def handle_resolve_alert(self, payload: Dict[str, Any]):
         handle_error(e, {"command": "resolve-alert", "payload": payload})
         self.send_log(f"Error resolving alert: {str(e)}", "error")
 
-
 async def handle_get_high_value_groups(self, payload: Dict[str, Any]):
     """獲取高價值群組"""
     try:
@@ -205,7 +205,6 @@ async def handle_get_high_value_groups(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("high-value-groups", {"success": False, "error": str(e)})
-
 
 async def handle_get_group_overlap_analysis(self, payload: Dict[str, Any]):
     """獲取群組重疊分析"""
@@ -224,7 +223,6 @@ async def handle_get_group_overlap_analysis(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("group-overlap-analysis", {"success": False, "error": str(e)})
 
-
 async def handle_get_unified_overview(self, payload: Dict[str, Any]):
     """獲取統一概覽"""
     try:
@@ -241,7 +239,6 @@ async def handle_get_unified_overview(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("unified-overview", {"success": False, "error": str(e)})
-
 
 async def handle_get_daily_trends(self, payload: Dict[str, Any]):
     """獲取每日趨勢"""
@@ -260,7 +257,6 @@ async def handle_get_daily_trends(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("daily-trends", {"success": False, "error": str(e)})
 
-
 async def handle_get_channel_performance(self, payload: Dict[str, Any]):
     """獲取渠道效能"""
     try:
@@ -275,7 +271,6 @@ async def handle_get_channel_performance(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("channel-performance", {"success": False, "error": str(e)})
-
 
 # ==================== 數據驅動 Handlers (Phase D) ====================
 
@@ -297,7 +292,6 @@ async def handle_analyze_attribution(self, payload: Dict[str, Any]):
         print(f"[Backend] Error analyzing attribution: {e}", file=sys.stderr)
         self.send_event("attribution-analysis", {"success": False, "error": str(e)})
 
-
 async def handle_analyze_account_roi(self, payload: Dict[str, Any]):
     """分析帳號 ROI"""
     try:
@@ -315,7 +309,6 @@ async def handle_analyze_account_roi(self, payload: Dict[str, Any]):
         print(f"[Backend] Error analyzing account ROI: {e}", file=sys.stderr)
         self.send_event("account-roi-analysis", {"success": False, "error": str(e)})
 
-
 async def handle_analyze_time_effectiveness(self, payload: Dict[str, Any]):
     """分析時段效果"""
     try:
@@ -330,7 +323,6 @@ async def handle_analyze_time_effectiveness(self, payload: Dict[str, Any]):
     except Exception as e:
         print(f"[Backend] Error analyzing time effectiveness: {e}", file=sys.stderr)
         self.send_event("time-analysis", {"success": False, "error": str(e)})
-
 
 async def handle_get_group_collected_stats(self, payload: Dict[str, Any]):
     """🆕 獲取群組已收集用戶統計"""
@@ -398,7 +390,6 @@ async def handle_get_group_collected_stats(self, payload: Dict[str, Any]):
             "monitoredMessages": 0,
             "error": str(e)
         })
-
 
 async def handle_get_history_collection_stats(self, payload: Dict[str, Any]):
     """🆕 獲取歷史消息收集統計（用於收集對話框）"""
@@ -487,7 +478,6 @@ async def handle_get_history_collection_stats(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
 async def handle_get_group_profile(self, payload: Dict[str, Any]):
     """獲取群組畫像"""
     try:
@@ -509,7 +499,6 @@ async def handle_get_group_profile(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
 async def handle_compare_groups(self, payload: Dict[str, Any]):
     """比較多個群組"""
     try:
@@ -530,7 +519,6 @@ async def handle_compare_groups(self, payload: Dict[str, Any]):
             "success": False,
             "error": str(e)
         })
-
 
 # ==================== Analytics Handlers ====================
 
@@ -628,7 +616,6 @@ async def handle_analytics_get_stats(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
 async def handle_analytics_get_trend(self, payload: Dict[str, Any]):
     """獲取趨勢數據"""
     import sys
@@ -682,7 +669,6 @@ async def handle_analytics_get_trend(self, payload: Dict[str, Any]):
             "success": False,
             "error": str(e)
         })
-
 
 async def handle_analytics_get_sources(self, payload: Dict[str, Any]):
     """獲取用戶來源分布"""
@@ -739,7 +725,6 @@ async def handle_analytics_get_sources(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
 async def handle_analytics_get_hourly(self, payload: Dict[str, Any]):
     """獲取時段數據"""
     import sys
@@ -781,7 +766,6 @@ async def handle_analytics_get_hourly(self, payload: Dict[str, Any]):
             "success": False,
             "error": str(e)
         })
-
 
 async def handle_analytics_generate_insights(self, payload: Dict[str, Any]):
     """AI 生成洞察"""
@@ -860,7 +844,6 @@ async def handle_analytics_generate_insights(self, payload: Dict[str, Any]):
             "success": False,
             "error": str(e)
         })
-
 
 async def handle_analytics_export(self, payload: Dict[str, Any]):
     """導出分析報告"""

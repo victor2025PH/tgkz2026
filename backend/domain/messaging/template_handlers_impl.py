@@ -13,6 +13,8 @@ from typing import Any, Dict, List, Optional
 from service_context import get_service_context
 from database import db
 
+from error_handler import handle_error, AppError, ErrorType
+from validators import validate_template, TemplateValidator, ValidationError
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.

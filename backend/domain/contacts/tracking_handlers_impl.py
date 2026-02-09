@@ -13,11 +13,16 @@ from typing import Any, Dict, List, Optional
 from service_context import get_service_context
 from database import db
 
+from service_locator import (
+    auto_funnel,
+    get_user_analytics,
+    get_user_tracker,
+    vector_memory
+)
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
 # This is a transitional pattern - later, replace self.xxx with ctx.xxx
-
 
 async def handle_analyze_user_message(self, payload: Dict[str, Any]):
     """分析用戶消息並確定漏斗階段"""
@@ -38,7 +43,6 @@ async def handle_analyze_user_message(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
 async def handle_get_user_journey(self, payload: Dict[str, Any]):
     """獲取用戶漏斗旅程"""
     try:
@@ -55,7 +59,6 @@ async def handle_get_user_journey(self, payload: Dict[str, Any]):
             "success": False,
             "error": str(e)
         })
-
 
 # ==================== User CRM Handlers ====================
 
@@ -102,7 +105,6 @@ async def handle_get_user_profile_full(self, payload: Dict[str, Any]):
             "success": False,
             "error": str(e)
         })
-
 
 async def handle_update_user_crm(self, payload: Dict[str, Any]):
     """更新用戶 CRM 資料"""
@@ -159,7 +161,6 @@ async def handle_update_user_crm(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
 async def handle_analyze_user_journey(self, payload: Dict[str, Any]):
     """分析用戶旅程"""
     try:
@@ -186,7 +187,6 @@ async def handle_analyze_user_journey(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
 # ==================== User Management Handlers ====================
 
 async def handle_get_users_with_profiles(self, payload: Dict[str, Any]):
@@ -212,7 +212,6 @@ async def handle_get_users_with_profiles(self, payload: Dict[str, Any]):
             "total": 0,
             "error": str(e)
         })
-
 
 async def handle_update_user_profile(self, payload: Dict[str, Any]):
     """更新單個用戶畫像"""
@@ -242,7 +241,6 @@ async def handle_update_user_profile(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
-
 # ==================== User Tracking Handlers (用戶追蹤系統) ====================
 
 async def handle_add_user_to_track(self, payload: Dict[str, Any]):
@@ -271,7 +269,6 @@ async def handle_add_user_to_track(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("user-added-to-track", {"success": False, "error": str(e)})
 
-
 async def handle_add_user_from_lead(self, payload: Dict[str, Any]):
     """從 Lead 添加用戶到追蹤"""
     try:
@@ -287,7 +284,6 @@ async def handle_add_user_from_lead(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("user-added-from-lead", {"success": False, "error": str(e)})
-
 
 async def handle_remove_tracked_user(self, payload: Dict[str, Any]):
     """移除追蹤用戶"""
@@ -307,7 +303,6 @@ async def handle_remove_tracked_user(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("user-removed", {"success": False, "error": str(e)})
-
 
 async def handle_get_tracked_users(self, payload: Dict[str, Any]):
     """獲取追蹤用戶列表"""
@@ -329,7 +324,6 @@ async def handle_get_tracked_users(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("tracked-users", {"success": False, "error": str(e)})
 
-
 async def handle_update_user_value_level(self, payload: Dict[str, Any]):
     """更新用戶價值等級"""
     try:
@@ -347,7 +341,6 @@ async def handle_update_user_value_level(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("user-value-updated", {"success": False, "error": str(e)})
-
 
 async def handle_track_user_groups(self, payload: Dict[str, Any]):
     """追蹤用戶群組"""
@@ -367,7 +360,6 @@ async def handle_track_user_groups(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("user-tracking-failed", {"success": False, "error": str(e)})
 
-
 async def handle_batch_track_users(self, payload: Dict[str, Any]):
     """批量追蹤用戶"""
     try:
@@ -386,7 +378,6 @@ async def handle_batch_track_users(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("batch-tracking-completed", {"success": False, "error": str(e)})
 
-
 async def handle_get_user_groups(self, payload: Dict[str, Any]):
     """獲取用戶群組"""
     try:
@@ -402,7 +393,6 @@ async def handle_get_user_groups(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("user-groups", {"success": False, "error": str(e)})
 
-
 async def handle_get_tracking_stats(self, payload: Dict[str, Any]):
     """獲取追蹤統計"""
     try:
@@ -417,7 +407,6 @@ async def handle_get_tracking_stats(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("tracking-stats", {"success": False, "error": str(e)})
-
 
 async def handle_get_tracking_logs(self, payload: Dict[str, Any]):
     """獲取追蹤日誌"""
@@ -438,7 +427,6 @@ async def handle_get_tracking_logs(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("tracking-logs", {"success": False, "error": str(e)})
 
-
 async def handle_get_user_value_distribution(self, payload: Dict[str, Any]):
     """獲取用戶價值分佈"""
     try:
@@ -454,7 +442,6 @@ async def handle_get_user_value_distribution(self, payload: Dict[str, Any]):
     except Exception as e:
         self.send_event("user-value-distribution", {"success": False, "error": str(e)})
 
-
 async def handle_get_tracking_effectiveness(self, payload: Dict[str, Any]):
     """獲取追蹤效率"""
     try:
@@ -469,7 +456,6 @@ async def handle_get_tracking_effectiveness(self, payload: Dict[str, Any]):
         
     except Exception as e:
         self.send_event("tracking-effectiveness", {"success": False, "error": str(e)})
-
 
 async def handle_sync_resource_status_to_leads(self, payload: Dict[str, Any]):
     """

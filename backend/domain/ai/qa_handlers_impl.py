@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from service_context import get_service_context
+from service_locator import get_knowledge_search_engine
 
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
@@ -31,6 +32,7 @@ async def handle_add_qa_pair(self, payload: Dict[str, Any]):
             self.send_event("qa-pair-added", {"success": False, "error": "Question and answer required"})
             return
         
+        search_engine = get_knowledge_search_engine()
         qa_id = await search_engine.add_qa_pair(
             question=question,
             answer=answer,
@@ -55,6 +57,7 @@ async def handle_get_qa_pairs(self, payload: Dict[str, Any]):
     """Get all QA pairs"""
     try:
         category = payload.get('category')
+        search_engine = get_knowledge_search_engine()
         qa_pairs = await search_engine.get_all_qa_pairs(category)
         
         self.send_event("qa-pairs-list", {
@@ -74,6 +77,7 @@ async def handle_import_qa(self, payload: Dict[str, Any]):
         file_path = payload.get('filePath')
         file_type = payload.get('fileType', 'csv')
         
+        search_engine = get_knowledge_search_engine()
         if file_type == 'csv':
             result = await search_engine.import_qa_from_csv(file_path)
         else:

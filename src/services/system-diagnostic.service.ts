@@ -696,4 +696,25 @@ export class SystemDiagnosticService {
     
     return lines.join('\n');
   }
+
+  // ==================== Phase4: 命令診斷看板 ====================
+  
+  private _commandDiagnostics = signal<any>(null);
+  commandDiagnostics = this._commandDiagnostics.asReadonly();
+  
+  /**
+   * Phase4: 獲取命令執行診斷數據
+   * 包含：別名註冊表、未知命令統計、成功/失敗率、慢命令、FloodWait 狀態
+   */
+  fetchCommandDiagnostics(): void {
+    this.ipc.send('get-command-diagnostics', {});
+    
+    const cleanup = this.ipc.on('command-diagnostics', (data: any) => {
+      this._commandDiagnostics.set(data);
+      console.log('[Diagnostics] Command diagnostics received:', data);
+    });
+    
+    // 自動清理（10秒後）
+    setTimeout(() => cleanup(), 10000);
+  }
 }

@@ -857,13 +857,23 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
                                 'action': 'suggest_monitor'
                             }
                         elif 'FLOOD' in err_msg.upper():
+                            # 🆕 Phase4: 從 flood_handler 提取精確等待時間
+                            actual_wait = 120
+                            try:
+                                from flood_wait_handler import flood_handler as _fh
+                                parsed_wait = _fh.get_wait_time_from_error(Exception(err_msg))
+                                if parsed_wait:
+                                    actual_wait = parsed_wait
+                                    _fh.record_flood_wait(phone, actual_wait)
+                            except Exception:
+                                pass
                             result['error_code'] = 'E4003_RATE_LIMITED'
                             result['error_details'] = {
                                 'code': 'E4003',
                                 'reason': 'Telegram 速率限制，請求過於頻繁',
-                                'suggestion': '請等待幾分鐘後再試',
+                                'suggestion': f'請等待 {actual_wait} 秒後再試',
                                 'action': 'retry_later',
-                                'retry_after_seconds': 120
+                                'retry_after_seconds': actual_wait
                             }
                     break
                     
@@ -977,6 +987,121 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
             "members": [],
             "extracted": 0,
             "total": 0
+        })
+
+
+async def handle_extract_active_users(self, payload: Dict[str, Any]):
+    """
+    Phase4: 從消息歷史中提取活躍用戶
+    
+    與 extract-members 互補的提取方式：
+    - extract-members: 使用 get_chat_members API (上限 10,000)
+    - extract-active-users: 遍歷消息歷史，發現活躍發言者
+    
+    適用場景：
+    1. 群組超過 10,000 成員
+    2. 管理員限制了成員列表
+    3. 需要按活躍度篩選高價值用戶
+    """
+    try:
+        resource_id = payload.get('resourceId')
+        chat_id = payload.get('chatId') or payload.get('telegramId')
+        username = payload.get('username')
+        phone = payload.get('phone')
+        message_limit = payload.get('messageLimit', 2000)
+        
+        # 構建 chat_id
+        effective_chat_id = chat_id
+        if not effective_chat_id and username:
+            effective_chat_id = f"@{username.lstrip('@')}"
+        
+        if not effective_chat_id:
+            self.send_event("active-users-extracted", {
+                "resourceId": resource_id,
+                "success": False,
+                "error": "無法確定群組標識",
+                "members": [],
+                "extracted": 0
+            })
+            return
+        
+        # 獲取手機號
+        if not phone:
+            from database import db as _db
+            await _db.connect()
+            if resource_id:
+                resource = await _db.fetch_one(
+                    "SELECT joined_by_phone FROM discovered_resources WHERE id = ?",
+                    (resource_id,)
+                )
+                if resource:
+                    phone = resource.get('joined_by_phone') if hasattr(resource, 'get') else resource[0]
+        
+        self.send_log(f"🔍 從消息歷史中提取活躍用戶: {effective_chat_id}", "info")
+        self.send_event("active-users-extraction-progress", {
+            "resourceId": resource_id,
+            "status": "starting",
+            "message": f"開始掃描最近 {message_limit} 條消息..."
+        })
+        
+        # 設置客戶端
+        member_extraction_service.set_clients(self.telegram_manager.clients)
+        member_extraction_service.set_event_callback(self.send_event)
+        
+        result = await member_extraction_service.extract_active_from_history(
+            chat_id=effective_chat_id,
+            phone=phone,
+            message_limit=message_limit,
+            save_to_db=True
+        )
+        
+        if result['success']:
+            new_users = [m for m in result.get('members', []) if m.get('is_new')]
+            self.send_log(
+                f"✅ 活躍用戶提取完成: 掃描 {result['messages_scanned']} 條消息，"
+                f"發現 {result['unique_users']} 用戶 (新增 {len(new_users)})",
+                "success"
+            )
+            
+            # 自動同步到統一聯繫人
+            try:
+                from unified_contacts import get_unified_contacts_manager
+                from database import db as sync_db
+                await sync_db.connect()
+                manager = get_unified_contacts_manager(sync_db)
+                sync_stats = await manager.sync_from_sources()
+                self.send_event("unified-contacts:updated", {
+                    "reason": "extract-active-users",
+                    "synced": sync_stats.get('synced', 0),
+                    "updated": sync_stats.get('updated', 0)
+                })
+            except Exception as sync_err:
+                print(f"[Backend] Auto-sync after active extraction: {sync_err}", file=sys.stderr)
+        else:
+            self.send_log(f"❌ 活躍用戶提取失敗: {result.get('error')}", "error")
+        
+        self.send_event("active-users-extracted", {
+            "resourceId": resource_id,
+            "success": result.get('success', False),
+            "method": "history",
+            "members": result.get('members', []),
+            "extracted": result.get('extracted', 0),
+            "unique_users": result.get('unique_users', 0),
+            "messages_scanned": result.get('messages_scanned', 0),
+            "new_members": result.get('new_members', 0),
+            "error": result.get('error')
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        self.send_log(f"❌ 活躍用戶提取失敗: {e}", "error")
+        self.send_event("active-users-extracted", {
+            "resourceId": payload.get('resourceId'),
+            "success": False,
+            "error": str(e),
+            "members": [],
+            "extracted": 0
         })
 
 

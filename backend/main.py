@@ -427,12 +427,31 @@ COMMAND_ALIAS_REGISTRY: Dict[str, tuple] = {
     'join-and-monitor':         ('domain.groups.handlers_impl', 'handle_join_and_monitor_resource'),
     'join-resource':            ('domain.groups.handlers_impl', 'handle_join_resource'),
     
+    # === Phase4: 消息歷史提取 ===
+    'extract-active-users':     ('domain.contacts.member_handlers_impl', 'handle_extract_active_users'),
+    
     # === 預留擴展點 (新增別名只需在此添加一行) ===
 }
 
 # 未知命令追蹤器 — 用於診斷前端發送了哪些未註冊的命令
 _unknown_command_counter: Dict[str, int] = {}
 _UNKNOWN_CMD_LOG_THRESHOLD = 3  # 同一未知命令每 N 次才記一次日誌
+
+# 🆕 Phase4: 命令執行度量（成功/失敗/耗時）
+_command_metrics: Dict[str, Dict] = {}  # {command: {success: int, failed: int, total_ms: float, last_error: str}}
+
+def _record_command_metric(command: str, success: bool, duration_ms: float, error: str = None):
+    """記錄命令執行結果"""
+    if command not in _command_metrics:
+        _command_metrics[command] = {'success': 0, 'failed': 0, 'total_ms': 0.0, 'count': 0, 'last_error': None}
+    m = _command_metrics[command]
+    m['count'] += 1
+    m['total_ms'] += duration_ms
+    if success:
+        m['success'] += 1
+    else:
+        m['failed'] += 1
+        m['last_error'] = error
 
 
 # 🆕 Phase 8: 使用統一的日誌脫敏工具（延遲導入）
@@ -2600,6 +2619,9 @@ class BackendService:
     
     async def handle_command(self, command: str, payload: Any, request_id: Optional[str] = None):
         """Handle incoming commands"""
+        _cmd_start_time = time.time()
+        _cmd_success = True
+        _cmd_error = None
         try:
             # Register request for acknowledgment if request_id is provided
             ack_manager = get_ack_manager()
@@ -2867,6 +2889,8 @@ class BackendService:
             # 這大幅減少了代碼重複並提高了可維護性
         
         except Exception as e:
+            _cmd_success = False
+            _cmd_error = str(e)
             # Use global error handler
             app_error = handle_error(e, {"command": command, "payload": payload})
             # Error is already logged by error handler
@@ -2882,6 +2906,10 @@ class BackendService:
             
             import traceback
             traceback.print_exc()
+        finally:
+            # 🆕 Phase4: 記錄命令執行度量
+            _cmd_duration = (time.time() - _cmd_start_time) * 1000
+            _record_command_metric(command, _cmd_success, _cmd_duration, _cmd_error)
     
     async def handle_get_initial_state(self):
         from api.handlers.lifecycle_handlers_impl import handle_get_initial_state as _handle_get_initial_state
@@ -3549,7 +3577,25 @@ class BackendService:
         return await _handle_get_system_status(self)
 
     async def handle_get_command_diagnostics(self, payload=None):
-        """Phase3: 命令診斷 — 返回別名註冊表狀態和未知命令統計"""
+        """Phase4: 命令診斷看板 — 別名註冊表 + 未知命令 + 執行度量"""
+        # 計算 Top 命令（按失敗率排序）
+        top_failed = sorted(
+            [(cmd, m) for cmd, m in _command_metrics.items() if m['failed'] > 0],
+            key=lambda x: x[1]['failed'],
+            reverse=True
+        )[:15]
+        
+        # 計算 Top 慢命令（按平均耗時排序）
+        top_slow = sorted(
+            [(cmd, m) for cmd, m in _command_metrics.items() if m['count'] >= 3],
+            key=lambda x: x[1]['total_ms'] / max(1, x[1]['count']),
+            reverse=True
+        )[:10]
+        
+        total_commands = sum(m['count'] for m in _command_metrics.values())
+        total_success = sum(m['success'] for m in _command_metrics.values())
+        total_failed = sum(m['failed'] for m in _command_metrics.values())
+        
         diagnostics = {
             'alias_registry': {
                 'total': len(COMMAND_ALIAS_REGISTRY),
@@ -3559,10 +3605,54 @@ class BackendService:
                 _unknown_command_counter.items(),
                 key=lambda x: x[1],
                 reverse=True
-            )[:20]),  # Top 20 unknown commands
+            )[:20]),
             'unknown_total': sum(_unknown_command_counter.values()),
-            'router_available': ROUTER_AVAILABLE
+            'router_available': ROUTER_AVAILABLE,
+            # 🆕 Phase4: 命令執行度量
+            'metrics_summary': {
+                'total_commands': total_commands,
+                'total_success': total_success,
+                'total_failed': total_failed,
+                'success_rate': round(total_success / max(1, total_commands) * 100, 1),
+                'unique_commands': len(_command_metrics)
+            },
+            'top_failed_commands': [
+                {
+                    'command': cmd,
+                    'failed': m['failed'],
+                    'success': m['success'],
+                    'total': m['count'],
+                    'fail_rate': round(m['failed'] / max(1, m['count']) * 100, 1),
+                    'last_error': m.get('last_error', '')[:200]
+                }
+                for cmd, m in top_failed
+            ],
+            'top_slow_commands': [
+                {
+                    'command': cmd,
+                    'avg_ms': round(m['total_ms'] / max(1, m['count']), 1),
+                    'count': m['count']
+                }
+                for cmd, m in top_slow
+            ],
+            # 🆕 Phase4: FloodWait 狀態
+            'flood_wait_status': {}
         }
+        
+        # 添加 FloodWait 冷卻狀態
+        try:
+            from flood_wait_handler import flood_handler
+            import time as _time
+            for phone, until in flood_handler._flood_wait_until.items():
+                remaining = until - _time.time()
+                if remaining > 0:
+                    diagnostics['flood_wait_status'][phone[:4] + '****'] = {
+                        'remaining_seconds': round(remaining, 1),
+                        'until': datetime.fromtimestamp(until).isoformat()
+                    }
+        except Exception:
+            pass
+        
         self.send_event("command-diagnostics", diagnostics)
         return diagnostics
 

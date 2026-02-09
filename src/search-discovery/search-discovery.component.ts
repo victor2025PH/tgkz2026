@@ -16,6 +16,7 @@ import { ElectronIpcService } from '../electron-ipc.service';
 import { AccountManagementService } from '../services';
 import { DialogService } from '../services/dialog.service';
 import { OperationHistoryService } from '../services/operation-history.service';
+import { NavBridgeService } from '../services/nav-bridge.service';
 
 // 資源類型定義
 export interface DiscoveredResource {
@@ -1196,6 +1197,7 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   private accountService = inject(AccountManagementService);
   private dialogService = inject(DialogService);
   opHistory = inject(OperationHistoryService);
+  private navBridge = inject(NavBridgeService);
   
   // 🆕 Phase3: 操作歷史面板開關
   showOperationHistory = signal(false);
@@ -1474,6 +1476,9 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     
     // 🔧 P1: 從 sessionStorage 恢復上次搜索結果
     this.restoreSearchResults();
+    
+    // 🔧 Phase4: 恢復後，向後端請求最新監控列表用於狀態交叉校驗
+    this.syncResourceStatusWithMonitoredGroups();
   }
   
   // 🔧 P1: 保存搜索結果到 sessionStorage
@@ -1521,6 +1526,62 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     }
   }
   
+  /**
+   * 🔧 Phase4: 搜索結果狀態與監控列表交叉校驗
+   * 解決：資源在 sessionStorage 中標記為 'monitoring'，但用戶可能已在監控頁刪除
+   */
+  private syncResourceStatusWithMonitoredGroups(): void {
+    // 監聽監控列表返回，用它來校正搜索結果中的狀態
+    const syncCleanup = this.ipc.on('get-groups-result', (data: any) => {
+      const groups = data.groups || [];
+      if (!groups.length && !this._internalResources().length) return;
+      
+      // 構建監控中的群組標識集合
+      const monitoredUrls = new Set<string>();
+      const monitoredUsernames = new Set<string>();
+      const monitoredTelegramIds = new Set<string>();
+      
+      for (const g of groups) {
+        if (g.url) monitoredUrls.add(g.url);
+        if (g.username) monitoredUsernames.add(g.username.toLowerCase().replace('@', ''));
+        if (g.telegramId) monitoredTelegramIds.add(String(g.telegramId));
+      }
+      
+      // 校正搜索結果中的狀態
+      let corrected = 0;
+      const resources = this._internalResources();
+      const updated = resources.map(r => {
+        const isActuallyMonitored = 
+          (r.username && monitoredUsernames.has(r.username.toLowerCase().replace('@', ''))) ||
+          (r.telegram_id && monitoredTelegramIds.has(String(r.telegram_id)));
+        
+        if (r.status === 'monitoring' && !isActuallyMonitored) {
+          // 搜索結果顯示監控中，但實際已不在監控列表 → 降級為 joined 或 discovered
+          corrected++;
+          return { ...r, status: 'joined' as any };
+        }
+        if (r.status !== 'monitoring' && isActuallyMonitored) {
+          // 搜索結果未標記監控，但實際在監控列表 → 升級為 monitoring
+          corrected++;
+          return { ...r, status: 'monitoring' as any };
+        }
+        return r;
+      });
+      
+      if (corrected > 0) {
+        console.log(`[SearchDiscovery] Phase4: 校正了 ${corrected} 個資源的監控狀態`);
+        this._internalResources.set(updated);
+        this.saveSearchResults();
+      }
+    });
+    this.ipcCleanup.push(syncCleanup);
+    
+    // 主動請求最新監控列表（觸發校驗）
+    if (this._internalResources().length > 0) {
+      this.ipc.send('get-monitored-groups', {});
+    }
+  }
+
   ngOnDestroy(): void {
     document.removeEventListener('click', this.handleOutsideClick.bind(this));
     document.removeEventListener('keydown', this.handleKeydown.bind(this));
@@ -1855,9 +1916,13 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
         });
         this._internalResources.set(updatedResources);
         this.saveSearchResults();
-        // 只在首次收到成功事件時顯示 toast（避免 WS + HTTP 雙重觸發）
+        // 🔧 Phase4: 帶導航鏈接的 toast（只在首次觸發時顯示，避免重複）
         if (!alreadyUpdated) {
-          this.toast.success(`📡 已成功添加到監控列表: ${data.name || ''}`);
+          this.toast.successWithNextStep(
+            `📡 已成功添加到監控列表: ${data.name || ''}`,
+            '前往監控頁 →',
+            () => this.navBridge.navigateTo('monitoring-groups')
+          );
         }
       } else {
         // 失敗：清除所有 loading + 顯示錯誤（只在有 loading 中的資源時顯示）
@@ -1868,7 +1933,46 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       }
     });
     
-    this.ipcCleanup.push(cleanup1, cleanup2a, cleanup2, cleanup3, cleanup4, cleanup5, cleanup6, cleanup7, cleanup8);
+    // 🔧 Phase4: 監聽監控群組列表 → 交叉比對修正搜索結果中的狀態
+    const cleanup9 = this.ipc.on('get-groups-result', (data: any) => {
+      const groups = data.groups;
+      if (!groups || !Array.isArray(groups) || groups.length === 0) return;
+      
+      const currentResources = this._internalResources();
+      if (currentResources.length === 0) return;
+      
+      // 構建監控群組的 URL/username 集合（用於快速查找）
+      const monitoredUrls = new Set<string>();
+      const monitoredUsernames = new Set<string>();
+      for (const g of groups) {
+        if (g.url) monitoredUrls.add(g.url.toLowerCase());
+        if (g.username) monitoredUsernames.add(g.username.toLowerCase().replace('@', ''));
+      }
+      
+      // 交叉比對：如果搜索結果中的資源已在監控列表中但狀態不是 monitoring，修正它
+      let fixCount = 0;
+      const updatedResources = currentResources.map(r => {
+        if (r.status === 'monitoring') return r; // 已正確
+        
+        const isMonitored = 
+          (r.username && monitoredUsernames.has(r.username.toLowerCase().replace('@', ''))) ||
+          (r.telegram_id && groups.some((g: any) => String(g.telegramId) === String(r.telegram_id)));
+        
+        if (isMonitored) {
+          fixCount++;
+          return { ...r, status: 'monitoring' as any };
+        }
+        return r;
+      });
+      
+      if (fixCount > 0) {
+        console.log(`[SearchDiscovery] Phase4: 修正 ${fixCount} 個資源狀態（discovered → monitoring）`);
+        this._internalResources.set(updatedResources);
+        this.saveSearchResults();
+      }
+    });
+    
+    this.ipcCleanup.push(cleanup1, cleanup2a, cleanup2, cleanup3, cleanup4, cleanup5, cleanup6, cleanup7, cleanup8, cleanup9);
   }
   
   // 🔧 P0: 加載搜索歷史

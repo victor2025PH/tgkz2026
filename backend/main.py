@@ -6461,6 +6461,11 @@ class BackendService:
         from domain.search.resource_handlers_impl import handle_batch_join_resources as _handle_batch_join_resources
         return await _handle_batch_join_resources(self, payload)
 
+    async def handle_join_resource(self, payload=None):
+        """join-resource: 僅加入群組，不添加到監控"""
+        from domain.groups.handlers_impl import handle_join_resource as _handle_join_resource
+        return await _handle_join_resource(self, payload)
+
     async def handle_join_and_monitor(self, payload=None):
         """join-and-monitor 別名 → join-and-monitor-resource"""
         from domain.groups.handlers_impl import handle_join_and_monitor_resource as _handle_join_and_monitor_resource

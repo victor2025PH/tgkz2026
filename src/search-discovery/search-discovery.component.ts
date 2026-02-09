@@ -2161,7 +2161,7 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     this.executeJoin(resource, selectedAcc.phone);
   }
   
-  // 🔧 P0: 執行加入操作
+  // 🔧 Phase2: 執行加入操作（僅加入，不監控）
   private executeJoin(resource: DiscoveredResource, phone: string): void {
     // 設置 Loading 狀態
     this.joiningResourceIds.update(ids => {
@@ -2172,8 +2172,8 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     
     this.toast.info(`正在使用 ${phone.slice(0, 4)}**** 加入群組: ${resource.title || resource.username}...`);
     
-    // 發送加入命令
-    this.ipc.send('join-and-monitor-resource', {
+    // 🆕 Phase2: 使用 join-resource 命令（僅加入，不自動添加到監控）
+    this.ipc.send('join-resource', {
       resourceId: resource.id || 0,
       username: resource.username,
       telegramId: resource.telegram_id,

@@ -1,6 +1,6 @@
 /**
  * TG-AI智控王 群組詳情組件
- * Group Detail Component v1.0
+ * Group Detail Component v2.0 — Phase2: 狀態感知按鈕
  */
 import { Component, Input, Output, EventEmitter, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -8,6 +8,9 @@ import { GroupSearchService } from './search.service';
 import { MembershipService } from '../membership.service';
 import { ToastService } from '../toast.service';
 import { GroupBasicInfo, GroupDetailInfo, GroupStats } from './search.types';
+
+/** 群組在系統中的狀態 */
+export type GroupResourceStatus = 'discovered' | 'pending' | 'joined' | 'monitoring' | 'paused' | 'failed' | 'unknown';
 
 @Component({
   selector: 'app-group-detail',
@@ -22,6 +25,14 @@ import { GroupBasicInfo, GroupDetailInfo, GroupStats } from './search.types';
           ← 返回
         </button>
         <h3 class="text-lg font-semibold">群組詳情</h3>
+        
+        <!-- 狀態標記 -->
+        @if (resourceStatus !== 'unknown') {
+          <span class="ml-auto px-3 py-1 rounded-full text-xs font-medium"
+                [class]="statusStyle">
+            {{ statusLabel }}
+          </span>
+        }
       </div>
       
       <!-- 內容區 -->
@@ -78,23 +89,43 @@ import { GroupBasicInfo, GroupDetailInfo, GroupStats } from './search.types';
                   }
                 </div>
                 
-                <!-- 操作按鈕 -->
+                <!-- 操作按鈕 — 根據狀態智能顯示 -->
                 <div class="flex flex-col gap-2">
-                  <button (click)="joinGroup()"
-                          class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg transition-colors flex items-center gap-2">
-                    ➕ 加入群組
-                  </button>
-                  <button (click)="joinAndMonitor.emit()"
-                          class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors flex items-center gap-2 text-white">
-                    📡 加入並監控
-                  </button>
+                  @if (isMonitoring) {
+                    <!-- 監控中：顯示狀態 + 提取 -->
+                    <span class="px-4 py-2 bg-emerald-500/15 text-emerald-400 rounded-lg text-sm text-center font-medium">
+                      📡 監控中
+                    </span>
+                    <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm text-center">
+                      ✅ 已加入
+                    </span>
+                  } @else if (isJoined) {
+                    <!-- 已加入未監控：提供監控選項 -->
+                    <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm text-center">
+                      ✅ 已加入
+                    </span>
+                    <button (click)="joinAndMonitor.emit()"
+                            class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors flex items-center gap-2 text-white text-sm">
+                      📡 加入監控
+                    </button>
+                  } @else {
+                    <!-- 未加入：完整操作 -->
+                    <button (click)="joinGroup()"
+                            class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 rounded-lg transition-colors flex items-center gap-2 text-sm">
+                      ➕ 加入群組
+                    </button>
+                    <button (click)="joinAndMonitor.emit()"
+                            class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors flex items-center gap-2 text-white text-sm">
+                      📡 加入並監控
+                    </button>
+                  }
                   <button (click)="toggleFavorite()"
-                          class="px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                          class="px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
                           [class]="isFavorite() ? 'bg-yellow-500/20 text-yellow-400' : 'bg-slate-700 hover:bg-slate-600'">
                     {{ isFavorite() ? '⭐ 已收藏' : '☆ 收藏' }}
                   </button>
                   <button (click)="copyLink()"
-                          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors flex items-center gap-2">
+                          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors flex items-center gap-2 text-sm">
                     📋 複製鏈接
                   </button>
                 </div>
@@ -148,19 +179,29 @@ import { GroupBasicInfo, GroupDetailInfo, GroupStats } from './search.types';
               </div>
             </div>
             
-            <!-- 成員提取按鈕 -->
-            <div class="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-xl p-6 border border-cyan-500/30">
+            <!-- 成員提取按鈕 — 根據狀態顯示 -->
+            <div class="rounded-xl p-6 border"
+                 [class]="canExtractNow ? 'bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border-cyan-500/30' : 'bg-slate-800/50 border-slate-700/50'">
               <div class="flex items-center justify-between">
                 <div>
                   <h4 class="font-semibold text-lg">👥 提取群組成員</h4>
                   <p class="text-sm text-slate-400 mt-1">
-                    提取成員的頭像、暱稱、用戶名、ID 等公開信息
+                    @if (!isJoined && !isMonitoring) {
+                      需要先加入群組才能提取成員
+                    } @else if (!canExtract()) {
+                      需要升級會員才能使用此功能
+                    } @else {
+                      提取成員的頭像、暱稱、用戶名、ID 等公開信息
+                    }
                   </p>
                 </div>
-                <button (click)="extractMembers.emit()"
-                        [disabled]="!canExtract()"
-                        class="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-medium hover:opacity-90 disabled:opacity-50 transition-all">
-                  @if (!canExtract()) {
+                <button (click)="handleExtractClick()"
+                        [disabled]="!canExtractNow"
+                        class="px-6 py-3 rounded-xl font-medium transition-all"
+                        [class]="canExtractNow ? 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:opacity-90 text-white' : 'bg-slate-700 text-slate-500 cursor-not-allowed'">
+                  @if (!isJoined && !isMonitoring) {
+                    🔒 需先加入
+                  } @else if (!canExtract()) {
                     🔒 需要升級
                   } @else {
                     📥 提取成員
@@ -168,9 +209,14 @@ import { GroupBasicInfo, GroupDetailInfo, GroupStats } from './search.types';
                 </button>
               </div>
               
-              @if (!canExtract()) {
+              @if (!canExtract() && (isJoined || isMonitoring)) {
                 <p class="mt-3 text-sm text-orange-400">
                   {{ membershipService.levelIcon() }} {{ membershipService.levelName() }} 無法使用成員提取功能，需要升級到 🥈 白銀精英 或以上
+                </p>
+              }
+              @if (!isJoined && !isMonitoring) {
+                <p class="mt-3 text-sm text-slate-500">
+                  💡 提示：請先點擊上方「加入群組」按鈕，加入後即可提取成員
                 </p>
               }
             </div>
@@ -207,6 +253,7 @@ import { GroupBasicInfo, GroupDetailInfo, GroupStats } from './search.types';
 })
 export class GroupDetailComponent implements OnInit {
   @Input({ required: true }) group!: GroupBasicInfo;
+  @Input() resourceStatus: GroupResourceStatus = 'unknown';
   @Output() back = new EventEmitter<void>();
   @Output() extractMembers = new EventEmitter<void>();
   @Output() joinAndMonitor = new EventEmitter<void>();
@@ -217,6 +264,46 @@ export class GroupDetailComponent implements OnInit {
   
   detail = signal<GroupDetailInfo | null>(null);
   isLoading = signal(true);
+  
+  /** 是否已加入（包含 monitoring） */
+  get isJoined(): boolean {
+    return this.resourceStatus === 'joined' || this.resourceStatus === 'monitoring' || this.resourceStatus === 'paused';
+  }
+  
+  /** 是否正在監控 */
+  get isMonitoring(): boolean {
+    return this.resourceStatus === 'monitoring';
+  }
+  
+  /** 是否可以立即提取 */
+  get canExtractNow(): boolean {
+    return this.isJoined && this.canExtract();
+  }
+  
+  /** 狀態標籤文字 */
+  get statusLabel(): string {
+    switch (this.resourceStatus) {
+      case 'monitoring': return '📡 監控中';
+      case 'joined': return '✅ 已加入';
+      case 'paused': return '⏸ 已暫停';
+      case 'discovered': return '🔍 已發現';
+      case 'pending': return '⏳ 待處理';
+      case 'failed': return '❌ 失敗';
+      default: return '';
+    }
+  }
+  
+  /** 狀態標籤樣式 */
+  get statusStyle(): string {
+    switch (this.resourceStatus) {
+      case 'monitoring': return 'bg-emerald-500/20 text-emerald-400';
+      case 'joined': return 'bg-green-500/20 text-green-400';
+      case 'paused': return 'bg-yellow-500/20 text-yellow-400';
+      case 'discovered': return 'bg-blue-500/20 text-blue-400';
+      case 'failed': return 'bg-red-500/20 text-red-400';
+      default: return 'bg-slate-700 text-slate-400';
+    }
+  }
   
   ngOnInit(): void {
     this.loadDetail();
@@ -230,7 +317,6 @@ export class GroupDetailComponent implements OnInit {
     if (result) {
       this.detail.set(result);
     } else {
-      // 使用基本信息構建詳情
       this.detail.set({
         ...this.group,
         stats: {
@@ -263,6 +349,19 @@ export class GroupDetailComponent implements OnInit {
   
   joinGroup(): void {
     this.searchService.joinGroup(this.group);
+  }
+  
+  /** 提取按鈕點擊處理 — 帶前置引導 */
+  handleExtractClick(): void {
+    if (!this.isJoined) {
+      this.toastService.warning('📥 需要先加入群組才能提取成員。請點擊「加入群組」按鈕。');
+      return;
+    }
+    if (!this.canExtract()) {
+      this.toastService.warning('🔒 需要升級會員才能使用提取功能');
+      return;
+    }
+    this.extractMembers.emit();
   }
   
   copyLink(): void {

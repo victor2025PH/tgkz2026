@@ -144,6 +144,7 @@ async def handle_batch_join_and_monitor(self, payload: Dict[str, Any]):
         
         # 獲取資源詳情
         from database import db
+from config import config
         await db.connect()
         
         success_count = 0

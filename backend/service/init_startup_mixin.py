@@ -177,6 +177,71 @@ def _get_command_alias_registry():
 
 COMMAND_ALIAS_REGISTRY = None  # 延遲初始化
 
+# ====================================================================
+# 🔧 P3-1: 延迟获取单例对象（原 main.py 模块级全局变量）
+# 这些在 initialize() 的子初始化方法中被直接引用
+# ====================================================================
+
+def _get_auto_funnel():
+    try:
+        return _get_module('auto_funnel').auto_funnel
+    except Exception:
+        return None
+
+def _get_ai_auto_chat():
+    try:
+        return _get_module('ai_auto_chat').ai_auto_chat
+    except Exception:
+        return None
+
+def _get_vector_memory():
+    try:
+        return _get_module('vector_memory').vector_memory
+    except Exception:
+        return None
+
+def _get_scheduler():
+    try:
+        return _get_module('scheduler').scheduler
+    except Exception:
+        return None
+
+def _get_MessagePriority():
+    try:
+        return _get_module('message_queue').MessagePriority
+    except Exception:
+        from enum import IntEnum
+        class _FallbackPriority(IntEnum):
+            LOW = 0
+            NORMAL = 1
+            HIGH = 2
+        return _FallbackPriority
+
+def _get_collaboration_coordinator():
+    try:
+        return _get_module('collaboration_coordinator').get_collaboration_coordinator()
+    except Exception:
+        return None
+
+def _get_Anomaly():
+    try:
+        return _get_module('enhanced_health_monitor').Anomaly
+    except Exception:
+        return None
+
+def _get_RotationReason():
+    try:
+        return _get_module('proxy_rotation_manager').RotationReason
+    except Exception:
+        return None
+
+def _get_WarmupManager():
+    try:
+        return _get_module('warmup_manager').WarmupManager
+    except Exception:
+        return None
+
+
 class InitStartupMixin:
     """Mixin: Initialization, startup, quota, consistency check"""
 
@@ -1037,6 +1102,10 @@ class InitStartupMixin:
     async def _initialize_auto_funnel(self):
         """Initialize auto funnel manager"""
         try:
+            auto_funnel = _get_auto_funnel()
+            if not auto_funnel:
+                self.send_log("[AutoFunnel] 模块不可用，跳过初始化", "warning")
+                return
             # Set callbacks
             auto_funnel.set_callbacks(
                 send_callback=self._funnel_send_callback,
@@ -1053,6 +1122,10 @@ class InitStartupMixin:
     async def _initialize_ai_auto_chat(self):
         """Initialize AI auto chat service"""
         try:
+            ai_auto_chat = _get_ai_auto_chat()
+            if not ai_auto_chat:
+                self.send_log("[AIAutoChat] 模块不可用，跳过初始化", "warning")
+                return
             # Initialize AI auto chat
             await ai_auto_chat.initialize()
             
@@ -1081,7 +1154,7 @@ class InitStartupMixin:
                         text=message,
                         source_group=source_group,
                         target_username=username,  # 🆕 用戶名備選
-                        priority=MessagePriority.NORMAL
+                        priority=_get_MessagePriority().NORMAL
                     )
                     
                     # 更新每日計數（僅未互動用戶）
@@ -1158,7 +1231,7 @@ class InitStartupMixin:
                     text=message,
                     source_group=source_group,      # 🆕 來源群組
                     target_username=target_username, # 🆕 用戶名備選
-                    priority=MessagePriority.NORMAL
+                    priority=_get_MessagePriority().NORMAL
                 )
                 return True
             return False
@@ -1169,6 +1242,10 @@ class InitStartupMixin:
     async def _initialize_vector_memory(self):
         """Initialize vector memory system"""
         try:
+            vector_memory = _get_vector_memory()
+            if not vector_memory:
+                self.send_log("[VectorMemory] 模块不可用，跳过初始化", "warning")
+                return
             await vector_memory.initialize(use_neural=False)  # 默认使用简单嵌入
             self.send_log("[VectorMemory] 向量化记忆系统已启动", "success")
         except Exception as e:
@@ -1177,6 +1254,10 @@ class InitStartupMixin:
     async def _initialize_scheduler(self):
         """Initialize task scheduler"""
         try:
+            scheduler = _get_scheduler()
+            if not scheduler:
+                self.send_log("[Scheduler] 模块不可用，跳过初始化", "warning")
+                return
             # Set callbacks
             scheduler.set_log_callback(self.send_log)
             scheduler.set_task_callback('follow_up', self._funnel_send_callback)
@@ -1294,7 +1375,7 @@ class InitStartupMixin:
                 log_callback=self.send_log
             )
             # Link with collaboration coordinator
-            coordinator = get_collaboration_coordinator()
+            coordinator = _get_collaboration_coordinator()
             if coordinator:
                 marketing_task_svc.set_collaboration_coordinator(coordinator)
             
@@ -1306,8 +1387,9 @@ class InitStartupMixin:
     async def _initialize_enhanced_health_monitor(self):
         """Initialize enhanced health monitor"""
         try:
+            Anomaly = _get_Anomaly()
             # Create alert callback
-            def alert_callback(anomaly: Anomaly):
+            def alert_callback(anomaly):
                 """告警回调函数"""
                 # 发送告警事件到前端
                 self.send_event("health-anomaly-detected", {
@@ -1423,7 +1505,7 @@ class InitStartupMixin:
                             new_proxy = await self.proxy_rotation_manager.rotate_proxy(
                                 phone=phone,
                                 current_proxy=current_proxy,
-                                reason=get_RotationReason().ERROR
+                                reason=_get_RotationReason().ERROR
                             )
                             if new_proxy:
                                 await db.update_account(account_id, {"proxy": new_proxy})

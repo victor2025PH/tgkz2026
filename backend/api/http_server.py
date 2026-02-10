@@ -1007,27 +1007,36 @@ class HttpApiServer:
             return await self._demo_mode_handler(command, payload)
     
     async def _demo_mode_handler(self, command: str, payload: dict) -> dict:
-        """演示模式處理器 - 後端未初始化時使用"""
-        demo_responses = {
-            'get-accounts': {'success': True, 'data': []},
-            'get-initial-state': {
-                'success': True,
-                'data': {
-                    'accounts': [],
-                    'settings': {},
-                    'monitoring_status': False,
-                    'version': '2.1.1'
-                }
-            },
-            'get-api-credentials': {'success': True, 'data': []},
-            'get-monitoring-status': {'success': True, 'data': {'running': False}},
-            'get-settings': {'success': True, 'data': {}},
-            'get-keyword-sets': {'success': True, 'data': []},
-            'get-groups': {'success': True, 'data': []},
+        """🔧 P3-4: 优化的降级处理器 — 尽量从 DB 读取真实数据而非返回空
+        
+        策略：
+        1. 优先尝试直接 DB 读取（get-initial-state, get-keyword-sets, get-groups 等）
+        2. DB 失败时才回退到空数据
+        3. 写操作直接返回 demo_mode 标记
+        """
+        # 🔧 P3-4: 对读取类命令尝试 DB 直接查询
+        db_read_commands = {
+            'get-initial-state': self._demo_get_initial_state,
+            'get-keyword-sets': self._demo_get_keyword_sets,
+            'get-groups': self._demo_get_groups,
+            'get-settings': self._demo_get_settings,
         }
         
-        if command in demo_responses:
-            return demo_responses[command]
+        if command in db_read_commands:
+            try:
+                return await db_read_commands[command]()
+            except Exception as e:
+                logger.warning(f"[DemoMode] DB fallback for {command} failed: {e}")
+        
+        # 静态降级响应
+        static_responses = {
+            'get-accounts': {'success': True, 'data': []},
+            'get-api-credentials': {'success': True, 'data': []},
+            'get-monitoring-status': {'success': True, 'data': {'running': False}},
+        }
+        
+        if command in static_responses:
+            return static_responses[command]
         
         return {
             'success': True,
@@ -1035,6 +1044,36 @@ class HttpApiServer:
             'demo_mode': True,
             'note': 'Backend not fully initialized'
         }
+    
+    async def _demo_get_initial_state(self) -> dict:
+        """降级模式：直接从 DB 读取初始状态"""
+        from database import db
+        accounts = await db.get_all_accounts()
+        return {
+            'success': True,
+            'data': {
+                'accounts': accounts,
+                'settings': {},
+                'monitoring_status': False,
+                'version': '2.1.1'
+            },
+            'demo_mode': True
+        }
+    
+    async def _demo_get_keyword_sets(self) -> dict:
+        from database import db
+        keyword_sets = await db.get_all_keyword_sets()
+        return {'success': True, 'keywordSets': keyword_sets, 'demo_mode': True}
+    
+    async def _demo_get_groups(self) -> dict:
+        from database import db
+        groups = await db.get_all_groups()
+        return {'success': True, 'groups': groups, 'demo_mode': True}
+    
+    async def _demo_get_settings(self) -> dict:
+        from database import db
+        settings = await db.get_all_settings()
+        return {'success': True, 'data': settings, 'demo_mode': True}
     
     def _json_response(self, data: dict, status: int = 200, events: list = None) -> web.Response:
         """
@@ -1159,13 +1198,24 @@ class HttpApiServer:
         except Exception as read_err:
             init_error = f'Error reading init error file: {read_err}'
         
+        # 🔧 P3-3: 读取启动性能指标
+        init_perf = None
+        try:
+            perf_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'backend_init_perf.json')
+            if os.path.exists(perf_path):
+                with open(perf_path, 'r') as f:
+                    init_perf = json.loads(f.read())
+        except Exception:
+            pass
+        
         return self._json_response({
             'deploy_version': deploy_version,
-            'http_server_version': '2026-02-10-p1-fix3',
+            'http_server_version': '2026-02-10-p3',
             'wallet_available': WALLET_MODULE_AVAILABLE,
             'wallet_error': WALLET_IMPORT_ERROR,
             'backend_initialized': self.backend_service is not None,
             'backend_init_error': init_error,
+            'init_performance': init_perf,
         })
     
     async def debug_accounts(self, request):

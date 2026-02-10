@@ -1,11 +1,16 @@
 """
 Phase 9-3: AI generation, local AI, knowledge, collaboration
 Extracted from BackendService in main.py.
+
+🔧 P3-1: 模块级导入清理 — 消除方法内重复导入
 """
+import re
 import sys
 import json
 import time
+import random
 import asyncio
+import traceback
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from text_utils import safe_json_dumps
@@ -18,6 +23,39 @@ def _get_module(name: str):
     """Safe lazy module accessor."""
     from lazy_imports import lazy_imports
     return lazy_imports.get(name)
+
+
+# ====================================================================
+# 🔧 P3-1: 延迟导入获取器 — 避免循环依赖
+# ====================================================================
+
+def _get_ai_auto_chat():
+    """延迟获取 ai_auto_chat 单例"""
+    try:
+        return _get_module('ai_auto_chat').ai_auto_chat
+    except Exception:
+        return None
+
+def _get_telegram_rag():
+    """延迟获取 telegram_rag 单例"""
+    try:
+        return _get_module('telegram_rag_system').telegram_rag
+    except Exception:
+        return None
+
+def _get_KnowledgeType():
+    """延迟获取 KnowledgeType 枚举"""
+    try:
+        return _get_module('telegram_rag_system').KnowledgeType
+    except Exception:
+        return None
+
+def _get_group_search_service():
+    """延迟获取 group_search_service 单例"""
+    try:
+        return _get_module('group_search_service').group_search_service
+    except Exception:
+        return None
 
 class AiServiceMixin:
     """Mixin: AI generation, local AI, knowledge, collaboration"""
@@ -72,8 +110,6 @@ class AiServiceMixin:
         🔧 P0: 增加超時時間到 45 秒
         """
         import aiohttp
-        import sys
-        import time
         
         provider = model.get('provider', '').lower()
         api_key = model.get('apiKey', '')
@@ -298,8 +334,6 @@ class AiServiceMixin:
 
     def _parse_ai_messages(self, content: str, count: int) -> List[str]:
         """解析 AI 返回的消息"""
-        import re
-        
         lines = content.strip().split('\n')
         messages = []
         
@@ -317,8 +351,6 @@ class AiServiceMixin:
 
     def _get_local_message_templates(self, topic: str, style: str, count: int) -> List[str]:
         """獲取本地消息模板（回退方案）"""
-        import random
-        
         style_templates = {
             'friendly': [
                 "{greeting}！我是在群裡看到你的，想認識一下~",
@@ -366,7 +398,6 @@ class AiServiceMixin:
         """
         🆕 處理群聊協作中的消息
         """
-        import sys
         from pyrogram.enums import ChatType
         
         try:
@@ -418,8 +449,8 @@ class AiServiceMixin:
             role_prompt = responding_role.get('prompt', '')
             
             try:
-                # 使用 AI 生成回覆
-                from ai_auto_chat import ai_auto_chat
+                # 使用 AI 生成回覆（🔧 P3-1: 使用模块级延迟导入）
+                ai_auto_chat = _get_ai_auto_chat()
                 
                 # 🆕 P0-2: 搜索知識庫，獲取相關專業內容
                 knowledge_context = ""
@@ -427,7 +458,7 @@ class AiServiceMixin:
                 
                 try:
                     # 方法1: 從 RAG 系統搜索
-                    from telegram_rag_system import telegram_rag
+                    telegram_rag = _get_telegram_rag()
                     if telegram_rag:
                         rag_context = await telegram_rag.build_rag_context(
                             user_message=message_text,
@@ -488,7 +519,6 @@ class AiServiceMixin:
                 
                 if response:
                     # 添加隨機延遲，更自然
-                    import random
                     delay = random.uniform(2, 8)
                     await asyncio.sleep(delay)
                     
@@ -517,7 +547,6 @@ class AiServiceMixin:
                 print(f"[GroupCollab] AI 回覆生成失敗: {ai_err}", file=sys.stderr)
                 
         except Exception as e:
-            import traceback
             print(f"[GroupCollab] 處理群消息失敗: {traceback.format_exc()}", file=sys.stderr)
 
     async def _select_responding_role(
@@ -529,8 +558,6 @@ class AiServiceMixin:
         """
         🆕 P2-1: 選擇合適的角色回覆（避免刷屏）
         """
-        import random
-        
         roles = collab.get('roles', [])
         if not roles:
             return None
@@ -545,7 +572,6 @@ class AiServiceMixin:
         # 4. 不再使用隨機跳過，改為延遲回覆控制頻率
         
         # 🔧 Phase 8: 添加調試日誌
-        import sys
         print(f"[GroupCollab] 🔍 選擇回覆角色: roles={len(roles)}, last_responder={last_responder}", file=sys.stderr)
         
         available_roles = roles.copy()
@@ -589,7 +615,6 @@ class AiServiceMixin:
     async def _call_local_ai(self, endpoint: str, model: str, system_prompt: str, user_message: str) -> str:
         """直接調用本地/遠程 AI API"""
         import aiohttp
-        import time
         import socket
         from urllib.parse import urlparse
         
@@ -723,10 +748,8 @@ class AiServiceMixin:
             print(f"[AI] Network error: {error_msg}", file=sys.stderr)
             raise Exception(f"無法連接到 AI 服務 ({endpoint}): {error_msg}")
         except Exception as e:
-            import traceback
             error_details = traceback.format_exc()
             print(f"[AI] Unexpected error: {error_details}", file=sys.stderr)
-            raise
             raise
 
     async def _execute_ai_group_search(self, strategy: Dict[str, Any]):
@@ -743,9 +766,10 @@ class AiServiceMixin:
                     "message": f"正在搜索關鍵詞: {keyword}..."
                 })
                 
-                # 調用群組搜索服務
+                # 調用群組搜索服務（🔧 P3-1: 延迟导入）
                 try:
-                    results = await group_search_service.search_groups(keyword, limit=10)
+                    group_search_service = _get_group_search_service()
+                    results = await group_search_service.search_groups(keyword, limit=10) if group_search_service else []
                     total_found += len(results) if results else 0
                     
                     self.send_event("ai-execution-stats", {
@@ -777,9 +801,6 @@ class AiServiceMixin:
 
     def _parse_ai_knowledge_response(self, response: str) -> list:
         """解析 AI 生成的知識響應"""
-        import json
-        import re
-        
         try:
             # 嘗試直接解析 JSON
             if '{' in response and '}' in response:
@@ -832,9 +853,6 @@ class AiServiceMixin:
 
     def _parse_rag_knowledge_response(self, response: str) -> list:
         """解析 AI 生成的知識 JSON"""
-        import json
-        import re
-        
         # 🔧 P0 修復：空值檢查，避免 NoneType 錯誤
         if not response:
             print("[RAG] ⚠️ AI 回應為空，跳過解析", file=sys.stderr)
@@ -910,8 +928,6 @@ class AiServiceMixin:
         - faq: 常見問答
         - resource: 資源連結
         """
-        import re
-        
         if not document or len(document.strip()) < 10:
             return []
         
@@ -1088,9 +1104,10 @@ class AiServiceMixin:
         return suggestions.get(industry, ['怎麼購買？', '價格是多少？', '有售後嗎？'])
 
     async def _generate_knowledge_from_guided_answers(self, answers: dict):
-        """根據引導式問答的答案生成知識"""
-        import sys
-        from telegram_rag_system import telegram_rag, KnowledgeType
+        """根據引導式問答的答案生成知識（🔧 P3-1: 模块级延迟导入）"""
+        telegram_rag = _get_telegram_rag()
+        KnowledgeType = _get_KnowledgeType()
+        ai_auto_chat = _get_ai_auto_chat()
         
         try:
             industry = answers.get('step1', 'other')
@@ -1199,7 +1216,6 @@ class AiServiceMixin:
             self.send_log(f"🧠 引導式構建完成，共 {total_items} 條知識", "success")
             
         except Exception as e:
-            import traceback
             traceback.print_exc(file=sys.stderr)
             self.send_event("rag-build-complete", {
                 "success": False,

@@ -22,6 +22,30 @@ def _get_module(name: str):
     from lazy_imports import lazy_imports
     return lazy_imports.get(name)
 
+
+# ====================================================================
+# 🔧 P3-1: 延迟获取器 — 从 main.py 拆分后遗漏的全局引用
+# ====================================================================
+
+def _get_WarmupManager():
+    try:
+        return _get_module('warmup_manager').WarmupManager
+    except Exception:
+        return None
+
+def _get_RecoveryAction():
+    try:
+        return _get_module('error_recovery_manager').RecoveryAction
+    except Exception:
+        return None
+
+def _get_RotationReason():
+    try:
+        return _get_module('proxy_rotation_manager').RotationReason
+    except Exception:
+        return None
+
+
 class SendQueueMixin:
     """Mixin: Message queue, send callbacks, partial updates"""
 
@@ -55,7 +79,11 @@ class SendQueueMixin:
                 message_type = "active"  # Could be "reply_only" if replying to a message
                 
                 # Check if sending is allowed
-                warmup_check = WarmupManager.should_allow_send(account, message_type)
+                WarmupManager = _get_WarmupManager()
+                if not WarmupManager:
+                    warmup_check = {'allowed': True}
+                else:
+                    warmup_check = WarmupManager.should_allow_send(account, message_type)
                 
                 if not warmup_check.get('allowed'):
                     reason = warmup_check.get('reason', 'Unknown reason')
@@ -158,7 +186,7 @@ class SendQueueMixin:
                                     new_proxy = await self.proxy_rotation_manager.rotate_proxy(
                                         account_id=account_id,
                                         phone=phone,
-                                        reason=get_RotationReason().ERROR,
+                                        reason=_get_RotationReason().ERROR,
                                         preferred_country=account.get('proxyCountry')
                                     )
                                     if new_proxy and new_proxy != current_proxy:
@@ -191,7 +219,8 @@ class SendQueueMixin:
                         # 记录恢复结果
                         if recovery_result.success:
                             self.error_recovery_manager.record_recovery_success(str(account_id), recovery_result.action_taken)
-                            if recovery_result.action_taken != RecoveryAction.RETRY:
+                            RecoveryAction = _get_RecoveryAction()
+                            if RecoveryAction and recovery_result.action_taken != RecoveryAction.RETRY:
                                 self.send_log(f"账户 {phone} 错误恢复成功: {recovery_result.message}", "info")
                         else:
                             self.error_recovery_manager.record_recovery_failure(str(account_id), recovery_result.action_taken)

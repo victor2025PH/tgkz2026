@@ -164,6 +164,129 @@ COMMON_SCHEMAS = {
             "accounts_limit": {"type": "integer"},
             "messages_sent": {"type": "integer"}
         }
+    },
+    # P12-3: 高频端点 Schema 增强
+    "Wallet": {
+        "type": "object",
+        "properties": {
+            "user_id": {"type": "string"},
+            "balance": {"type": "number", "format": "float", "description": "可用餘額"},
+            "frozen_balance": {"type": "number", "format": "float", "description": "凍結餘額"},
+            "total_recharged": {"type": "number", "format": "float"},
+            "total_consumed": {"type": "number", "format": "float"},
+            "currency": {"type": "string", "default": "CNY"},
+            "status": {"type": "string", "enum": ["active", "frozen", "disabled"]},
+            "created_at": {"type": "string", "format": "date-time"},
+            "updated_at": {"type": "string", "format": "date-time"}
+        }
+    },
+    "Transaction": {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "user_id": {"type": "string"},
+            "type": {"type": "string", "enum": ["recharge", "consume", "refund", "withdraw", "adjust", "reward"]},
+            "amount": {"type": "number", "format": "float"},
+            "balance_after": {"type": "number", "format": "float"},
+            "description": {"type": "string"},
+            "reference_no": {"type": "string"},
+            "created_at": {"type": "string", "format": "date-time"}
+        }
+    },
+    "RechargeOrder": {
+        "type": "object",
+        "properties": {
+            "order_no": {"type": "string"},
+            "user_id": {"type": "string"},
+            "amount": {"type": "number", "format": "float"},
+            "status": {"type": "string", "enum": ["pending", "paid", "confirmed", "cancelled", "expired"]},
+            "payment_method": {"type": "string"},
+            "created_at": {"type": "string", "format": "date-time"},
+            "paid_at": {"type": "string", "format": "date-time", "nullable": True}
+        }
+    },
+    "AdminUser": {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "email": {"type": "string", "format": "email"},
+            "username": {"type": "string"},
+            "subscription_tier": {"type": "string", "enum": ["free", "basic", "pro", "enterprise"]},
+            "is_banned": {"type": "boolean"},
+            "expires_at": {"type": "string", "format": "date-time", "nullable": True},
+            "accounts_count": {"type": "integer"},
+            "last_login": {"type": "string", "format": "date-time", "nullable": True}
+        }
+    },
+    "HealthStatus": {
+        "type": "object",
+        "properties": {
+            "status": {"type": "string", "enum": ["ok", "degraded", "unhealthy"]},
+            "service": {"type": "string"},
+            "version": {"type": "string"},
+            "timestamp": {"type": "string", "format": "date-time"},
+            "backend_ready": {"type": "boolean"},
+            "wallet_module": {"type": "boolean"},
+            "migration": {"type": "object", "nullable": True}
+        }
+    },
+    "BatchOperation": {
+        "type": "object",
+        "required": ["action", "account_id"],
+        "properties": {
+            "action": {"type": "string", "enum": ["delete", "login", "logout", "update_status"]},
+            "account_id": {"type": "string"},
+            "status": {"type": "string", "description": "用於 update_status 操作"}
+        }
+    },
+    "BatchResult": {
+        "type": "object",
+        "properties": {
+            "total": {"type": "integer"},
+            "succeeded": {"type": "integer"},
+            "failed": {"type": "integer"},
+            "results": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "account_id": {"type": "string"},
+                        "action": {"type": "string"},
+                        "success": {"type": "boolean"},
+                        "error": {"type": "string", "nullable": True}
+                    }
+                }
+            }
+        }
+    },
+    "Keyword": {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "keywords": {"type": "array", "items": {"type": "string"}},
+            "name": {"type": "string"},
+            "is_active": {"type": "boolean"},
+            "created_at": {"type": "string", "format": "date-time"}
+        }
+    },
+    "Group": {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "title": {"type": "string"},
+            "chat_id": {"type": "string"},
+            "member_count": {"type": "integer"},
+            "is_active": {"type": "boolean"}
+        }
+    },
+    "TokenPair": {
+        "type": "object",
+        "properties": {
+            "access_token": {"type": "string", "description": "JWT access token (短期)"},
+            "refresh_token": {"type": "string", "description": "Refresh token (長期)"},
+            "token_type": {"type": "string", "default": "Bearer"},
+            "expires_in": {"type": "integer", "description": "過期時間（秒）"}
+        }
     }
 }
 
@@ -426,6 +549,279 @@ API_PATHS = {
         }
     },
     
+    # ==================== 錢包 (P12-3) ====================
+    "/api/wallet": {
+        "get": {
+            "tags": ["錢包"],
+            "summary": "獲取錢包信息",
+            "security": [{"BearerAuth": []}],
+            "responses": {
+                "200": {
+                    "description": "成功",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "success": {"type": "boolean"},
+                                    "data": {"$ref": "#/components/schemas/Wallet"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "401": {"$ref": "#/components/responses/Unauthorized"}
+            }
+        }
+    },
+    "/api/wallet/transactions": {
+        "get": {
+            "tags": ["錢包"],
+            "summary": "獲取交易記錄",
+            "security": [{"BearerAuth": []}],
+            "parameters": [
+                {"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}},
+                {"name": "page_size", "in": "query", "schema": {"type": "integer", "default": 20, "maximum": 100}},
+                {"name": "type", "in": "query", "schema": {"type": "string", "enum": ["recharge", "consume", "refund", "withdraw"]}}
+            ],
+            "responses": {
+                "200": {
+                    "description": "成功",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "success": {"type": "boolean"},
+                                    "data": {
+                                        "type": "array",
+                                        "items": {"$ref": "#/components/schemas/Transaction"}
+                                    },
+                                    "total": {"type": "integer"},
+                                    "page": {"type": "integer"}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "/api/wallet/recharge/create": {
+        "post": {
+            "tags": ["錢包"],
+            "summary": "創建充值訂單",
+            "security": [{"BearerAuth": []}],
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["amount", "payment_method"],
+                            "properties": {
+                                "amount": {"type": "number", "minimum": 1, "description": "充值金額"},
+                                "payment_method": {"type": "string", "enum": ["usdt_trc20", "usdt_erc20", "alipay", "wechat"]},
+                                "package_id": {"type": "string", "description": "套餐 ID（可選）"}
+                            }
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "200": {
+                    "description": "訂單創建成功",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "success": {"type": "boolean"},
+                                    "data": {"$ref": "#/components/schemas/RechargeOrder"}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+
+    # ==================== 批量操作 (P12-3) ====================
+    "/api/v1/accounts/batch": {
+        "post": {
+            "tags": ["帳號管理"],
+            "summary": "批量帳號操作",
+            "description": "批量執行帳號操作（最多 50 個）",
+            "security": [{"BearerAuth": []}],
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["operations"],
+                            "properties": {
+                                "operations": {
+                                    "type": "array",
+                                    "items": {"$ref": "#/components/schemas/BatchOperation"},
+                                    "maxItems": 50
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "200": {
+                    "description": "批量操作結果",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "success": {"type": "boolean"},
+                                    "data": {"$ref": "#/components/schemas/BatchResult"}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+
+    # ==================== 管理後台 (P12-3) ====================
+    "/api/admin/login": {
+        "post": {
+            "tags": ["管理後台"],
+            "summary": "管理員登入",
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["username", "password"],
+                            "properties": {
+                                "username": {"type": "string"},
+                                "password": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "200": {
+                    "description": "登入成功",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "success": {"type": "boolean"},
+                                    "token": {"type": "string"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "401": {"$ref": "#/components/responses/Unauthorized"}
+            }
+        }
+    },
+    "/api/admin/users": {
+        "get": {
+            "tags": ["管理後台"],
+            "summary": "獲取用戶列表",
+            "security": [{"BearerAuth": []}],
+            "parameters": [
+                {"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}},
+                {"name": "page_size", "in": "query", "schema": {"type": "integer", "default": 20}},
+                {"name": "search", "in": "query", "schema": {"type": "string"}},
+                {"name": "tier", "in": "query", "schema": {"type": "string", "enum": ["free", "basic", "pro", "enterprise"]}}
+            ],
+            "responses": {
+                "200": {
+                    "description": "成功",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "success": {"type": "boolean"},
+                                    "data": {
+                                        "type": "array",
+                                        "items": {"$ref": "#/components/schemas/AdminUser"}
+                                    },
+                                    "total": {"type": "integer"}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+
+    # ==================== Token 刷新 (P12-3) ====================
+    "/api/v1/auth/refresh": {
+        "post": {
+            "tags": ["認證"],
+            "summary": "刷新令牌",
+            "description": "使用 refresh_token 獲取新的 access_token",
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["refresh_token"],
+                            "properties": {
+                                "refresh_token": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "200": {
+                    "description": "刷新成功",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "success": {"type": "boolean"},
+                                    "data": {"$ref": "#/components/schemas/TokenPair"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "401": {"$ref": "#/components/responses/Unauthorized"}
+            }
+        }
+    },
+
+    # ==================== 健康檢查 (P12-3 增強) ====================
+    "/api/health": {
+        "get": {
+            "tags": ["健康檢查"],
+            "summary": "基礎健康檢查",
+            "responses": {
+                "200": {
+                    "description": "服務正常",
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/HealthStatus"}
+                        }
+                    }
+                }
+            }
+        }
+    },
+
     # ==================== 系統 ====================
     "/api/v1/system/health": {
         "get": {

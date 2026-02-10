@@ -136,6 +136,12 @@ jobs:
           "
         continue-on-error: true
 
+      - name: Mixin structural integrity (P12-2)
+        run: |
+          export PYTHONPATH="${GITHUB_WORKSPACE}/backend"
+          cd backend
+          python -m pytest tests/test_mixin_integrity.py -v --tb=short
+
       - name: Performance baseline check
         run: |
           export PYTHONPATH="${GITHUB_WORKSPACE}/backend"
@@ -170,19 +176,22 @@ jobs:
               print(f'HttpApiServer import failed: {e}')
               sys.exit(1)
 
-          # Mixin verification (P11-1: 6 mixins)
+          # Mixin verification (P12-1: 6 mixins + admin_module_routes)
           from api.auth_routes_mixin import AuthRoutesMixin
           from api.quota_routes_mixin import QuotaRoutesMixin
           from api.payment_routes_mixin import PaymentRoutesMixin
           from api.admin_routes_mixin import AdminRoutesMixin
           from api.business_routes_mixin import BusinessRoutesMixin
           from api.system_routes_mixin import SystemRoutesMixin
+          from api.admin_module_routes import register_admin_module_routes
 
           # Verify MRO
           for mixin in [AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
                         AdminRoutesMixin, BusinessRoutesMixin, SystemRoutesMixin]:
               assert issubclass(HttpApiServer, mixin), f'MRO: {mixin.__name__} missing'
           print(f'PASS: HttpApiServer MRO includes all 6 mixins')
+          assert callable(register_admin_module_routes), 'admin_module_routes not callable'
+          print('PASS: admin_module_routes import OK')
 
           # Method count check
           auth_m = [m for m in dir(AuthRoutesMixin) if not m.startswith('_')]

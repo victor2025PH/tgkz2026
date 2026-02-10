@@ -1007,3 +1007,243 @@ class SystemRoutesMixin:
             logger.error(f"Get system info error: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
 
+    # ==================== P12-1: Debug/Diagnostic Methods ====================
+
+    def _get_wallet_vars(self):
+        """P12-1: 安全获取 wallet 模块级变量（避免循环导入）"""
+        try:
+            import importlib
+            mod = importlib.import_module('api.http_server')
+            return (
+                getattr(mod, 'WALLET_MODULE_AVAILABLE', False),
+                getattr(mod, 'WALLET_IMPORT_ERROR', None)
+            )
+        except Exception:
+            return False, None
+
+    async def debug_modules(self, request):
+        """診斷模塊狀態"""
+        import os
+        import sys
+        
+        WALLET_MODULE_AVAILABLE, WALLET_IMPORT_ERROR = self._get_wallet_vars()
+        
+        # 檢查 wallet 目錄
+        wallet_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'wallet')
+        wallet_exists = os.path.exists(wallet_path)
+        wallet_files = os.listdir(wallet_path) if wallet_exists else []
+        
+        return self._json_response({
+            'wallet_module_available': WALLET_MODULE_AVAILABLE,
+            'wallet_import_error': WALLET_IMPORT_ERROR,
+            'wallet_path': wallet_path,
+            'wallet_exists': wallet_exists,
+            'wallet_files': wallet_files[:20],
+            'python_path': sys.path[:5],
+            'cwd': os.getcwd()
+        })
+
+    async def debug_deploy(self, request):
+        """部署診斷"""
+        import os
+        
+        WALLET_MODULE_AVAILABLE, WALLET_IMPORT_ERROR = self._get_wallet_vars()
+        
+        deploy_version = "unknown"
+        try:
+            from deploy_test import DEPLOY_VERSION
+            deploy_version = DEPLOY_VERSION
+        except:
+            pass
+        
+        # 🔧 P1: 從文件讀取初始化錯誤
+        init_error = None
+        try:
+            error_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'backend_init_error.json')
+            if os.path.exists(error_path):
+                with open(error_path, 'r') as f:
+                    init_error = json.loads(f.read())
+        except Exception as read_err:
+            init_error = f'Error reading init error file: {read_err}'
+        
+        # 🔧 P3-3: 读取启动性能指标
+        init_perf = None
+        try:
+            perf_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'backend_init_perf.json')
+            if os.path.exists(perf_path):
+                with open(perf_path, 'r') as f:
+                    init_perf = json.loads(f.read())
+        except Exception:
+            pass
+        
+        return self._json_response({
+            'deploy_version': deploy_version,
+            'http_server_version': '2026-02-10-p3',
+            'wallet_available': WALLET_MODULE_AVAILABLE,
+            'wallet_error': WALLET_IMPORT_ERROR,
+            'backend_initialized': self.backend_service is not None,
+            'backend_init_error': init_error,
+            'init_performance': init_perf,
+        })
+
+    async def debug_accounts(self, request):
+        """🔧 P1: 帳號診斷端點 —— 深度檢測帳號加載鏈路"""
+        import os
+        import sys
+        from pathlib import Path
+        
+        diag = {
+            'timestamp': datetime.now().isoformat(),
+            'checks': {},
+            'errors': [],
+        }
+        
+        # 1. 檢查 config 導入
+        try:
+            from config import DATABASE_PATH, DATABASE_DIR
+            diag['checks']['config_import'] = 'OK'
+            diag['checks']['DATABASE_PATH'] = str(DATABASE_PATH)
+            diag['checks']['DATABASE_DIR'] = str(DATABASE_DIR)
+            diag['checks']['db_file_exists'] = DATABASE_PATH.exists()
+        except Exception as e:
+            diag['checks']['config_import'] = f'FAIL: {e}'
+            diag['errors'].append(f'config import: {e}')
+        
+        # 2. 檢查 account_mixin 導入
+        try:
+            from db.account_mixin import AccountMixin, ACCOUNTS_DB_PATH, HAS_AIOSQLITE
+            diag['checks']['account_mixin_import'] = 'OK'
+            diag['checks']['ACCOUNTS_DB_PATH'] = str(ACCOUNTS_DB_PATH)
+            diag['checks']['HAS_AIOSQLITE'] = HAS_AIOSQLITE
+            diag['checks']['accounts_db_exists'] = ACCOUNTS_DB_PATH.exists()
+        except Exception as e:
+            diag['checks']['account_mixin_import'] = f'FAIL: {e}'
+            diag['errors'].append(f'account_mixin import: {e}')
+        
+        # 3. 檢查 database.db 實例
+        try:
+            from database import db
+            diag['checks']['database_db_import'] = 'OK'
+            diag['checks']['db_type'] = type(db).__name__
+            diag['checks']['db_mro'] = [c.__name__ for c in type(db).__mro__[:8]]
+            diag['checks']['has_get_all_accounts'] = hasattr(db, 'get_all_accounts')
+        except Exception as e:
+            diag['checks']['database_db_import'] = f'FAIL: {e}'
+            diag['errors'].append(f'database db import: {e}')
+        
+        # 4. 直接查詢數據庫
+        try:
+            import sqlite3 as _sqlite3
+            from config import DATABASE_PATH as _db_path
+            if _db_path.exists():
+                conn = _sqlite3.connect(str(_db_path))
+                cursor = conn.cursor()
+                
+                # 檢查 accounts 表是否存在
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='accounts'")
+                table_exists = cursor.fetchone() is not None
+                diag['checks']['accounts_table_exists'] = table_exists
+                
+                if table_exists:
+                    # 檢查欄位
+                    cursor.execute("PRAGMA table_info(accounts)")
+                    columns = [row[1] for row in cursor.fetchall()]
+                    diag['checks']['accounts_columns'] = columns
+                    diag['checks']['has_owner_user_id_column'] = 'owner_user_id' in columns
+                    
+                    # 計數
+                    cursor.execute("SELECT COUNT(*) FROM accounts")
+                    total = cursor.fetchone()[0]
+                    diag['checks']['total_accounts'] = total
+                    
+                    # 按狀態統計
+                    cursor.execute("SELECT status, COUNT(*) FROM accounts GROUP BY status")
+                    status_counts = {row[0] or 'NULL': row[1] for row in cursor.fetchall()}
+                    diag['checks']['accounts_by_status'] = status_counts
+                    
+                    # owner_user_id 分佈
+                    if 'owner_user_id' in columns:
+                        cursor.execute("SELECT owner_user_id, COUNT(*) FROM accounts GROUP BY owner_user_id")
+                        owner_counts = {str(row[0] or 'NULL'): row[1] for row in cursor.fetchall()}
+                        diag['checks']['accounts_by_owner'] = owner_counts
+                
+                conn.close()
+            else:
+                diag['checks']['accounts_table_exists'] = False
+                diag['errors'].append(f'DB file not found: {_db_path}')
+        except Exception as e:
+            diag['checks']['direct_query'] = f'FAIL: {e}'
+            diag['errors'].append(f'direct query: {e}')
+        
+        # 5. 嘗試通過 db 實例獲取帳號
+        try:
+            from database import db as _db
+            accounts = await _db.get_all_accounts()
+            diag['checks']['db_get_all_accounts'] = f'OK, returned {len(accounts)} accounts'
+            if accounts:
+                diag['checks']['first_account_keys'] = list(accounts[0].keys())[:15]
+        except Exception as e:
+            diag['checks']['db_get_all_accounts'] = f'FAIL: {e}'
+            diag['errors'].append(f'db.get_all_accounts(): {e}')
+        
+        # 6. 檢查租戶上下文
+        try:
+            from core.tenant_context import get_current_tenant
+            tenant = get_current_tenant()
+            diag['checks']['tenant_context'] = {
+                'available': tenant is not None,
+                'user_id': tenant.user_id if tenant else None,
+            }
+        except ImportError:
+            diag['checks']['tenant_context'] = 'tenant_context module not available'
+        except Exception as e:
+            diag['checks']['tenant_context'] = f'Error: {e}'
+        
+        # 7. 環境變量
+        diag['checks']['env'] = {
+            'ELECTRON_MODE': os.environ.get('ELECTRON_MODE', 'NOT SET'),
+            'DATABASE_PATH_ENV': os.environ.get('DATABASE_PATH', 'NOT SET'),
+            'TG_DATA_DIR': os.environ.get('TG_DATA_DIR', 'NOT SET'),
+            'PYTHONPATH': os.environ.get('PYTHONPATH', 'NOT SET'),
+            'PWD': os.getcwd(),
+        }
+        
+        # 8. 模擬帶 owner_user_id 的查詢
+        try:
+            from database import db as _db2
+            # 使用查到的 owner_user_id 進行過濾測試
+            if 'accounts_by_owner' in diag.get('checks', {}):
+                for owner_id in diag['checks']['accounts_by_owner']:
+                    if owner_id and owner_id != 'NULL':
+                        filtered = await _db2.get_all_accounts(owner_user_id=owner_id)
+                        diag['checks'][f'filtered_accounts_{owner_id[:8]}'] = len(filtered)
+        except Exception as e:
+            diag['checks']['filtered_query'] = f'Error: {e}'
+        
+        # 9. 直接測試 handle_get_accounts（模擬實際請求路徑）
+        try:
+            if self.backend_service:
+                result = await self.backend_service.handle_command('get-accounts', {})
+                if result:
+                    diag['checks']['handle_command_result'] = {
+                        'success': result.get('success'),
+                        'accounts_count': len(result.get('accounts', [])),
+                        'error': result.get('error'),
+                    }
+                else:
+                    diag['checks']['handle_command_result'] = 'returned None'
+            else:
+                diag['checks']['handle_command_result'] = 'backend_service not initialized'
+        except Exception as e:
+            diag['checks']['handle_command_result'] = f'Error: {e}'
+            diag['errors'].append(f'handle_command: {e}')
+        
+        # 10. 後端服務狀態
+        diag['checks']['backend_service_status'] = {
+            'initialized': self.backend_service is not None,
+            'type': type(self.backend_service).__name__ if self.backend_service else None,
+        }
+        
+        diag['summary'] = 'ALL OK' if not diag['errors'] else f'{len(diag["errors"])} errors found'
+        
+        return self._json_response(diag)

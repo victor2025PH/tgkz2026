@@ -144,11 +144,17 @@ if admin_token:
     if stats:
         print(f'    -> Users: {stats.get("totalUsers", "?")}, Paid: {stats.get("paidUsers", "?")}')
     
-    # Admin users list
+    # Admin users list (supports both formats: data=[] or data={users:[]})
     code, data = api_get('/api/admin/users', admin_token)
     if code == 200:
-        users = data.get('data', [])
-        check('Admin users list', isinstance(users, list))
+        raw = data.get('data', [])
+        if isinstance(raw, list):
+            users = raw
+        elif isinstance(raw, dict):
+            users = raw.get('users', [])
+        else:
+            users = []
+        check('Admin users list', isinstance(users, list) and len(users) > 0)
         print(f'    -> Found {len(users)} user(s)')
     else:
         check('Admin users list', False, f'HTTP {code}')

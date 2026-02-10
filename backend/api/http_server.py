@@ -1149,11 +1149,21 @@ class HttpApiServer:
         except:
             pass
         
+        # 🔧 P1: 包含初始化錯誤信息
+        init_error = None
+        try:
+            from web_server import _backend_init_error
+            init_error = _backend_init_error
+        except:
+            pass
+        
         return self._json_response({
             'deploy_version': deploy_version,
-            'http_server_version': '2026-02-10-p1',
+            'http_server_version': '2026-02-10-p1-fix3',
             'wallet_available': WALLET_MODULE_AVAILABLE,
-            'wallet_error': WALLET_IMPORT_ERROR
+            'wallet_error': WALLET_IMPORT_ERROR,
+            'backend_initialized': self.backend_service is not None,
+            'backend_init_error': init_error,
         })
     
     async def debug_accounts(self, request):

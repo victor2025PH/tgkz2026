@@ -38,20 +38,34 @@ async def init_backend():
     except Exception as e:
         logger.warning(f"⚠️ Auth service init warning: {e}")
     
+    # 🔧 P1: 記錄初始化錯誤供診斷端點查詢
+    global _backend_init_error
+    _backend_init_error = None
+    
     try:
+        logger.info("📦 Step 1: Importing BackendService...")
         from main import BackendService
-        logger.info("📦 BackendService imported successfully")
+        logger.info("📦 Step 2: BackendService imported, creating instance...")
         backend = BackendService()
-        logger.info("📦 BackendService instance created, starting initialize()...")
+        logger.info("📦 Step 3: BackendService instance created, calling initialize()...")
         await backend.initialize()
-        logger.info("✅ Backend service initialized")
+        logger.info("✅ Step 4: Backend service FULLY initialized")
         return backend
     except Exception as e:
         import traceback
+        error_detail = traceback.format_exc()
+        _backend_init_error = {
+            'error': str(e),
+            'type': type(e).__name__,
+            'traceback': error_detail
+        }
         logger.error(f"❌ Backend initialization FAILED: {e}")
-        logger.error(f"❌ Traceback:\n{traceback.format_exc()}")
+        logger.error(f"❌ Traceback:\n{error_detail}")
         logger.warning("⚠️ Running in DEMO MODE — accounts and all commands will return empty data!")
         return None
+
+# 模塊級變量存儲初始化錯誤
+_backend_init_error = None
 
 
 async def main():

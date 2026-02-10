@@ -47,6 +47,14 @@ async def init_backend():
         logger.info("📦 Step 3: BackendService instance created, calling initialize()...")
         await backend.initialize()
         logger.info("✅ Step 4: Backend service FULLY initialized")
+        # 初始化成功，清理旧的错误文件
+        try:
+            error_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'backend_init_error.json')
+            if os.path.exists(error_path):
+                os.remove(error_path)
+                logger.info("🧹 Cleaned up old init error file")
+        except Exception:
+            pass
         return backend
     except Exception as e:
         import traceback

@@ -20,7 +20,7 @@ class KeywordGroupMixin:
     async def _ensure_keyword_tables(self):
         """確保關鍵詞相關表存在（只執行一次）"""
         # 🔧 性能優化：如果已初始化，直接返回
-        if Database._keyword_tables_initialized:
+        if KeywordGroupMixin._keyword_tables_initialized:
             return
         
         try:
@@ -329,19 +329,19 @@ class KeywordGroupMixin:
                 pass  # 索引可能已存在
             
             # 🔧 性能優化：標記為已初始化
-            Database._keyword_tables_initialized = True
+            KeywordGroupMixin._keyword_tables_initialized = True
             
         except Exception as e:
             print(f"Error creating keyword tables: {e}")
             # 即使出錯也標記為已嘗試，避免重複嘗試
-            Database._keyword_tables_initialized = True
+            KeywordGroupMixin._keyword_tables_initialized = True
     
     # 🆕 知識庫表初始化標誌
     _knowledge_tables_initialized = False
     
     async def _ensure_knowledge_tables(self):
         """🆕 確保知識庫相關表存在（只執行一次）"""
-        if Database._knowledge_tables_initialized:
+        if KeywordGroupMixin._knowledge_tables_initialized:
             return
         
         try:
@@ -390,12 +390,12 @@ class KeywordGroupMixin:
             await self.execute('CREATE INDEX IF NOT EXISTS idx_conv_eff_user ON conversation_effectiveness(user_id)')
             await self.execute('CREATE INDEX IF NOT EXISTS idx_conv_eff_learned ON conversation_effectiveness(learned)')
             
-            Database._knowledge_tables_initialized = True
+            KeywordGroupMixin._knowledge_tables_initialized = True
             print("[Database] ✓ Knowledge tables created/verified", file=sys.stderr)
             
         except Exception as e:
             print(f"[Database] Error creating knowledge tables: {e}", file=sys.stderr)
-            Database._knowledge_tables_initialized = True
+            KeywordGroupMixin._knowledge_tables_initialized = True
     
     async def add_keyword_set(self, name: str, description: str = '') -> int:
         """添加關鍵詞集

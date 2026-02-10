@@ -89,59 +89,35 @@ jobs:
             docker-compose.yml nginx.conf \
             deploy-server:${{ env.DEPLOY_PATH }}/
       
-      - name: Rebuild and restart services
+      - name: Build and deploy container
         run: |
           ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 deploy-server << 'ENDSSH'
-            cd /opt/tg-matrix
-            
-            # 🔧 清理孤儿容器防止名称冲突
-            sudo docker compose down --remove-orphans api 2>/dev/null || true
-            sudo docker rm -f $(sudo docker ps -aq --filter "name=tg-matrix-api") 2>/dev/null || true
-            
-            # 🔧 P8-3: 部署前显式执行迁移（容器内）
-            echo "📦 Pre-deploy: Running database migrations..."
-            sudo docker compose run --rm --no-deps api python -c "
-            import asyncio, sys
-            sys.path.insert(0, '/app/backend')
-            async def run_migrations():
-                try:
-                    from database import db
-                    from pathlib import Path
-                    from migrations.migration_manager import init_migration_manager, get_migration_manager
-                    await db.connect()
-                    init_migration_manager(db, Path('/app/backend/migrations'))
-                    mgr = get_migration_manager()
-                    if mgr:
-                        await mgr.initialize()
-                        ver = await mgr.get_current_version()
-                        pending = await mgr.get_pending_migrations()
-                        print(f'DB version: {ver}, pending: {len(pending)}')
-                        if pending:
-                            ok = await mgr.migrate()
-                            new_ver = await mgr.get_current_version()
-                            print(f'Migrated: v{ver} -> v{new_ver}, success={ok}')
-                        else:
-                            print('Database is up to date')
-                except Exception as e:
-                    print(f'Migration warning (non-fatal): {e}', file=sys.stderr)
-            asyncio.run(run_migrations())
-            " 2>&1 || echo "⚠️ Migration step had issues (non-fatal)"
-            
-            # 重建 API 容器（确保使用新代码）
-            sudo docker compose build --no-cache api
-            
-            # 重启 API 容器
-            sudo docker compose up -d api
-            
-            # 等待启动
-            sleep 10
-            
-            # 重载 nginx 配置
-            sudo docker compose exec -T web nginx -s reload || true
-            
-            # 显示状态
-            sudo docker compose ps
-            echo "✅ Backend deployment completed at $(date)"
+          set -x
+          cd /opt/tg-matrix
+
+          # 重建 API 容器（确保使用新代码）
+          echo "🔨 Building API container..."
+          sudo docker compose build --no-cache api
+
+          # 停止旧容器
+          echo "🔄 Stopping old container..."
+          sudo docker compose down --remove-orphans api 2>/dev/null || true
+          sudo docker rm -f $(sudo docker ps -aq --filter "name=tg-matrix-api") 2>/dev/null || true
+
+          # 启动新容器
+          echo "🚀 Starting new container..."
+          sudo docker compose up -d api
+
+          # 等待启动
+          sleep 15
+
+          # 重载 nginx 配置
+          sudo docker compose exec -T web nginx -s reload || true
+
+          # 显示状态
+          sudo docker compose ps
+          sudo docker compose logs --tail=30 api 2>&1 || true
+          echo "✅ Backend deployment completed at $(date)"
           ENDSSH
       
       - name: Health check with migration verification

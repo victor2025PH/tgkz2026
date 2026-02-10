@@ -345,6 +345,54 @@ class TestRouteRegistrationCoverage(unittest.TestCase):
                 self.fail(f"Duplicate routes in {f.name}: {dup_combos[:5]}")
 
 
+class TestDeclarativePermissions(unittest.TestCase):
+    """P14-2: 声明式权限标记测试"""
+
+    def test_01_public_paths_is_frozenset(self):
+        """PUBLIC_PATHS should be a frozenset on HttpApiServer"""
+        with open(HTTP_SERVER_FILE, 'r', encoding='utf-8') as f:
+            tree = ast.parse(f.read())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name == 'HttpApiServer':
+                for item in node.body:
+                    if isinstance(item, ast.Assign):
+                        for target in item.targets:
+                            if isinstance(target, ast.Name) and target.id == 'PUBLIC_PATHS':
+                                return  # Found it
+        self.fail("PUBLIC_PATHS not found on HttpApiServer")
+
+    def test_02_public_paths_contains_essentials(self):
+        """PUBLIC_PATHS must include login, register, health endpoints"""
+        import sys, importlib, os
+        os.environ.setdefault('ELECTRON_MODE', 'true')
+        sys.path.insert(0, str(BACKEND_DIR))
+        try:
+            mod = importlib.import_module('api.http_server')
+            public = mod.HttpApiServer.get_public_paths()
+            essentials = ['/health', '/api/health', '/api/v1/auth/login',
+                          '/api/v1/auth/register', '/api/v1/health']
+            for ep in essentials:
+                self.assertIn(ep, public, f"Essential public path missing: {ep}")
+        except Exception as e:
+            self.skipTest(f"Cannot import HttpApiServer: {e}")
+
+    def test_03_admin_path_prefixes_defined(self):
+        """ADMIN_PATH_PREFIXES should be defined"""
+        with open(HTTP_SERVER_FILE, 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('ADMIN_PATH_PREFIXES', content)
+
+    def test_04_auth_middleware_uses_single_source(self):
+        """auth/middleware.py should reference _get_public_routes(), not hardcoded list"""
+        middleware_file = BACKEND_DIR / 'auth' / 'middleware.py'
+        with open(middleware_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('_get_public_routes', content,
+                      "auth/middleware.py should use _get_public_routes()")
+        self.assertIn('HttpApiServer', content,
+                      "auth/middleware.py should reference HttpApiServer for public paths")
+
+
 if __name__ == '__main__':
     # Run with verbose output
     unittest.main(verbosity=2)

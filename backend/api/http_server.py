@@ -136,14 +136,22 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
             backend_service._http_server = self
     
     def _setup_middleware(self):
-        """設置中間件 — P13-3: 添加性能指標收集"""
-        # P13-3: Performance metrics middleware (always loaded first)
+        """設置中間件 — P13-3: 性能指標, P14-3: 響應緩存"""
+        # P13-3/P14-1: Performance metrics + request tracing (outermost — first in, last out)
         try:
             from api.perf_metrics import create_perf_middleware
             self.app.middlewares.append(create_perf_middleware())
-            logger.info("P13-3: Performance metrics middleware loaded")
+            logger.info("P14-1: Perf metrics + request tracing middleware loaded")
         except Exception as e:
             logger.warning(f"Perf metrics middleware failed: {e}")
+
+        # P14-3: Response cache (before auth — cached public endpoints skip auth)
+        try:
+            from api.response_cache import create_cache_middleware
+            self.app.middlewares.append(create_cache_middleware())
+            logger.info("P14-3: Response cache middleware loaded")
+        except Exception as e:
+            logger.warning(f"Response cache middleware failed: {e}")
 
         # 嘗試使用完整的中間件堆棧
         try:
@@ -460,14 +468,61 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
         ('GET',    '/api/redoc',                       'redoc_ui'),
         ('GET',    '/api/openapi.json',                'openapi_json'),
 
-        # === 性能指標 (P13-3) ===
+        # === 性能指標 (P13-3) / 缓存 (P14-3) ===
         ('GET',    '/api/v1/metrics/api',              'api_perf_metrics'),
+        ('GET',    '/api/v1/metrics/cache',            'api_cache_stats'),
+        ('POST',   '/api/v1/cache/invalidate',         'invalidate_cache'),
 
         # === WebSocket ===
         ('GET',    '/ws',                              'websocket_handler'),
         ('GET',    '/api/v1/ws',                       'websocket_handler'),
         ('GET',    '/ws/login-token/{token}',          'login_token_websocket'),
     ]
+
+    # ==================== P14-2: 声明式权限标记 ====================
+    # 默认: 所有路由需要认证 (auth_required)
+    # PUBLIC_PATHS: 无需认证即可访问
+    # ADMIN_PATHS: 需要管理员权限 (前缀匹配)
+
+    PUBLIC_PATHS = frozenset([
+        # 健康检查 / 基础
+        '/', '/health', '/api/health', '/metrics',
+        '/api/debug/modules', '/api/debug/deploy', '/api/debug/accounts',
+        # 认证 (登录/注册等不需要已登录)
+        '/api/v1/auth/login', '/api/v1/auth/register', '/api/v1/auth/refresh',
+        '/api/v1/auth/forgot-password', '/api/v1/auth/reset-password',
+        '/api/v1/auth/verify-email', '/api/v1/auth/verify-email-code',
+        '/api/v1/auth/reset-password-code', '/api/v1/auth/send-verification',
+        '/api/v1/auth/submit-2fa',
+        # OAuth
+        '/api/oauth/telegram/authorize', '/api/v1/oauth/telegram',
+        '/api/v1/oauth/telegram/authorize', '/api/v1/oauth/telegram/config',
+        '/api/v1/oauth/google', '/api/v1/oauth/google/authorize',
+        '/api/v1/oauth/providers', '/api/v1/oauth/google/callback',
+        # Webhook (外部回调)
+        '/webhook/telegram',
+        # 系统 / 文档
+        '/api/v1/health', '/api/v1/health/live', '/api/v1/health/ready',
+        '/api/v1/health/info', '/api/v1/status',
+        '/api/docs', '/api/redoc', '/api/openapi.json',
+        '/api/v1/metrics/api',
+        '/api/v1/metrics/cache',
+    ])
+
+    ADMIN_PATH_PREFIXES = (
+        '/api/v1/admin/',
+        '/api/admin/',
+    )
+
+    @classmethod
+    def get_public_paths(cls) -> frozenset:
+        """P14-2: 供 auth middleware 获取公开路径（单一数据源）"""
+        return cls.PUBLIC_PATHS
+
+    @classmethod
+    def is_admin_path(cls, path: str) -> bool:
+        """P14-2: 判断是否为管理员路径"""
+        return path.startswith(cls.ADMIN_PATH_PREFIXES)
 
     def _setup_routes(self):
         """P13-2: 声明式路由注册 — 数据驱动替代 9 个过程式 _setup_* 方法"""

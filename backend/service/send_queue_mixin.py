@@ -24,26 +24,28 @@ def _get_module(name: str):
 
 
 # ====================================================================
-# 🔧 P3-1: 延迟获取器 — 从 main.py 拆分后遗漏的全局引用
+# 🔧 P3→P4: 延迟获取器 + 模块级缓存
 # ====================================================================
 
+_cache = {}
+
 def _get_WarmupManager():
-    try:
-        return _get_module('warmup_manager').WarmupManager
-    except Exception:
-        return None
+    if 'WarmupManager' not in _cache:
+        try: _cache['WarmupManager'] = _get_module('warmup_manager').WarmupManager
+        except Exception: _cache['WarmupManager'] = None
+    return _cache['WarmupManager']
 
 def _get_RecoveryAction():
-    try:
-        return _get_module('error_recovery_manager').RecoveryAction
-    except Exception:
-        return None
+    if 'RecoveryAction' not in _cache:
+        try: _cache['RecoveryAction'] = _get_module('error_recovery_manager').RecoveryAction
+        except Exception: _cache['RecoveryAction'] = None
+    return _cache['RecoveryAction']
 
 def _get_RotationReason():
-    try:
-        return _get_module('proxy_rotation_manager').RotationReason
-    except Exception:
-        return None
+    if 'RotationReason' not in _cache:
+        try: _cache['RotationReason'] = _get_module('proxy_rotation_manager').RotationReason
+        except Exception: _cache['RotationReason'] = None
+    return _cache['RotationReason']
 
 
 class SendQueueMixin:
@@ -448,37 +450,7 @@ class SendQueueMixin:
         # 启动后台任务
         task = asyncio.create_task(browsing_task())
         self.background_tasks.append(task)
-        import sys
         print(f"[BehaviorSimulator] Started browsing simulation for account {phone}", file=sys.stderr)
-        
-        # Start background tasks
-        self.background_tasks.append(asyncio.create_task(self.daily_reset_task()))
-        self.background_tasks.append(asyncio.create_task(self.account_health_monitor_task()))
-        self.background_tasks.append(asyncio.create_task(self.queue_cleanup_task()))
-        self.background_tasks.append(asyncio.create_task(self.message_confirmation_timeout_task()))
-        
-        # 同步 API 憑據使用計數
-        try:
-            from api_credential_pool import get_api_credential_pool
-            data_dir = str(Path(config.DATA_PATH))
-            pool = get_api_credential_pool(data_dir)
-            accounts = await db.get_all_accounts()
-            pool.sync_usage_counts(accounts)
-            print(f"[Backend] API credential usage counts synced for {len(accounts)} accounts", file=sys.stderr)
-        except Exception as e:
-            print(f"[Backend] Error syncing API credential usage: {e}", file=sys.stderr)
-        
-        # Log startup
-        await db.add_log("Backend service started", "info")
-        print(safe_json_dumps({
-            "event": "log-entry",
-            "payload": {
-                "id": int(datetime.now().timestamp() * 1000),
-                "timestamp": datetime.now().isoformat() + "Z",
-                "message": "Backend service started",
-                "type": "info"
-            }
-        }), flush=True)
 
     async def send_keyword_sets_update(self):
         """Send only keyword sets update to frontend with deduplication and error handling"""

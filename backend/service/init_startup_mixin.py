@@ -178,68 +178,71 @@ def _get_command_alias_registry():
 COMMAND_ALIAS_REGISTRY = None  # 延遲初始化
 
 # ====================================================================
-# 🔧 P3-1: 延迟获取单例对象（原 main.py 模块级全局变量）
-# 这些在 initialize() 的子初始化方法中被直接引用
+# 🔧 P3→P4: 延迟获取单例 + 模块级缓存
+# 首次调用后缓存，消除 initialize() 多次子调用的重复查找开销
 # ====================================================================
 
+_cache = {}
+
 def _get_auto_funnel():
-    try:
-        return _get_module('auto_funnel').auto_funnel
-    except Exception:
-        return None
+    if 'auto_funnel' not in _cache:
+        try: _cache['auto_funnel'] = _get_module('auto_funnel').auto_funnel
+        except Exception: _cache['auto_funnel'] = None
+    return _cache['auto_funnel']
 
 def _get_ai_auto_chat():
-    try:
-        return _get_module('ai_auto_chat').ai_auto_chat
-    except Exception:
-        return None
+    if 'ai_auto_chat' not in _cache:
+        try: _cache['ai_auto_chat'] = _get_module('ai_auto_chat').ai_auto_chat
+        except Exception: _cache['ai_auto_chat'] = None
+    return _cache['ai_auto_chat']
 
 def _get_vector_memory():
-    try:
-        return _get_module('vector_memory').vector_memory
-    except Exception:
-        return None
+    if 'vector_memory' not in _cache:
+        try: _cache['vector_memory'] = _get_module('vector_memory').vector_memory
+        except Exception: _cache['vector_memory'] = None
+    return _cache['vector_memory']
 
 def _get_scheduler():
-    try:
-        return _get_module('scheduler').scheduler
-    except Exception:
-        return None
+    if 'scheduler' not in _cache:
+        try: _cache['scheduler'] = _get_module('scheduler').scheduler
+        except Exception: _cache['scheduler'] = None
+    return _cache['scheduler']
 
 def _get_MessagePriority():
-    try:
-        return _get_module('message_queue').MessagePriority
-    except Exception:
-        from enum import IntEnum
-        class _FallbackPriority(IntEnum):
-            LOW = 0
-            NORMAL = 1
-            HIGH = 2
-        return _FallbackPriority
+    if 'MessagePriority' not in _cache:
+        try:
+            _cache['MessagePriority'] = _get_module('message_queue').MessagePriority
+        except Exception:
+            from enum import IntEnum
+            class _F(IntEnum):
+                LOW = 0; NORMAL = 1; HIGH = 2
+            _cache['MessagePriority'] = _F
+    return _cache['MessagePriority']
 
 def _get_collaboration_coordinator():
+    # 不缓存 — coordinator 是动态获取的单例
     try:
         return _get_module('collaboration_coordinator').get_collaboration_coordinator()
     except Exception:
         return None
 
 def _get_Anomaly():
-    try:
-        return _get_module('enhanced_health_monitor').Anomaly
-    except Exception:
-        return None
+    if 'Anomaly' not in _cache:
+        try: _cache['Anomaly'] = _get_module('enhanced_health_monitor').Anomaly
+        except Exception: _cache['Anomaly'] = None
+    return _cache['Anomaly']
 
 def _get_RotationReason():
-    try:
-        return _get_module('proxy_rotation_manager').RotationReason
-    except Exception:
-        return None
+    if 'RotationReason' not in _cache:
+        try: _cache['RotationReason'] = _get_module('proxy_rotation_manager').RotationReason
+        except Exception: _cache['RotationReason'] = None
+    return _cache['RotationReason']
 
 def _get_WarmupManager():
-    try:
-        return _get_module('warmup_manager').WarmupManager
-    except Exception:
-        return None
+    if 'WarmupManager' not in _cache:
+        try: _cache['WarmupManager'] = _get_module('warmup_manager').WarmupManager
+        except Exception: _cache['WarmupManager'] = None
+    return _cache['WarmupManager']
 
 
 class InitStartupMixin:

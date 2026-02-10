@@ -33,20 +33,10 @@ from pathlib import Path
 from database import db
 from config import config, IS_DEV_MODE
 from telegram_client import TelegramClientManager
-from message_queue import MessageQueue, MessagePriority
-from error_handler import init_error_handler, handle_error, AppError, ErrorType
-from message_ack import init_ack_manager, get_ack_manager
-from text_utils import safe_json_dumps, sanitize_text, sanitize_dict, format_chat_info, format_user_info
-from cache_manager import init_cache_manager, get_cache_manager
-
-# 第二層：輕量核心工具（約 10MB）
-from validators import (
-    validate_account, validate_keyword, validate_template, 
-    validate_campaign, validate_group_url,
-    AccountValidator, KeywordValidator, TemplateValidator,
-    CampaignValidator, GroupValidator, ValidationError
-)
-from flood_wait_handler import flood_handler, safe_telegram_call
+from message_queue import MessageQueue
+from error_handler import handle_error
+from message_ack import get_ack_manager
+from text_utils import safe_json_dumps, sanitize_dict
 
 # ========== 🔧 以下模塊全部延遲加載 ==========
 # 使用 lazy_imports 管理器進行延遲加載，節省約 300-400MB 內存
@@ -306,8 +296,7 @@ def get_init_db_optimizer():
 def get_init_memory_monitor():
     return _get_module('memory_monitor').init_memory_monitor
 
-def get_init_group_poller():
-    return _get_module('group_message_poller').init_group_poller
+# 🔧 P5-1: 移除了重复的 get_init_group_poller()（已在第 174 行定义）
 
 
 # 類型提示的類獲取器
@@ -394,8 +383,7 @@ def get_ErrorRecoveryManager():
     except:
         return None
 
-RecoveryAction = None
-ErrorCategory = None
+# 🔧 P5-1: 移除了未使用的 RecoveryAction = None, ErrorCategory = None（已由 mixin 延迟获取器处理）
 
 
 # 🆕 Phase 2: 命令路由器整合（延遲檢測）
@@ -1380,10 +1368,6 @@ class BackendService(InitStartupMixin, SendQueueMixin, AiServiceMixin, ConfigExe
                     print(f"[Backend] ⚠ Unknown command: {command} (count: {count})", file=sys.stderr)
                 self.send_log(f"Unknown command: {command}", "warning")
                 return None
-            
-            # 🆕 Phase 7: 舊的 if-elif 鏈（1,370+ 行）已被上方動態機制取代
-            # 所有 452 個命令現在通過 CommandRouter + 動態 getattr 回退處理
-            # 這大幅減少了代碼重複並提高了可維護性
         
         except Exception as e:
             _cmd_success = False

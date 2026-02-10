@@ -16,7 +16,6 @@ TG-AI智控王 數據庫模塊
 """
 
 import sqlite3
-import secrets
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -31,7 +30,7 @@ except ImportError:
     aiosqlite = None
 
 # 🆕 從 config 導入持久化數據庫路徑
-from config import DATABASE_DIR, DATABASE_PATH
+from config import DATABASE_PATH
 
 # 數據庫路徑 - 統一使用 tgmatrix.db（合併 auth.db 後單一主庫）
 # 原 tgai_server.db 已合併到 tgmatrix.db，避免數據混亂

@@ -74,8 +74,11 @@ def setup_command_router(backend_service) -> CommandRouter:
     
     logger.info("Setting up command router...")
     
-    # 初始化事件總線
-    init_event_bus()
+    # 🔧 P5-2: 事件总线初始化增加异常保护
+    try:
+        init_event_bus()
+    except Exception as e:
+        logger.warning(f"Event bus init failed (non-fatal): {e}")
     
     # 初始化命令路由器
     router = init_command_router(backend_service)

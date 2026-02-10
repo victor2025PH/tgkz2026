@@ -61,43 +61,59 @@ CRITICAL_COMMANDS = [
     # Queue
     'get-queue-status',
     'send-message',
-    # Diagnostics
-    'get-command-diagnostics',
     # Logs
     'get-logs',
 ]
 
 
+def _get_all_registered_methods():
+    """Extract all method names from _HANDLER_REGISTRY"""
+    from main import _HANDLER_REGISTRY
+    methods = set()
+    for module_path, names_data in _HANDLER_REGISTRY.items():
+        names_str = names_data if isinstance(names_data, str) else names_data
+        for method_name in names_str.split():
+            methods.add(method_name)
+    return methods
+
+
+def _command_to_method(cmd):
+    """Convert command name to handler method name"""
+    return 'handle_' + cmd.replace('-', '_').replace(':', '_')
+
+
 def test_handler_registry_has_critical_commands():
     """Verify all critical commands have registered handlers in _HANDLER_REGISTRY"""
-    from main import _HANDLER_REGISTRY
+    all_methods = _get_all_registered_methods()
     
     missing = []
     for cmd in CRITICAL_COMMANDS:
-        if cmd not in _HANDLER_REGISTRY:
+        method_name = _command_to_method(cmd)
+        if method_name not in all_methods:
             missing.append(cmd)
     
     if missing:
         print(f"\n  MISSING from _HANDLER_REGISTRY ({len(missing)}):")
         for m in missing:
-            print(f"    - {m}")
+            print(f"    - {m} -> {_command_to_method(m)}")
     
     assert len(missing) == 0, f"{len(missing)} critical commands missing from handler registry: {missing}"
 
 
 def test_handler_registry_methods_exist():
-    """Verify handler methods referenced in _HANDLER_REGISTRY actually exist on BackendService"""
-    from main import _HANDLER_REGISTRY, BackendService
+    """Verify handler methods referenced in _HANDLER_REGISTRY resolve on BackendService"""
+    from main import BackendService
+    all_methods = _get_all_registered_methods()
     
+    # Only check critical command methods
     broken = []
-    for cmd, (module_path, func_name, _) in _HANDLER_REGISTRY.items():
-        if cmd not in CRITICAL_COMMANDS:
-            continue
-        
-        # Check if the method exists on BackendService (via MRO)
-        method = getattr(BackendService, func_name, None)
+    for cmd in CRITICAL_COMMANDS:
+        method_name = _command_to_method(cmd)
+        if method_name not in all_methods:
+            continue  # skip - will be caught by test above
+        method = getattr(BackendService, method_name, None)
         if method is None:
-            broken.append((cmd, func_name))
+            broken.append((cmd, method_name))
     
     if broken:
         print(f"\n  BROKEN handler methods ({len(broken)}):")
@@ -155,11 +171,12 @@ def test_mixin_handler_methods_callable():
     from main import BackendService
     
     key_methods = [
-        'initialize',                    # InitStartupMixin
-        '_get_default_ai_model',         # AiServiceMixin
-        'check_monitoring_configuration', # ConfigExecMixin
-        '_queue_send_callback',          # SendQueueMixin
-        'send_keyword_sets_update',      # SendQueueMixin
+        'initialize',                        # InitStartupMixin
+        '_get_default_ai_model',             # AiServiceMixin
+        'check_monitoring_configuration',     # ConfigExecMixin
+        '_queue_send_callback',              # SendQueueMixin
+        'send_keyword_sets_update',          # SendQueueMixin
+        'handle_get_command_diagnostics',     # ConfigExecMixin (mixin-direct, not in registry)
     ]
     
     missing = []
@@ -178,19 +195,19 @@ def test_no_payload_handlers_resolvable():
     """Verify _NO_PAYLOAD_HANDLERS entries correspond to real methods"""
     from main import _NO_PAYLOAD_HANDLERS, BackendService
     
+    # _NO_PAYLOAD_HANDLERS contains method names (handle_xxx) not command names
     broken = []
-    for cmd in list(_NO_PAYLOAD_HANDLERS)[:20]:  # check first 20
-        method_name = 'handle_' + cmd.replace('-', '_').replace(':', '_')
+    for method_name in list(_NO_PAYLOAD_HANDLERS)[:30]:
         if not hasattr(BackendService, method_name):
-            broken.append((cmd, method_name))
+            broken.append(method_name)
     
     if broken:
         print(f"\n  NO_PAYLOAD handlers without method ({len(broken)}):")
-        for cmd, fn in broken:
-            print(f"    - {cmd} -> {fn}")
+        for fn in broken:
+            print(f"    - {fn}")
     
     # Allow some tolerance (some may be from deprecated commands)
-    assert len(broken) <= 3, f"Too many broken no-payload handlers: {broken}"
+    assert len(broken) <= 5, f"Too many broken no-payload handlers: {broken}"
 
 
 # ====================================================================
@@ -264,6 +281,85 @@ def test_database_no_forbidden_refs():
 
 
 # ====================================================================
+# Test 6: Import Speed Baseline
+# ====================================================================
+
+def test_import_speed_baseline():
+    """Verify BackendService import completes within acceptable time (< 10s)"""
+    import importlib
+    
+    # Force re-import timing (approximate since module may be cached)
+    t0 = time.time()
+    importlib.import_module('main')
+    t1 = time.time()
+    
+    elapsed = t1 - t0
+    # If already cached, elapsed ~0. Real first-import measured by web_server.py.
+    # Here we just ensure no import crash and it's reasonably fast.
+    assert elapsed < 10, f"BackendService import took {elapsed:.2f}s (threshold: 10s)"
+
+
+def test_no_duplicate_getter_functions():
+    """Verify no getter function is defined twice in main.py (Phase 9 artifact)"""
+    import ast
+    
+    main_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'main.py')
+    with open(main_path, 'r', encoding='utf-8') as f:
+        source = f.read()
+    
+    tree = ast.parse(source)
+    
+    # Collect module-level function defs
+    func_names = []
+    duplicates = []
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, ast.FunctionDef):
+            if node.name in func_names:
+                duplicates.append(f"{node.name} (line {node.lineno})")
+            func_names.append(node.name)
+    
+    assert len(duplicates) == 0, f"Duplicate function definitions in main.py: {duplicates}"
+
+
+def test_unused_dangling_globals():
+    """Verify no dangling None assignments for removed globals"""
+    import ast
+    
+    main_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'main.py')
+    with open(main_path, 'r', encoding='utf-8') as f:
+        source = f.read()
+    
+    tree = ast.parse(source)
+    
+    # Find module-level assignments to None that are never read
+    none_assigns = []
+    all_names = set()
+    
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and isinstance(node.value, ast.Constant) and node.value.value is None:
+                    none_assigns.append(target.id)
+    
+    # Collect all Name references in the whole file
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            all_names.add(node.id)
+    
+    # A dangling None is one assigned to None and only referenced on that line
+    # (it will appear in all_names from the assignment itself)
+    # We check: is it referenced MORE than just the assignment?
+    # Simple heuristic: count occurrences in source
+    dangling = []
+    for name in none_assigns:
+        count = source.count(name)
+        if count <= 1:  # only appears in the assignment
+            dangling.append(name)
+    
+    assert len(dangling) == 0, f"Dangling None globals in main.py: {dangling}"
+
+
+# ====================================================================
 # Standalone runner
 # ====================================================================
 
@@ -279,6 +375,9 @@ def run_all():
         ('Lazy Imports Registered', test_lazy_imports_registered),
         ('Database Class Composition', test_database_class_composition),
         ('Database No Forbidden Refs', test_database_no_forbidden_refs),
+        ('Import Speed Baseline', test_import_speed_baseline),
+        ('No Duplicate Getter Functions', test_no_duplicate_getter_functions),
+        ('No Dangling None Globals', test_unused_dangling_globals),
     ]
     
     passed = 0

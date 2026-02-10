@@ -66,7 +66,6 @@ class SendQueueMixin:
         Returns:
             Dict with 'success' (bool) and optionally 'error' (str)
         """
-        import sys
         attachment_info = f"attachment={type(attachment).__name__}" if attachment else "no attachment"
         if attachment and isinstance(attachment, dict):
             attachment_info = f"attachment={{name={attachment.get('name')}, type={attachment.get('type')}}}"
@@ -91,7 +90,6 @@ class SendQueueMixin:
                     reason = warmup_check.get('reason', 'Unknown reason')
                     stage_info = warmup_check.get('current_stage')
                     
-                    import sys
                     print(f"[Backend] Warmup check failed for {phone}: {reason}", file=sys.stderr)
                     if stage_info:
                         print(f"[Backend] Current stage: {stage_info.get('stage_name')} (Stage {stage_info.get('stage')})", file=sys.stderr)
@@ -196,7 +194,6 @@ class SendQueueMixin:
                                         await db.update_account(account_id, {'proxy': new_proxy})
                                         self.send_log(f"账户 {phone} 代理已自动轮换: {current_proxy[:30]}... -> {new_proxy[:30]}...", "info")
                                 except Exception as e:
-                                    import sys
                                     print(f"[Backend] Failed to auto-rotate proxy: {e}", file=sys.stderr)
                 
                 # Handle error with recovery manager (错误恢复和自动重试机制)
@@ -233,7 +230,6 @@ class SendQueueMixin:
                             result['retry_after'] = recovery_result.retry_after
                             result['recovery_action'] = recovery_result.action_taken.value
                     except Exception as e:
-                        import sys
                         print(f"[Backend] Error in error recovery: {e}", file=sys.stderr)
                 
                 # Record health metrics (账户健康监控增强)
@@ -299,7 +295,6 @@ class SendQueueMixin:
         2. 嘗試使用其他在線的 Sender 帳號
         3. 嘗試使用任何在線帳號
         """
-        import sys
         print(f"[Backend] _try_fallback_send: source_group={source_group}, target_username={target_username}", file=sys.stderr)
         
         try:
@@ -428,7 +423,6 @@ class SendQueueMixin:
                             )
                             
                             if browse_result.get('success'):
-                                import sys
                                 print(f"[BehaviorSimulator] Account {phone} browsed {browse_result.get('count', 0)} groups", file=sys.stderr)
                         
                         # 等待下次浏览（30-60 分钟）
@@ -438,13 +432,11 @@ class SendQueueMixin:
                     except asyncio.CancelledError:
                         break
                     except Exception as e:
-                        import sys
                         print(f"[BehaviorSimulator] Error in browsing task for {phone}: {e}", file=sys.stderr)
                         # 等待一段时间后重试
                         await asyncio.sleep(300)  # 5 分钟后重试
             
             except Exception as e:
-                import sys
                 print(f"[BehaviorSimulator] Browsing task failed for {phone}: {e}", file=sys.stderr)
         
         # 启动后台任务
@@ -479,7 +471,6 @@ class SendQueueMixin:
                 # 如果關鍵詞集名稱已存在且 ID 不同，記錄警告但保留（因為可能確實有同名但不同的集）
                 if set_name and set_name in seen_set_names:
                     if seen_set_names[set_name] != set_id:
-                        import sys
                         print(f"[Backend] Warning: Duplicate keyword set name '{set_name}' with different IDs: {seen_set_names[set_name]} and {set_id}", file=sys.stderr)
                 seen_set_names[set_name] = set_id
                 
@@ -494,7 +485,6 @@ class SendQueueMixin:
                     
                     # 如果關鍵詞已存在，跳過（保留第一個）
                     if key in seen_keywords:
-                        import sys
                         print(f"[Backend] Warning: Duplicate keyword '{keyword_text}' (isRegex={is_regex}) in set {set_id}, skipping", file=sys.stderr)
                         continue
                     
@@ -514,11 +504,9 @@ class SendQueueMixin:
                 deduplicated_sets.append(deduplicated_set)
             
             # 確保事件被發送
-            import sys
             print(f"[Backend] Sending keyword-sets-updated event with {len(deduplicated_sets)} sets", file=sys.stderr)
             self.send_event("keyword-sets-updated", {"keywordSets": deduplicated_sets})
         except Exception as e:
-            import sys
             print(f"[Backend] Error sending keyword sets update: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc(file=sys.stderr)
@@ -544,7 +532,6 @@ class SendQueueMixin:
             # 保持向後兼容（其他組件可能監聽此事件）
             self.send_event("groups-updated", {"monitoredGroups": groups, "groups": groups})
         except Exception as e:
-            import sys
             print(f"[Backend] Error sending groups update: {e}", file=sys.stderr)
 
     async def send_templates_update(self):

@@ -375,7 +375,6 @@ class InitStartupMixin:
     async def initialize(self):
         """Initialize the backend service"""
         # 確保 sys 在函數開頭導入（避免後續 import sys 導致的 UnboundLocalError）
-        import sys
         import traceback
         import time
         
@@ -442,16 +441,13 @@ class InitStartupMixin:
                 except Exception as e:
                     error_str = str(e).lower()
                     if "malformed" in error_str or "corrupt" in error_str or "database disk image" in error_str:
-                        import sys
                         print(f"[Backend] Database corruption detected, skipping search index rebuild: {e}", file=sys.stderr)
                         self.send_log("資料庫損壞，跳過搜索索引重建", "warning")
                     else:
-                        import sys
                         print(f"[Backend] Error rebuilding search index: {e}", file=sys.stderr)
             asyncio.create_task(safe_rebuild_index())
             self.send_log("全文搜索引擎已初始化", "success")
         except Exception as e:
-            import sys
             print(f"[Backend] Failed to initialize search engine: {e}", file=sys.stderr)
             self.send_log(f"全文搜索引擎初始化失敗: {str(e)}", "warning")
         
@@ -483,7 +479,6 @@ class InitStartupMixin:
                             else:
                                 self.send_log("⚠ Some migrations completed with warnings", "warning")
                         except Exception as mig_err:
-                            import sys
                             print(f"[Backend] Background migration error: {mig_err}", file=sys.stderr)
                             self.send_log(f"⚠ Migration error: {str(mig_err)[:100]}", "warning")
                     asyncio.create_task(background_migrate())
@@ -779,14 +774,12 @@ class InitStartupMixin:
             try:
                 await self._sync_leads_to_user_profiles()
             except Exception as e:
-                import sys
                 print(f"[Backend] Background sync leads error: {e}", file=sys.stderr)
             
             # 一致性檢查（後台執行）
             try:
                 await self._startup_consistency_check()
             except Exception as e:
-                import sys
                 print(f"[Backend] Background consistency check error: {e}", file=sys.stderr)
             
             # 🆕 P2: 數據庫健康守護
@@ -797,7 +790,6 @@ class InitStartupMixin:
                 self._db_health_guard = get_db_health_guard(data_dir)
                 await self._db_health_guard.start()
             except Exception as e:
-                import sys
                 print(f"[Backend] DB Health Guard start error: {e}", file=sys.stderr)
             
             # 🆕 代理供應商自動同步（Phase 2）
@@ -805,10 +797,8 @@ class InitStartupMixin:
                 from admin.proxy_sync import get_sync_service
                 proxy_sync_svc = get_sync_service()
                 await proxy_sync_svc.start_auto_sync()
-                import sys
                 print("[Backend] ✓ Proxy provider auto-sync started", file=sys.stderr)
             except Exception as e:
-                import sys
                 print(f"[Backend] Proxy auto-sync start error: {e}", file=sys.stderr)
         
         # 創建後台任務（不等待完成）
@@ -942,7 +932,6 @@ class InitStartupMixin:
                 self.send_log(f"📊 已同步 {synced_count} 個 Lead 到漏斗系統", "info")
                 
         except Exception as e:
-            import sys
             print(f"[Backend] Error syncing leads to user_profiles: {e}", file=sys.stderr)
 
     async def _startup_consistency_check(self):
@@ -952,7 +941,6 @@ class InitStartupMixin:
         2. 嘗試使用 metadata.json 自動恢復
         3. 向前端發送恢復提示事件
         """
-        import sys
         import json
         from pathlib import Path
         from config import SESSIONS_DIR
@@ -1053,7 +1041,6 @@ class InitStartupMixin:
                 print("[Backend] No orphan sessions found, database is consistent", file=sys.stderr)
                 
         except Exception as e:
-            import sys
             print(f"[Backend] Error in consistency check: {e}", file=sys.stderr)
 
     def _validate_command_alias_registry(self):
@@ -1432,7 +1419,6 @@ class InitStartupMixin:
                                 }
                             )
                         except Exception as e:
-                            import sys
                             print(f"[EnhancedHealthMonitor] Error creating alert: {e}", file=sys.stderr)
             
             # Initialize enhanced health monitor
@@ -1441,10 +1427,8 @@ class InitStartupMixin:
                 check_interval_seconds=300  # 5 分钟检查一次
             )
             
-            import sys
             print("[Backend] Enhanced health monitor initialized", file=sys.stderr)
         except Exception as e:
-            import sys
             print(f"[Backend] Failed to initialize enhanced health monitor: {e}", file=sys.stderr)
             # Don't fail initialization if health monitor fails
             self.enhanced_health_monitor = None
@@ -1456,7 +1440,6 @@ class InitStartupMixin:
             async def update_proxy_callback(account_id: int, phone: str, new_proxy: str):
                 """更新账户代理的回调函数"""
                 await db.update_account(account_id, {"proxy": new_proxy})
-                import sys
                 print(f"[ProxyRotationManager] Updated proxy for account {mask_phone(phone)}: {new_proxy[:30]}...", file=sys.stderr)
             
             # Initialize proxy rotation manager with empty pool (will be populated dynamically)
@@ -1469,10 +1452,8 @@ class InitStartupMixin:
             # Set update callback
             self.proxy_rotation_manager.update_proxy_callback = update_proxy_callback
             
-            import sys
             print("[Backend] Proxy rotation manager initialized", file=sys.stderr)
         except Exception as e:
-            import sys
             print(f"[Backend] Failed to initialize proxy rotation manager: {e}", file=sys.stderr)
             # Don't fail initialization if proxy rotation manager fails
             self.proxy_rotation_manager = None
@@ -1493,7 +1474,6 @@ class InitStartupMixin:
                         return True
                     return False
                 except Exception as e:
-                    import sys
                     print(f"[ErrorRecovery] Failed to reconnect client for {mask_phone(phone)}: {e}", file=sys.stderr)
                     return False
             
@@ -1514,7 +1494,6 @@ class InitStartupMixin:
                                 await db.update_account(account_id, {"proxy": new_proxy})
                                 return new_proxy
                     except Exception as e:
-                        import sys
                         print(f"[ErrorRecovery] Failed to rotate proxy for {mask_phone(phone)}: {e}", file=sys.stderr)
                 return None
             
@@ -1533,7 +1512,6 @@ class InitStartupMixin:
                         )
                         return result.get('success', False)
                 except Exception as e:
-                    import sys
                     print(f"[ErrorRecovery] Failed to relogin account {mask_phone(phone)}: {e}", file=sys.stderr)
                 return False
             
@@ -1558,10 +1536,8 @@ class InitStartupMixin:
                 else:
                     self.error_recovery_manager = None
             
-            import sys
             print("[Backend] Error recovery manager initialized", file=sys.stderr)
         except Exception as e:
-            import sys
             print(f"[Backend] Failed to initialize error recovery manager: {e}", file=sys.stderr)
             # Don't fail initialization if error recovery manager fails
             self.error_recovery_manager = None
@@ -1581,11 +1557,9 @@ class InitStartupMixin:
             # 啟動定期備份（每24小時一次）
             await self.backup_manager.start_scheduled_backups(interval_hours=24)
             
-            import sys
             print("[Backend] Backup manager initialized", file=sys.stderr)
             self.send_log("備份管理器已初始化（每24小時自動備份）", "success")
         except Exception as e:
-            import sys
             print(f"[Backend] Failed to initialize backup manager: {e}", file=sys.stderr)
             self.backup_manager = None
         
@@ -1593,11 +1567,9 @@ class InitStartupMixin:
         try:
             SmartAlertManagerClass = _get_module('smart_alert_manager').SmartAlertManager
             self.smart_alert_manager = SmartAlertManagerClass(db)
-            import sys
             print("[Backend] Smart alert manager initialized", file=sys.stderr)
             self.send_log("智能告警管理器已初始化", "success")
         except Exception as e:
-            import sys
             print(f"[Backend] Failed to initialize smart alert manager: {e}", file=sys.stderr)
             self.smart_alert_manager = None
         
@@ -1642,11 +1614,9 @@ class InitStartupMixin:
         try:
             data_dir = str(Path(config.DATA_PATH))
             self.ip_binding_manager = get_init_ip_binding_manager()(data_dir, self.send_event)
-            import sys
             print("[Backend] IP Binding manager initialized", file=sys.stderr)
             self.send_log("IP 粘性綁定管理器已初始化", "success")
         except Exception as e:
-            import sys
             print(f"[Backend] Failed to initialize IP binding manager: {e}", file=sys.stderr)
             self.ip_binding_manager = None
         
@@ -1675,11 +1645,9 @@ class InitStartupMixin:
             self.credential_scraper = get_init_credential_scraper()(
                 sessions_dir, data_dir, self.send_event, save_credential_log
             )
-            import sys
             print("[Backend] Credential scraper initialized", file=sys.stderr)
             self.send_log("API 憑據獲取器已初始化", "success")
         except Exception as e:
-            import sys
             print(f"[Backend] Failed to initialize credential scraper: {e}", file=sys.stderr)
             self.credential_scraper = None
 
@@ -1705,7 +1673,6 @@ class InitStartupMixin:
             # 如果用戶發送過至少一條消息，視為已互動
             return user_message_count > 0
         except Exception as e:
-            import sys
             print(f"[Backend] Error checking user interaction: {e}", file=sys.stderr)
             return False
 

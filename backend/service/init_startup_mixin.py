@@ -451,11 +451,15 @@ class InitStartupMixin:
             print(f"[Backend] Failed to initialize search engine: {e}", file=sys.stderr)
             self.send_log(f"全文搜索引擎初始化失敗: {str(e)}", "warning")
         
-        # Initialize migration manager (after database is ready)
+        # ====================================================================
+        # 🔧 P8-3: Migration 执行保障 — 阻塞式迁移 + 状态追踪
+        # 改进: 从后台异步 → 阻塞式执行（带 60s 超时），确保服务启动时 schema 已就绪
+        # ====================================================================
         from migrations.migration_manager import init_migration_manager, get_migration_manager
         from pathlib import Path
+        self._migration_status = {'state': 'pending', 'version': 0, 'pending': 0, 'error': None}
         try:
-            # 首先建立異步數據庫連接（遷移系統需要）
+            # 首先建立异步数据库连接（迁移系统需要）
             await db.connect()
             print("[Backend] Async database connection established for migrations", file=sys.stderr)
             
@@ -464,31 +468,56 @@ class InitStartupMixin:
             migration_manager = get_migration_manager()
             if migration_manager:
                 await migration_manager.initialize()
-                # 🔧 P0: 優化 - 只檢查版本，迁移在後台執行（不阻塞啟動）
                 current_version = await migration_manager.get_current_version()
                 pending = await migration_manager.get_pending_migrations()
+                self._migration_status['version'] = current_version
+                self._migration_status['pending'] = len(pending)
                 print(f"[Backend] Database version: {current_version}, pending migrations: {len(pending)}", file=sys.stderr)
+                
                 if pending:
-                    self.send_log(f"Found {len(pending)} pending migration(s), running in background...", "info")
-                    # 🔧 P0: 後台執行遷移，不阻塞啟動
-                    async def background_migrate():
-                        try:
-                            success = await migration_manager.migrate()
-                            if success:
-                                self.send_log("✓ Migrations applied successfully", "success")
-                            else:
-                                self.send_log("⚠ Some migrations completed with warnings", "warning")
-                        except Exception as mig_err:
-                            print(f"[Backend] Background migration error: {mig_err}", file=sys.stderr)
-                            self.send_log(f"⚠ Migration error: {str(mig_err)[:100]}", "warning")
-                    asyncio.create_task(background_migrate())
+                    self.send_log(f"Found {len(pending)} pending migration(s), executing...", "info")
+                    self._migration_status['state'] = 'running'
+                    
+                    # 🔧 P8-3: 阻塞式迁移，带 60s 超时保护
+                    _mig_start = time.time()
+                    try:
+                        success = await asyncio.wait_for(
+                            migration_manager.migrate(),
+                            timeout=60.0
+                        )
+                        _mig_elapsed = time.time() - _mig_start
+                        new_version = await migration_manager.get_current_version()
+                        self._migration_status['version'] = new_version
+                        self._migration_status['pending'] = 0
+                        
+                        if success:
+                            self._migration_status['state'] = 'completed'
+                            self.send_log(f"✓ Migrations applied ({_mig_elapsed:.1f}s, v{current_version}→v{new_version})", "success")
+                            print(f"[Backend] Migrations completed in {_mig_elapsed:.1f}s (v{current_version}→v{new_version})", file=sys.stderr)
+                        else:
+                            self._migration_status['state'] = 'partial'
+                            self.send_log(f"⚠ Some migrations had warnings ({_mig_elapsed:.1f}s)", "warning")
+                    except asyncio.TimeoutError:
+                        _mig_elapsed = time.time() - _mig_start
+                        self._migration_status['state'] = 'timeout'
+                        self._migration_status['error'] = f'Migration timed out after {_mig_elapsed:.0f}s'
+                        print(f"[Backend] ⚠ Migration timed out after {_mig_elapsed:.0f}s — service starting anyway", file=sys.stderr)
+                        self.send_log(f"⚠ Migration timed out after {_mig_elapsed:.0f}s", "warning")
+                    except Exception as mig_err:
+                        self._migration_status['state'] = 'error'
+                        self._migration_status['error'] = str(mig_err)[:200]
+                        print(f"[Backend] Migration error: {mig_err}", file=sys.stderr)
+                        self.send_log(f"⚠ Migration error: {str(mig_err)[:100]}", "warning")
                 else:
+                    self._migration_status['state'] = 'up_to_date'
                     print(f"[Backend] Database is up to date (version {current_version})", file=sys.stderr)
         except Exception as e:
             import traceback
+            self._migration_status['state'] = 'init_error'
+            self._migration_status['error'] = str(e)[:200]
             print(f"[Backend] Error initializing migration system: {e}", file=sys.stderr)
             traceback.print_exc(file=sys.stderr)
-            self.send_log(f"遷移系統初始化失敗: {str(e)}", "warning")
+            self.send_log(f"迁移系统初始化失败: {str(e)}", "warning")
         
         # Initialize alert manager (after database is ready)
         def alert_notification_callback(alert):

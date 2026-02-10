@@ -178,16 +178,26 @@ class AccountMixin:
         - 如果提供 owner_user_id，只返回該用戶的帳號
         - 如果未提供，嘗試從租戶上下文獲取
         - Electron 模式下返回所有帳號
+        
+        🔧 P1 加固：防御性查詢 —— 如果 owner_user_id 欄位不存在，自動回退到簡單查詢
         """
         try:
             accounts_db_path = self._get_accounts_db_path()
+            print(f"[get_all_accounts] DB path: {accounts_db_path}, exists: {accounts_db_path.exists()}", file=sys.stderr)
+            
             if not accounts_db_path.exists():
                 # 確保數據庫和表存在
+                accounts_db_path.parent.mkdir(parents=True, exist_ok=True)
                 await self._ensure_accounts_table(accounts_db_path)
+                print(f"[get_all_accounts] DB did not exist, created empty table", file=sys.stderr)
                 return []
             
-            # 確保表存在
+            # 確保表存在 + 自動遷移欄位
             await self._ensure_accounts_table(accounts_db_path)
+            
+            # 🔧 P1: 先檢測 owner_user_id 欄位是否真的存在
+            has_owner_column = await self._check_column_exists(accounts_db_path, 'accounts', 'owner_user_id')
+            print(f"[get_all_accounts] has_owner_column: {has_owner_column}", file=sys.stderr)
             
             # 🆕 獲取租戶上下文
             if owner_user_id is None:
@@ -196,6 +206,7 @@ class AccountMixin:
                     tenant = get_current_tenant()
                     if tenant and tenant.user_id:
                         owner_user_id = tenant.user_id
+                        print(f"[get_all_accounts] tenant owner_user_id: {owner_user_id}", file=sys.stderr)
                 except ImportError:
                     pass
             
@@ -206,17 +217,22 @@ class AccountMixin:
             # 🔧 P3-6: 排除已刪除/已封禁的帳號（與配額計數邏輯對齊）
             excluded_status_clause = "AND (status IS NULL OR LOWER(status) NOT IN ('deleted', 'banned', 'removed'))"
             
-            if is_electron or not owner_user_id:
-                # Electron 模式或無用戶上下文：返回所有帳號
-                query = f'SELECT * FROM accounts WHERE 1=1 {excluded_status_clause} ORDER BY id'
-                params = ()
-            else:
+            # 🔧 P1 加固：如果 owner_user_id 欄位不存在，強制使用簡單查詢（避免 OperationalError）
+            use_tenant_filter = (not is_electron) and owner_user_id and has_owner_column
+            
+            if use_tenant_filter:
                 # SaaS 模式：返回當前用戶的帳號 + 未綁定/歷史帳號（owner_user_id 為空或 local_user，兼容舊數據）
                 query = f'''SELECT * FROM accounts
                     WHERE (owner_user_id = ? OR owner_user_id IS NULL OR owner_user_id = '' OR owner_user_id = 'local_user')
                     {excluded_status_clause}
                     ORDER BY id'''
                 params = (owner_user_id,)
+            else:
+                # Electron 模式 / 無用戶上下文 / 欄位不存在：返回所有帳號
+                query = f'SELECT * FROM accounts WHERE 1=1 {excluded_status_clause} ORDER BY id'
+                params = ()
+            
+            print(f"[get_all_accounts] use_tenant_filter={use_tenant_filter}, is_electron={is_electron}", file=sys.stderr)
             
             if not HAS_AIOSQLITE:
                 # 同步回退
@@ -226,19 +242,53 @@ class AccountMixin:
                 cursor.execute(query, params)
                 rows = cursor.fetchall()
                 conn.close()
-                return [dict(row) for row in rows]
+                result = [dict(row) for row in rows]
+                print(f"[get_all_accounts] sync returned {len(result)} accounts", file=sys.stderr)
+                return result
             
             # 異步方式
             async with aiosqlite.connect(str(accounts_db_path)) as conn:
                 conn.row_factory = aiosqlite.Row
-                cursor = await conn.execute(query, params)
-                rows = await cursor.fetchall()
-                return [dict(row) for row in rows]
+                try:
+                    cursor = await conn.execute(query, params)
+                    rows = await cursor.fetchall()
+                    result = [dict(row) for row in rows]
+                    print(f"[get_all_accounts] async returned {len(result)} accounts", file=sys.stderr)
+                    return result
+                except Exception as query_err:
+                    # 🔧 P1: 查詢失敗（可能是欄位不存在），回退到最簡單的查詢
+                    print(f"[get_all_accounts] ⚠️ Query failed: {query_err}, falling back to simple query", file=sys.stderr)
+                    fallback_query = f'SELECT * FROM accounts WHERE 1=1 {excluded_status_clause} ORDER BY id'
+                    cursor = await conn.execute(fallback_query)
+                    rows = await cursor.fetchall()
+                    result = [dict(row) for row in rows]
+                    print(f"[get_all_accounts] fallback returned {len(result)} accounts", file=sys.stderr)
+                    return result
         except Exception as e:
-            print(f"Error getting all accounts: {e}")
+            print(f"[get_all_accounts] ❌ FATAL error: {e}", file=sys.stderr)
             import traceback
-            traceback.print_exc()
+            traceback.print_exc(file=sys.stderr)
             return []
+    
+    async def _check_column_exists(self, db_path: Path, table: str, column: str) -> bool:
+        """檢查數據庫表中是否存在指定欄位"""
+        try:
+            if not HAS_AIOSQLITE:
+                conn = sqlite3.connect(str(db_path))
+                cursor = conn.cursor()
+                cursor.execute(f"PRAGMA table_info({table})")
+                columns = {row[1] for row in cursor.fetchall()}
+                conn.close()
+                return column in columns
+            
+            async with aiosqlite.connect(str(db_path)) as conn:
+                cursor = await conn.execute(f"PRAGMA table_info({table})")
+                rows = await cursor.fetchall()
+                columns = {row[1] for row in rows}
+                return column in columns
+        except Exception as e:
+            print(f"[_check_column_exists] Error checking column {column}: {e}", file=sys.stderr)
+            return False
     
     async def update_account(self, account_id: int, updates: Dict[str, Any]) -> bool:
         """更新帳號"""

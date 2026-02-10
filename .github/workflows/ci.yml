@@ -75,6 +75,14 @@ jobs:
           cd backend
           python scripts/check_mixin_imports.py --strict
 
+      - name: Command routing smoke test
+        run: |
+          export PYTHONPATH="${GITHUB_WORKSPACE}/backend"
+          export ELECTRON_MODE=true
+          cd backend
+          python tests/test_command_routing.py
+        continue-on-error: true
+
   # ==================== 前端構建 ====================
   frontend-build:
     name: Frontend Build

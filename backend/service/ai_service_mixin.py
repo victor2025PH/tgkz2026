@@ -26,36 +26,35 @@ def _get_module(name: str):
 
 
 # ====================================================================
-# 🔧 P3-1: 延迟导入获取器 — 避免循环依赖
+# 🔧 P3→P4: 延迟导入获取器 + 模块级缓存
+# 首次调用后缓存结果，避免重复 lazy_imports.get() 查找
 # ====================================================================
 
+_cache = {}
+
 def _get_ai_auto_chat():
-    """延迟获取 ai_auto_chat 单例"""
-    try:
-        return _get_module('ai_auto_chat').ai_auto_chat
-    except Exception:
-        return None
+    if 'ai_auto_chat' not in _cache:
+        try: _cache['ai_auto_chat'] = _get_module('ai_auto_chat').ai_auto_chat
+        except Exception: _cache['ai_auto_chat'] = None
+    return _cache['ai_auto_chat']
 
 def _get_telegram_rag():
-    """延迟获取 telegram_rag 单例"""
-    try:
-        return _get_module('telegram_rag_system').telegram_rag
-    except Exception:
-        return None
+    if 'telegram_rag' not in _cache:
+        try: _cache['telegram_rag'] = _get_module('telegram_rag_system').telegram_rag
+        except Exception: _cache['telegram_rag'] = None
+    return _cache['telegram_rag']
 
 def _get_KnowledgeType():
-    """延迟获取 KnowledgeType 枚举"""
-    try:
-        return _get_module('telegram_rag_system').KnowledgeType
-    except Exception:
-        return None
+    if 'KnowledgeType' not in _cache:
+        try: _cache['KnowledgeType'] = _get_module('telegram_rag_system').KnowledgeType
+        except Exception: _cache['KnowledgeType'] = None
+    return _cache['KnowledgeType']
 
 def _get_group_search_service():
-    """延迟获取 group_search_service 单例"""
-    try:
-        return _get_module('group_search_service').group_search_service
-    except Exception:
-        return None
+    if 'group_search_service' not in _cache:
+        try: _cache['group_search_service'] = _get_module('group_search_service').group_search_service
+        except Exception: _cache['group_search_service'] = None
+    return _cache['group_search_service']
 
 class AiServiceMixin:
     """Mixin: AI generation, local AI, knowledge, collaboration"""

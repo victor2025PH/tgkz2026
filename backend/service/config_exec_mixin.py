@@ -20,6 +20,30 @@ def _get_module(name: str):
     return lazy_imports.get(name)
 
 
+# ====================================================================
+# 🔧 P4-2: 延迟获取器 — 修复 Phase 9 拆分后遗漏的全局引用
+# ====================================================================
+
+def _get_jiso_search_service():
+    try:
+        return _get_module('jiso_search_service').jiso_search_service
+    except Exception:
+        return None
+
+def _get_private_message_poller():
+    try:
+        return _get_module('private_message_poller').private_message_poller
+    except Exception:
+        return None
+
+def _get_flood_handler():
+    try:
+        from flood_wait_handler import flood_handler
+        return flood_handler
+    except Exception:
+        return None
+
+
 # 🔧 P1: 從 main.py 延遲導入共享狀態（避免循環依賴）
 # 這些模塊級變量在 main.py 中定義，此 mixin 的 handle_get_command_diagnostics 使用
 # 使用延遲導入模式：首次訪問時從 main.py 獲取引用
@@ -526,7 +550,9 @@ class ConfigExecMixin:
         try:
             channels = await db.get_custom_search_channels(enabled_only=True)
             custom_bots = [ch['bot_username'] for ch in channels]
-            jiso_search_service.config.custom_bots = custom_bots
+            jiso_svc = _get_jiso_search_service()
+            if jiso_svc:
+                jiso_svc.config.custom_bots = custom_bots
             self.send_log(f"🔄 已刷新自定義 Bot 列表: {len(custom_bots)} 個", "info")
         except Exception as e:
             self.send_log(f"刷新自定義 Bot 列表失敗: {e}", "warning")
@@ -698,9 +724,11 @@ class ConfigExecMixin:
 
     async def _ensure_private_poller_running(self, account_matches: list):
         """🔧 Phase 3: 確保私聊輪詢器運行以接收目標用戶回覆"""
-        import sys
-        
         try:
+            private_message_poller = _get_private_message_poller()
+            if not private_message_poller:
+                print(f"[AITeam] ⚠️ private_message_poller 不可用", file=sys.stderr)
+                return
             # 獲取需要監控的帳號
             phones_to_monitor = [m.get('accountPhone') for m in account_matches if m.get('accountPhone')]
             

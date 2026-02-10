@@ -471,6 +471,8 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
         # === 性能指標 (P13-3) / 缓存 (P14-3) ===
         ('GET',    '/api/v1/metrics/api',              'api_perf_metrics'),
         ('GET',    '/api/v1/metrics/cache',            'api_cache_stats'),
+        ('GET',    '/api/v1/metrics/db',               'api_db_health'),
+        ('GET',    '/api/v1/metrics/alerts',            'api_alert_rules'),
         ('POST',   '/api/v1/cache/invalidate',         'invalidate_cache'),
 
         # === WebSocket ===
@@ -507,6 +509,8 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
         '/api/docs', '/api/redoc', '/api/openapi.json',
         '/api/v1/metrics/api',
         '/api/v1/metrics/cache',
+        '/api/v1/metrics/db',
+        '/api/v1/metrics/alerts',
     ])
 
     ADMIN_PATH_PREFIXES = (

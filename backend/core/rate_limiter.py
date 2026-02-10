@@ -154,6 +154,64 @@ DEFAULT_RULES = [
         window_seconds=60,
         path_pattern='/api/v1/search/*'
     ),
+
+    # P15-1: 管理員路由 (寬鬆但獨立追蹤)
+    RateLimitRule(
+        name='admin_api',
+        scope=RateLimitScope.IP,
+        requests=200,
+        window_seconds=60,
+        burst=40,
+        path_pattern='/api/v1/admin/*'
+    ),
+    RateLimitRule(
+        name='admin_legacy',
+        scope=RateLimitScope.IP,
+        requests=200,
+        window_seconds=60,
+        path_pattern='/api/admin/*'
+    ),
+
+    # P15-1: Webhook (外部回調，寬鬆)
+    RateLimitRule(
+        name='webhook',
+        scope=RateLimitScope.IP,
+        requests=500,
+        window_seconds=60,
+        path_pattern='/webhook/*'
+    ),
+
+    # P15-1: 支付端點 (嚴格防刷)
+    RateLimitRule(
+        name='payment',
+        scope=RateLimitScope.USER,
+        requests=10,
+        window_seconds=60,
+        path_pattern='/api/v1/payment/*'
+    ),
+    RateLimitRule(
+        name='subscription',
+        scope=RateLimitScope.USER,
+        requests=15,
+        window_seconds=60,
+        path_pattern='/api/v1/subscription/*'
+    ),
+
+    # P15-1: 登入/註冊 (嚴格防暴力破解)
+    RateLimitRule(
+        name='ip_login',
+        scope=RateLimitScope.IP,
+        requests=10,
+        window_seconds=300,
+        path_pattern='/api/v1/auth/login'
+    ),
+    RateLimitRule(
+        name='ip_register',
+        scope=RateLimitScope.IP,
+        requests=5,
+        window_seconds=300,
+        path_pattern='/api/v1/auth/register'
+    ),
 ]
 
 
@@ -392,6 +450,21 @@ class RateLimiter:
             key = self._build_key(rule.scope, ip, user_id, api_key, path)
             if not key:
                 continue
+            
+            # P15-1: 令牌桶突發控制（rule.burst > 0 時啟用）
+            if rule.burst > 0:
+                rate = rule.requests / max(rule.window_seconds, 1)
+                tb_allowed, tb_remaining = self._token_bucket.check_and_consume(
+                    f"burst:{key}", rate, rule.burst
+                )
+                if not tb_allowed:
+                    self._log_rate_limit(rule.scope.value, key, path, rule.name, False)
+                    return RateLimitResult(
+                        allowed=False, remaining=0,
+                        reset_at=int(time.time()) + int(1.0 / max(rate, 0.01)),
+                        retry_after=int(1.0 / max(rate, 0.01)),
+                        rule_name=f"{rule.name}:burst"
+                    )
             
             # 使用滑動窗口檢查
             allowed, remaining, reset_at = self._counter.check_and_increment(

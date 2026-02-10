@@ -128,6 +128,10 @@ class CommandRouter:
                 deprecated_message=deprecated_message
             )
             
+            # 🔧 P6-3: 重复注册检测
+            if command_name in self._commands:
+                logger.debug(f"Command '{command_name}' re-registered (overwriting previous handler)")
+            
             self._commands[command_name] = meta
             
             # 註冊別名

@@ -1,31 +1,52 @@
-# TG-Matrix Backend Dockerfile
-FROM python:3.11-slim
+# TG-Matrix Backend Dockerfile — P11-2: Multi-stage optimized build
+# Stage 1: Builder — compile C extensions with gcc
+FROM python:3.11-slim AS builder
 
-WORKDIR /app
+WORKDIR /build
 
-# 安裝系統依賴
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# 複製依賴文件
 COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# 安裝 Python 依賴
-RUN pip install --no-cache-dir -r requirements.txt
+# Stage 2: Runtime — minimal image without gcc
+FROM python:3.11-slim AS runtime
 
-# 複製應用代碼
+WORKDIR /app
+
+# Copy pre-built Python packages from builder
+COPY --from=builder /install /usr/local
+
+# Install only runtime libs (no gcc/dev headers)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser
+
+# Copy application code
 COPY . .
 
-# 創建必要目錄
-RUN mkdir -p /app/sessions /app/logs /app/data
+# Create necessary directories with correct ownership
+RUN mkdir -p /app/sessions /app/logs /app/data \
+    && chown -R appuser:appuser /app
 
-# 🔧 修復：禁用 Python 輸出緩衝，確保 Docker logs 能即時看到 stderr 日誌
+# Switch to non-root user
+USER appuser
+
+# Environment
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
-# 暴露端口
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -sf http://localhost:8000/health || exit 1
+
 EXPOSE 8000
 
-# 啟動命令 - 使用 Web 服務器模式
 CMD ["python", "-u", "web_server.py"]

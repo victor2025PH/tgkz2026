@@ -1,0 +1,16 @@
+# P11-2: Reduce Docker build context
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.git
+.gitignore
+*.md
+tests/
+scripts/
+*.egg-info
+.env.local
+.env.development
+sessions/*
+logs/*
+data/*

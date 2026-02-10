@@ -972,7 +972,10 @@ class HttpApiServer:
     # ==================== 核心方法 ====================
     
     async def _execute_command(self, command: str, payload: dict = None) -> dict:
-        """執行命令 - 核心方法"""
+        """執行命令 - 核心方法
+        
+        🔧 P1: 如果 backend_service 未初始化，嘗試直接從數據庫讀取關鍵數據
+        """
         if payload is None:
             payload = {}
         
@@ -987,7 +990,20 @@ class HttpApiServer:
                 logger.error(f"Command execution error: {command} - {e}")
                 return {'success': False, 'error': str(e)}
         else:
-            # 後端服務未初始化時的演示模式
+            # 🔧 P1: 後端服務未初始化 — 嘗試直接讀取數據庫（比空的 demo 數據好得多）
+            logger.warning(f"⚠️ backend_service is None for command: {command}, trying direct DB access")
+            
+            # 對關鍵命令提供數據庫直接讀取作為降級
+            if command == 'get-accounts':
+                try:
+                    from database import db
+                    accounts = await db.get_all_accounts()
+                    logger.info(f"✅ Direct DB fallback: got {len(accounts)} accounts")
+                    return {'success': True, 'accounts': accounts}
+                except Exception as db_err:
+                    logger.error(f"❌ Direct DB fallback failed: {db_err}")
+            
+            # 其他命令走 demo 模式
             return await self._demo_mode_handler(command, payload)
     
     async def _demo_mode_handler(self, command: str, payload: dict) -> dict:
@@ -1291,6 +1307,12 @@ class HttpApiServer:
         except Exception as e:
             diag['checks']['handle_command_result'] = f'Error: {e}'
             diag['errors'].append(f'handle_command: {e}')
+        
+        # 10. 後端服務狀態
+        diag['checks']['backend_service_status'] = {
+            'initialized': self.backend_service is not None,
+            'type': type(self.backend_service).__name__ if self.backend_service else None,
+        }
         
         diag['summary'] = 'ALL OK' if not diag['errors'] else f'{len(diag["errors"])} errors found'
         

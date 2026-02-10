@@ -83,6 +83,59 @@ jobs:
           python tests/test_command_routing.py
         continue-on-error: true
 
+      - name: Migration file integrity check
+        run: |
+          export PYTHONPATH="${GITHUB_WORKSPACE}/backend"
+          cd backend
+          python -c "
+          # 🔧 P8-3: 验证迁移文件完整性
+          from pathlib import Path
+          import importlib.util, sys
+
+          mig_dir = Path('migrations')
+          skip = {'__init__.py', 'migration_base.py', 'migration_manager.py', 'add_owner_user_id.py'}
+          files = sorted(f for f in mig_dir.glob('*.py') if f.name not in skip)
+          
+          versions = []
+          errors = 0
+          for f in files:
+              try:
+                  spec = importlib.util.spec_from_file_location(f'mig_{f.stem}', f)
+                  mod = importlib.util.module_from_spec(spec)
+                  spec.loader.exec_module(mod)
+                  found = False
+                  for attr_name in dir(mod):
+                      attr = getattr(mod, attr_name)
+                      if isinstance(attr, type) and hasattr(attr, 'version') and hasattr(attr, 'up'):
+                          inst = attr()
+                          versions.append(inst.version)
+                          found = True
+                          break
+                  if not found:
+                      print(f'⚠ {f.name}: No Migration class found')
+                      errors += 1
+              except Exception as e:
+                  print(f'❌ {f.name}: {e}')
+                  errors += 1
+          
+          # Check for duplicate versions
+          dups = [v for v in set(versions) if versions.count(v) > 1]
+          if dups:
+              print(f'❌ Duplicate migration versions: {dups}')
+              errors += 1
+          
+          # Check for gaps (warning only)
+          if versions:
+              for i in range(1, max(versions) + 1):
+                  if i not in versions and i != 19:  # 19 is known missing
+                      print(f'⚠ Missing migration version: {i}')
+          
+          print(f'✅ {len(versions)} migrations loaded, {errors} error(s)')
+          if errors > 0:
+              sys.exit(1)
+          "
+        continue-on-error: true
+
   # ==================== 前端構建 ====================
   frontend-build:
     name: Frontend Build

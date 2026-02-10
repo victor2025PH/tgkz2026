@@ -253,7 +253,7 @@ class SystemRoutesMixin:
     async def openapi_json(self, request):
         """OpenAPI JSON 規範 — P11-3: 自動掃描已註冊路由"""
         from api.openapi import get_openapi_json
-        app = getattr(self, 'app', None)
+        app = request.app if request else getattr(self, 'app', None)
         return web.Response(
             text=get_openapi_json(app),
             content_type='application/json'

@@ -19,6 +19,36 @@ def _get_module(name: str):
     from lazy_imports import lazy_imports
     return lazy_imports.get(name)
 
+
+# 🔧 P1: 從 main.py 延遲導入共享狀態（避免循環依賴）
+# 這些模塊級變量在 main.py 中定義，此 mixin 的 handle_get_command_diagnostics 使用
+# 使用延遲導入模式：首次訪問時從 main.py 獲取引用
+
+_command_metrics = None
+_unknown_command_counter = None
+_routing_stats = None
+COMMAND_ALIAS_REGISTRY = None
+ROUTER_AVAILABLE = False
+
+def _ensure_main_refs():
+    """延遲初始化 main.py 的共享引用"""
+    global _command_metrics, _unknown_command_counter, _routing_stats, COMMAND_ALIAS_REGISTRY, ROUTER_AVAILABLE
+    if _command_metrics is None:
+        try:
+            import main
+            _command_metrics = getattr(main, '_command_metrics', {})
+            _unknown_command_counter = getattr(main, '_unknown_command_counter', {})
+            _routing_stats = getattr(main, '_routing_stats', {})
+            COMMAND_ALIAS_REGISTRY = getattr(main, 'COMMAND_ALIAS_REGISTRY', {})
+            ROUTER_AVAILABLE = getattr(main, 'ROUTER_AVAILABLE', False)
+        except Exception as e:
+            print(f"[ConfigExecMixin] Warning: Cannot import main.py refs: {e}", file=sys.stderr)
+            _command_metrics = {}
+            _unknown_command_counter = {}
+            _routing_stats = {}
+            COMMAND_ALIAS_REGISTRY = {}
+            ROUTER_AVAILABLE = False
+
 class ConfigExecMixin:
     """Mixin: QR login, config check, diagnostics, resource verification, team execution"""
 
@@ -390,6 +420,7 @@ class ConfigExecMixin:
 
     async def handle_get_command_diagnostics(self, payload=None):
         """Phase4: 命令診斷看板 — 別名註冊表 + 未知命令 + 執行度量"""
+        _ensure_main_refs()  # 🔧 P1: 確保 main.py 共享引用已初始化
         # 計算 Top 命令（按失敗率排序）
         top_failed = sorted(
             [(cmd, m) for cmd, m in _command_metrics.items() if m['failed'] > 0],

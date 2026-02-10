@@ -1,6 +1,8 @@
 """
 Phase 9-3: Initialization, startup, quota, consistency check
 Extracted from BackendService in main.py.
+
+🔧 P1 加固：補全所有從 main.py 分離後遺漏的導入
 """
 import sys
 import os
@@ -19,10 +21,161 @@ from flood_wait_handler import flood_handler, safe_telegram_call
 from database import db
 from config import config, IS_DEV_MODE
 
+# 🔧 P1: 從原 main.py 遺漏的核心導入
+from error_handler import init_error_handler, ErrorType
+from message_ack import init_ack_manager
+from message_queue import MessageQueue
+from cache_manager import init_cache_manager
+
 def _get_module(name: str):
     """Safe lazy module accessor."""
     from lazy_imports import lazy_imports
     return lazy_imports.get(name)
+
+
+# ====================================================================
+# 🔧 P1 加固：從 main.py 分離後需要的 lazy import 獲取器
+# 這些函數原本在 main.py 的模塊級別定義，init_startup_mixin 的
+# initialize() 方法中直接調用它們。現在需要在此重新定義。
+# ====================================================================
+
+def get_init_performance_monitor():
+    return _get_module('performance_monitor').init_performance_monitor
+
+def get_init_search_engine():
+    return _get_module('fulltext_search').init_search_engine
+
+def get_search_engine():
+    return _get_module('fulltext_search').get_search_engine
+
+def get_init_alert_manager():
+    return _get_module('alert_manager').init_alert_manager
+
+def get_init_db_optimizer():
+    return _get_module('db_optimizer').init_db_optimizer
+
+def get_init_memory_monitor():
+    return _get_module('memory_monitor').init_memory_monitor
+
+def get_init_group_poller():
+    return _get_module('group_message_poller').init_group_poller
+
+def get_group_poller():
+    return _get_module('group_message_poller').get_group_poller
+
+def get_init_qr_auth_manager():
+    return _get_module('qr_auth_manager').init_qr_auth_manager
+
+def get_init_ip_binding_manager():
+    return _get_module('ip_binding_manager').init_ip_binding_manager
+
+def get_init_credential_scraper():
+    return _get_module('credential_scraper').init_credential_scraper
+
+def get_init_batch_operations():
+    return _get_module('batch_operations').init_batch_operations
+
+def get_init_ad_template_manager():
+    return _get_module('ad_template').init_ad_template_manager
+
+def get_init_ad_manager():
+    return _get_module('ad_manager').init_ad_manager
+
+def get_init_ad_broadcaster():
+    return _get_module('ad_broadcaster').init_ad_broadcaster
+
+def get_init_ad_scheduler():
+    return _get_module('ad_scheduler').init_ad_scheduler
+
+def get_init_ad_analytics():
+    return _get_module('ad_analytics').init_ad_analytics
+
+def get_init_user_tracker():
+    return _get_module('user_tracker').init_user_tracker
+
+def get_init_user_analytics():
+    return _get_module('user_analytics').init_user_analytics
+
+def get_init_campaign_orchestrator():
+    return _get_module('campaign_orchestrator').init_campaign_orchestrator
+
+def get_init_multi_channel_stats():
+    return _get_module('multi_channel_stats').init_multi_channel_stats
+
+def get_init_marketing_task_service():
+    return _get_module('marketing_task_service').init_marketing_task_service
+
+def get_init_script_engine():
+    return _get_module('script_engine').init_script_engine
+
+def get_init_collaboration_coordinator():
+    return _get_module('collaboration_coordinator').init_collaboration_coordinator
+
+# 類型/類獲取器
+def get_QueueOptimizer():
+    return _get_module('queue_optimizer').QueueOptimizer
+
+def get_ErrorRecoveryManager():
+    try:
+        return _get_module('error_recovery_manager').ErrorRecoveryManager
+    except:
+        return None
+
+def get_BackupManager():
+    return _get_module('backup_manager').BackupManager
+
+def get_ProxyRotationManager():
+    return _get_module('proxy_rotation_manager').ProxyRotationManager
+
+def get_EnhancedHealthMonitor():
+    return _get_module('enhanced_health_monitor').EnhancedHealthMonitor
+
+def get_Anomaly():
+    return _get_module('enhanced_health_monitor').Anomaly
+
+def get_log_rotator():
+    return _get_module('log_rotator').get_log_rotator
+
+# 日誌脫敏工具
+def mask_phone(phone):
+    try:
+        from core.logging import mask_phone as _mask_phone
+        return _mask_phone(phone)
+    except ImportError:
+        # 降級處理：簡單脫敏
+        s = str(phone)
+        if len(s) > 6:
+            return s[:3] + '***' + s[-3:]
+        return '***'
+
+# 命令路由器（延遲導入避免循環依賴）
+ROUTER_AVAILABLE = False
+
+def check_router_available():
+    global ROUTER_AVAILABLE
+    try:
+        from api.router_integration import setup_command_router, try_route_command
+        ROUTER_AVAILABLE = True
+        return True
+    except ImportError:
+        ROUTER_AVAILABLE = False
+        return False
+
+def setup_command_router(*args, **kwargs):
+    """延遲導入 setup_command_router"""
+    from api.router_integration import setup_command_router as _setup
+    return _setup(*args, **kwargs)
+
+# 命令別名（延遲從 main.py 獲取）
+def _get_command_alias_registry():
+    """延遲導入避免循環依賴"""
+    try:
+        from main import COMMAND_ALIAS_REGISTRY
+        return COMMAND_ALIAS_REGISTRY
+    except ImportError:
+        return {}
+
+COMMAND_ALIAS_REGISTRY = None  # 延遲初始化
 
 class InitStartupMixin:
     """Mixin: Initialization, startup, quota, consistency check"""
@@ -837,6 +990,9 @@ class InitStartupMixin:
 
     def _validate_command_alias_registry(self):
         """Phase3: 啟動時驗證命令別名註冊表中的所有條目"""
+        global COMMAND_ALIAS_REGISTRY
+        if COMMAND_ALIAS_REGISTRY is None:
+            COMMAND_ALIAS_REGISTRY = _get_command_alias_registry()
         import importlib
         valid = 0
         invalid = 0

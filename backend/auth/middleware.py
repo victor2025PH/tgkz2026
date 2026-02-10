@@ -50,6 +50,8 @@ PUBLIC_ROUTES = [
     '/api/v1/health',
     '/api/v1/health/liveness',
     '/api/v1/health/readiness',
+    # P13-3: 性能指標
+    '/api/v1/metrics/api',
 ]
 
 # 速率限制配置

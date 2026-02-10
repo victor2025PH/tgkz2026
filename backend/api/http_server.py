@@ -136,7 +136,15 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
             backend_service._http_server = self
     
     def _setup_middleware(self):
-        """設置中間件"""
+        """設置中間件 — P13-3: 添加性能指標收集"""
+        # P13-3: Performance metrics middleware (always loaded first)
+        try:
+            from api.perf_metrics import create_perf_middleware
+            self.app.middlewares.append(create_perf_middleware())
+            logger.info("P13-3: Performance metrics middleware loaded")
+        except Exception as e:
+            logger.warning(f"Perf metrics middleware failed: {e}")
+
         # 嘗試使用完整的中間件堆棧
         try:
             from api.middleware import create_middleware_stack
@@ -164,15 +172,7 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
                     'error_type': type(e).__name__
                 }, status=500)
         
-        @web.middleware
-        async def logging_middleware(request, handler):
-            start_time = datetime.now()
-            response = await handler(request)
-            duration = (datetime.now() - start_time).total_seconds() * 1000
-            logger.info(f"{request.method} {request.path} - {response.status} ({duration:.1f}ms)")
-            return response
-        
-        self.app.middlewares.extend([logging_middleware, error_middleware])
+        self.app.middlewares.extend([error_middleware])
     
     def _setup_cors(self):
         """設置 CORS"""
@@ -191,321 +191,307 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
             except ValueError:
                 pass
     
+    # ==================== P13-2: 声明式路由表 ====================
+    # 格式: (HTTP方法, 路径, handler方法名)
+    # 用数据结构替代 9 个 _setup_* 过程式方法，集中管理所有路由映射
+
+    ROUTE_TABLE = [
+        # === 核心: 健康检查 / 诊断 / 命令 ===
+        ('GET',    '/health',                          'basic_health_check'),
+        ('GET',    '/api/health',                      'basic_health_check'),
+        ('GET',    '/api/debug/modules',               'debug_modules'),
+        ('GET',    '/api/debug/deploy',                'debug_deploy'),
+        ('GET',    '/api/debug/accounts',              'debug_accounts'),
+        ('POST',   '/api/command',                     'handle_command'),
+        ('POST',   '/api/v1/command',                  'handle_command'),
+
+        # === 帳號管理 ===
+        ('GET',    '/api/v1/accounts',                 'get_accounts'),
+        ('POST',   '/api/v1/accounts',                 'add_account'),
+        ('GET',    '/api/v1/accounts/{id}',            'get_account'),
+        ('PUT',    '/api/v1/accounts/{id}',            'update_account'),
+        ('DELETE', '/api/v1/accounts/{id}',            'delete_account'),
+        ('POST',   '/api/v1/accounts/{id}/login',      'login_account'),
+        ('POST',   '/api/v1/accounts/{id}/logout',     'logout_account'),
+        ('POST',   '/api/v1/accounts/batch',           'batch_account_operations'),
+
+        # === API 憑證 ===
+        ('GET',    '/api/v1/credentials',              'get_credentials'),
+        ('POST',   '/api/v1/credentials',              'add_credential'),
+        ('DELETE', '/api/v1/credentials/{id}',         'delete_credential'),
+        ('GET',    '/api/v1/credentials/recommend',    'get_recommended_credential'),
+
+        # === 監控 ===
+        ('GET',    '/api/v1/monitoring/status',        'get_monitoring_status'),
+        ('POST',   '/api/v1/monitoring/start',         'start_monitoring'),
+        ('POST',   '/api/v1/monitoring/stop',          'stop_monitoring'),
+
+        # === 關鍵詞 / 群組 / 設置 ===
+        ('GET',    '/api/v1/keywords',                 'get_keywords'),
+        ('POST',   '/api/v1/keywords',                 'add_keyword_set'),
+        ('GET',    '/api/v1/groups',                   'get_groups'),
+        ('POST',   '/api/v1/groups',                   'add_group'),
+        ('GET',    '/api/v1/settings',                 'get_settings'),
+        ('POST',   '/api/v1/settings',                 'save_settings'),
+
+        # === 數據導出 / 備份 ===
+        ('POST',   '/api/v1/export',                   'export_data'),
+        ('GET',    '/api/v1/backups',                  'list_backups'),
+        ('POST',   '/api/v1/backups',                  'create_backup'),
+        ('DELETE', '/api/v1/backups/{id}',             'delete_backup'),
+        ('GET',    '/api/v1/backups/{id}/download',    'download_backup'),
+        ('GET',    '/api/v1/initial-state',            'get_initial_state'),
+
+        # === 認證: 用戶認證 ===
+        ('POST',   '/api/v1/auth/register',            'user_register'),
+        ('POST',   '/api/v1/auth/login',               'user_login'),
+        ('POST',   '/api/v1/auth/logout',              'user_logout'),
+        ('POST',   '/api/v1/auth/refresh',             'user_refresh_token'),
+        ('GET',    '/api/v1/auth/me',                  'get_current_user'),
+        ('PUT',    '/api/v1/auth/me',                  'update_current_user'),
+        ('POST',   '/api/v1/auth/change-password',     'change_password'),
+        ('GET',    '/api/v1/auth/sessions',            'get_user_sessions'),
+        ('DELETE', '/api/v1/auth/sessions/{id}',       'revoke_session'),
+        ('POST',   '/api/v1/auth/send-code',           'send_code'),
+        ('POST',   '/api/v1/auth/verify-code',         'verify_code'),
+        ('POST',   '/api/v1/auth/submit-2fa',          'submit_2fa'),
+
+        # === 認證: OAuth ===
+        ('POST',   '/api/v1/oauth/telegram',           'oauth_telegram'),
+        ('GET',    '/api/v1/oauth/telegram/config',    'oauth_telegram_config'),
+        ('GET',    '/api/oauth/telegram/authorize',    'oauth_telegram_authorize'),
+        ('GET',    '/api/v1/oauth/telegram/authorize', 'oauth_telegram_authorize'),
+        ('POST',   '/api/v1/oauth/google',             'oauth_google'),
+        ('GET',    '/api/v1/oauth/google/authorize',   'oauth_google_authorize'),
+        ('GET',    '/api/v1/oauth/google/config',      'oauth_google_config'),
+        ('GET',    '/api/v1/oauth/google/callback',    'oauth_google_callback'),
+        ('GET',    '/api/v1/oauth/providers',          'oauth_providers'),
+        ('POST',   '/api/v1/oauth/telegram/bind',      'bind_telegram'),
+        ('DELETE', '/api/v1/oauth/telegram/unbind',    'unbind_telegram'),
+
+        # === 認證: Deep Link / QR ===
+        ('POST',   '/api/v1/auth/login-token',                            'create_login_token'),
+        ('GET',    '/api/v1/auth/login-token/{token}',                    'check_login_token'),
+        ('POST',   '/api/v1/auth/login-token/{token}/confirm',            'confirm_login_token'),
+        ('POST',   '/api/v1/auth/login-token/{token}/send-confirmation',  'send_login_confirmation'),
+        ('POST',   '/webhook/telegram',                'telegram_webhook'),
+        ('POST',   '/webhook/telegram/{token}',        'telegram_webhook'),
+
+        # === 認證: 設備 / 安全事件 ===
+        ('GET',    '/api/v1/auth/devices',                                   'get_user_devices'),
+        ('DELETE', '/api/v1/auth/devices/{session_id}',                      'revoke_device'),
+        ('POST',   '/api/v1/auth/devices/revoke-all',                        'revoke_all_devices'),
+        ('GET',    '/api/v1/auth/security-events',                           'get_security_events'),
+        ('POST',   '/api/v1/auth/security-events/{event_id}/acknowledge',    'acknowledge_security_event'),
+        ('GET',    '/api/v1/auth/trusted-locations',                         'get_trusted_locations'),
+        ('DELETE', '/api/v1/auth/trusted-locations/{location_id}',           'remove_trusted_location'),
+
+        # === 認證: 郵箱驗證 / 密碼重置 ===
+        ('POST',   '/api/v1/auth/send-verification',   'send_verification_email'),
+        ('POST',   '/api/v1/auth/verify-email',         'verify_email'),
+        ('POST',   '/api/v1/auth/verify-email-code',    'verify_email_by_code'),
+        ('POST',   '/api/v1/auth/forgot-password',      'forgot_password'),
+        ('POST',   '/api/v1/auth/reset-password',       'reset_password'),
+        ('POST',   '/api/v1/auth/reset-password-code',  'reset_password_by_code'),
+
+        # === 認證: 2FA ===
+        ('GET',    '/api/v1/auth/2fa',                 'get_2fa_status'),
+        ('POST',   '/api/v1/auth/2fa/setup',           'setup_2fa'),
+        ('POST',   '/api/v1/auth/2fa/enable',          'enable_2fa'),
+        ('POST',   '/api/v1/auth/2fa/disable',         'disable_2fa'),
+        ('POST',   '/api/v1/auth/2fa/verify',          'verify_2fa'),
+        ('GET',    '/api/v1/auth/2fa/devices',         'get_trusted_devices'),
+        ('DELETE', '/api/v1/auth/2fa/devices/{id}',    'remove_trusted_device'),
+
+        # === API 密鑰 ===
+        ('GET',    '/api/v1/api-keys',                 'list_api_keys'),
+        ('POST',   '/api/v1/api-keys',                 'create_api_key'),
+        ('DELETE', '/api/v1/api-keys/{id}',            'delete_api_key'),
+        ('POST',   '/api/v1/api-keys/{id}/revoke',     'revoke_api_key'),
+
+        # === 業務: 通知 ===
+        ('GET',    '/api/v1/notifications',                 'get_notifications'),
+        ('GET',    '/api/v1/notifications/unread-count',    'get_unread_count'),
+        ('POST',   '/api/v1/notifications/read',            'mark_notification_read'),
+        ('POST',   '/api/v1/notifications/read-all',        'mark_all_notifications_read'),
+        ('GET',    '/api/v1/notifications/preferences',     'get_notification_preferences'),
+        ('PUT',    '/api/v1/notifications/preferences',     'update_notification_preferences'),
+
+        # === 業務: 國際化 / 時區 ===
+        ('GET',    '/api/v1/i18n/languages',           'get_supported_languages'),
+        ('GET',    '/api/v1/i18n/translations',        'get_translations'),
+        ('PUT',    '/api/v1/i18n/language',            'set_user_language'),
+        ('GET',    '/api/v1/timezone/list',            'get_timezones'),
+        ('GET',    '/api/v1/timezone/settings',        'get_timezone_settings'),
+        ('PUT',    '/api/v1/timezone/settings',        'update_timezone_settings'),
+
+        # === 業務: 分析 / 營銷 ===
+        ('POST',   '/api/v1/leads/score',              'score_leads'),
+        ('GET',    '/api/v1/leads/dedup/scan',         'scan_duplicates'),
+        ('POST',   '/api/v1/leads/dedup/merge',        'merge_duplicates'),
+        ('GET',    '/api/v1/analytics/sources',        'analytics_lead_sources'),
+        ('GET',    '/api/v1/analytics/templates',      'analytics_templates'),
+        ('GET',    '/api/v1/analytics/trends',         'analytics_trends'),
+        ('GET',    '/api/v1/analytics/funnel',         'analytics_funnel'),
+        ('GET',    '/api/v1/analytics/summary',        'analytics_summary'),
+        ('GET',    '/api/v1/retry/schedule',           'retry_schedule'),
+        ('POST',   '/api/v1/ab-tests',                 'create_ab_test'),
+        ('GET',    '/api/v1/ab-tests',                 'list_ab_tests'),
+        ('GET',    '/api/v1/ab-tests/{test_id}',       'get_ab_test'),
+        ('POST',   '/api/v1/ab-tests/{test_id}/complete', 'complete_ab_test'),
+
+        # === 業務: 聯繫人 / 推薦 / 優惠券 ===
+        ('GET',    '/api/v1/contacts',                 'get_contacts'),
+        ('GET',    '/api/v1/contacts/stats',           'get_contacts_stats'),
+        ('GET',    '/api/v1/referral/code',            'get_referral_code'),
+        ('GET',    '/api/v1/referral/stats',           'get_referral_stats'),
+        ('POST',   '/api/v1/referral/track',           'track_referral'),
+        ('POST',   '/api/v1/coupon/validate',          'validate_coupon'),
+        ('POST',   '/api/v1/coupon/apply',             'apply_coupon'),
+        ('GET',    '/api/v1/campaigns/active',         'get_active_campaigns'),
+
+        # === 配額 ===
+        ('GET',    '/api/v1/usage',                    'get_usage_stats'),
+        ('GET',    '/api/v1/usage/today',              'get_today_usage'),
+        ('GET',    '/api/v1/usage/history',            'get_usage_history'),
+        ('GET',    '/api/v1/quota',                    'get_quota_status'),
+        ('POST',   '/api/v1/quota/check',              'check_quota'),
+        ('GET',    '/api/v1/quota/alerts',             'get_quota_alerts'),
+        ('POST',   '/api/v1/quota/alerts/acknowledge', 'acknowledge_quota_alert'),
+        ('GET',    '/api/v1/membership/levels',        'get_all_membership_levels'),
+        ('GET',    '/api/v1/quota/trend',              'get_quota_trend'),
+        ('GET',    '/api/v1/quota/history',            'get_quota_history'),
+        ('GET',    '/api/v1/quota/consistency',        'quota_consistency_check'),
+
+        # === 支付 / 訂閱 ===
+        ('GET',    '/api/v1/subscription',             'get_subscription'),
+        ('POST',   '/api/v1/subscription/checkout',    'create_checkout'),
+        ('POST',   '/api/v1/subscription/cancel',      'cancel_subscription'),
+        ('GET',    '/api/v1/subscription/plans',       'get_plans'),
+        ('GET',    '/api/v1/transactions',             'get_transactions'),
+        ('POST',   '/api/v1/webhooks/stripe',          'stripe_webhook'),
+        ('POST',   '/api/v1/payment/create',           'create_payment'),
+        ('GET',    '/api/v1/payment/status',           'get_payment_status'),
+        ('GET',    '/api/v1/payment/history',          'get_payment_history'),
+        ('POST',   '/api/v1/webhooks/paypal',          'paypal_webhook'),
+        ('POST',   '/api/v1/webhooks/alipay',          'alipay_webhook'),
+        ('POST',   '/api/v1/webhooks/wechat',          'wechat_webhook'),
+        ('GET',    '/api/v1/invoices',                 'get_invoices'),
+        ('GET',    '/api/v1/invoices/{invoice_id}',    'get_invoice_detail'),
+        ('GET',    '/api/v1/admin/financial/summary',  'admin_financial_summary'),
+        ('GET',    '/api/v1/admin/financial/export',   'admin_export_financial'),
+        ('GET',    '/api/v1/billing/quota-packs',      'get_quota_packs'),
+        ('POST',   '/api/v1/billing/quota-packs/purchase', 'purchase_quota_pack'),
+        ('GET',    '/api/v1/billing/my-packages',      'get_my_packages'),
+        ('GET',    '/api/v1/billing/bills',            'get_user_bills'),
+        ('POST',   '/api/v1/billing/bills/pay',        'pay_bill'),
+        ('GET',    '/api/v1/billing/overage',          'get_overage_info'),
+        ('GET',    '/api/v1/billing/freeze-status',    'get_freeze_status'),
+        ('GET',    '/api/v1/subscription/details',     'get_subscription_details'),
+        ('POST',   '/api/v1/subscription/upgrade',     'upgrade_subscription'),
+        ('POST',   '/api/v1/subscription/downgrade',   'downgrade_subscription'),
+        ('POST',   '/api/v1/subscription/pause',       'pause_subscription'),
+        ('POST',   '/api/v1/subscription/resume',      'resume_subscription'),
+        ('GET',    '/api/v1/subscription/history',     'get_subscription_history'),
+
+        # === 管理員 v1 ===
+        ('GET',    '/api/v1/admin/dashboard',          'admin_dashboard'),
+        ('GET',    '/api/v1/admin/users',              'admin_list_users'),
+        ('GET',    '/api/v1/admin/users/{id}',         'admin_get_user'),
+        ('PUT',    '/api/v1/admin/users/{id}',         'admin_update_user'),
+        ('POST',   '/api/v1/admin/users/{id}/suspend', 'admin_suspend_user'),
+        ('GET',    '/api/v1/admin/security',           'admin_security_overview'),
+        ('GET',    '/api/v1/admin/audit-logs',         'admin_audit_logs'),
+        ('GET',    '/api/v1/admin/usage-trends',       'admin_usage_trends'),
+        ('GET',    '/api/v1/admin/cache-stats',        'admin_cache_stats'),
+        ('GET',    '/api/v1/admin/quota/overview',     'admin_quota_overview'),
+        ('GET',    '/api/v1/admin/quota/rankings',     'admin_quota_rankings'),
+        ('GET',    '/api/v1/admin/quota/alerts',       'admin_quota_alerts'),
+        ('POST',   '/api/v1/admin/quota/adjust',       'admin_adjust_quota'),
+        ('POST',   '/api/v1/admin/quota/batch-adjust', 'admin_batch_adjust_quotas'),
+        ('GET',    '/api/v1/admin/quota/export',       'admin_export_quota_report'),
+        ('POST',   '/api/v1/admin/quota/reset-daily',  'admin_reset_daily_quotas'),
+        ('GET',    '/api/v1/admin/quota/consistency',  'admin_quota_consistency_check'),
+        ('GET',    '/api/v1/admin/billing/overview',   'admin_billing_overview'),
+        ('GET',    '/api/v1/admin/billing/bills',      'admin_get_all_bills'),
+        ('POST',   '/api/v1/admin/billing/refund',     'admin_process_refund'),
+        ('POST',   '/api/v1/admin/billing/freeze',     'admin_freeze_quota'),
+        ('POST',   '/api/v1/admin/billing/unfreeze',   'admin_unfreeze_quota'),
+        ('GET',    '/api/v1/admin/billing/frozen-users','admin_get_frozen_users'),
+        ('GET',    '/api/v1/admin/analytics/dashboard','admin_analytics_dashboard'),
+        ('GET',    '/api/v1/admin/analytics/trends',   'admin_analytics_trends'),
+        ('GET',    '/api/v1/admin/cache/stats',        'admin_cache_detail_stats'),
+        ('POST',   '/api/v1/admin/cache/clear',        'admin_clear_cache'),
+        ('GET',    '/api/v1/admin/queue/stats',        'admin_queue_stats'),
+        ('GET',    '/api/v1/admin/rate-limit/stats',   'admin_rate_limit_stats'),
+        ('GET',    '/api/v1/admin/rate-limit/rules',   'admin_get_rate_limit_rules'),
+        ('POST',   '/api/v1/admin/rate-limit/ban',     'admin_ban_ip'),
+        ('POST',   '/api/v1/admin/rate-limit/unban',   'admin_unban_ip'),
+        ('GET',    '/api/v1/admin/audit/logs',         'admin_get_audit_logs'),
+        ('GET',    '/api/v1/admin/audit/stats',        'admin_audit_stats'),
+        ('GET',    '/api/v1/admin/audit/export',       'admin_export_audit'),
+        ('GET',    '/api/v1/admin/security/alerts',    'admin_get_security_alerts'),
+        ('GET',    '/api/v1/admin/security/stats',     'admin_security_stats'),
+        ('POST',   '/api/v1/admin/security/acknowledge','admin_acknowledge_alert'),
+        ('POST',   '/api/v1/admin/security/resolve',   'admin_resolve_alert'),
+        ('POST',   '/api/v1/errors',                   'receive_frontend_error'),
+        ('GET',    '/api/v1/admin/errors',             'admin_get_frontend_errors'),
+        ('POST',   '/api/v1/performance',              'receive_performance_report'),
+        ('GET',    '/api/v1/audit/frontend',           'get_frontend_audit_logs'),
+        ('GET',    '/api/v1/admin/ops/dashboard',      'ops_dashboard'),
+        ('GET',    '/api/v1/admin/ops/resources',      'resource_trends'),
+        ('GET',    '/api/v1/admin/ops/error-patterns', 'error_patterns'),
+
+        # === 系統 / 健康檢查 / 文檔 ===
+        ('GET',    '/api/v1/system/health',            'system_health'),
+        ('GET',    '/api/v1/system/metrics',           'system_metrics'),
+        ('GET',    '/api/v1/system/alerts',            'system_alerts'),
+        ('GET',    '/api/v1/health',                   'health_check'),
+        ('GET',    '/api/v1/health/live',              'liveness_probe'),
+        ('GET',    '/api/v1/health/ready',             'readiness_probe'),
+        ('GET',    '/api/v1/health/info',              'service_info'),
+        ('GET',    '/api/v1/health/history',           'health_history'),
+        ('GET',    '/api/v1/status',                   'status_page'),
+        ('GET',    '/metrics',                         'prometheus_metrics'),
+        ('GET',    '/api/v1/diagnostics',              'get_diagnostics'),
+        ('GET',    '/api/v1/diagnostics/quick',        'get_quick_health'),
+        ('GET',    '/api/v1/diagnostics/system',       'get_system_info'),
+        ('GET',    '/api/docs',                        'swagger_ui'),
+        ('GET',    '/api/redoc',                       'redoc_ui'),
+        ('GET',    '/api/openapi.json',                'openapi_json'),
+
+        # === 性能指標 (P13-3) ===
+        ('GET',    '/api/v1/metrics/api',              'api_perf_metrics'),
+
+        # === WebSocket ===
+        ('GET',    '/ws',                              'websocket_handler'),
+        ('GET',    '/api/v1/ws',                       'websocket_handler'),
+        ('GET',    '/ws/login-token/{token}',          'login_token_websocket'),
+    ]
+
     def _setup_routes(self):
-        """設置路由 — P10-1: 按域分組為子方法，提升可讀性與可維護性"""
-        self._setup_core_routes()
-        self._setup_auth_routes()
-        self._setup_business_routes()
-        self._setup_quota_routes()
-        self._setup_payment_routes()
-        self._setup_admin_v1_routes()
-        self._setup_system_routes()
-        self._setup_websocket_routes()
-        self._setup_admin_module_routes()
+        """P13-2: 声明式路由注册 — 数据驱动替代 9 个过程式 _setup_* 方法"""
+        method_map = {
+            'GET': self.app.router.add_get,
+            'POST': self.app.router.add_post,
+            'PUT': self.app.router.add_put,
+            'DELETE': self.app.router.add_delete,
+            'PATCH': self.app.router.add_patch,
+        }
+        registered = 0
+        for method, path, handler_name in self.ROUTE_TABLE:
+            handler = getattr(self, handler_name, None)
+            if handler is None:
+                logger.warning(f"Route handler not found: {handler_name} for {method} {path}")
+                continue
+            add_fn = method_map.get(method)
+            if add_fn:
+                add_fn(path, handler)
+                registered += 1
 
-    # ---------- P10-1: 路由子方法 ----------
+        logger.info(f"P13-2: Registered {registered}/{len(self.ROUTE_TABLE)} declarative routes")
 
-    def _setup_core_routes(self):
-        """核心路由: 健康檢查、診斷、命令端點、帳號管理"""
-        # 基础健康检查（轻量级）
-        self.app.router.add_get('/health', self.basic_health_check)
-        self.app.router.add_get('/api/health', self.basic_health_check)
-        # 診斷端點
-        self.app.router.add_get('/api/debug/modules', self.debug_modules)
-        self.app.router.add_get('/api/debug/deploy', self.debug_deploy)
-        self.app.router.add_get('/api/debug/accounts', self.debug_accounts)
-        # 通用命令端點（核心）
-        self.app.router.add_post('/api/command', self.handle_command)
-        self.app.router.add_post('/api/v1/command', self.handle_command)
-        # 帳號管理
-        self.app.router.add_get('/api/v1/accounts', self.get_accounts)
-        self.app.router.add_post('/api/v1/accounts', self.add_account)
-        self.app.router.add_get('/api/v1/accounts/{id}', self.get_account)
-        self.app.router.add_put('/api/v1/accounts/{id}', self.update_account)
-        self.app.router.add_delete('/api/v1/accounts/{id}', self.delete_account)
-        self.app.router.add_post('/api/v1/accounts/{id}/login', self.login_account)
-        self.app.router.add_post('/api/v1/accounts/{id}/logout', self.logout_account)
-        self.app.router.add_post('/api/v1/accounts/batch', self.batch_account_operations)
-        # API 憑證
-        self.app.router.add_get('/api/v1/credentials', self.get_credentials)
-        self.app.router.add_post('/api/v1/credentials', self.add_credential)
-        self.app.router.add_delete('/api/v1/credentials/{id}', self.delete_credential)
-        self.app.router.add_get('/api/v1/credentials/recommend', self.get_recommended_credential)
-        # 監控
-        self.app.router.add_get('/api/v1/monitoring/status', self.get_monitoring_status)
-        self.app.router.add_post('/api/v1/monitoring/start', self.start_monitoring)
-        self.app.router.add_post('/api/v1/monitoring/stop', self.stop_monitoring)
-        # 關鍵詞 / 群組 / 設置
-        self.app.router.add_get('/api/v1/keywords', self.get_keywords)
-        self.app.router.add_post('/api/v1/keywords', self.add_keyword_set)
-        self.app.router.add_get('/api/v1/groups', self.get_groups)
-        self.app.router.add_post('/api/v1/groups', self.add_group)
-        self.app.router.add_get('/api/v1/settings', self.get_settings)
-        self.app.router.add_post('/api/v1/settings', self.save_settings)
-        # 數據導出和備份
-        self.app.router.add_post('/api/v1/export', self.export_data)
-        self.app.router.add_get('/api/v1/backups', self.list_backups)
-        self.app.router.add_post('/api/v1/backups', self.create_backup)
-        self.app.router.add_delete('/api/v1/backups/{id}', self.delete_backup)
-        self.app.router.add_get('/api/v1/backups/{id}/download', self.download_backup)
-        # 初始狀態
-        self.app.router.add_get('/api/v1/initial-state', self.get_initial_state)
-
-    def _setup_auth_routes(self):
-        """認證路由: 用戶認證、OAuth、2FA、API 密鑰"""
-        # 用戶認證（SaaS）
-        self.app.router.add_post('/api/v1/auth/register', self.user_register)
-        self.app.router.add_post('/api/v1/auth/login', self.user_login)
-        self.app.router.add_post('/api/v1/auth/logout', self.user_logout)
-        self.app.router.add_post('/api/v1/auth/refresh', self.user_refresh_token)
-        self.app.router.add_get('/api/v1/auth/me', self.get_current_user)
-        self.app.router.add_put('/api/v1/auth/me', self.update_current_user)
-        self.app.router.add_post('/api/v1/auth/change-password', self.change_password)
-        self.app.router.add_get('/api/v1/auth/sessions', self.get_user_sessions)
-        self.app.router.add_delete('/api/v1/auth/sessions/{id}', self.revoke_session)
-        # Telegram 帳號認證
-        self.app.router.add_post('/api/v1/auth/send-code', self.send_code)
-        self.app.router.add_post('/api/v1/auth/verify-code', self.verify_code)
-        self.app.router.add_post('/api/v1/auth/submit-2fa', self.submit_2fa)
-        # OAuth 第三方登入
-        self.app.router.add_post('/api/v1/oauth/telegram', self.oauth_telegram)
-        self.app.router.add_get('/api/v1/oauth/telegram/config', self.oauth_telegram_config)
-        self.app.router.add_get('/api/oauth/telegram/authorize', self.oauth_telegram_authorize)
-        self.app.router.add_get('/api/v1/oauth/telegram/authorize', self.oauth_telegram_authorize)
-        self.app.router.add_post('/api/v1/oauth/google', self.oauth_google)
-        self.app.router.add_get('/api/v1/oauth/google/authorize', self.oauth_google_authorize)
-        self.app.router.add_get('/api/v1/oauth/google/config', self.oauth_google_config)
-        self.app.router.add_get('/api/v1/oauth/google/callback', self.oauth_google_callback)
-        self.app.router.add_get('/api/v1/oauth/providers', self.oauth_providers)
-        self.app.router.add_post('/api/v1/oauth/telegram/bind', self.bind_telegram)
-        self.app.router.add_delete('/api/v1/oauth/telegram/unbind', self.unbind_telegram)
-        # Deep Link / QR Code 登入
-        self.app.router.add_post('/api/v1/auth/login-token', self.create_login_token)
-        self.app.router.add_get('/api/v1/auth/login-token/{token}', self.check_login_token)
-        self.app.router.add_post('/api/v1/auth/login-token/{token}/confirm', self.confirm_login_token)
-        self.app.router.add_post('/api/v1/auth/login-token/{token}/send-confirmation', self.send_login_confirmation)
-        # Telegram Bot Webhook
-        self.app.router.add_post('/webhook/telegram', self.telegram_webhook)
-        self.app.router.add_post('/webhook/telegram/{token}', self.telegram_webhook)
-        # 設備管理
-        self.app.router.add_get('/api/v1/auth/devices', self.get_user_devices)
-        self.app.router.add_delete('/api/v1/auth/devices/{session_id}', self.revoke_device)
-        self.app.router.add_post('/api/v1/auth/devices/revoke-all', self.revoke_all_devices)
-        # 安全事件和信任位置
-        self.app.router.add_get('/api/v1/auth/security-events', self.get_security_events)
-        self.app.router.add_post('/api/v1/auth/security-events/{event_id}/acknowledge', self.acknowledge_security_event)
-        self.app.router.add_get('/api/v1/auth/trusted-locations', self.get_trusted_locations)
-        self.app.router.add_delete('/api/v1/auth/trusted-locations/{location_id}', self.remove_trusted_location)
-        # 郵箱驗證和密碼重置
-        self.app.router.add_post('/api/v1/auth/send-verification', self.send_verification_email)
-        self.app.router.add_post('/api/v1/auth/verify-email', self.verify_email)
-        self.app.router.add_post('/api/v1/auth/verify-email-code', self.verify_email_by_code)
-        self.app.router.add_post('/api/v1/auth/forgot-password', self.forgot_password)
-        self.app.router.add_post('/api/v1/auth/reset-password', self.reset_password)
-        self.app.router.add_post('/api/v1/auth/reset-password-code', self.reset_password_by_code)
-        # 2FA
-        self.app.router.add_get('/api/v1/auth/2fa', self.get_2fa_status)
-        self.app.router.add_post('/api/v1/auth/2fa/setup', self.setup_2fa)
-        self.app.router.add_post('/api/v1/auth/2fa/enable', self.enable_2fa)
-        self.app.router.add_post('/api/v1/auth/2fa/disable', self.disable_2fa)
-        self.app.router.add_post('/api/v1/auth/2fa/verify', self.verify_2fa)
-        self.app.router.add_get('/api/v1/auth/2fa/devices', self.get_trusted_devices)
-        self.app.router.add_delete('/api/v1/auth/2fa/devices/{id}', self.remove_trusted_device)
-        # API 密鑰
-        self.app.router.add_get('/api/v1/api-keys', self.list_api_keys)
-        self.app.router.add_post('/api/v1/api-keys', self.create_api_key)
-        self.app.router.add_delete('/api/v1/api-keys/{id}', self.delete_api_key)
-        self.app.router.add_post('/api/v1/api-keys/{id}/revoke', self.revoke_api_key)
-
-    def _setup_business_routes(self):
-        """業務路由: 通知、國際化、時區、分析、聯繫人、A/B 測試"""
-        # 通知 API
-        self.app.router.add_get('/api/v1/notifications', self.get_notifications)
-        self.app.router.add_get('/api/v1/notifications/unread-count', self.get_unread_count)
-        self.app.router.add_post('/api/v1/notifications/read', self.mark_notification_read)
-        self.app.router.add_post('/api/v1/notifications/read-all', self.mark_all_notifications_read)
-        self.app.router.add_get('/api/v1/notifications/preferences', self.get_notification_preferences)
-        self.app.router.add_put('/api/v1/notifications/preferences', self.update_notification_preferences)
-        # 國際化 API
-        self.app.router.add_get('/api/v1/i18n/languages', self.get_supported_languages)
-        self.app.router.add_get('/api/v1/i18n/translations', self.get_translations)
-        self.app.router.add_put('/api/v1/i18n/language', self.set_user_language)
-        # 時區 API
-        self.app.router.add_get('/api/v1/timezone/list', self.get_timezones)
-        self.app.router.add_get('/api/v1/timezone/settings', self.get_timezone_settings)
-        self.app.router.add_put('/api/v1/timezone/settings', self.update_timezone_settings)
-        # 業務功能增強 (P12)
-        self.app.router.add_post('/api/v1/leads/score', self.score_leads)
-        self.app.router.add_get('/api/v1/leads/dedup/scan', self.scan_duplicates)
-        self.app.router.add_post('/api/v1/leads/dedup/merge', self.merge_duplicates)
-        self.app.router.add_get('/api/v1/analytics/sources', self.analytics_lead_sources)
-        self.app.router.add_get('/api/v1/analytics/templates', self.analytics_templates)
-        self.app.router.add_get('/api/v1/analytics/trends', self.analytics_trends)
-        self.app.router.add_get('/api/v1/analytics/funnel', self.analytics_funnel)
-        self.app.router.add_get('/api/v1/analytics/summary', self.analytics_summary)
-        self.app.router.add_get('/api/v1/retry/schedule', self.retry_schedule)
-        self.app.router.add_post('/api/v1/ab-tests', self.create_ab_test)
-        self.app.router.add_get('/api/v1/ab-tests', self.list_ab_tests)
-        self.app.router.add_get('/api/v1/ab-tests/{test_id}', self.get_ab_test)
-        self.app.router.add_post('/api/v1/ab-tests/{test_id}/complete', self.complete_ab_test)
-        # 聯繫人 REST API
-        self.app.router.add_get('/api/v1/contacts', self.get_contacts)
-        self.app.router.add_get('/api/v1/contacts/stats', self.get_contacts_stats)
-        # 推薦獎勵 API
-        self.app.router.add_get('/api/v1/referral/code', self.get_referral_code)
-        self.app.router.add_get('/api/v1/referral/stats', self.get_referral_stats)
-        self.app.router.add_post('/api/v1/referral/track', self.track_referral)
-        # 優惠券 API
-        self.app.router.add_post('/api/v1/coupon/validate', self.validate_coupon)
-        self.app.router.add_post('/api/v1/coupon/apply', self.apply_coupon)
-        self.app.router.add_get('/api/v1/campaigns/active', self.get_active_campaigns)
-
-    def _setup_quota_routes(self):
-        """配額路由: 使用量統計、配額管理"""
-        # 使用量統計
-        self.app.router.add_get('/api/v1/usage', self.get_usage_stats)
-        self.app.router.add_get('/api/v1/usage/today', self.get_today_usage)
-        self.app.router.add_get('/api/v1/usage/history', self.get_usage_history)
-        self.app.router.add_get('/api/v1/quota', self.get_quota_status)
-        # 配額管理（增強版）
-        self.app.router.add_post('/api/v1/quota/check', self.check_quota)
-        self.app.router.add_get('/api/v1/quota/alerts', self.get_quota_alerts)
-        self.app.router.add_post('/api/v1/quota/alerts/acknowledge', self.acknowledge_quota_alert)
-        self.app.router.add_get('/api/v1/membership/levels', self.get_all_membership_levels)
-        self.app.router.add_get('/api/v1/quota/trend', self.get_quota_trend)
-        self.app.router.add_get('/api/v1/quota/history', self.get_quota_history)
-        self.app.router.add_get('/api/v1/quota/consistency', self.quota_consistency_check)
-
-    def _setup_payment_routes(self):
-        """支付路由: 訂閱、支付、發票、計費"""
-        # 支付和訂閱
-        self.app.router.get('/api/v1/subscription', self.get_subscription)
-        self.app.router.add_post('/api/v1/subscription/checkout', self.create_checkout)
-        self.app.router.add_post('/api/v1/subscription/cancel', self.cancel_subscription)
-        self.app.router.add_get('/api/v1/subscription/plans', self.get_plans)
-        self.app.router.add_get('/api/v1/transactions', self.get_transactions)
-        self.app.router.add_post('/api/v1/webhooks/stripe', self.stripe_webhook)
-        # 統一支付 API
-        self.app.router.add_post('/api/v1/payment/create', self.create_payment)
-        self.app.router.add_get('/api/v1/payment/status', self.get_payment_status)
-        self.app.router.add_get('/api/v1/payment/history', self.get_payment_history)
-        self.app.router.add_post('/api/v1/webhooks/paypal', self.paypal_webhook)
-        self.app.router.add_post('/api/v1/webhooks/alipay', self.alipay_webhook)
-        self.app.router.add_post('/api/v1/webhooks/wechat', self.wechat_webhook)
-        # 發票 API
-        self.app.router.add_get('/api/v1/invoices', self.get_invoices)
-        self.app.router.add_get('/api/v1/invoices/{invoice_id}', self.get_invoice_detail)
-        # 財務報表 API（管理員）
-        self.app.router.add_get('/api/v1/admin/financial/summary', self.admin_financial_summary)
-        self.app.router.add_get('/api/v1/admin/financial/export', self.admin_export_financial)
-        # 計費和配額包
-        self.app.router.add_get('/api/v1/billing/quota-packs', self.get_quota_packs)
-        self.app.router.add_post('/api/v1/billing/quota-packs/purchase', self.purchase_quota_pack)
-        self.app.router.add_get('/api/v1/billing/my-packages', self.get_my_packages)
-        self.app.router.add_get('/api/v1/billing/bills', self.get_user_bills)
-        self.app.router.add_post('/api/v1/billing/bills/pay', self.pay_bill)
-        self.app.router.add_get('/api/v1/billing/overage', self.get_overage_info)
-        self.app.router.add_get('/api/v1/billing/freeze-status', self.get_freeze_status)
-        # 訂閱管理 API
-        self.app.router.add_get('/api/v1/subscription/details', self.get_subscription_details)
-        self.app.router.add_post('/api/v1/subscription/upgrade', self.upgrade_subscription)
-        self.app.router.add_post('/api/v1/subscription/downgrade', self.downgrade_subscription)
-        self.app.router.add_post('/api/v1/subscription/pause', self.pause_subscription)
-        self.app.router.add_post('/api/v1/subscription/resume', self.resume_subscription)
-        self.app.router.add_get('/api/v1/subscription/history', self.get_subscription_history)
-
-    def _setup_admin_v1_routes(self):
-        """管理員 v1 路由: 用戶管理、配額監控、計費、安全"""
-        # 管理員 API
-        self.app.router.add_get('/api/v1/admin/dashboard', self.admin_dashboard)
-        self.app.router.add_get('/api/v1/admin/users', self.admin_list_users)
-        self.app.router.add_get('/api/v1/admin/users/{id}', self.admin_get_user)
-        self.app.router.add_put('/api/v1/admin/users/{id}', self.admin_update_user)
-        self.app.router.add_post('/api/v1/admin/users/{id}/suspend', self.admin_suspend_user)
-        self.app.router.add_get('/api/v1/admin/security', self.admin_security_overview)
-        self.app.router.add_get('/api/v1/admin/audit-logs', self.admin_audit_logs)
-        self.app.router.add_get('/api/v1/admin/usage-trends', self.admin_usage_trends)
-        self.app.router.add_get('/api/v1/admin/cache-stats', self.admin_cache_stats)
-        # 管理員配額監控 API
-        self.app.router.add_get('/api/v1/admin/quota/overview', self.admin_quota_overview)
-        self.app.router.add_get('/api/v1/admin/quota/rankings', self.admin_quota_rankings)
-        self.app.router.add_get('/api/v1/admin/quota/alerts', self.admin_quota_alerts)
-        self.app.router.add_post('/api/v1/admin/quota/adjust', self.admin_adjust_quota)
-        self.app.router.add_post('/api/v1/admin/quota/batch-adjust', self.admin_batch_adjust_quotas)
-        self.app.router.add_get('/api/v1/admin/quota/export', self.admin_export_quota_report)
-        self.app.router.add_post('/api/v1/admin/quota/reset-daily', self.admin_reset_daily_quotas)
-        self.app.router.add_get('/api/v1/admin/quota/consistency', self.admin_quota_consistency_check)
-        # 管理員計費 API
-        self.app.router.add_get('/api/v1/admin/billing/overview', self.admin_billing_overview)
-        self.app.router.add_get('/api/v1/admin/billing/bills', self.admin_get_all_bills)
-        self.app.router.add_post('/api/v1/admin/billing/refund', self.admin_process_refund)
-        self.app.router.add_post('/api/v1/admin/billing/freeze', self.admin_freeze_quota)
-        self.app.router.add_post('/api/v1/admin/billing/unfreeze', self.admin_unfreeze_quota)
-        self.app.router.add_get('/api/v1/admin/billing/frozen-users', self.admin_get_frozen_users)
-        # 數據分析 API（管理員）
-        self.app.router.add_get('/api/v1/admin/analytics/dashboard', self.admin_analytics_dashboard)
-        self.app.router.add_get('/api/v1/admin/analytics/trends', self.admin_analytics_trends)
-        # 緩存管理 API（管理員）
-        self.app.router.add_get('/api/v1/admin/cache/stats', self.admin_cache_detail_stats)
-        self.app.router.add_post('/api/v1/admin/cache/clear', self.admin_clear_cache)
-        # 消息隊列 API（管理員）
-        self.app.router.add_get('/api/v1/admin/queue/stats', self.admin_queue_stats)
-        # 速率限制 API（管理員）
-        self.app.router.add_get('/api/v1/admin/rate-limit/stats', self.admin_rate_limit_stats)
-        self.app.router.add_get('/api/v1/admin/rate-limit/rules', self.admin_get_rate_limit_rules)
-        self.app.router.add_post('/api/v1/admin/rate-limit/ban', self.admin_ban_ip)
-        self.app.router.add_post('/api/v1/admin/rate-limit/unban', self.admin_unban_ip)
-        # 審計日誌 API（管理員）
-        self.app.router.add_get('/api/v1/admin/audit/logs', self.admin_get_audit_logs)
-        self.app.router.add_get('/api/v1/admin/audit/stats', self.admin_audit_stats)
-        self.app.router.add_get('/api/v1/admin/audit/export', self.admin_export_audit)
-        # 安全告警 API（管理員）
-        self.app.router.add_get('/api/v1/admin/security/alerts', self.admin_get_security_alerts)
-        self.app.router.add_get('/api/v1/admin/security/stats', self.admin_security_stats)
-        self.app.router.add_post('/api/v1/admin/security/acknowledge', self.admin_acknowledge_alert)
-        self.app.router.add_post('/api/v1/admin/security/resolve', self.admin_resolve_alert)
-        # 前端錯誤 / 性能 / 審計
-        self.app.router.add_post('/api/v1/errors', self.receive_frontend_error)
-        self.app.router.add_get('/api/v1/admin/errors', self.admin_get_frontend_errors)
-        self.app.router.add_post('/api/v1/performance', self.receive_performance_report)
-        self.app.router.add_get('/api/v1/audit/frontend', self.get_frontend_audit_logs)
-        # 運維可觀測性 API（管理員專用）
-        self.app.router.add_get('/api/v1/admin/ops/dashboard', self.ops_dashboard)
-        self.app.router.add_get('/api/v1/admin/ops/resources', self.resource_trends)
-        self.app.router.add_get('/api/v1/admin/ops/error-patterns', self.error_patterns)
-
-    def _setup_system_routes(self):
-        """系統路由: 健康檢查、診斷、系統監控、API 文檔"""
-        # 系統監控
-        self.app.router.add_get('/api/v1/system/health', self.system_health)
-        self.app.router.add_get('/api/v1/system/metrics', self.system_metrics)
-        self.app.router.add_get('/api/v1/system/alerts', self.system_alerts)
-        # 健康檢查 API
-        self.app.router.add_get('/api/v1/health', self.health_check)
-        self.app.router.add_get('/api/v1/health/live', self.liveness_probe)
-        self.app.router.add_get('/api/v1/health/ready', self.readiness_probe)
-        self.app.router.add_get('/api/v1/health/info', self.service_info)
-        self.app.router.add_get('/api/v1/health/history', self.health_history)
-        self.app.router.add_get('/api/v1/status', self.status_page)
-        # Prometheus 指標
-        self.app.router.add_get('/metrics', self.prometheus_metrics)
-        # 診斷 API
-        self.app.router.add_get('/api/v1/diagnostics', self.get_diagnostics)
-        self.app.router.add_get('/api/v1/diagnostics/quick', self.get_quick_health)
-        self.app.router.add_get('/api/v1/diagnostics/system', self.get_system_info)
-        # API 文檔
-        self.app.router.add_get('/api/docs', self.swagger_ui)
-        self.app.router.add_get('/api/redoc', self.redoc_ui)
-        self.app.router.add_get('/api/openapi.json', self.openapi_json)
-
-    def _setup_websocket_routes(self):
-        """WebSocket 路由"""
-        self.app.router.add_get('/ws', self.websocket_handler)
-        self.app.router.add_get('/api/v1/ws', self.websocket_handler)
-        self.app.router.add_get('/ws/login-token/{token}', self.login_token_websocket)
-
-    def _setup_admin_module_routes(self):
-        """管理後台模組路由 — P12-1: 委托到独立模块 admin_module_routes.py"""
+        # External module routes (admin_handlers, wallet, legacy)
         from api.admin_module_routes import register_admin_module_routes
         register_admin_module_routes(self.app)
 

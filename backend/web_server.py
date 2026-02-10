@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 import sys
+import time
 
 # 設置日誌
 logging.basicConfig(
@@ -38,10 +39,6 @@ async def init_backend():
     except Exception as e:
         logger.warning(f"⚠️ Auth service init warning: {e}")
     
-    # 🔧 P1: 記錄初始化錯誤供診斷端點查詢
-    global _backend_init_error
-    _backend_init_error = None
-    
     try:
         logger.info("📦 Step 1: Importing BackendService...")
         from main import BackendService
@@ -54,18 +51,26 @@ async def init_backend():
     except Exception as e:
         import traceback
         error_detail = traceback.format_exc()
-        _backend_init_error = {
-            'error': str(e),
-            'type': type(e).__name__,
-            'traceback': error_detail
-        }
+        # 🔧 P1: 寫入文件 + 環境變量以便診斷端點讀取
+        try:
+            error_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'backend_init_error.json')
+            os.makedirs(os.path.dirname(error_path), exist_ok=True)
+            import json as _json
+            with open(error_path, 'w') as f:
+                _json.dump({
+                    'error': str(e),
+                    'type': type(e).__name__,
+                    'traceback': error_detail,
+                    'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S')
+                }, f, indent=2)
+            logger.info(f"📝 Init error saved to {error_path}")
+        except Exception as write_err:
+            logger.error(f"Could not save init error: {write_err}")
+        
         logger.error(f"❌ Backend initialization FAILED: {e}")
-        logger.error(f"❌ Traceback:\n{error_detail}")
+        logger.error(f"❌ Full traceback:\n{error_detail}")
         logger.warning("⚠️ Running in DEMO MODE — accounts and all commands will return empty data!")
         return None
-
-# 模塊級變量存儲初始化錯誤
-_backend_init_error = None
 
 
 async def main():

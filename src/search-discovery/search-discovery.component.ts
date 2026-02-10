@@ -62,8 +62,8 @@ export interface Account {
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-4">
             <h1 class="text-2xl font-bold text-white flex items-center gap-3">
-              <span class="text-2xl">🔍</span>
-              搜索發現
+              <span class="text-2xl">{{ initialView() === 'resource-center' ? '📦' : '🔍' }}</span>
+              {{ initialView() === 'resource-center' ? '資源中心' : '搜索發現' }}
             </h1>
             <!-- 快速統計 -->
             <div class="flex items-center gap-2 text-sm">
@@ -1241,6 +1241,7 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   private lastProgressTime: number = 0;               // 最後收到進度事件的時間
   
   // ============ 輸入信號 ============
+  initialView = input<string>('search-discovery');  // 🔧 Phase9-5: 區分「資源中心」vs「搜索發現」
   resources = input<DiscoveredResource[]>([]);
   isSearching = input<boolean>(false);
   selectedAccount = input<Account | null>(null);
@@ -1357,6 +1358,7 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   filterSource = signal<string>('all'); // 'all' | 'telegram' | 'jiso' | 'local'
   filterJoinStatus = signal<string>('all'); // 'all' | 'joined' | 'not_joined'
   filterHasId = signal<boolean>(false); // 只顯示有完整 ID 的結果
+  filterSavedOnly = signal<boolean>(false); // 🔧 Phase9-5: 只顯示收藏的資源（資源中心模式）
   
   // 🆕 詳情彈窗狀態
   showDetailDialog = signal(false);
@@ -1422,6 +1424,11 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       result = result.filter(r => r.telegram_id && r.telegram_id.trim() !== '');
     }
     
+    // 🔧 Phase9-5: 資源中心模式 - 只顯示收藏的資源
+    if (this.filterSavedOnly()) {
+      result = result.filter(r => r.is_saved);
+    }
+    
     return result;
   });
   
@@ -1472,6 +1479,11 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     document.addEventListener('click', this.handleOutsideClick.bind(this));
     // 🆕 鍵盤快捷鍵支持
     document.addEventListener('keydown', this.handleKeydown.bind(this));
+    
+    // 🔧 Phase9-5: 資源中心模式 - 默認只顯示收藏
+    if (this.initialView() === 'resource-center') {
+      this.filterSavedOnly.set(true);
+    }
     
     // 🔧 P0: 獲取帳號列表並監聯更新
     this.loadAccounts();

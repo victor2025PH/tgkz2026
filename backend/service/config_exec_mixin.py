@@ -530,9 +530,9 @@ class ConfigExecMixin:
         
         # 添加 FloodWait 冷卻狀態
         try:
-            from flood_wait_handler import flood_handler
+            _flood = _get_flood_handler()
             import time as _time
-            for phone, until in flood_handler._flood_wait_until.items():
+            for phone, until in (_flood._flood_wait_until if _flood else {}).items():
                 remaining = until - _time.time()
                 if remaining > 0:
                     diagnostics['flood_wait_status'][phone[:4] + '****'] = {
@@ -559,7 +559,6 @@ class ConfigExecMixin:
 
     async def _auto_verify_resource_types(self, resources: list):
         """後台自動驗證資源類型"""
-        import sys
         import asyncio
         
         try:
@@ -596,7 +595,9 @@ class ConfigExecMixin:
                         continue
                     
                     # 🆕 使用智能 FloodWait 處理
-                    await flood_handler.wait_before_operation(online_phone, 'get_chat')
+                    _flood = _get_flood_handler()
+                    if _flood:
+                        await _flood.wait_before_operation(online_phone, 'get_chat')
                     
                     chat_info = await client.get_chat(chat_target)
                     
@@ -776,7 +777,6 @@ class ConfigExecMixin:
 
     async def _execute_scripted_phase(self, execution_id: str):
         """執行劇本階段"""
-        import sys
         
         execution = self._ai_team_executions.get(execution_id)
         if not execution:
@@ -814,7 +814,6 @@ class ConfigExecMixin:
         context: Dict[str, Any]
     ) -> Optional[str]:
         """使用 AI 生成消息內容"""
-        import sys
         
         try:
             # 獲取 AI 配置 - 🔧 修復: 使用正確的方法名

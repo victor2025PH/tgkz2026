@@ -475,6 +475,75 @@ class Database(UserAdminMixin, AccountMixin, KeywordGroupMixin, CampaignQueueMix
                 
         except Exception as e:
             print(f"[Database] Telegram migration warning: {e}", file=sys.stderr)
+        
+        # ====================================================================
+        # 🔧 P6-2: Schema 一致性修复 — 补齐缺失的列和表
+        # ====================================================================
+        try:
+            # --- chat_history 表缺失列 (member_handlers_impl / analytics 需要) ---
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='chat_history'")
+            if cursor.fetchone():
+                cursor.execute("PRAGMA table_info(chat_history)")
+                ch_columns = [col[1] for col in cursor.fetchall()]
+                
+                ch_migrations = [
+                    ('sender_id', "TEXT"),
+                    ('sender_name', "TEXT"),
+                    ('sender_username', "TEXT"),
+                    ('chat_id', "TEXT"),
+                ]
+                for col_name, col_def in ch_migrations:
+                    if col_name not in ch_columns:
+                        print(f"[Database] P6 fix: Adding chat_history.{col_name}", file=sys.stderr)
+                        cursor.execute(f'ALTER TABLE chat_history ADD COLUMN {col_name} {col_def}')
+                        conn.commit()
+            
+            # --- captured_leads 表 (discussion_watcher 需要) ---
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='captured_leads'")
+            if not cursor.fetchone():
+                print("[Database] P6 fix: Creating table captured_leads", file=sys.stderr)
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS captured_leads (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT,
+                        username TEXT,
+                        first_name TEXT,
+                        last_name TEXT,
+                        source_group TEXT,
+                        source_message TEXT,
+                        interactions INTEGER DEFAULT 0,
+                        lead_score REAL DEFAULT 0,
+                        status TEXT DEFAULT 'new',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                conn.commit()
+            
+            # --- user_profiles 缺失列 (quota_service / admin 需要) ---
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_profiles'")
+            if cursor.fetchone():
+                cursor.execute("PRAGMA table_info(user_profiles)")
+                up_columns = [col[1] for col in cursor.fetchall()]
+                
+                up_migrations = [
+                    ('subscription_tier', "TEXT DEFAULT 'free'"),
+                    ('max_accounts', "INTEGER DEFAULT 3"),
+                    ('max_api_calls', "INTEGER DEFAULT 100"),
+                    ('status', "TEXT DEFAULT 'active'"),
+                    ('funnel_stage', "TEXT"),
+                    ('interest_level', "REAL DEFAULT 0"),
+                    ('last_interaction', "TIMESTAMP"),
+                ]
+                for col_name, col_def in up_migrations:
+                    if col_name not in up_columns:
+                        print(f"[Database] P6 fix: Adding user_profiles.{col_name}", file=sys.stderr)
+                        cursor.execute(f'ALTER TABLE user_profiles ADD COLUMN {col_name} {col_def}')
+                        conn.commit()
+            
+        except Exception as e:
+            print(f"[Database] P6 schema fix warning: {e}", file=sys.stderr)
+        
         finally:
             conn.close()
     

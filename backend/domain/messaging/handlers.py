@@ -31,7 +31,9 @@ def register_messaging_handlers(backend_service):
     @router.register('send-greeting', category=CommandCategory.MESSAGING, description='發送問候')
     async def handle_send_greeting(payload: Dict[str, Any], context: CommandContext):
         """發送問候消息"""
-        return await backend_service.handle_send_greeting(payload) if hasattr(backend_service, 'handle_send_greeting') else None
+        if hasattr(backend_service, 'handle_send_greeting'):
+            return await backend_service.handle_send_greeting(payload)
+        return {'success': False, 'error': 'Not implemented: handle_send_greeting'}
     
     # ==================== 消息隊列 ====================
     
@@ -73,7 +75,9 @@ def register_messaging_handlers(backend_service):
     @router.register('add-to-queue', category=CommandCategory.MESSAGING, description='添加到隊列')
     async def handle_add_to_queue(payload: Dict[str, Any], context: CommandContext):
         """添加消息到隊列"""
-        return await backend_service.handle_add_to_queue(payload) if hasattr(backend_service, 'handle_add_to_queue') else None
+        if hasattr(backend_service, 'handle_add_to_queue'):
+            return await backend_service.handle_add_to_queue(payload)
+        return {'success': False, 'error': 'Not implemented: handle_add_to_queue'}
     
     # ==================== 消息模板 ====================
     
@@ -119,12 +123,16 @@ def register_messaging_handlers(backend_service):
     @router.register('get-chat-history-full', category=CommandCategory.MESSAGING, description='獲取完整聊天記錄')
     async def handle_get_chat_history_full(payload: Dict[str, Any], context: CommandContext):
         """獲取完整聊天記錄"""
-        return await backend_service.handle_get_chat_history_full(payload) if hasattr(backend_service, 'handle_get_chat_history_full') else None
+        if hasattr(backend_service, 'handle_get_chat_history_full'):
+            return await backend_service.handle_get_chat_history_full(payload)
+        return {'success': False, 'error': 'Not implemented: handle_get_chat_history_full'}
     
     @router.register('get-chat-list', category=CommandCategory.MESSAGING, description='獲取聊天列表')
     async def handle_get_chat_list(payload: Dict[str, Any], context: CommandContext):
         """獲取聊天列表"""
-        return await backend_service.handle_get_chat_list(payload) if hasattr(backend_service, 'handle_get_chat_list') else None
+        if hasattr(backend_service, 'handle_get_chat_list'):
+            return await backend_service.handle_get_chat_list(payload)
+        return {'success': False, 'error': 'Not implemented: handle_get_chat_list'}
     
     # ==================== 🔧 群聊協作：群組管理 ====================
     
@@ -158,12 +166,16 @@ def register_messaging_handlers(backend_service):
     @router.register('group:get-info', category=CommandCategory.MESSAGING, description='獲取群組信息')
     async def handle_group_get_info(payload: Dict[str, Any], context: CommandContext):
         """獲取群組信息"""
-        return await backend_service.handle_group_get_info(payload) if hasattr(backend_service, 'handle_group_get_info') else None
+        if hasattr(backend_service, 'handle_group_get_info'):
+            return await backend_service.handle_group_get_info(payload)
+        return {'success': False, 'error': 'Not implemented: handle_group_get_info'}
     
     @router.register('group:monitor-messages', category=CommandCategory.MESSAGING, description='監聯群組消息')
     async def handle_group_monitor_messages(payload: Dict[str, Any], context: CommandContext):
         """監聯群組消息（群聊協作用）"""
-        return await backend_service.handle_group_monitor_messages(payload) if hasattr(backend_service, 'handle_group_monitor_messages') else None
+        if hasattr(backend_service, 'handle_group_monitor_messages'):
+            return await backend_service.handle_group_monitor_messages(payload)
+        return {'success': False, 'error': 'Not implemented: handle_group_monitor_messages'}
     
     # ==================== 🆕 P0: 操作記錄 ====================
     

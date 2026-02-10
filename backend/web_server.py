@@ -40,13 +40,42 @@ async def init_backend():
         logger.warning(f"⚠️ Auth service init warning: {e}")
     
     try:
+        t0 = time.time()
         logger.info("📦 Step 1: Importing BackendService...")
         from main import BackendService
-        logger.info("📦 Step 2: BackendService imported, creating instance...")
+        t1 = time.time()
+        logger.info(f"📦 Step 2: BackendService imported in {t1-t0:.3f}s, creating instance...")
         backend = BackendService()
-        logger.info("📦 Step 3: BackendService instance created, calling initialize()...")
+        t2 = time.time()
+        logger.info(f"📦 Step 3: Instance created in {t2-t1:.3f}s, calling initialize()...")
         await backend.initialize()
-        logger.info("✅ Step 4: Backend service FULLY initialized")
+        t3 = time.time()
+        total_s = t3 - t0
+        logger.info(f"✅ Step 4: Backend FULLY initialized in {total_s:.3f}s (import={t1-t0:.2f}s, init={t3-t2:.2f}s)")
+        
+        # 🔧 P3-3: 写入启动性能指标
+        try:
+            import json as _json
+            data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+            os.makedirs(data_dir, exist_ok=True)
+            perf_path = os.path.join(data_dir, 'backend_init_perf.json')
+            with open(perf_path, 'w') as f:
+                _json.dump({
+                    'total_seconds': round(total_s, 3),
+                    'import_seconds': round(t1 - t0, 3),
+                    'construct_seconds': round(t2 - t1, 3),
+                    'initialize_seconds': round(t3 - t2, 3),
+                    'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
+                    'status': 'ok'
+                }, f, indent=2)
+        except Exception:
+            pass
+        
+        # 🔧 P3-3: 超过阈值发出告警
+        INIT_WARN_THRESHOLD_S = 30
+        if total_s > INIT_WARN_THRESHOLD_S:
+            logger.warning(f"⚠️ Backend initialization took {total_s:.1f}s (threshold: {INIT_WARN_THRESHOLD_S}s)")
+        
         # 初始化成功，清理旧的错误文件
         try:
             error_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'backend_init_error.json')

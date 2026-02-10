@@ -473,6 +473,7 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
         ('GET',    '/api/v1/metrics/cache',            'api_cache_stats'),
         ('GET',    '/api/v1/metrics/db',               'api_db_health'),
         ('GET',    '/api/v1/metrics/alerts',            'api_alert_rules'),
+        ('POST',   '/api/v1/db/maintenance',           'api_db_maintenance'),
         ('POST',   '/api/v1/cache/invalidate',         'invalidate_cache'),
 
         # === WebSocket ===

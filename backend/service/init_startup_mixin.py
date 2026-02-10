@@ -839,6 +839,14 @@ class InitStartupMixin:
             setup_anomaly_alert_bridge()
         except Exception as bridge_err:
             print(f"[Backend] ObservabilityBridge setup: {bridge_err}", file=sys.stderr)
+
+        # 🔧 P16-2: 啟動告警引擎後台定時評估 + Telegram 通知
+        try:
+            from api.alert_engine import start_alert_engine_background
+            start_alert_engine_background(interval_seconds=60)
+            print("[Backend] P16-2: Alert engine background loop started", file=sys.stderr)
+        except Exception as alert_err:
+            print(f"[Backend] P16-2: Alert engine start error: {alert_err}", file=sys.stderr)
         
 
         # ── Build ServiceContext (shared dependency container for domain handlers) ──

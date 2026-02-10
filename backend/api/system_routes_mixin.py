@@ -1346,3 +1346,19 @@ class SystemRoutesMixin:
                 'success': False, 'error': str(e),
                 'message': 'Alert engine not available'
             }, 500)
+
+    # ==================== P16-3: DB Maintenance ====================
+
+    async def api_db_maintenance(self, request):
+        """P16-3: 手动触发数据库维护 (WAL checkpoint + VACUUM)"""
+        try:
+            from api.db_health import DbHealthMonitor
+            monitor = DbHealthMonitor.get_instance()
+            result = monitor.auto_maintenance()
+            return self._json_response({'success': True, 'data': result})
+        except Exception as e:
+            logger.error(f"DB maintenance error: {e}")
+            return self._json_response({
+                'success': False, 'error': str(e),
+                'message': 'DB maintenance failed'
+            }, 500)

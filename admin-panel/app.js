@@ -166,6 +166,7 @@ createApp({
             { id: 'sysSettings', name: '系統設置', icon: '⚙️' },  // 🆕 Phase 5
             { id: 'smartOps', name: '智能運維', icon: '🧠' },  // 🆕 Phase 7
             { id: 'serviceDashboard', name: '服務狀態', icon: '🏥' },  // 🆕 Phase 9
+            { id: 'systemMetrics', name: '系統指標', icon: '📡' },  // 🆕 P16
             { id: 'analyticsCenter', name: '分析中心', icon: '🔬' },  // 🆕 Phase 10
             { id: 'devices', name: '設備管理', icon: '💻' },
             { id: 'logs', name: '操作日誌', icon: '📝' },
@@ -247,6 +248,7 @@ createApp({
         const proxyStats = ref({ total: 0, available: 0, assigned: 0, failed: 0 });
         const proxyPagination = ref({ total: 0, page: 1, page_size: 50, total_pages: 1 });
         const proxyFilter = ref('');  // all, available, assigned, failed
+        const proxySourceFilter = ref('');  // manual, api_sync, dynamic
         const showProxyModal = ref(false);
         const proxyForm = reactive({
             text: '',  // 批量添加的文本
@@ -816,6 +818,7 @@ createApp({
         const loadProxies = async () => {
             const params = new URLSearchParams();
             if (proxyFilter.value) params.append('status', proxyFilter.value);
+            if (proxySourceFilter.value) params.append('proxy_source', proxySourceFilter.value);
             params.append('page', proxyPagination.value.page);
             params.append('page_size', proxyPagination.value.page_size);
             
@@ -1685,6 +1688,112 @@ createApp({
             }
         };
         
+        // 🆕 P16: 系統指標儀表盤
+        const systemMetrics = ref({
+            api: null,
+            cache: null,
+            db: null,
+            alerts: null,
+        });
+        const metricsAutoRefresh = ref(false);
+        let metricsRefreshTimer = null;
+
+        const loadSystemMetrics = async () => {
+            try {
+                const [apiRes, cacheRes, dbRes, alertsRes] = await Promise.allSettled([
+                    apiRequest('/v1/metrics/api'),
+                    apiRequest('/v1/metrics/cache'),
+                    apiRequest('/v1/metrics/db'),
+                    apiRequest('/v1/metrics/alerts'),
+                ]);
+                if (apiRes.status === 'fulfilled' && apiRes.value.success)
+                    systemMetrics.value.api = apiRes.value.data;
+                if (cacheRes.status === 'fulfilled' && cacheRes.value.success)
+                    systemMetrics.value.cache = cacheRes.value.data;
+                if (dbRes.status === 'fulfilled' && dbRes.value.success)
+                    systemMetrics.value.db = dbRes.value.data;
+                if (alertsRes.status === 'fulfilled' && alertsRes.value.success)
+                    systemMetrics.value.alerts = alertsRes.value.data;
+
+                // 渲染圖表
+                setTimeout(() => renderMetricsCharts(), 200);
+            } catch (e) {
+                console.error('加載系統指標失敗:', e);
+            }
+        };
+
+        const toggleMetricsAutoRefresh = () => {
+            metricsAutoRefresh.value = !metricsAutoRefresh.value;
+            if (metricsAutoRefresh.value) {
+                metricsRefreshTimer = setInterval(loadSystemMetrics, 15000);
+            } else {
+                clearInterval(metricsRefreshTimer);
+                metricsRefreshTimer = null;
+            }
+        };
+
+        let metricsStatusChart = null;
+        let metricsEndpointChart = null;
+
+        const renderMetricsCharts = () => {
+            const api = systemMetrics.value.api;
+            if (!api) return;
+
+            // 1) 状态码分布饼图
+            const statusCtx = document.getElementById('metricsStatusChart');
+            if (statusCtx) {
+                if (metricsStatusChart) metricsStatusChart.destroy();
+                const dist = api.status_distribution || {};
+                const labels = Object.keys(dist);
+                const values = Object.values(dist);
+                const colors = labels.map(l => {
+                    if (l.startsWith('2')) return '#22c55e';
+                    if (l.startsWith('3')) return '#3b82f6';
+                    if (l.startsWith('4')) return '#f59e0b';
+                    return '#ef4444';
+                });
+                metricsStatusChart = new Chart(statusCtx, {
+                    type: 'doughnut',
+                    data: { labels, datasets: [{ data: values, backgroundColor: colors }] },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { position: 'bottom', labels: { color: '#ccc' } } }
+                    }
+                });
+            }
+
+            // 2) Top 端点响应时间柱状图
+            const epCtx = document.getElementById('metricsEndpointChart');
+            if (epCtx) {
+                if (metricsEndpointChart) metricsEndpointChart.destroy();
+                const slowest = (api.slowest_endpoints || []).slice(0, 10);
+                metricsEndpointChart = new Chart(epCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: slowest.map(e => e.path?.substring(0, 30) || ''),
+                        datasets: [{
+                            label: 'Avg (ms)',
+                            data: slowest.map(e => e.avg_ms || 0),
+                            backgroundColor: '#8b5cf6'
+                        }, {
+                            label: 'P95 (ms)',
+                            data: slowest.map(e => e.p95_ms || 0),
+                            backgroundColor: '#f59e0b'
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        scales: {
+                            x: { ticks: { color: '#aaa' }, grid: { color: '#333' } },
+                            y: { ticks: { color: '#aaa', font: { size: 10 } }, grid: { color: '#333' } }
+                        },
+                        plugins: { legend: { labels: { color: '#ccc' } } }
+                    }
+                });
+            }
+        };
+
         // 🆕 P10: 分析中心
         const analyticsCenter = ref({
             predictions: {},
@@ -3831,6 +3940,7 @@ createApp({
             if (currentPage.value === 'sysSettings') await loadSystemSettings();
             if (currentPage.value === 'smartOps') await loadSmartOpsData();
             if (currentPage.value === 'serviceDashboard') await loadServiceDashboard();
+            if (currentPage.value === 'systemMetrics') await loadSystemMetrics();
             if (currentPage.value === 'analyticsCenter') await loadAnalyticsCenter();
         };
         
@@ -4856,6 +4966,7 @@ createApp({
             proxyStats,
             proxyPagination,
             proxyFilter,
+            proxySourceFilter,
             showProxyModal,
             proxyForm,
             loadProxies,
@@ -5176,6 +5287,12 @@ createApp({
             loadServiceDashboard,
             createStatusUpdate,
             scheduleMaintenance,
+            
+            // 🆕 P16: 系統指標
+            systemMetrics,
+            metricsAutoRefresh,
+            loadSystemMetrics,
+            toggleMetricsAutoRefresh,
             
             // 🆕 P10: 分析中心
             analyticsCenter,

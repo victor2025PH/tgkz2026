@@ -190,6 +190,78 @@ class DbHealthMonitor:
         except Exception as e:
             return {'error': str(e)}
 
+    # ==================== P16-3: 自动 WAL 维护 ====================
+
+    WAL_CHECKPOINT_THRESHOLD_MB = 50    # WAL > 50MB 时触发 checkpoint
+    FRAGMENTATION_VACUUM_THRESHOLD = 20  # 碎片率 > 20% 时建议 VACUUM
+    _last_checkpoint_time: float = 0
+    _last_vacuum_time: float = 0
+    _checkpoint_cooldown: float = 300    # 5 分钟冷却
+    _vacuum_cooldown: float = 86400      # 24 小时冷却
+
+    def auto_maintenance(self) -> Dict[str, Any]:
+        """
+        P16-3: 自动数据库维护
+        - WAL > 50MB → PRAGMA wal_checkpoint(TRUNCATE)
+        - 碎片率 > 20% → VACUUM (仅在冷却期后)
+        返回执行结果
+        """
+        results: Dict[str, Any] = {'actions': []}
+        now = time.time()
+        db_path = self._resolve_db_path()
+        if not db_path or not os.path.exists(db_path):
+            return results
+
+        try:
+            diag = self._get_pragma_diagnostics()
+
+            # WAL checkpoint
+            wal_mb = diag.get('wal_size_mb', 0)
+            if wal_mb > self.WAL_CHECKPOINT_THRESHOLD_MB and (now - self._last_checkpoint_time > self._checkpoint_cooldown):
+                try:
+                    conn = sqlite3.connect(db_path, timeout=10)
+                    result = conn.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()
+                    conn.close()
+                    self._last_checkpoint_time = now
+                    # Invalidate PRAGMA cache
+                    self._last_diagnostic_time = 0
+                    action = {
+                        'type': 'wal_checkpoint',
+                        'wal_size_before_mb': wal_mb,
+                        'result': list(result) if result else None,
+                        'timestamp': datetime.utcnow().isoformat(),
+                    }
+                    results['actions'].append(action)
+                    logger.info("P16-3: WAL checkpoint executed (was %.1f MB)", wal_mb)
+                except Exception as e:
+                    logger.warning("P16-3: WAL checkpoint failed: %s", e)
+                    results['actions'].append({'type': 'wal_checkpoint', 'error': str(e)})
+
+            # VACUUM (碎片整理)
+            frag = diag.get('fragmentation_pct', 0)
+            if frag > self.FRAGMENTATION_VACUUM_THRESHOLD and (now - self._last_vacuum_time > self._vacuum_cooldown):
+                try:
+                    conn = sqlite3.connect(db_path, timeout=60)
+                    conn.execute('VACUUM')
+                    conn.close()
+                    self._last_vacuum_time = now
+                    self._last_diagnostic_time = 0
+                    action = {
+                        'type': 'vacuum',
+                        'fragmentation_before_pct': frag,
+                        'timestamp': datetime.utcnow().isoformat(),
+                    }
+                    results['actions'].append(action)
+                    logger.info("P16-3: VACUUM executed (fragmentation was %.1f%%)", frag)
+                except Exception as e:
+                    logger.warning("P16-3: VACUUM failed: %s", e)
+                    results['actions'].append({'type': 'vacuum', 'error': str(e)})
+
+        except Exception as e:
+            results['error'] = str(e)
+
+        return results
+
     # ==================== 辅助 ====================
 
     def _resolve_db_path(self) -> Optional[str]:

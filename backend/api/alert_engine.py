@@ -1,5 +1,5 @@
 """
-P15-3: 运维告警规则引擎
+P15-3 → P16-2: 运维告警规则引擎 + 定时评估 + Telegram 通知
 
 功能：
 1. 声明式告警规则（阈值 + 检查函数 + 严重等级）
@@ -7,9 +7,11 @@ P15-3: 运维告警规则引擎
 3. 告警去重 — 同一规则连续触发只记录一次 (cool-down 机制)
 4. 历史告警环形缓冲区（最近 200 条）
 5. 为 /api/v1/metrics/alerts 端点提供数据
+6. P16-2: 后台 asyncio.Task 每 60s 自动评估 + Telegram 推送
 """
 
 import time
+import asyncio
 import logging
 import threading
 from typing import Dict, Any, Optional, List, Callable
@@ -355,6 +357,8 @@ class AlertEngine:
             'active_count': len(self._active_alerts),
             'history_recent': [a.to_dict() for a in list(self._history)[-20:]],
             'history_total': len(self._history),
+            'background_running': self._bg_task is not None and not self._bg_task.done()
+                                  if hasattr(self, '_bg_task') and self._bg_task else False,
             'rules': [
                 {
                     'name': r.name,
@@ -366,3 +370,81 @@ class AlertEngine:
                 for r in self._rules
             ],
         }
+
+    # ==================== P16-2: 后台定时评估 + Telegram 通知 ====================
+
+    _bg_task: Optional[asyncio.Task] = None
+
+    def start_background_loop(self, interval_seconds: int = 60):
+        """启动后台定时评估循环（在 asyncio event loop 中调用）"""
+        if self._bg_task and not self._bg_task.done():
+            logger.info("P16-2: Alert background loop already running")
+            return
+        self._bg_task = asyncio.create_task(self._background_eval_loop(interval_seconds))
+        logger.info("P16-2: Alert background loop started (interval=%ds)", interval_seconds)
+
+    async def _background_eval_loop(self, interval: int):
+        """后台循环：每 interval 秒评估规则 + 自动 DB 维护"""
+        await asyncio.sleep(30)  # 启动延迟，等系统稳定
+        cycle = 0
+        while True:
+            try:
+                new_alerts = self.evaluate()
+                if new_alerts:
+                    await self._send_telegram_alerts(new_alerts)
+
+                # P16-3: 每 5 分钟执行一次自动 DB 维护
+                cycle += 1
+                if cycle % 5 == 0:
+                    try:
+                        from api.db_health import DbHealthMonitor
+                        result = DbHealthMonitor.get_instance().auto_maintenance()
+                        if result.get('actions'):
+                            logger.info("P16-3: DB maintenance: %s", result['actions'])
+                    except Exception as e:
+                        logger.debug("P16-3: DB maintenance error: %s", e)
+
+            except Exception as e:
+                logger.debug("P16-2: Alert eval loop error: %s", e)
+            await asyncio.sleep(interval)
+
+    async def _send_telegram_alerts(self, alerts: List[Alert]):
+        """P16-2: 通过 Telegram 推送告警"""
+        try:
+            from telegram_bot import send_notification
+        except ImportError:
+            logger.debug("P16-2: telegram_bot not available, skip notification")
+            return
+
+        for alert in alerts:
+            severity_icon = {
+                'critical': '🔴',
+                'warning': '🟡',
+                'info': '🔵',
+            }.get(alert.severity, '⚪')
+
+            lines = [
+                f"{severity_icon} <b>P15 Alert: {alert.rule_name}</b>",
+                f"Severity: {alert.severity.upper()}",
+                f"Message: {alert.message}",
+            ]
+            # 添加关键详情（限制长度）
+            for k, v in list(alert.details.items())[:5]:
+                lines.append(f"  {k}: {v}")
+            lines.append(f"\nTime: {alert.timestamp}")
+
+            text = "\n".join(lines)
+            try:
+                await send_notification(text)
+                logger.info("P16-2: Telegram alert sent: %s", alert.rule_name)
+            except Exception as e:
+                logger.warning("P16-2: Telegram send failed: %s", e)
+
+
+# ==================== 启动便捷函数 ====================
+
+def start_alert_engine_background(interval_seconds: int = 60):
+    """便捷函数 — 在 asyncio 上下文中启动告警引擎后台循环"""
+    engine = AlertEngine.get_instance()
+    engine.start_background_loop(interval_seconds)
+    return engine

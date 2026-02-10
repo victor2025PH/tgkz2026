@@ -847,6 +847,14 @@ class InitStartupMixin:
             print("[Backend] P16-2: Alert engine background loop started", file=sys.stderr)
         except Exception as alert_err:
             print(f"[Backend] P16-2: Alert engine start error: {alert_err}", file=sys.stderr)
+
+        # 🔧 P17-1: 啟動時序指標採樣器 (60s 間隔，7 天保留)
+        try:
+            from api.metrics_history import start_metrics_history_sampler
+            start_metrics_history_sampler(interval=60)
+            print("[Backend] P17-1: Metrics history sampler started", file=sys.stderr)
+        except Exception as mh_err:
+            print(f"[Backend] P17-1: Metrics history start error: {mh_err}", file=sys.stderr)
         
 
         # ── Build ServiceContext (shared dependency container for domain handlers) ──

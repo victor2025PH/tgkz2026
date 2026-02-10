@@ -5327,6 +5327,81 @@ api_id,api_hash,name,source_phone,max_accounts
                             </div>
                         </div>
                     </div>
+
+                    <!-- P17-1: 時序趨勢線圖 -->
+                    <div class="bg-gray-800 rounded-xl p-6 mb-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold">📈 指標趨勢 (RPM / P95 / 錯誤率)</h3>
+                            <div class="flex gap-2">
+                                <button v-for="p in ['30m','1h','6h','24h','3d','7d']" :key="p"
+                                        @click="changeMetricsPeriod(p)"
+                                        :class="metricsPeriod === p ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'"
+                                        class="px-3 py-1 rounded text-xs transition-colors">
+                                    {{ p }}
+                                </button>
+                            </div>
+                        </div>
+                        <div v-if="systemMetrics.history?.count > 1" style="height: 300px;">
+                            <canvas id="metricsTrendChart"></canvas>
+                        </div>
+                        <div v-else class="text-gray-500 text-sm text-center py-12">
+                            採樣中... 數據將在 1-2 分鐘後開始出現 (已採集 {{ systemMetrics.history?.total_samples || 0 }} 點)
+                        </div>
+                    </div>
+
+                    <!-- P17-2: 安全審計 -->
+                    <div class="grid grid-cols-2 gap-6 mb-6">
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">🛡 安全審計摘要</h3>
+                            <div v-if="systemMetrics.security" class="space-y-3">
+                                <div class="grid grid-cols-3 gap-4 mb-4">
+                                    <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                                        <p class="text-gray-400 text-xs">攔截次數 (1h)</p>
+                                        <p class="text-xl font-bold text-red-400">{{ systemMetrics.security.summary?.total_blocks_1h || 0 }}</p>
+                                    </div>
+                                    <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                                        <p class="text-gray-400 text-xs">被攔截 IP</p>
+                                        <p class="text-xl font-bold text-orange-400">{{ systemMetrics.security.summary?.unique_blocked_ips_1h || 0 }}</p>
+                                    </div>
+                                    <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                                        <p class="text-gray-400 text-xs">活躍封禁</p>
+                                        <p class="text-xl font-bold text-yellow-400">{{ systemMetrics.security.summary?.active_bans || 0 }}</p>
+                                    </div>
+                                </div>
+                                <div v-if="systemMetrics.security.top_blocked_ips?.length">
+                                    <p class="text-gray-500 text-xs mb-2">Top 被攔截 IP</p>
+                                    <div class="space-y-1 max-h-40 overflow-y-auto">
+                                        <div v-for="item in systemMetrics.security.top_blocked_ips.slice(0, 8)" :key="item.ip"
+                                             class="flex justify-between text-xs bg-gray-700/30 p-2 rounded">
+                                            <span class="text-gray-300 font-mono">{{ item.ip }}</span>
+                                            <span class="text-red-400 font-bold">{{ item.block_count }}x</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p v-else class="text-green-400 text-sm text-center py-4">最近無被攔截 IP ✅</p>
+                            </div>
+                            <p v-else class="text-gray-500 text-sm">數據加載中...</p>
+                        </div>
+
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">🔍 異常模式偵測</h3>
+                            <div v-if="systemMetrics.security?.suspicious_patterns?.length" class="space-y-2 max-h-60 overflow-y-auto">
+                                <div v-for="(p, idx) in systemMetrics.security.suspicious_patterns" :key="idx"
+                                     class="bg-red-900/20 border border-red-800 p-3 rounded-lg text-sm">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-red-400 font-mono font-bold">{{ p.ip }}</span>
+                                        <span class="text-xs bg-red-700 px-2 py-0.5 rounded">{{ p.distinct_rules_hit }} rules</span>
+                                    </div>
+                                    <p class="text-gray-400 text-xs">{{ p.reason }}</p>
+                                    <p class="text-gray-500 text-xs mt-1">Rules: {{ p.rules }}</p>
+                                </div>
+                            </div>
+                            <div v-else class="text-center py-8">
+                                <p class="text-green-400 text-sm">未檢測到可疑模式 ✅</p>
+                                <p class="text-gray-500 text-xs mt-2">偵測條件: 同一 IP 觸發 ≥3 條不同限流規則</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
             </div>

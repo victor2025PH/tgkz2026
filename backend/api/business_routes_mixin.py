@@ -830,3 +830,129 @@ class BusinessRoutesMixin:
             logger.error(f"Get contacts stats error: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
 
+    # ==================== P12-1: Batch Operations ====================
+
+    async def batch_account_operations(self, request):
+        """
+        🔧 P6-5: 批量帳號操作
+        
+        支持的操作：delete, login, logout, update_status
+        
+        請求格式:
+        {
+            "operations": [
+                {"action": "delete", "account_id": "123"},
+                {"action": "login", "account_id": "456"},
+                {"action": "logout", "account_id": "789"},
+                {"action": "update_status", "account_id": "abc", "status": "paused"}
+            ]
+        }
+        
+        響應格式:
+        {
+            "success": true,
+            "data": {
+                "total": 3,
+                "succeeded": 2,
+                "failed": 1,
+                "results": [
+                    {"account_id": "123", "action": "delete", "success": true},
+                    {"account_id": "456", "action": "login", "success": true},
+                    {"account_id": "789", "action": "logout", "success": false, "error": "..."}
+                ]
+            }
+        }
+        """
+        try:
+            data = await request.json()
+            operations = data.get('operations', [])
+            
+            if not operations:
+                return self._error_response('No operations provided', 'EMPTY_BATCH', 400)
+            
+            # 限制批量操作數量（防止濫用）
+            MAX_BATCH_SIZE = 50
+            if len(operations) > MAX_BATCH_SIZE:
+                return self._error_response(
+                    f'Batch size exceeds limit ({MAX_BATCH_SIZE})',
+                    'BATCH_TOO_LARGE', 400
+                )
+            
+            # 支持的操作映射
+            action_map = {
+                'delete': lambda op: self._execute_command('remove-account', {'id': op['account_id']}),
+                'login': lambda op: self._execute_command('login-account', {'id': op['account_id']}),
+                'logout': lambda op: self._execute_command('logout-account', {'id': op['account_id']}),
+                'update_status': lambda op: self._execute_command('update-account', {
+                    'id': op['account_id'],
+                    'status': op.get('status', 'active')
+                })
+            }
+            
+            results = []
+            succeeded = 0
+            failed = 0
+            
+            for op in operations:
+                action = op.get('action', '')
+                account_id = op.get('account_id', '')
+                
+                if not action or not account_id:
+                    results.append({
+                        'account_id': account_id,
+                        'action': action,
+                        'success': False,
+                        'error': 'Missing action or account_id'
+                    })
+                    failed += 1
+                    continue
+                
+                handler = action_map.get(action)
+                if not handler:
+                    results.append({
+                        'account_id': account_id,
+                        'action': action,
+                        'success': False,
+                        'error': f'Unknown action: {action}'
+                    })
+                    failed += 1
+                    continue
+                
+                try:
+                    result = await handler(op)
+                    is_success = (
+                        isinstance(result, dict) and result.get('success', False)
+                    ) or (
+                        isinstance(result, dict) and 'error' not in result
+                    )
+                    
+                    results.append({
+                        'account_id': account_id,
+                        'action': action,
+                        'success': is_success,
+                        'error': result.get('error') if isinstance(result, dict) and not is_success else None
+                    })
+                    
+                    if is_success:
+                        succeeded += 1
+                    else:
+                        failed += 1
+                        
+                except Exception as op_err:
+                    results.append({
+                        'account_id': account_id,
+                        'action': action,
+                        'success': False,
+                        'error': str(op_err)
+                    })
+                    failed += 1
+            
+            return self._success_response({
+                'total': len(operations),
+                'succeeded': succeeded,
+                'failed': failed,
+                'results': results
+            })
+            
+        except Exception as e:
+            return self._error_response(str(e), 'BATCH_ERROR', 500)

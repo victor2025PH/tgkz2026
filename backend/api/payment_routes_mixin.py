@@ -718,3 +718,131 @@ class PaymentRoutesMixin:
             return self._json_response({'success': False, 'error': str(e)}, 500)
     
 
+    # ==================== 訂閱管理 API ====================
+    
+    async def get_subscription_details(self, request):
+        """獲取訂閱詳情"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            from core.subscription_manager import get_subscription_manager
+            manager = get_subscription_manager()
+            
+            sub = manager.get_user_subscription(tenant.user_id)
+            history = manager.get_subscription_history(tenant.user_id, limit=10)
+            
+            return self._json_response({
+                'success': True,
+                'data': {
+                    'subscription': sub.to_dict() if sub else None,
+                    'history': [h.to_dict() for h in history]
+                }
+            })
+        except Exception as e:
+            logger.error(f"Get subscription details error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def upgrade_subscription(self, request):
+        """升級訂閱"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            data = await request.json()
+            to_tier = data.get('tier')
+            billing_cycle = data.get('billing_cycle', 'monthly')
+            
+            if not to_tier:
+                return self._json_response({'success': False, 'error': '缺少目標等級'}, 400)
+            
+            from core.subscription_manager import get_subscription_manager
+            manager = get_subscription_manager()
+            
+            result = await manager.upgrade_subscription(tenant.user_id, to_tier, billing_cycle)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Upgrade subscription error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def downgrade_subscription(self, request):
+        """降級訂閱"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            data = await request.json()
+            to_tier = data.get('tier')
+            immediate = data.get('immediate', False)
+            
+            if not to_tier:
+                return self._json_response({'success': False, 'error': '缺少目標等級'}, 400)
+            
+            from core.subscription_manager import get_subscription_manager
+            manager = get_subscription_manager()
+            
+            result = await manager.downgrade_subscription(tenant.user_id, to_tier, immediate)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Downgrade subscription error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def pause_subscription(self, request):
+        """暫停訂閱"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            data = await request.json()
+            reason = data.get('reason', '')
+            
+            from core.subscription_manager import get_subscription_manager
+            manager = get_subscription_manager()
+            
+            result = await manager.pause_subscription(tenant.user_id, reason)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Pause subscription error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def resume_subscription(self, request):
+        """恢復訂閱"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            from core.subscription_manager import get_subscription_manager
+            manager = get_subscription_manager()
+            
+            result = await manager.resume_subscription(tenant.user_id)
+            return self._json_response(result)
+        except Exception as e:
+            logger.error(f"Resume subscription error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+    
+    async def get_subscription_history(self, request):
+        """獲取訂閱歷史"""
+        try:
+            tenant = request.get('tenant')
+            if not tenant or not tenant.user_id:
+                return self._json_response({'success': False, 'error': '需要登入'}, 401)
+            
+            limit = int(request.query.get('limit', 50))
+            
+            from core.subscription_manager import get_subscription_manager
+            manager = get_subscription_manager()
+            
+            history = manager.get_subscription_history(tenant.user_id, limit)
+            return self._json_response({
+                'success': True,
+                'data': [h.to_dict() for h in history]
+            })
+        except Exception as e:
+            logger.error(f"Get subscription history error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, 500)
+

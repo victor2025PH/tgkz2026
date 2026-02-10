@@ -107,14 +107,15 @@ except Exception as e:
 
 logger = logging.getLogger(__name__)
 
-# P9-1: Mixin imports for extracted route handlers
+# P9-1 + P10-1: Mixin imports for extracted route handlers
 from api.auth_routes_mixin import AuthRoutesMixin
 from api.quota_routes_mixin import QuotaRoutesMixin
 from api.payment_routes_mixin import PaymentRoutesMixin
+from api.admin_routes_mixin import AdminRoutesMixin
 
 
-class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin):
-    """HTTP API 服务器 - 包装 CommandRouter (P9-1: mixin-based architecture)"""
+class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin, AdminRoutesMixin):
+    """HTTP API 服务器 - 包装 CommandRouter (P10-1: 4-mixin architecture)"""
     
     def __init__(self, backend_service=None, host='0.0.0.0', port=8000):
         self.backend_service = backend_service
@@ -188,21 +189,31 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin):
                 pass
     
     def _setup_routes(self):
-        """設置路由"""
-        # 基础健康检查（轻量级，不依赖 health_service）
+        """設置路由 — P10-1: 按域分組為子方法，提升可讀性與可維護性"""
+        self._setup_core_routes()
+        self._setup_auth_routes()
+        self._setup_business_routes()
+        self._setup_quota_routes()
+        self._setup_payment_routes()
+        self._setup_admin_v1_routes()
+        self._setup_system_routes()
+        self._setup_websocket_routes()
+        self._setup_admin_module_routes()
+
+    # ---------- P10-1: 路由子方法 ----------
+
+    def _setup_core_routes(self):
+        """核心路由: 健康檢查、診斷、命令端點、帳號管理"""
+        # 基础健康检查（轻量级）
         self.app.router.add_get('/health', self.basic_health_check)
         self.app.router.add_get('/api/health', self.basic_health_check)
-        
         # 診斷端點
         self.app.router.add_get('/api/debug/modules', self.debug_modules)
         self.app.router.add_get('/api/debug/deploy', self.debug_deploy)
         self.app.router.add_get('/api/debug/accounts', self.debug_accounts)
-        
         # 通用命令端點（核心）
         self.app.router.add_post('/api/command', self.handle_command)
         self.app.router.add_post('/api/v1/command', self.handle_command)
-        
-        # RESTful 端點（語義化）
         # 帳號管理
         self.app.router.add_get('/api/v1/accounts', self.get_accounts)
         self.app.router.add_post('/api/v1/accounts', self.add_account)
@@ -211,9 +222,34 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin):
         self.app.router.add_delete('/api/v1/accounts/{id}', self.delete_account)
         self.app.router.add_post('/api/v1/accounts/{id}/login', self.login_account)
         self.app.router.add_post('/api/v1/accounts/{id}/logout', self.logout_account)
-        # 🔧 P6-5: 批量操作端點
         self.app.router.add_post('/api/v1/accounts/batch', self.batch_account_operations)
-        
+        # API 憑證
+        self.app.router.add_get('/api/v1/credentials', self.get_credentials)
+        self.app.router.add_post('/api/v1/credentials', self.add_credential)
+        self.app.router.add_delete('/api/v1/credentials/{id}', self.delete_credential)
+        self.app.router.add_get('/api/v1/credentials/recommend', self.get_recommended_credential)
+        # 監控
+        self.app.router.add_get('/api/v1/monitoring/status', self.get_monitoring_status)
+        self.app.router.add_post('/api/v1/monitoring/start', self.start_monitoring)
+        self.app.router.add_post('/api/v1/monitoring/stop', self.stop_monitoring)
+        # 關鍵詞 / 群組 / 設置
+        self.app.router.add_get('/api/v1/keywords', self.get_keywords)
+        self.app.router.add_post('/api/v1/keywords', self.add_keyword_set)
+        self.app.router.add_get('/api/v1/groups', self.get_groups)
+        self.app.router.add_post('/api/v1/groups', self.add_group)
+        self.app.router.add_get('/api/v1/settings', self.get_settings)
+        self.app.router.add_post('/api/v1/settings', self.save_settings)
+        # 數據導出和備份
+        self.app.router.add_post('/api/v1/export', self.export_data)
+        self.app.router.add_get('/api/v1/backups', self.list_backups)
+        self.app.router.add_post('/api/v1/backups', self.create_backup)
+        self.app.router.add_delete('/api/v1/backups/{id}', self.delete_backup)
+        self.app.router.add_get('/api/v1/backups/{id}/download', self.download_backup)
+        # 初始狀態
+        self.app.router.add_get('/api/v1/initial-state', self.get_initial_state)
+
+    def _setup_auth_routes(self):
+        """認證路由: 用戶認證、OAuth、2FA、API 密鑰"""
         # 用戶認證（SaaS）
         self.app.router.add_post('/api/v1/auth/register', self.user_register)
         self.app.router.add_post('/api/v1/auth/login', self.user_login)
@@ -224,56 +260,39 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin):
         self.app.router.add_post('/api/v1/auth/change-password', self.change_password)
         self.app.router.add_get('/api/v1/auth/sessions', self.get_user_sessions)
         self.app.router.add_delete('/api/v1/auth/sessions/{id}', self.revoke_session)
-        
         # Telegram 帳號認證
         self.app.router.add_post('/api/v1/auth/send-code', self.send_code)
         self.app.router.add_post('/api/v1/auth/verify-code', self.verify_code)
         self.app.router.add_post('/api/v1/auth/submit-2fa', self.submit_2fa)
-        
         # OAuth 第三方登入
         self.app.router.add_post('/api/v1/oauth/telegram', self.oauth_telegram)
         self.app.router.add_get('/api/v1/oauth/telegram/config', self.oauth_telegram_config)
-        
-        # Telegram OAuth 授權重定向（兼容舊路由）
         self.app.router.add_get('/api/oauth/telegram/authorize', self.oauth_telegram_authorize)
         self.app.router.add_get('/api/v1/oauth/telegram/authorize', self.oauth_telegram_authorize)
-        
-        # Google OAuth
         self.app.router.add_post('/api/v1/oauth/google', self.oauth_google)
         self.app.router.add_get('/api/v1/oauth/google/authorize', self.oauth_google_authorize)
         self.app.router.add_get('/api/v1/oauth/google/config', self.oauth_google_config)
         self.app.router.add_get('/api/v1/oauth/google/callback', self.oauth_google_callback)
-        
         self.app.router.add_get('/api/v1/oauth/providers', self.oauth_providers)
-        
-        # 🆕 P2.2: Telegram 帳號綁定
         self.app.router.add_post('/api/v1/oauth/telegram/bind', self.bind_telegram)
         self.app.router.add_delete('/api/v1/oauth/telegram/unbind', self.unbind_telegram)
-        
-        # 🆕 Deep Link / QR Code 登入
+        # Deep Link / QR Code 登入
         self.app.router.add_post('/api/v1/auth/login-token', self.create_login_token)
         self.app.router.add_get('/api/v1/auth/login-token/{token}', self.check_login_token)
         self.app.router.add_post('/api/v1/auth/login-token/{token}/confirm', self.confirm_login_token)
         self.app.router.add_post('/api/v1/auth/login-token/{token}/send-confirmation', self.send_login_confirmation)
-        
-        # 🆕 Telegram Bot Webhook
+        # Telegram Bot Webhook
         self.app.router.add_post('/webhook/telegram', self.telegram_webhook)
         self.app.router.add_post('/webhook/telegram/{token}', self.telegram_webhook)
-        
-        # 🆕 登入 Token WebSocket（實時狀態推送）
-        self.app.router.add_get('/ws/login-token/{token}', self.login_token_websocket)
-        
-        # 🆕 Phase 4: 設備管理
+        # 設備管理
         self.app.router.add_get('/api/v1/auth/devices', self.get_user_devices)
         self.app.router.add_delete('/api/v1/auth/devices/{session_id}', self.revoke_device)
         self.app.router.add_post('/api/v1/auth/devices/revoke-all', self.revoke_all_devices)
-        
-        # 🆕 Phase 5: 安全事件和信任位置
+        # 安全事件和信任位置
         self.app.router.add_get('/api/v1/auth/security-events', self.get_security_events)
         self.app.router.add_post('/api/v1/auth/security-events/{event_id}/acknowledge', self.acknowledge_security_event)
         self.app.router.add_get('/api/v1/auth/trusted-locations', self.get_trusted_locations)
         self.app.router.add_delete('/api/v1/auth/trusted-locations/{location_id}', self.remove_trusted_location)
-        
         # 郵箱驗證和密碼重置
         self.app.router.add_post('/api/v1/auth/send-verification', self.send_verification_email)
         self.app.router.add_post('/api/v1/auth/verify-email', self.verify_email)
@@ -281,90 +300,6 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin):
         self.app.router.add_post('/api/v1/auth/forgot-password', self.forgot_password)
         self.app.router.add_post('/api/v1/auth/reset-password', self.reset_password)
         self.app.router.add_post('/api/v1/auth/reset-password-code', self.reset_password_by_code)
-        
-        # API 憑證
-        self.app.router.add_get('/api/v1/credentials', self.get_credentials)
-        self.app.router.add_post('/api/v1/credentials', self.add_credential)
-        self.app.router.add_delete('/api/v1/credentials/{id}', self.delete_credential)
-        self.app.router.add_get('/api/v1/credentials/recommend', self.get_recommended_credential)
-        
-        # 監控
-        self.app.router.add_get('/api/v1/monitoring/status', self.get_monitoring_status)
-        self.app.router.add_post('/api/v1/monitoring/start', self.start_monitoring)
-        self.app.router.add_post('/api/v1/monitoring/stop', self.stop_monitoring)
-        
-        # 關鍵詞
-        self.app.router.add_get('/api/v1/keywords', self.get_keywords)
-        self.app.router.add_post('/api/v1/keywords', self.add_keyword_set)
-        
-        # 群組
-        self.app.router.add_get('/api/v1/groups', self.get_groups)
-        self.app.router.add_post('/api/v1/groups', self.add_group)
-        
-        # 設置
-        self.app.router.add_get('/api/v1/settings', self.get_settings)
-        self.app.router.add_post('/api/v1/settings', self.save_settings)
-        
-        # 使用量統計
-        self.app.router.add_get('/api/v1/usage', self.get_usage_stats)
-        self.app.router.add_get('/api/v1/usage/today', self.get_today_usage)
-        self.app.router.add_get('/api/v1/usage/history', self.get_usage_history)
-        self.app.router.add_get('/api/v1/quota', self.get_quota_status)
-        
-        # 配額管理（增強版）
-        self.app.router.add_post('/api/v1/quota/check', self.check_quota)
-        self.app.router.add_get('/api/v1/quota/alerts', self.get_quota_alerts)
-        self.app.router.add_post('/api/v1/quota/alerts/acknowledge', self.acknowledge_quota_alert)
-        self.app.router.add_get('/api/v1/membership/levels', self.get_all_membership_levels)
-        self.app.router.add_get('/api/v1/quota/trend', self.get_quota_trend)
-        self.app.router.add_get('/api/v1/quota/history', self.get_quota_history)
-        
-        # 支付和訂閱
-        self.app.router.get('/api/v1/subscription', self.get_subscription)
-        self.app.router.add_post('/api/v1/subscription/checkout', self.create_checkout)
-        self.app.router.add_post('/api/v1/subscription/cancel', self.cancel_subscription)
-        self.app.router.add_get('/api/v1/subscription/plans', self.get_plans)
-        self.app.router.add_get('/api/v1/transactions', self.get_transactions)
-        self.app.router.add_post('/api/v1/webhooks/stripe', self.stripe_webhook)
-        
-        # 統一支付 API
-        self.app.router.add_post('/api/v1/payment/create', self.create_payment)
-        self.app.router.add_get('/api/v1/payment/status', self.get_payment_status)
-        self.app.router.add_get('/api/v1/payment/history', self.get_payment_history)
-        self.app.router.add_post('/api/v1/webhooks/paypal', self.paypal_webhook)
-        self.app.router.add_post('/api/v1/webhooks/alipay', self.alipay_webhook)
-        self.app.router.add_post('/api/v1/webhooks/wechat', self.wechat_webhook)
-        
-        # 發票 API
-        self.app.router.add_get('/api/v1/invoices', self.get_invoices)
-        self.app.router.add_get('/api/v1/invoices/{invoice_id}', self.get_invoice_detail)
-        
-        # 財務報表 API（管理員）
-        self.app.router.add_get('/api/v1/admin/financial/summary', self.admin_financial_summary)
-        self.app.router.add_get('/api/v1/admin/financial/export', self.admin_export_financial)
-        
-        # 計費和配額包
-        self.app.router.add_get('/api/v1/billing/quota-packs', self.get_quota_packs)
-        self.app.router.add_post('/api/v1/billing/quota-packs/purchase', self.purchase_quota_pack)
-        self.app.router.add_get('/api/v1/billing/my-packages', self.get_my_packages)
-        self.app.router.add_get('/api/v1/billing/bills', self.get_user_bills)
-        self.app.router.add_post('/api/v1/billing/bills/pay', self.pay_bill)
-        self.app.router.add_get('/api/v1/billing/overage', self.get_overage_info)
-        self.app.router.add_get('/api/v1/billing/freeze-status', self.get_freeze_status)
-        
-        # 數據導出和備份
-        self.app.router.add_post('/api/v1/export', self.export_data)
-        self.app.router.add_get('/api/v1/backups', self.list_backups)
-        self.app.router.add_post('/api/v1/backups', self.create_backup)
-        self.app.router.add_delete('/api/v1/backups/{id}', self.delete_backup)
-        self.app.router.add_get('/api/v1/backups/{id}/download', self.download_backup)
-        
-        # 系統監控
-        self.app.router.add_get('/api/v1/system/health', self.system_health)
-        self.app.router.add_get('/api/v1/system/metrics', self.system_metrics)
-        self.app.router.add_get('/api/v1/system/alerts', self.system_alerts)
-        # 🔧 P11-2: /metrics 路由已移至下方健康檢查區塊，避免重複註冊
-        
         # 2FA
         self.app.router.add_get('/api/v1/auth/2fa', self.get_2fa_status)
         self.app.router.add_post('/api/v1/auth/2fa/setup', self.setup_2fa)
@@ -373,63 +308,14 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin):
         self.app.router.add_post('/api/v1/auth/2fa/verify', self.verify_2fa)
         self.app.router.add_get('/api/v1/auth/2fa/devices', self.get_trusted_devices)
         self.app.router.add_delete('/api/v1/auth/2fa/devices/{id}', self.remove_trusted_device)
-        
         # API 密鑰
         self.app.router.add_get('/api/v1/api-keys', self.list_api_keys)
         self.app.router.add_post('/api/v1/api-keys', self.create_api_key)
         self.app.router.add_delete('/api/v1/api-keys/{id}', self.delete_api_key)
         self.app.router.add_post('/api/v1/api-keys/{id}/revoke', self.revoke_api_key)
-        
-        # 管理員 API
-        self.app.router.add_get('/api/v1/admin/dashboard', self.admin_dashboard)
-        self.app.router.add_get('/api/v1/admin/users', self.admin_list_users)
-        self.app.router.add_get('/api/v1/admin/users/{id}', self.admin_get_user)
-        self.app.router.add_put('/api/v1/admin/users/{id}', self.admin_update_user)
-        self.app.router.add_post('/api/v1/admin/users/{id}/suspend', self.admin_suspend_user)
-        self.app.router.add_get('/api/v1/admin/security', self.admin_security_overview)
-        self.app.router.add_get('/api/v1/admin/audit-logs', self.admin_audit_logs)
-        self.app.router.add_get('/api/v1/admin/usage-trends', self.admin_usage_trends)
-        self.app.router.add_get('/api/v1/admin/cache-stats', self.admin_cache_stats)
-        
-        # 管理員配額監控 API
-        self.app.router.add_get('/api/v1/admin/quota/overview', self.admin_quota_overview)
-        self.app.router.add_get('/api/v1/admin/quota/rankings', self.admin_quota_rankings)
-        self.app.router.add_get('/api/v1/admin/quota/alerts', self.admin_quota_alerts)
-        self.app.router.add_post('/api/v1/admin/quota/adjust', self.admin_adjust_quota)
-        self.app.router.add_post('/api/v1/admin/quota/batch-adjust', self.admin_batch_adjust_quotas)
-        self.app.router.add_get('/api/v1/admin/quota/export', self.admin_export_quota_report)
-        self.app.router.add_post('/api/v1/admin/quota/reset-daily', self.admin_reset_daily_quotas)
-        
-        # 🔧 P4-2: 配額一致性校驗 API
-        self.app.router.add_get('/api/v1/admin/quota/consistency', self.admin_quota_consistency_check)
-        self.app.router.add_get('/api/v1/quota/consistency', self.quota_consistency_check)
-        
-        # 管理員計費 API
-        self.app.router.add_get('/api/v1/admin/billing/overview', self.admin_billing_overview)
-        self.app.router.add_get('/api/v1/admin/billing/bills', self.admin_get_all_bills)
-        self.app.router.add_post('/api/v1/admin/billing/refund', self.admin_process_refund)
-        self.app.router.add_post('/api/v1/admin/billing/freeze', self.admin_freeze_quota)
-        self.app.router.add_post('/api/v1/admin/billing/unfreeze', self.admin_unfreeze_quota)
-        self.app.router.add_get('/api/v1/admin/billing/frozen-users', self.admin_get_frozen_users)
-        
-        # 訂閱管理 API
-        self.app.router.add_get('/api/v1/subscription/details', self.get_subscription_details)
-        self.app.router.add_post('/api/v1/subscription/upgrade', self.upgrade_subscription)
-        self.app.router.add_post('/api/v1/subscription/downgrade', self.downgrade_subscription)
-        self.app.router.add_post('/api/v1/subscription/pause', self.pause_subscription)
-        self.app.router.add_post('/api/v1/subscription/resume', self.resume_subscription)
-        self.app.router.add_get('/api/v1/subscription/history', self.get_subscription_history)
-        
-        # 優惠券 API
-        self.app.router.add_post('/api/v1/coupon/validate', self.validate_coupon)
-        self.app.router.add_post('/api/v1/coupon/apply', self.apply_coupon)
-        self.app.router.add_get('/api/v1/campaigns/active', self.get_active_campaigns)
-        
-        # 推薦獎勵 API
-        self.app.router.add_get('/api/v1/referral/code', self.get_referral_code)
-        self.app.router.add_get('/api/v1/referral/stats', self.get_referral_stats)
-        self.app.router.add_post('/api/v1/referral/track', self.track_referral)
-        
+
+    def _setup_business_routes(self):
+        """業務路由: 通知、國際化、時區、分析、聯繫人、A/B 測試"""
         # 通知 API
         self.app.router.add_get('/api/v1/notifications', self.get_notifications)
         self.app.router.add_get('/api/v1/notifications/unread-count', self.get_unread_count)
@@ -437,37 +323,15 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin):
         self.app.router.add_post('/api/v1/notifications/read-all', self.mark_all_notifications_read)
         self.app.router.add_get('/api/v1/notifications/preferences', self.get_notification_preferences)
         self.app.router.add_put('/api/v1/notifications/preferences', self.update_notification_preferences)
-        
-        # 數據分析 API（管理員）
-        self.app.router.add_get('/api/v1/admin/analytics/dashboard', self.admin_analytics_dashboard)
-        self.app.router.add_get('/api/v1/admin/analytics/trends', self.admin_analytics_trends)
-        
         # 國際化 API
         self.app.router.add_get('/api/v1/i18n/languages', self.get_supported_languages)
         self.app.router.add_get('/api/v1/i18n/translations', self.get_translations)
         self.app.router.add_put('/api/v1/i18n/language', self.set_user_language)
-        
         # 時區 API
         self.app.router.add_get('/api/v1/timezone/list', self.get_timezones)
         self.app.router.add_get('/api/v1/timezone/settings', self.get_timezone_settings)
         self.app.router.add_put('/api/v1/timezone/settings', self.update_timezone_settings)
-        
-        # 健康檢查 API
-        self.app.router.add_get('/api/v1/health', self.health_check)
-        self.app.router.add_get('/api/v1/health/live', self.liveness_probe)
-        self.app.router.add_get('/api/v1/health/ready', self.readiness_probe)
-        self.app.router.add_get('/api/v1/health/info', self.service_info)
-        # 🔧 P10-4: 健康歷史記錄 + 部署狀態頁
-        self.app.router.add_get('/api/v1/health/history', self.health_history)
-        self.app.router.add_get('/api/v1/status', self.status_page)
-        # 🔧 P11-2: Prometheus 指標導出
-        self.app.router.add_get('/metrics', self.prometheus_metrics)
-        # 🔧 P11-4/5/6: 運維可觀測性 API（管理員專用）
-        self.app.router.add_get('/api/v1/admin/ops/dashboard', self.ops_dashboard)
-        self.app.router.add_get('/api/v1/admin/ops/resources', self.resource_trends)
-        self.app.router.add_get('/api/v1/admin/ops/error-patterns', self.error_patterns)
-        
-        # 🔧 P12: 業務功能增強 API
+        # 業務功能增強 (P12)
         self.app.router.add_post('/api/v1/leads/score', self.score_leads)
         self.app.router.add_get('/api/v1/leads/dedup/scan', self.scan_duplicates)
         self.app.router.add_post('/api/v1/leads/dedup/merge', self.merge_duplicates)
@@ -481,62 +345,164 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin):
         self.app.router.add_get('/api/v1/ab-tests', self.list_ab_tests)
         self.app.router.add_get('/api/v1/ab-tests/{test_id}', self.get_ab_test)
         self.app.router.add_post('/api/v1/ab-tests/{test_id}/complete', self.complete_ab_test)
-        
-        # 🔧 P15-1: 聯繫人 REST API（HTTP 模式回退）
+        # 聯繫人 REST API
         self.app.router.add_get('/api/v1/contacts', self.get_contacts)
         self.app.router.add_get('/api/v1/contacts/stats', self.get_contacts_stats)
-        
-        # 🔧 P5-2: 前端錯誤上報端點
-        self.app.router.add_post('/api/v1/errors', self.receive_frontend_error)
-        self.app.router.add_get('/api/v1/admin/errors', self.admin_get_frontend_errors)
-        
-        # 🔧 P7-6: 前端性能指標上報端點
-        self.app.router.add_post('/api/v1/performance', self.receive_performance_report)
-        
-        # 🔧 P8-5: 前端審計日誌查詢
-        self.app.router.add_get('/api/v1/audit/frontend', self.get_frontend_audit_logs)
-        
-        # 緩存管理 API（管理員）— 详细缓存统计
+        # 推薦獎勵 API
+        self.app.router.add_get('/api/v1/referral/code', self.get_referral_code)
+        self.app.router.add_get('/api/v1/referral/stats', self.get_referral_stats)
+        self.app.router.add_post('/api/v1/referral/track', self.track_referral)
+        # 優惠券 API
+        self.app.router.add_post('/api/v1/coupon/validate', self.validate_coupon)
+        self.app.router.add_post('/api/v1/coupon/apply', self.apply_coupon)
+        self.app.router.add_get('/api/v1/campaigns/active', self.get_active_campaigns)
+
+    def _setup_quota_routes(self):
+        """配額路由: 使用量統計、配額管理"""
+        # 使用量統計
+        self.app.router.add_get('/api/v1/usage', self.get_usage_stats)
+        self.app.router.add_get('/api/v1/usage/today', self.get_today_usage)
+        self.app.router.add_get('/api/v1/usage/history', self.get_usage_history)
+        self.app.router.add_get('/api/v1/quota', self.get_quota_status)
+        # 配額管理（增強版）
+        self.app.router.add_post('/api/v1/quota/check', self.check_quota)
+        self.app.router.add_get('/api/v1/quota/alerts', self.get_quota_alerts)
+        self.app.router.add_post('/api/v1/quota/alerts/acknowledge', self.acknowledge_quota_alert)
+        self.app.router.add_get('/api/v1/membership/levels', self.get_all_membership_levels)
+        self.app.router.add_get('/api/v1/quota/trend', self.get_quota_trend)
+        self.app.router.add_get('/api/v1/quota/history', self.get_quota_history)
+        self.app.router.add_get('/api/v1/quota/consistency', self.quota_consistency_check)
+
+    def _setup_payment_routes(self):
+        """支付路由: 訂閱、支付、發票、計費"""
+        # 支付和訂閱
+        self.app.router.get('/api/v1/subscription', self.get_subscription)
+        self.app.router.add_post('/api/v1/subscription/checkout', self.create_checkout)
+        self.app.router.add_post('/api/v1/subscription/cancel', self.cancel_subscription)
+        self.app.router.add_get('/api/v1/subscription/plans', self.get_plans)
+        self.app.router.add_get('/api/v1/transactions', self.get_transactions)
+        self.app.router.add_post('/api/v1/webhooks/stripe', self.stripe_webhook)
+        # 統一支付 API
+        self.app.router.add_post('/api/v1/payment/create', self.create_payment)
+        self.app.router.add_get('/api/v1/payment/status', self.get_payment_status)
+        self.app.router.add_get('/api/v1/payment/history', self.get_payment_history)
+        self.app.router.add_post('/api/v1/webhooks/paypal', self.paypal_webhook)
+        self.app.router.add_post('/api/v1/webhooks/alipay', self.alipay_webhook)
+        self.app.router.add_post('/api/v1/webhooks/wechat', self.wechat_webhook)
+        # 發票 API
+        self.app.router.add_get('/api/v1/invoices', self.get_invoices)
+        self.app.router.add_get('/api/v1/invoices/{invoice_id}', self.get_invoice_detail)
+        # 財務報表 API（管理員）
+        self.app.router.add_get('/api/v1/admin/financial/summary', self.admin_financial_summary)
+        self.app.router.add_get('/api/v1/admin/financial/export', self.admin_export_financial)
+        # 計費和配額包
+        self.app.router.add_get('/api/v1/billing/quota-packs', self.get_quota_packs)
+        self.app.router.add_post('/api/v1/billing/quota-packs/purchase', self.purchase_quota_pack)
+        self.app.router.add_get('/api/v1/billing/my-packages', self.get_my_packages)
+        self.app.router.add_get('/api/v1/billing/bills', self.get_user_bills)
+        self.app.router.add_post('/api/v1/billing/bills/pay', self.pay_bill)
+        self.app.router.add_get('/api/v1/billing/overage', self.get_overage_info)
+        self.app.router.add_get('/api/v1/billing/freeze-status', self.get_freeze_status)
+        # 訂閱管理 API
+        self.app.router.add_get('/api/v1/subscription/details', self.get_subscription_details)
+        self.app.router.add_post('/api/v1/subscription/upgrade', self.upgrade_subscription)
+        self.app.router.add_post('/api/v1/subscription/downgrade', self.downgrade_subscription)
+        self.app.router.add_post('/api/v1/subscription/pause', self.pause_subscription)
+        self.app.router.add_post('/api/v1/subscription/resume', self.resume_subscription)
+        self.app.router.add_get('/api/v1/subscription/history', self.get_subscription_history)
+
+    def _setup_admin_v1_routes(self):
+        """管理員 v1 路由: 用戶管理、配額監控、計費、安全"""
+        # 管理員 API
+        self.app.router.add_get('/api/v1/admin/dashboard', self.admin_dashboard)
+        self.app.router.add_get('/api/v1/admin/users', self.admin_list_users)
+        self.app.router.add_get('/api/v1/admin/users/{id}', self.admin_get_user)
+        self.app.router.add_put('/api/v1/admin/users/{id}', self.admin_update_user)
+        self.app.router.add_post('/api/v1/admin/users/{id}/suspend', self.admin_suspend_user)
+        self.app.router.add_get('/api/v1/admin/security', self.admin_security_overview)
+        self.app.router.add_get('/api/v1/admin/audit-logs', self.admin_audit_logs)
+        self.app.router.add_get('/api/v1/admin/usage-trends', self.admin_usage_trends)
+        self.app.router.add_get('/api/v1/admin/cache-stats', self.admin_cache_stats)
+        # 管理員配額監控 API
+        self.app.router.add_get('/api/v1/admin/quota/overview', self.admin_quota_overview)
+        self.app.router.add_get('/api/v1/admin/quota/rankings', self.admin_quota_rankings)
+        self.app.router.add_get('/api/v1/admin/quota/alerts', self.admin_quota_alerts)
+        self.app.router.add_post('/api/v1/admin/quota/adjust', self.admin_adjust_quota)
+        self.app.router.add_post('/api/v1/admin/quota/batch-adjust', self.admin_batch_adjust_quotas)
+        self.app.router.add_get('/api/v1/admin/quota/export', self.admin_export_quota_report)
+        self.app.router.add_post('/api/v1/admin/quota/reset-daily', self.admin_reset_daily_quotas)
+        self.app.router.add_get('/api/v1/admin/quota/consistency', self.admin_quota_consistency_check)
+        # 管理員計費 API
+        self.app.router.add_get('/api/v1/admin/billing/overview', self.admin_billing_overview)
+        self.app.router.add_get('/api/v1/admin/billing/bills', self.admin_get_all_bills)
+        self.app.router.add_post('/api/v1/admin/billing/refund', self.admin_process_refund)
+        self.app.router.add_post('/api/v1/admin/billing/freeze', self.admin_freeze_quota)
+        self.app.router.add_post('/api/v1/admin/billing/unfreeze', self.admin_unfreeze_quota)
+        self.app.router.add_get('/api/v1/admin/billing/frozen-users', self.admin_get_frozen_users)
+        # 數據分析 API（管理員）
+        self.app.router.add_get('/api/v1/admin/analytics/dashboard', self.admin_analytics_dashboard)
+        self.app.router.add_get('/api/v1/admin/analytics/trends', self.admin_analytics_trends)
+        # 緩存管理 API（管理員）
         self.app.router.add_get('/api/v1/admin/cache/stats', self.admin_cache_detail_stats)
         self.app.router.add_post('/api/v1/admin/cache/clear', self.admin_clear_cache)
-        
         # 消息隊列 API（管理員）
         self.app.router.add_get('/api/v1/admin/queue/stats', self.admin_queue_stats)
-        
         # 速率限制 API（管理員）
         self.app.router.add_get('/api/v1/admin/rate-limit/stats', self.admin_rate_limit_stats)
         self.app.router.add_get('/api/v1/admin/rate-limit/rules', self.admin_get_rate_limit_rules)
         self.app.router.add_post('/api/v1/admin/rate-limit/ban', self.admin_ban_ip)
         self.app.router.add_post('/api/v1/admin/rate-limit/unban', self.admin_unban_ip)
-        
         # 審計日誌 API（管理員）
         self.app.router.add_get('/api/v1/admin/audit/logs', self.admin_get_audit_logs)
         self.app.router.add_get('/api/v1/admin/audit/stats', self.admin_audit_stats)
         self.app.router.add_get('/api/v1/admin/audit/export', self.admin_export_audit)
-        
         # 安全告警 API（管理員）
         self.app.router.add_get('/api/v1/admin/security/alerts', self.admin_get_security_alerts)
         self.app.router.add_get('/api/v1/admin/security/stats', self.admin_security_stats)
         self.app.router.add_post('/api/v1/admin/security/acknowledge', self.admin_acknowledge_alert)
         self.app.router.add_post('/api/v1/admin/security/resolve', self.admin_resolve_alert)
-        
+        # 前端錯誤 / 性能 / 審計
+        self.app.router.add_post('/api/v1/errors', self.receive_frontend_error)
+        self.app.router.add_get('/api/v1/admin/errors', self.admin_get_frontend_errors)
+        self.app.router.add_post('/api/v1/performance', self.receive_performance_report)
+        self.app.router.add_get('/api/v1/audit/frontend', self.get_frontend_audit_logs)
+        # 運維可觀測性 API（管理員專用）
+        self.app.router.add_get('/api/v1/admin/ops/dashboard', self.ops_dashboard)
+        self.app.router.add_get('/api/v1/admin/ops/resources', self.resource_trends)
+        self.app.router.add_get('/api/v1/admin/ops/error-patterns', self.error_patterns)
+
+    def _setup_system_routes(self):
+        """系統路由: 健康檢查、診斷、系統監控、API 文檔"""
+        # 系統監控
+        self.app.router.add_get('/api/v1/system/health', self.system_health)
+        self.app.router.add_get('/api/v1/system/metrics', self.system_metrics)
+        self.app.router.add_get('/api/v1/system/alerts', self.system_alerts)
+        # 健康檢查 API
+        self.app.router.add_get('/api/v1/health', self.health_check)
+        self.app.router.add_get('/api/v1/health/live', self.liveness_probe)
+        self.app.router.add_get('/api/v1/health/ready', self.readiness_probe)
+        self.app.router.add_get('/api/v1/health/info', self.service_info)
+        self.app.router.add_get('/api/v1/health/history', self.health_history)
+        self.app.router.add_get('/api/v1/status', self.status_page)
+        # Prometheus 指標
+        self.app.router.add_get('/metrics', self.prometheus_metrics)
         # 診斷 API
         self.app.router.add_get('/api/v1/diagnostics', self.get_diagnostics)
         self.app.router.add_get('/api/v1/diagnostics/quick', self.get_quick_health)
         self.app.router.add_get('/api/v1/diagnostics/system', self.get_system_info)
-        
         # API 文檔
         self.app.router.add_get('/api/docs', self.swagger_ui)
         self.app.router.add_get('/api/redoc', self.redoc_ui)
         self.app.router.add_get('/api/openapi.json', self.openapi_json)
-        
-        # 初始狀態
-        self.app.router.add_get('/api/v1/initial-state', self.get_initial_state)
-        
-        # WebSocket
+
+    def _setup_websocket_routes(self):
+        """WebSocket 路由"""
         self.app.router.add_get('/ws', self.websocket_handler)
         self.app.router.add_get('/api/v1/ws', self.websocket_handler)
-        
+        self.app.router.add_get('/ws/login-token/{token}', self.login_token_websocket)
+
+    def _setup_admin_module_routes(self):
+        """管理後台模組路由（admin_handlers + wallet + legacy）"""
         # 🆕 管理後台 API（Phase 1 優化版）
         if ADMIN_MODULE_AVAILABLE and admin_handlers:
             # 使用新的處理器（帶審計日誌）
@@ -1881,598 +1847,39 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin):
             content_type='application/json'
         )
     
-    # ==================== 2FA ====================
-    
-    async def get_2fa_status(self, request):
-        """獲取 2FA 狀態"""
-        try:
-            from auth.two_factor import get_two_factor_service
-            service = get_two_factor_service()
-            
-            tenant = request.get('tenant')
-            user_id = tenant.user_id if tenant else None
-            
-            if not user_id:
-                return self._json_response({'success': False, 'error': '未登入'}, 401)
-            
-            config = service.get_config(user_id)
-            if config:
-                return self._json_response({'success': True, 'data': config.to_dict()})
-            return self._json_response({'success': True, 'data': {'enabled': False}})
-        except Exception as e:
-            logger.error(f"Get 2FA status error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def setup_2fa(self, request):
-        """開始 2FA 設置"""
-        try:
-            from auth.two_factor import get_two_factor_service
-            service = get_two_factor_service()
-            
-            tenant = request.get('tenant')
-            user_id = tenant.user_id if tenant else None
-            email = tenant.email if tenant else ''
-            
-            if not user_id:
-                return self._json_response({'success': False, 'error': '未登入'}, 401)
-            
-            result = await service.setup(user_id, email)
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Setup 2FA error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def enable_2fa(self, request):
-        """啟用 2FA"""
-        try:
-            from auth.two_factor import get_two_factor_service
-            service = get_two_factor_service()
-            
-            tenant = request.get('tenant')
-            user_id = tenant.user_id if tenant else None
-            
-            if not user_id:
-                return self._json_response({'success': False, 'error': '未登入'}, 401)
-            
-            data = await request.json()
-            code = data.get('code', '')
-            
-            result = await service.enable(user_id, code)
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Enable 2FA error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def disable_2fa(self, request):
-        """禁用 2FA"""
-        try:
-            from auth.two_factor import get_two_factor_service
-            service = get_two_factor_service()
-            
-            tenant = request.get('tenant')
-            user_id = tenant.user_id if tenant else None
-            
-            if not user_id:
-                return self._json_response({'success': False, 'error': '未登入'}, 401)
-            
-            data = await request.json()
-            code = data.get('code', '')
-            
-            result = await service.disable(user_id, code)
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Disable 2FA error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def verify_2fa(self, request):
-        """驗證 2FA"""
-        try:
-            from auth.two_factor import get_two_factor_service
-            service = get_two_factor_service()
-            
-            data = await request.json()
-            user_id = data.get('user_id', '')
-            code = data.get('code', '')
-            device_fingerprint = data.get('device_fingerprint', '')
-            
-            result = await service.verify(user_id, code, device_fingerprint)
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Verify 2FA error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def get_trusted_devices(self, request):
-        """獲取受信任設備"""
-        try:
-            from auth.two_factor import get_two_factor_service
-            service = get_two_factor_service()
-            
-            tenant = request.get('tenant')
-            user_id = tenant.user_id if tenant else None
-            
-            if not user_id:
-                return self._json_response({'success': False, 'error': '未登入'}, 401)
-            
-            devices = await service.get_trusted_devices(user_id)
-            return self._json_response({'success': True, 'data': devices})
-        except Exception as e:
-            logger.error(f"Get trusted devices error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def remove_trusted_device(self, request):
-        """移除受信任設備"""
-        try:
-            from auth.two_factor import get_two_factor_service
-            service = get_two_factor_service()
-            
-            tenant = request.get('tenant')
-            user_id = tenant.user_id if tenant else None
-            device_id = request.match_info.get('id')
-            
-            if not user_id:
-                return self._json_response({'success': False, 'error': '未登入'}, 401)
-            
-            success = await service.remove_trusted_device(user_id, device_id)
-            return self._json_response({'success': success})
-        except Exception as e:
-            logger.error(f"Remove trusted device error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    # ==================== API 密鑰 ====================
-    
-    async def list_api_keys(self, request):
-        """列出 API 密鑰"""
-        try:
-            from auth.api_key import get_api_key_service
-            service = get_api_key_service()
-            
-            tenant = request.get('tenant')
-            user_id = tenant.user_id if tenant else None
-            
-            if not user_id:
-                return self._json_response({'success': False, 'error': '未登入'}, 401)
-            
-            keys = await service.list_keys(user_id)
-            return self._json_response({
-                'success': True,
-                'data': [k.to_dict() for k in keys]
-            })
-        except Exception as e:
-            logger.error(f"List API keys error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def create_api_key(self, request):
-        """創建 API 密鑰"""
-        try:
-            from auth.api_key import get_api_key_service
-            service = get_api_key_service()
-            
-            tenant = request.get('tenant')
-            user_id = tenant.user_id if tenant else None
-            
-            if not user_id:
-                return self._json_response({'success': False, 'error': '未登入'}, 401)
-            
-            data = await request.json()
-            name = data.get('name', 'Unnamed Key')
-            scopes = data.get('scopes', ['read'])
-            expires_in_days = data.get('expires_in_days')
-            
-            result = await service.create(user_id, name, scopes, expires_in_days)
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Create API key error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def delete_api_key(self, request):
-        """刪除 API 密鑰"""
-        try:
-            from auth.api_key import get_api_key_service
-            service = get_api_key_service()
-            
-            tenant = request.get('tenant')
-            user_id = tenant.user_id if tenant else None
-            key_id = request.match_info.get('id')
-            
-            if not user_id:
-                return self._json_response({'success': False, 'error': '未登入'}, 401)
-            
-            result = await service.delete(user_id, key_id)
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Delete API key error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def revoke_api_key(self, request):
-        """撤銷 API 密鑰"""
-        try:
-            from auth.api_key import get_api_key_service
-            service = get_api_key_service()
-            
-            tenant = request.get('tenant')
-            user_id = tenant.user_id if tenant else None
-            key_id = request.match_info.get('id')
-            
-            if not user_id:
-                return self._json_response({'success': False, 'error': '未登入'}, 401)
-            
-            result = await service.revoke(user_id, key_id)
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Revoke API key error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
+    # P10-2: 2FA + API Keys extracted to api/auth_routes_mixin.py
+
     # ==================== 管理員 API ====================
     
-    async def admin_dashboard(self, request):
-        """管理員儀表板"""
-        try:
-            from api.admin import get_admin_service
-            admin = get_admin_service()
-            
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            stats = await admin.get_dashboard_stats()
-            return self._json_response({'success': True, 'data': stats})
-        except Exception as e:
-            logger.error(f"Admin dashboard error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_dashboard(self, request):... -> admin_routes_mixin.py
     
-    async def admin_list_users(self, request):
-        """管理員 - 用戶列表"""
-        try:
-            from api.admin import get_admin_service
-            admin = get_admin_service()
-            
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            page = int(request.query.get('page', '1'))
-            page_size = int(request.query.get('page_size', '20'))
-            search = request.query.get('search', '')
-            status = request.query.get('status', '')
-            tier = request.query.get('tier', '')
-            
-            result = await admin.get_users(page, page_size, search, status, tier)
-            return self._json_response({'success': True, 'data': result})
-        except Exception as e:
-            logger.error(f"Admin list users error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_list_users(self, request):... -> admin_routes_mixin.py
     
-    async def admin_get_user(self, request):
-        """管理員 - 用戶詳情"""
-        try:
-            from api.admin import get_admin_service
-            admin = get_admin_service()
-            
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            user_id = request.match_info.get('id')
-            user = await admin.get_user_detail(user_id)
-            
-            if user:
-                return self._json_response({'success': True, 'data': user})
-            return self._json_response({'success': False, 'error': '用戶不存在'}, 404)
-        except Exception as e:
-            logger.error(f"Admin get user error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_get_user(self, request):... -> admin_routes_mixin.py
     
-    async def admin_update_user(self, request):
-        """管理員 - 更新用戶"""
-        try:
-            from api.admin import get_admin_service
-            admin = get_admin_service()
-            
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            user_id = request.match_info.get('id')
-            data = await request.json()
-            
-            result = await admin.update_user(user_id, data)
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin update user error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_update_user(self, request):... -> admin_routes_mixin.py
     
-    async def admin_suspend_user(self, request):
-        """管理員 - 暫停用戶"""
-        try:
-            from api.admin import get_admin_service
-            admin = get_admin_service()
-            
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            user_id = request.match_info.get('id')
-            data = await request.json()
-            reason = data.get('reason', '')
-            
-            result = await admin.suspend_user(user_id, reason)
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin suspend user error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_suspend_user(self, request):... -> admin_routes_mixin.py
     
-    async def admin_security_overview(self, request):
-        """管理員 - 安全概覽"""
-        try:
-            from api.admin import get_admin_service
-            admin = get_admin_service()
-            
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            overview = await admin.get_security_overview()
-            return self._json_response({'success': True, 'data': overview})
-        except Exception as e:
-            logger.error(f"Admin security overview error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_security_overview(self, request):... -> admin_routes_mixin.py
     
-    async def admin_audit_logs(self, request):
-        """管理員 - 審計日誌"""
-        try:
-            from api.admin import get_admin_service
-            admin = get_admin_service()
-            
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            page = int(request.query.get('page', '1'))
-            page_size = int(request.query.get('page_size', '50'))
-            action = request.query.get('action', '')
-            
-            result = await admin.get_audit_logs(page, page_size, action or None)
-            return self._json_response({'success': True, 'data': result})
-        except Exception as e:
-            logger.error(f"Admin audit logs error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_audit_logs(self, request):... -> admin_routes_mixin.py
     
-    async def admin_usage_trends(self, request):
-        """管理員 - 使用趨勢"""
-        try:
-            from api.admin import get_admin_service
-            admin = get_admin_service()
-            
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            days = int(request.query.get('days', '30'))
-            trends = await admin.get_usage_trends(days)
-            return self._json_response({'success': True, 'data': trends})
-        except Exception as e:
-            logger.error(f"Admin usage trends error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_usage_trends(self, request):... -> admin_routes_mixin.py
     
-    async def admin_cache_stats(self, request):
-        """管理員 - 緩存統計"""
-        try:
-            from core.cache import get_cache_service
-            cache = get_cache_service()
-            
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            stats = cache.stats()
-            return self._json_response({'success': True, 'data': stats})
-        except Exception as e:
-            logger.error(f"Admin cache stats error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_cache_stats(self, request):... -> admin_routes_mixin.py
     
-    # ==================== 管理員配額監控 API ====================
+    # P10-1: # ==================== 管理員配額監控 API ====================... -> admin_routes_mixin.py
     
-    async def admin_quota_overview(self, request):
-        """管理員 - 配額使用總覽"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            from api.admin import get_admin_service
-            service = get_admin_service()
-            result = await service.get_quota_overview()
-            
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin quota overview error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_quota_rankings(self, request):... -> admin_routes_mixin.py
     
-    async def admin_quota_rankings(self, request):
-        """管理員 - 配額使用排行"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            quota_type = request.query.get('type', 'daily_messages')
-            period = request.query.get('period', 'today')
-            limit = int(request.query.get('limit', 20))
-            
-            from api.admin import get_admin_service
-            service = get_admin_service()
-            result = await service.get_quota_rankings(quota_type, period, limit)
-            
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin quota rankings error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_quota_alerts(self, request):... -> admin_routes_mixin.py
     
-    async def admin_quota_alerts(self, request):
-        """管理員 - 配額告警列表"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            page = int(request.query.get('page', 1))
-            page_size = int(request.query.get('page_size', 50))
-            alert_type = request.query.get('alert_type')
-            acknowledged = request.query.get('acknowledged')
-            
-            if acknowledged is not None:
-                acknowledged = acknowledged.lower() == 'true'
-            
-            from api.admin import get_admin_service
-            service = get_admin_service()
-            result = await service.get_quota_alerts_admin(page, page_size, alert_type, acknowledged)
-            
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin quota alerts error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_adjust_quota(self, request):... -> admin_routes_mixin.py
     
-    async def admin_adjust_quota(self, request):
-        """管理員 - 調整用戶配額"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            data = await request.json()
-            user_id = data.get('user_id')
-            quota_type = data.get('quota_type')
-            new_value = data.get('new_value')
-            reason = data.get('reason', '')
-            
-            if not all([user_id, quota_type, new_value is not None]):
-                return self._json_response({
-                    'success': False,
-                    'error': '缺少必要參數'
-                }, 400)
-            
-            from api.admin import get_admin_service
-            service = get_admin_service()
-            result = await service.adjust_user_quota(
-                user_id, quota_type, new_value, tenant.user_id, reason
-            )
-            
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin adjust quota error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_batch_adjust_quotas(self, request):... -> admin_routes_mixin.py
     
-    async def admin_batch_adjust_quotas(self, request):
-        """管理員 - 批量調整用戶配額"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            data = await request.json()
-            user_ids = data.get('user_ids', [])
-            quota_type = data.get('quota_type')
-            new_value = data.get('new_value')
-            reason = data.get('reason', '')
-            
-            if not all([user_ids, quota_type, new_value is not None]):
-                return self._json_response({
-                    'success': False,
-                    'error': '缺少必要參數'
-                }, 400)
-            
-            from api.admin import get_admin_service
-            service = get_admin_service()
-            result = await service.batch_adjust_quotas(
-                user_ids, quota_type, new_value, tenant.user_id, reason
-            )
-            
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin batch adjust quotas error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def admin_export_quota_report(self, request):
-        """管理員 - 導出配額報表"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            start_date = request.query.get('start_date')
-            end_date = request.query.get('end_date')
-            quota_types = request.query.get('types')
-            format = request.query.get('format', 'json')
-            
-            if quota_types:
-                quota_types = quota_types.split(',')
-            
-            from api.admin import get_admin_service
-            service = get_admin_service()
-            result = await service.export_quota_report(
-                start_date, end_date, quota_types, format
-            )
-            
-            # 如果是 CSV 格式，轉換並返回
-            if format == 'csv' and result.get('success'):
-                csv_content = self._convert_to_csv(result['data'])
-                return web.Response(
-                    body=csv_content.encode('utf-8-sig'),
-                    content_type='text/csv',
-                    headers={
-                        'Content-Disposition': f'attachment; filename=quota_report_{datetime.now().strftime("%Y%m%d")}.csv'
-                    }
-                )
-            
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin export quota report error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_export_quota_report(self, request):... -> admin_routes_mixin.py
     
     def _convert_to_csv(self, report_data: dict) -> str:
         """將報表數據轉換為 CSV"""
@@ -2516,48 +1923,9 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin):
         
         return output.getvalue()
     
-    async def admin_reset_daily_quotas(self, request):
-        """管理員 - 手動重置每日配額"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            from api.admin import get_admin_service
-            service = get_admin_service()
-            result = await service.reset_daily_quotas(tenant.user_id)
-            
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin reset daily quotas error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_reset_daily_quotas(self, request):... -> admin_routes_mixin.py
     
-    # ==================== P4-2: 配額一致性校驗 ====================
-    
-    async def admin_quota_consistency_check(self, request):
-        """管理員 - 全量配額一致性校驗"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            from core.quota_service import get_quota_service
-            service = get_quota_service()
-            result = service.run_all_users_consistency_check()
-            
-            return self._json_response({
-                'success': True,
-                'data': result
-            })
-        except Exception as e:
-            logger.error(f"Admin quota consistency check error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: # ==================== P4-2: 配額一致性校驗 ====================... -> admin_routes_mixin.py
     
     async def quota_consistency_check(self, request):
         """用戶 - 個人配額一致性校驗"""
@@ -2581,286 +1949,20 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin):
             logger.error(f"Quota consistency check error: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
     
-    # ==================== 管理員計費 API ====================
+    # P10-1: # ==================== 管理員計費 API ====================... -> admin_routes_mixin.py
     
-    async def admin_billing_overview(self, request):
-        """管理員 - 獲取計費總覽"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            from api.admin import get_admin_service
-            service = get_admin_service()
-            result = await service.get_billing_overview()
-            
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin billing overview error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_get_all_bills(self, request):... -> admin_routes_mixin.py
     
-    async def admin_get_all_bills(self, request):
-        """管理員 - 獲取所有賬單"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            page = int(request.query.get('page', 1))
-            page_size = int(request.query.get('page_size', 20))
-            status = request.query.get('status')
-            billing_type = request.query.get('type')
-            user_id = request.query.get('user_id')
-            
-            from api.admin import get_admin_service
-            service = get_admin_service()
-            result = await service.get_all_bills(page, page_size, status, billing_type, user_id)
-            
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin get all bills error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_process_refund(self, request):... -> admin_routes_mixin.py
     
-    async def admin_process_refund(self, request):
-        """管理員 - 處理退款"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            data = await request.json()
-            bill_id = data.get('bill_id')
-            refund_amount = data.get('refund_amount')
-            reason = data.get('reason', '')
-            
-            if not bill_id or refund_amount is None:
-                return self._json_response({
-                    'success': False,
-                    'error': '缺少必要參數'
-                }, 400)
-            
-            from api.admin import get_admin_service
-            service = get_admin_service()
-            result = await service.process_refund(bill_id, refund_amount, reason, tenant.user_id)
-            
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin process refund error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_freeze_quota(self, request):... -> admin_routes_mixin.py
     
-    async def admin_freeze_quota(self, request):
-        """管理員 - 凍結用戶配額"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            data = await request.json()
-            user_id = data.get('user_id')
-            reason = data.get('reason', '管理員操作')
-            duration_hours = int(data.get('duration_hours', 24))
-            
-            if not user_id:
-                return self._json_response({
-                    'success': False,
-                    'error': '缺少用戶 ID'
-                }, 400)
-            
-            from api.admin import get_admin_service
-            service = get_admin_service()
-            result = await service.freeze_user_quota(user_id, reason, duration_hours, tenant.user_id)
-            
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin freeze quota error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_unfreeze_quota(self, request):... -> admin_routes_mixin.py
     
-    async def admin_unfreeze_quota(self, request):
-        """管理員 - 解凍用戶配額"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            data = await request.json()
-            user_id = data.get('user_id')
-            
-            if not user_id:
-                return self._json_response({
-                    'success': False,
-                    'error': '缺少用戶 ID'
-                }, 400)
-            
-            from api.admin import get_admin_service
-            service = get_admin_service()
-            result = await service.unfreeze_user_quota(user_id, tenant.user_id)
-            
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin unfreeze quota error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_get_frozen_users(self, request):... -> admin_routes_mixin.py
     
-    async def admin_get_frozen_users(self, request):
-        """管理員 - 獲取被凍結的用戶"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({
-                    'success': False,
-                    'error': '需要管理員權限'
-                }, 403)
-            
-            from api.admin import get_admin_service
-            service = get_admin_service()
-            result = await service.get_frozen_users()
-            
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Admin get frozen users error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    # ==================== 訂閱管理 API ====================
-    
-    async def get_subscription_details(self, request):
-        """獲取訂閱詳情"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or not tenant.user_id:
-                return self._json_response({'success': False, 'error': '需要登入'}, 401)
-            
-            from core.subscription_manager import get_subscription_manager
-            manager = get_subscription_manager()
-            
-            sub = manager.get_user_subscription(tenant.user_id)
-            history = manager.get_subscription_history(tenant.user_id, limit=10)
-            
-            return self._json_response({
-                'success': True,
-                'data': {
-                    'subscription': sub.to_dict() if sub else None,
-                    'history': [h.to_dict() for h in history]
-                }
-            })
-        except Exception as e:
-            logger.error(f"Get subscription details error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def upgrade_subscription(self, request):
-        """升級訂閱"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or not tenant.user_id:
-                return self._json_response({'success': False, 'error': '需要登入'}, 401)
-            
-            data = await request.json()
-            to_tier = data.get('tier')
-            billing_cycle = data.get('billing_cycle', 'monthly')
-            
-            if not to_tier:
-                return self._json_response({'success': False, 'error': '缺少目標等級'}, 400)
-            
-            from core.subscription_manager import get_subscription_manager
-            manager = get_subscription_manager()
-            
-            result = await manager.upgrade_subscription(tenant.user_id, to_tier, billing_cycle)
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Upgrade subscription error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def downgrade_subscription(self, request):
-        """降級訂閱"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or not tenant.user_id:
-                return self._json_response({'success': False, 'error': '需要登入'}, 401)
-            
-            data = await request.json()
-            to_tier = data.get('tier')
-            immediate = data.get('immediate', False)
-            
-            if not to_tier:
-                return self._json_response({'success': False, 'error': '缺少目標等級'}, 400)
-            
-            from core.subscription_manager import get_subscription_manager
-            manager = get_subscription_manager()
-            
-            result = await manager.downgrade_subscription(tenant.user_id, to_tier, immediate)
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Downgrade subscription error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def pause_subscription(self, request):
-        """暫停訂閱"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or not tenant.user_id:
-                return self._json_response({'success': False, 'error': '需要登入'}, 401)
-            
-            data = await request.json()
-            reason = data.get('reason', '')
-            
-            from core.subscription_manager import get_subscription_manager
-            manager = get_subscription_manager()
-            
-            result = await manager.pause_subscription(tenant.user_id, reason)
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Pause subscription error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def resume_subscription(self, request):
-        """恢復訂閱"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or not tenant.user_id:
-                return self._json_response({'success': False, 'error': '需要登入'}, 401)
-            
-            from core.subscription_manager import get_subscription_manager
-            manager = get_subscription_manager()
-            
-            result = await manager.resume_subscription(tenant.user_id)
-            return self._json_response(result)
-        except Exception as e:
-            logger.error(f"Resume subscription error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def get_subscription_history(self, request):
-        """獲取訂閱歷史"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or not tenant.user_id:
-                return self._json_response({'success': False, 'error': '需要登入'}, 401)
-            
-            limit = int(request.query.get('limit', 50))
-            
-            from core.subscription_manager import get_subscription_manager
-            manager = get_subscription_manager()
-            
-            history = manager.get_subscription_history(tenant.user_id, limit)
-            return self._json_response({
-                'success': True,
-                'data': [h.to_dict() for h in history]
-            })
-        except Exception as e:
-            logger.error(f"Get subscription history error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-2: Subscription management extracted to api/payment_routes_mixin.py
+
     
     # ==================== 優惠券 API ====================
     
@@ -3107,54 +2209,9 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin):
             logger.error(f"Update notification preferences error: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
     
-    # ==================== 數據分析 API（管理員）====================
+    # P10-1: # ==================== 數據分析 API（管理員）====================... -> admin_routes_mixin.py
     
-    async def admin_analytics_dashboard(self, request):
-        """管理員 - 分析儀表板"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            from core.analytics_service import get_analytics_service
-            service = get_analytics_service()
-            
-            summary = service.get_dashboard_summary()
-            funnel = service.get_conversion_funnel()
-            
-            return self._json_response({
-                'success': True,
-                'data': {
-                    'summary': summary,
-                    'funnel': funnel
-                }
-            })
-        except Exception as e:
-            logger.error(f"Admin analytics dashboard error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def admin_analytics_trends(self, request):
-        """管理員 - 趨勢數據"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            metric = request.query.get('metric', 'revenue')
-            days = int(request.query.get('days', 30))
-            
-            from core.analytics_service import get_analytics_service
-            service = get_analytics_service()
-            
-            trend = service.get_trend_data(metric, days)
-            
-            return self._json_response({
-                'success': True,
-                'data': {'trend': trend}
-            })
-        except Exception as e:
-            logger.error(f"Admin analytics trends error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_analytics_trends(self, request):... -> admin_routes_mixin.py
     
     # ==================== 國際化 API ====================
     
@@ -4173,60 +3230,7 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin):
             logger.error(f"Frontend error receive failed: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
     
-    async def admin_get_frontend_errors(self, request):
-        """管理員查詢前端錯誤日誌"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            limit = int(request.query.get('limit', '50'))
-            error_type = request.query.get('type', '')
-            severity = request.query.get('severity', '')
-            
-            import sqlite3
-            db_path = os.environ.get('DATABASE_PATH',
-                os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db'))
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
-            
-            query = 'SELECT * FROM frontend_errors WHERE 1=1'
-            params = []
-            
-            if error_type:
-                query += ' AND type = ?'
-                params.append(error_type)
-            if severity:
-                query += ' AND severity = ?'
-                params.append(severity)
-            
-            query += ' ORDER BY id DESC LIMIT ?'
-            params.append(min(limit, 200))
-            
-            rows = conn.execute(query, params).fetchall()
-            errors = [dict(row) for row in rows]
-            
-            # 統計
-            stats = conn.execute('''
-                SELECT type, severity, COUNT(*) as count 
-                FROM frontend_errors 
-                WHERE server_timestamp > datetime('now', '-24 hours')
-                GROUP BY type, severity
-            ''').fetchall()
-            
-            conn.close()
-            
-            return self._json_response({
-                'success': True,
-                'data': {
-                    'errors': errors,
-                    'stats_24h': [dict(s) for s in stats],
-                    'total': len(errors)
-                }
-            })
-        except Exception as e:
-            logger.error(f"Admin get frontend errors failed: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_get_frontend_errors(self, request):... -> admin_routes_mixin.py
     
     # ==================== 🔧 P7-6: 性能指標 API ====================
     
@@ -4422,353 +3426,33 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin):
             logger.error(f"Frontend audit logs query error: {e}")
             return self._json_response({'success': False, 'error': str(e)}, 500)
     
-    # ==================== 緩存管理 API（管理員）====================
+    # P10-1: # ==================== 緩存管理 API（管理員）====================... -> admin_routes_mixin.py
     
-    async def admin_cache_detail_stats(self, request):
-        """🔧 P8-2: 管理員 - 获取详细缓存统计（重命名，避免与 L5601 admin_cache_stats 冲突）"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            from core.cache_service import get_cache_service
-            service = get_cache_service()
-            
-            return self._json_response({
-                'success': True,
-                'data': service.get_stats()
-            })
-        except Exception as e:
-            logger.error(f"Admin cache detail stats error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_clear_cache(self, request):... -> admin_routes_mixin.py
     
-    async def admin_clear_cache(self, request):
-        """管理員 - 清空緩存"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            data = await request.json()
-            namespace = data.get('namespace')
-            
-            from core.cache_service import get_cache_service
-            service = get_cache_service()
-            
-            if namespace:
-                service.clear_namespace(namespace)
-            else:
-                service.clear_all()
-            
-            return self._json_response({
-                'success': True,
-                'message': f'緩存已清空 ({namespace or "all"})'
-            })
-        except Exception as e:
-            logger.error(f"Admin clear cache error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: # ==================== 消息隊列 API（管理員）====================... -> admin_routes_mixin.py
     
-    # ==================== 消息隊列 API（管理員）====================
+    # P10-1: # ==================== 速率限制 API（管理員）====================... -> admin_routes_mixin.py
     
-    async def admin_queue_stats(self, request):
-        """管理員 - 獲取隊列統計"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            from core.message_queue import get_message_queue
-            queue = get_message_queue()
-            
-            return self._json_response({
-                'success': True,
-                'data': queue.get_stats()
-            })
-        except Exception as e:
-            logger.error(f"Admin queue stats error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_get_rate_limit_rules(self, request):... -> admin_routes_mixin.py
     
-    # ==================== 速率限制 API（管理員）====================
+    # P10-1: async def admin_ban_ip(self, request):... -> admin_routes_mixin.py
     
-    async def admin_rate_limit_stats(self, request):
-        """管理員 - 獲取限流統計"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            from core.rate_limiter import get_rate_limiter
-            limiter = get_rate_limiter()
-            
-            return self._json_response({
-                'success': True,
-                'data': limiter.get_stats()
-            })
-        except Exception as e:
-            logger.error(f"Admin rate limit stats error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_unban_ip(self, request):... -> admin_routes_mixin.py
     
-    async def admin_get_rate_limit_rules(self, request):
-        """管理員 - 獲取限流規則"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            from core.rate_limiter import get_rate_limiter
-            limiter = get_rate_limiter()
-            
-            return self._json_response({
-                'success': True,
-                'data': limiter.get_rules()
-            })
-        except Exception as e:
-            logger.error(f"Admin get rate limit rules error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: # ==================== 審計日誌 API（管理員）====================... -> admin_routes_mixin.py
     
-    async def admin_ban_ip(self, request):
-        """管理員 - 封禁 IP"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            data = await request.json()
-            identifier = data.get('identifier')
-            duration = data.get('duration', 3600)
-            reason = data.get('reason', '')
-            
-            if not identifier:
-                return self._json_response({'success': False, 'error': '缺少標識符'}, 400)
-            
-            from core.rate_limiter import get_rate_limiter
-            limiter = get_rate_limiter()
-            limiter.ban(identifier, duration, reason)
-            
-            # 記錄審計日誌
-            from core.audit_service import get_audit_service, AuditCategory, AuditAction
-            audit = get_audit_service()
-            audit.log_admin_action(
-                admin_id=tenant.user_id,
-                admin_name=tenant.email or '',
-                action='ban_ip',
-                target_type='ip',
-                target_id=identifier,
-                description=f"Banned for {duration}s: {reason}"
-            )
-            
-            return self._json_response({'success': True, 'message': f'已封禁 {identifier}'})
-        except Exception as e:
-            logger.error(f"Admin ban IP error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_audit_stats(self, request):... -> admin_routes_mixin.py
     
-    async def admin_unban_ip(self, request):
-        """管理員 - 解除封禁"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            data = await request.json()
-            identifier = data.get('identifier')
-            
-            if not identifier:
-                return self._json_response({'success': False, 'error': '缺少標識符'}, 400)
-            
-            from core.rate_limiter import get_rate_limiter
-            limiter = get_rate_limiter()
-            limiter.unban(identifier)
-            
-            return self._json_response({'success': True, 'message': f'已解除封禁 {identifier}'})
-        except Exception as e:
-            logger.error(f"Admin unban IP error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_export_audit(self, request):... -> admin_routes_mixin.py
     
-    # ==================== 審計日誌 API（管理員）====================
+    # P10-1: # ==================== 安全告警 API（管理員）====================... -> admin_routes_mixin.py
     
-    async def admin_get_audit_logs(self, request):
-        """管理員 - 獲取審計日誌"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            user_id = request.query.get('user_id')
-            category = request.query.get('category')
-            action = request.query.get('action')
-            start_time = request.query.get('start_time')
-            end_time = request.query.get('end_time')
-            limit = int(request.query.get('limit', 100))
-            offset = int(request.query.get('offset', 0))
-            
-            from core.audit_service import get_audit_service
-            audit = get_audit_service()
-            
-            logs = audit.query(
-                user_id=user_id,
-                category=category,
-                action=action,
-                start_time=start_time,
-                end_time=end_time,
-                limit=limit,
-                offset=offset
-            )
-            
-            return self._json_response({
-                'success': True,
-                'data': [log.to_dict() for log in logs]
-            })
-        except Exception as e:
-            logger.error(f"Admin get audit logs error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_security_stats(self, request):... -> admin_routes_mixin.py
     
-    async def admin_audit_stats(self, request):
-        """管理員 - 審計統計"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            days = int(request.query.get('days', 7))
-            
-            from core.audit_service import get_audit_service
-            audit = get_audit_service()
-            
-            return self._json_response({
-                'success': True,
-                'data': audit.get_stats(days)
-            })
-        except Exception as e:
-            logger.error(f"Admin audit stats error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_acknowledge_alert(self, request):... -> admin_routes_mixin.py
     
-    async def admin_export_audit(self, request):
-        """管理員 - 導出審計日誌"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            start_time = request.query.get('start_time')
-            end_time = request.query.get('end_time')
-            format_type = request.query.get('format', 'json')
-            
-            if not start_time or not end_time:
-                return self._json_response({'success': False, 'error': '缺少時間範圍'}, 400)
-            
-            from core.audit_service import get_audit_service
-            audit = get_audit_service()
-            
-            data = audit.export(start_time, end_time, format_type)
-            
-            content_type = 'application/json' if format_type == 'json' else 'text/csv'
-            
-            return web.Response(
-                text=data,
-                content_type=content_type,
-                headers={
-                    'Content-Disposition': f'attachment; filename="audit_{start_time}_{end_time}.{format_type}"'
-                }
-            )
-        except Exception as e:
-            logger.error(f"Admin export audit error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    # ==================== 安全告警 API（管理員）====================
-    
-    async def admin_get_security_alerts(self, request):
-        """管理員 - 獲取安全告警"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            status = request.query.get('status')
-            severity = request.query.get('severity')
-            alert_type = request.query.get('type')
-            limit = int(request.query.get('limit', 100))
-            
-            from core.security_alert import get_security_alert_service
-            service = get_security_alert_service()
-            
-            alerts = service.get_alerts(
-                status=status,
-                severity=severity,
-                alert_type=alert_type,
-                limit=limit
-            )
-            
-            return self._json_response({
-                'success': True,
-                'data': [a.to_dict() for a in alerts]
-            })
-        except Exception as e:
-            logger.error(f"Admin get security alerts error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def admin_security_stats(self, request):
-        """管理員 - 安全統計"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            from core.security_alert import get_security_alert_service
-            service = get_security_alert_service()
-            
-            return self._json_response({
-                'success': True,
-                'data': service.get_stats()
-            })
-        except Exception as e:
-            logger.error(f"Admin security stats error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def admin_acknowledge_alert(self, request):
-        """管理員 - 確認告警"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            data = await request.json()
-            alert_id = data.get('alert_id')
-            
-            if not alert_id:
-                return self._json_response({'success': False, 'error': '缺少告警 ID'}, 400)
-            
-            from core.security_alert import get_security_alert_service
-            service = get_security_alert_service()
-            
-            success = service.acknowledge_alert(alert_id, tenant.user_id)
-            return self._json_response({'success': success})
-        except Exception as e:
-            logger.error(f"Admin acknowledge alert error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
-    
-    async def admin_resolve_alert(self, request):
-        """管理員 - 解決告警"""
-        try:
-            tenant = request.get('tenant')
-            if not tenant or tenant.role != 'admin':
-                return self._json_response({'success': False, 'error': '需要管理員權限'}, 403)
-            
-            data = await request.json()
-            alert_id = data.get('alert_id')
-            notes = data.get('notes', '')
-            false_positive = data.get('false_positive', False)
-            
-            if not alert_id:
-                return self._json_response({'success': False, 'error': '缺少告警 ID'}, 400)
-            
-            from core.security_alert import get_security_alert_service
-            service = get_security_alert_service()
-            
-            success = service.resolve_alert(alert_id, notes, false_positive)
-            return self._json_response({'success': success})
-        except Exception as e:
-            logger.error(f"Admin resolve alert error: {e}")
-            return self._json_response({'success': False, 'error': str(e)}, 500)
+    # P10-1: async def admin_resolve_alert(self, request):... -> admin_routes_mixin.py
     
     # ==================== 診斷 API ====================
     

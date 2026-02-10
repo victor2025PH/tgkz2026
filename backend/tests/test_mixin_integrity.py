@@ -493,6 +493,56 @@ class TestP15AlertEngine(unittest.TestCase):
         self.assertIn('/api/v1/metrics/alerts', content)
 
 
+class TestP16SystemMetrics(unittest.TestCase):
+    """P16: 系统指标仪表板 + 定时告警 + DB 维护"""
+
+    def test_01_admin_panel_has_system_metrics_tab(self):
+        """admin-panel should have systemMetrics menu item"""
+        with open(BACKEND_DIR.parent / 'admin-panel' / 'app.js', 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn("'systemMetrics'", content)
+        self.assertIn('loadSystemMetrics', content)
+        self.assertIn('renderMetricsCharts', content)
+
+    def test_02_admin_panel_has_metrics_html(self):
+        """index.html should have systemMetrics page section"""
+        with open(BACKEND_DIR.parent / 'admin-panel' / 'index.html', 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn("currentPage === 'systemMetrics'", content)
+        self.assertIn('metricsStatusChart', content)
+        self.assertIn('metricsEndpointChart', content)
+
+    def test_03_alert_engine_background_loop(self):
+        """AlertEngine should have background evaluation loop"""
+        with open(BACKEND_DIR / 'api' / 'alert_engine.py', 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('start_background_loop', content)
+        self.assertIn('_background_eval_loop', content)
+        self.assertIn('_send_telegram_alerts', content)
+        self.assertIn('start_alert_engine_background', content)
+
+    def test_04_alert_engine_registered_in_startup(self):
+        """init_startup_mixin.py should start alert engine"""
+        with open(BACKEND_DIR / 'service' / 'init_startup_mixin.py', 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('start_alert_engine_background', content)
+
+    def test_05_db_auto_maintenance(self):
+        """DbHealthMonitor should have auto_maintenance method"""
+        with open(BACKEND_DIR / 'api' / 'db_health.py', 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('auto_maintenance', content)
+        self.assertIn('wal_checkpoint', content)
+        self.assertIn('VACUUM', content)
+        self.assertIn('WAL_CHECKPOINT_THRESHOLD_MB', content)
+
+    def test_06_db_maintenance_route(self):
+        """ROUTE_TABLE should have /api/v1/db/maintenance"""
+        with open(HTTP_SERVER_FILE, 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('/api/v1/db/maintenance', content)
+
+
 if __name__ == '__main__':
     # Run with verbose output
     unittest.main(verbosity=2)

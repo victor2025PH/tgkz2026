@@ -1010,7 +1010,7 @@
                     
                     <!-- 操作欄 -->
                     <div class="flex justify-between items-center mb-6">
-                        <div class="flex gap-4">
+                        <div class="flex gap-3">
                             <select v-model="proxyFilter" @change="loadProxies" 
                                     class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2">
                                 <option value="">全部狀態</option>
@@ -1019,11 +1019,29 @@
                                 <option value="failed">失敗</option>
                                 <option value="disabled">已禁用</option>
                             </select>
+                            <select v-model="proxySourceFilter" @change="loadProxies"
+                                    class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2">
+                                <option value="">全部來源</option>
+                                <option value="manual">手動添加</option>
+                                <option value="api_sync">API 同步</option>
+                                <option value="dynamic">動態代理</option>
+                            </select>
                         </div>
-                        <button @click="openProxyModal" 
-                                class="gradient-bg hover:opacity-90 px-6 py-2 rounded-lg font-medium transition-opacity">
-                            ➕ 批量添加代理
-                        </button>
+                        <div class="flex gap-3">
+                            <button @click="syncAllProviders" 
+                                    :disabled="providerSyncing"
+                                    class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm transition-colors">
+                                {{ providerSyncing ? '⏳ 同步中...' : '🔄 同步供應商' }}
+                            </button>
+                            <button @click="cleanupExpiredProxies"
+                                    class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg text-sm transition-colors">
+                                🧹 清理過期
+                            </button>
+                            <button @click="openProxyModal" 
+                                    class="gradient-bg hover:opacity-90 px-6 py-2 rounded-lg font-medium transition-opacity">
+                                ➕ 批量添加代理
+                            </button>
+                        </div>
                     </div>
                     
                     <!-- 代理列表 -->
@@ -1041,7 +1059,11 @@
                             </thead>
                             <tbody>
                                 <tr v-for="proxy in proxies" :key="proxy.id" 
-                                    class="border-t border-gray-700 table-row-hover">
+                                    :class="[
+                                        'border-t border-gray-700 table-row-hover',
+                                        proxy.expires_at && new Date(proxy.expires_at) < new Date() ? 'bg-red-500/5' : '',
+                                        proxy.expires_at && new Date(proxy.expires_at) > new Date() && new Date(proxy.expires_at) < new Date(Date.now() + 3*86400000) ? 'bg-yellow-500/5' : ''
+                                    ]">
                                     <td class="px-6 py-4">
                                         <div class="flex items-center">
                                             <span class="text-lg mr-2">🌐</span>
@@ -1049,8 +1071,13 @@
                                                 <p class="font-medium">{{ proxy.host }}:{{ proxy.port }}</p>
                                                 <p class="text-sm text-gray-400" v-if="proxy.country || proxy.provider">
                                                     {{ proxy.country || '' }} {{ proxy.provider || '' }}
-                                                    <span v-if="proxy.proxy_source === 'api_sync'" class="ml-1 px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">API</span>
+                                                    <span v-if="proxy.proxy_source === 'api_sync'" class="ml-1 px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">API同步</span>
                                                     <span v-else-if="proxy.proxy_source === 'dynamic'" class="ml-1 px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs">動態</span>
+                                                    <span v-else class="ml-1 px-1.5 py-0.5 bg-gray-500/20 text-gray-400 rounded text-xs">手動</span>
+                                                </p>
+                                                <p v-if="proxy.expires_at" class="text-xs mt-0.5"
+                                                   :class="new Date(proxy.expires_at) < new Date() ? 'text-red-400 font-bold' : new Date(proxy.expires_at) < new Date(Date.now() + 3*86400000) ? 'text-yellow-400' : 'text-gray-500'">
+                                                    {{ new Date(proxy.expires_at) < new Date() ? '⚠ 已過期' : '到期' }}: {{ formatDate(proxy.expires_at) }}
                                                 </p>
                                             </div>
                                         </div>
@@ -1095,6 +1122,35 @@
                         </table>
                     </div>
                     
+                    <!-- 分頁導航 -->
+                    <div v-if="proxyPagination.total_pages > 1" class="flex justify-between items-center mt-4">
+                        <span class="text-sm text-gray-400">
+                            共 {{ proxyPagination.total }} 條，第 {{ proxyPagination.page }} / {{ proxyPagination.total_pages }} 頁
+                        </span>
+                        <div class="flex gap-2">
+                            <button @click="proxyPagination.page = 1; loadProxies()"
+                                    :disabled="proxyPagination.page <= 1"
+                                    class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 rounded text-sm">
+                                首頁
+                            </button>
+                            <button @click="proxyPagination.page--; loadProxies()"
+                                    :disabled="proxyPagination.page <= 1"
+                                    class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 rounded text-sm">
+                                ← 上一頁
+                            </button>
+                            <button @click="proxyPagination.page++; loadProxies()"
+                                    :disabled="proxyPagination.page >= proxyPagination.total_pages"
+                                    class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 rounded text-sm">
+                                下一頁 →
+                            </button>
+                            <button @click="proxyPagination.page = proxyPagination.total_pages; loadProxies()"
+                                    :disabled="proxyPagination.page >= proxyPagination.total_pages"
+                                    class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 rounded text-sm">
+                                末頁
+                            </button>
+                        </div>
+                    </div>
+                    
                     <!-- 使用說明 -->
                     <div class="mt-6 glass-card rounded-xl p-4">
                         <h4 class="font-medium mb-2">📖 使用說明</h4>
@@ -1103,6 +1159,8 @@
                             <li>• 每個帳號綁定固定代理，避免 IP 變化觸發風控</li>
                             <li>• 建議使用 <span class="text-blue-400">靜態ISP代理</span> 以獲得最高信任度</li>
                             <li>• 支持格式：<code class="bg-gray-700 px-1 rounded">socks5://user:pass@host:port</code> 或 <code class="bg-gray-700 px-1 rounded">host:port</code></li>
+                            <li>• 「API同步」標籤表示從代理供應商自動拉取，「動態」標籤表示按需分配的動態代理</li>
+                            <li>• 黃色高亮行表示即將到期（3天內），紅色高亮行表示已過期</li>
                         </ul>
                     </div>
                 </div>
@@ -5021,6 +5079,256 @@ api_id,api_hash,name,source_phone,max_accounts
                         </div>
                     </div>
                 </div>
+                
+                <!-- ==================== 🆕 P16: 系統指標儀表盤 ==================== -->
+                <div v-if="currentPage === 'systemMetrics'" @vue:mounted="loadSystemMetrics()">
+                    <!-- 控制欄 -->
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="flex gap-3">
+                            <button @click="loadSystemMetrics" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors text-sm">
+                                🔄 刷新數據
+                            </button>
+                            <button @click="toggleMetricsAutoRefresh" 
+                                    :class="metricsAutoRefresh ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 hover:bg-gray-700'"
+                                    class="px-4 py-2 rounded-lg transition-colors text-sm">
+                                {{ metricsAutoRefresh ? '⏸ 停止自動刷新' : '▶ 每15s自動刷新' }}
+                            </button>
+                        </div>
+                        <span class="text-gray-500 text-xs">P14-P15 可觀測性集成</span>
+                    </div>
+
+                    <!-- 頂部指標卡片 -->
+                    <div class="grid grid-cols-5 gap-4 mb-6">
+                        <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4">
+                            <p class="text-blue-200 text-sm">總請求</p>
+                            <p class="text-2xl font-bold mt-1">{{ systemMetrics.api?.total_requests?.toLocaleString() || 0 }}</p>
+                            <p class="text-blue-300 text-xs mt-1">RPM: {{ systemMetrics.api?.rpm || 0 }}</p>
+                        </div>
+                        <div :class="['rounded-xl p-4', (systemMetrics.api?.error_rate || 0) > 5 
+                            ? 'bg-gradient-to-r from-red-600 to-red-700' 
+                            : 'bg-gradient-to-r from-green-600 to-green-700']">
+                            <p class="text-white/80 text-sm">錯誤率</p>
+                            <p class="text-2xl font-bold mt-1">{{ systemMetrics.api?.error_rate || 0 }}%</p>
+                            <p class="text-white/60 text-xs mt-1">5xx: {{ systemMetrics.api?.total_errors || 0 }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl p-4">
+                            <p class="text-purple-200 text-sm">緩存命中</p>
+                            <p class="text-2xl font-bold mt-1">{{ systemMetrics.cache?.hit_rate || 0 }}%</p>
+                            <p class="text-purple-300 text-xs mt-1">{{ systemMetrics.cache?.hits || 0 }} / {{ (systemMetrics.cache?.hits || 0) + (systemMetrics.cache?.misses || 0) }}</p>
+                        </div>
+                        <div :class="['rounded-xl p-4', (systemMetrics.alerts?.active_count || 0) > 0 
+                            ? 'bg-gradient-to-r from-orange-600 to-orange-700' 
+                            : 'bg-gradient-to-r from-teal-600 to-teal-700']">
+                            <p class="text-white/80 text-sm">活躍告警</p>
+                            <p class="text-2xl font-bold mt-1">{{ systemMetrics.alerts?.active_count || 0 }}</p>
+                            <p class="text-white/60 text-xs mt-1">規則: {{ systemMetrics.alerts?.rules_count || 0 }}</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-cyan-600 to-cyan-700 rounded-xl p-4">
+                            <p class="text-cyan-200 text-sm">DB 大小</p>
+                            <p class="text-2xl font-bold mt-1">{{ systemMetrics.db?.pragma?.db_size_mb || '—' }} MB</p>
+                            <p class="text-cyan-300 text-xs mt-1">WAL: {{ systemMetrics.db?.pragma?.wal_size_mb || 0 }} MB</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-6 mb-6">
+                        <!-- 狀態碼分佈 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">📊 HTTP 狀態碼分佈</h3>
+                            <div style="max-height: 280px; display: flex; justify-content: center;">
+                                <canvas id="metricsStatusChart"></canvas>
+                            </div>
+                        </div>
+                        <!-- 端點響應時間 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">⏱ 最慢端點 (Top 10)</h3>
+                            <div style="max-height: 280px;">
+                                <canvas id="metricsEndpointChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-6 mb-6">
+                        <!-- 限流統計 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">🚦 限流統計</h3>
+                            <div v-if="systemMetrics.api?.rate_limiter" class="space-y-3">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-400">最近 1 小時請求</span>
+                                    <span>{{ systemMetrics.api.rate_limiter.total_requests?.toLocaleString() || 0 }}</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-400">被攔截請求</span>
+                                    <span class="text-red-400">{{ systemMetrics.api.rate_limiter.blocked_requests || 0 }}</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-400">攔截率</span>
+                                    <span :class="(systemMetrics.api.rate_limiter.block_rate || 0) > 2 ? 'text-red-400' : 'text-green-400'">
+                                        {{ systemMetrics.api.rate_limiter.block_rate || 0 }}%
+                                    </span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-400">活躍封禁</span>
+                                    <span>{{ systemMetrics.api.rate_limiter.active_bans || 0 }}</span>
+                                </div>
+                                <div v-if="systemMetrics.api.rate_limiter.by_rule" class="mt-3 pt-3 border-t border-gray-700">
+                                    <p class="text-gray-500 text-xs mb-2">按規則封禁分佈</p>
+                                    <div v-for="(count, rule) in systemMetrics.api.rate_limiter.by_rule" :key="rule"
+                                         class="flex justify-between text-xs text-gray-400">
+                                        <span>{{ rule }}</span>
+                                        <span class="text-orange-400">{{ count }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <p v-else class="text-gray-500 text-sm">數據加載中...</p>
+                        </div>
+
+                        <!-- 數據庫健康 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">🗄 數據庫健康</h3>
+                            <div v-if="systemMetrics.db" class="space-y-3">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-400">日誌模式</span>
+                                    <span :class="systemMetrics.db.pragma?.journal_mode === 'wal' ? 'text-green-400' : 'text-yellow-400'">
+                                        {{ systemMetrics.db.pragma?.journal_mode || '—' }}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-400">碎片率</span>
+                                    <span :class="(systemMetrics.db.pragma?.fragmentation_pct || 0) > 20 ? 'text-orange-400' : 'text-green-400'">
+                                        {{ systemMetrics.db.pragma?.fragmentation_pct || 0 }}%
+                                    </span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-400">連接泄漏</span>
+                                    <span :class="(systemMetrics.db.connection_tracking?.potentially_leaked || 0) > 5 ? 'text-red-400' : 'text-green-400'">
+                                        {{ systemMetrics.db.connection_tracking?.potentially_leaked || 0 }}
+                                    </span>
+                                </div>
+                                <div v-if="systemMetrics.db.connection_pool" class="mt-3 pt-3 border-t border-gray-700">
+                                    <p class="text-gray-500 text-xs mb-2">連接池</p>
+                                    <div class="grid grid-cols-2 gap-2 text-xs text-gray-400">
+                                        <span>池大小: {{ systemMetrics.db.connection_pool.pool_size || 0 }}</span>
+                                        <span>使用中: {{ systemMetrics.db.connection_pool.in_use || 0 }}</span>
+                                        <span>已執行: {{ systemMetrics.db.connection_pool.queries_executed?.toLocaleString() || 0 }}</span>
+                                        <span>慢查詢: {{ systemMetrics.db.connection_pool.slow_queries || 0 }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <p v-else class="text-gray-500 text-sm">數據加載中...</p>
+                        </div>
+
+                        <!-- 緩存詳情 -->
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">💨 響應緩存</h3>
+                            <div v-if="systemMetrics.cache" class="space-y-3">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-400">緩存條目</span>
+                                    <span>{{ systemMetrics.cache.entries || 0 }} / {{ systemMetrics.cache.max_size || 0 }}</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-400">命中次數</span>
+                                    <span class="text-green-400">{{ systemMetrics.cache.hits || 0 }}</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-400">未命中</span>
+                                    <span class="text-yellow-400">{{ systemMetrics.cache.misses || 0 }}</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-400">驅逐次數</span>
+                                    <span>{{ systemMetrics.cache.evictions || 0 }}</span>
+                                </div>
+                                <div v-if="systemMetrics.cache.cached_paths" class="mt-3 pt-3 border-t border-gray-700">
+                                    <p class="text-gray-500 text-xs mb-2">緩存路徑 ({{ Object.keys(systemMetrics.cache.cached_paths || {}).length }})</p>
+                                    <div class="max-h-32 overflow-y-auto space-y-1">
+                                        <div v-for="(info, path) in systemMetrics.cache.cached_paths" :key="path"
+                                             class="flex justify-between text-xs text-gray-400">
+                                            <span class="truncate mr-2">{{ path }}</span>
+                                            <span class="text-green-400 whitespace-nowrap">{{ info.hits || 0 }} hits</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p v-else class="text-gray-500 text-sm">數據加載中...</p>
+                        </div>
+                    </div>
+
+                    <!-- 告警規則 & 歷史 -->
+                    <div class="grid grid-cols-2 gap-6 mb-6">
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">🚨 告警規則 ({{ systemMetrics.alerts?.rules_count || 0 }})</h3>
+                            <div class="space-y-2 max-h-72 overflow-y-auto">
+                                <div v-for="rule in (systemMetrics.alerts?.rules || [])" :key="rule.name"
+                                     :class="['flex justify-between items-center p-3 rounded-lg', 
+                                              rule.active ? 'bg-red-900/30 border border-red-700' : 'bg-gray-700/50']">
+                                    <div>
+                                        <span :class="['text-xs font-medium px-2 py-0.5 rounded mr-2',
+                                            rule.severity === 'critical' ? 'bg-red-600' :
+                                            rule.severity === 'warning' ? 'bg-yellow-600' : 'bg-blue-600']">
+                                            {{ rule.severity }}
+                                        </span>
+                                        <span class="text-sm">{{ rule.name }}</span>
+                                    </div>
+                                    <span :class="rule.active ? 'text-red-400 text-sm font-bold' : 'text-green-400 text-sm'">
+                                        {{ rule.active ? '🔴 觸發' : '✅ 正常' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">📜 告警歷史 (最近 {{ systemMetrics.alerts?.history_total || 0 }})</h3>
+                            <div class="space-y-2 max-h-72 overflow-y-auto">
+                                <div v-for="(alert, idx) in (systemMetrics.alerts?.history_recent || []).slice().reverse()" :key="idx"
+                                     :class="['p-3 rounded-lg text-sm',
+                                              alert.resolved ? 'bg-gray-700/30' : 'bg-orange-900/20 border border-orange-700']">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span :class="['text-xs font-medium px-2 py-0.5 rounded',
+                                            alert.severity === 'critical' ? 'bg-red-600' :
+                                            alert.severity === 'warning' ? 'bg-yellow-600' : 'bg-blue-600']">
+                                            {{ alert.severity }}
+                                        </span>
+                                        <span class="text-gray-500 text-xs">{{ alert.timestamp?.replace('T', ' ')?.substring(0, 19) }}</span>
+                                    </div>
+                                    <p class="text-gray-300">{{ alert.rule_name }}: {{ alert.message }}</p>
+                                    <span v-if="alert.resolved" class="text-green-400 text-xs">✅ 已解決</span>
+                                </div>
+                                <p v-if="!systemMetrics.alerts?.history_recent?.length" class="text-gray-500 text-sm text-center py-8">暫無告警歷史 🎉</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 慢請求 & 慢查詢 -->
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">🐢 最近慢請求</h3>
+                            <div class="space-y-2 max-h-60 overflow-y-auto">
+                                <div v-for="(req, idx) in (systemMetrics.api?.slow_requests_recent || [])" :key="idx"
+                                     class="bg-gray-700/50 p-3 rounded-lg text-xs">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-300 font-mono">{{ req.method }} {{ req.path }}</span>
+                                        <span class="text-orange-400 font-bold">{{ req.duration_ms }}ms</span>
+                                    </div>
+                                    <span class="text-gray-500">{{ req.timestamp }} | Status: {{ req.status }}</span>
+                                </div>
+                                <p v-if="!systemMetrics.api?.slow_requests_recent?.length" class="text-gray-500 text-sm text-center py-4">暫無慢請求 ⚡</p>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">🔍 慢查詢 (DB)</h3>
+                            <div class="space-y-2 max-h-60 overflow-y-auto">
+                                <div v-for="(q, idx) in (systemMetrics.db?.slow_queries_recent || [])" :key="idx"
+                                     class="bg-gray-700/50 p-3 rounded-lg text-xs">
+                                    <div class="flex justify-between mb-1">
+                                        <span class="text-orange-400 font-bold">{{ q.elapsed }}s</span>
+                                        <span class="text-gray-500">{{ q.timestamp }}</span>
+                                    </div>
+                                    <p class="text-gray-300 font-mono truncate">{{ q.query }}</p>
+                                </div>
+                                <p v-if="!systemMetrics.db?.slow_queries_recent?.length" class="text-gray-500 text-sm text-center py-4">暫無慢查詢 ⚡</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
         

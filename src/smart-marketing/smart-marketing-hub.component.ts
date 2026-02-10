@@ -10,9 +10,10 @@
  * - 流程簡化：從 8+ 步驟減少到 2 步驟
  */
 
-import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { NavBridgeService } from '../services/nav-bridge.service';
 import { MarketingTaskService } from '../services/marketing-task.service';
 import { MarketingStateService } from '../services/marketing-state.service';
 import { AICenterService } from '../ai-center/ai-center.service';
@@ -514,6 +515,7 @@ export class SmartMarketingHubComponent implements OnInit {
   private dynamicEngine = inject(DynamicScriptEngineService);
   private toast = inject(ToastService);
   private ipc = inject(ElectronIpcService);
+  private navBridge = inject(NavBridgeService);
   
   // ============ 狀態 ============
   
@@ -605,8 +607,25 @@ export class SmartMarketingHubComponent implements OnInit {
   
   // ============ 生命週期 ============
   
+  // 🔧 Phase9-5: 視圖名稱 → Tab 映射（NavBridge 驅動）
+  private static readonly VIEW_TAB_MAP: Record<string, 'quick-start' | 'tasks' | 'monitor' | 'settings'> = {
+    'ai-assistant': 'quick-start',
+    'marketing-hub': 'quick-start',
+    'ai-team': 'tasks',
+    'marketing-tasks': 'tasks',
+    'marketing-monitor': 'monitor',
+    'marketing-report': 'settings',
+  };
+
   ngOnInit(): void {
     this.loadSettings();
+    
+    // 🔧 Phase9-5: 根據 NavBridge 的視圖名稱自動切換到對應 tab
+    const currentView = this.navBridge.currentView();
+    const targetTab = SmartMarketingHubComponent.VIEW_TAB_MAP[currentView];
+    if (targetTab) {
+      this.activeTab.set(targetTab);
+    }
   }
   
   // ============ 快速啟動 ============

@@ -15,13 +15,14 @@
  * - 快速啟動功能
  */
 
-import { Component, signal, computed, inject } from '@angular/core';
+import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AICenterService } from './ai-center.service';
 import { DialogService } from '../services/dialog.service';
 import { ToastService } from '../toast.service';
 import { ElectronIpcService } from '../electron-ipc.service';
+import { NavBridgeService } from '../services/nav-bridge.service';
 import { 
   AIModelConfig, 
   AIProvider, 
@@ -1074,13 +1075,26 @@ type AITab = 'quick' | 'models' | 'persona' | 'stats';
     </div>
   `
 })
-export class AICenterComponent {
+export class AICenterComponent implements OnInit {
   aiService = inject(AICenterService);
   private dialogService = inject(DialogService);
   private toastService = inject(ToastService);
   private ipcService = inject(ElectronIpcService);  // 🔊 P1: 用於 TTS
+  private navBridge = inject(NavBridgeService);
   
   activeTab = signal<AITab>('models');  // 🆕 Phase 3-1: 默認顯示模型配置
+  
+  // 🔧 Phase9-5: 視圖名稱 → Tab 映射（NavBridge 驅動）
+  private static readonly VIEW_TAB_MAP: Record<string, AITab> = {
+    'ai-center': 'quick',
+    'ai-engine': 'quick',
+    'ai-models': 'models',
+    'ai-persona': 'persona',
+    'ai-brain': 'quick',
+    'knowledge-brain': 'stats',
+    'knowledge-manage': 'stats',
+    'knowledge-gaps': 'stats',
+  };
   showAddModel = signal(false);
   
   // 快速設置狀態
@@ -2060,6 +2074,13 @@ A: 支持微信、支付寶、銀行卡`,
     this.loadQuickSettings();
     this.loadSenderAccounts();
     this.loadStrategyFromLocalStorage();
+    
+    // 🔧 Phase9-5: 根據 NavBridge 的視圖名稱自動切換到對應 tab
+    const currentView = this.navBridge.currentView();
+    const targetTab = AICenterComponent.VIEW_TAB_MAP[currentView];
+    if (targetTab) {
+      this.activeTab.set(targetTab);
+    }
   }
   
   loadSenderAccounts() {

@@ -4,7 +4,7 @@
  * 
  * 🆕 Phase 32: 修復組件綁定和服務調用
  */
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NavBridgeService, LegacyView } from '../services/nav-bridge.service';
@@ -28,13 +28,14 @@ import { SearchDiscoveryComponent } from '../search-discovery/search-discovery.c
   ],
   template: `
     <app-search-discovery
+      [initialView]="initialView()"
       (resourceSelected)="selectResource($event)"
       (batchJoin)="batchJoin($event)"
       (navigateTo)="navigateTo($event)">
     </app-search-discovery>
   `
 })
-export class ResourceDiscoveryViewComponent {
+export class ResourceDiscoveryViewComponent implements OnInit {
   // 服務注入
   private i18n = inject(I18nService);
   private nav = inject(NavBridgeService);
@@ -43,6 +44,18 @@ export class ResourceDiscoveryViewComponent {
   public membershipService = inject(MembershipService);
   public accountService = inject(AccountManagementService);
   public resourceService = inject(ResourceService);
+  
+  // 🔧 Phase9-5: 根據 NavBridge 區分「資源中心」vs「搜索發現」
+  initialView = signal<string>('search-discovery');
+  
+  ngOnInit(): void {
+    const currentView = this.nav.currentView();
+    if (currentView === 'resource-center' || currentView === 'resources') {
+      this.initialView.set('resource-center');
+    } else {
+      this.initialView.set('search-discovery');
+    }
+  }
   
   // 導航
   navigateTo(view: string): void {

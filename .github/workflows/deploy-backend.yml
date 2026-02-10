@@ -10,6 +10,10 @@ on:
       - 'nginx.conf'
   workflow_dispatch:  # 允許手動觸發
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 env:
   SERVER_HOST: 165.154.210.154
   SERVER_USER: ubuntu
@@ -90,11 +94,15 @@ jobs:
           ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 deploy-server << 'ENDSSH'
             cd /opt/tg-matrix
             
+            # 🔧 清理孤儿容器防止名称冲突
+            sudo docker compose down --remove-orphans api 2>/dev/null || true
+            sudo docker rm -f $(sudo docker ps -aq --filter "name=tg-matrix-api") 2>/dev/null || true
+            
             # 重建 API 容器（確保使用新代碼）
             sudo docker compose build --no-cache api
             
             # 重啟 API 容器
-            sudo docker compose up -d --force-recreate api
+            sudo docker compose up -d api
             
             # 等待啟動
             sleep 10

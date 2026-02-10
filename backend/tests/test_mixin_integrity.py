@@ -543,6 +543,76 @@ class TestP16SystemMetrics(unittest.TestCase):
         self.assertIn('/api/v1/db/maintenance', content)
 
 
+class TestP17MetricsHistory(unittest.TestCase):
+    """P17-1: 时序指标存储测试"""
+
+    def test_01_metrics_history_module_exists(self):
+        """api/metrics_history.py should exist"""
+        self.assertTrue(
+            (BACKEND_DIR / 'api' / 'metrics_history.py').exists(),
+            "api/metrics_history.py not found"
+        )
+
+    def test_02_metrics_history_has_key_components(self):
+        """MetricsHistory should have sampling, query, cleanup"""
+        with open(BACKEND_DIR / 'api' / 'metrics_history.py', 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('class MetricsHistory', content)
+        self.assertIn('sample_now', content)
+        self.assertIn('def query', content)
+        self.assertIn('def cleanup', content)
+        self.assertIn('start_background_sampler', content)
+        self.assertIn('PERIOD_MAP', content)
+
+    def test_03_metrics_history_route(self):
+        """/api/v1/metrics/history should be in ROUTE_TABLE"""
+        with open(HTTP_SERVER_FILE, 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('/api/v1/metrics/history', content)
+
+    def test_04_metrics_history_registered_in_startup(self):
+        """init_startup_mixin should start metrics sampler"""
+        with open(BACKEND_DIR / 'service' / 'init_startup_mixin.py', 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('start_metrics_history_sampler', content)
+
+
+class TestP17SecurityAudit(unittest.TestCase):
+    """P17-2: API 安全审计测试"""
+
+    def test_01_security_audit_module_exists(self):
+        """api/security_audit.py should exist"""
+        self.assertTrue(
+            (BACKEND_DIR / 'api' / 'security_audit.py').exists(),
+            "api/security_audit.py not found"
+        )
+
+    def test_02_security_audit_has_key_components(self):
+        """SecurityAuditor should detect suspicious patterns"""
+        with open(BACKEND_DIR / 'api' / 'security_audit.py', 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('class SecurityAuditor', content)
+        self.assertIn('generate_report', content)
+        self.assertIn('top_blocked_ips', content)
+        self.assertIn('suspicious_patterns', content)
+        self.assertIn('current_bans', content)
+
+    def test_03_security_audit_route(self):
+        """/api/v1/metrics/security should be in ROUTE_TABLE"""
+        with open(HTTP_SERVER_FILE, 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('/api/v1/metrics/security', content)
+
+    def test_04_admin_panel_has_trend_chart(self):
+        """admin-panel should have P17 trend chart and security panel"""
+        with open(BACKEND_DIR.parent / 'admin-panel' / 'index.html', 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('metricsTrendChart', content)
+        self.assertIn('changeMetricsPeriod', content)
+        self.assertIn('安全審計', content)
+        self.assertIn('異常模式', content)
+
+
 if __name__ == '__main__':
     # Run with verbose output
     unittest.main(verbosity=2)

@@ -1362,3 +1362,37 @@ class SystemRoutesMixin:
                 'success': False, 'error': str(e),
                 'message': 'DB maintenance failed'
             }, 500)
+
+    # ==================== P17-1: Metrics History ====================
+
+    async def api_metrics_history(self, request):
+        """P17-1: 时序指标历史查询 — period=30m|1h|6h|24h|3d|7d"""
+        try:
+            from api.metrics_history import MetricsHistory
+            period = request.query.get('period', '1h')
+            history = MetricsHistory.get_instance()
+            data = history.query(period=period)
+            data['storage'] = history.get_info()
+            return self._json_response({'success': True, 'data': data})
+        except Exception as e:
+            logger.error(f"Metrics history error: {e}")
+            return self._json_response({
+                'success': False, 'error': str(e),
+                'message': 'Metrics history not available'
+            }, 500)
+
+    # ==================== P17-2: Security Audit ====================
+
+    async def api_security_audit(self, request):
+        """P17-2: API 安全审计报告 — Top 被限流 IP / 异常访问"""
+        try:
+            from api.security_audit import SecurityAuditor
+            auditor = SecurityAuditor.get_instance()
+            report = auditor.generate_report()
+            return self._json_response({'success': True, 'data': report})
+        except Exception as e:
+            logger.error(f"Security audit error: {e}")
+            return self._json_response({
+                'success': False, 'error': str(e),
+                'message': 'Security audit not available'
+            }, 500)

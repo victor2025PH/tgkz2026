@@ -1688,23 +1688,28 @@ createApp({
             }
         };
         
-        // 🆕 P16: 系統指標儀表盤
+        // 🆕 P16 → P17: 系統指標儀表盤
         const systemMetrics = ref({
             api: null,
             cache: null,
             db: null,
             alerts: null,
+            history: null,     // P17-1
+            security: null,    // P17-2
         });
         const metricsAutoRefresh = ref(false);
+        const metricsPeriod = ref('1h');
         let metricsRefreshTimer = null;
 
         const loadSystemMetrics = async () => {
             try {
-                const [apiRes, cacheRes, dbRes, alertsRes] = await Promise.allSettled([
+                const [apiRes, cacheRes, dbRes, alertsRes, histRes, secRes] = await Promise.allSettled([
                     apiRequest('/v1/metrics/api'),
                     apiRequest('/v1/metrics/cache'),
                     apiRequest('/v1/metrics/db'),
                     apiRequest('/v1/metrics/alerts'),
+                    apiRequest(`/v1/metrics/history?period=${metricsPeriod.value}`),
+                    apiRequest('/v1/metrics/security'),
                 ]);
                 if (apiRes.status === 'fulfilled' && apiRes.value.success)
                     systemMetrics.value.api = apiRes.value.data;
@@ -1714,12 +1719,21 @@ createApp({
                     systemMetrics.value.db = dbRes.value.data;
                 if (alertsRes.status === 'fulfilled' && alertsRes.value.success)
                     systemMetrics.value.alerts = alertsRes.value.data;
+                if (histRes.status === 'fulfilled' && histRes.value.success)
+                    systemMetrics.value.history = histRes.value.data;
+                if (secRes.status === 'fulfilled' && secRes.value.success)
+                    systemMetrics.value.security = secRes.value.data;
 
                 // 渲染圖表
                 setTimeout(() => renderMetricsCharts(), 200);
             } catch (e) {
                 console.error('加載系統指標失敗:', e);
             }
+        };
+
+        const changeMetricsPeriod = (period) => {
+            metricsPeriod.value = period;
+            loadSystemMetrics();
         };
 
         const toggleMetricsAutoRefresh = () => {
@@ -1734,6 +1748,7 @@ createApp({
 
         let metricsStatusChart = null;
         let metricsEndpointChart = null;
+        let metricsTrendChart = null;
 
         const renderMetricsCharts = () => {
             const api = systemMetrics.value.api;
@@ -1787,6 +1802,62 @@ createApp({
                         scales: {
                             x: { ticks: { color: '#aaa' }, grid: { color: '#333' } },
                             y: { ticks: { color: '#aaa', font: { size: 10 } }, grid: { color: '#333' } }
+                        },
+                        plugins: { legend: { labels: { color: '#ccc' } } }
+                    }
+                });
+            }
+
+            // 3) P17-1: 趋势线图 (RPM + P95 + 错误率)
+            const history = systemMetrics.value.history;
+            const trendCtx = document.getElementById('metricsTrendChart');
+            if (trendCtx && history && history.points && history.points.length > 1) {
+                if (metricsTrendChart) metricsTrendChart.destroy();
+                const pts = history.points;
+                const timeLabels = pts.map(p => {
+                    const d = new Date(p.ts + 'Z');
+                    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+                });
+                metricsTrendChart = new Chart(trendCtx, {
+                    type: 'line',
+                    data: {
+                        labels: timeLabels,
+                        datasets: [
+                            {
+                                label: 'RPM',
+                                data: pts.map(p => p.rpm || 0),
+                                borderColor: '#3b82f6',
+                                backgroundColor: 'rgba(59,130,246,0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                yAxisID: 'y',
+                            },
+                            {
+                                label: 'P95 (ms)',
+                                data: pts.map(p => p.p95_ms || 0),
+                                borderColor: '#f59e0b',
+                                borderDash: [5, 5],
+                                tension: 0.3,
+                                yAxisID: 'y1',
+                            },
+                            {
+                                label: 'Error %',
+                                data: pts.map(p => p.error_rate || 0),
+                                borderColor: '#ef4444',
+                                tension: 0.3,
+                                yAxisID: 'y2',
+                            },
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        interaction: { mode: 'index', intersect: false },
+                        scales: {
+                            x: { ticks: { color: '#aaa', maxTicksLimit: 15 }, grid: { color: '#333' } },
+                            y: { position: 'left', title: { display: true, text: 'RPM', color: '#3b82f6' }, ticks: { color: '#aaa' }, grid: { color: '#333' } },
+                            y1: { position: 'right', title: { display: true, text: 'P95 ms', color: '#f59e0b' }, ticks: { color: '#aaa' }, grid: { display: false } },
+                            y2: { position: 'right', title: { display: true, text: 'Err %', color: '#ef4444' }, ticks: { color: '#aaa' }, grid: { display: false },
+                                  afterFit: (axis) => { axis.width = 50; } },
                         },
                         plugins: { legend: { labels: { color: '#ccc' } } }
                     }
@@ -5288,11 +5359,13 @@ createApp({
             createStatusUpdate,
             scheduleMaintenance,
             
-            // 🆕 P16: 系統指標
+            // 🆕 P16 → P17: 系統指標
             systemMetrics,
             metricsAutoRefresh,
+            metricsPeriod,
             loadSystemMetrics,
             toggleMetricsAutoRefresh,
+            changeMetricsPeriod,
             
             // 🆕 P10: 分析中心
             analyticsCenter,

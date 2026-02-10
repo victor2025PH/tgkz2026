@@ -5,7 +5,7 @@ Mixin class for Database — merged via multiple inheritance.
 from typing import Dict, List, Any, Optional
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class CampaignQueueMixin:

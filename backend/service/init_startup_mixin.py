@@ -3,9 +3,12 @@ Phase 9-3: Initialization, startup, quota, consistency check
 Extracted from BackendService in main.py.
 """
 import sys
+import os
+import gc
 import json
 import time
 import asyncio
+import traceback
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from pathlib import Path

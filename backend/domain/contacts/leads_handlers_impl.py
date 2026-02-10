@@ -1060,3 +1060,21 @@ async def handle_unified_contacts_delete(self, payload: Dict[str, Any]):
             "error": str(e)
         })
 
+
+# ====================================================================
+# 🔧 P7-3: 缺失 handler 补充实现
+# ====================================================================
+
+async def handle_batch_update_leads(self, payload: Dict[str, Any]):
+    """批量更新 leads 状态（委托到 handle_batch_update_lead_status）"""
+    return await handle_batch_update_lead_status(self, payload)
+
+
+async def handle_batch_tag_leads(self, payload: Dict[str, Any]):
+    """批量标签 leads（委托到 handle_bulk_update_user_tags）"""
+    return await handle_bulk_update_user_tags(self, payload)
+
+
+async def handle_batch_export_leads(self, payload: Dict[str, Any]):
+    """批量导出 leads（委托到 handle_export_leads_to_excel）"""
+    return await handle_export_leads_to_excel(self, payload)

@@ -457,6 +457,15 @@ COMMAND_ALIAS_REGISTRY: Dict[str, tuple] = {
     # === Phase6-1: 數據庫性能統計 ===
     'get-db-performance':          ('api.handlers.system_handlers_impl', 'handle_get_db_performance'),
     
+    # === 🔧 P7-3: 缺失 handler 的别名映射 ===
+    # 以下命令由 Router 注册但缺少 BackendService 方法
+    # 映射到已有的等效实现
+    'add-tracked-user':             ('domain.contacts.tracking_handlers_impl', 'handle_add_user_to_track'),
+    'update-tracked-user':          ('domain.contacts.tracking_handlers_impl', 'handle_update_user_profile'),
+    'delete-tracked-user':          ('domain.contacts.tracking_handlers_impl', 'handle_remove_tracked_user'),
+    'check-group-monitoring-status':('domain.automation.monitoring_handlers_impl', 'handle_get_group_monitoring_status'),
+    'group-get-info':               ('domain.automation.monitoring_handlers_impl', 'handle_analyze_group_link'),
+    
     # === 預留擴展點 (新增別名只需在此添加一行) ===
 }
 
@@ -705,7 +714,8 @@ _HANDLER_REGISTRY = {
         'handle_get_funnel_overview handle_transition_funnel_stage '
         'handle_batch_update_stages handle_analyze_funnel handle_get_funnel_stats '
         'handle_bulk_update_user_stage handle_batch_update_funnel_stage '
-        'handle_get_funnel_analysis handle_process_stage_event handle_get_stage_flow'
+        'handle_get_funnel_analysis handle_process_stage_event handle_get_stage_flow '
+        'handle_get_detailed_funnel_stats'
     ),
     'domain.contacts.leads_handlers_impl': (
         'handle_update_lead_status handle_get_leads_paginated handle_add_lead '
@@ -718,7 +728,8 @@ _HANDLER_REGISTRY = {
         'handle_get_collected_users_count handle_unified_contacts_sync '
         'handle_unified_contacts_get handle_unified_contacts_stats '
         'handle_unified_contacts_update handle_unified_contacts_add_tags '
-        'handle_unified_contacts_update_status handle_unified_contacts_delete'
+        'handle_unified_contacts_update_status handle_unified_contacts_delete '
+        'handle_batch_update_leads handle_batch_tag_leads handle_batch_export_leads'
     ),
     'domain.contacts.member_handlers_impl': (
         'handle_batch_refresh_member_counts handle_get_group_member_count '
@@ -802,7 +813,8 @@ _HANDLER_REGISTRY = {
         'handle_delete_queue_message handle_update_queue_message_priority '
         'handle_get_queue_messages handle_send_message handle_send_group_message '
         'handle_get_queue_length_history handle_validate_spintax handle_predict_send_time '
-        'handle_batch_send_start handle_batch_send_cancel'
+        'handle_batch_send_start handle_batch_send_cancel '
+        'handle_send_greeting handle_add_to_queue'
     ),
     'domain.messaging.template_handlers_impl': (
         'handle_add_template handle_remove_template handle_toggle_template_status'

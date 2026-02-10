@@ -813,3 +813,18 @@ async def handle_batch_send_cancel(self, payload: Dict[str, Any]):
     self._batch_send_cancelled = True
     self.send_log("⏹️ 批量發送已取消", "info")
 
+
+# ====================================================================
+# 🔧 P7-3: 缺失 handler 补充实现
+# ====================================================================
+
+async def handle_send_greeting(self, payload: Dict[str, Any]):
+    """发送问候消息（委托到 handle_send_message）"""
+    if not payload.get('text'):
+        payload['text'] = payload.get('greeting', '你好！')
+    return await handle_send_message(self, payload)
+
+
+async def handle_add_to_queue(self, payload: Dict[str, Any]):
+    """添加消息到队列（委托到 handle_send_message）"""
+    return await handle_send_message(self, payload)

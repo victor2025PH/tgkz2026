@@ -544,6 +544,29 @@ class Database(UserAdminMixin, AccountMixin, KeywordGroupMixin, CampaignQueueMix
         except Exception as e:
             print(f"[Database] P6 schema fix warning: {e}", file=sys.stderr)
         
+        # ====================================================================
+        # 🔧 P7-2: owner_user_id 多租户列 fallback (Migration 0021 可能未执行)
+        # ====================================================================
+        try:
+            _tenant_tables = [
+                'keyword_sets', 'trigger_rules', 'message_templates',
+                'chat_templates', 'collected_users', 'extracted_members',
+                'monitored_groups', 'accounts', 'leads', 'campaigns',
+                'discovered_resources', 'api_credentials',
+            ]
+            for tbl in _tenant_tables:
+                cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{tbl}'")
+                if not cursor.fetchone():
+                    continue
+                cursor.execute(f"PRAGMA table_info({tbl})")
+                cols = [c[1] for c in cursor.fetchall()]
+                if 'owner_user_id' not in cols:
+                    print(f"[Database] P7 fix: Adding {tbl}.owner_user_id", file=sys.stderr)
+                    cursor.execute(f'ALTER TABLE {tbl} ADD COLUMN owner_user_id TEXT')
+                    conn.commit()
+        except Exception as e:
+            print(f"[Database] P7 owner_user_id fix warning: {e}", file=sys.stderr)
+        
         finally:
             conn.close()
     

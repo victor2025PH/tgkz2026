@@ -257,3 +257,12 @@ async def handle_get_stage_flow(self, payload: Dict[str, Any]):
         print(f"[Backend] Error getting stage flow: {e}", file=sys.stderr)
         self.send_event("stage-flow", {"success": False, "error": str(e)})
 
+
+# ====================================================================
+# 🔧 P7-3: 缺失 handler 补充实现
+# ====================================================================
+
+async def handle_get_detailed_funnel_stats(self, payload: Dict[str, Any] = None):
+    """获取详细漏斗统计（委托到 handle_get_funnel_stats）"""
+    return await handle_get_funnel_stats(self, payload)
+

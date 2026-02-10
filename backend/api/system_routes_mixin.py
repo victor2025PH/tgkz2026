@@ -1247,3 +1247,20 @@ class SystemRoutesMixin:
         diag['summary'] = 'ALL OK' if not diag['errors'] else f'{len(diag["errors"])} errors found'
         
         return self._json_response(diag)
+
+    # ==================== P13-3: API Performance Metrics ====================
+
+    async def api_perf_metrics(self, request):
+        """P13-3: API 性能指标端点 — 响应时间/状态分布/慢请求"""
+        try:
+            from api.perf_metrics import ApiMetrics
+            metrics = ApiMetrics.get_instance()
+            summary = metrics.get_summary()
+            return self._json_response({'success': True, 'data': summary})
+        except Exception as e:
+            logger.error(f"API perf metrics error: {e}")
+            return self._json_response({
+                'success': False,
+                'error': str(e),
+                'message': 'Performance metrics not available'
+            }, 500)

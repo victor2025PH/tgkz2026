@@ -34,7 +34,11 @@ MIXIN_MODULES = [
     'api.system_routes_mixin',
 ]
 
+# P13-1: auth_routes_mixin is now a facade; actual methods are in sub-mixins
 MIXIN_FILES = [
+    BACKEND_DIR / 'api' / 'auth_core_mixin.py',
+    BACKEND_DIR / 'api' / 'auth_oauth_mixin.py',
+    BACKEND_DIR / 'api' / 'auth_security_mixin.py',
     BACKEND_DIR / 'api' / 'auth_routes_mixin.py',
     BACKEND_DIR / 'api' / 'quota_routes_mixin.py',
     BACKEND_DIR / 'api' / 'payment_routes_mixin.py',
@@ -199,9 +203,13 @@ class TestMixinStructuralIntegrity(unittest.TestCase):
             self.assertIn(fn, func_names, f"Missing function: {fn}")
 
     def test_09_total_method_count_reasonable(self):
-        """总方法数保持合理（200-300 之间）"""
+        """总方法数保持合理（200-400 之间）"""
         total = 0
+        counted_files = set()
         for f in list(MIXIN_FILES) + [HTTP_SERVER_FILE]:
+            if f in counted_files:
+                continue
+            counted_files.add(f)
             with open(f, 'r', encoding='utf-8') as fh:
                 tree = ast.parse(fh.read())
             for node in ast.walk(tree):
@@ -214,11 +222,17 @@ class TestMixinStructuralIntegrity(unittest.TestCase):
         self.assertLess(total, 400, f"Too many methods: {total}")
 
     def test_10_mixin_sizes_balanced(self):
-        """Mixin 大小相对均衡（最大:最小 < 7:1）"""
+        """Mixin 大小相对均衡（排除 facade 文件后，最大:最小 < 7:1）"""
         sizes = {}
+        # P13-1: Skip facade files (< 50 lines) — they just re-export sub-mixins
         for f in MIXIN_FILES:
             with open(f, 'r', encoding='utf-8') as fh:
-                sizes[f.stem] = len(fh.readlines())
+                line_count = len(fh.readlines())
+            if line_count >= 50:  # Skip facade files
+                sizes[f.stem] = line_count
+        
+        if not sizes:
+            return
         
         max_size = max(sizes.values())
         min_size = min(sizes.values())
@@ -227,6 +241,74 @@ class TestMixinStructuralIntegrity(unittest.TestCase):
         if ratio > 7:
             detail = "\n".join(f"  {k}: {v} lines" for k, v in sorted(sizes.items(), key=lambda x: -x[1]))
             self.fail(f"Mixin size imbalance ({ratio:.1f}:1):\n{detail}")
+
+
+class TestAuthMixinFacade(unittest.TestCase):
+    """P13-1: AuthRoutesMixin facade pattern tests"""
+
+    def test_01_facade_inherits_all_sub_mixins(self):
+        """AuthRoutesMixin inherits AuthCoreMixin, AuthOAuthMixin, AuthSecurityMixin"""
+        with open(BACKEND_DIR / 'api' / 'auth_routes_mixin.py', 'r', encoding='utf-8') as f:
+            tree = ast.parse(f.read())
+        
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name == 'AuthRoutesMixin':
+                base_names = []
+                for base in node.bases:
+                    if isinstance(base, ast.Name):
+                        base_names.append(base.id)
+                
+                for expected in ['AuthCoreMixin', 'AuthOAuthMixin', 'AuthSecurityMixin']:
+                    self.assertIn(expected, base_names, f"AuthRoutesMixin missing base: {expected}")
+                return
+        self.fail("AuthRoutesMixin class not found")
+
+    def test_02_sub_mixin_files_exist_and_valid(self):
+        """All 3 auth sub-mixin files exist and have valid syntax"""
+        sub_files = [
+            BACKEND_DIR / 'api' / 'auth_core_mixin.py',
+            BACKEND_DIR / 'api' / 'auth_oauth_mixin.py',
+            BACKEND_DIR / 'api' / 'auth_security_mixin.py',
+        ]
+        for f in sub_files:
+            self.assertTrue(f.exists(), f"Missing: {f.name}")
+            with open(f, 'r', encoding='utf-8') as fh:
+                try:
+                    ast.parse(fh.read())
+                except SyntaxError as e:
+                    self.fail(f"Syntax error in {f.name}: {e}")
+
+    def test_03_total_auth_methods_preserved(self):
+        """Total auth methods >= 50 (was 56 pre-split)"""
+        total = 0
+        for f in [BACKEND_DIR / 'api' / 'auth_core_mixin.py',
+                  BACKEND_DIR / 'api' / 'auth_oauth_mixin.py',
+                  BACKEND_DIR / 'api' / 'auth_security_mixin.py']:
+            with open(f, 'r', encoding='utf-8') as fh:
+                tree = ast.parse(fh.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    total += sum(1 for n in node.body
+                                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)))
+        self.assertGreaterEqual(total, 50, f"Expected >= 50 auth methods, got {total}")
+
+    def test_04_no_cross_sub_mixin_conflicts(self):
+        """No method name conflicts between the 3 auth sub-mixins"""
+        method_sources = {}
+        for f in [BACKEND_DIR / 'api' / 'auth_core_mixin.py',
+                  BACKEND_DIR / 'api' / 'auth_oauth_mixin.py',
+                  BACKEND_DIR / 'api' / 'auth_security_mixin.py']:
+            with open(f, 'r', encoding='utf-8') as fh:
+                tree = ast.parse(fh.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    for n in node.body:
+                        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            method_sources.setdefault(n.name, []).append(f.stem)
+        
+        conflicts = {k: v for k, v in method_sources.items() if len(v) > 1}
+        if conflicts:
+            self.fail(f"Method conflicts in auth sub-mixins: {conflicts}")
 
 
 class TestRouteRegistrationCoverage(unittest.TestCase):

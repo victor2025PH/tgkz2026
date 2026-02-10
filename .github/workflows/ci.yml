@@ -69,6 +69,12 @@ jobs:
           print('✅ All admin modules import OK')
           " || echo "⚠️ Admin module verification failed (non-blocking)"
 
+      - name: Check mixin import integrity
+        run: |
+          export PYTHONPATH="${GITHUB_WORKSPACE}/backend"
+          cd backend
+          python scripts/check_mixin_imports.py --strict
+
   # ==================== 前端構建 ====================
   frontend-build:
     name: Frontend Build

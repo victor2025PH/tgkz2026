@@ -1020,7 +1020,12 @@ class BackendService(InitStartupMixin, SendQueueMixin, AiServiceMixin, ConfigExe
                 pass
         
         # 獲取帳號（按租戶過濾）
-        accounts = await db.get_all_accounts(owner_user_id=tenant_id)
+        try:
+            accounts = await db.get_all_accounts(owner_user_id=tenant_id)
+            print(f"[_send_accounts_updated] Got {len(accounts)} accounts for tenant={tenant_id}", file=sys.stderr)
+        except Exception as e:
+            print(f"[_send_accounts_updated] ❌ Error getting accounts: {e}", file=sys.stderr)
+            accounts = []
         
         # 清除緩存
         self._cache.pop("accounts", None)

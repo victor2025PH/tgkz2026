@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """
-P13-3: API Performance Metrics Collector
+P13-3 → P14-1: API Performance Metrics & Request Tracing
 
-Lightweight request-level metrics collection with:
+Features:
+- X-Request-ID generation and propagation (P14-1)
 - Per-endpoint response time tracking (P50, P95, P99)
 - Status code distribution
 - Request rate per minute
 - Slowest endpoints ranking
+- Slow request tracing with Request-ID correlation
 - No external dependencies (pure Python, memory-based)
 """
 
 import time
+import uuid
 import logging
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
@@ -22,6 +25,15 @@ logger = logging.getLogger(__name__)
 MAX_HISTORY_MINUTES = 10       # Keep last N minutes of raw data
 MAX_LATENCIES_PER_ENDPOINT = 500  # Rolling window per endpoint
 SLOW_THRESHOLD_MS = 1000       # Mark as slow if > N ms
+
+# P14-1: Request context key for X-Request-ID
+REQUEST_ID_KEY = web.AppKey('request_id', str)
+REQUEST_ID_HEADER = 'X-Request-ID'
+
+
+def get_request_id(request) -> str:
+    """Get the X-Request-ID from current request (P14-1)"""
+    return request.get(REQUEST_ID_KEY, 'unknown')
 
 
 class ApiMetrics:
@@ -49,8 +61,9 @@ class ApiMetrics:
         self._slow_requests = deque(maxlen=50)
         self._start_time = time.time()
 
-    def record(self, method: str, path: str, status: int, duration_ms: float):
-        """Record a request metric"""
+    def record(self, method: str, path: str, status: int, duration_ms: float,
+               request_id: str = ''):
+        """Record a request metric (P14-1: with request_id correlation)"""
         now = time.time()
         endpoint = f"{method} {self._normalize_path(path)}"
 
@@ -67,6 +80,7 @@ class ApiMetrics:
                 'endpoint': endpoint,
                 'duration_ms': round(duration_ms, 1),
                 'status': status,
+                'request_id': request_id,
                 'time': datetime.fromtimestamp(now).isoformat(),
             })
 
@@ -135,28 +149,42 @@ class ApiMetrics:
         }
 
 
+def _generate_request_id() -> str:
+    """Generate a short, unique request ID (P14-1)"""
+    return uuid.uuid4().hex[:12]
+
+
 def create_perf_middleware():
-    """Create aiohttp middleware for performance tracking"""
+    """Create aiohttp middleware for performance tracking + request tracing (P14-1)"""
     metrics = ApiMetrics.get_instance()
 
     @web.middleware
     async def perf_middleware(request, handler):
+        # P14-1: Generate or reuse X-Request-ID
+        req_id = request.headers.get(REQUEST_ID_HEADER, '') or _generate_request_id()
+        request[REQUEST_ID_KEY] = req_id
+
         start = time.monotonic()
         try:
             response = await handler(request)
             duration_ms = (time.monotonic() - start) * 1000
-            metrics.record(request.method, request.path, response.status, duration_ms)
-            # Add timing header
+            metrics.record(request.method, request.path, response.status,
+                           duration_ms, request_id=req_id)
+            # P14-1: Propagate request ID + timing in response headers
+            response.headers[REQUEST_ID_HEADER] = req_id
             response.headers['X-Response-Time'] = f"{duration_ms:.1f}ms"
             return response
         except web.HTTPException as e:
             duration_ms = (time.monotonic() - start) * 1000
-            metrics.record(request.method, request.path, e.status, duration_ms)
+            metrics.record(request.method, request.path, e.status,
+                           duration_ms, request_id=req_id)
+            e.headers[REQUEST_ID_HEADER] = req_id
+            e.headers['X-Response-Time'] = f"{duration_ms:.1f}ms"
             raise
         except Exception as e:
             duration_ms = (time.monotonic() - start) * 1000
-            metrics.record(request.method, request.path, 500, duration_ms)
+            metrics.record(request.method, request.path, 500,
+                           duration_ms, request_id=req_id)
             raise
 
     return perf_middleware
-# P13-3: API Performance Metrics Collector — v1.1

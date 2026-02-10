@@ -1251,11 +1251,17 @@ class SystemRoutesMixin:
     # ==================== P13-3: API Performance Metrics ====================
 
     async def api_perf_metrics(self, request):
-        """P13-3: API 性能指标端点 — 响应时间/状态分布/慢请求"""
+        """P13-3/P14-1: API 性能指标端点 — 响应时间/状态分布/慢请求/缓存统计"""
         try:
             from api.perf_metrics import ApiMetrics
             metrics = ApiMetrics.get_instance()
             summary = metrics.get_summary()
+            # P14-3: Include cache stats
+            try:
+                from api.response_cache import ResponseCache
+                summary['cache'] = ResponseCache.get_instance().get_stats()
+            except Exception:
+                summary['cache'] = None
             return self._json_response({'success': True, 'data': summary})
         except Exception as e:
             logger.error(f"API perf metrics error: {e}")
@@ -1263,4 +1269,34 @@ class SystemRoutesMixin:
                 'success': False,
                 'error': str(e),
                 'message': 'Performance metrics not available'
+            }, 500)
+
+    async def api_cache_stats(self, request):
+        """P14-3: 缓存统计端点"""
+        try:
+            from api.response_cache import ResponseCache, CACHE_CONFIG
+            cache = ResponseCache.get_instance()
+            stats = cache.get_stats()
+            stats['config'] = {path: ttl for path, ttl in sorted(CACHE_CONFIG.items())}
+            return self._json_response({'success': True, 'data': stats})
+        except Exception as e:
+            return self._json_response({
+                'success': False, 'error': str(e)
+            }, 500)
+
+    async def invalidate_cache(self, request):
+        """P14-3: 缓存失效端点 (管理员操作)"""
+        try:
+            from api.response_cache import ResponseCache
+            data = await request.json() if request.can_read_body else {}
+            path = data.get('path')  # None = clear all
+            cache = ResponseCache.get_instance()
+            cache.invalidate(path)
+            return self._json_response({
+                'success': True,
+                'message': f'Cache invalidated: {"all" if path is None else path}'
+            })
+        except Exception as e:
+            return self._json_response({
+                'success': False, 'error': str(e)
             }, 500)

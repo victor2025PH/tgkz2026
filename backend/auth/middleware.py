@@ -21,38 +21,29 @@ from .models import User, UserRole
 logger = logging.getLogger(__name__)
 
 
-# 公開路由（不需要認證）
-PUBLIC_ROUTES = [
-    '/',
-    '/health',
-    '/api/health',
-    '/api/debug/modules',
-    '/api/debug/deploy',
-    '/api/debug/accounts',
-    '/api/v1/auth/login',
-    '/api/v1/auth/register',
-    '/api/v1/auth/refresh',
-    '/api/v1/auth/forgot-password',
-    '/api/v1/auth/reset-password',
-    '/api/v1/auth/verify-email',
-    '/api/v1/auth/verify-email-code',
-    '/api/v1/auth/reset-password-code',
-    '/api/v1/auth/send-verification',
-    # OAuth 路由
-    '/api/oauth/telegram/authorize',
-    '/api/v1/oauth/telegram',
-    '/api/v1/oauth/telegram/authorize',
-    '/api/v1/oauth/telegram/config',
-    '/api/v1/oauth/google',
-    '/api/v1/oauth/google/authorize',
-    '/api/v1/oauth/providers',
-    # 健康檢查
-    '/api/v1/health',
-    '/api/v1/health/liveness',
-    '/api/v1/health/readiness',
-    # P13-3: 性能指標
-    '/api/v1/metrics/api',
-]
+# P14-2: 公开路由 — 单一数据源从 HttpApiServer.PUBLIC_PATHS 获取
+# 此处保留 fallback 以防循环导入
+_PUBLIC_ROUTES_CACHE = None
+
+def _get_public_routes():
+    """P14-2: 从 HttpApiServer.PUBLIC_PATHS 获取公开路径（懒加载避免循环导入）"""
+    global _PUBLIC_ROUTES_CACHE
+    if _PUBLIC_ROUTES_CACHE is not None:
+        return _PUBLIC_ROUTES_CACHE
+    try:
+        from api.http_server import HttpApiServer
+        _PUBLIC_ROUTES_CACHE = HttpApiServer.get_public_paths()
+        logger.info(f"P14-2: Loaded {len(_PUBLIC_ROUTES_CACHE)} public paths from ROUTE_TABLE")
+        return _PUBLIC_ROUTES_CACHE
+    except Exception as e:
+        logger.warning(f"P14-2: Failed to load public paths from HttpApiServer: {e}")
+        # Fallback: minimal set for safety
+        _PUBLIC_ROUTES_CACHE = frozenset([
+            '/', '/health', '/api/health',
+            '/api/v1/auth/login', '/api/v1/auth/register', '/api/v1/auth/refresh',
+            '/api/v1/health',
+        ])
+        return _PUBLIC_ROUTES_CACHE
 
 # 速率限制配置
 RATE_LIMITS = {
@@ -221,7 +212,8 @@ def create_auth_middleware():
         try:
             # 檢查是否為公開路由
             path = request.path
-            if any(path == route or path.startswith(route + '/') for route in PUBLIC_ROUTES):
+            public_routes = _get_public_routes()
+            if path in public_routes or any(path.startswith(route + '/') for route in public_routes):
                 request['auth'] = AuthContext()
                 return await handler(request)
             

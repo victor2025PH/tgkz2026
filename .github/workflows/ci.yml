@@ -170,29 +170,34 @@ jobs:
               print(f'HttpApiServer import failed: {e}')
               sys.exit(1)
 
-          # Mixin verification (P10-1: 4 mixins)
+          # Mixin verification (P11-1: 6 mixins)
           from api.auth_routes_mixin import AuthRoutesMixin
           from api.quota_routes_mixin import QuotaRoutesMixin
           from api.payment_routes_mixin import PaymentRoutesMixin
           from api.admin_routes_mixin import AdminRoutesMixin
+          from api.business_routes_mixin import BusinessRoutesMixin
+          from api.system_routes_mixin import SystemRoutesMixin
 
           # Verify MRO
-          assert issubclass(HttpApiServer, AuthRoutesMixin), 'MRO: AuthRoutesMixin missing'
-          assert issubclass(HttpApiServer, QuotaRoutesMixin), 'MRO: QuotaRoutesMixin missing'
-          assert issubclass(HttpApiServer, PaymentRoutesMixin), 'MRO: PaymentRoutesMixin missing'
-          assert issubclass(HttpApiServer, AdminRoutesMixin), 'MRO: AdminRoutesMixin missing'
-          print(f'PASS: HttpApiServer MRO includes all 4 mixins')
+          for mixin in [AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
+                        AdminRoutesMixin, BusinessRoutesMixin, SystemRoutesMixin]:
+              assert issubclass(HttpApiServer, mixin), f'MRO: {mixin.__name__} missing'
+          print(f'PASS: HttpApiServer MRO includes all 6 mixins')
 
           # Method count check
           auth_m = [m for m in dir(AuthRoutesMixin) if not m.startswith('_')]
           quota_m = [m for m in dir(QuotaRoutesMixin) if not m.startswith('_')]
           pay_m = [m for m in dir(PaymentRoutesMixin) if not m.startswith('_')]
           admin_m = [m for m in dir(AdminRoutesMixin) if not m.startswith('_')]
-          print(f'Methods: auth={len(auth_m)}, quota={len(quota_m)}, payment={len(pay_m)}, admin={len(admin_m)}')
+          biz_m = [m for m in dir(BusinessRoutesMixin) if not m.startswith('_')]
+          sys_m = [m for m in dir(SystemRoutesMixin) if not m.startswith('__')]
+          print(f'Methods: auth={len(auth_m)}, quota={len(quota_m)}, payment={len(pay_m)}, admin={len(admin_m)}, business={len(biz_m)}, system={len(sys_m)}')
           assert len(auth_m) >= 30, f'Auth mixin too few methods: {len(auth_m)}'
           assert len(quota_m) >= 8, f'Quota mixin too few methods: {len(quota_m)}'
           assert len(pay_m) >= 15, f'Payment mixin too few methods: {len(pay_m)}'
           assert len(admin_m) >= 35, f'Admin mixin too few methods: {len(admin_m)}'
+          assert len(biz_m) >= 25, f'Business mixin too few methods: {len(biz_m)}'
+          assert len(sys_m) >= 20, f'System mixin too few methods: {len(sys_m)}'
           print('PASS: All performance and structure checks passed')
           "
         continue-on-error: true

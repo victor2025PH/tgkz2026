@@ -548,31 +548,166 @@ COMMON_RESPONSES = {
 }
 
 
-def generate_openapi_spec() -> Dict[str, Any]:
-    """生成完整的 OpenAPI 規範"""
+# P11-3: Route-to-tag mapping for auto-generated paths
+TAG_RULES = [
+    ('/api/v1/auth/', '認證'),
+    ('/api/v1/oauth/', '認證'),
+    ('/webhook/telegram', '認證'),
+    ('/ws/login-token', '認證'),
+    ('/api/v1/accounts', '帳號管理'),
+    ('/api/v1/credentials', '帳號管理'),
+    ('/api/v1/monitoring', '監控'),
+    ('/api/v1/keywords', '核心功能'),
+    ('/api/v1/groups', '核心功能'),
+    ('/api/v1/settings', '核心功能'),
+    ('/api/v1/contacts', '核心功能'),
+    ('/api/v1/usage', '使用量'),
+    ('/api/v1/quota', '配額'),
+    ('/api/v1/membership', '配額'),
+    ('/api/v1/subscription', '訂閱'),
+    ('/api/v1/payment', '支付'),
+    ('/api/v1/webhooks', '支付'),
+    ('/api/v1/invoices', '發票'),
+    ('/api/v1/billing', '計費'),
+    ('/api/v1/notifications', '通知'),
+    ('/api/v1/i18n', '國際化'),
+    ('/api/v1/timezone', '時區'),
+    ('/api/v1/leads', '營銷分析'),
+    ('/api/v1/analytics', '營銷分析'),
+    ('/api/v1/ab-tests', '營銷分析'),
+    ('/api/v1/referral', '推薦'),
+    ('/api/v1/coupon', '優惠券'),
+    ('/api/v1/campaigns', '優惠券'),
+    ('/api/v1/export', '數據導出'),
+    ('/api/v1/backups', '數據導出'),
+    ('/api/v1/admin/', '管理員'),
+    ('/api/admin/', '管理後台'),
+    ('/api/v1/health', '健康檢查'),
+    ('/api/v1/system', '系統監控'),
+    ('/api/v1/diagnostics', '診斷'),
+    ('/metrics', '系統監控'),
+    ('/api/v1/api-keys', 'API 密鑰'),
+    ('/api/v1/errors', '前端遙測'),
+    ('/api/v1/performance', '前端遙測'),
+    ('/api/v1/audit', '審計'),
+    ('/api/v1/retry', '營銷分析'),
+    ('/api/wallet', '錢包'),
+    ('/api/purchase', '購買'),
+    ('/health', '健康檢查'),
+    ('/api/health', '健康檢查'),
+    ('/api/debug', '診斷'),
+    ('/api/command', '命令'),
+    ('/api/v1/command', '命令'),
+    ('/api/docs', '文檔'),
+    ('/api/redoc', '文檔'),
+    ('/api/openapi', '文檔'),
+    ('/api/v1/initial-state', '核心功能'),
+    ('/api/status', '系統監控'),
+    ('/api/v1/status', '系統監控'),
+    ('/ws', 'WebSocket'),
+]
+
+
+def _classify_route(path: str) -> str:
+    """Classify a route path into a tag"""
+    for prefix, tag in TAG_RULES:
+        if path.startswith(prefix):
+            return tag
+    return '其他'
+
+
+def _method_to_operation_id(method: str, path: str) -> str:
+    """Generate an operation ID from method + path"""
+    parts = path.replace('/api/v1/', '').replace('/api/', '').replace('{', '').replace('}', '')
+    parts = parts.strip('/').replace('/', '_').replace('-', '_')
+    return f"{method}_{parts}"
+
+
+def generate_openapi_spec(app=None) -> Dict[str, Any]:
+    """生成完整的 OpenAPI 規範 — P11-3: 自動掃描已註冊路由"""
+    # Start with manually enriched paths
+    all_paths = dict(API_PATHS)
+
+    # Auto-scan routes from aiohttp app (if available)
+    auto_count = 0
+    if app is not None:
+        try:
+            for resource in app.router.resources():
+                info = resource.get_info()
+                path = info.get('path') or info.get('formatter', '')
+                if not path:
+                    continue
+                # Convert aiohttp {id} to OpenAPI {id}
+                openapi_path = path
+                if openapi_path not in all_paths:
+                    all_paths[openapi_path] = {}
+
+                for route in resource:
+                    method = route.method.lower()
+                    if method == '*':
+                        continue
+                    if method not in all_paths[openapi_path]:
+                        tag = _classify_route(openapi_path)
+                        handler = route.handler
+                        summary = ''
+                        if hasattr(handler, '__doc__') and handler.__doc__:
+                            summary = handler.__doc__.strip().split('\n')[0]
+                        elif hasattr(handler, '__name__'):
+                            summary = handler.__name__.replace('_', ' ').title()
+
+                        needs_auth = not any(openapi_path.startswith(p) for p in
+                            ['/health', '/api/health', '/api/docs', '/api/redoc',
+                             '/api/openapi', '/metrics', '/api/debug', '/api/status',
+                             '/api/v1/status', '/webhook/', '/api/v1/auth/register',
+                             '/api/v1/auth/login', '/api/v1/health'])
+
+                        operation = {
+                            "tags": [tag],
+                            "summary": summary or _method_to_operation_id(method, openapi_path),
+                            "operationId": _method_to_operation_id(method, openapi_path),
+                            "responses": {
+                                "200": {"description": "成功"},
+                                "401": {"$ref": "#/components/responses/Unauthorized"} if needs_auth else {"description": "N/A"},
+                            }
+                        }
+                        if needs_auth:
+                            operation["security"] = [{"BearerAuth": []}]
+                        if method in ('post', 'put', 'patch'):
+                            operation["requestBody"] = {
+                                "content": {"application/json": {"schema": {"type": "object"}}}
+                            }
+
+                        all_paths[openapi_path][method] = operation
+                        auto_count += 1
+        except Exception:
+            pass  # Graceful fallback to manual paths only
+
+    # Collect unique tags
+    all_tags = set()
+    for path_ops in all_paths.values():
+        for op in path_ops.values():
+            if isinstance(op, dict) and 'tags' in op:
+                all_tags.update(op['tags'])
+
+    tag_list = sorted([{"name": t, "description": f"{t}相關 API"} for t in all_tags], key=lambda x: x['name'])
+
     return {
         "openapi": OPENAPI_VERSION,
-        "info": API_INFO,
+        "info": {**API_INFO, "x-auto-generated-routes": auto_count},
         "servers": SERVERS,
-        "paths": API_PATHS,
+        "paths": dict(sorted(all_paths.items())),
         "components": {
             "schemas": COMMON_SCHEMAS,
             "responses": COMMON_RESPONSES,
             "securitySchemes": SECURITY_SCHEMES
         },
-        "tags": [
-            {"name": "認證", "description": "用戶認證相關 API"},
-            {"name": "帳號管理", "description": "Telegram 帳號管理"},
-            {"name": "訂閱", "description": "訂閱和付款"},
-            {"name": "使用量", "description": "使用量統計"},
-            {"name": "系統", "description": "系統狀態和監控"}
-        ]
+        "tags": tag_list
     }
 
 
-def get_openapi_json() -> str:
+def get_openapi_json(app=None) -> str:
     """獲取 OpenAPI JSON 字符串"""
-    spec = generate_openapi_spec()
+    spec = generate_openapi_spec(app)
     return json.dumps(spec, ensure_ascii=False, indent=2)
 
 

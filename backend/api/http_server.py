@@ -1262,6 +1262,36 @@ class HttpApiServer:
             'PWD': os.getcwd(),
         }
         
+        # 8. 模擬帶 owner_user_id 的查詢
+        try:
+            from database import db as _db2
+            # 使用查到的 owner_user_id 進行過濾測試
+            if 'accounts_by_owner' in diag.get('checks', {}):
+                for owner_id in diag['checks']['accounts_by_owner']:
+                    if owner_id and owner_id != 'NULL':
+                        filtered = await _db2.get_all_accounts(owner_user_id=owner_id)
+                        diag['checks'][f'filtered_accounts_{owner_id[:8]}'] = len(filtered)
+        except Exception as e:
+            diag['checks']['filtered_query'] = f'Error: {e}'
+        
+        # 9. 直接測試 handle_get_accounts（模擬實際請求路徑）
+        try:
+            if self.backend_service:
+                result = await self.backend_service.handle_command('get-accounts', {})
+                if result:
+                    diag['checks']['handle_command_result'] = {
+                        'success': result.get('success'),
+                        'accounts_count': len(result.get('accounts', [])),
+                        'error': result.get('error'),
+                    }
+                else:
+                    diag['checks']['handle_command_result'] = 'returned None'
+            else:
+                diag['checks']['handle_command_result'] = 'backend_service not initialized'
+        except Exception as e:
+            diag['checks']['handle_command_result'] = f'Error: {e}'
+            diag['errors'].append(f'handle_command: {e}')
+        
         diag['summary'] = 'ALL OK' if not diag['errors'] else f'{len(diag["errors"])} errors found'
         
         return self._json_response(diag)

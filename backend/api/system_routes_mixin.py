@@ -1251,17 +1251,29 @@ class SystemRoutesMixin:
     # ==================== P13-3: API Performance Metrics ====================
 
     async def api_perf_metrics(self, request):
-        """P13-3/P14-1: API 性能指标端点 — 响应时间/状态分布/慢请求/缓存统计"""
+        """P13-3 → P15-1: API 性能指标端点 — 响应时间/缓存/限流/数据库 统合仪表板"""
         try:
             from api.perf_metrics import ApiMetrics
             metrics = ApiMetrics.get_instance()
             summary = metrics.get_summary()
-            # P14-3: Include cache stats
+            # P14-3: Cache stats
             try:
                 from api.response_cache import ResponseCache
                 summary['cache'] = ResponseCache.get_instance().get_stats()
             except Exception:
                 summary['cache'] = None
+            # P15-1: Rate limiter stats
+            try:
+                from core.rate_limiter import get_rate_limiter
+                summary['rate_limiter'] = get_rate_limiter().get_stats()
+            except Exception:
+                summary['rate_limiter'] = None
+            # P15-2: Database health stats
+            try:
+                from api.db_health import DbHealthMonitor
+                summary['database'] = DbHealthMonitor.get_instance().get_stats()
+            except Exception:
+                summary['database'] = None
             return self._json_response({'success': True, 'data': summary})
         except Exception as e:
             logger.error(f"API perf metrics error: {e}")
@@ -1299,4 +1311,38 @@ class SystemRoutesMixin:
         except Exception as e:
             return self._json_response({
                 'success': False, 'error': str(e)
+            }, 500)
+
+    # ==================== P15-2: Database Health Metrics ====================
+
+    async def api_db_health(self, request):
+        """P15-2: 数据库健康监控端点 — 连接池/慢查询/PRAGMA/文件统计"""
+        try:
+            from api.db_health import DbHealthMonitor
+            monitor = DbHealthMonitor.get_instance()
+            stats = monitor.get_stats()
+            return self._json_response({'success': True, 'data': stats})
+        except Exception as e:
+            logger.error(f"DB health metrics error: {e}")
+            return self._json_response({
+                'success': False, 'error': str(e),
+                'message': 'Database health metrics not available'
+            }, 500)
+
+    # ==================== P15-3: Alert Rules Engine ====================
+
+    async def api_alert_rules(self, request):
+        """P15-3: 告警规则状态端点 — 当前告警/历史/阈值配置"""
+        try:
+            from api.alert_engine import AlertEngine
+            engine = AlertEngine.get_instance()
+            return self._json_response({
+                'success': True,
+                'data': engine.get_status()
+            })
+        except Exception as e:
+            logger.error(f"Alert rules error: {e}")
+            return self._json_response({
+                'success': False, 'error': str(e),
+                'message': 'Alert engine not available'
             }, 500)

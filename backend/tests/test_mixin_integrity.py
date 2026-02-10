@@ -393,6 +393,106 @@ class TestDeclarativePermissions(unittest.TestCase):
                       "auth/middleware.py should reference HttpApiServer for public paths")
 
 
+class TestP15RateLimiterEnhancement(unittest.TestCase):
+    """P15-1: 限流增强测试"""
+
+    def test_01_token_bucket_burst_rules(self):
+        """DEFAULT_RULES should have rules with burst > 0"""
+        with open(BACKEND_DIR / 'core' / 'rate_limiter.py', 'r', encoding='utf-8') as f:
+            content = f.read()
+        # P15-1 added burst-enabled rules
+        self.assertIn('admin_api', content, "admin_api rule missing")
+        self.assertIn('ip_login', content, "ip_login rule missing")
+        self.assertIn('ip_register', content, "ip_register rule missing")
+        self.assertIn('payment', content, "payment rule missing")
+        self.assertIn('webhook', content, "webhook rule missing")
+
+    def test_02_token_bucket_used_in_check(self):
+        """check() method should actually use token_bucket for burst control"""
+        with open(BACKEND_DIR / 'core' / 'rate_limiter.py', 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('check_and_consume', content,
+                      "TokenBucket.check_and_consume not called in RateLimiter")
+        self.assertIn('burst:{key}', content,
+                      "Burst key prefix not found — TokenBucket not integrated")
+
+    def test_03_rate_limiter_stats_in_metrics(self):
+        """api_perf_metrics endpoint should include rate_limiter stats"""
+        with open(BACKEND_DIR / 'api' / 'system_routes_mixin.py', 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn("summary['rate_limiter']", content)
+        self.assertIn('get_rate_limiter', content)
+
+
+class TestP15DbHealth(unittest.TestCase):
+    """P15-2: 数据库健康监控测试"""
+
+    def test_01_db_health_module_exists(self):
+        """api/db_health.py should exist"""
+        self.assertTrue(
+            (BACKEND_DIR / 'api' / 'db_health.py').exists(),
+            "api/db_health.py not found"
+        )
+
+    def test_02_db_health_has_key_methods(self):
+        """DbHealthMonitor should have get_stats, PRAGMA diagnostics"""
+        with open(BACKEND_DIR / 'api' / 'db_health.py', 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('class DbHealthMonitor', content)
+        self.assertIn('def get_stats', content)
+        self.assertIn('PRAGMA journal_mode', content)
+        self.assertIn('PRAGMA page_count', content)
+        self.assertIn('freelist_count', content)
+
+    def test_03_db_health_route_registered(self):
+        """ROUTE_TABLE should have /api/v1/metrics/db"""
+        with open(HTTP_SERVER_FILE, 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('/api/v1/metrics/db', content)
+
+    def test_04_db_health_public(self):
+        """/api/v1/metrics/db should be in PUBLIC_PATHS"""
+        with open(HTTP_SERVER_FILE, 'r', encoding='utf-8') as f:
+            content = f.read()
+        # Check that the path is in PUBLIC_PATHS block
+        self.assertIn("'/api/v1/metrics/db'", content)
+
+
+class TestP15AlertEngine(unittest.TestCase):
+    """P15-3: 告警规则引擎测试"""
+
+    def test_01_alert_engine_module_exists(self):
+        """api/alert_engine.py should exist"""
+        self.assertTrue(
+            (BACKEND_DIR / 'api' / 'alert_engine.py').exists(),
+            "api/alert_engine.py not found"
+        )
+
+    def test_02_alert_engine_rules_registered(self):
+        """AlertEngine should register default rules"""
+        with open(BACKEND_DIR / 'api' / 'alert_engine.py', 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('high_error_rate', content)
+        self.assertIn('slow_response_p95', content)
+        self.assertIn('low_cache_hit_rate', content)
+        self.assertIn('db_connection_leak', content)
+        self.assertIn('wal_too_large', content)
+        self.assertIn('slow_query_surge', content)
+
+    def test_03_alert_engine_cooldown(self):
+        """AlertEngine should have cooldown mechanism"""
+        with open(BACKEND_DIR / 'api' / 'alert_engine.py', 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('cooldown_seconds', content)
+        self.assertIn('_last_fired', content)
+
+    def test_04_alert_route_registered(self):
+        """/api/v1/metrics/alerts should be in ROUTE_TABLE"""
+        with open(HTTP_SERVER_FILE, 'r', encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('/api/v1/metrics/alerts', content)
+
+
 if __name__ == '__main__':
     # Run with verbose output
     unittest.main(verbosity=2)

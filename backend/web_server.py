@@ -40,13 +40,17 @@ async def init_backend():
     
     try:
         from main import BackendService
+        logger.info("📦 BackendService imported successfully")
         backend = BackendService()
+        logger.info("📦 BackendService instance created, starting initialize()...")
         await backend.initialize()
         logger.info("✅ Backend service initialized")
         return backend
     except Exception as e:
-        logger.warning(f"⚠️ Backend initialization failed: {e}")
-        logger.info("Running in demo mode without full backend")
+        import traceback
+        logger.error(f"❌ Backend initialization FAILED: {e}")
+        logger.error(f"❌ Traceback:\n{traceback.format_exc()}")
+        logger.warning("⚠️ Running in DEMO MODE — accounts and all commands will return empty data!")
         return None
 
 

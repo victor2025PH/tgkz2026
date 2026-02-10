@@ -23,6 +23,11 @@ class SystemRoutesMixin:
         migration_status = None
         if self.backend_service and hasattr(self.backend_service, '_migration_status'):
             migration_status = self.backend_service._migration_status
+        # P11-1: 安全引用模块级变量（可能在 http_server.py 中定义）
+        try:
+            from api.http_server import WALLET_MODULE_AVAILABLE
+        except ImportError:
+            WALLET_MODULE_AVAILABLE = False
         return self._json_response({
             'status': 'ok',
             'service': 'TG-Matrix API',

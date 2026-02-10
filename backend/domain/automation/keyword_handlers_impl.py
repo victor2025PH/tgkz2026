@@ -179,10 +179,16 @@ async def handle_save_keyword_set(self, payload: Dict[str, Any]):
         else:
             # 創建新詞集
             print(f"[Backend] Creating new set", file=sys.stderr)
+            # 🔧 Phase8-P1: 包含 owner_user_id
+            try:
+                from core.tenant_filter import get_owner_user_id
+                _ks_owner = get_owner_user_id()
+            except ImportError:
+                _ks_owner = 'local_user'
             cursor = await db.execute_insert(
-                """INSERT INTO keyword_sets (name, description, keywords, match_mode, is_active)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (name, description, keywords_json, match_mode, 1 if is_active else 0)
+                """INSERT INTO keyword_sets (name, description, keywords, match_mode, is_active, owner_user_id)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (name, description, keywords_json, match_mode, 1 if is_active else 0, _ks_owner)
             )
             set_id = cursor
             print(f"[Backend] New set created with id={set_id}", file=sys.stderr)

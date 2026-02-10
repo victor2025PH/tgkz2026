@@ -1409,7 +1409,7 @@ export class ElectronIpcService implements OnDestroy {
   private readonly THROTTLE_EVENTS = new Set([
     'batch-send:progress', 'members-extraction-progress',
     'one-click-start-progress', 'batch-extraction-progress',
-    'history-collection-progress', 'loading-progress',
+    'history-collection-progress', 'collect-from-history-progress', 'loading-progress',
     'batch-refresh-member-count-progress', 'export-progress',
   ]);
 

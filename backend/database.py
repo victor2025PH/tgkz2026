@@ -3465,6 +3465,19 @@ class Database:
                 )
             ''')
             
+            # 🔧 Phase8-P1-2: 添加緩存統計列
+            for col_name, col_def in [
+                ('cached_msg_count', 'INTEGER DEFAULT 0'),
+                ('cached_user_count', 'INTEGER DEFAULT 0'),
+            ]:
+                try:
+                    await self.fetch_one(f"SELECT {col_name} FROM monitored_groups LIMIT 1")
+                except Exception:
+                    try:
+                        await self.execute(f'ALTER TABLE monitored_groups ADD COLUMN {col_name} {col_def}')
+                    except Exception:
+                        pass
+            
             # 消息模板表
             await self.execute('''
                 CREATE TABLE IF NOT EXISTS message_templates (
@@ -3713,7 +3726,7 @@ class Database:
                 )
             except ImportError:
                 return await self.execute_insert(
-                    'INSERT INTO keyword_sets (name, description) VALUES (?, ?)',
+                    "INSERT INTO keyword_sets (name, description, owner_user_id) VALUES (?, ?, 'local_user')",
                     (name, description)
                 )
         except Exception as e:
@@ -4890,16 +4903,22 @@ class Database:
             triggered_keyword = lead_data.get('triggeredKeyword', '')
             online_status = lead_data.get('onlineStatus', 'Unknown')
             
+            # 🔧 Phase8-P1: 獲取 owner_user_id
+            try:
+                from core.tenant_filter import get_owner_user_id
+                _em_owner = get_owner_user_id()
+            except ImportError:
+                _em_owner = 'local_user'
             await self.execute('''
                 INSERT INTO extracted_members 
-                (user_id, username, first_name, last_name, source_chat_title, notes, online_status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                (user_id, username, first_name, last_name, source_chat_title, notes, online_status, owner_user_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(user_id) DO UPDATE SET
                     username = COALESCE(excluded.username, username),
                     first_name = COALESCE(excluded.first_name, first_name),
                     last_name = COALESCE(excluded.last_name, last_name),
                     updated_at = CURRENT_TIMESTAMP
-            ''', (user_id, username, first_name, last_name, source_group, f'觸發詞: {triggered_keyword}', online_status))
+            ''', (user_id, username, first_name, last_name, source_group, f'觸發詞: {triggered_keyword}', online_status, _em_owner))
             
             # 獲取插入的 ID
             result = await self.fetch_one(

@@ -1756,64 +1756,68 @@ class HttpApiServer:
                         if em:
                             wheres.append("email = ?")
                             params.append(em)
-                        q = "SELECT id, user_id, is_lifetime, membership_level, subscription_tier, expires_at, subscription_expires FROM users WHERE " + " OR ".join(wheres) + " ORDER BY COALESCE(is_lifetime, 0) DESC, id LIMIT 1"
+                        # 🔧 P7-1: 动态构建 SELECT — 仅查询存在的列
+                        _user_cols = [c[1] for c in conn.execute("PRAGMA table_info(users)").fetchall()]
+                        _has_sub_tier = 'subscription_tier' in _user_cols
+                        _has_sub_exp = 'subscription_expires' in _user_cols
+                        _sel_cols = "id, user_id, is_lifetime, membership_level, expires_at"
+                        if _has_sub_tier:
+                            _sel_cols += ", subscription_tier"
+                        if _has_sub_exp:
+                            _sel_cols += ", subscription_expires"
+                        q = f"SELECT {_sel_cols} FROM users WHERE " + " OR ".join(wheres) + " ORDER BY COALESCE(is_lifetime, 0) DESC, id LIMIT 1"
                         row = conn.execute(q, params).fetchone()
                         if row:
-                            # sqlite3.Row 用 [] 取列，無 .get()
                             db_membership = row['membership_level'] or ''
-                            db_sub_tier = row['subscription_tier'] or ''
-                            logger.info("[auth/me] DB row: id=%s user_id=%s is_lifetime=%s membership_level=%s subscription_tier=%s expires_at=%s",
+                            db_sub_tier = (row['subscription_tier'] or '') if _has_sub_tier else ''
+                            logger.info("[auth/me] DB row: id=%s user_id=%s is_lifetime=%s membership_level=%s sub_tier=%s expires_at=%s",
                                         row['id'], row['user_id'], row['is_lifetime'], db_membership, db_sub_tier, row['expires_at'])
                             
-                            # 🔧 修復：同步兩套等級字段，防止不一致
-                            # 以 subscription_tier 為主（管理後台更新的是這個字段）
                             effective_level = db_sub_tier or db_membership or 'bronze'
-                            if db_membership != effective_level or db_sub_tier != effective_level:
+                            if _has_sub_tier and (db_membership != effective_level or db_sub_tier != effective_level):
                                 try:
                                     pk = row['id'] or row['user_id'] or user.id
                                     conn.execute(
                                         "UPDATE users SET membership_level = ?, subscription_tier = ? WHERE id = ? OR user_id = ?",
                                         (effective_level, effective_level, pk, pk)
                                     )
-                                    # 同步 expires_at 和 subscription_expires
                                     db_exp = row['expires_at']
-                                    db_sub_exp = row['subscription_expires']
+                                    db_sub_exp = row['subscription_expires'] if _has_sub_exp else None
                                     if db_sub_exp and not db_exp:
                                         conn.execute("UPDATE users SET expires_at = ? WHERE id = ? OR user_id = ?", (db_sub_exp, pk, pk))
-                                    elif db_exp and not db_sub_exp:
+                                    elif db_exp and not db_sub_exp and _has_sub_exp:
                                         conn.execute("UPDATE users SET subscription_expires = ? WHERE id = ? OR user_id = ?", (db_exp, pk, pk))
                                     conn.commit()
-                                    logger.info("[auth/me] Synced level fields: %s → membership_level=%s, subscription_tier=%s", pk, effective_level, effective_level)
                                 except Exception as sync_err:
                                     logger.warning("[auth/me] Failed to sync level fields: %s", sync_err)
+                            elif not _has_sub_tier and db_membership:
+                                effective_level = db_membership
                             
-                            # 🔧 修復：確保返回數據使用正確的等級
                             data['subscription_tier'] = effective_level
                             data['subscriptionTier'] = effective_level
                             data['membershipLevel'] = effective_level
                             
                             if (row['is_lifetime'] or 0) == 1:
                                 is_lifetime = True
-                            # 若為 king，清除配額緩存，確保 tg_accounts=-1 生效（修復 1/1 上限）
                             if (effective_level.lower() == 'king' or is_lifetime):
                                 try:
                                     from core.quota_service import get_quota_service
                                     get_quota_service().invalidate_cache(user.id)
                                 except Exception:
                                     pass
-                                # 同步 subscription_expires 為 NULL，避免前端誤算剩餘天數
-                                try:
-                                    pk = row['id'] or row['user_id'] or user.id
-                                    conn.execute(
-                                        "UPDATE users SET subscription_expires = NULL, subscription_tier = COALESCE(membership_level, subscription_tier) WHERE id = ? OR user_id = ?",
-                                        (pk, pk)
-                                    )
-                                    conn.commit()
-                                except Exception:
-                                    pass
+                                if _has_sub_tier and _has_sub_exp:
+                                    try:
+                                        pk = row['id'] or row['user_id'] or user.id
+                                        conn.execute(
+                                            "UPDATE users SET subscription_expires = NULL, subscription_tier = COALESCE(membership_level, subscription_tier) WHERE id = ? OR user_id = ?",
+                                            (pk, pk)
+                                        )
+                                        conn.commit()
+                                    except Exception:
+                                        pass
                             elif not is_lifetime:
                                 level = effective_level.lower()
-                                exp = row['expires_at'] or row['subscription_expires']
+                                exp = row['expires_at'] or (row['subscription_expires'] if _has_sub_exp else None)
                                 if level == 'king' and (not exp or (exp and _is_far_future(exp))):
                                     is_lifetime = True
                     finally:
@@ -4191,10 +4195,18 @@ _如果這是您本人操作，可以在設置中將此位置添加為信任位�
                 from core.level_config import get_level_config_service
                 service = get_level_config_service()
                 
-                # 獲取用戶等級
-                cursor.execute('SELECT subscription_tier FROM users WHERE id = ?', (user_id,))
-                row = cursor.fetchone()
-                tier = row['subscription_tier'] if row else 'bronze'
+                # 🔧 P7-1: 防御式查询，兼容无 subscription_tier 列的 schema
+                _qcols = [c[1] for c in cursor.execute("PRAGMA table_info(users)").fetchall()]
+                if 'subscription_tier' in _qcols:
+                    cursor.execute('SELECT subscription_tier FROM users WHERE id = ?', (user_id,))
+                    _qrow = cursor.fetchone()
+                    tier = (_qrow['subscription_tier'] or 'bronze') if _qrow else 'bronze'
+                elif 'membership_level' in _qcols:
+                    cursor.execute('SELECT membership_level FROM users WHERE id = ?', (user_id,))
+                    _qrow = cursor.fetchone()
+                    tier = (_qrow['membership_level'] or 'bronze') if _qrow else 'bronze'
+                else:
+                    tier = 'bronze'
                 
                 cursor.execute(query, params)
                 

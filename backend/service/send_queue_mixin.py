@@ -3,6 +3,7 @@ Phase 9-3: Message queue, send callbacks, partial updates
 Extracted from BackendService in main.py.
 """
 import sys
+import re
 import json
 import time
 import asyncio

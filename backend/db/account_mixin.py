@@ -6,6 +6,19 @@ from typing import Dict, List, Any, Optional, Tuple
 from pathlib import Path
 import json
 import sys
+import sqlite3
+
+# 異步數據庫支持
+try:
+    import aiosqlite
+    HAS_AIOSQLITE = True
+except ImportError:
+    HAS_AIOSQLITE = False
+    aiosqlite = None
+
+# 從 config 導入數據庫路徑（避免與 database.py 循環導入）
+from config import DATABASE_PATH
+ACCOUNTS_DB_PATH = DATABASE_PATH
 
 
 class AccountMixin:
@@ -447,6 +460,7 @@ class AccountMixin:
                     avatarPath TEXT,
                     telegramId TEXT,
                     tags TEXT,
+                    owner_user_id TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -477,6 +491,7 @@ class AccountMixin:
                 ("avatarPath", "TEXT"),
                 ("telegramId", "TEXT"),
                 ("tags", "TEXT"),
+                ("owner_user_id", "TEXT"),
             ]
             
             if not HAS_AIOSQLITE:

@@ -4,7 +4,20 @@ Mixin class for Database — merged via multiple inheritance.
 """
 from typing import Dict, List, Any, Optional, Tuple
 import sys
-from datetime import datetime
+import secrets
+import sqlite3
+from datetime import datetime, timedelta
+
+
+def _get_membership_levels():
+    """延遲導入避免與 database.py 循環依賴"""
+    from database import MEMBERSHIP_LEVELS
+    return MEMBERSHIP_LEVELS
+
+def _get_referral_rewards():
+    """延遲導入避免與 database.py 循環依賴"""
+    from database import REFERRAL_REWARDS
+    return REFERRAL_REWARDS
 
 
 class UserAdminMixin:
@@ -147,7 +160,7 @@ class UserAdminMixin:
         
         # 價格
         if price is None:
-            price = MEMBERSHIP_LEVELS.get(level, {}).get('prices', {}).get(duration_type, 0)
+            price = _get_membership_levels().get(level, {}).get('prices', {}).get(duration_type, 0)
         
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -249,7 +262,7 @@ class UserAdminMixin:
         ''', (user_id, now.isoformat(), machine_id, now.isoformat(), expires_at.isoformat(), license_key))
         
         # 更新用戶會員等級和過期時間
-        level_order = MEMBERSHIP_LEVELS.get(license_data['level'], {}).get('order', 0)
+        level_order = _get_membership_levels().get(license_data['level'], {}).get('order', 0)
         
         cursor.execute('SELECT membership_level, expires_at FROM users WHERE user_id = ?', (user_id,))
         user_row = cursor.fetchone()
@@ -257,7 +270,7 @@ class UserAdminMixin:
         if user_row:
             current_level = user_row['membership_level']
             current_expires = user_row['expires_at']
-            current_level_order = MEMBERSHIP_LEVELS.get(current_level, {}).get('order', 0)
+            current_level_order = _get_membership_levels().get(current_level, {}).get('order', 0)
             
             # 如果新等級更高或當前已過期，直接使用新過期時間
             if level_order > current_level_order or not current_expires or datetime.fromisoformat(current_expires) < now:
@@ -339,7 +352,7 @@ class UserAdminMixin:
             row_dict = dict(row)
             # 解析等級名稱
             level = row_dict.get('level', 'bronze')
-            level_config = MEMBERSHIP_LEVELS.get(level, {})
+            level_config = _get_membership_levels().get(level, {})
             row_dict['level_name'] = level_config.get('name', level)
             row_dict['level_icon'] = level_config.get('icon', '🎫')
             
@@ -401,7 +414,7 @@ class UserAdminMixin:
             return False
         
         inviter_id = inviter_row['user_id']
-        rewards = REFERRAL_REWARDS['register']
+        rewards = _get_referral_rewards()['register']
         
         # 記錄邀請
         cursor.execute('''
@@ -453,7 +466,7 @@ class UserAdminMixin:
         is_first = cursor.fetchone()['count'] == 0
         
         if is_first:
-            rewards = REFERRAL_REWARDS['first_payment'].get(level, {})
+            rewards = _get_referral_rewards()['first_payment'].get(level, {})
             inviter_days = rewards.get('inviter_days', 0)
             inviter_cash = rewards.get('inviter_cash', 0)
             
@@ -469,7 +482,7 @@ class UserAdminMixin:
             ''', (inviter_cash, inviter_id))
         else:
             # 重複付費返傭
-            commission_rate = REFERRAL_REWARDS['repeat_payment']['commission_rate']
+            commission_rate = _get_referral_rewards()['repeat_payment']['commission_rate']
             commission = order_amount * commission_rate
             
             cursor.execute('''
@@ -572,7 +585,7 @@ class UserAdminMixin:
         
         # 各等級卡密統計
         license_stats = {}
-        for level, config in MEMBERSHIP_LEVELS.items():
+        for level, config in _get_membership_levels().items():
             if level == 'bronze':
                 continue
             cursor.execute("SELECT COUNT(*) as total FROM licenses WHERE level = ?", (level,))

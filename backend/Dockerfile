@@ -26,18 +26,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser
-
 # Copy application code
 COPY . .
 
-# Create necessary directories with correct ownership
-RUN mkdir -p /app/sessions /app/logs /app/data \
-    && chown -R appuser:appuser /app
-
-# Switch to non-root user
-USER appuser
+# Create necessary directories
+RUN mkdir -p /app/sessions /app/logs /app/data
 
 # Environment
 ENV PYTHONUNBUFFERED=1

@@ -287,14 +287,11 @@ class UserAdminMixin:
                     expires_at = ?,
                     is_lifetime = ?,
                     total_spent = total_spent + ?,
-                    last_active_at = ?,
-                    subscription_tier = ?,
-                    subscription_expires = ?
+                    last_active_at = ?
                 WHERE user_id = ? OR id = ?
             ''', (new_level, new_expires.isoformat(), 
                   1 if license_data['duration_type'] == 'lifetime' else 0,
                   license_data['price'], now.isoformat(),
-                  new_level, new_expires.isoformat(),
                   user_id, user_id))
         
         # 記錄激活

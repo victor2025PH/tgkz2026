@@ -1666,10 +1666,16 @@ async def handle_join_and_monitor_resource(self, payload: Dict[str, Any]):
                 tg_id_str = str(chat_telegram_id) if chat_telegram_id else None
                 
                 if not existing:
+                    # 🔧 Phase8-P1: 包含 owner_user_id
+                    try:
+                        from core.tenant_filter import get_owner_user_id
+                        _mg_owner = get_owner_user_id()
+                    except ImportError:
+                        _mg_owner = 'local_user'
                     await db.execute("""
-                        INSERT INTO monitored_groups (link, name, phone, keyword_set_ids, is_active, member_count, telegram_id, resource_type, can_extract_members, created_at)
-                        VALUES (?, ?, ?, '[]', 1, ?, ?, ?, ?, datetime('now'))
-                    """, (group_link, title, phone, members_count, tg_id_str, resource_type, can_extract), auto_commit=False)
+                        INSERT INTO monitored_groups (link, name, phone, keyword_set_ids, is_active, member_count, telegram_id, resource_type, can_extract_members, owner_user_id, created_at)
+                        VALUES (?, ?, ?, '[]', 1, ?, ?, ?, ?, ?, datetime('now'))
+                    """, (group_link, title, phone, members_count, tg_id_str, resource_type, can_extract, _mg_owner), auto_commit=False)
                     type_label = {'channel': '頻道', 'supergroup': '超級群', 'group': '群組'}.get(resource_type, '群組')
                     self.send_log(f"✅ 已添加到監控: {title} ({type_label}，{members_count} 成員，帳號: {phone[:4]}****)", "success")
                 else:
@@ -2244,10 +2250,16 @@ async def handle_join_and_monitor_with_account(self, payload: Dict[str, Any]):
                 )
             
             if not existing:
+                # 🔧 Phase8-P1: 包含 owner_user_id
+                try:
+                    from core.tenant_filter import get_owner_user_id
+                    _mg_owner2 = get_owner_user_id()
+                except ImportError:
+                    _mg_owner2 = 'local_user'
                 await db.execute(
-                    """INSERT INTO monitored_groups (name, link, phone, is_active, keywords, keyword_set_ids, member_count, telegram_id, resource_type, last_active, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
-                    (title, group_link, phone, is_active, keywords_str, keyword_set_ids_json, members_count, telegram_id, resource.get('resource_type', 'group') if resource else 'group'), auto_commit=False
+                    """INSERT INTO monitored_groups (name, link, phone, is_active, keywords, keyword_set_ids, member_count, telegram_id, resource_type, owner_user_id, last_active, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
+                    (title, group_link, phone, is_active, keywords_str, keyword_set_ids_json, members_count, telegram_id, resource.get('resource_type', 'group') if resource else 'group', _mg_owner2), auto_commit=False
                 )
                 bound_msg = f", 綁定 {len(keyword_set_ids)} 個詞集" if keyword_set_ids else ""
                 active_msg = "監控中" if is_active else "已加入（待配置關鍵詞）"

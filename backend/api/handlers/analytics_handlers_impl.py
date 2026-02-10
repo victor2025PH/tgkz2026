@@ -389,11 +389,12 @@ async def handle_analyze_time_effectiveness(self, payload: Dict[str, Any]):
         self.send_event("time-analysis", {"success": False, "error": str(e)})
 
 async def handle_get_group_collected_stats(self, payload: Dict[str, Any]):
-    """🔧 Phase8: 獲取群組可收集用戶統計（統一查詢 discussion_messages + chat_history 兩個數據源）"""
+    """🔧 Phase8-P1: 獲取群組可收集用戶統計（優先讀緩存，fallback 到 COUNT 查詢）"""
     import sys
     
     group_id = payload.get('groupId')
     telegram_id = payload.get('telegramId')
+    use_cache = payload.get('useCache', True)  # 默認使用緩存
     
     try:
         from database import db
@@ -402,6 +403,27 @@ async def handle_get_group_collected_stats(self, payload: Dict[str, Any]):
         collected_users = 0
         monitored_messages = 0
         chat_history_messages = 0
+        
+        # 🔧 Phase8-P1-2: 嘗試從緩存讀取
+        if use_cache and group_id:
+            try:
+                cached = await db.fetch_one(
+                    "SELECT cached_msg_count, cached_user_count FROM monitored_groups WHERE id = ? AND cached_msg_count > 0",
+                    (group_id,)
+                )
+                if cached:
+                    cm = cached['cached_msg_count'] if isinstance(cached, dict) else 0
+                    cu = cached['cached_user_count'] if isinstance(cached, dict) else 0
+                    if cm > 0:
+                        self.send_event("group-collected-stats", {
+                            "groupId": group_id,
+                            "collectedUsers": cu,
+                            "monitoredMessages": cm,
+                            "fromCache": True
+                        })
+                        return
+            except Exception:
+                pass  # 列可能不存在，繼續查詢
         
         if telegram_id:
             telegram_id_str = str(telegram_id)
@@ -465,9 +487,21 @@ async def handle_get_group_collected_stats(self, payload: Dict[str, Any]):
                 except Exception:
                     pass
         
+        final_users = cu_count if cu_count > 0 else collected_users
+        
+        # 🔧 Phase8-P1-2: 寫入緩存
+        if group_id and monitored_messages > 0:
+            try:
+                await db.execute(
+                    "UPDATE monitored_groups SET cached_msg_count = ?, cached_user_count = ? WHERE id = ?",
+                    (monitored_messages, final_users, group_id)
+                )
+            except Exception:
+                pass
+        
         self.send_event("group-collected-stats", {
             "groupId": group_id,
-            "collectedUsers": cu_count if cu_count > 0 else collected_users,
+            "collectedUsers": final_users,
             "monitoredMessages": monitored_messages
         })
         

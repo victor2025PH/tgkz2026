@@ -400,11 +400,17 @@ async def handle_execute_ai_strategy(self, payload: Dict[str, Any]):
         if all_keywords:
             # 保存為關鍵詞集
             keyword_set_name = f"AI策略_{strategy.get('industry', '自定義')}"
+            # 🔧 Phase8-P1: 包含 owner_user_id
+            try:
+                from core.tenant_filter import get_owner_user_id
+                _ks_owner = get_owner_user_id()
+            except ImportError:
+                _ks_owner = 'local_user'
             await db.execute(
-                """INSERT INTO keyword_sets (name, keywords, is_active, created_at)
-                   VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+                """INSERT INTO keyword_sets (name, keywords, is_active, owner_user_id, created_at)
+                   VALUES (?, ?, 1, ?, CURRENT_TIMESTAMP)
                    ON CONFLICT(name) DO UPDATE SET keywords = ?, is_active = 1""",
-                (keyword_set_name, json.dumps(all_keywords), json.dumps(all_keywords))
+                (keyword_set_name, json.dumps(all_keywords), _ks_owner, json.dumps(all_keywords))
             )
             self.send_log(f"✅ 已創建關鍵詞集: {keyword_set_name} ({len(all_keywords)} 個關鍵詞)", "success")
         
@@ -414,10 +420,10 @@ async def handle_execute_ai_strategy(self, payload: Dict[str, Any]):
             if content:
                 template_name = f"AI_{strategy.get('industry', '')}_{template_type}"
                 await db.execute(
-                    """INSERT INTO message_templates (name, content, template_type, created_at)
-                       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    """INSERT INTO message_templates (name, content, template_type, owner_user_id, created_at)
+                       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
                        ON CONFLICT(name) DO UPDATE SET content = ?""",
-                    (template_name, content, template_type, content)
+                    (template_name, content, template_type, _ks_owner, content)
                 )
         self.send_log(f"✅ 已創建消息模板", "success")
         

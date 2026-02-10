@@ -553,12 +553,32 @@ import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, Collectio
                     </p>
                   </div>
                 } @else if (isCollectingFromHistory()) {
-                  <!-- 收集中 -->
-                  <button disabled
-                          class="w-full px-4 py-3 bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 opacity-80">
-                    <span class="text-base animate-spin">🔄</span>
-                    <span>正在收集用戶...</span>
-                  </button>
+                  <!-- 收集中 — 帶實時進度 -->
+                  <div class="w-full p-3 bg-slate-800/80 rounded-xl border border-cyan-500/30">
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-xs text-cyan-400 flex items-center gap-1.5">
+                        <span class="animate-spin">🔄</span>
+                        {{ collectProgress()?.status || '正在收集...' }}
+                      </span>
+                      @if (collectProgress()?.total) {
+                        <span class="text-[10px] text-slate-500">
+                          {{ collectProgress()!.current }}/{{ collectProgress()!.total }}
+                        </span>
+                      }
+                    </div>
+                    <!-- 進度條 -->
+                    @if (collectProgress()?.total) {
+                      <div class="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-300"
+                             [style.width.%]="(collectProgress()!.current / collectProgress()!.total) * 100">
+                        </div>
+                      </div>
+                      <div class="flex justify-between mt-1.5 text-[10px] text-slate-500">
+                        <span>已收集 {{ collectProgress()!.collected }} 人</span>
+                        <span>新增 {{ collectProgress()!.newUsers }} 人</span>
+                      </div>
+                    }
+                  </div>
                 } @else {
                   <!-- 態3: 有消息 → 進階收集（彈窗配置） -->
                   <button (click)="openHistoryCollectionDialog()"
@@ -789,6 +809,9 @@ export class MonitoringGroupsComponent implements OnInit {
   accountRecommendations = signal<any[]>([]);
   isLoadingRecommendations = signal(false);
   isReassigning = signal(false);
+
+  // 🔧 Phase8-P1: 收集進度
+  collectProgress = signal<{current: number; total: number; collected: number; newUsers: number; status: string} | null>(null);
 
   // 🔧 Phase7-2: 批量選擇
   selectedGroupIds = signal<Set<string>>(new Set());
@@ -1149,13 +1172,18 @@ export class MonitoringGroupsComponent implements OnInit {
     });
   }
   
-  // 🆕 從歷史消息收集用戶
+  // 🔧 Phase8-P1: 從歷史消息收集用戶（帶實時進度）
   collectFromHistory() {
     const group = this.selectedGroup();
     if (!group) return;
     
+    if (!group.accountPhone) {
+      this.toggleAccountSelector();
+      return;
+    }
+    
     this.isCollectingFromHistory.set(true);
-    this.toastService.info('🔄 正在從歷史消息中收集用戶...');
+    this.collectProgress.set({ current: 0, total: 0, collected: 0, newUsers: 0, status: '正在查詢...' });
     
     this.ipcService.send('collect-users-from-history', {
       groupId: group.id,
@@ -1163,28 +1191,46 @@ export class MonitoringGroupsComponent implements OnInit {
       limit: 500
     });
     
-    // 監聽收集結果
-    const cleanup = this.ipcService.on('collect-from-history-result', (data: {
-      groupId: string;
-      success: boolean;
-      collected?: number;
-      newUsers?: number;
-      error?: string;
-    }) => {
+    // 監聽進度事件
+    const progressCleanup = this.ipcService.on('collect-from-history-progress', (data: any) => {
+      if (String(data.groupId) === String(group.id)) {
+        this.collectProgress.set({
+          current: data.current || 0,
+          total: data.total || 0,
+          collected: data.collected || 0,
+          newUsers: data.newUsers || 0,
+          status: data.status || ''
+        });
+      }
+    });
+    
+    // 監聯完成事件
+    const resultCleanup = this.ipcService.on('collect-from-history-result', (data: any) => {
       if (String(data.groupId) === String(group.id)) {
         this.isCollectingFromHistory.set(false);
-        cleanup();
+        this.collectProgress.set(null);
+        progressCleanup();
+        resultCleanup();
         
         if (data.success) {
-          this.toastService.success(`✅ 收集完成！共 ${data.collected} 位用戶，新增 ${data.newUsers || 0} 位`);
-          // 刷新統計
+          this.toastService.success(`收集完成！共 ${data.collected} 位用戶，新增 ${data.newUsers || 0} 位`);
           this.loadCollectedStats(group);
         } else {
           this.toastService.error(data.error || '收集失敗');
         }
       }
     });
-    this.listeners.push(cleanup);
+    this.listeners.push(progressCleanup, resultCleanup);
+    
+    // 安全超時
+    setTimeout(() => {
+      if (this.isCollectingFromHistory()) {
+        this.isCollectingFromHistory.set(false);
+        this.collectProgress.set(null);
+        progressCleanup();
+        resultCleanup();
+      }
+    }, 120000);
   }
   
   // 🆕 打開歷史收集對話框

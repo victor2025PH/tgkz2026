@@ -71,6 +71,8 @@ import { ABTestingService } from './services/ab-testing.service';
 import { MonitoringGroupsComponent, ConfigProgressComponent, MonitoringStateService } from './monitoring';
 // 🆕 Phase 3: 統一導航服務
 import { NavBridgeService, NavShortcutsService } from './services/nav-bridge.service';
+// 🔧 Phase8-P1-3: Sidebar 狀態服務
+import { SidebarStateService } from './sidebar-state.service';
 import { UnifiedNavService } from './components/unified-nav.service';
 // 🆕 Phase 4: 統一導航組件
 // 注意：UnifiedNavComponent 和 UnifiedSidebarComponent 暫時未使用
@@ -349,6 +351,7 @@ export class AppComponent implements OnDestroy, OnInit {
   navBridge = inject(NavBridgeService);
   navShortcuts = inject(NavShortcutsService);
   unifiedNav = inject(UnifiedNavService);
+  sidebarState = inject(SidebarStateService);  // 🔧 Phase8-P1-3
   
   // 🆕 Phase 19-22: 專用服務
   navigationService = inject(NavigationService);
@@ -483,58 +486,15 @@ export class AppComponent implements OnDestroy, OnInit {
     }
   }
   
-  // --- 🆕 側邊欄收縮模式 ---
-  sidebarCollapsed = signal(false);
-  
-  // 🔧 P8-3: 移動端響應式狀態
-  isMobile = signal(false);
-  mobileMenuOpen = signal(false);
-  
-  private _mobileMediaQuery: MediaQueryList | null = null;
-  
-  /** P8-3: 初始化移動端偵測 */
-  private initMobileDetection(): void {
-    if (typeof window === 'undefined') return;
-    this._mobileMediaQuery = window.matchMedia('(max-width: 768px)');
-    
-    const handler = (e: MediaQueryListEvent | MediaQueryList) => {
-      const mobile = e.matches;
-      this.isMobile.set(mobile);
-      if (mobile) {
-        this.sidebarCollapsed.set(false);  // 移動端不使用收縮模式
-        this.mobileMenuOpen.set(false);    // 預設隱藏
-      }
-    };
-    
-    // 初始值
-    handler(this._mobileMediaQuery);
-    
-    // 監聽變化
-    this._mobileMediaQuery.addEventListener('change', handler);
-  }
-  
-  /** P8-3: 切換移動端選單 */
-  toggleMobileMenu(): void {
-    this.mobileMenuOpen.update(v => !v);
-  }
-  
-  /** P8-3: 移動端選擇選單項後自動關閉 */
-  onMobileNavSelect(): void {
-    if (this.isMobile()) {
-      this.mobileMenuOpen.set(false);
-    }
-  }
-  
-  // 切換側邊欄收縮狀態
-  toggleSidebarCollapse(): void {
-    if (this.isMobile()) {
-      this.toggleMobileMenu();
-      return;
-    }
-    const newState = !this.sidebarCollapsed();
-    this.sidebarCollapsed.set(newState);
-    localStorage.setItem('sidebar_collapsed', String(newState));
-  }
+  // --- 🔧 Phase8-P1-3: 側邊欄狀態 → 委託 SidebarStateService ---
+  get sidebarCollapsed() { return this.sidebarState.collapsed; }
+  get isMobile() { return this.sidebarState.isMobile; }
+  get mobileMenuOpen() { return this.sidebarState.mobileMenuOpen; }
+
+  private initMobileDetection(): void { this.sidebarState.initMobileDetection(); }
+  toggleMobileMenu(): void { this.sidebarState.toggleMobileMenu(); }
+  onMobileNavSelect(): void { this.sidebarState.onMobileNavSelect(); }
+  toggleSidebarCollapse(): void { this.sidebarState.toggleCollapse(); }
   
   // --- AI 模組銜接狀態 ---
   aiTeamIncomingStrategy = signal<AIStrategyResult | null>(null);  // 從 AI 營銷助手傳入的策略

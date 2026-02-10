@@ -470,11 +470,22 @@ async def handle_collect_users_from_history(self, payload: Dict[str, Any]):
             })
             return
         
-        # 將發送者添加到 collected_users 表
+        # 🔧 Phase8-P1: 帶進度反饋的收集循環
         collected_count = 0
         new_count = 0
+        total = len(results)
         
-        for row in results:
+        # 初始進度
+        self.send_event("collect-from-history-progress", {
+            "groupId": group_id,
+            "current": 0,
+            "total": total,
+            "collected": 0,
+            "newUsers": 0,
+            "status": f"開始處理 {total} 位用戶..."
+        })
+        
+        for idx, row in enumerate(results):
             try:
                 sender_id = row['sender_id'] if hasattr(row, '__getitem__') else row[0]
                 sender_name = row['sender_name'] if hasattr(row, '__getitem__') else row[1]
@@ -500,10 +511,30 @@ async def handle_collect_users_from_history(self, payload: Dict[str, Any]):
                 collected_count += 1
                 if user_id > 0:
                     new_count += 1
+                
+                # 每 5 個用戶發送進度更新（比每 10 個更精細）
+                if (idx + 1) % 5 == 0 or idx == total - 1:
+                    self.send_event("collect-from-history-progress", {
+                        "groupId": group_id,
+                        "current": idx + 1,
+                        "total": total,
+                        "collected": collected_count,
+                        "newUsers": new_count,
+                        "status": f"已處理 {idx + 1}/{total}"
+                    })
                     
             except Exception as row_err:
                 print(f"[Backend] Error processing row: {row_err}", file=sys.stderr)
                 continue
+        
+        # 🔧 Phase8-P1-2: 收集完成後更新緩存統計
+        try:
+            await db.execute(
+                "UPDATE monitored_groups SET cached_user_count = ?, cached_msg_count = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? OR telegram_id = ?",
+                (collected_count, total, group_id, chat_id)
+            )
+        except Exception:
+            pass  # 列可能還未添加
         
         self.send_log(f"✅ 從歷史消息收集完成: 共 {collected_count} 位用戶，新增 {new_count} 位", "success")
         

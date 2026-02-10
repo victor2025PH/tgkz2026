@@ -533,6 +533,422 @@ print(f"[Backend] 🚀 Phase 3 內存優化已啟用", file=sys.stderr)
 print(f"[Backend] 📊 已註冊 {len(lazy_imports._modules)} 個延遲加載模塊", file=sys.stderr)
 
 
+# ========== Phase 9-4: Handler Auto-Registry ==========
+# Replaces 551 individual 3-line delegation stubs with compact registry.
+# Each module maps to a tuple of handler method names.
+# Default: method accepts payload, function name == method name.
+
+_HANDLER_REGISTRY = {
+    'api.handlers.analytics_handlers_impl': (
+        'handle_get_account_health_report handle_get_performance_summary '
+        'handle_get_performance_metrics handle_get_sending_stats '
+        'handle_get_account_sending_comparison handle_get_alerts handle_acknowledge_alert '
+        'handle_resolve_alert handle_clear_all_alerts handle_get_high_value_groups '
+        'handle_get_group_overlap_analysis handle_get_unified_overview '
+        'handle_get_daily_trends handle_get_channel_performance handle_analyze_attribution '
+        'handle_analyze_account_roi handle_analyze_time_effectiveness '
+        'handle_get_group_collected_stats handle_get_history_collection_stats '
+        'handle_get_group_profile handle_compare_groups handle_analytics_get_stats '
+        'handle_analytics_get_trend handle_analytics_get_sources '
+        'handle_analytics_get_hourly handle_analytics_generate_insights '
+        'handle_analytics_export'
+    ),
+    'api.handlers.api_credential_handlers_impl': (
+        'handle_get_api_credentials handle_add_api_credential handle_remove_api_credential '
+        'handle_toggle_api_credential handle_bulk_import_api_credentials '
+        'handle_get_api_recommendation handle_get_platform_api_usage '
+        'handle_allocate_platform_api handle_release_platform_api '
+        'handle_admin_add_platform_api handle_admin_list_platform_apis'
+    ),
+    'api.handlers.backup_handlers_impl': (
+        'handle_create_backup handle_restore_backup handle_list_backups '
+        'handle_get_backup_info'
+    ),
+    'api.handlers.lifecycle_handlers_impl': 'handle_get_initial_state handle_graceful_shutdown',
+    'api.handlers.log_handlers_impl': 'handle_get_logs handle_export_logs handle_clear_logs',
+    'api.handlers.migration_handlers_impl': (
+        'handle_migration_status handle_migrate handle_rollback_migration'
+    ),
+    'api.handlers.settings_handlers_impl': 'handle_save_settings handle_get_settings',
+    'api.handlers.system_handlers_impl': (
+        'handle_rebuild_database handle_get_active_executions handle_get_execution_stats '
+        'handle_get_background_tasks handle_recalculate_scores'
+    ),
+    'domain.accounts.account_handlers_impl': (
+        'handle_add_account handle_send_code handle_login_account '
+        'handle_check_account_status handle_update_account_data handle_update_account '
+        'handle_test_proxy handle_sync_account_info handle_logout_account handle_save_tags '
+        'handle_save_groups handle_get_tags handle_get_groups handle_save_personas '
+        'handle_get_personas handle_batch_update_accounts handle_bulk_assign_role '
+        'handle_bulk_assign_group handle_bulk_delete_accounts handle_remove_account '
+        'handle_get_accounts'
+    ),
+    'domain.accounts.credential_handlers_impl': (
+        'handle_credential_start_scrape handle_credential_submit_code '
+        'handle_credential_get_status handle_credential_get_all '
+        'handle_credential_cancel_scrape'
+    ),
+    'domain.accounts.ip_handlers_impl': (
+        'handle_ip_bind handle_ip_unbind handle_ip_get_binding handle_ip_get_all_bindings '
+        'handle_ip_get_statistics handle_ip_verify_binding'
+    ),
+    'domain.accounts.qr_handlers_impl': (
+        'handle_qr_login_create handle_qr_login_status handle_qr_login_refresh '
+        'handle_qr_login_submit_2fa handle_qr_login_cancel'
+    ),
+    'domain.accounts.role_handlers_impl': (
+        'handle_get_role_templates handle_assign_role handle_update_role '
+        'handle_remove_role handle_get_account_roles handle_get_all_roles '
+        'handle_get_role_stats'
+    ),
+    'domain.accounts.session_handlers_impl': (
+        'handle_load_accounts_from_excel handle_reload_sessions_and_accounts '
+        'handle_scan_orphan_sessions handle_recover_orphan_sessions handle_import_session '
+        'handle_scan_tdata handle_import_tdata_account handle_import_tdata_batch '
+        'handle_get_default_tdata_path handle_export_session handle_export_sessions_batch '
+        'handle_select_tdata_folder handle_parse_tdata handle_import_tdata'
+    ),
+    'domain.ai.chat_handlers_impl': (
+        'handle_get_ai_chat_settings handle_update_ai_chat_settings '
+        'handle_get_chat_history handle_get_user_context handle_generate_ai_response '
+        'handle_add_ai_memory handle_get_ai_memories handle_analyze_conversation '
+        'handle_generate_ai_strategy handle_save_ai_strategy handle_get_ai_strategies '
+        'handle_execute_ai_strategy handle_save_conversation_strategy '
+        'handle_get_conversation_strategy handle_get_chat_history_full'
+    ),
+    'domain.ai.generation_handlers_impl': (
+        'handle_ai_generate_message handle_ai_generate_text handle_ai_generate_group_names '
+        'handle_ai_generate_welcome handle_test_local_ai handle_test_tts_service '
+        'handle_test_stt_service handle_get_ai_settings handle_save_ai_settings '
+        'handle_set_autonomous_mode handle_generate_with_local_ai '
+        'handle_summarize_conversation handle_ai_analyze_interest handle_ai_execution_save '
+        'handle_ai_execution_get_active'
+    ),
+    'domain.ai.knowledge_handlers_impl': (
+        'handle_learn_from_history handle_get_knowledge_gaps handle_init_knowledge_base '
+        'handle_get_knowledge_stats handle_add_document handle_add_knowledge_base '
+        'handle_add_knowledge_item handle_get_knowledge_items handle_ai_generate_knowledge '
+        'handle_apply_industry_template handle_learn_from_chat_history '
+        'handle_get_documents handle_delete_document handle_search_knowledge'
+    ),
+    'domain.ai.memory_handlers_impl': (
+        'handle_add_vector_memory handle_search_vector_memories handle_get_memory_context '
+        'handle_get_memory_stats'
+    ),
+    'domain.ai.model_handlers_impl': (
+        'handle_save_ai_model handle_get_ai_models handle_update_ai_model '
+        'handle_delete_ai_model handle_test_ai_model handle_set_default_ai_model '
+        'handle_save_model_usage handle_get_model_usage'
+    ),
+    'domain.ai.qa_handlers_impl': 'handle_add_qa_pair handle_get_qa_pairs handle_import_qa',
+    'domain.ai.rag_handlers_impl': (
+        'handle_rag_initialize handle_rag_search handle_rag_get_stats '
+        'handle_rag_record_feedback handle_rag_build_from_conversation '
+        'handle_rag_preview_import handle_rag_confirm_import handle_rag_import_url '
+        'handle_rag_import_document handle_rag_cleanup handle_rag_merge_similar '
+        'handle_rag_get_gaps handle_rag_resolve_gap handle_rag_ignore_gap '
+        'handle_rag_delete_gap handle_rag_delete_gaps_batch '
+        'handle_rag_cleanup_duplicate_gaps handle_rag_suggest_gap_answer '
+        'handle_rag_get_health_report handle_rag_get_all_knowledge '
+        'handle_rag_add_knowledge handle_rag_update_knowledge handle_rag_delete_knowledge '
+        'handle_rag_delete_knowledge_batch handle_rag_start_guided_build '
+        'handle_get_rag_context handle_init_rag_system handle_get_rag_stats '
+        'handle_search_rag handle_trigger_rag_learning handle_add_rag_knowledge '
+        'handle_rag_feedback handle_cleanup_rag_knowledge handle_get_ollama_models '
+        'handle_test_ollama_connection handle_ollama_generate'
+    ),
+    'domain.ai.team_handlers_impl': (
+        'handle_get_customer_state handle_get_smart_system_stats '
+        'handle_ai_team_pause_execution handle_ai_team_resume_execution '
+        'handle_ai_team_stop_execution handle_ai_team_add_targets '
+        'handle_ai_team_start_execution handle_ai_team_adjust_strategy '
+        'handle_ai_team_generate_scriptless_message handle_ai_team_send_scriptless_message '
+        'handle_ai_team_conversion_signal handle_ai_team_customer_reply '
+        'handle_ai_team_send_manual_message handle_ai_team_send_private_message '
+        'handle_ai_team_request_suggestion handle_ai_team_user_completed '
+        'handle_ai_team_queue_completed handle_ai_team_next_user'
+    ),
+    'domain.ai.voice_handlers_impl': (
+        'handle_text_to_speech handle_speech_to_text handle_upload_voice_sample '
+        'handle_delete_voice_sample handle_preview_voice_sample '
+        'handle_generate_cloned_voice handle_list_voice_samples'
+    ),
+    'domain.automation.campaign_handlers_impl': (
+        'handle_add_campaign handle_remove_campaign handle_toggle_campaign_status '
+        'handle_get_campaign_performance_stats handle_get_campaigns handle_get_campaign '
+        'handle_get_campaign_logs'
+    ),
+    'domain.automation.keyword_handlers_impl': (
+        'handle_get_keyword_sets handle_save_keyword_set handle_delete_keyword_set '
+        'handle_bind_keyword_set handle_unbind_keyword_set handle_add_keyword_set '
+        'handle_remove_keyword_set handle_add_keyword handle_remove_keyword'
+    ),
+    'domain.automation.monitoring_handlers_impl': (
+        'handle_start_monitoring handle_stop_monitoring handle_one_click_start '
+        'handle_one_click_stop handle_get_system_status handle_get_monitored_groups '
+        'handle_pause_monitoring handle_resume_monitoring handle_pause_monitored_group '
+        'handle_resume_monitored_group handle_get_monitoring_status '
+        'handle_check_monitoring_health handle_analyze_group_link '
+        'handle_get_group_monitoring_status'
+    ),
+    'domain.automation.rule_handlers_impl': (
+        'handle_get_automation_rules handle_add_automation_rule '
+        'handle_update_automation_rule handle_delete_automation_rule'
+    ),
+    'domain.automation.scheduler_handlers_impl': (
+        'handle_schedule_follow_up handle_get_pending_tasks handle_cancel_scheduled_task '
+        'handle_get_scheduler_stats handle_get_reminders handle_create_reminder '
+        'handle_snooze_reminder handle_complete_reminder'
+    ),
+    'domain.automation.script_handlers_impl': (
+        'handle_get_script_templates handle_create_script_template '
+        'handle_delete_script_template handle_start_script_execution '
+        'handle_run_script_execution handle_stop_script_execution '
+        'handle_workflow_get_executions'
+    ),
+    'domain.automation.template_handlers_impl': (
+        'handle_get_chat_templates handle_save_chat_template handle_delete_chat_template'
+    ),
+    'domain.automation.trigger_handlers_impl': (
+        'handle_get_trigger_rules handle_get_trigger_rule handle_save_trigger_rule '
+        'handle_delete_trigger_rule handle_toggle_trigger_rule'
+    ),
+    'domain.contacts.funnel_handlers_impl': (
+        'handle_get_funnel_overview handle_transition_funnel_stage '
+        'handle_batch_update_stages handle_analyze_funnel handle_get_funnel_stats '
+        'handle_bulk_update_user_stage handle_batch_update_funnel_stage '
+        'handle_get_funnel_analysis handle_process_stage_event handle_get_stage_flow'
+    ),
+    'domain.contacts.leads_handlers_impl': (
+        'handle_update_lead_status handle_get_leads_paginated handle_add_lead '
+        'handle_add_to_dnc handle_export_leads_to_excel handle_get_collected_users '
+        'handle_get_collected_users_stats handle_mark_user_as_ad handle_blacklist_user '
+        'handle_get_user_message_samples handle_recalculate_user_risk handle_search_leads '
+        'handle_bulk_update_user_tags handle_batch_update_lead_status '
+        'handle_batch_add_to_dnc handle_batch_remove_from_dnc handle_batch_delete_leads '
+        'handle_delete_lead handle_get_intent_score handle_predict_lead_conversion '
+        'handle_get_collected_users_count handle_unified_contacts_sync '
+        'handle_unified_contacts_get handle_unified_contacts_stats '
+        'handle_unified_contacts_update handle_unified_contacts_add_tags '
+        'handle_unified_contacts_update_status handle_unified_contacts_delete'
+    ),
+    'domain.contacts.member_handlers_impl': (
+        'handle_batch_refresh_member_counts handle_get_group_member_count '
+        'handle_collect_users_from_history_advanced handle_collect_users_from_history '
+        'handle_extract_members handle_get_extracted_members handle_get_member_stats '
+        'handle_get_online_members handle_update_member handle_get_extraction_stats '
+        'handle_start_background_extraction handle_clear_extraction_cache '
+        'handle_export_members handle_deduplicate_members'
+    ),
+    'domain.contacts.profile_handlers_impl': (
+        'handle_get_user_memories handle_get_users_by_tag handle_get_customer_profile '
+        'handle_get_emotion_trend handle_get_workflow_rules handle_get_followup_tasks '
+        'handle_get_learning_stats handle_schedule_followup handle_trigger_workflow '
+        'handle_add_user_tag handle_remove_user_tag handle_get_user_tags'
+    ),
+    'domain.contacts.tag_handlers_impl': (
+        'handle_batch_add_tag handle_batch_remove_tag handle_create_tag handle_delete_tag '
+        'handle_get_lead_tags handle_get_auto_tags handle_batch_tag_members '
+        'handle_get_all_tags'
+    ),
+    'domain.contacts.tracking_handlers_impl': (
+        'handle_analyze_user_message handle_get_user_journey handle_get_user_profile_full '
+        'handle_update_user_crm handle_analyze_user_journey handle_get_users_with_profiles '
+        'handle_update_user_profile handle_add_user_to_track handle_add_user_from_lead '
+        'handle_remove_tracked_user handle_get_tracked_users '
+        'handle_update_user_value_level handle_track_user_groups handle_batch_track_users '
+        'handle_get_user_groups handle_get_tracking_stats handle_get_tracking_logs '
+        'handle_get_user_value_distribution handle_get_tracking_effectiveness '
+        'handle_sync_resource_status_to_leads'
+    ),
+    'domain.groups.handlers_impl': (
+        'handle_create_group handle_group_invite_user handle_group_add_member '
+        'handle_group_send_msg handle_group_monitor_messages handle_add_group '
+        'handle_add_monitored_group handle_search_groups handle_join_group '
+        'handle_remove_group handle_remove_monitored_group handle_leave_group '
+        'handle_join_resource handle_join_and_monitor handle_join_and_monitor_resource '
+        'handle_join_and_monitor_with_account handle_get_admin_groups'
+    ),
+    'domain.marketing.ab_handlers_impl': (
+        'handle_create_ab_test handle_start_ab_test handle_get_ab_test_results'
+    ),
+    'domain.marketing.ad_handlers_impl': (
+        'handle_create_ad_template handle_update_ad_template handle_delete_ad_template '
+        'handle_get_ad_templates handle_toggle_ad_template_status '
+        'handle_preview_ad_template handle_create_ad_schedule handle_update_ad_schedule '
+        'handle_delete_ad_schedule handle_get_ad_schedules '
+        'handle_toggle_ad_schedule_status handle_run_ad_schedule_now handle_send_ad_now '
+        'handle_get_ad_send_logs handle_get_ad_overview_stats handle_get_ad_template_stats '
+        'handle_get_ad_schedule_stats handle_get_ad_account_stats '
+        'handle_get_ad_group_stats handle_get_ad_daily_stats'
+    ),
+    'domain.marketing.campaign_handlers_impl': (
+        'handle_create_campaign handle_update_campaign handle_delete_campaign '
+        'handle_start_campaign handle_pause_campaign handle_resume_campaign '
+        'handle_stop_campaign'
+    ),
+    'domain.marketing.task_handlers_impl': (
+        'handle_get_marketing_tasks handle_create_marketing_task '
+        'handle_update_marketing_task handle_delete_marketing_task '
+        'handle_start_marketing_task handle_pause_marketing_task '
+        'handle_resume_marketing_task handle_complete_marketing_task '
+        'handle_add_marketing_task_targets handle_get_marketing_task_targets '
+        'handle_update_marketing_task_target handle_assign_marketing_task_role '
+        'handle_auto_assign_marketing_task_roles handle_get_marketing_task_stats '
+        'handle_create_marketing_campaign handle_start_marketing_campaign '
+        'handle_get_marketing_stats'
+    ),
+    'domain.messaging.batch_handlers_impl': (
+        'handle_undo_batch_operation handle_get_batch_operation_history '
+        'handle_add_to_join_queue handle_process_join_queue handle_batch_join_and_monitor '
+        'handle_send_bulk_messages handle_batch_invite_to_group handle_batch_invite_start '
+        'handle_batch_invite_cancel'
+    ),
+    'domain.messaging.chat_handlers_impl': (
+        'handle_reindex_conversations handle_search_chat_history handle_get_chat_list '
+        'handle_send_ai_response handle_get_smart_replies'
+    ),
+    'domain.messaging.media_handlers_impl': 'handle_add_media handle_get_media handle_delete_media',
+    'domain.messaging.queue_handlers_impl': (
+        'handle_get_queue_status handle_clear_queue handle_pause_queue handle_resume_queue '
+        'handle_delete_queue_message handle_update_queue_message_priority '
+        'handle_get_queue_messages handle_send_message handle_send_group_message '
+        'handle_get_queue_length_history handle_validate_spintax handle_predict_send_time '
+        'handle_batch_send_start handle_batch_send_cancel'
+    ),
+    'domain.messaging.template_handlers_impl': (
+        'handle_add_template handle_remove_template handle_toggle_template_status'
+    ),
+    'domain.multi_role.collab_handlers_impl': (
+        'handle_invite_lead_to_collab_group handle_create_collab_group_for_lead '
+        'handle_create_collab_group handle_add_collab_member handle_get_collab_groups '
+        'handle_update_collab_status handle_get_collab_stats'
+    ),
+    'domain.multi_role.handlers_impl': (
+        'handle_multi_role_add_role handle_multi_role_update_role '
+        'handle_multi_role_delete_role handle_multi_role_get_roles '
+        'handle_multi_role_add_script handle_multi_role_update_script '
+        'handle_multi_role_delete_script handle_multi_role_get_scripts '
+        'handle_multi_role_create_group handle_multi_role_update_group '
+        'handle_multi_role_get_groups handle_multi_role_get_stats '
+        'handle_multi_role_export_data handle_multi_role_import_data '
+        'handle_create_multi_role_group handle_multi_role_start_script '
+        'handle_multi_role_send_message handle_multi_role_ai_reply '
+        'handle_multi_role_advance_stage handle_multi_role_ai_plan '
+        'handle_multi_role_start_private_collaboration handle_multi_role_auto_create_group '
+        'handle_multi_role_start_group_collaboration'
+    ),
+    'domain.search.discovery_handlers_impl': (
+        'handle_get_discovery_keywords handle_add_discovery_keyword '
+        'handle_get_discovery_logs handle_init_discussion_watcher '
+        'handle_discover_discussion handle_discover_discussions_from_resources '
+        'handle_get_channel_discussions handle_start_discussion_monitoring '
+        'handle_stop_discussion_monitoring handle_get_discussion_messages '
+        'handle_reply_to_discussion handle_get_discussion_stats'
+    ),
+    'domain.search.resource_handlers_impl': (
+        'handle_get_resource_history handle_init_resource_discovery '
+        'handle_search_resources handle_clear_resources handle_get_resources '
+        'handle_get_resource_stats handle_add_resource_manually handle_save_resource '
+        'handle_unsave_resource handle_delete_resource handle_delete_resources_batch '
+        'handle_verify_resource_type handle_batch_verify_resource_types '
+        'handle_clear_all_resources handle_batch_join_resources'
+    ),
+    'domain.search.search_handlers_impl': (
+        'handle_rebuild_search_index handle_get_search_history '
+        'handle_get_search_results_by_id handle_get_search_statistics '
+        'handle_cleanup_search_history handle_search_jiso handle_check_jiso_availability '
+        'handle_get_search_channels handle_add_search_channel handle_update_search_channel '
+        'handle_delete_search_channel handle_test_search_channel'
+    ),
+}
+
+# Handlers that take NO payload argument (44 methods)
+_NO_PAYLOAD_HANDLERS = {
+    'handle_check_monitoring_health',
+    'handle_clear_all_resources',
+    'handle_clear_logs',
+    'handle_discover_discussions_from_resources',
+    'handle_get_accounts',
+    'handle_get_ai_chat_settings',
+    'handle_get_ai_models',
+    'handle_get_backup_info',
+    'handle_get_chat_templates',
+    'handle_get_collected_users_stats',
+    'handle_get_conversation_strategy',
+    'handle_get_default_tdata_path',
+    'handle_get_discovery_keywords',
+    'handle_get_discussion_stats',
+    'handle_get_funnel_overview',
+    'handle_get_initial_state',
+    'handle_get_keyword_sets',
+    'handle_get_knowledge_stats',
+    'handle_get_model_usage',
+    'handle_get_monitored_groups',
+    'handle_get_monitoring_status',
+    'handle_get_performance_summary',
+    'handle_get_rag_stats',
+    'handle_get_scheduler_stats',
+    'handle_get_settings',
+    'handle_get_system_status',
+    'handle_get_trigger_rules',
+    'handle_graceful_shutdown',
+    'handle_init_discussion_watcher',
+    'handle_init_knowledge_base',
+    'handle_init_rag_system',
+    'handle_init_resource_discovery',
+    'handle_list_backups',
+    'handle_list_voice_samples',
+    'handle_multi_role_export_data',
+    'handle_multi_role_get_roles',
+    'handle_multi_role_get_scripts',
+    'handle_multi_role_get_stats',
+    'handle_one_click_stop',
+    'handle_rebuild_database',
+    'handle_rebuild_search_index',
+    'handle_reload_sessions_and_accounts',
+    'handle_start_monitoring',
+    'handle_stop_monitoring',
+}
+
+# Methods where impl function name differs from method name
+_HANDLER_RENAMES = {
+    'handle_join_and_monitor': 'handle_join_and_monitor_resource',
+    'handle_pause_monitored_group': 'handle_pause_monitoring',
+    'handle_remove_monitored_group': 'handle_remove_group',
+    'handle_resume_monitored_group': 'handle_resume_monitoring',
+}
+
+
+def _register_all_handlers(cls):
+    """Auto-generate handler methods on BackendService from registry."""
+    import importlib
+
+    for module_path, names_data in _HANDLER_REGISTRY.items():
+        names_str = names_data if isinstance(names_data, str) else names_data
+        for method_name in names_str.split():
+            func_name = _HANDLER_RENAMES.get(method_name, method_name)
+            takes_payload = method_name not in _NO_PAYLOAD_HANDLERS
+
+            def _make(mp, fn, tp, mn):
+                _cached = [None]
+                if tp:
+                    async def handler(self, payload=None):
+                        if _cached[0] is None:
+                            _cached[0] = getattr(importlib.import_module(mp), fn)
+                        return await _cached[0](self, payload)
+                else:
+                    async def handler(self):
+                        if _cached[0] is None:
+                            _cached[0] = getattr(importlib.import_module(mp), fn)
+                        return await _cached[0](self)
+                handler.__name__ = mn
+                handler.__qualname__ = f'BackendService.{mn}'
+                return handler
+
+            setattr(cls, method_name, _make(module_path, func_name, takes_payload, method_name))
+
+
 class BackendService(InitStartupMixin, SendQueueMixin, AiServiceMixin, ConfigExecMixin):
     """Main backend service handling commands and events"""
     
@@ -987,530 +1403,8 @@ class BackendService(InitStartupMixin, SendQueueMixin, AiServiceMixin, ConfigExe
             _cmd_duration = (time.time() - _cmd_start_time) * 1000
             _record_command_metric(command, _cmd_success, _cmd_duration, _cmd_error)
     
-    async def handle_get_initial_state(self):
-        from api.handlers.lifecycle_handlers_impl import handle_get_initial_state as _handle_get_initial_state
-        return await _handle_get_initial_state(self)
-
-    # ========== Partial Update Functions ==========
-    # These functions send only the updated data instead of full state refresh
-    
-    async def handle_add_account(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_add_account as _handle_add_account
-        return await _handle_add_account(self, payload)
-
-    async def handle_send_code(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_send_code as _handle_send_code
-        return await _handle_send_code(self, payload)
-
-    async def handle_login_account(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_login_account as _handle_login_account
-        return await _handle_login_account(self, payload)
-
-    async def handle_qr_login_create(self, payload=None):
-        from domain.accounts.qr_handlers_impl import handle_qr_login_create as _handle_qr_login_create
-        return await _handle_qr_login_create(self, payload)
-
-    async def handle_qr_login_status(self, payload=None):
-        from domain.accounts.qr_handlers_impl import handle_qr_login_status as _handle_qr_login_status
-        return await _handle_qr_login_status(self, payload)
-
-    async def handle_qr_login_refresh(self, payload=None):
-        from domain.accounts.qr_handlers_impl import handle_qr_login_refresh as _handle_qr_login_refresh
-        return await _handle_qr_login_refresh(self, payload)
-
-    async def handle_qr_login_submit_2fa(self, payload=None):
-        from domain.accounts.qr_handlers_impl import handle_qr_login_submit_2fa as _handle_qr_login_submit_2fa
-        return await _handle_qr_login_submit_2fa(self, payload)
-
-    async def handle_qr_login_cancel(self, payload=None):
-        from domain.accounts.qr_handlers_impl import handle_qr_login_cancel as _handle_qr_login_cancel
-        return await _handle_qr_login_cancel(self, payload)
-
-    async def handle_ip_bind(self, payload=None):
-        from domain.accounts.ip_handlers_impl import handle_ip_bind as _handle_ip_bind
-        return await _handle_ip_bind(self, payload)
-
-    async def handle_ip_unbind(self, payload=None):
-        from domain.accounts.ip_handlers_impl import handle_ip_unbind as _handle_ip_unbind
-        return await _handle_ip_unbind(self, payload)
-
-    async def handle_ip_get_binding(self, payload=None):
-        from domain.accounts.ip_handlers_impl import handle_ip_get_binding as _handle_ip_get_binding
-        return await _handle_ip_get_binding(self, payload)
-
-    async def handle_ip_get_all_bindings(self, payload=None):
-        from domain.accounts.ip_handlers_impl import handle_ip_get_all_bindings as _handle_ip_get_all_bindings
-        return await _handle_ip_get_all_bindings(self, payload)
-
-    async def handle_ip_get_statistics(self, payload=None):
-        from domain.accounts.ip_handlers_impl import handle_ip_get_statistics as _handle_ip_get_statistics
-        return await _handle_ip_get_statistics(self, payload)
-
-    async def handle_ip_verify_binding(self, payload=None):
-        from domain.accounts.ip_handlers_impl import handle_ip_verify_binding as _handle_ip_verify_binding
-        return await _handle_ip_verify_binding(self, payload)
-
-    async def handle_credential_start_scrape(self, payload=None):
-        from domain.accounts.credential_handlers_impl import handle_credential_start_scrape as _handle_credential_start_scrape
-        return await _handle_credential_start_scrape(self, payload)
-
-    async def handle_credential_submit_code(self, payload=None):
-        from domain.accounts.credential_handlers_impl import handle_credential_submit_code as _handle_credential_submit_code
-        return await _handle_credential_submit_code(self, payload)
-
-    async def handle_credential_get_status(self, payload=None):
-        from domain.accounts.credential_handlers_impl import handle_credential_get_status as _handle_credential_get_status
-        return await _handle_credential_get_status(self, payload)
-
-    async def handle_credential_get_all(self, payload=None):
-        from domain.accounts.credential_handlers_impl import handle_credential_get_all as _handle_credential_get_all
-        return await _handle_credential_get_all(self, payload)
-
-    async def handle_credential_cancel_scrape(self, payload=None):
-        from domain.accounts.credential_handlers_impl import handle_credential_cancel_scrape as _handle_credential_cancel_scrape
-        return await _handle_credential_cancel_scrape(self, payload)
-
-    async def handle_check_account_status(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_check_account_status as _handle_check_account_status
-        return await _handle_check_account_status(self, payload)
-
-    async def handle_update_account_data(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_update_account_data as _handle_update_account_data
-        return await _handle_update_account_data(self, payload)
-
-    async def handle_update_account(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_update_account as _handle_update_account
-        return await _handle_update_account(self, payload)
-
-    async def handle_test_proxy(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_test_proxy as _handle_test_proxy
-        return await _handle_test_proxy(self, payload)
-
-    async def handle_sync_account_info(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_sync_account_info as _handle_sync_account_info
-        return await _handle_sync_account_info(self, payload)
-
-    async def handle_logout_account(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_logout_account as _handle_logout_account
-        return await _handle_logout_account(self, payload)
-
-    async def handle_save_tags(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_save_tags as _handle_save_tags
-        return await _handle_save_tags(self, payload)
-
-    async def handle_save_groups(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_save_groups as _handle_save_groups
-        return await _handle_save_groups(self, payload)
-
-    async def handle_get_tags(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_get_tags as _handle_get_tags
-        return await _handle_get_tags(self, payload)
-
-    async def handle_get_groups(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_get_groups as _handle_get_groups
-        return await _handle_get_groups(self, payload)
-
-    async def handle_save_personas(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_save_personas as _handle_save_personas
-        return await _handle_save_personas(self, payload)
-
-    async def handle_get_personas(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_get_personas as _handle_get_personas
-        return await _handle_get_personas(self, payload)
-
-    async def handle_batch_update_accounts(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_batch_update_accounts as _handle_batch_update_accounts
-        return await _handle_batch_update_accounts(self, payload)
-
-    async def handle_bulk_assign_role(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_bulk_assign_role as _handle_bulk_assign_role
-        return await _handle_bulk_assign_role(self, payload)
-
-    async def handle_bulk_assign_group(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_bulk_assign_group as _handle_bulk_assign_group
-        return await _handle_bulk_assign_group(self, payload)
-
-    async def handle_bulk_delete_accounts(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_bulk_delete_accounts as _handle_bulk_delete_accounts
-        return await _handle_bulk_delete_accounts(self, payload)
-
-    async def handle_remove_account(self, payload=None):
-        from domain.accounts.account_handlers_impl import handle_remove_account as _handle_remove_account
-        return await _handle_remove_account(self, payload)
-
-    async def handle_start_monitoring(self):
-        from domain.automation.monitoring_handlers_impl import handle_start_monitoring as _handle_start_monitoring
-        return await _handle_start_monitoring(self)
-
-    async def handle_stop_monitoring(self):
-        from domain.automation.monitoring_handlers_impl import handle_stop_monitoring as _handle_stop_monitoring
-        return await _handle_stop_monitoring(self)
-
-    async def handle_one_click_start(self, payload=None):
-        from domain.automation.monitoring_handlers_impl import handle_one_click_start as _handle_one_click_start
-        return await _handle_one_click_start(self, payload)
-
-    async def handle_one_click_stop(self):
-        from domain.automation.monitoring_handlers_impl import handle_one_click_stop as _handle_one_click_stop
-        return await _handle_one_click_stop(self)
-
-    async def handle_get_system_status(self):
-        from domain.automation.monitoring_handlers_impl import handle_get_system_status as _handle_get_system_status
-        return await _handle_get_system_status(self)
-
-    async def handle_learn_from_history(self, payload=None):
-        from domain.ai.knowledge_handlers_impl import handle_learn_from_history as _handle_learn_from_history
-        return await _handle_learn_from_history(self, payload)
-
-    async def handle_save_settings(self, payload=None):
-        from api.handlers.settings_handlers_impl import handle_save_settings as _handle_save_settings
-        return await _handle_save_settings(self, payload)
-
-    async def handle_get_settings(self):
-        from api.handlers.settings_handlers_impl import handle_get_settings as _handle_get_settings
-        return await _handle_get_settings(self)
-
-    async def handle_get_queue_status(self, payload=None):
-        from domain.messaging.queue_handlers_impl import handle_get_queue_status as _handle_get_queue_status
-        return await _handle_get_queue_status(self, payload)
-
-    async def handle_get_account_health_report(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_get_account_health_report as _handle_get_account_health_report
-        return await _handle_get_account_health_report(self, payload)
-
-    async def handle_clear_queue(self, payload=None):
-        from domain.messaging.queue_handlers_impl import handle_clear_queue as _handle_clear_queue
-        return await _handle_clear_queue(self, payload)
-
-    async def handle_pause_queue(self, payload=None):
-        from domain.messaging.queue_handlers_impl import handle_pause_queue as _handle_pause_queue
-        return await _handle_pause_queue(self, payload)
-
-    async def handle_resume_queue(self, payload=None):
-        from domain.messaging.queue_handlers_impl import handle_resume_queue as _handle_resume_queue
-        return await _handle_resume_queue(self, payload)
-
-    async def handle_delete_queue_message(self, payload=None):
-        from domain.messaging.queue_handlers_impl import handle_delete_queue_message as _handle_delete_queue_message
-        return await _handle_delete_queue_message(self, payload)
-
-    async def handle_update_queue_message_priority(self, payload=None):
-        from domain.messaging.queue_handlers_impl import handle_update_queue_message_priority as _handle_update_queue_message_priority
-        return await _handle_update_queue_message_priority(self, payload)
-
-    async def handle_get_queue_messages(self, payload=None):
-        from domain.messaging.queue_handlers_impl import handle_get_queue_messages as _handle_get_queue_messages
-        return await _handle_get_queue_messages(self, payload)
-
-    async def handle_get_logs(self, payload=None):
-        from api.handlers.log_handlers_impl import handle_get_logs as _handle_get_logs
-        return await _handle_get_logs(self, payload)
-
-    async def handle_export_logs(self, payload=None):
-        from api.handlers.log_handlers_impl import handle_export_logs as _handle_export_logs
-        return await _handle_export_logs(self, payload)
-
-    async def handle_get_accounts(self):
-        from domain.accounts.account_handlers_impl import handle_get_accounts as _handle_get_accounts
-        return await _handle_get_accounts(self)
-
-    async def handle_get_monitored_groups(self):
-        from domain.automation.monitoring_handlers_impl import handle_get_monitored_groups as _handle_get_monitored_groups
-        return await _handle_get_monitored_groups(self)
-
-    async def handle_get_keyword_sets(self):
-        from domain.automation.keyword_handlers_impl import handle_get_keyword_sets as _handle_get_keyword_sets
-        return await _handle_get_keyword_sets(self)
-
-    async def handle_save_keyword_set(self, payload=None):
-        from domain.automation.keyword_handlers_impl import handle_save_keyword_set as _handle_save_keyword_set
-        return await _handle_save_keyword_set(self, payload)
-
-    async def handle_delete_keyword_set(self, payload=None):
-        from domain.automation.keyword_handlers_impl import handle_delete_keyword_set as _handle_delete_keyword_set
-        return await _handle_delete_keyword_set(self, payload)
-
-    async def handle_bind_keyword_set(self, payload=None):
-        from domain.automation.keyword_handlers_impl import handle_bind_keyword_set as _handle_bind_keyword_set
-        return await _handle_bind_keyword_set(self, payload)
-
-    async def handle_unbind_keyword_set(self, payload=None):
-        from domain.automation.keyword_handlers_impl import handle_unbind_keyword_set as _handle_unbind_keyword_set
-        return await _handle_unbind_keyword_set(self, payload)
-
-    async def handle_ai_generate_message(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_ai_generate_message as _handle_ai_generate_message
-        return await _handle_ai_generate_message(self, payload)
-
-    async def handle_ai_generate_text(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_ai_generate_text as _handle_ai_generate_text
-        return await _handle_ai_generate_text(self, payload)
-
-    async def handle_ai_generate_group_names(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_ai_generate_group_names as _handle_ai_generate_group_names
-        return await _handle_ai_generate_group_names(self, payload)
-
-    async def handle_ai_generate_welcome(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_ai_generate_welcome as _handle_ai_generate_welcome
-        return await _handle_ai_generate_welcome(self, payload)
-
-    async def handle_create_group(self, payload=None):
-        from domain.groups.handlers_impl import handle_create_group as _handle_create_group
-        return await _handle_create_group(self, payload)
-
-    async def handle_group_invite_user(self, payload=None):
-        from domain.groups.handlers_impl import handle_group_invite_user as _handle_group_invite_user
-        return await _handle_group_invite_user(self, payload)
-
-    async def handle_group_add_member(self, payload=None):
-        from domain.groups.handlers_impl import handle_group_add_member as _handle_group_add_member
-        return await _handle_group_add_member(self, payload)
-
-    async def handle_group_send_msg(self, payload=None):
-        from domain.groups.handlers_impl import handle_group_send_msg as _handle_group_send_msg
-        return await _handle_group_send_msg(self, payload)
-
-    # ==================== 🆕 P1-2: 群聊協作消息監聽 ====================
-    
-    # 存儲活躍的群組協作
     _active_group_collabs: Dict[str, Dict[str, Any]] = {}
     
-    async def handle_group_monitor_messages(self, payload=None):
-        from domain.groups.handlers_impl import handle_group_monitor_messages as _handle_group_monitor_messages
-        return await _handle_group_monitor_messages(self, payload)
-
-    async def handle_pause_monitoring(self, payload=None):
-        from domain.automation.monitoring_handlers_impl import handle_pause_monitoring as _handle_pause_monitoring
-        return await _handle_pause_monitoring(self, payload)
-
-    async def handle_resume_monitoring(self, payload=None):
-        from domain.automation.monitoring_handlers_impl import handle_resume_monitoring as _handle_resume_monitoring
-        return await _handle_resume_monitoring(self, payload)
-
-    async def handle_pause_monitored_group(self, payload=None):
-        """pause-monitored-group 別名 → pause-monitoring"""
-        from domain.automation.monitoring_handlers_impl import handle_pause_monitoring as _handle_pause_monitoring
-        return await _handle_pause_monitoring(self, payload)
-
-    async def handle_resume_monitored_group(self, payload=None):
-        """resume-monitored-group 別名 → resume-monitoring"""
-        from domain.automation.monitoring_handlers_impl import handle_resume_monitoring as _handle_resume_monitoring
-        return await _handle_resume_monitoring(self, payload)
-
-    async def handle_add_keyword_set(self, payload=None):
-        from domain.automation.keyword_handlers_impl import handle_add_keyword_set as _handle_add_keyword_set
-        return await _handle_add_keyword_set(self, payload)
-
-    async def handle_remove_keyword_set(self, payload=None):
-        from domain.automation.keyword_handlers_impl import handle_remove_keyword_set as _handle_remove_keyword_set
-        return await _handle_remove_keyword_set(self, payload)
-
-    async def handle_add_keyword(self, payload=None):
-        from domain.automation.keyword_handlers_impl import handle_add_keyword as _handle_add_keyword
-        return await _handle_add_keyword(self, payload)
-
-    async def handle_remove_keyword(self, payload=None):
-        from domain.automation.keyword_handlers_impl import handle_remove_keyword as _handle_remove_keyword
-        return await _handle_remove_keyword(self, payload)
-
-    async def handle_add_group(self, payload=None):
-        from domain.groups.handlers_impl import handle_add_group as _handle_add_group
-        return await _handle_add_group(self, payload)
-
-    async def handle_add_monitored_group(self, payload=None):
-        """add-monitored-group 的別名路由 → 統一使用 add-group 處理"""
-        from domain.groups.handlers_impl import handle_add_monitored_group as _handle_add_monitored_group
-        return await _handle_add_monitored_group(self, payload)
-
-    async def handle_search_groups(self, payload=None):
-        from domain.groups.handlers_impl import handle_search_groups as _handle_search_groups
-        return await _handle_search_groups(self, payload)
-
-    async def handle_join_group(self, payload=None):
-        from domain.groups.handlers_impl import handle_join_group as _handle_join_group
-        return await _handle_join_group(self, payload)
-
-    async def handle_remove_group(self, payload=None):
-        from domain.groups.handlers_impl import handle_remove_group as _handle_remove_group
-        return await _handle_remove_group(self, payload)
-
-    async def handle_remove_monitored_group(self, payload=None):
-        """remove-monitored-group 別名 → remove-group"""
-        from domain.groups.handlers_impl import handle_remove_group as _handle_remove_group
-        return await _handle_remove_group(self, payload)
-
-    async def handle_leave_group(self, payload=None):
-        from domain.groups.handlers_impl import handle_leave_group as _handle_leave_group
-        return await _handle_leave_group(self, payload)
-
-    async def handle_add_template(self, payload=None):
-        from domain.messaging.template_handlers_impl import handle_add_template as _handle_add_template
-        return await _handle_add_template(self, payload)
-
-    async def handle_remove_template(self, payload=None):
-        from domain.messaging.template_handlers_impl import handle_remove_template as _handle_remove_template
-        return await _handle_remove_template(self, payload)
-
-    async def handle_toggle_template_status(self, payload=None):
-        from domain.messaging.template_handlers_impl import handle_toggle_template_status as _handle_toggle_template_status
-        return await _handle_toggle_template_status(self, payload)
-
-    async def handle_add_campaign(self, payload=None):
-        from domain.automation.campaign_handlers_impl import handle_add_campaign as _handle_add_campaign
-        return await _handle_add_campaign(self, payload)
-
-    async def handle_remove_campaign(self, payload=None):
-        from domain.automation.campaign_handlers_impl import handle_remove_campaign as _handle_remove_campaign
-        return await _handle_remove_campaign(self, payload)
-
-    async def handle_toggle_campaign_status(self, payload=None):
-        from domain.automation.campaign_handlers_impl import handle_toggle_campaign_status as _handle_toggle_campaign_status
-        return await _handle_toggle_campaign_status(self, payload)
-
-    async def handle_send_message(self, payload=None):
-        from domain.messaging.queue_handlers_impl import handle_send_message as _handle_send_message
-        return await _handle_send_message(self, payload)
-
-    async def handle_send_group_message(self, payload=None):
-        from domain.messaging.queue_handlers_impl import handle_send_group_message as _handle_send_group_message
-        return await _handle_send_group_message(self, payload)
-
-    async def handle_update_lead_status(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_update_lead_status as _handle_update_lead_status
-        return await _handle_update_lead_status(self, payload)
-
-    async def handle_get_leads_paginated(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_get_leads_paginated as _handle_get_leads_paginated
-        return await _handle_get_leads_paginated(self, payload)
-
-    async def handle_add_lead(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_add_lead as _handle_add_lead
-        return await _handle_add_lead(self, payload)
-
-    async def handle_add_to_dnc(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_add_to_dnc as _handle_add_to_dnc
-        return await _handle_add_to_dnc(self, payload)
-
-    async def handle_clear_logs(self):
-        from api.handlers.log_handlers_impl import handle_clear_logs as _handle_clear_logs
-        return await _handle_clear_logs(self)
-
-    async def handle_load_accounts_from_excel(self, payload=None):
-        from domain.accounts.session_handlers_impl import handle_load_accounts_from_excel as _handle_load_accounts_from_excel
-        return await _handle_load_accounts_from_excel(self, payload)
-
-    async def handle_export_leads_to_excel(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_export_leads_to_excel as _handle_export_leads_to_excel
-        return await _handle_export_leads_to_excel(self, payload)
-
-    async def handle_reload_sessions_and_accounts(self):
-        from domain.accounts.session_handlers_impl import handle_reload_sessions_and_accounts as _handle_reload_sessions_and_accounts
-        return await _handle_reload_sessions_and_accounts(self)
-
-    async def handle_scan_orphan_sessions(self, payload=None):
-        from domain.accounts.session_handlers_impl import handle_scan_orphan_sessions as _handle_scan_orphan_sessions
-        return await _handle_scan_orphan_sessions(self, payload)
-
-    async def handle_recover_orphan_sessions(self, payload=None):
-        from domain.accounts.session_handlers_impl import handle_recover_orphan_sessions as _handle_recover_orphan_sessions
-        return await _handle_recover_orphan_sessions(self, payload)
-
-    async def handle_import_session(self, payload=None):
-        from domain.accounts.session_handlers_impl import handle_import_session as _handle_import_session
-        return await _handle_import_session(self, payload)
-
-    async def handle_scan_tdata(self, payload=None):
-        from domain.accounts.session_handlers_impl import handle_scan_tdata as _handle_scan_tdata
-        return await _handle_scan_tdata(self, payload)
-
-    async def handle_import_tdata_account(self, payload=None):
-        from domain.accounts.session_handlers_impl import handle_import_tdata_account as _handle_import_tdata_account
-        return await _handle_import_tdata_account(self, payload)
-
-    async def handle_import_tdata_batch(self, payload=None):
-        from domain.accounts.session_handlers_impl import handle_import_tdata_batch as _handle_import_tdata_batch
-        return await _handle_import_tdata_batch(self, payload)
-
-    async def handle_get_default_tdata_path(self):
-        from domain.accounts.session_handlers_impl import handle_get_default_tdata_path as _handle_get_default_tdata_path
-        return await _handle_get_default_tdata_path(self)
-
-    async def handle_export_session(self, payload=None):
-        from domain.accounts.session_handlers_impl import handle_export_session as _handle_export_session
-        return await _handle_export_session(self, payload)
-
-    async def handle_export_sessions_batch(self, payload=None):
-        from domain.accounts.session_handlers_impl import handle_export_sessions_batch as _handle_export_sessions_batch
-        return await _handle_export_sessions_batch(self, payload)
-
-    async def handle_create_backup(self, payload=None):
-        from api.handlers.backup_handlers_impl import handle_create_backup as _handle_create_backup
-        return await _handle_create_backup(self, payload)
-
-    async def handle_restore_backup(self, payload=None):
-        from api.handlers.backup_handlers_impl import handle_restore_backup as _handle_restore_backup
-        return await _handle_restore_backup(self, payload)
-
-    async def handle_list_backups(self):
-        from api.handlers.backup_handlers_impl import handle_list_backups as _handle_list_backups
-        return await _handle_list_backups(self)
-
-    async def handle_get_backup_info(self):
-        from api.handlers.backup_handlers_impl import handle_get_backup_info as _handle_get_backup_info
-        return await _handle_get_backup_info(self)
-
-    async def handle_get_performance_summary(self):
-        from api.handlers.analytics_handlers_impl import handle_get_performance_summary as _handle_get_performance_summary
-        return await _handle_get_performance_summary(self)
-
-    async def handle_get_performance_metrics(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_get_performance_metrics as _handle_get_performance_metrics
-        return await _handle_get_performance_metrics(self, payload)
-
-    async def handle_get_sending_stats(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_get_sending_stats as _handle_get_sending_stats
-        return await _handle_get_sending_stats(self, payload)
-
-    async def handle_get_queue_length_history(self, payload=None):
-        from domain.messaging.queue_handlers_impl import handle_get_queue_length_history as _handle_get_queue_length_history
-        return await _handle_get_queue_length_history(self, payload)
-
-    async def handle_get_account_sending_comparison(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_get_account_sending_comparison as _handle_get_account_sending_comparison
-        return await _handle_get_account_sending_comparison(self, payload)
-
-    async def handle_get_campaign_performance_stats(self, payload=None):
-        from domain.automation.campaign_handlers_impl import handle_get_campaign_performance_stats as _handle_get_campaign_performance_stats
-        return await _handle_get_campaign_performance_stats(self, payload)
-
-    async def handle_get_alerts(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_get_alerts as _handle_get_alerts
-        return await _handle_get_alerts(self, payload)
-
-    async def handle_acknowledge_alert(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_acknowledge_alert as _handle_acknowledge_alert
-        return await _handle_acknowledge_alert(self, payload)
-
-    async def handle_resolve_alert(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_resolve_alert as _handle_resolve_alert
-        return await _handle_resolve_alert(self, payload)
-
-    async def handle_clear_all_alerts(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_clear_all_alerts as _handle_clear_all_alerts
-        return await _handle_clear_all_alerts(self, payload)
-
-    async def handle_migration_status(self, payload=None):
-        from api.handlers.migration_handlers_impl import handle_migration_status as _handle_migration_status
-        return await _handle_migration_status(self, payload)
-
-    async def handle_migrate(self, payload=None):
-        from api.handlers.migration_handlers_impl import handle_migrate as _handle_migrate
-        return await _handle_migrate(self, payload)
-
-    async def handle_rollback_migration(self, payload=None):
-        from api.handlers.migration_handlers_impl import handle_rollback_migration as _handle_rollback_migration
-        return await _handle_rollback_migration(self, payload)
-
     async def run(self):
         """Main event loop - read commands from stdin"""
         await self.initialize()
@@ -1553,1714 +1447,17 @@ class BackendService(InitStartupMixin, SendQueueMixin, AiServiceMixin, ConfigExe
             await self.shutdown()
 
 
-    async def handle_test_local_ai(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_test_local_ai as _handle_test_local_ai
-        return await _handle_test_local_ai(self, payload)
-
-    async def handle_test_tts_service(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_test_tts_service as _handle_test_tts_service
-        return await _handle_test_tts_service(self, payload)
-
-    async def handle_test_stt_service(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_test_stt_service as _handle_test_stt_service
-        return await _handle_test_stt_service(self, payload)
-
-    async def handle_get_ai_settings(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_get_ai_settings as _handle_get_ai_settings
-        return await _handle_get_ai_settings(self, payload)
-
-    async def handle_save_ai_settings(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_save_ai_settings as _handle_save_ai_settings
-        return await _handle_save_ai_settings(self, payload)
-
-    async def handle_set_autonomous_mode(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_set_autonomous_mode as _handle_set_autonomous_mode
-        return await _handle_set_autonomous_mode(self, payload)
-
-    async def handle_get_customer_state(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_get_customer_state as _handle_get_customer_state
-        return await _handle_get_customer_state(self, payload)
-
-    async def handle_get_smart_system_stats(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_get_smart_system_stats as _handle_get_smart_system_stats
-        return await _handle_get_smart_system_stats(self, payload)
-
-    async def handle_get_user_memories(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_get_user_memories as _handle_get_user_memories
-        return await _handle_get_user_memories(self, payload)
-
-    async def handle_get_users_by_tag(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_get_users_by_tag as _handle_get_users_by_tag
-        return await _handle_get_users_by_tag(self, payload)
-
-    async def handle_get_customer_profile(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_get_customer_profile as _handle_get_customer_profile
-        return await _handle_get_customer_profile(self, payload)
-
-    async def handle_get_emotion_trend(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_get_emotion_trend as _handle_get_emotion_trend
-        return await _handle_get_emotion_trend(self, payload)
-
-    async def handle_get_workflow_rules(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_get_workflow_rules as _handle_get_workflow_rules
-        return await _handle_get_workflow_rules(self, payload)
-
-    async def handle_get_followup_tasks(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_get_followup_tasks as _handle_get_followup_tasks
-        return await _handle_get_followup_tasks(self, payload)
-
-    async def handle_get_learning_stats(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_get_learning_stats as _handle_get_learning_stats
-        return await _handle_get_learning_stats(self, payload)
-
-    async def handle_get_knowledge_gaps(self, payload=None):
-        from domain.ai.knowledge_handlers_impl import handle_get_knowledge_gaps as _handle_get_knowledge_gaps
-        return await _handle_get_knowledge_gaps(self, payload)
-
-    async def handle_schedule_followup(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_schedule_followup as _handle_schedule_followup
-        return await _handle_schedule_followup(self, payload)
-
-    async def handle_trigger_workflow(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_trigger_workflow as _handle_trigger_workflow
-        return await _handle_trigger_workflow(self, payload)
-
-    async def handle_generate_with_local_ai(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_generate_with_local_ai as _handle_generate_with_local_ai
-        return await _handle_generate_with_local_ai(self, payload)
-
-    async def handle_text_to_speech(self, payload=None):
-        from domain.ai.voice_handlers_impl import handle_text_to_speech as _handle_text_to_speech
-        return await _handle_text_to_speech(self, payload)
-
-    async def handle_speech_to_text(self, payload=None):
-        from domain.ai.voice_handlers_impl import handle_speech_to_text as _handle_speech_to_text
-        return await _handle_speech_to_text(self, payload)
-
-    async def handle_upload_voice_sample(self, payload=None):
-        from domain.ai.voice_handlers_impl import handle_upload_voice_sample as _handle_upload_voice_sample
-        return await _handle_upload_voice_sample(self, payload)
-
-    async def handle_delete_voice_sample(self, payload=None):
-        from domain.ai.voice_handlers_impl import handle_delete_voice_sample as _handle_delete_voice_sample
-        return await _handle_delete_voice_sample(self, payload)
-
-    async def handle_preview_voice_sample(self, payload=None):
-        from domain.ai.voice_handlers_impl import handle_preview_voice_sample as _handle_preview_voice_sample
-        return await _handle_preview_voice_sample(self, payload)
-
-    async def handle_generate_cloned_voice(self, payload=None):
-        from domain.ai.voice_handlers_impl import handle_generate_cloned_voice as _handle_generate_cloned_voice
-        return await _handle_generate_cloned_voice(self, payload)
-
-    async def handle_list_voice_samples(self):
-        from domain.ai.voice_handlers_impl import handle_list_voice_samples as _handle_list_voice_samples
-        return await _handle_list_voice_samples(self)
-
-    async def handle_get_ai_chat_settings(self):
-        from domain.ai.chat_handlers_impl import handle_get_ai_chat_settings as _handle_get_ai_chat_settings
-        return await _handle_get_ai_chat_settings(self)
-
-    async def handle_update_ai_chat_settings(self, payload=None):
-        from domain.ai.chat_handlers_impl import handle_update_ai_chat_settings as _handle_update_ai_chat_settings
-        return await _handle_update_ai_chat_settings(self, payload)
-
-    async def handle_get_chat_history(self, payload=None):
-        from domain.ai.chat_handlers_impl import handle_get_chat_history as _handle_get_chat_history
-        return await _handle_get_chat_history(self, payload)
-
-    async def handle_get_user_context(self, payload=None):
-        from domain.ai.chat_handlers_impl import handle_get_user_context as _handle_get_user_context
-        return await _handle_get_user_context(self, payload)
-
-    async def handle_generate_ai_response(self, payload=None):
-        from domain.ai.chat_handlers_impl import handle_generate_ai_response as _handle_generate_ai_response
-        return await _handle_generate_ai_response(self, payload)
-
-    async def handle_add_ai_memory(self, payload=None):
-        from domain.ai.chat_handlers_impl import handle_add_ai_memory as _handle_add_ai_memory
-        return await _handle_add_ai_memory(self, payload)
-
-    async def handle_get_ai_memories(self, payload=None):
-        from domain.ai.chat_handlers_impl import handle_get_ai_memories as _handle_get_ai_memories
-        return await _handle_get_ai_memories(self, payload)
-
-    async def handle_analyze_conversation(self, payload=None):
-        from domain.ai.chat_handlers_impl import handle_analyze_conversation as _handle_analyze_conversation
-        return await _handle_analyze_conversation(self, payload)
-
-    async def handle_generate_ai_strategy(self, payload=None):
-        from domain.ai.chat_handlers_impl import handle_generate_ai_strategy as _handle_generate_ai_strategy
-        return await _handle_generate_ai_strategy(self, payload)
-
-    async def handle_save_ai_strategy(self, payload=None):
-        from domain.ai.chat_handlers_impl import handle_save_ai_strategy as _handle_save_ai_strategy
-        return await _handle_save_ai_strategy(self, payload)
-
-    async def handle_get_ai_strategies(self, payload=None):
-        from domain.ai.chat_handlers_impl import handle_get_ai_strategies as _handle_get_ai_strategies
-        return await _handle_get_ai_strategies(self, payload)
-
-    async def handle_execute_ai_strategy(self, payload=None):
-        from domain.ai.chat_handlers_impl import handle_execute_ai_strategy as _handle_execute_ai_strategy
-        return await _handle_execute_ai_strategy(self, payload)
-
-    async def handle_get_chat_templates(self):
-        from domain.automation.template_handlers_impl import handle_get_chat_templates as _handle_get_chat_templates
-        return await _handle_get_chat_templates(self)
-
-    async def handle_save_chat_template(self, payload=None):
-        from domain.automation.template_handlers_impl import handle_save_chat_template as _handle_save_chat_template
-        return await _handle_save_chat_template(self, payload)
-
-    async def handle_delete_chat_template(self, payload=None):
-        from domain.automation.template_handlers_impl import handle_delete_chat_template as _handle_delete_chat_template
-        return await _handle_delete_chat_template(self, payload)
-
-    async def handle_get_trigger_rules(self):
-        from domain.automation.trigger_handlers_impl import handle_get_trigger_rules as _handle_get_trigger_rules
-        return await _handle_get_trigger_rules(self)
-
-    async def handle_get_trigger_rule(self, payload=None):
-        from domain.automation.trigger_handlers_impl import handle_get_trigger_rule as _handle_get_trigger_rule
-        return await _handle_get_trigger_rule(self, payload)
-
-    async def handle_save_trigger_rule(self, payload=None):
-        from domain.automation.trigger_handlers_impl import handle_save_trigger_rule as _handle_save_trigger_rule
-        return await _handle_save_trigger_rule(self, payload)
-
-    async def handle_delete_trigger_rule(self, payload=None):
-        from domain.automation.trigger_handlers_impl import handle_delete_trigger_rule as _handle_delete_trigger_rule
-        return await _handle_delete_trigger_rule(self, payload)
-
-    async def handle_toggle_trigger_rule(self, payload=None):
-        from domain.automation.trigger_handlers_impl import handle_toggle_trigger_rule as _handle_toggle_trigger_rule
-        return await _handle_toggle_trigger_rule(self, payload)
-
-    async def handle_get_collected_users(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_get_collected_users as _handle_get_collected_users
-        return await _handle_get_collected_users(self, payload)
-
-    async def handle_get_collected_users_stats(self):
-        from domain.contacts.leads_handlers_impl import handle_get_collected_users_stats as _handle_get_collected_users_stats
-        return await _handle_get_collected_users_stats(self)
-
-    async def handle_mark_user_as_ad(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_mark_user_as_ad as _handle_mark_user_as_ad
-        return await _handle_mark_user_as_ad(self, payload)
-
-    async def handle_blacklist_user(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_blacklist_user as _handle_blacklist_user
-        return await _handle_blacklist_user(self, payload)
-
-    async def handle_get_user_message_samples(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_get_user_message_samples as _handle_get_user_message_samples
-        return await _handle_get_user_message_samples(self, payload)
-
-    async def handle_recalculate_user_risk(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_recalculate_user_risk as _handle_recalculate_user_risk
-        return await _handle_recalculate_user_risk(self, payload)
-
-    async def handle_save_ai_model(self, payload=None):
-        from domain.ai.model_handlers_impl import handle_save_ai_model as _handle_save_ai_model
-        return await _handle_save_ai_model(self, payload)
-
-    async def handle_get_ai_models(self):
-        from domain.ai.model_handlers_impl import handle_get_ai_models as _handle_get_ai_models
-        return await _handle_get_ai_models(self)
-
-    async def handle_update_ai_model(self, payload=None):
-        from domain.ai.model_handlers_impl import handle_update_ai_model as _handle_update_ai_model
-        return await _handle_update_ai_model(self, payload)
-
-    async def handle_delete_ai_model(self, payload=None):
-        from domain.ai.model_handlers_impl import handle_delete_ai_model as _handle_delete_ai_model
-        return await _handle_delete_ai_model(self, payload)
-
-    async def handle_test_ai_model(self, payload=None):
-        from domain.ai.model_handlers_impl import handle_test_ai_model as _handle_test_ai_model
-        return await _handle_test_ai_model(self, payload)
-
-    async def handle_set_default_ai_model(self, payload=None):
-        from domain.ai.model_handlers_impl import handle_set_default_ai_model as _handle_set_default_ai_model
-        return await _handle_set_default_ai_model(self, payload)
-
-    async def handle_save_model_usage(self, payload=None):
-        from domain.ai.model_handlers_impl import handle_save_model_usage as _handle_save_model_usage
-        return await _handle_save_model_usage(self, payload)
-
-    async def handle_get_model_usage(self):
-        from domain.ai.model_handlers_impl import handle_get_model_usage as _handle_get_model_usage
-        return await _handle_get_model_usage(self)
-
-    async def handle_save_conversation_strategy(self, payload=None):
-        from domain.ai.chat_handlers_impl import handle_save_conversation_strategy as _handle_save_conversation_strategy
-        return await _handle_save_conversation_strategy(self, payload)
-
-    async def handle_get_conversation_strategy(self):
-        from domain.ai.chat_handlers_impl import handle_get_conversation_strategy as _handle_get_conversation_strategy
-        return await _handle_get_conversation_strategy(self)
-
-    async def handle_init_knowledge_base(self):
-        from domain.ai.knowledge_handlers_impl import handle_init_knowledge_base as _handle_init_knowledge_base
-        return await _handle_init_knowledge_base(self)
-
-    async def handle_get_knowledge_stats(self):
-        from domain.ai.knowledge_handlers_impl import handle_get_knowledge_stats as _handle_get_knowledge_stats
-        return await _handle_get_knowledge_stats(self)
-
-    async def handle_add_document(self, payload=None):
-        from domain.ai.knowledge_handlers_impl import handle_add_document as _handle_add_document
-        return await _handle_add_document(self, payload)
-
-    async def handle_add_knowledge_base(self, payload=None):
-        from domain.ai.knowledge_handlers_impl import handle_add_knowledge_base as _handle_add_knowledge_base
-        return await _handle_add_knowledge_base(self, payload)
-
-    async def handle_add_knowledge_item(self, payload=None):
-        from domain.ai.knowledge_handlers_impl import handle_add_knowledge_item as _handle_add_knowledge_item
-        return await _handle_add_knowledge_item(self, payload)
-
-    async def handle_get_knowledge_items(self, payload=None):
-        from domain.ai.knowledge_handlers_impl import handle_get_knowledge_items as _handle_get_knowledge_items
-        return await _handle_get_knowledge_items(self, payload)
-
-    async def handle_ai_generate_knowledge(self, payload=None):
-        from domain.ai.knowledge_handlers_impl import handle_ai_generate_knowledge as _handle_ai_generate_knowledge
-        return await _handle_ai_generate_knowledge(self, payload)
-
-    async def handle_apply_industry_template(self, payload=None):
-        from domain.ai.knowledge_handlers_impl import handle_apply_industry_template as _handle_apply_industry_template
-        return await _handle_apply_industry_template(self, payload)
-
-    async def handle_learn_from_chat_history(self, payload=None):
-        from domain.ai.knowledge_handlers_impl import handle_learn_from_chat_history as _handle_learn_from_chat_history
-        return await _handle_learn_from_chat_history(self, payload)
-
-    async def handle_rag_initialize(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_initialize as _handle_rag_initialize
-        return await _handle_rag_initialize(self, payload)
-
-    async def handle_rag_search(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_search as _handle_rag_search
-        return await _handle_rag_search(self, payload)
-
-    async def handle_rag_get_stats(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_get_stats as _handle_rag_get_stats
-        return await _handle_rag_get_stats(self, payload)
-
-    async def handle_rag_record_feedback(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_record_feedback as _handle_rag_record_feedback
-        return await _handle_rag_record_feedback(self, payload)
-
-    async def handle_rag_build_from_conversation(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_build_from_conversation as _handle_rag_build_from_conversation
-        return await _handle_rag_build_from_conversation(self, payload)
-
-    async def handle_rag_preview_import(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_preview_import as _handle_rag_preview_import
-        return await _handle_rag_preview_import(self, payload)
-
-    async def handle_rag_confirm_import(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_confirm_import as _handle_rag_confirm_import
-        return await _handle_rag_confirm_import(self, payload)
-
-    async def handle_rag_import_url(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_import_url as _handle_rag_import_url
-        return await _handle_rag_import_url(self, payload)
-
-    async def handle_rag_import_document(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_import_document as _handle_rag_import_document
-        return await _handle_rag_import_document(self, payload)
-
-    async def handle_rag_cleanup(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_cleanup as _handle_rag_cleanup
-        return await _handle_rag_cleanup(self, payload)
-
-    async def handle_rag_merge_similar(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_merge_similar as _handle_rag_merge_similar
-        return await _handle_rag_merge_similar(self, payload)
-
-    async def handle_rag_get_gaps(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_get_gaps as _handle_rag_get_gaps
-        return await _handle_rag_get_gaps(self, payload)
-
-    async def handle_rag_resolve_gap(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_resolve_gap as _handle_rag_resolve_gap
-        return await _handle_rag_resolve_gap(self, payload)
-
-    async def handle_rag_ignore_gap(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_ignore_gap as _handle_rag_ignore_gap
-        return await _handle_rag_ignore_gap(self, payload)
-
-    async def handle_rag_delete_gap(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_delete_gap as _handle_rag_delete_gap
-        return await _handle_rag_delete_gap(self, payload)
-
-    async def handle_rag_delete_gaps_batch(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_delete_gaps_batch as _handle_rag_delete_gaps_batch
-        return await _handle_rag_delete_gaps_batch(self, payload)
-
-    async def handle_rag_cleanup_duplicate_gaps(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_cleanup_duplicate_gaps as _handle_rag_cleanup_duplicate_gaps
-        return await _handle_rag_cleanup_duplicate_gaps(self, payload)
-
-    async def handle_rag_suggest_gap_answer(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_suggest_gap_answer as _handle_rag_suggest_gap_answer
-        return await _handle_rag_suggest_gap_answer(self, payload)
-
-    async def handle_rag_get_health_report(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_get_health_report as _handle_rag_get_health_report
-        return await _handle_rag_get_health_report(self, payload)
-
-    async def handle_rag_get_all_knowledge(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_get_all_knowledge as _handle_rag_get_all_knowledge
-        return await _handle_rag_get_all_knowledge(self, payload)
-
-    async def handle_rag_add_knowledge(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_add_knowledge as _handle_rag_add_knowledge
-        return await _handle_rag_add_knowledge(self, payload)
-
-    async def handle_rag_update_knowledge(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_update_knowledge as _handle_rag_update_knowledge
-        return await _handle_rag_update_knowledge(self, payload)
-
-    async def handle_rag_delete_knowledge(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_delete_knowledge as _handle_rag_delete_knowledge
-        return await _handle_rag_delete_knowledge(self, payload)
-
-    async def handle_rag_delete_knowledge_batch(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_delete_knowledge_batch as _handle_rag_delete_knowledge_batch
-        return await _handle_rag_delete_knowledge_batch(self, payload)
-
-    async def handle_rag_start_guided_build(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_start_guided_build as _handle_rag_start_guided_build
-        return await _handle_rag_start_guided_build(self, payload)
-
-    async def handle_get_documents(self, payload=None):
-        from domain.ai.knowledge_handlers_impl import handle_get_documents as _handle_get_documents
-        return await _handle_get_documents(self, payload)
-
-    async def handle_delete_document(self, payload=None):
-        from domain.ai.knowledge_handlers_impl import handle_delete_document as _handle_delete_document
-        return await _handle_delete_document(self, payload)
-
-    async def handle_add_media(self, payload=None):
-        from domain.messaging.media_handlers_impl import handle_add_media as _handle_add_media
-        return await _handle_add_media(self, payload)
-
-    async def handle_get_media(self, payload=None):
-        from domain.messaging.media_handlers_impl import handle_get_media as _handle_get_media
-        return await _handle_get_media(self, payload)
-
-    async def handle_delete_media(self, payload=None):
-        from domain.messaging.media_handlers_impl import handle_delete_media as _handle_delete_media
-        return await _handle_delete_media(self, payload)
-
-    async def handle_search_knowledge(self, payload=None):
-        from domain.ai.knowledge_handlers_impl import handle_search_knowledge as _handle_search_knowledge
-        return await _handle_search_knowledge(self, payload)
-
-    async def handle_add_qa_pair(self, payload=None):
-        from domain.ai.qa_handlers_impl import handle_add_qa_pair as _handle_add_qa_pair
-        return await _handle_add_qa_pair(self, payload)
-
-    async def handle_get_qa_pairs(self, payload=None):
-        from domain.ai.qa_handlers_impl import handle_get_qa_pairs as _handle_get_qa_pairs
-        return await _handle_get_qa_pairs(self, payload)
-
-    async def handle_import_qa(self, payload=None):
-        from domain.ai.qa_handlers_impl import handle_import_qa as _handle_import_qa
-        return await _handle_import_qa(self, payload)
-
-    async def handle_get_rag_context(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_get_rag_context as _handle_get_rag_context
-        return await _handle_get_rag_context(self, payload)
-
-    async def handle_get_funnel_overview(self):
-        from domain.contacts.funnel_handlers_impl import handle_get_funnel_overview as _handle_get_funnel_overview
-        return await _handle_get_funnel_overview(self)
-
-    async def handle_analyze_user_message(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_analyze_user_message as _handle_analyze_user_message
-        return await _handle_analyze_user_message(self, payload)
-
-    async def handle_transition_funnel_stage(self, payload=None):
-        from domain.contacts.funnel_handlers_impl import handle_transition_funnel_stage as _handle_transition_funnel_stage
-        return await _handle_transition_funnel_stage(self, payload)
-
-    async def handle_get_user_journey(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_get_user_journey as _handle_get_user_journey
-        return await _handle_get_user_journey(self, payload)
-
-    async def handle_batch_update_stages(self, payload=None):
-        from domain.contacts.funnel_handlers_impl import handle_batch_update_stages as _handle_batch_update_stages
-        return await _handle_batch_update_stages(self, payload)
-
-    async def handle_add_vector_memory(self, payload=None):
-        from domain.ai.memory_handlers_impl import handle_add_vector_memory as _handle_add_vector_memory
-        return await _handle_add_vector_memory(self, payload)
-
-    async def handle_search_vector_memories(self, payload=None):
-        from domain.ai.memory_handlers_impl import handle_search_vector_memories as _handle_search_vector_memories
-        return await _handle_search_vector_memories(self, payload)
-
-    async def handle_get_memory_context(self, payload=None):
-        from domain.ai.memory_handlers_impl import handle_get_memory_context as _handle_get_memory_context
-        return await _handle_get_memory_context(self, payload)
-
-    async def handle_summarize_conversation(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_summarize_conversation as _handle_summarize_conversation
-        return await _handle_summarize_conversation(self, payload)
-
-    async def handle_get_memory_stats(self, payload=None):
-        from domain.ai.memory_handlers_impl import handle_get_memory_stats as _handle_get_memory_stats
-        return await _handle_get_memory_stats(self, payload)
-
-    async def handle_init_rag_system(self):
-        from domain.ai.rag_handlers_impl import handle_init_rag_system as _handle_init_rag_system
-        return await _handle_init_rag_system(self)
-
-    async def handle_get_rag_stats(self):
-        from domain.ai.rag_handlers_impl import handle_get_rag_stats as _handle_get_rag_stats
-        return await _handle_get_rag_stats(self)
-
-    async def handle_search_rag(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_search_rag as _handle_search_rag
-        return await _handle_search_rag(self, payload)
-
-    async def handle_trigger_rag_learning(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_trigger_rag_learning as _handle_trigger_rag_learning
-        return await _handle_trigger_rag_learning(self, payload)
-
-    async def handle_add_rag_knowledge(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_add_rag_knowledge as _handle_add_rag_knowledge
-        return await _handle_add_rag_knowledge(self, payload)
-
-    async def handle_rag_feedback(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_rag_feedback as _handle_rag_feedback
-        return await _handle_rag_feedback(self, payload)
-
-    async def handle_reindex_conversations(self, payload=None):
-        from domain.messaging.chat_handlers_impl import handle_reindex_conversations as _handle_reindex_conversations
-        return await _handle_reindex_conversations(self, payload)
-
-    async def handle_cleanup_rag_knowledge(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_cleanup_rag_knowledge as _handle_cleanup_rag_knowledge
-        return await _handle_cleanup_rag_knowledge(self, payload)
-
-    async def handle_schedule_follow_up(self, payload=None):
-        from domain.automation.scheduler_handlers_impl import handle_schedule_follow_up as _handle_schedule_follow_up
-        return await _handle_schedule_follow_up(self, payload)
-
-    async def handle_get_pending_tasks(self, payload=None):
-        from domain.automation.scheduler_handlers_impl import handle_get_pending_tasks as _handle_get_pending_tasks
-        return await _handle_get_pending_tasks(self, payload)
-
-    async def handle_cancel_scheduled_task(self, payload=None):
-        from domain.automation.scheduler_handlers_impl import handle_cancel_scheduled_task as _handle_cancel_scheduled_task
-        return await _handle_cancel_scheduled_task(self, payload)
-
-    async def handle_get_scheduler_stats(self):
-        from domain.automation.scheduler_handlers_impl import handle_get_scheduler_stats as _handle_get_scheduler_stats
-        return await _handle_get_scheduler_stats(self)
-
-    async def handle_get_user_profile_full(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_get_user_profile_full as _handle_get_user_profile_full
-        return await _handle_get_user_profile_full(self, payload)
-
-    async def handle_update_user_crm(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_update_user_crm as _handle_update_user_crm
-        return await _handle_update_user_crm(self, payload)
-
-    async def handle_add_user_tag(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_add_user_tag as _handle_add_user_tag
-        return await _handle_add_user_tag(self, payload)
-
-    async def handle_remove_user_tag(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_remove_user_tag as _handle_remove_user_tag
-        return await _handle_remove_user_tag(self, payload)
-
-    async def handle_get_user_tags(self, payload=None):
-        from domain.contacts.profile_handlers_impl import handle_get_user_tags as _handle_get_user_tags
-        return await _handle_get_user_tags(self, payload)
-
-    async def handle_search_chat_history(self, payload=None):
-        from domain.messaging.chat_handlers_impl import handle_search_chat_history as _handle_search_chat_history
-        return await _handle_search_chat_history(self, payload)
-
-    async def handle_search_leads(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_search_leads as _handle_search_leads
-        return await _handle_search_leads(self, payload)
-
-    async def handle_rebuild_search_index(self):
-        from domain.search.search_handlers_impl import handle_rebuild_search_index as _handle_rebuild_search_index
-        return await _handle_rebuild_search_index(self)
-
-    async def handle_analyze_funnel(self, payload=None):
-        from domain.contacts.funnel_handlers_impl import handle_analyze_funnel as _handle_analyze_funnel
-        return await _handle_analyze_funnel(self, payload)
-
-    async def handle_analyze_user_journey(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_analyze_user_journey as _handle_analyze_user_journey
-        return await _handle_analyze_user_journey(self, payload)
-
-    async def handle_get_monitoring_status(self):
-        from domain.automation.monitoring_handlers_impl import handle_get_monitoring_status as _handle_get_monitoring_status
-        return await _handle_get_monitoring_status(self)
-
-    async def handle_check_monitoring_health(self):
-        from domain.automation.monitoring_handlers_impl import handle_check_monitoring_health as _handle_check_monitoring_health
-        return await _handle_check_monitoring_health(self)
-
-    async def handle_rebuild_database(self):
-        from api.handlers.system_handlers_impl import handle_rebuild_database as _handle_rebuild_database
-        return await _handle_rebuild_database(self)
-
-    async def handle_get_chat_history_full(self, payload=None):
-        from domain.ai.chat_handlers_impl import handle_get_chat_history_full as _handle_get_chat_history_full
-        return await _handle_get_chat_history_full(self, payload)
-
-    async def handle_get_chat_list(self, payload=None):
-        from domain.messaging.chat_handlers_impl import handle_get_chat_list as _handle_get_chat_list
-        return await _handle_get_chat_list(self, payload)
-
-    async def handle_send_ai_response(self, payload=None):
-        from domain.messaging.chat_handlers_impl import handle_send_ai_response as _handle_send_ai_response
-        return await _handle_send_ai_response(self, payload)
-
-    async def handle_get_users_with_profiles(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_get_users_with_profiles as _handle_get_users_with_profiles
-        return await _handle_get_users_with_profiles(self, payload)
-
-    async def handle_get_funnel_stats(self, payload=None):
-        from domain.contacts.funnel_handlers_impl import handle_get_funnel_stats as _handle_get_funnel_stats
-        return await _handle_get_funnel_stats(self, payload)
-
-    async def handle_bulk_update_user_tags(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_bulk_update_user_tags as _handle_bulk_update_user_tags
-        return await _handle_bulk_update_user_tags(self, payload)
-
-    async def handle_bulk_update_user_stage(self, payload=None):
-        from domain.contacts.funnel_handlers_impl import handle_bulk_update_user_stage as _handle_bulk_update_user_stage
-        return await _handle_bulk_update_user_stage(self, payload)
-
-    async def handle_update_user_profile(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_update_user_profile as _handle_update_user_profile
-        return await _handle_update_user_profile(self, payload)
-
-    async def handle_batch_update_lead_status(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_batch_update_lead_status as _handle_batch_update_lead_status
-        return await _handle_batch_update_lead_status(self, payload)
-
-    async def handle_batch_add_tag(self, payload=None):
-        from domain.contacts.tag_handlers_impl import handle_batch_add_tag as _handle_batch_add_tag
-        return await _handle_batch_add_tag(self, payload)
-
-    async def handle_batch_remove_tag(self, payload=None):
-        from domain.contacts.tag_handlers_impl import handle_batch_remove_tag as _handle_batch_remove_tag
-        return await _handle_batch_remove_tag(self, payload)
-
-    async def handle_batch_add_to_dnc(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_batch_add_to_dnc as _handle_batch_add_to_dnc
-        return await _handle_batch_add_to_dnc(self, payload)
-
-    async def handle_batch_remove_from_dnc(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_batch_remove_from_dnc as _handle_batch_remove_from_dnc
-        return await _handle_batch_remove_from_dnc(self, payload)
-
-    async def handle_batch_update_funnel_stage(self, payload=None):
-        from domain.contacts.funnel_handlers_impl import handle_batch_update_funnel_stage as _handle_batch_update_funnel_stage
-        return await _handle_batch_update_funnel_stage(self, payload)
-
-    async def handle_batch_delete_leads(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_batch_delete_leads as _handle_batch_delete_leads
-        return await _handle_batch_delete_leads(self, payload)
-
-    async def handle_delete_lead(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_delete_lead as _handle_delete_lead
-        return await _handle_delete_lead(self, payload)
-
-    async def handle_invite_lead_to_collab_group(self, payload=None):
-        from domain.multi_role.collab_handlers_impl import handle_invite_lead_to_collab_group as _handle_invite_lead_to_collab_group
-        return await _handle_invite_lead_to_collab_group(self, payload)
-
-    async def handle_create_collab_group_for_lead(self, payload=None):
-        from domain.multi_role.collab_handlers_impl import handle_create_collab_group_for_lead as _handle_create_collab_group_for_lead
-        return await _handle_create_collab_group_for_lead(self, payload)
-
-    async def handle_undo_batch_operation(self, payload=None):
-        from domain.messaging.batch_handlers_impl import handle_undo_batch_operation as _handle_undo_batch_operation
-        return await _handle_undo_batch_operation(self, payload)
-
-    async def handle_get_batch_operation_history(self, payload=None):
-        from domain.messaging.batch_handlers_impl import handle_get_batch_operation_history as _handle_get_batch_operation_history
-        return await _handle_get_batch_operation_history(self, payload)
-
-    async def handle_get_search_history(self, payload=None):
-        from domain.search.search_handlers_impl import handle_get_search_history as _handle_get_search_history
-        return await _handle_get_search_history(self, payload)
-
-    async def handle_get_search_results_by_id(self, payload=None):
-        from domain.search.search_handlers_impl import handle_get_search_results_by_id as _handle_get_search_results_by_id
-        return await _handle_get_search_results_by_id(self, payload)
-
-    async def handle_get_search_statistics(self, payload=None):
-        from domain.search.search_handlers_impl import handle_get_search_statistics as _handle_get_search_statistics
-        return await _handle_get_search_statistics(self, payload)
-
-    async def handle_get_resource_history(self, payload=None):
-        from domain.search.resource_handlers_impl import handle_get_resource_history as _handle_get_resource_history
-        return await _handle_get_resource_history(self, payload)
-
-    async def handle_cleanup_search_history(self, payload=None):
-        from domain.search.search_handlers_impl import handle_cleanup_search_history as _handle_cleanup_search_history
-        return await _handle_cleanup_search_history(self, payload)
-
-    async def handle_create_tag(self, payload=None):
-        from domain.contacts.tag_handlers_impl import handle_create_tag as _handle_create_tag
-        return await _handle_create_tag(self, payload)
-
-    async def handle_delete_tag(self, payload=None):
-        from domain.contacts.tag_handlers_impl import handle_delete_tag as _handle_delete_tag
-        return await _handle_delete_tag(self, payload)
-
-    async def handle_get_lead_tags(self, payload=None):
-        from domain.contacts.tag_handlers_impl import handle_get_lead_tags as _handle_get_lead_tags
-        return await _handle_get_lead_tags(self, payload)
-
-    async def handle_create_ad_template(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_create_ad_template as _handle_create_ad_template
-        return await _handle_create_ad_template(self, payload)
-
-    async def handle_update_ad_template(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_update_ad_template as _handle_update_ad_template
-        return await _handle_update_ad_template(self, payload)
-
-    async def handle_delete_ad_template(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_delete_ad_template as _handle_delete_ad_template
-        return await _handle_delete_ad_template(self, payload)
-
-    async def handle_get_ad_templates(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_get_ad_templates as _handle_get_ad_templates
-        return await _handle_get_ad_templates(self, payload)
-
-    async def handle_toggle_ad_template_status(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_toggle_ad_template_status as _handle_toggle_ad_template_status
-        return await _handle_toggle_ad_template_status(self, payload)
-
-    async def handle_preview_ad_template(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_preview_ad_template as _handle_preview_ad_template
-        return await _handle_preview_ad_template(self, payload)
-
-    async def handle_validate_spintax(self, payload=None):
-        from domain.messaging.queue_handlers_impl import handle_validate_spintax as _handle_validate_spintax
-        return await _handle_validate_spintax(self, payload)
-
-    async def handle_create_ad_schedule(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_create_ad_schedule as _handle_create_ad_schedule
-        return await _handle_create_ad_schedule(self, payload)
-
-    async def handle_update_ad_schedule(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_update_ad_schedule as _handle_update_ad_schedule
-        return await _handle_update_ad_schedule(self, payload)
-
-    async def handle_delete_ad_schedule(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_delete_ad_schedule as _handle_delete_ad_schedule
-        return await _handle_delete_ad_schedule(self, payload)
-
-    async def handle_get_ad_schedules(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_get_ad_schedules as _handle_get_ad_schedules
-        return await _handle_get_ad_schedules(self, payload)
-
-    async def handle_toggle_ad_schedule_status(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_toggle_ad_schedule_status as _handle_toggle_ad_schedule_status
-        return await _handle_toggle_ad_schedule_status(self, payload)
-
-    async def handle_run_ad_schedule_now(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_run_ad_schedule_now as _handle_run_ad_schedule_now
-        return await _handle_run_ad_schedule_now(self, payload)
-
-    async def handle_send_ad_now(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_send_ad_now as _handle_send_ad_now
-        return await _handle_send_ad_now(self, payload)
-
-    async def handle_get_ad_send_logs(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_get_ad_send_logs as _handle_get_ad_send_logs
-        return await _handle_get_ad_send_logs(self, payload)
-
-    async def handle_get_ad_overview_stats(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_get_ad_overview_stats as _handle_get_ad_overview_stats
-        return await _handle_get_ad_overview_stats(self, payload)
-
-    async def handle_get_ad_template_stats(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_get_ad_template_stats as _handle_get_ad_template_stats
-        return await _handle_get_ad_template_stats(self, payload)
-
-    async def handle_get_ad_schedule_stats(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_get_ad_schedule_stats as _handle_get_ad_schedule_stats
-        return await _handle_get_ad_schedule_stats(self, payload)
-
-    async def handle_get_ad_account_stats(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_get_ad_account_stats as _handle_get_ad_account_stats
-        return await _handle_get_ad_account_stats(self, payload)
-
-    async def handle_get_ad_group_stats(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_get_ad_group_stats as _handle_get_ad_group_stats
-        return await _handle_get_ad_group_stats(self, payload)
-
-    async def handle_get_ad_daily_stats(self, payload=None):
-        from domain.marketing.ad_handlers_impl import handle_get_ad_daily_stats as _handle_get_ad_daily_stats
-        return await _handle_get_ad_daily_stats(self, payload)
-
-    async def handle_add_user_to_track(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_add_user_to_track as _handle_add_user_to_track
-        return await _handle_add_user_to_track(self, payload)
-
-    async def handle_add_user_from_lead(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_add_user_from_lead as _handle_add_user_from_lead
-        return await _handle_add_user_from_lead(self, payload)
-
-    async def handle_remove_tracked_user(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_remove_tracked_user as _handle_remove_tracked_user
-        return await _handle_remove_tracked_user(self, payload)
-
-    async def handle_get_tracked_users(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_get_tracked_users as _handle_get_tracked_users
-        return await _handle_get_tracked_users(self, payload)
-
-    async def handle_update_user_value_level(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_update_user_value_level as _handle_update_user_value_level
-        return await _handle_update_user_value_level(self, payload)
-
-    async def handle_track_user_groups(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_track_user_groups as _handle_track_user_groups
-        return await _handle_track_user_groups(self, payload)
-
-    async def handle_batch_track_users(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_batch_track_users as _handle_batch_track_users
-        return await _handle_batch_track_users(self, payload)
-
-    async def handle_get_user_groups(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_get_user_groups as _handle_get_user_groups
-        return await _handle_get_user_groups(self, payload)
-
-    async def handle_get_high_value_groups(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_get_high_value_groups as _handle_get_high_value_groups
-        return await _handle_get_high_value_groups(self, payload)
-
-    async def handle_get_tracking_stats(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_get_tracking_stats as _handle_get_tracking_stats
-        return await _handle_get_tracking_stats(self, payload)
-
-    async def handle_get_tracking_logs(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_get_tracking_logs as _handle_get_tracking_logs
-        return await _handle_get_tracking_logs(self, payload)
-
-    async def handle_get_user_value_distribution(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_get_user_value_distribution as _handle_get_user_value_distribution
-        return await _handle_get_user_value_distribution(self, payload)
-
-    async def handle_get_group_overlap_analysis(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_get_group_overlap_analysis as _handle_get_group_overlap_analysis
-        return await _handle_get_group_overlap_analysis(self, payload)
-
-    async def handle_get_tracking_effectiveness(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_get_tracking_effectiveness as _handle_get_tracking_effectiveness
-        return await _handle_get_tracking_effectiveness(self, payload)
-
-    async def handle_create_campaign(self, payload=None):
-        from domain.marketing.campaign_handlers_impl import handle_create_campaign as _handle_create_campaign
-        return await _handle_create_campaign(self, payload)
-
-    async def handle_update_campaign(self, payload=None):
-        from domain.marketing.campaign_handlers_impl import handle_update_campaign as _handle_update_campaign
-        return await _handle_update_campaign(self, payload)
-
-    async def handle_delete_campaign(self, payload=None):
-        from domain.marketing.campaign_handlers_impl import handle_delete_campaign as _handle_delete_campaign
-        return await _handle_delete_campaign(self, payload)
-
-    async def handle_get_campaigns(self, payload=None):
-        from domain.automation.campaign_handlers_impl import handle_get_campaigns as _handle_get_campaigns
-        return await _handle_get_campaigns(self, payload)
-
-    async def handle_get_campaign(self, payload=None):
-        from domain.automation.campaign_handlers_impl import handle_get_campaign as _handle_get_campaign
-        return await _handle_get_campaign(self, payload)
-
-    async def handle_start_campaign(self, payload=None):
-        from domain.marketing.campaign_handlers_impl import handle_start_campaign as _handle_start_campaign
-        return await _handle_start_campaign(self, payload)
-
-    async def handle_pause_campaign(self, payload=None):
-        from domain.marketing.campaign_handlers_impl import handle_pause_campaign as _handle_pause_campaign
-        return await _handle_pause_campaign(self, payload)
-
-    async def handle_resume_campaign(self, payload=None):
-        from domain.marketing.campaign_handlers_impl import handle_resume_campaign as _handle_resume_campaign
-        return await _handle_resume_campaign(self, payload)
-
-    async def handle_stop_campaign(self, payload=None):
-        from domain.marketing.campaign_handlers_impl import handle_stop_campaign as _handle_stop_campaign
-        return await _handle_stop_campaign(self, payload)
-
-    async def handle_get_campaign_logs(self, payload=None):
-        from domain.automation.campaign_handlers_impl import handle_get_campaign_logs as _handle_get_campaign_logs
-        return await _handle_get_campaign_logs(self, payload)
-
-    async def handle_get_unified_overview(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_get_unified_overview as _handle_get_unified_overview
-        return await _handle_get_unified_overview(self, payload)
-
-    async def handle_get_daily_trends(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_get_daily_trends as _handle_get_daily_trends
-        return await _handle_get_daily_trends(self, payload)
-
-    async def handle_get_channel_performance(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_get_channel_performance as _handle_get_channel_performance
-        return await _handle_get_channel_performance(self, payload)
-
-    async def handle_get_funnel_analysis(self, payload=None):
-        from domain.contacts.funnel_handlers_impl import handle_get_funnel_analysis as _handle_get_funnel_analysis
-        return await _handle_get_funnel_analysis(self, payload)
-
-    async def handle_get_role_templates(self, payload=None):
-        from domain.accounts.role_handlers_impl import handle_get_role_templates as _handle_get_role_templates
-        return await _handle_get_role_templates(self, payload)
-
-    async def handle_assign_role(self, payload=None):
-        from domain.accounts.role_handlers_impl import handle_assign_role as _handle_assign_role
-        return await _handle_assign_role(self, payload)
-
-    async def handle_update_role(self, payload=None):
-        from domain.accounts.role_handlers_impl import handle_update_role as _handle_update_role
-        return await _handle_update_role(self, payload)
-
-    async def handle_remove_role(self, payload=None):
-        from domain.accounts.role_handlers_impl import handle_remove_role as _handle_remove_role
-        return await _handle_remove_role(self, payload)
-
-    async def handle_get_account_roles(self, payload=None):
-        from domain.accounts.role_handlers_impl import handle_get_account_roles as _handle_get_account_roles
-        return await _handle_get_account_roles(self, payload)
-
-    async def handle_get_all_roles(self, payload=None):
-        from domain.accounts.role_handlers_impl import handle_get_all_roles as _handle_get_all_roles
-        return await _handle_get_all_roles(self, payload)
-
-    async def handle_get_role_stats(self, payload=None):
-        from domain.accounts.role_handlers_impl import handle_get_role_stats as _handle_get_role_stats
-        return await _handle_get_role_stats(self, payload)
-
-    async def handle_get_script_templates(self, payload=None):
-        from domain.automation.script_handlers_impl import handle_get_script_templates as _handle_get_script_templates
-        return await _handle_get_script_templates(self, payload)
-
-    async def handle_create_script_template(self, payload=None):
-        from domain.automation.script_handlers_impl import handle_create_script_template as _handle_create_script_template
-        return await _handle_create_script_template(self, payload)
-
-    async def handle_delete_script_template(self, payload=None):
-        from domain.automation.script_handlers_impl import handle_delete_script_template as _handle_delete_script_template
-        return await _handle_delete_script_template(self, payload)
-
-    async def handle_start_script_execution(self, payload=None):
-        from domain.automation.script_handlers_impl import handle_start_script_execution as _handle_start_script_execution
-        return await _handle_start_script_execution(self, payload)
-
-    async def handle_run_script_execution(self, payload=None):
-        from domain.automation.script_handlers_impl import handle_run_script_execution as _handle_run_script_execution
-        return await _handle_run_script_execution(self, payload)
-
-    async def handle_stop_script_execution(self, payload=None):
-        from domain.automation.script_handlers_impl import handle_stop_script_execution as _handle_stop_script_execution
-        return await _handle_stop_script_execution(self, payload)
-
-    async def handle_get_active_executions(self, payload=None):
-        from api.handlers.system_handlers_impl import handle_get_active_executions as _handle_get_active_executions
-        return await _handle_get_active_executions(self, payload)
-
-    async def handle_get_execution_stats(self, payload=None):
-        from api.handlers.system_handlers_impl import handle_get_execution_stats as _handle_get_execution_stats
-        return await _handle_get_execution_stats(self, payload)
-
-    async def handle_create_collab_group(self, payload=None):
-        from domain.multi_role.collab_handlers_impl import handle_create_collab_group as _handle_create_collab_group
-        return await _handle_create_collab_group(self, payload)
-
-    async def handle_add_collab_member(self, payload=None):
-        from domain.multi_role.collab_handlers_impl import handle_add_collab_member as _handle_add_collab_member
-        return await _handle_add_collab_member(self, payload)
-
-    async def handle_get_collab_groups(self, payload=None):
-        from domain.multi_role.collab_handlers_impl import handle_get_collab_groups as _handle_get_collab_groups
-        return await _handle_get_collab_groups(self, payload)
-
-    async def handle_update_collab_status(self, payload=None):
-        from domain.multi_role.collab_handlers_impl import handle_update_collab_status as _handle_update_collab_status
-        return await _handle_update_collab_status(self, payload)
-
-    async def handle_get_collab_stats(self, payload=None):
-        from domain.multi_role.collab_handlers_impl import handle_get_collab_stats as _handle_get_collab_stats
-        return await _handle_get_collab_stats(self, payload)
-
-    async def handle_get_marketing_tasks(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_get_marketing_tasks as _handle_get_marketing_tasks
-        return await _handle_get_marketing_tasks(self, payload)
-
-    async def handle_create_marketing_task(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_create_marketing_task as _handle_create_marketing_task
-        return await _handle_create_marketing_task(self, payload)
-
-    async def handle_update_marketing_task(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_update_marketing_task as _handle_update_marketing_task
-        return await _handle_update_marketing_task(self, payload)
-
-    async def handle_delete_marketing_task(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_delete_marketing_task as _handle_delete_marketing_task
-        return await _handle_delete_marketing_task(self, payload)
-
-    async def handle_start_marketing_task(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_start_marketing_task as _handle_start_marketing_task
-        return await _handle_start_marketing_task(self, payload)
-
-    async def handle_pause_marketing_task(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_pause_marketing_task as _handle_pause_marketing_task
-        return await _handle_pause_marketing_task(self, payload)
-
-    async def handle_resume_marketing_task(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_resume_marketing_task as _handle_resume_marketing_task
-        return await _handle_resume_marketing_task(self, payload)
-
-    async def handle_complete_marketing_task(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_complete_marketing_task as _handle_complete_marketing_task
-        return await _handle_complete_marketing_task(self, payload)
-
-    async def handle_add_marketing_task_targets(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_add_marketing_task_targets as _handle_add_marketing_task_targets
-        return await _handle_add_marketing_task_targets(self, payload)
-
-    async def handle_get_marketing_task_targets(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_get_marketing_task_targets as _handle_get_marketing_task_targets
-        return await _handle_get_marketing_task_targets(self, payload)
-
-    async def handle_update_marketing_task_target(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_update_marketing_task_target as _handle_update_marketing_task_target
-        return await _handle_update_marketing_task_target(self, payload)
-
-    async def handle_assign_marketing_task_role(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_assign_marketing_task_role as _handle_assign_marketing_task_role
-        return await _handle_assign_marketing_task_role(self, payload)
-
-    async def handle_auto_assign_marketing_task_roles(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_auto_assign_marketing_task_roles as _handle_auto_assign_marketing_task_roles
-        return await _handle_auto_assign_marketing_task_roles(self, payload)
-
-    async def handle_get_marketing_task_stats(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_get_marketing_task_stats as _handle_get_marketing_task_stats
-        return await _handle_get_marketing_task_stats(self, payload)
-
-    async def handle_get_api_credentials(self, payload=None):
-        from api.handlers.api_credential_handlers_impl import handle_get_api_credentials as _handle_get_api_credentials
-        return await _handle_get_api_credentials(self, payload)
-
-    async def handle_add_api_credential(self, payload=None):
-        from api.handlers.api_credential_handlers_impl import handle_add_api_credential as _handle_add_api_credential
-        return await _handle_add_api_credential(self, payload)
-
-    async def handle_remove_api_credential(self, payload=None):
-        from api.handlers.api_credential_handlers_impl import handle_remove_api_credential as _handle_remove_api_credential
-        return await _handle_remove_api_credential(self, payload)
-
-    async def handle_toggle_api_credential(self, payload=None):
-        from api.handlers.api_credential_handlers_impl import handle_toggle_api_credential as _handle_toggle_api_credential
-        return await _handle_toggle_api_credential(self, payload)
-
-    async def handle_bulk_import_api_credentials(self, payload=None):
-        from api.handlers.api_credential_handlers_impl import handle_bulk_import_api_credentials as _handle_bulk_import_api_credentials
-        return await _handle_bulk_import_api_credentials(self, payload)
-
-    async def handle_get_api_recommendation(self, payload=None):
-        from api.handlers.api_credential_handlers_impl import handle_get_api_recommendation as _handle_get_api_recommendation
-        return await _handle_get_api_recommendation(self, payload)
-
-    async def handle_get_platform_api_usage(self, payload=None):
-        from api.handlers.api_credential_handlers_impl import handle_get_platform_api_usage as _handle_get_platform_api_usage
-        return await _handle_get_platform_api_usage(self, payload)
-
-    async def handle_allocate_platform_api(self, payload=None):
-        from api.handlers.api_credential_handlers_impl import handle_allocate_platform_api as _handle_allocate_platform_api
-        return await _handle_allocate_platform_api(self, payload)
-
-    async def handle_release_platform_api(self, payload=None):
-        from api.handlers.api_credential_handlers_impl import handle_release_platform_api as _handle_release_platform_api
-        return await _handle_release_platform_api(self, payload)
-
-    async def handle_admin_add_platform_api(self, payload=None):
-        from api.handlers.api_credential_handlers_impl import handle_admin_add_platform_api as _handle_admin_add_platform_api
-        return await _handle_admin_add_platform_api(self, payload)
-
-    async def handle_admin_list_platform_apis(self, payload=None):
-        from api.handlers.api_credential_handlers_impl import handle_admin_list_platform_apis as _handle_admin_list_platform_apis
-        return await _handle_admin_list_platform_apis(self, payload)
-
-    async def handle_select_tdata_folder(self, payload=None):
-        from domain.accounts.session_handlers_impl import handle_select_tdata_folder as _handle_select_tdata_folder
-        return await _handle_select_tdata_folder(self, payload)
-
-    async def handle_parse_tdata(self, payload=None):
-        from domain.accounts.session_handlers_impl import handle_parse_tdata as _handle_parse_tdata
-        return await _handle_parse_tdata(self, payload)
-
-    async def handle_import_tdata(self, payload=None):
-        from domain.accounts.session_handlers_impl import handle_import_tdata as _handle_import_tdata
-        return await _handle_import_tdata(self, payload)
-
-    async def handle_get_intent_score(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_get_intent_score as _handle_get_intent_score
-        return await _handle_get_intent_score(self, payload)
-
-    async def handle_get_smart_replies(self, payload=None):
-        from domain.messaging.chat_handlers_impl import handle_get_smart_replies as _handle_get_smart_replies
-        return await _handle_get_smart_replies(self, payload)
-
-    async def handle_get_auto_tags(self, payload=None):
-        from domain.contacts.tag_handlers_impl import handle_get_auto_tags as _handle_get_auto_tags
-        return await _handle_get_auto_tags(self, payload)
-
-    async def handle_predict_send_time(self, payload=None):
-        from domain.messaging.queue_handlers_impl import handle_predict_send_time as _handle_predict_send_time
-        return await _handle_predict_send_time(self, payload)
-
-    async def handle_get_automation_rules(self, payload=None):
-        from domain.automation.rule_handlers_impl import handle_get_automation_rules as _handle_get_automation_rules
-        return await _handle_get_automation_rules(self, payload)
-
-    async def handle_add_automation_rule(self, payload=None):
-        from domain.automation.rule_handlers_impl import handle_add_automation_rule as _handle_add_automation_rule
-        return await _handle_add_automation_rule(self, payload)
-
-    async def handle_update_automation_rule(self, payload=None):
-        from domain.automation.rule_handlers_impl import handle_update_automation_rule as _handle_update_automation_rule
-        return await _handle_update_automation_rule(self, payload)
-
-    async def handle_delete_automation_rule(self, payload=None):
-        from domain.automation.rule_handlers_impl import handle_delete_automation_rule as _handle_delete_automation_rule
-        return await _handle_delete_automation_rule(self, payload)
-
-    async def handle_get_reminders(self, payload=None):
-        from domain.automation.scheduler_handlers_impl import handle_get_reminders as _handle_get_reminders
-        return await _handle_get_reminders(self, payload)
-
-    async def handle_create_reminder(self, payload=None):
-        from domain.automation.scheduler_handlers_impl import handle_create_reminder as _handle_create_reminder
-        return await _handle_create_reminder(self, payload)
-
-    async def handle_snooze_reminder(self, payload=None):
-        from domain.automation.scheduler_handlers_impl import handle_snooze_reminder as _handle_snooze_reminder
-        return await _handle_snooze_reminder(self, payload)
-
-    async def handle_complete_reminder(self, payload=None):
-        from domain.automation.scheduler_handlers_impl import handle_complete_reminder as _handle_complete_reminder
-        return await _handle_complete_reminder(self, payload)
-
-    async def handle_process_stage_event(self, payload=None):
-        from domain.contacts.funnel_handlers_impl import handle_process_stage_event as _handle_process_stage_event
-        return await _handle_process_stage_event(self, payload)
-
-    async def handle_get_stage_flow(self, payload=None):
-        from domain.contacts.funnel_handlers_impl import handle_get_stage_flow as _handle_get_stage_flow
-        return await _handle_get_stage_flow(self, payload)
-
-    async def handle_create_ab_test(self, payload=None):
-        from domain.marketing.ab_handlers_impl import handle_create_ab_test as _handle_create_ab_test
-        return await _handle_create_ab_test(self, payload)
-
-    async def handle_start_ab_test(self, payload=None):
-        from domain.marketing.ab_handlers_impl import handle_start_ab_test as _handle_start_ab_test
-        return await _handle_start_ab_test(self, payload)
-
-    async def handle_get_ab_test_results(self, payload=None):
-        from domain.marketing.ab_handlers_impl import handle_get_ab_test_results as _handle_get_ab_test_results
-        return await _handle_get_ab_test_results(self, payload)
-
-    async def handle_analyze_attribution(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_analyze_attribution as _handle_analyze_attribution
-        return await _handle_analyze_attribution(self, payload)
-
-    async def handle_analyze_account_roi(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_analyze_account_roi as _handle_analyze_account_roi
-        return await _handle_analyze_account_roi(self, payload)
-
-    async def handle_analyze_time_effectiveness(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_analyze_time_effectiveness as _handle_analyze_time_effectiveness
-        return await _handle_analyze_time_effectiveness(self, payload)
-
-    async def handle_predict_lead_conversion(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_predict_lead_conversion as _handle_predict_lead_conversion
-        return await _handle_predict_lead_conversion(self, payload)
-
-    async def handle_init_resource_discovery(self):
-        from domain.search.resource_handlers_impl import handle_init_resource_discovery as _handle_init_resource_discovery
-        return await _handle_init_resource_discovery(self)
-
-    async def handle_search_resources(self, payload=None):
-        from domain.search.resource_handlers_impl import handle_search_resources as _handle_search_resources
-        return await _handle_search_resources(self, payload)
-
-    async def handle_search_jiso(self, payload=None):
-        from domain.search.search_handlers_impl import handle_search_jiso as _handle_search_jiso
-        return await _handle_search_jiso(self, payload)
-
-    async def handle_check_jiso_availability(self, payload=None):
-        from domain.search.search_handlers_impl import handle_check_jiso_availability as _handle_check_jiso_availability
-        return await _handle_check_jiso_availability(self, payload)
-
-    async def handle_clear_resources(self, payload=None):
-        from domain.search.resource_handlers_impl import handle_clear_resources as _handle_clear_resources
-        return await _handle_clear_resources(self, payload)
-
-    async def handle_get_search_channels(self, payload=None):
-        from domain.search.search_handlers_impl import handle_get_search_channels as _handle_get_search_channels
-        return await _handle_get_search_channels(self, payload)
-
-    async def handle_add_search_channel(self, payload=None):
-        from domain.search.search_handlers_impl import handle_add_search_channel as _handle_add_search_channel
-        return await _handle_add_search_channel(self, payload)
-
-    async def handle_update_search_channel(self, payload=None):
-        from domain.search.search_handlers_impl import handle_update_search_channel as _handle_update_search_channel
-        return await _handle_update_search_channel(self, payload)
-
-    async def handle_delete_search_channel(self, payload=None):
-        from domain.search.search_handlers_impl import handle_delete_search_channel as _handle_delete_search_channel
-        return await _handle_delete_search_channel(self, payload)
-
-    async def handle_test_search_channel(self, payload=None):
-        from domain.search.search_handlers_impl import handle_test_search_channel as _handle_test_search_channel
-        return await _handle_test_search_channel(self, payload)
-
-    async def handle_get_resources(self, payload=None):
-        from domain.search.resource_handlers_impl import handle_get_resources as _handle_get_resources
-        return await _handle_get_resources(self, payload)
-
-    async def handle_get_resource_stats(self, payload=None):
-        from domain.search.resource_handlers_impl import handle_get_resource_stats as _handle_get_resource_stats
-        return await _handle_get_resource_stats(self, payload)
-
-    async def handle_add_resource_manually(self, payload=None):
-        from domain.search.resource_handlers_impl import handle_add_resource_manually as _handle_add_resource_manually
-        return await _handle_add_resource_manually(self, payload)
-
-    async def handle_save_resource(self, payload=None):
-        from domain.search.resource_handlers_impl import handle_save_resource as _handle_save_resource
-        return await _handle_save_resource(self, payload)
-
-    async def handle_unsave_resource(self, payload=None):
-        from domain.search.resource_handlers_impl import handle_unsave_resource as _handle_unsave_resource
-        return await _handle_unsave_resource(self, payload)
-
-    async def handle_delete_resource(self, payload=None):
-        from domain.search.resource_handlers_impl import handle_delete_resource as _handle_delete_resource
-        return await _handle_delete_resource(self, payload)
-
-    async def handle_delete_resources_batch(self, payload=None):
-        from domain.search.resource_handlers_impl import handle_delete_resources_batch as _handle_delete_resources_batch
-        return await _handle_delete_resources_batch(self, payload)
-
-    async def handle_verify_resource_type(self, payload=None):
-        from domain.search.resource_handlers_impl import handle_verify_resource_type as _handle_verify_resource_type
-        return await _handle_verify_resource_type(self, payload)
-
-    async def handle_batch_verify_resource_types(self, payload=None):
-        from domain.search.resource_handlers_impl import handle_batch_verify_resource_types as _handle_batch_verify_resource_types
-        return await _handle_batch_verify_resource_types(self, payload)
-
-    async def handle_clear_all_resources(self):
-        from domain.search.resource_handlers_impl import handle_clear_all_resources as _handle_clear_all_resources
-        return await _handle_clear_all_resources(self)
-
-    async def handle_add_to_join_queue(self, payload=None):
-        from domain.messaging.batch_handlers_impl import handle_add_to_join_queue as _handle_add_to_join_queue
-        return await _handle_add_to_join_queue(self, payload)
-
-    async def handle_process_join_queue(self, payload=None):
-        from domain.messaging.batch_handlers_impl import handle_process_join_queue as _handle_process_join_queue
-        return await _handle_process_join_queue(self, payload)
-
-    async def handle_batch_join_resources(self, payload=None):
-        from domain.search.resource_handlers_impl import handle_batch_join_resources as _handle_batch_join_resources
-        return await _handle_batch_join_resources(self, payload)
-
-    async def handle_join_resource(self, payload=None):
-        """join-resource: 僅加入群組，不添加到監控"""
-        from domain.groups.handlers_impl import handle_join_resource as _handle_join_resource
-        return await _handle_join_resource(self, payload)
-
-    async def handle_join_and_monitor(self, payload=None):
-        """join-and-monitor 別名 → join-and-monitor-resource"""
-        from domain.groups.handlers_impl import handle_join_and_monitor_resource as _handle_join_and_monitor_resource
-        return await _handle_join_and_monitor_resource(self, payload)
-
-    async def handle_join_and_monitor_resource(self, payload=None):
-        from domain.groups.handlers_impl import handle_join_and_monitor_resource as _handle_join_and_monitor_resource
-        return await _handle_join_and_monitor_resource(self, payload)
-
-    async def handle_join_and_monitor_with_account(self, payload=None):
-        from domain.groups.handlers_impl import handle_join_and_monitor_with_account as _handle_join_and_monitor_with_account
-        return await _handle_join_and_monitor_with_account(self, payload)
-
-    async def handle_batch_join_and_monitor(self, payload=None):
-        from domain.messaging.batch_handlers_impl import handle_batch_join_and_monitor as _handle_batch_join_and_monitor
-        return await _handle_batch_join_and_monitor(self, payload)
-
-    async def handle_analyze_group_link(self, payload=None):
-        from domain.automation.monitoring_handlers_impl import handle_analyze_group_link as _handle_analyze_group_link
-        return await _handle_analyze_group_link(self, payload)
-
-    async def handle_batch_refresh_member_counts(self, payload=None):
-        from domain.contacts.member_handlers_impl import handle_batch_refresh_member_counts as _handle_batch_refresh_member_counts
-        return await _handle_batch_refresh_member_counts(self, payload)
-
-    async def handle_get_group_member_count(self, payload=None):
-        from domain.contacts.member_handlers_impl import handle_get_group_member_count as _handle_get_group_member_count
-        return await _handle_get_group_member_count(self, payload)
-
-    async def handle_get_group_collected_stats(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_get_group_collected_stats as _handle_get_group_collected_stats
-        return await _handle_get_group_collected_stats(self, payload)
-
-    async def handle_get_collected_users_count(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_get_collected_users_count as _handle_get_collected_users_count
-        return await _handle_get_collected_users_count(self, payload)
-
-    async def handle_get_history_collection_stats(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_get_history_collection_stats as _handle_get_history_collection_stats
-        return await _handle_get_history_collection_stats(self, payload)
-
-    async def handle_collect_users_from_history_advanced(self, payload=None):
-        from domain.contacts.member_handlers_impl import handle_collect_users_from_history_advanced as _handle_collect_users_from_history_advanced
-        return await _handle_collect_users_from_history_advanced(self, payload)
-
-    async def handle_get_group_monitoring_status(self, payload=None):
-        from domain.automation.monitoring_handlers_impl import handle_get_group_monitoring_status as _handle_get_group_monitoring_status
-        return await _handle_get_group_monitoring_status(self, payload)
-
-    async def handle_collect_users_from_history(self, payload=None):
-        from domain.contacts.member_handlers_impl import handle_collect_users_from_history as _handle_collect_users_from_history
-        return await _handle_collect_users_from_history(self, payload)
-
-    async def handle_extract_members(self, payload=None):
-        from domain.contacts.member_handlers_impl import handle_extract_members as _handle_extract_members
-        return await _handle_extract_members(self, payload)
-
-    async def handle_get_extracted_members(self, payload=None):
-        from domain.contacts.member_handlers_impl import handle_get_extracted_members as _handle_get_extracted_members
-        return await _handle_get_extracted_members(self, payload)
-
-    async def handle_get_member_stats(self, payload=None):
-        from domain.contacts.member_handlers_impl import handle_get_member_stats as _handle_get_member_stats
-        return await _handle_get_member_stats(self, payload)
-
-    async def handle_get_online_members(self, payload=None):
-        from domain.contacts.member_handlers_impl import handle_get_online_members as _handle_get_online_members
-        return await _handle_get_online_members(self, payload)
-
-    async def handle_update_member(self, payload=None):
-        from domain.contacts.member_handlers_impl import handle_update_member as _handle_update_member
-        return await _handle_update_member(self, payload)
-
-    async def handle_get_extraction_stats(self, payload=None):
-        from domain.contacts.member_handlers_impl import handle_get_extraction_stats as _handle_get_extraction_stats
-        return await _handle_get_extraction_stats(self, payload)
-
-    async def handle_start_background_extraction(self, payload=None):
-        from domain.contacts.member_handlers_impl import handle_start_background_extraction as _handle_start_background_extraction
-        return await _handle_start_background_extraction(self, payload)
-
-    async def handle_get_background_tasks(self, payload=None):
-        from api.handlers.system_handlers_impl import handle_get_background_tasks as _handle_get_background_tasks
-        return await _handle_get_background_tasks(self, payload)
-
-    async def handle_clear_extraction_cache(self, payload=None):
-        from domain.contacts.member_handlers_impl import handle_clear_extraction_cache as _handle_clear_extraction_cache
-        return await _handle_clear_extraction_cache(self, payload)
-
-    async def handle_export_members(self, payload=None):
-        from domain.contacts.member_handlers_impl import handle_export_members as _handle_export_members
-        return await _handle_export_members(self, payload)
-
-    async def handle_deduplicate_members(self, payload=None):
-        from domain.contacts.member_handlers_impl import handle_deduplicate_members as _handle_deduplicate_members
-        return await _handle_deduplicate_members(self, payload)
-
-    async def handle_batch_tag_members(self, payload=None):
-        from domain.contacts.tag_handlers_impl import handle_batch_tag_members as _handle_batch_tag_members
-        return await _handle_batch_tag_members(self, payload)
-
-    async def handle_get_all_tags(self, payload=None):
-        from domain.contacts.tag_handlers_impl import handle_get_all_tags as _handle_get_all_tags
-        return await _handle_get_all_tags(self, payload)
-
-    async def handle_get_group_profile(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_get_group_profile as _handle_get_group_profile
-        return await _handle_get_group_profile(self, payload)
-
-    async def handle_compare_groups(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_compare_groups as _handle_compare_groups
-        return await _handle_compare_groups(self, payload)
-
-    async def handle_recalculate_scores(self, payload=None):
-        from api.handlers.system_handlers_impl import handle_recalculate_scores as _handle_recalculate_scores
-        return await _handle_recalculate_scores(self, payload)
-
-    async def handle_send_bulk_messages(self, payload=None):
-        from domain.messaging.batch_handlers_impl import handle_send_bulk_messages as _handle_send_bulk_messages
-        return await _handle_send_bulk_messages(self, payload)
-
-    async def handle_batch_invite_to_group(self, payload=None):
-        from domain.messaging.batch_handlers_impl import handle_batch_invite_to_group as _handle_batch_invite_to_group
-        return await _handle_batch_invite_to_group(self, payload)
-
-    async def handle_create_marketing_campaign(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_create_marketing_campaign as _handle_create_marketing_campaign
-        return await _handle_create_marketing_campaign(self, payload)
-
-    async def handle_start_marketing_campaign(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_start_marketing_campaign as _handle_start_marketing_campaign
-        return await _handle_start_marketing_campaign(self, payload)
-
-    async def handle_get_marketing_stats(self, payload=None):
-        from domain.marketing.task_handlers_impl import handle_get_marketing_stats as _handle_get_marketing_stats
-        return await _handle_get_marketing_stats(self, payload)
-
-    async def handle_get_ollama_models(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_get_ollama_models as _handle_get_ollama_models
-        return await _handle_get_ollama_models(self, payload)
-
-    async def handle_test_ollama_connection(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_test_ollama_connection as _handle_test_ollama_connection
-        return await _handle_test_ollama_connection(self, payload)
-
-    async def handle_ollama_generate(self, payload=None):
-        from domain.ai.rag_handlers_impl import handle_ollama_generate as _handle_ollama_generate
-        return await _handle_ollama_generate(self, payload)
-
-    async def handle_get_discovery_keywords(self):
-        from domain.search.discovery_handlers_impl import handle_get_discovery_keywords as _handle_get_discovery_keywords
-        return await _handle_get_discovery_keywords(self)
-
-    async def handle_add_discovery_keyword(self, payload=None):
-        from domain.search.discovery_handlers_impl import handle_add_discovery_keyword as _handle_add_discovery_keyword
-        return await _handle_add_discovery_keyword(self, payload)
-
-    async def handle_get_discovery_logs(self, payload=None):
-        from domain.search.discovery_handlers_impl import handle_get_discovery_logs as _handle_get_discovery_logs
-        return await _handle_get_discovery_logs(self, payload)
-
-    async def handle_init_discussion_watcher(self):
-        from domain.search.discovery_handlers_impl import handle_init_discussion_watcher as _handle_init_discussion_watcher
-        return await _handle_init_discussion_watcher(self)
-
-    async def handle_discover_discussion(self, payload=None):
-        from domain.search.discovery_handlers_impl import handle_discover_discussion as _handle_discover_discussion
-        return await _handle_discover_discussion(self, payload)
-
-    async def handle_discover_discussions_from_resources(self):
-        from domain.search.discovery_handlers_impl import handle_discover_discussions_from_resources as _handle_discover_discussions_from_resources
-        return await _handle_discover_discussions_from_resources(self)
-
-    async def handle_get_channel_discussions(self, payload=None):
-        from domain.search.discovery_handlers_impl import handle_get_channel_discussions as _handle_get_channel_discussions
-        return await _handle_get_channel_discussions(self, payload)
-
-    async def handle_start_discussion_monitoring(self, payload=None):
-        from domain.search.discovery_handlers_impl import handle_start_discussion_monitoring as _handle_start_discussion_monitoring
-        return await _handle_start_discussion_monitoring(self, payload)
-
-    async def handle_stop_discussion_monitoring(self, payload=None):
-        from domain.search.discovery_handlers_impl import handle_stop_discussion_monitoring as _handle_stop_discussion_monitoring
-        return await _handle_stop_discussion_monitoring(self, payload)
-
-    async def handle_get_discussion_messages(self, payload=None):
-        from domain.search.discovery_handlers_impl import handle_get_discussion_messages as _handle_get_discussion_messages
-        return await _handle_get_discussion_messages(self, payload)
-
-    async def handle_multi_role_add_role(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_add_role as _handle_multi_role_add_role
-        return await _handle_multi_role_add_role(self, payload)
-
-    async def handle_multi_role_update_role(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_update_role as _handle_multi_role_update_role
-        return await _handle_multi_role_update_role(self, payload)
-
-    async def handle_multi_role_delete_role(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_delete_role as _handle_multi_role_delete_role
-        return await _handle_multi_role_delete_role(self, payload)
-
-    async def handle_multi_role_get_roles(self):
-        from domain.multi_role.handlers_impl import handle_multi_role_get_roles as _handle_multi_role_get_roles
-        return await _handle_multi_role_get_roles(self)
-
-    async def handle_multi_role_add_script(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_add_script as _handle_multi_role_add_script
-        return await _handle_multi_role_add_script(self, payload)
-
-    async def handle_multi_role_update_script(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_update_script as _handle_multi_role_update_script
-        return await _handle_multi_role_update_script(self, payload)
-
-    async def handle_multi_role_delete_script(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_delete_script as _handle_multi_role_delete_script
-        return await _handle_multi_role_delete_script(self, payload)
-
-    async def handle_multi_role_get_scripts(self):
-        from domain.multi_role.handlers_impl import handle_multi_role_get_scripts as _handle_multi_role_get_scripts
-        return await _handle_multi_role_get_scripts(self)
-
-    async def handle_multi_role_create_group(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_create_group as _handle_multi_role_create_group
-        return await _handle_multi_role_create_group(self, payload)
-
-    async def handle_multi_role_update_group(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_update_group as _handle_multi_role_update_group
-        return await _handle_multi_role_update_group(self, payload)
-
-    async def handle_multi_role_get_groups(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_get_groups as _handle_multi_role_get_groups
-        return await _handle_multi_role_get_groups(self, payload)
-
-    async def handle_multi_role_get_stats(self):
-        from domain.multi_role.handlers_impl import handle_multi_role_get_stats as _handle_multi_role_get_stats
-        return await _handle_multi_role_get_stats(self)
-
-    async def handle_multi_role_export_data(self):
-        from domain.multi_role.handlers_impl import handle_multi_role_export_data as _handle_multi_role_export_data
-        return await _handle_multi_role_export_data(self)
-
-    async def handle_multi_role_import_data(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_import_data as _handle_multi_role_import_data
-        return await _handle_multi_role_import_data(self, payload)
-
-    async def handle_reply_to_discussion(self, payload=None):
-        from domain.search.discovery_handlers_impl import handle_reply_to_discussion as _handle_reply_to_discussion
-        return await _handle_reply_to_discussion(self, payload)
-
-    async def handle_get_discussion_stats(self):
-        from domain.search.discovery_handlers_impl import handle_get_discussion_stats as _handle_get_discussion_stats
-        return await _handle_get_discussion_stats(self)
-
-    # ==================== AI Team Execution Handlers ====================
-    
-    # AI 團隊執行器實例
     _ai_team_executor = None
-    
-    async def handle_ai_team_pause_execution(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_pause_execution as _handle_ai_team_pause_execution
-        return await _handle_ai_team_pause_execution(self, payload)
-
-    async def handle_ai_team_resume_execution(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_resume_execution as _handle_ai_team_resume_execution
-        return await _handle_ai_team_resume_execution(self, payload)
-
-    async def handle_ai_team_stop_execution(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_stop_execution as _handle_ai_team_stop_execution
-        return await _handle_ai_team_stop_execution(self, payload)
-
-    async def handle_ai_team_add_targets(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_add_targets as _handle_ai_team_add_targets
-        return await _handle_ai_team_add_targets(self, payload)
-
-    # ==================== Batch Send Handlers ====================
     
     _batch_send_active = False
     _batch_send_cancelled = False
     
-    async def handle_batch_send_start(self, payload=None):
-        from domain.messaging.queue_handlers_impl import handle_batch_send_start as _handle_batch_send_start
-        return await _handle_batch_send_start(self, payload)
-
-    async def handle_batch_send_cancel(self, payload=None):
-        from domain.messaging.queue_handlers_impl import handle_batch_send_cancel as _handle_batch_send_cancel
-        return await _handle_batch_send_cancel(self, payload)
-
-    # ==================== Batch Invite Handlers ====================
-    
     _batch_invite_active = False
     _batch_invite_cancelled = False
     
-    async def handle_batch_invite_start(self, payload=None):
-        from domain.messaging.batch_handlers_impl import handle_batch_invite_start as _handle_batch_invite_start
-        return await _handle_batch_invite_start(self, payload)
 
-    async def handle_batch_invite_cancel(self, payload=None):
-        from domain.messaging.batch_handlers_impl import handle_batch_invite_cancel as _handle_batch_invite_cancel
-        return await _handle_batch_invite_cancel(self, payload)
-
-    async def handle_get_admin_groups(self, payload=None):
-        from domain.groups.handlers_impl import handle_get_admin_groups as _handle_get_admin_groups
-        return await _handle_get_admin_groups(self, payload)
-
-    async def handle_unified_contacts_sync(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_unified_contacts_sync as _handle_unified_contacts_sync
-        return await _handle_unified_contacts_sync(self, payload)
-
-    async def handle_unified_contacts_get(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_unified_contacts_get as _handle_unified_contacts_get
-        return await _handle_unified_contacts_get(self, payload)
-
-    async def handle_unified_contacts_stats(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_unified_contacts_stats as _handle_unified_contacts_stats
-        return await _handle_unified_contacts_stats(self, payload)
-
-    async def handle_unified_contacts_update(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_unified_contacts_update as _handle_unified_contacts_update
-        return await _handle_unified_contacts_update(self, payload)
-
-    async def handle_unified_contacts_add_tags(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_unified_contacts_add_tags as _handle_unified_contacts_add_tags
-        return await _handle_unified_contacts_add_tags(self, payload)
-
-    async def handle_unified_contacts_update_status(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_unified_contacts_update_status as _handle_unified_contacts_update_status
-        return await _handle_unified_contacts_update_status(self, payload)
-
-    async def handle_unified_contacts_delete(self, payload=None):
-        from domain.contacts.leads_handlers_impl import handle_unified_contacts_delete as _handle_unified_contacts_delete
-        return await _handle_unified_contacts_delete(self, payload)
-
-    async def handle_sync_resource_status_to_leads(self, payload=None):
-        from domain.contacts.tracking_handlers_impl import handle_sync_resource_status_to_leads as _handle_sync_resource_status_to_leads
-        return await _handle_sync_resource_status_to_leads(self, payload)
-
-    async def handle_analytics_get_stats(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_analytics_get_stats as _handle_analytics_get_stats
-        return await _handle_analytics_get_stats(self, payload)
-
-    async def handle_analytics_get_trend(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_analytics_get_trend as _handle_analytics_get_trend
-        return await _handle_analytics_get_trend(self, payload)
-
-    async def handle_analytics_get_sources(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_analytics_get_sources as _handle_analytics_get_sources
-        return await _handle_analytics_get_sources(self, payload)
-
-    async def handle_analytics_get_hourly(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_analytics_get_hourly as _handle_analytics_get_hourly
-        return await _handle_analytics_get_hourly(self, payload)
-
-    async def handle_analytics_generate_insights(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_analytics_generate_insights as _handle_analytics_generate_insights
-        return await _handle_analytics_generate_insights(self, payload)
-
-    async def handle_analytics_export(self, payload=None):
-        from api.handlers.analytics_handlers_impl import handle_analytics_export as _handle_analytics_export
-        return await _handle_analytics_export(self, payload)
-
-    async def handle_create_multi_role_group(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_create_multi_role_group as _handle_create_multi_role_group
-        return await _handle_create_multi_role_group(self, payload)
-
-    async def handle_multi_role_start_script(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_start_script as _handle_multi_role_start_script
-        return await _handle_multi_role_start_script(self, payload)
-
-    async def handle_multi_role_send_message(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_send_message as _handle_multi_role_send_message
-        return await _handle_multi_role_send_message(self, payload)
-
-    async def handle_multi_role_ai_reply(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_ai_reply as _handle_multi_role_ai_reply
-        return await _handle_multi_role_ai_reply(self, payload)
-
-    async def handle_multi_role_advance_stage(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_advance_stage as _handle_multi_role_advance_stage
-        return await _handle_multi_role_advance_stage(self, payload)
-
-    async def handle_multi_role_ai_plan(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_ai_plan as _handle_multi_role_ai_plan
-        return await _handle_multi_role_ai_plan(self, payload)
-
-    async def handle_multi_role_start_private_collaboration(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_start_private_collaboration as _handle_multi_role_start_private_collaboration
-        return await _handle_multi_role_start_private_collaboration(self, payload)
-
-    async def handle_multi_role_auto_create_group(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_auto_create_group as _handle_multi_role_auto_create_group
-        return await _handle_multi_role_auto_create_group(self, payload)
-
-    async def handle_multi_role_start_group_collaboration(self, payload=None):
-        from domain.multi_role.handlers_impl import handle_multi_role_start_group_collaboration as _handle_multi_role_start_group_collaboration
-        return await _handle_multi_role_start_group_collaboration(self, payload)
-
-    async def handle_ai_analyze_interest(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_ai_analyze_interest as _handle_ai_analyze_interest
-        return await _handle_ai_analyze_interest(self, payload)
-
-    async def handle_workflow_get_executions(self, payload=None):
-        from domain.automation.script_handlers_impl import handle_workflow_get_executions as _handle_workflow_get_executions
-        return await _handle_workflow_get_executions(self, payload)
-
-    async def handle_ai_execution_save(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_ai_execution_save as _handle_ai_execution_save
-        return await _handle_ai_execution_save(self, payload)
-
-    async def handle_ai_execution_get_active(self, payload=None):
-        from domain.ai.generation_handlers_impl import handle_ai_execution_get_active as _handle_ai_execution_get_active
-        return await _handle_ai_execution_get_active(self, payload)
-
-    async def handle_ai_team_start_execution(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_start_execution as _handle_ai_team_start_execution
-        return await _handle_ai_team_start_execution(self, payload)
-
-    async def handle_ai_team_adjust_strategy(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_adjust_strategy as _handle_ai_team_adjust_strategy
-        return await _handle_ai_team_adjust_strategy(self, payload)
-
-    async def handle_ai_team_generate_scriptless_message(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_generate_scriptless_message as _handle_ai_team_generate_scriptless_message
-        return await _handle_ai_team_generate_scriptless_message(self, payload)
-
-    async def handle_ai_team_send_scriptless_message(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_send_scriptless_message as _handle_ai_team_send_scriptless_message
-        return await _handle_ai_team_send_scriptless_message(self, payload)
-
-    async def handle_ai_team_conversion_signal(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_conversion_signal as _handle_ai_team_conversion_signal
-        return await _handle_ai_team_conversion_signal(self, payload)
-
-    async def handle_ai_team_customer_reply(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_customer_reply as _handle_ai_team_customer_reply
-        return await _handle_ai_team_customer_reply(self, payload)
-
-    async def handle_ai_team_send_manual_message(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_send_manual_message as _handle_ai_team_send_manual_message
-        return await _handle_ai_team_send_manual_message(self, payload)
-
-    async def handle_ai_team_send_private_message(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_send_private_message as _handle_ai_team_send_private_message
-        return await _handle_ai_team_send_private_message(self, payload)
-
-    async def handle_ai_team_request_suggestion(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_request_suggestion as _handle_ai_team_request_suggestion
-        return await _handle_ai_team_request_suggestion(self, payload)
-
-    async def handle_ai_team_user_completed(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_user_completed as _handle_ai_team_user_completed
-        return await _handle_ai_team_user_completed(self, payload)
-
-    async def handle_ai_team_queue_completed(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_queue_completed as _handle_ai_team_queue_completed
-        return await _handle_ai_team_queue_completed(self, payload)
-
-    async def handle_ai_team_next_user(self, payload=None):
-        from domain.ai.team_handlers_impl import handle_ai_team_next_user as _handle_ai_team_next_user
-        return await _handle_ai_team_next_user(self, payload)
-
-    async def handle_graceful_shutdown(self):
-        from api.handlers.lifecycle_handlers_impl import handle_graceful_shutdown as _handle_graceful_shutdown
-        return await _handle_graceful_shutdown(self)
+# Phase 9-4: Apply handler auto-registry
+_register_all_handlers(BackendService)
 
 async def main():
     """Main entry point"""

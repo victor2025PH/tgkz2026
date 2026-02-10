@@ -413,6 +413,12 @@ export class AppComponent implements OnDestroy, OnInit {
   declare loadRoleStats: () => void;
   declare loadCollabGroups: () => void;
   declare loadMemoryStats: () => void;
+  declare handleMemberExtractionStart: (event: any) => void;
+  declare handleMemberCountRefreshed: (event: any) => void;
+  declare handleCommandNavigation: (target: string) => void;
+  declare handleBatchSendComplete: (result: any) => void;
+  declare handleBatchInviteComplete: (result: any) => void;
+  declare closeMemberExtractionDialogUnified: () => void;
 
   // --- 認證狀態 ---
   isAuthenticated = computed(() => this.authService.isAuthenticated());

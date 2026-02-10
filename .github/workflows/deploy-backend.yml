@@ -168,4 +168,5 @@ jobs:
             echo "  Waiting 5s..."
             sleep 5
           done
-          echo "⚠️ Health check timeout — service may still be starting"
+          echo "⚠️ Health check timeout — fetching container logs for diagnosis..."
+          ssh -o ConnectTimeout=30 deploy-server "sudo docker compose -f /opt/tg-matrix/docker-compose.yml logs --tail=80 api 2>&1" || echo "(failed to get logs)"

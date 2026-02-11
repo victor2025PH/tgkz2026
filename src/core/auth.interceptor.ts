@@ -104,6 +104,16 @@ async function handle401Error(
       }
     }
     
+    // 🔧 第二用戶登入後載入前台時：短時間內不因 401 清除會話並跳轉，避免「載入到一半又回登入頁」
+    const justLoggedIn = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('tgm_just_logged_in') : null;
+    if (justLoggedIn) {
+      const t = parseInt(justLoggedIn, 10);
+      if (!isNaN(t) && Date.now() - t < 20000) {
+        try { sessionStorage.removeItem('tgm_just_logged_in'); } catch (_) {}
+        console.warn('[AuthInterceptor] 401 shortly after login, skipping redirect to avoid kicking user back');
+        throw new Error('Session expired');
+      }
+    }
     // 刷新失敗，登出用戶
     console.log('[AuthInterceptor] Token refresh failed, logging out');
     authEvents.emitSessionExpired();

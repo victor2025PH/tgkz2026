@@ -228,13 +228,12 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps --ignore-scripts
+        run: npm ci --legacy-peer-deps
 
       - name: Build (SaaS mode)
         run: npm run build:saas
         env:
           NODE_OPTIONS: '--max_old_space_size=4096'
-          CI: 'true'
 
       - name: Verify build output
         run: |

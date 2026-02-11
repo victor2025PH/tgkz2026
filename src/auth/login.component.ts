@@ -1806,7 +1806,11 @@ export class LoginComponent implements OnInit, OnDestroy {
     
     const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
     console.log('[Login] Will redirect to:', returnUrl, 'in 1.5 seconds');
-    // 🔧 掃碼/驗證碼登入後使用整頁跳轉，確保前端重新載入並讀取 localStorage 的 token，避免「輸入驗證碼無法進入前端」
+    // 🔧 第二用戶載入前台時避免被 401 立即踢回登入頁：標記「剛登入」，攔截器在短時間內不因 401 清除會話
+    try {
+      sessionStorage.setItem('tgm_just_logged_in', String(Date.now()));
+    } catch (_) {}
+    // 🔧 掃碼/驗證碼登入後使用整頁跳轉，確保前端重新載入並讀取 localStorage 的 token
     setTimeout(() => {
       const url = returnUrl.startsWith('/') ? `${window.location.origin}${returnUrl}` : returnUrl;
       window.location.href = url;

@@ -76,6 +76,7 @@ export { AiChatService } from './ai-chat.service';
 
 // 資源服務
 export { ResourceService } from './resource.service';
+export { SavedResourcesService } from './saved-resources.service';
 
 // 導出服務
 export * from './export.service';

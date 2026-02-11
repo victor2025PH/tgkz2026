@@ -168,9 +168,10 @@ export const NAV_MODULES: NavModule[] = [
     icon: '🤖',
     description: 'AI 模型和人格配置',
     color: 'from-indigo-500 to-violet-500',
-    defaultView: 'ai-models',
+    defaultView: 'ai-engine',
     views: [
-      { id: 'ai-models', label: '模型配置', icon: '🤖', description: '選擇和配置 AI 模型', shortcut: 'I' },
+      { id: 'ai-engine' as ViewId, label: '智能引擎', icon: '⚙️', description: '引擎概覽、模型、知識大腦', shortcut: 'I' },
+      { id: 'ai-models', label: '模型配置', icon: '🤖', description: '選擇和配置 AI 模型' },
       { id: 'ai-persona', label: '人格設置', icon: '💬', description: 'AI 說話風格和人格' },
       { id: 'ai-usage' as ViewId, label: '使用統計', icon: '📊', description: 'AI 調用統計' },
     ]

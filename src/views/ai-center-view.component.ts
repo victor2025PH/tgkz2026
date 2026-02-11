@@ -44,6 +44,7 @@ export class AiCenterViewComponent implements OnInit, OnDestroy {
   public membershipService = inject(MembershipService);
   public aiService = inject(AiChatService);
   private routeDataSub: Subscription | null = null;
+  private queryParamsSub: Subscription | null = null;
 
   /** 由路由 data.enginePanel 決定：overview/knowledge/gaps → knowledge Tab，default → 不傳 */
   initialTab = signal<'quick' | 'models' | 'persona' | 'stats' | 'knowledge' | undefined>(undefined);
@@ -51,6 +52,8 @@ export class AiCenterViewComponent implements OnInit, OnDestroy {
 
   private setPanelFromRoute(): void {
     const panel = this.route.snapshot.data['enginePanel'] as string | undefined;
+    const queryTab = this.route.snapshot.queryParams['tab'] as string | undefined;
+    const validTabs = ['quick', 'models', 'persona', 'stats', 'knowledge'];
     if (panel === 'overview') {
       this.initialTab.set('knowledge');
       this.initialKnowledgeSub.set('overview');
@@ -60,6 +63,9 @@ export class AiCenterViewComponent implements OnInit, OnDestroy {
     } else if (panel === 'gaps') {
       this.initialTab.set('knowledge');
       this.initialKnowledgeSub.set('gaps');
+    } else if (queryTab && validTabs.includes(queryTab)) {
+      this.initialTab.set(queryTab as 'quick' | 'models' | 'persona' | 'stats' | 'knowledge');
+      this.initialKnowledgeSub.set(queryTab === 'knowledge' ? 'overview' : undefined);
     } else {
       this.initialTab.set(undefined);
       this.initialKnowledgeSub.set(undefined);
@@ -72,17 +78,13 @@ export class AiCenterViewComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.setPanelFromRoute();
     this.routeDataSub = this.route.data.subscribe(() => this.setPanelFromRoute());
-    // 從 URL 參數讀取初始標籤（兼容舊邏輯）
-    const urlParams = new URLSearchParams(window.location.search);
-    const tab = urlParams.get('tab');
-    if (tab && !this.initialTab()) {
-      this.activeTab.set(tab);
-    }
+    this.queryParamsSub = this.route.queryParams.subscribe(() => this.setPanelFromRoute());
     this.aiService.loadSettings();
   }
 
   ngOnDestroy(): void {
     this.routeDataSub?.unsubscribe();
+    this.queryParamsSub?.unsubscribe();
   }
   
   // 翻譯方法

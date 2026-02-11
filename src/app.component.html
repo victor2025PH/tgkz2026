@@ -186,111 +186,21 @@
     </app-progress-dialog>
     
     <!-- 刪除確認對話框 -->
+    <!-- Phase 10: Delete Confirm Dialog Component -->
     @if(deleteConfirmDialog().show) {
-      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center" 
-           (click)="cancelDeleteLeads()">
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
-             (click)="$event.stopPropagation()">
-          <!-- 標題 -->
-          <div class="px-6 py-4 border-b border-slate-700 flex items-center gap-3">
-            <div class="p-2 bg-red-500/20 rounded-lg">
-              <svg class="h-6 w-6 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                <line x1="10" y1="11" x2="10" y2="17"/>
-                <line x1="14" y1="11" x2="14" y2="17"/>
-              </svg>
-            </div>
-            <h3 class="text-lg font-bold text-white">確認刪除</h3>
-          </div>
-          
-          <!-- 內容 -->
-          <div class="px-6 py-6">
-            @if(deleteConfirmDialog().type === 'single') {
-              <p class="text-slate-300 mb-4">
-                確定要刪除客戶 <span class="font-bold text-cyan-400">@{{ deleteConfirmDialog().lead?.username || deleteConfirmDialog().lead?.userId }}</span> 嗎？
-              </p>
-            } @else {
-              <p class="text-slate-300 mb-4">
-                確定要刪除 <span class="font-bold text-red-400">{{ deleteConfirmDialog().count }}</span> 個選中的客戶嗎？
-              </p>
-            }
-            <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-sm text-red-300">
-              ⚠️ 此操作無法撤銷，所有相關記錄將被永久刪除。
-            </div>
-          </div>
-          
-          <!-- 按鈕 -->
-          <div class="px-6 py-4 border-t border-slate-700 flex justify-end gap-3">
-            <button (click)="cancelDeleteLeads()" 
-                    class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors">
-              取消
-            </button>
-            <button (click)="executeDeleteLeads()" 
-                    class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex items-center gap-2">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-              </svg>
-              確認刪除
-            </button>
-          </div>
-        </div>
-      </div>
+      <app-delete-confirm-dialog
+        [dialogData]="deleteConfirmDialog()"
+        (cancel)="cancelDeleteLeads()"
+        (confirm)="executeDeleteLeads()" />
     }
     
-    <!-- 邀請進群對話框 -->
+    <!-- Phase 10: Invite Group Dialog Component -->
     @if(showInviteGroupDialog()) {
-      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center" 
-           (click)="showInviteGroupDialog.set(false)">
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
-             (click)="$event.stopPropagation()">
-          <!-- 標題 -->
-          <div class="px-6 py-4 border-b border-slate-700 flex items-center gap-3">
-            <div class="p-2 bg-emerald-500/20 rounded-lg">
-              <span class="text-xl">👥</span>
-            </div>
-            <div>
-              <h3 class="text-lg font-bold text-white">邀請進群</h3>
-              <p class="text-sm text-slate-400">選擇協作群組</p>
-            </div>
-          </div>
-          
-          <!-- 群組列表 -->
-          <div class="px-6 py-4 max-h-64 overflow-y-auto">
-            @if(collabGroups().length === 0) {
-              <div class="text-center py-8 text-slate-400">
-                <p class="mb-2">暫無協作群組</p>
-                <button (click)="currentView.set('multi-role'); showInviteGroupDialog.set(false)" 
-                        class="text-cyan-400 hover:underline text-sm">
-                  去創建群組 →
-                </button>
-              </div>
-            } @else {
-              <div class="space-y-2">
-                @for(group of collabGroups(); track group.id) {
-                  <button (click)="executeInviteToGroup(group.id)"
-                          class="w-full p-3 bg-slate-800/50 hover:bg-emerald-500/20 border border-slate-700 hover:border-emerald-500/50 rounded-xl text-left transition-all group">
-                    <div class="flex items-center justify-between">
-                      <div>
-                        <p class="font-medium text-white group-hover:text-emerald-400">{{ group.name }}</p>
-                        <p class="text-xs text-slate-500">{{ group.members?.length || 0 }} 個成員</p>
-                      </div>
-                      <span class="text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
-                    </div>
-                  </button>
-                }
-              </div>
-            }
-          </div>
-          
-          <!-- 取消按鈕 -->
-          <div class="px-6 py-4 border-t border-slate-700">
-            <button (click)="showInviteGroupDialog.set(false)" 
-                    class="w-full py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors">
-              取消
-            </button>
-          </div>
-        </div>
-      </div>
+      <app-invite-group-dialog
+        [groups]="collabGroups()"
+        (close)="showInviteGroupDialog.set(false)"
+        (inviteToGroup)="executeInviteToGroup($event)"
+        (goCreateGroup)="currentView.set('multi-role'); showInviteGroupDialog.set(false)" />
     }
     
     <!-- 🔧 P8-3: 移動端漢堡選單按鈕（固定在左上角） -->
@@ -861,62 +771,18 @@
           
           @if (isSidebarGroupExpanded('ai')) {
             <div class="sidebar-group-content overflow-hidden">
-        
-        <!-- 🆕 知識大腦（可展開菜單） -->
-        <div class="knowledge-menu">
-          <!-- 主菜單項 -->
-          <a (click)="toggleKnowledgeMenu()" 
-             class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1"
-             [class.active]="isKnowledgeView()"
-             [style.background-color]="isKnowledgeView() ? 'rgba(236, 72, 153, 0.15)' : 'transparent'"
-             [style.color]="isKnowledgeView() ? '#f472b6' : 'var(--sidebar-text)'">
-             <span class="text-lg">🧠</span>
-             <span class="flex-1">{{ t('menu.knowledgeBrain') }}</span>
-             <span class="text-xs transition-transform duration-200" [class.rotate-180]="knowledgeMenuExpanded()">▼</span>
-          </a>
-          
-          <!-- 子菜單項 -->
-          @if (knowledgeMenuExpanded()) {
-            <div class="pl-6 space-y-1">
-              <a (click)="changeView('knowledge-brain')" 
-                 class="sidebar-item flex items-center gap-2 px-3 py-2 rounded-md transition-all duration-200 cursor-pointer text-sm"
-                 [class.active]="view === 'knowledge-brain'"
-                 [style.background-color]="view === 'knowledge-brain' ? 'rgba(236, 72, 153, 0.1)' : 'transparent'"
-                 [style.color]="view === 'knowledge-brain' ? '#f472b6' : 'var(--sidebar-text-muted)'">
-                 <span>📊</span>
-                 <span>{{ t('menu.overview') }}</span>
-              </a>
-              <a (click)="changeView('knowledge-manage')" 
-                 class="sidebar-item flex items-center gap-2 px-3 py-2 rounded-md transition-all duration-200 cursor-pointer text-sm"
-                 [class.active]="view === 'knowledge-manage'"
-                 [style.background-color]="view === 'knowledge-manage' ? 'rgba(236, 72, 153, 0.1)' : 'transparent'"
-                 [style.color]="view === 'knowledge-manage' ? '#f472b6' : 'var(--sidebar-text-muted)'">
-                 <span>📝</span>
-                 <span>{{ t('menu.knowledgeManagement') }}</span>
-              </a>
-              <a (click)="changeView('knowledge-gaps')" 
-                 class="sidebar-item flex items-center gap-2 px-3 py-2 rounded-md transition-all duration-200 cursor-pointer text-sm relative"
-                 [class.active]="view === 'knowledge-gaps'"
-                 [style.background-color]="view === 'knowledge-gaps' ? 'rgba(236, 72, 153, 0.1)' : 'transparent'"
-                 [style.color]="view === 'knowledge-gaps' ? '#f472b6' : 'var(--sidebar-text-muted)'">
-                 <span>❓</span>
-                 <span>{{ t('menu.knowledgeGaps') }}</span>
-                 @if (ragBrainService.gapsCount() > 0) {
-                   <span class="ml-auto text-xs font-bold rounded-full px-1.5 py-0.5" style="background-color: rgba(239, 68, 68, 0.2); color: #f87171;">{{ ragBrainService.gapsCount() }}</span>
-                 }
-              </a>
-            </div>
-          }
-        </div>
-        
-              <!-- AI 中心（模型配置） -->
-              <a (click)="changeView('ai-center')" 
+              <!-- 智能引擎：统一入口，包含引擎概览、模型配置、知识大脑等 -->
+              <a (click)="changeView('ai-engine')" 
+                 data-tour="ai-engine"
                  class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1"
-                 [class.active]="view === 'ai-center'"
-                 [style.background-color]="view === 'ai-center' ? 'rgba(168, 85, 247, 0.15)' : 'transparent'"
-                 [style.color]="view === 'ai-center' ? '#c084fc' : 'var(--sidebar-text)'">
+                 [class.active]="isAiEngineView()"
+                 [style.background-color]="isAiEngineView() ? 'rgba(168, 85, 247, 0.15)' : 'transparent'"
+                 [style.color]="isAiEngineView() ? '#c084fc' : 'var(--sidebar-text)'">
                  <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3"></path></svg>
-                 <span>{{ t('aiCenter') }}</span>
+                 <span class="flex-1">{{ t('aiEngine') }}</span>
+                 @if (ragBrainService.gapsCount() > 0) {
+                   <span class="text-xs font-bold rounded-full px-1.5 py-0.5" style="background-color: rgba(239, 68, 68, 0.2); color: #f87171;">{{ ragBrainService.gapsCount() }}</span>
+                 }
               </a>
             </div>
           }
@@ -997,881 +863,88 @@
     <router-outlet></router-outlet>
   </main>
 
-  <!-- Lead Detail Modal - 客戶操作中心 -->
+  <!-- Phase 10: Lead Detail Dialog Component -->
   @if (generationState().lead; as lead) {
-    <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50" (click)="closeLeadDetailModal()">
-      <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 border border-cyan-500/30 rounded-2xl shadow-2xl shadow-cyan-500/10 w-full max-w-2xl max-h-[90vh] overflow-hidden text-slate-200" (click)="$event.stopPropagation()">
-        
-        <!-- 客戶信息頭部 -->
-        <div class="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 border-b border-cyan-500/20 p-5">
-          <div class="flex justify-between items-start">
-            <div class="flex items-center gap-4">
-              <!-- 頭像 -->
-              <div class="w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-cyan-500/30">
-                {{ (lead.username || lead.firstName || lead.userId || '?')[0].toUpperCase() }}
-              </div>
-              <!-- 用戶信息 -->
-              <div>
-                <div class="flex items-center gap-2">
-                  <h3 class="text-xl font-bold text-white">
-                    @if(lead.username) { @{{ lead.username }} }
-                    @else if(lead.firstName) { {{ lead.firstName }} {{ lead.lastName || '' }} }
-                    @else { ID: {{ lead.userId | slice:0:12 }} }
-                  </h3>
-                  <span class="h-2.5 w-2.5 rounded-full animate-pulse" [class]="getOnlineStatusColor(lead.onlineStatus)"></span>
-                </div>
-                @if(lead.phone) {
-                  <p class="text-sm text-cyan-400">📱 {{ lead.phone }}</p>
-                }
-                <div class="flex items-center gap-2 mt-1 flex-wrap">
-                  @if(lead.sourceGroup) {
-                    <span class="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">📍 {{ lead.sourceGroup | slice:0:20 }}</span>
-                  }
-                  @if(lead.triggeredKeyword && lead.triggeredKeyword !== '無') {
-                    <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">🔑 {{ lead.triggeredKeyword | slice:0:15 }}</span>
-                  }
-                  @if(lead.intentLevel) {
-                    <span class="text-xs px-2 py-0.5 rounded-full" [class]="getIntentLevelColor(lead.intentLevel)">{{ getIntentLevelEmoji(lead.intentLevel) }} {{ t(lead.intentLevel) }}</span>
-                  }
-                </div>
-              </div>
-            </div>
-            <button (click)="closeLeadDetailModal()" class="text-slate-400 hover:text-white text-2xl leading-none transition-colors p-2 hover:bg-white/10 rounded-lg">✕</button>
-          </div>
-        </div>
-
-        <!-- Tab 導航 -->
-        <div class="border-b border-cyan-500/20 bg-slate-900/50">
-          <nav class="flex px-5" aria-label="Tabs">
-            <a (click)="leadDetailView.set('sendMessage')" 
-               [class.border-cyan-400]="leadDetailView() === 'sendMessage'" 
-               [class.text-cyan-400]="leadDetailView() === 'sendMessage'" 
-               [class.bg-cyan-500/10]="leadDetailView() === 'sendMessage'"
-               class="whitespace-nowrap py-3 px-4 border-b-2 border-transparent font-medium text-sm cursor-pointer text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/5 transition-all rounded-t-lg flex items-center gap-2">
-              💬 {{ t('sendMessageTab') }}
-            </a>
-            <a (click)="leadDetailView.set('history')" 
-               [class.border-cyan-400]="leadDetailView() === 'history'" 
-               [class.text-cyan-400]="leadDetailView() === 'history'"
-               [class.bg-cyan-500/10]="leadDetailView() === 'history'"
-               class="whitespace-nowrap py-3 px-4 border-b-2 border-transparent font-medium text-sm cursor-pointer text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/5 transition-all rounded-t-lg flex items-center gap-2">
-              📋 {{ t('historyTab') }}
-            </a>
-          </nav>
-        </div>
-        
-        <!-- 內容區域 - 可滾動 -->
-        <div class="overflow-y-auto max-h-[calc(90vh-220px)] p-5">
-        @if(leadDetailView() === 'sendMessage') {
-            <div class="space-y-4">
-              <!-- 發送帳號選擇器 -->
-              <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                <label class="block text-sm font-medium text-cyan-400 mb-2">📤 {{ t('selectSenderAccount') }}</label>
-                <select 
-                    [ngModel]="selectedSenderId()" 
-                    (ngModelChange)="selectedSenderId.set($event)"
-                    class="form-select w-full bg-slate-900/50 border-cyan-500/30 rounded-lg py-2.5 px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500">
-                    @if(senderAccounts().length === 0) {
-                        <option value="">{{ t('noSenderAccounts') }}</option>
-                    } @else {
-                        <option value="">選擇發送帳號...</option>
-                        @for(account of senderAccounts(); track account.id) {
-                            <option [value]="account.id">{{ account.phone }} ({{ account.username || t(account.status) }})</option>
-                        }
-                    }
-                </select>
-                @if(senderAccounts().length === 0) {
-                    <div class="mt-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                      <p class="text-xs text-amber-400">⚠️ {{ t('noSenderAccountsHint') }}</p>
-                      <a (click)="currentView.set('accounts'); closeLeadDetailModal()" class="text-xs text-cyan-400 hover:underline cursor-pointer mt-1 inline-block">前往帳號管理 →</a>
-                    </div>
-                }
-              </div>
-
-              <!-- 消息輸入方式選擇 - 青藍色主題卡片式 -->
-              <div class="grid grid-cols-3 gap-3">
-                <label (click)="messageMode.set('manual')"
-                       class="cursor-pointer p-3 rounded-xl border-2 transition-all text-center"
-                       [class]="messageMode() === 'manual' ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:border-cyan-500/30'">
-                    <div class="text-2xl mb-1">📝</div>
-                    <span class="text-sm font-medium">{{ t('manualInput') }}</span>
-                </label>
-                <label (click)="messageMode.set('ai')"
-                       class="cursor-pointer p-3 rounded-xl border-2 transition-all text-center"
-                       [class]="messageMode() === 'ai' ? 'bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border-cyan-500 text-cyan-400' : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:border-cyan-500/30'">
-                    <div class="text-2xl mb-1">🤖</div>
-                    <span class="text-sm font-medium">{{ t('aiGenerate') }}</span>
-                </label>
-                <label (click)="messageMode.set('template')"
-                       class="cursor-pointer p-3 rounded-xl border-2 transition-all text-center"
-                       [class]="messageMode() === 'template' ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:border-cyan-500/30'">
-                    <div class="text-2xl mb-1">📋</div>
-                    <span class="text-sm font-medium">{{ t('useTemplate') }}</span>
-                </label>
-              </div>
-
-              <!-- AI 生成模式 -->
-              @if(messageMode() === 'ai') {
-                <div class="space-y-3">
-                    <!-- AI 配置狀態 -->
-                    <div class="flex items-center justify-between p-2 bg-slate-200/30 dark:bg-slate-800/30 rounded-lg">
-                        <div class="flex items-center gap-2">
-                            <span class="text-lg">🤖</span>
-                            <span class="text-sm text-slate-400">
-                                {{ aiApiType() === 'local' ? '本地 AI' : aiApiType() === 'openai' ? 'OpenAI' : aiApiType() === 'custom' ? '自定義 API' : 'Gemini' }}
-                            </span>
-                            @if(isAiConfigured()) {
-                                <span class="text-xs text-green-400">✓ 已連接</span>
-                            }
-                        </div>
-                        @if(ragEnabled()) {
-                            <span class="text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded">📚 RAG 已啟用</span>
-                        }
-                    </div>
-                    
-                    <!-- 客戶資訊摘要 -->
-                    @if(generationState().lead) {
-                        <div class="p-2 bg-cyan-500/10 border border-cyan-500/20 rounded-lg text-xs text-slate-400">
-                            <strong class="text-cyan-400">客戶資訊：</strong>
-                            @{{ generationState().lead.username }} 
-                            @if(generationState().lead.sourceGroup) { | 來源: {{ generationState().lead.sourceGroup }} }
-                            @if(generationState().lead.triggerKeyword) { | 觸發詞: {{ generationState().lead.triggerKeyword }} }
-                        </div>
-                    }
-                    
-                    <!-- 自定義提示詞 -->
-                    <div>
-                        <label class="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{{ t('customizePrompt') }}</label>
-                        <textarea 
-                            [ngModel]="generationState().customPrompt" 
-                            (ngModelChange)="updateCustomPrompt($event)"
-                            rows="2" 
-                            class="form-textarea w-full bg-slate-200/50 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                            [placeholder]="t('aiPromptPlaceholder')">
-                        </textarea>
-                    </div>
-                    
-                    <!-- 生成按鈕 -->
-                    <div class="flex items-center justify-center gap-3">
-                        <button (click)="generateMessage()" [disabled]="generationState().status === 'loading' || !isAiConfigured()" class="bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white font-bold py-2 px-6 rounded-lg transition duration-200 shadow-lg disabled:from-slate-400 disabled:to-slate-500 disabled:shadow-none disabled:cursor-not-allowed flex items-center gap-2">
-                            @if(generationState().status === 'loading') { 
-                                <span class="animate-spin">⟳</span> <span>{{ t('generating') }}</span> 
-                            } @else { 
-                                <span>✨</span> <span>{{ t('generateWithAi') }}</span> 
-                            }
-                        </button>
-                        @if(generationState().status === 'success') {
-                            <button (click)="generateMessage()" class="p-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg" title="重新生成">
-                                🔄
-                            </button>
-                        }
-                    </div>
-                    
-                    @if(!isAiConfigured()) {
-                        <div class="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-lg text-sm text-center">
-                            ⚠️ {{ t('aiNotConfigured') }} 
-                            <a (click)="currentView.set('settings'); closeLeadDetailModal()" class="text-cyan-400 hover:underline cursor-pointer ml-1">{{ t('goToSettings') }}</a>
-                        </div>
-                    }
-                    
-                    @if(generationState().status === 'error') {
-                        <div class="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-sm">
-                            <strong>{{ t('error') }}:</strong> {{ generationState().error }}
-                            <button (click)="generateMessage()" class="ml-2 text-cyan-400 hover:underline">重試</button>
-                        </div>
-                    }
-                    
-                    <!-- 生成成功提示 -->
-                    @if(generationState().status === 'success' && generationState().generatedMessage) {
-                        <div class="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                            <p class="text-xs text-green-400 mb-2">✓ AI 已生成消息，您可以在下方編輯後發送</p>
-                        </div>
-                    }
-                </div>
-              }
-
-              <!-- 模板選擇模式 -->
-              @if(messageMode() === 'template') {
-                <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                    <label class="block text-sm font-medium text-cyan-400 mb-2">📋 {{ t('selectTemplate') }}</label>
-                    <select 
-                        (change)="applyTemplate($event)"
-                        class="form-select w-full bg-slate-900/50 border-cyan-500/30 rounded-lg py-2.5 px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
-                        <option value="">{{ t('selectTemplatePlaceholder') }}</option>
-                        @for(template of messageTemplates(); track template.id) {
-                            <option [value]="template.id">{{ template.name }}</option>
-                        }
-                    </select>
-                </div>
-              }
-
-              <!-- 消息內容編輯區 -->
-              <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                <div class="flex items-center justify-between mb-2">
-                    <label class="text-sm font-medium text-cyan-400">✏️ {{ t('messageContent') }}</label>
-                    <span class="text-xs text-slate-500 bg-slate-700/50 px-2 py-1 rounded">{{ editableMessage().length }} {{ t('characters') }}</span>
-                </div>
-                <textarea 
-                    [ngModel]="editableMessage()" 
-                    (ngModelChange)="editableMessage.set($event)"
-                    rows="5" 
-                    class="form-textarea w-full bg-slate-900/50 border-cyan-500/30 rounded-lg py-3 px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none placeholder-slate-500"
-                    [placeholder]="t('messageContentPlaceholder')">
-                </textarea>
-              </div>
-
-              <!-- 附件區域 - 支持多文件選擇 -->
-              <div class="space-y-3">
-                <div class="flex items-center gap-3 flex-wrap">
-                  <button (click)="selectAttachment('image', true)" class="flex items-center gap-2 bg-slate-800/50 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-400 text-sm font-medium py-2 px-4 rounded-lg transition-all border border-slate-700/50 hover:border-cyan-500/30">
-                      🖼️ {{ t('attachImage') }}
-                  </button>
-                  <button (click)="selectAttachment('file', true)" class="flex items-center gap-2 bg-slate-800/50 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-400 text-sm font-medium py-2 px-4 rounded-lg transition-all border border-slate-700/50 hover:border-cyan-500/30">
-                      📎 {{ t('attachFile') }}
-                  </button>
-                  @if(generationState().attachments.length > 0) {
-                    <button (click)="addMoreAttachments('file')" class="flex items-center gap-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 text-sm font-medium py-2 px-3 rounded-lg transition-all border border-green-500/30">
-                        ➕ 添加更多
-                    </button>
-                    <button (click)="clearAllAttachments()" class="flex items-center gap-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm font-medium py-2 px-3 rounded-lg transition-all border border-red-500/30">
-                        🗑️ 清空
-                    </button>
-                  }
-                </div>
-                
-                <!-- 附件列表 -->
-                @if(generationState().attachments.length > 0) {
-                  <div class="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30">
-                    <div class="flex items-center justify-between mb-2">
-                      <span class="text-sm text-cyan-400 font-medium">📎 附件列表 ({{ generationState().attachments.length }})</span>
-                      <span class="text-xs text-slate-500">
-                        總大小: {{ getTotalAttachmentSize() }} MB
-                      </span>
-                    </div>
-                    <div class="space-y-2 max-h-40 overflow-y-auto">
-                      @for(attachment of generationState().attachments; track attachment.name; let i = $index) {
-                        <div class="flex items-center justify-between text-sm bg-slate-800/50 rounded-lg px-3 py-2">
-                          <div class="flex items-center gap-2 truncate flex-1 min-w-0">
-                            @if(attachment.type === 'image') { <span class="text-green-400">🖼️</span> }
-                            @else { <span class="text-blue-400">📄</span> }
-                            <span class="truncate text-white">{{ attachment.name }}</span>
-                            @if(attachment.fileSize) {
-                              <span class="text-slate-500 text-xs whitespace-nowrap">
-                                ({{ (attachment.fileSize / 1024 / 1024).toFixed(2) }} MB)
-                              </span>
-                            }
-                            @if(attachment.filePath) {
-                              <span class="text-green-500 text-xs">✓</span>
-                            }
-                          </div>
-                          <button (click)="removeAttachmentByIndex(i)" class="text-red-400 hover:text-red-300 text-lg font-bold p-1 hover:bg-red-500/20 rounded ml-2">&times;</button>
-                        </div>
-                      }
-                    </div>
-                  </div>
-                }
-              </div>
-
-              <!-- 發送狀態提示 -->
-              @if(!canSendMessage() && !lead.doNotContact) {
-                <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-                  <p class="text-sm text-amber-400">
-                    @if(senderAccounts().length === 0) {
-                      ⚠️ 無可用發送帳號
-                    } @else if(!selectedSenderId()) {
-                      ⚠️ 請選擇發送帳號
-                    } @else if(editableMessage().trim().length === 0 && !generationState().attachment && generationState().attachments.length === 0) {
-                      ⚠️ 請輸入訊息內容或添加附件
-                    }
-                  </p>
-                </div>
-              }
-              @if(lead.doNotContact) {
-                <div class="p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
-                  <p class="text-sm text-red-400">🚫 此客戶已加入黑名單，無法發送訊息</p>
-                </div>
-              }
-
-              <!-- 底部操作按鈕 - 青藍色主題 -->
-              <div class="flex justify-between items-center pt-4 border-t border-cyan-500/20">
-                <button (click)="addToDoNotContact(lead.id)" [disabled]="lead.doNotContact" class="text-sm text-red-400 hover:text-red-300 disabled:text-slate-500 disabled:cursor-not-allowed flex items-center gap-1.5 px-3 py-2 rounded-lg hover:bg-red-500/10 transition-all">
-                    🚫 {{ lead.doNotContact ? t('userOnDNC') : t('addToDNC') }}
-                </button>
-                <div class="flex gap-3">
-                    <button (click)="closeLeadDetailModal()" class="bg-slate-700/80 hover:bg-slate-600 text-slate-300 font-medium py-2.5 px-5 rounded-xl transition-all border border-slate-600/50 hover:border-slate-500">
-                        {{ t('cancel') }}
-                    </button>
-                    <button 
-                        (click)="sendMessageToLead()" 
-                        [disabled]="!canSendMessage() || lead.doNotContact" 
-                        class="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg shadow-cyan-500/30 disabled:from-slate-500 disabled:to-slate-600 disabled:shadow-none disabled:cursor-not-allowed flex items-center gap-2 transition-all">
-                        ✈️ {{ t('sendMessage') }}
-                    </button>
-                </div>
-              </div>
-            </div>
-        }
-        @if(leadDetailView() === 'history') {
-            <div class="py-4">
-                <!-- 加載完整聊天記錄按鈕 -->
-                <div class="mb-4 flex items-center justify-between">
-                    <button 
-                        (click)="loadChatHistory(lead.userId)" 
-                        [disabled]="isLoadingChatHistory()"
-                        class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg text-sm disabled:bg-slate-500 disabled:cursor-not-allowed flex items-center gap-2">
-                        @if(isLoadingChatHistory()) {
-                            <span class="animate-spin">⟳</span> <span>加載中...</span>
-                        } @else {
-                            <span>💬</span> <span>加載完整聊天記錄</span>
-                        }
-                    </button>
-                    @if(selectedChatUserId() === lead.userId && chatHistory().length > 0) {
-                        <span class="text-xs text-slate-500">共 {{ chatHistory().length }} 條消息</span>
-                    }
-                </div>
-                
-                <!-- 完整聊天記錄（如果已加載） -->
-                @if(selectedChatUserId() === lead.userId && chatHistory().length > 0) {
-                    <div 
-                        class="h-96 overflow-y-auto space-y-3 mb-4 bg-slate-200/30 dark:bg-slate-800/30 rounded-lg p-4"
-                        (scroll)="onChatHistoryScroll($event)">
-                        @for(message of chatHistory(); track trackByChatMessageId($index, message)) {
-                            @if(message.role === 'user') {
-                                <!-- 用戶消息（左側） -->
-                                <div class="flex justify-start">
-                                    <div class="max-w-[75%]">
-                                        <div class="bg-slate-700 text-white rounded-2xl rounded-bl-sm px-4 py-2">
-                                            <p class="text-sm">{{ message.content }}</p>
-                                        </div>
-                                        <p class="text-xs text-slate-500 mt-1">{{ formatTimestamp(message.timestamp) }}</p>
-                                    </div>
-                                </div>
-                            } @else if(message.role === 'assistant') {
-                                <!-- AI 回復（右側） -->
-                                <div class="flex justify-end">
-                                    <div class="max-w-[75%]">
-                                        <div class="bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-2xl rounded-br-sm px-4 py-2 shadow-lg">
-                                            <p class="text-sm">{{ message.content }}</p>
-                                        </div>
-                                        <div class="flex items-center justify-end gap-2 mt-1">
-                                            <span class="text-xs text-slate-500">{{ formatTimestamp(message.timestamp) }}</span>
-                                            <span class="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">🤖 AI</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
-                        }
-                        
-                        <!-- 加載更多指示器 -->
-                        @if(chatHistoryLoadingMore()) {
-                            <div class="text-center py-4">
-                                <span class="animate-spin text-cyan-400">⟳</span>
-                                <span class="ml-2 text-sm text-slate-500">加載中...</span>
-                            </div>
-                        }
-                        
-                        @if(chatHistoryHasMore() && !chatHistoryLoadingMore()) {
-                            <div class="text-center py-2">
-                                <button 
-                                    (click)="loadMoreChatHistory()"
-                                    class="text-sm text-cyan-400 hover:text-cyan-300">
-                                    加載更多消息
-                                </button>
-                            </div>
-                        }
-                    </div>
-                }
-                
-                <!-- 互動歷史（原有顯示） -->
-                <div class="h-96 overflow-y-auto">
-                    <div class="space-y-3 mb-4">
-                        @for(item of lead.interactionHistory; track trackByChatMessageId($index, item)) {
-                        @if(item.type.includes('Sent') || item.type.includes('Message')) {
-                            <!-- 我方消息（右側） -->
-                            <div class="flex justify-end">
-                                <div class="max-w-[75%]">
-                                    <div class="bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-2xl rounded-br-sm px-4 py-2 shadow-lg">
-                                        <p class="text-sm">{{ item.content }}</p>
-                                    </div>
-                                    <div class="flex items-center justify-end gap-2 mt-1">
-                                        <span class="text-xs text-slate-500">{{ formatTimestamp(item.timestamp) }}</span>
-                                        @if(item.type.includes('AI')) {
-                                            <span class="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">🤖 AI</span>
-                                        }
-                                    </div>
-                                </div>
-                            </div>
-                        } @else if(item.type.includes('Reply') || item.type.includes('Received')) {
-                            <!-- 對方回復（左側） -->
-                            <div class="flex justify-start">
-                                <div class="max-w-[75%]">
-                                    <div class="bg-slate-700 text-white rounded-2xl rounded-bl-sm px-4 py-2">
-                                        <p class="text-sm">{{ item.content }}</p>
-                                    </div>
-                                    <p class="text-xs text-slate-500 mt-1">{{ formatTimestamp(item.timestamp) }}</p>
-                                </div>
-                            </div>
-                        } @else {
-                            <!-- 系統消息（居中） -->
-                            <div class="flex justify-center">
-                                <div class="bg-slate-800/50 text-slate-400 text-xs px-3 py-1 rounded-full">
-                                    {{ item.type }}: {{ item.content }} · {{ formatTimestamp(item.timestamp) }}
-                                </div>
-                            </div>
-                        }
-                    }
-                </div>
-                </div>
-                
-                @if(lead.interactionHistory.length === 0 && (!selectedChatUserId() || chatHistory().length === 0)) { 
-                    <div class="text-center py-8">
-                        <div class="text-4xl mb-2">💬</div>
-                        <p class="text-slate-500 dark:text-slate-400">{{ t('noHistoryFound') }}</p>
-                        <p class="text-xs text-slate-500 mt-2">點擊「加載完整聊天記錄」查看所有對話</p>
-                    </div>
-                }
-                
-                <!-- AI 分析面板 -->
-                @if(lead.interactionHistory.length > 0) {
-                    <div class="mt-4 p-3 bg-slate-800/50 rounded-lg border border-cyan-500/20">
-                        <h4 class="text-sm font-medium text-cyan-400 mb-2 flex items-center gap-2">
-                            <span>📊</span> AI 對話分析
-                        </h4>
-                        <div class="grid grid-cols-3 gap-2 text-center text-xs">
-                            <div class="p-2 bg-slate-700/50 rounded">
-                                <p class="text-slate-400">總互動</p>
-                                <p class="text-lg font-bold text-white">{{ lead.interactionHistory.length }}</p>
-                            </div>
-                            <div class="p-2 bg-slate-700/50 rounded">
-                                <p class="text-slate-400">對話階段</p>
-                                <p class="text-sm font-bold text-cyan-400">{{ lead.status || '初次接觸' }}</p>
-                            </div>
-                            <div class="p-2 bg-slate-700/50 rounded">
-                                <p class="text-slate-400">興趣程度</p>
-                                <p class="text-lg">⭐⭐⭐</p>
-                            </div>
-                        </div>
-                    </div>
-                }
-            </div>
-        }
-        </div><!-- 內容區域結束 -->
-      </div>
-    </div>
+    <app-lead-detail-dialog
+      [lead]="lead"
+      [generationState]="generationState()"
+      [leadDetailView]="leadDetailView()"
+      [chatHistory]="chatHistory()"
+      [editableMessage]="editableMessage()"
+      [messageMode]="messageMode()"
+      [senderAccounts]="senderAccounts()"
+      [selectedSenderId]="selectedSenderId()"
+      [selectedChatUserId]="selectedChatUserId()"
+      [chatHistoryHasMore]="chatHistoryHasMore()"
+      [chatHistoryLoadingMore]="chatHistoryLoadingMore()"
+      [isLoadingChatHistory]="isLoadingChatHistory()"
+      [isAiConfigured]="isAiConfigured()"
+      [aiApiType]="aiApiType()"
+      [messageTemplates]="messageTemplates()"
+      [canSendMessage]="canSendMessage()"
+      [ragEnabled]="ragEnabled()"
+      (close)="closeLeadDetailModal()"
+      (generateMsg)="generateMessage()"
+      (sendMsg)="sendMessageToLead()"
+      (loadHistory)="loadChatHistory($event)"
+      (loadMoreHistory)="loadMoreChatHistory()"
+      (historyScroll)="onChatHistoryScroll($event)"
+      (selectAttach)="selectAttachment($event.type, $event.multi)"
+      (addMoreAttach)="addMoreAttachments($event)"
+      (clearAttach)="clearAllAttachments()"
+      (removeAttach)="removeAttachmentByIndex($event)"
+      (applyTmpl)="applyTemplate($event)"
+      (updatePrompt)="updateCustomPrompt($event)"
+      (addDnc)="addToDoNotContact($event)"
+      (editableMsgChange)="editableMessage.set($event)"
+      (msgModeChange)="messageMode.set($event)"
+      (senderChange)="selectedSenderId.set($event)"
+      (viewChange)="leadDetailView.set($event)"
+      (navigateTo)="currentView.set($event)" />
   }
 
-  <!-- 批量操作歷史對話框 -->
+  <!-- Phase 10: Batch Operation History Dialog Component -->
   @if(showBatchOperationHistory()) {
-    <div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm" (click)="showBatchOperationHistory.set(false)">
-      <div class="bg-slate-100 dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-300 dark:border-slate-700 w-full max-w-3xl max-h-[80vh] overflow-hidden" (click)="$event.stopPropagation()">
-        <!-- 標題 -->
-        <div class="p-4 border-b border-slate-300 dark:border-slate-700 flex items-center justify-between bg-slate-200/50 dark:bg-slate-800/50">
-          <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <svg class="h-5 w-5 text-purple-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
-            批量操作歷史
-          </h3>
-          <button (click)="showBatchOperationHistory.set(false)" class="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white">
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-        
-        <!-- 內容 -->
-        <div class="p-4 overflow-y-auto max-h-[60vh]">
-          @if(batchOperationHistory().length === 0) {
-            <div class="text-center py-8 text-slate-500">
-              <svg class="h-12 w-12 mx-auto mb-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-              <p>暫無操作歷史</p>
-            </div>
-          } @else {
-            <div class="space-y-3">
-              @for(op of batchOperationHistory(); track op.id) {
-                <div class="bg-slate-200/50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-300 dark:border-slate-700"
-                     [class.opacity-50]="op.reversed">
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                      <div class="p-2 rounded-lg" 
-                           [class.bg-cyan-500/20]="op.operationType === 'update_status'"
-                           [class.bg-blue-500/20]="op.operationType === 'add_tag'"
-                           [class.bg-red-500/20]="op.operationType === 'delete' || op.operationType === 'add_to_dnc'">
-                        <svg class="h-4 w-4" 
-                             [class.text-cyan-400]="op.operationType === 'update_status'"
-                             [class.text-blue-400]="op.operationType === 'add_tag'"
-                             [class.text-red-400]="op.operationType === 'delete' || op.operationType === 'add_to_dnc'"
-                             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                      </div>
-                      <div>
-                        <p class="font-medium text-slate-900 dark:text-white">{{ getOperationTypeName(op.operationType) }}</p>
-                        <p class="text-xs text-slate-500">
-                          {{ op.itemCount }} 項 · {{ formatBatchOperationDate(op.createdAt) }}
-                          @if(op.reversed) {
-                            <span class="text-yellow-500 ml-2">（已撤銷）</span>
-                          }
-                        </p>
-                      </div>
-                    </div>
-                    <div class="flex items-center gap-3">
-                      <div class="text-sm">
-                        <span class="text-green-400">{{ op.successCount }} 成功</span>
-                        @if(op.failureCount > 0) {
-                          <span class="text-red-400 ml-2">{{ op.failureCount }} 失敗</span>
-                        }
-                      </div>
-                      @if(op.isReversible && !op.reversed) {
-                        <button (click)="undoBatchOperation(op.id)" 
-                                class="text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 px-2 py-1 rounded">
-                          撤銷
-                        </button>
-                      }
-                    </div>
-                  </div>
-                </div>
-              }
-            </div>
-          }
-        </div>
-        
-        <!-- 底部 -->
-        <div class="p-4 border-t border-slate-300 dark:border-slate-700 bg-slate-200/50 dark:bg-slate-800/50 flex justify-end">
-          <button (click)="showBatchOperationHistory.set(false)" 
-                  class="px-4 py-2 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors">
-            關閉
-          </button>
-        </div>
-      </div>
-    </div>
+    <app-batch-history-dialog
+      [history]="batchOperationHistory()"
+      (close)="showBatchOperationHistory.set(false)"
+      (undo)="undoBatchOperation($event)" />
   }
   
   <!-- 首次啟動歡迎向導 -->
+  <!-- Phase 10: Welcome Dialog Component -->
   @if (showWelcomeDialog()) {
-    <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100]">
-      <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden border border-cyan-500/30">
-        
-        <!-- 頭部 -->
-        <div class="bg-gradient-to-r from-cyan-500 to-purple-500 p-6 text-center">
-          <h1 class="text-3xl font-bold text-white mb-2">🚀 歡迎使用 TG-AI智控王</h1>
-          <p class="text-cyan-100">AI 驅動的 Telegram 營銷自動化平台</p>
-        </div>
-        
-        <!-- 步驟指示器 -->
-        <div class="flex justify-center gap-2 py-4 bg-slate-800/50">
-          <div class="w-3 h-3 rounded-full transition-all" 
-               [class]="welcomeStep() >= 1 ? 'bg-cyan-500' : 'bg-slate-600'"></div>
-          <div class="w-3 h-3 rounded-full transition-all" 
-               [class]="welcomeStep() >= 2 ? 'bg-cyan-500' : 'bg-slate-600'"></div>
-          <div class="w-3 h-3 rounded-full transition-all" 
-               [class]="welcomeStep() >= 3 ? 'bg-cyan-500' : 'bg-slate-600'"></div>
-        </div>
-        
-        <!-- 內容區域 -->
-        <div class="p-6">
-          @switch (welcomeStep()) {
-            @case (1) {
-              <!-- 步驟 1: 歡迎介紹 -->
-              <div class="text-center space-y-6">
-                <div class="grid grid-cols-3 gap-4 mb-6">
-                  <div class="p-4 bg-slate-700/50 rounded-xl">
-                    <div class="text-3xl mb-2">🤖</div>
-                    <div class="text-sm font-medium text-white">AI 自動回覆</div>
-                    <div class="text-xs text-slate-400">智能客服助手</div>
-                  </div>
-                  <div class="p-4 bg-slate-700/50 rounded-xl">
-                    <div class="text-3xl mb-2">🔍</div>
-                    <div class="text-sm font-medium text-white">資源發現</div>
-                    <div class="text-xs text-slate-400">自動搜索群組</div>
-                  </div>
-                  <div class="p-4 bg-slate-700/50 rounded-xl">
-                    <div class="text-3xl mb-2">📊</div>
-                    <div class="text-sm font-medium text-white">數據分析</div>
-                    <div class="text-xs text-slate-400">轉化追蹤報表</div>
-                  </div>
-                </div>
-                
-                <p class="text-slate-300">
-                  TG-AI智控王 將幫助您自動化 Telegram 營銷流程，<br>
-                  讓您專注於業務增長而非重複操作。
-                </p>
-              </div>
-            }
-            @case (2) {
-              <!-- 步驟 2: AI 設置 -->
-              <div class="space-y-4">
-                <h3 class="text-lg font-semibold text-white text-center mb-4">🦙 AI 服務配置</h3>
-                
-                <!-- Ollama 檢測狀態 -->
-                <div class="p-4 rounded-xl" 
-                     [class]="ollamaDetected() ? 'bg-green-500/20 border border-green-500/30' : 'bg-yellow-500/20 border border-yellow-500/30'">
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                      <span class="text-2xl">{{ ollamaDetected() ? '✅' : '⚠️' }}</span>
-                      <div>
-                        <div class="font-medium text-white">
-                          {{ ollamaDetected() ? 'Ollama 已檢測到' : 'Ollama 未運行' }}
-                        </div>
-                        <div class="text-sm text-slate-400">
-                          {{ ollamaDetected() ? '本地 AI 服務可用' : '建議安裝 Ollama 獲得免費 AI 能力' }}
-                        </div>
-                      </div>
-                    </div>
-                    <button (click)="detectOllama()" [disabled]="isDetectingOllama()"
-                            class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm text-white disabled:opacity-50">
-                      {{ isDetectingOllama() ? '檢測中...' : '重新檢測' }}
-                    </button>
-                  </div>
-                </div>
-                
-                @if (ollamaDetected()) {
-                  <!-- 模型選擇 -->
-                  <div class="p-4 bg-slate-700/50 rounded-xl">
-                    <label class="block text-sm font-medium text-slate-300 mb-2">選擇 AI 模型</label>
-                    @if (detectedOllamaModels().length > 0) {
-                      <select [ngModel]="localAiModel()" (ngModelChange)="localAiModel.set($event)"
-                              class="w-full bg-slate-800 border border-slate-600 rounded-lg py-2 px-3 text-white">
-                        @for (model of detectedOllamaModels(); track model) {
-                          <option [value]="model">{{ model }}</option>
-                        }
-                      </select>
-                    } @else {
-                      <input [ngModel]="localAiModel()" (ngModelChange)="localAiModel.set($event)"
-                             class="w-full bg-slate-800 border border-slate-600 rounded-lg py-2 px-3 text-white"
-                             placeholder="qwen2:7b">
-                    }
-                    <p class="text-xs text-slate-500 mt-1">推薦：qwen2:7b（中英文通用）</p>
-                  </div>
-                } @else {
-                  <!-- Ollama 安裝指南 -->
-                  <div class="p-4 bg-slate-700/50 rounded-xl">
-                    <div class="text-sm text-slate-300 space-y-2">
-                      <p class="font-medium">📦 安裝 Ollama（免費）：</p>
-                      <code class="block bg-slate-800 p-2 rounded text-cyan-400 text-xs">
-                        curl -fsSL https://ollama.com/install.sh | sh
-                      </code>
-                      <p class="text-xs text-slate-500">
-                        安裝後運行 <code class="text-cyan-400">ollama pull qwen2:7b</code> 下載模型
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <!-- 備選：雲端 AI -->
-                  <div class="p-4 bg-slate-700/50 rounded-xl">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" [checked]="aiAutoFallback()" (change)="aiAutoFallback.set(!aiAutoFallback())"
-                             class="w-4 h-4 text-cyan-500 rounded">
-                      <span class="text-sm text-slate-300">使用雲端 AI 作為備選</span>
-                    </label>
-                    @if (aiAutoFallback()) {
-                      <div class="mt-2">
-                        <select [ngModel]="aiBackupProvider()" (ngModelChange)="aiBackupProvider.set($event)"
-                                class="w-full bg-slate-800 border border-slate-600 rounded py-1 px-2 text-sm text-white">
-                          <option value="gemini">Google Gemini（免費額度）</option>
-                          <option value="openai">OpenAI GPT</option>
-                        </select>
-                      </div>
-                    }
-                  </div>
-                }
-              </div>
-            }
-            @case (3) {
-              <!-- 步驟 3: 完成 -->
-              <div class="text-center space-y-6">
-                <div class="text-6xl mb-4">🎉</div>
-                <h3 class="text-2xl font-bold text-white">設置完成！</h3>
-                <p class="text-slate-300">
-                  您已準備好開始使用 TG-AI智控王。<br>
-                  接下來請添加您的第一個 Telegram 帳號。
-                </p>
-                
-                <div class="p-4 bg-cyan-500/10 rounded-xl border border-cyan-500/30">
-                  <div class="text-sm text-slate-300 space-y-1">
-                    <p>✅ AI 服務：{{ ollamaDetected() ? 'Ollama 本地 AI' : '雲端 AI' }}</p>
-                    @if (ollamaDetected()) {
-                      <p>✅ 模型：{{ localAiModel() }}</p>
-                    }
-                    <p>✅ 自動降級：{{ aiAutoFallback() ? '已啟用' : '已禁用' }}</p>
-                  </div>
-                </div>
-              </div>
-            }
-          }
-        </div>
-        
-        <!-- 底部按鈕 -->
-        <div class="p-6 bg-slate-800/50 flex justify-between items-center">
-          <button (click)="skipFirstRunSetup()" class="text-sm text-slate-400 hover:text-white transition-colors">
-            跳過設置
-          </button>
-          
-          <div class="flex gap-3">
-            @if (welcomeStep() > 1) {
-              <button (click)="welcomeStep.set(welcomeStep() - 1)"
-                      class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">
-                上一步
-              </button>
-            }
-            
-            @if (welcomeStep() < 3) {
-              <button (click)="welcomeStep.set(welcomeStep() + 1)"
-                      class="px-6 py-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 text-white font-medium rounded-lg transition-all">
-                下一步
-              </button>
-            } @else {
-              <button (click)="completeFirstRunSetup()"
-                      class="px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-medium rounded-lg transition-all">
-                開始使用 🚀
-              </button>
-            }
-          </div>
-        </div>
-      </div>
-    </div>
+    <app-welcome-dialog
+      [step]="welcomeStep()"
+      [ollamaDetected]="ollamaDetected()"
+      [isDetecting]="isDetectingOllama()"
+      [ollamaModels]="detectedOllamaModels()"
+      [localModel]="localAiModel()"
+      [autoFallback]="aiAutoFallback()"
+      [backupProvider]="aiBackupProvider()"
+      (skip)="skipFirstRunSetup()"
+      (complete)="completeFirstRunSetup()"
+      (stepChange)="welcomeStep.set($event)"
+      (detectOllamaClick)="detectOllama()"
+      (localModelChange)="localAiModel.set($event)"
+      (autoFallbackChange)="aiAutoFallback.set($event)"
+      (backupProviderChange)="aiBackupProvider.set($event)" />
   }
   
-  <!-- 孤立 Session 恢復對話框 -->
+  <!-- Phase 10: Orphan Session Dialog Component -->
   @if (showOrphanSessionDialog()) {
-    <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100]">
-      <div class="bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden border border-amber-500/50">
-        
-        <!-- 頭部 -->
-        <div class="bg-amber-500/20 p-6 text-center border-b border-amber-500/30">
-          <div class="text-5xl mb-3">🔄</div>
-          <h2 class="text-xl font-bold text-amber-400">發現可恢復的帳號</h2>
-          <p class="text-slate-400 text-sm mt-2">
-            發現 {{ orphanSessions().length }} 個 Session 文件需要手動恢復
-          </p>
-        </div>
-        
-        <!-- 內容 -->
-        <div class="p-6 space-y-4">
-          <p class="text-slate-300 text-sm">
-            這些 Session 文件存在於系統中，但未在數據庫中找到對應的帳號記錄。
-            您可以嘗試恢復這些帳號，或選擇忽略。
-          </p>
-          
-          <!-- Session 列表 -->
-          <div class="bg-slate-700/50 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
-            @for (session of orphanSessions(); track session.phone) {
-              <div class="flex items-center justify-between p-2 bg-slate-600/50 rounded-lg">
-                <div class="flex items-center gap-3">
-                  <span class="text-2xl">📱</span>
-                  <div>
-                    <p class="text-white font-medium">+{{ session.phone }}</p>
-                    @if (session.hasMetadata && session.metadata) {
-                      <p class="text-green-400 text-xs">
-                        ✓ 有元數據: {{ session.metadata.firstName || '' }} {{ session.metadata.username ? '@' + session.metadata.username : '' }}
-                      </p>
-                    } @else {
-                      <p class="text-amber-400 text-xs">⚠ 無元數據，需要重新登錄驗證</p>
-                    }
-                  </div>
-                </div>
-              </div>
-            }
-          </div>
-          
-          <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-            <p class="text-blue-400 text-sm">
-              💡 <strong>提示：</strong> 恢復後，帳號將以「離線」狀態添加到列表中。
-              您需要點擊「登錄」來重新連接帳號。
-            </p>
-          </div>
-        </div>
-        
-        <!-- 底部按鈕 -->
-        <div class="p-4 bg-slate-700/30 flex justify-end gap-3">
-          <button (click)="dismissOrphanSessionDialog()" 
-                  class="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg transition-colors">
-            稍後處理
-          </button>
-          <button (click)="recoverOrphanSessions()" 
-                  [disabled]="isRecoveringOrphanSessions()"
-                  class="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center gap-2">
-            @if (isRecoveringOrphanSessions()) {
-              <span class="animate-spin">⏳</span>
-              <span>恢復中...</span>
-            } @else {
-              <span>🔄</span>
-              <span>恢復帳號</span>
-            }
-          </button>
-        </div>
-      </div>
-    </div>
+    <app-orphan-session-dialog
+      [sessions]="orphanSessions()"
+      [isRecovering]="isRecoveringOrphanSessions()"
+      (dismiss)="dismissOrphanSessionDialog()"
+      (recover)="recoverOrphanSessions()" />
   }
 
-  <!-- 後端錯誤提示對話框 -->
+  <!-- Phase 10: Backend Error Dialog Component -->
   @if (showBackendErrorDialog()) {
-    <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100]">
-      <div class="bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden border border-red-500/50">
-        
-        <!-- 頭部 -->
-        <div class="bg-red-500/20 p-6 text-center border-b border-red-500/30">
-          <div class="text-5xl mb-3">⚠️</div>
-          <h2 class="text-xl font-bold text-red-400">Python 後端未運行</h2>
-        </div>
-        
-        <!-- 內容 -->
-        <div class="p-6 space-y-4">
-          <p class="text-slate-300">
-            程序需要 Python 環境才能正常運行。請確保：
-          </p>
-          
-          <div class="bg-slate-700/50 rounded-lg p-4 space-y-3">
-            <div class="flex items-start gap-3">
-              <span class="text-cyan-400">1.</span>
-              <div>
-                <p class="text-white font-medium">安裝 Python 3.9+</p>
-                <a href="https://www.python.org/downloads/" target="_blank" 
-                   class="text-cyan-400 text-sm hover:underline">
-                  https://www.python.org/downloads/
-                </a>
-              </div>
-            </div>
-            
-            <div class="flex items-start gap-3">
-              <span class="text-cyan-400">2.</span>
-              <div>
-                <p class="text-white font-medium">安裝時勾選 "Add Python to PATH"</p>
-                <p class="text-slate-400 text-sm">確保 Python 添加到系統環境變量</p>
-              </div>
-            </div>
-            
-            <div class="flex items-start gap-3">
-              <span class="text-cyan-400">3.</span>
-              <div>
-                <p class="text-white font-medium">安裝依賴</p>
-                <code class="block bg-slate-800 text-green-400 text-sm p-2 rounded mt-1">
-                  pip install pyrogram tgcrypto aiosqlite
-                </code>
-              </div>
-            </div>
-            
-            <div class="flex items-start gap-3">
-              <span class="text-cyan-400">4.</span>
-              <div>
-                <p class="text-white font-medium">重新啟動程序</p>
-              </div>
-            </div>
-          </div>
-          
-          @if (backendError()) {
-            <div class="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-              <p class="text-red-400 text-sm">
-                <span class="font-medium">錯誤詳情：</span>
-                {{ backendError() }}
-              </p>
-            </div>
-          }
-        </div>
-        
-        <!-- 底部按鈕 -->
-        <div class="p-4 bg-slate-700/30 flex justify-end gap-3">
-          <button (click)="showBackendErrorDialog.set(false)" 
-                  class="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg transition-colors">
-            我知道了
-          </button>
-        </div>
-      </div>
-    </div>
+    <app-backend-error-dialog
+      [errorDetail]="backendError()"
+      (close)="showBackendErrorDialog.set(false)" />
   }
   
     <!-- 後端狀態指示器 -->
@@ -1883,49 +956,13 @@
       </div>
     }
     
-    <!-- 創建關鍵詞集對話框 -->
+    <!-- Phase 10: Keyword Set Creator Dialog Component -->
     @if (showKeywordSetCreator()) {
-      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100]"
-           (click)="cancelNewKeywordSet()">
-        <div class="bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden border border-cyan-500/30"
-             (click)="$event.stopPropagation()">
-          
-          <!-- 頭部 -->
-          <div class="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 p-4 border-b border-slate-700/50">
-            <h2 class="text-lg font-bold text-white flex items-center gap-2">
-              <span>🔑</span> 創建關鍵詞集
-            </h2>
-          </div>
-          
-          <!-- 內容 -->
-          <div class="p-6">
-            <label class="block text-sm text-slate-400 mb-2">關鍵詞集名稱</label>
-            <input type="text" 
-                   class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-3 text-white 
-                          focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
-                   placeholder="例如：買家意向、產品諮詢..."
-                   [value]="newKeywordSet().name"
-                   (input)="newKeywordSet.set({ name: $any($event.target).value })"
-                   (keyup.enter)="submitNewKeywordSet()"
-                   autofocus>
-            <p class="text-xs text-slate-500 mt-2">
-              💡 創建後可在詞集中添加多個關鍵詞
-            </p>
-          </div>
-          
-          <!-- 底部按鈕 -->
-          <div class="p-4 bg-slate-700/30 flex justify-end gap-3">
-            <button (click)="cancelNewKeywordSet()" 
-                    class="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg transition-colors">
-              取消
-            </button>
-            <button (click)="submitNewKeywordSet()" 
-                    class="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg transition-colors font-medium">
-              創建
-            </button>
-          </div>
-        </div>
-      </div>
+      <app-keyword-creator-dialog
+        [name]="newKeywordSet().name"
+        (cancel)="cancelNewKeywordSet()"
+        (submit)="submitNewKeywordSet()"
+        (nameChange)="newKeywordSet.set({ name: $event })" />
     }
   </div>
 } @else {

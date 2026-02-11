@@ -213,6 +213,7 @@ export class I18nService {
       'alerts': 'menu.alerts',
       'settings': 'menu.settings',
       'aiCenter': 'menu.aiCenter',
+      'aiEngine': 'menu.aiEngine',
       'resourceDiscoveryMenu': 'menu.resourceDiscovery',
       'monitoringCenter': 'menu.monitoringCenter',
       'resourceManagement': 'menu.resourceManagement',

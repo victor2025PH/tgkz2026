@@ -56,6 +56,15 @@ import { ExtractedMember } from './member-database/member-database.component';
 import { BatchSendDialogComponent, BatchSendTarget } from './dialogs/batch-send-dialog.component';
 import { BatchInviteDialogComponent, BatchInviteTarget } from './dialogs/batch-invite-dialog.component';
 import { MemberExtractionDialogComponent, MemberExtractionConfig, ExtractionGroupInfo } from './dialogs/member-extraction-dialog.component';
+// Phase 10: Extracted dialog components
+import { OrphanSessionDialogComponent } from './dialogs/orphan-session-dialog.component';
+import { BackendErrorDialogComponent } from './dialogs/backend-error-dialog.component';
+import { KeywordCreatorDialogComponent } from './dialogs/keyword-creator-dialog.component';
+import { WelcomeDialogComponent } from './dialogs/welcome-dialog.component';
+import { BatchHistoryDialogComponent } from './dialogs/batch-history-dialog.component';
+import { DeleteConfirmDialogComponent } from './dialogs/delete-confirm-dialog.component';
+import { InviteGroupDialogComponent } from './dialogs/invite-group-dialog.component';
+import { LeadDetailDialogComponent } from './dialogs/lead-detail-dialog.component';
 import { AIStrategyResult } from './ai-assistant/ai-marketing-assistant.component';
 import { CommandPaletteComponent } from './components/command-palette.component';
 import { UserLevelBadgeComponent } from './components/user-level-badge.component';
@@ -112,7 +121,7 @@ import {
 import { RAGBrainService } from './services/rag-brain.service';
 
 // 視圖類型定義
-type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'resource-discovery' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps' | 'settings' | 'analytics' | 'analytics-center' | 'marketing-report' | 'profile' | 'membership-center' | 'wallet' | 'wallet-recharge' | 'wallet-withdraw' | 'wallet-transactions' | 'wallet-orders' | 'wallet-analytics' | 'monitoring' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules' | 'collected-users';
+type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'resource-discovery' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-engine' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps' | 'settings' | 'analytics' | 'analytics-center' | 'marketing-report' | 'profile' | 'membership-center' | 'wallet' | 'wallet-recharge' | 'wallet-withdraw' | 'wallet-transactions' | 'wallet-orders' | 'wallet-analytics' | 'monitoring' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules' | 'collected-users';
 type LeadDetailView = 'sendMessage' | 'history';
 type LeadsViewMode = 'kanban' | 'list';
 
@@ -151,6 +160,10 @@ interface SuccessOverlayConfig {
     QrLoginComponent,
     // 對話框（模板中使用）
     BatchSendDialogComponent, BatchInviteDialogComponent, MemberExtractionDialogComponent,
+    // Phase 10: 提取的對話框組件
+    OrphanSessionDialogComponent, BackendErrorDialogComponent,
+    KeywordCreatorDialogComponent, WelcomeDialogComponent, BatchHistoryDialogComponent,
+    DeleteConfirmDialogComponent, InviteGroupDialogComponent, LeadDetailDialogComponent,
     // 命令面板（模板中使用）
     CommandPaletteComponent,
     // 🆕 網絡狀態和認證過渡動畫
@@ -460,9 +473,6 @@ export class AppComponent implements OnDestroy, OnInit {
   // --- 子視圖狀態 ---
   aiCenterTab = signal<'config' | 'chat' | 'rag' | 'voice' | 'memory'>('config');
   automationTab = signal<'targets' | 'keywords' | 'templates' | 'campaigns'>('targets');  // 自動化中心標籤頁
-  
-  // --- 🆕 知識大腦菜單狀態 ---
-  knowledgeMenuExpanded = signal(true);  // 默認展開
   
   // --- 🆕 側邊欄分組折疊狀態 ---
   sidebarGroups = signal<Record<string, boolean>>({
@@ -1872,14 +1882,10 @@ export class AppComponent implements OnDestroy, OnInit {
     this.automationTab.set(tab as 'targets' | 'keywords' | 'templates' | 'campaigns');
   }
 
-  // 🆕 知識大腦菜單方法
-  toggleKnowledgeMenu(): void {
-    this.knowledgeMenuExpanded.set(!this.knowledgeMenuExpanded());
-  }
-  
-  isKnowledgeView(): boolean {
+  /** 智能引擎入口：任意 /ai-engine/* 均高亮此项 */
+  isAiEngineView(): boolean {
     const view = this.currentView();
-    return view === 'knowledge-brain' || view === 'knowledge-manage' || view === 'knowledge-gaps';
+    return view === 'ai-engine' || view === 'ai-center' || view === 'knowledge-brain' || view === 'knowledge-manage' || view === 'knowledge-gaps';
   }
 
   // --- Kanban State ---
@@ -2543,9 +2549,16 @@ export class AppComponent implements OnDestroy, OnInit {
     this.router.events.subscribe(event => {
       if (event instanceof NavigationEnd) {
         const url = event.urlAfterRedirects || event.url;
-        // 反查 VIEW_ROUTE_MAP: 找出對應的 view 名稱
-        // 優先精確匹配，但 currentView 可能已由 changeView() 設定
-        const viewEntry = Object.entries(VIEW_ROUTE_MAP).find(([, route]) => route === url);
+        const path = url.split('?')[0];
+        // 智能引擎：任意 /ai-engine/* 均高亮「智能引擎」側欄項
+        if (path === '/ai-engine' || path.startsWith('/ai-engine/')) {
+          if (this.currentView() !== 'ai-engine') {
+            this.currentView.set('ai-engine');
+          }
+          return;
+        }
+        // 其他路由：反查 VIEW_ROUTE_MAP（用 path 匹配，忽略 query）
+        const viewEntry = Object.entries(VIEW_ROUTE_MAP).find(([, route]) => route === path);
         if (viewEntry) {
           const viewName = viewEntry[0] as View;
           if (this.currentView() !== viewName) {
@@ -2761,8 +2774,8 @@ export class AppComponent implements OnDestroy, OnInit {
             this.loadResources();
           }
           this.loadDiscoveryKeywords();
-        } else if (currentView === 'ai-center') {
-          // 刷新 RAG 統計
+        } else if (this.isAiEngineView()) {
+          // 刷新 RAG 統計（智能引擎 / 知识大脑）
           this.refreshRagStats();
         }
       }
@@ -3563,7 +3576,7 @@ export class AppComponent implements OnDestroy, OnInit {
     'NO_ACTIVE_CAMPAIGN': {view: 'trigger-rules', elementId: 'trigger-rules-section'},
     'CAMPAIGN_INCOMPLETE': {view: 'trigger-rules', elementId: 'trigger-rules-section'},
     'NO_TEMPLATE': {view: 'automation', elementId: 'templates-section'},
-    'AI_NOT_ENABLED': {view: 'ai-center', elementId: 'ai-settings-section'}
+    'AI_NOT_ENABLED': {view: 'ai-engine', elementId: 'ai-settings-section'}
   };
   
   // 導航到錯誤位置

@@ -18,6 +18,7 @@
 import { Component, signal, computed, inject, OnInit, input, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { AICenterService } from './ai-center.service';
 import { KnowledgeManageComponent } from './knowledge-manage.component';
 import { KnowledgeGapsComponent } from './knowledge-gaps.component';
@@ -91,7 +92,7 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
         <!-- Tab 導航 -->
         <div class="flex gap-1 mt-4 bg-slate-800/50 p-1 rounded-xl w-fit">
           @for (tab of tabs; track tab.id) {
-            <button (click)="activeTab.set(tab.id)"
+            <button (click)="selectTab(tab.id)"
                     class="px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 text-sm font-medium"
                     [class.bg-gradient-to-r]="activeTab() === tab.id"
                     [class.from-purple-500]="activeTab() === tab.id"
@@ -940,7 +941,7 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
             <!-- 知识大脑：总览 | 知识管理 | 知识缺口 -->
             <div class="max-w-5xl mx-auto space-y-4">
               <div class="flex gap-1 bg-slate-800/50 p-1 rounded-xl w-fit">
-                <button (click)="knowledgeSubTab.set('overview')"
+                <button (click)="selectKnowledgeSubTab('overview')"
                         class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
                         [class.bg-pink-500/30]="knowledgeSubTab() === 'overview'"
                         [class.text-white]="knowledgeSubTab() === 'overview'"
@@ -948,7 +949,7 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
                         [class.hover:bg-slate-700/50]="knowledgeSubTab() !== 'overview'">
                   📊 总览
                 </button>
-                <button (click)="knowledgeSubTab.set('manage')"
+                <button (click)="selectKnowledgeSubTab('manage')"
                         class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
                         [class.bg-pink-500/30]="knowledgeSubTab() === 'manage'"
                         [class.text-white]="knowledgeSubTab() === 'manage'"
@@ -956,7 +957,7 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
                         [class.hover:bg-slate-700/50]="knowledgeSubTab() !== 'manage'">
                   📝 知识管理
                 </button>
-                <button (click)="knowledgeSubTab.set('gaps')"
+                <button (click)="selectKnowledgeSubTab('gaps')"
                         class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
                         [class.bg-pink-500/30]="knowledgeSubTab() === 'gaps'"
                         [class.text-white]="knowledgeSubTab() === 'gaps'"
@@ -1219,6 +1220,8 @@ export class AICenterComponent implements OnInit {
   isSavingStrategy = signal(false);
   customPersona = signal('');
   private originalStrategy: any = null;
+
+  private router = inject(Router);
   
   // 🆕 Phase 3-1: 重新定義標籤為「智能引擎設置」焦點；🔧 知识大脑獨立 Tab
   tabs = [
@@ -2151,6 +2154,25 @@ A: 支持微信、支付寶、銀行卡`,
         if (tab === 'knowledge' && sub) this.knowledgeSubTab.set(sub);
       }
     });
+  }
+
+  /** Tab 切換並同步 URL（支持刷新、分享、前進後退） */
+  selectTab(tabId: AITab): void {
+    this.activeTab.set(tabId);
+    if (tabId === 'knowledge') {
+      this.router.navigate(['/ai-engine/overview'], { replaceUrl: true });
+    } else if (tabId === 'quick') {
+      this.router.navigate(['/ai-engine'], { replaceUrl: true });
+    } else {
+      this.router.navigate(['/ai-engine'], { queryParams: { tab: tabId }, replaceUrl: true });
+    }
+  }
+
+  /** 知识大脑子 Tab 切換並同步 URL */
+  selectKnowledgeSubTab(subId: KnowledgeSubTab): void {
+    this.knowledgeSubTab.set(subId);
+    const path = subId === 'overview' ? '/ai-engine/overview' : subId === 'manage' ? '/ai-engine/knowledge' : '/ai-engine/gaps';
+    this.router.navigate([path], { replaceUrl: true });
   }
 
   ngOnInit() {

@@ -1359,6 +1359,13 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   filterJoinStatus = signal<string>('all'); // 'all' | 'joined' | 'not_joined'
   filterHasId = signal<boolean>(false); // 只顯示有完整 ID 的結果
   filterSavedOnly = signal<boolean>(false); // 🔧 Phase9-5: 只顯示收藏的資源（資源中心模式）
+
+  constructor() {
+    // 路由切換時同步：資源中心只顯示收藏，搜索發現顯示全部
+    effect(() => {
+      this.filterSavedOnly.set(this.initialView() === 'resource-center');
+    });
+  }
   
   // 🆕 詳情彈窗狀態
   showDetailDialog = signal(false);

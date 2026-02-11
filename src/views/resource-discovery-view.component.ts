@@ -4,9 +4,11 @@
  * 
  * 🆕 Phase 32: 修復組件綁定和服務調用
  */
-import { Component, inject, signal, ChangeDetectionStrategy, OnInit } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { NavBridgeService, LegacyView } from '../services/nav-bridge.service';
 import { I18nService } from '../i18n.service';
 import { MembershipService } from '../membership.service';
@@ -35,26 +37,42 @@ import { SearchDiscoveryComponent } from '../search-discovery/search-discovery.c
     </app-search-discovery>
   `
 })
-export class ResourceDiscoveryViewComponent implements OnInit {
+export class ResourceDiscoveryViewComponent implements OnInit, OnDestroy {
   // 服務注入
   private i18n = inject(I18nService);
   private nav = inject(NavBridgeService);
+  private route = inject(ActivatedRoute);
   private ipc = inject(ElectronIpcService);
   private toast = inject(ToastService);
   public membershipService = inject(MembershipService);
   public accountService = inject(AccountManagementService);
   public resourceService = inject(ResourceService);
-  
-  // 🔧 Phase9-5: 根據 NavBridge 區分「資源中心」vs「搜索發現」
+  private routeDataSub: Subscription | null = null;
+
+  // 🔧 由路由決定：/resource-discovery → 資源中心，/search-discovery → 搜索發現
   initialView = signal<string>('search-discovery');
+
+  private setModeFromRoute(): void {
+    const mode = this.route.snapshot.data['discoveryMode'] as string | undefined;
+    if (mode === 'resource-center' || mode === 'search-discovery') {
+      this.initialView.set(mode);
+    } else {
+      const currentView = this.nav.currentView();
+      if (currentView === 'resource-center' || currentView === 'resources') {
+        this.initialView.set('resource-center');
+      } else {
+        this.initialView.set('search-discovery');
+      }
+    }
+  }
   
   ngOnInit(): void {
-    const currentView = this.nav.currentView();
-    if (currentView === 'resource-center' || currentView === 'resources') {
-      this.initialView.set('resource-center');
-    } else {
-      this.initialView.set('search-discovery');
-    }
+    this.setModeFromRoute();
+    this.routeDataSub = this.route.data.subscribe(() => this.setModeFromRoute());
+  }
+
+  ngOnDestroy(): void {
+    this.routeDataSub?.unsubscribe();
   }
   
   // 導航

@@ -185,17 +185,19 @@ async def handle_get_alerts(self, payload: Dict[str, Any]):
         return {"success": False, "error": str(e)}
 
 async def handle_acknowledge_alert(self, payload: Dict[str, Any]):
-    """Handle acknowledge-alert / alerts:mark-read command"""
+    """Handle acknowledge-alert / alerts:mark-read command. If no id, mark all as read."""
     try:
         if payload is None:
             payload = {}
         alert_id = payload.get('alertId') or payload.get('id')
-        if not alert_id:
-            self.send_log("Alert ID required", "error")
-            return {"success": False, "error": "Alert ID required"}
-        
-        await db.acknowledge_alert(alert_id)
-        self.send_log(f"Alert {alert_id} acknowledged", "success")
+        mark_all = payload.get('markAll', False)
+        if alert_id:
+            await db.acknowledge_alert(alert_id)
+            self.send_log(f"Alert {alert_id} acknowledged", "success")
+        else:
+            # 前端「全部已讀」會傳 {}，視為標記全部已讀
+            count = await db.acknowledge_all_alerts()
+            self.send_log(f"All alerts marked read ({count} updated)", "success")
         
         # Send updated alerts
         alerts = await db.get_recent_alerts(50)

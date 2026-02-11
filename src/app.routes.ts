@@ -150,7 +150,15 @@ export const routes: Routes = [
   {
     path: 'resource-discovery',
     loadComponent: () => import('./views/resource-discovery-view.component').then(m => m.ResourceDiscoveryViewComponent),
-    title: '資源發現',
+    title: '資源中心',
+    data: { discoveryMode: 'resource-center' },
+    canActivate: [membershipGuard]
+  },
+  {
+    path: 'search-discovery',
+    loadComponent: () => import('./views/resource-discovery-view.component').then(m => m.ResourceDiscoveryViewComponent),
+    title: '搜索發現',
+    data: { discoveryMode: 'search-discovery' },
     canActivate: [membershipGuard]
   },
   // ============ 🆕 重構後的核心模塊 ============
@@ -299,7 +307,7 @@ export const VIEW_ROUTE_MAP: Record<string, string> = {
   'resource-discovery': '/resource-discovery',
   'resources': '/resource-discovery',
   'resource-center': '/resource-discovery',
-  'search-discovery': '/resource-discovery',
+  'search-discovery': '/search-discovery',
   
   // ============ 客戶管理 ============
   'leads': '/leads',

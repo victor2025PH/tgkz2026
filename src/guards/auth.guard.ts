@@ -50,6 +50,11 @@ export const ROUTE_PERMISSIONS: Record<string, RoutePermission> = {
     membershipLevel: 'bronze',
     membershipMessage: '資源發現需要青銅會員或以上等級'
   },
+  'search-discovery': {
+    requiredFeature: 'resourceDiscovery',
+    membershipLevel: 'bronze',
+    membershipMessage: '搜索發現需要青銅會員或以上等級'
+  },
   
   // AI 功能 - 高級會員
   'ai-center': {

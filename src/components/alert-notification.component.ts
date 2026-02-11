@@ -497,6 +497,8 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
         // 更新列表
         this.allNotifications.set(active);
         this.unreadCount.set(active.filter(a => !a.dismissed).length);
+        // 從當前展示中移除 CPU 告警（避免舊提示殘留）
+        this.visibleNotifications.update(list => list.filter(n => n.type !== 'cpu_high'));
       }
     } catch (e) {
       console.error('Load alerts failed:', e);

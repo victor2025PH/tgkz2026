@@ -1156,10 +1156,14 @@ export class LoginComponent implements OnInit, OnDestroy {
       if (result.success) {
         // 記錄成功嘗試（清除限制）
         this.security.recordLoginAttempt(true, this.email);
-        
-        // 獲取重定向 URL
-        const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
-        this.router.navigateByUrl(returnUrl);
+        // 與掃碼登入一致：標記「剛登入」並整頁跳轉，避免首屏 401 被攔截器踢回登入頁（第一用戶也適用）
+        try {
+          sessionStorage.setItem('tgm_just_logged_in', String(Date.now()));
+        } catch (_) {}
+        const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
+        const url = returnUrl.startsWith('/') ? `${window.location.origin}${returnUrl}` : returnUrl;
+        window.location.href = url;
+        return;
       } else {
         // 記錄失敗嘗試
         this.security.recordLoginAttempt(false, this.email);

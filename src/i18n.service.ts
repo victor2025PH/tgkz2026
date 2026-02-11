@@ -32,8 +32,8 @@ type Translations = Record<TranslationKey, TranslationValue>;
   providedIn: 'root'
 })
 export class I18nService {
-  // 當前語言
-  private _locale = signal<SupportedLocale>('zh-TW');
+  // 當前語言（默認 zh-CN，initLocale 會根據存儲覆蓋）
+  private _locale = signal<SupportedLocale>('zh-CN');
   locale = this._locale.asReadonly();
   
   // 語言包緩存
@@ -68,7 +68,7 @@ export class I18nService {
   
   /**
    * 初始化語言設置
-   * 🔧 優先默認簡體中文：無存儲時登入及全站默認 zh-CN；僅瀏覽器明確 en 時用 en
+   * 🔧 優先默認簡體中文：僅在用戶曾手動選擇過語言時使用存儲值，否則一律默認 zh-CN（不再跟隨瀏覽器）
    */
   private initLocale(): void {
     const stored = localStorage.getItem('tg-matrix-locale') as SupportedLocale;
@@ -76,15 +76,8 @@ export class I18nService {
       this._locale.set(stored);
       return;
     }
-    const browserLang = navigator.language;
-    if (browserLang.startsWith('en')) {
-      this._locale.set('en');
-    } else if (browserLang === 'zh-CN' || browserLang === 'zh-Hans') {
-      this._locale.set('zh-CN');
-    } else {
-      // 其餘（含 zh-TW、未識別）統一默認簡體中文
-      this._locale.set('zh-CN');
-    }
+    // 無存儲或首次訪問：統一默認簡體中文
+    this._locale.set('zh-CN');
   }
   
   /**

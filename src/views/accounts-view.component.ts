@@ -36,7 +36,7 @@ import { AccountCardListComponent } from '../account-card-list.component';
       <h2 id="accounts-section" class="text-4xl font-bold text-slate-900 dark:text-white">{{ t('accounts.manageAccounts') }}</h2>
       <!-- 賬戶配額顯示 -->
       <div class="flex items-center gap-3">
-        <span class="text-sm text-slate-500">賬戶配額:</span>
+        <span class="text-sm text-slate-500">{{ t('membership.accountQuota') }}:</span>
         <span class="text-lg font-bold px-3 py-1 rounded-lg"
               [class]="membershipService.quotas().maxAccounts === -1 ? 'bg-emerald-500/20 text-emerald-400' : 
                        (accounts().length >= membershipService.quotas().maxAccounts ? 'bg-red-500/20 text-red-400' : 'bg-cyan-500/20 text-cyan-400')">
@@ -44,7 +44,7 @@ import { AccountCardListComponent } from '../account-card-list.component';
         </span>
         @if (membershipService.quotas().maxAccounts !== -1 && accounts().length >= membershipService.quotas().maxAccounts) {
           <button (click)="showUpgrade()" class="text-xs px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full hover:opacity-90 transition-opacity">
-            升級解鎖更多
+            {{ t('membership.upgradeUnlock') }}
           </button>
         }
       </div>
@@ -57,18 +57,18 @@ import { AccountCardListComponent } from '../account-card-list.component';
           <!-- 添加帳戶 -->
           <button (click)="navigateTo('add-account')" class="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white text-sm font-bold py-2 px-4 rounded-lg transition duration-200 shadow-lg shadow-cyan-500/20">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            添加帳戶
+            {{ t('accounts.addAccount') }}
           </button>
           
           <!-- API 憑據池 -->
           <button (click)="navigateTo('api-credentials')" class="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-bold py-2 px-4 rounded-lg transition duration-200 shadow-lg shadow-amber-500/20">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-            API 憑據池
+            {{ t('accounts.apiCredentialsPool') }}
           </button>
           
           <button (click)="openQrLogin()" class="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white text-sm font-bold py-2 px-4 rounded-lg transition duration-200 shadow-lg shadow-emerald-500/20">
             <span>📱</span>
-            掃碼登入
+            {{ t('accounts.scanLogin') }}
           </button>
           
           <button (click)="importSession()" 
@@ -76,10 +76,10 @@ import { AccountCardListComponent } from '../account-card-list.component';
                   class="flex items-center gap-2 bg-slate-200 dark:bg-slate-800/50 hover:bg-slate-300 dark:hover:bg-slate-700/50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold py-2 px-4 rounded-lg transition duration-200">
             @if (isImportingSession()) {
               <span class="animate-spin">⏳</span>
-              導入中...
+              {{ t('accounts.importing') }}
             } @else {
               <span>📥</span>
-              導入 Session
+              {{ t('accounts.importSession') }}
             }
           </button>
         </div>

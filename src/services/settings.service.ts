@@ -45,7 +45,7 @@ export interface ApiCredentials {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
-  language: 'zh-TW',
+  language: 'zh-CN',
   sidebarCollapsed: false,
   animationType: 'default',
   autoConnect: true,

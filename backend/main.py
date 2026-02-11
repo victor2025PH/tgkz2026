@@ -873,7 +873,6 @@ _NO_PAYLOAD_HANDLERS = {
     'handle_clear_all_resources',
     'handle_clear_logs',
     'handle_discover_discussions_from_resources',
-    'handle_get_accounts',
     'handle_get_ai_chat_settings',
     'handle_get_ai_models',
     'handle_get_backup_info',

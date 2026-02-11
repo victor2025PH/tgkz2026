@@ -231,9 +231,11 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Build (SaaS mode)
-        run: npm run build:saas
+        run: |
+          echo "Node $(node -v) | npm $(npm -v)"
+          npm run build:saas
         env:
-          NODE_OPTIONS: '--max_old_space_size=4096'
+          NODE_OPTIONS: '--max_old_space_size=8192'
 
       - name: Verify build output
         run: |

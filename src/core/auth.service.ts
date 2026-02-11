@@ -1151,18 +1151,13 @@ export class AuthService implements OnDestroy {
       
       console.log('[Auth] restoreSession - accessToken:', !!accessToken, 'refreshToken:', !!refreshToken, 'user:', !!userJson);
       
-      // 🆕 P0: 驗證 Token 格式有效性
-      if (accessToken && !this.isValidTokenFormat(accessToken)) {
-        console.warn('[Auth] Invalid token format, clearing session');
-        this.clearAuthState();
-        return;
-      }
-      
-      if (accessToken) {
+      // 🔧 修復「進入前台秒回登入頁」：恢復時不因格式/過期清除會話，避免首屏未渲染就被踢回登入頁
+      // 僅做最小長度檢查；過期與有效性交給後端與 refresh 處理
+      if (accessToken && accessToken.length >= 10) {
         console.log('[Auth] Setting accessToken signal');
         this._accessToken.set(accessToken);
       }
-      if (refreshToken) {
+      if (refreshToken && refreshToken.length >= 10) {
         this._refreshToken.set(refreshToken);
       }
       if (userJson) {
@@ -1182,9 +1177,8 @@ export class AuthService implements OnDestroy {
           this._user.set(userData);
           console.log('[Auth] User restored from localStorage, displayName:', userData.displayName || userData.display_name);
         } catch {
-          console.warn('[Auth] Invalid user JSON, clearing');
-          this.clearAuthState();
-          return;
+          // 用戶 JSON 解析失敗時僅不恢復 user，不清除 token，避免秒回登入頁
+          console.warn('[Auth] Invalid user JSON, skipping user restore only');
         }
       }
       
@@ -1210,8 +1204,8 @@ export class AuthService implements OnDestroy {
         });
       }
     } catch (e) {
-      console.error('Restore session error:', e);
-      this.clearAuthState();
+      // 🔧 恢復出錯時只記日誌，不清除 session，避免任何意外導致秒回登入頁
+      console.error('[Auth] Restore session error (not clearing):', e);
     }
   }
   

@@ -18,7 +18,7 @@ export type LegacyView =
   | 'ai-assistant' | 'automation' | 'automation-legacy' 
   | 'leads' | 'lead-nurturing' | 'nurturing-analytics' 
   | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' 
-  | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps'
+  | 'ai-engine' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps'
   | 'settings' | 'analytics' | 'analytics-center' 
   | 'logs' | 'performance' | 'alerts' | 'profile' | 'membership-center'
   | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' 
@@ -119,7 +119,7 @@ export class NavBridgeService {
       'ai-assistant', 'automation', 'automation-legacy',
       'leads', 'lead-nurturing', 'nurturing-analytics',
       'ads', 'user-tracking', 'campaigns', 'multi-role', 'ai-team',
-      'ai-center', 'knowledge-brain', 'knowledge-manage', 'knowledge-gaps',
+      'ai-engine', 'ai-center', 'knowledge-brain', 'knowledge-manage', 'knowledge-gaps',
       'settings', 'analytics', 'analytics-center',
       'logs', 'performance', 'alerts', 'profile', 'membership-center',
       'monitoring-accounts', 'monitoring-groups', 'keyword-sets',

@@ -361,7 +361,7 @@ export class MarketingStateService implements OnDestroy {
       return {
         type: 'setup',
         description: '請先配置 AI 模型',
-        action: () => this.ipc.send('navigate-to', { path: '/ai-center' })
+        action: () => this.ipc.send('navigate-to', { path: '/ai-engine' })
       };
     }
     
@@ -379,7 +379,7 @@ export class MarketingStateService implements OnDestroy {
       return {
         type: 'optimize',
         description: '轉化率偏低，建議優化 AI 人格設置',
-        action: () => this.ipc.send('navigate-to', { path: '/ai-center', query: { tab: 'persona' } })
+        action: () => this.ipc.send('navigate-to', { path: '/ai-engine', query: { tab: 'persona' } })
       };
     }
     

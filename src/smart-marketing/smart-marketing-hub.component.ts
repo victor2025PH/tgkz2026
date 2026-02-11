@@ -735,7 +735,7 @@ export class SmartMarketingHubComponent implements OnInit {
   // ============ 導航 ============
   
   goToAICenter(): void {
-    this.ipc.send('navigate-to', { path: '/ai-center' });
+    this.ipc.send('navigate-to', { path: '/ai-engine' });
   }
   
   goToRoleLibrary(): void {

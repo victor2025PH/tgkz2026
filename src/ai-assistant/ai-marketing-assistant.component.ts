@@ -670,7 +670,7 @@ export class AiMarketingAssistantComponent implements OnInit {
   
   // 導航到 AI 中心
   goToAICenter(): void {
-    this.navigateEvent.emit('ai-center');
+    this.navigateEvent.emit('ai-engine');
     this.toastService.info('前往 AI 中心配置模型...');
   }
   

@@ -381,7 +381,7 @@ export class QuickWorkflowComponent implements OnInit {
         { id: 's2', title: '添加監控群組', description: '添加目標群組', icon: '💬', status: 'pending', isOptional: false, actionView: 'resources' },
         { id: 's3', title: '設置關鍵詞', description: '配置觸發關鍵詞', icon: '🔑', status: 'pending', isOptional: false, actionView: 'automation' },
         { id: 's4', title: '創建活動', description: '設置自動回覆活動', icon: '⚡', status: 'pending', isOptional: false, actionView: 'automation' },
-        { id: 's5', title: '配置 AI 回覆', description: '設置 AI 自動問候', icon: '🤖', status: 'pending', isOptional: true, actionView: 'ai-center' },
+        { id: 's5', title: '配置 AI 回覆', description: '設置 AI 自動問候', icon: '🤖', status: 'pending', isOptional: true, actionView: 'ai-engine' },
         { id: 's6', title: '開始監控', description: '啟動自動化系統', icon: '▶️', status: 'pending', isOptional: false, actionHandler: 'start-monitoring' }
       ]
     },
@@ -416,7 +416,7 @@ export class QuickWorkflowComponent implements OnInit {
     { id: 'view-stats', title: '數據分析', description: '查看統計報表', icon: '📊', category: 'analysis', actionView: 'nurturing-analytics' },
     { id: 'export-data', title: '導出數據', description: '導出客戶數據', icon: '📥', category: 'analysis', actionView: 'leads', actionHandler: 'export-leads' },
     { id: 'start-monitoring', title: '開始監控', description: '啟動自動監控', icon: '▶️', category: 'automation', actionView: 'automation', actionHandler: 'start-monitoring', isRecommended: true },
-    { id: 'ai-settings', title: 'AI 設置', description: '配置 AI 回覆', icon: '🤖', category: 'automation', actionView: 'ai-center' }
+    { id: 'ai-settings', title: 'AI 設置', description: '配置 AI 回覆', icon: '🤖', category: 'automation', actionView: 'ai-engine' }
   ]);
   
   // 推薦工作流

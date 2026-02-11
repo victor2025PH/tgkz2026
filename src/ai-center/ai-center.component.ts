@@ -15,10 +15,12 @@
  * - 快速啟動功能
  */
 
-import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, input, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AICenterService } from './ai-center.service';
+import { KnowledgeManageComponent } from './knowledge-manage.component';
+import { KnowledgeGapsComponent } from './knowledge-gaps.component';
 import { DialogService } from '../services/dialog.service';
 import { ToastService } from '../toast.service';
 import { ElectronIpcService } from '../electron-ipc.service';
@@ -33,13 +35,14 @@ import {
   ConversationStyle
 } from './ai-center.models';
 
-// 🔄 簡化標籤結構（知識大腦已移至左側菜單）
-type AITab = 'quick' | 'models' | 'persona' | 'stats';
+// 🔄 簡化標籤結構；知识大脑为独立 Tab，内含 总览/知识管理/知识缺口
+type AITab = 'quick' | 'models' | 'persona' | 'stats' | 'knowledge';
+type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
 
 @Component({
   selector: 'app-ai-center',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, KnowledgeManageComponent, KnowledgeGapsComponent],
   template: `
     <div class="ai-center h-full flex flex-col bg-slate-900">
       <!-- 頂部標題欄 -->
@@ -933,6 +936,68 @@ type AITab = 'quick' | 'models' | 'persona' | 'stats';
               </div>
             </div>
           }
+          @case ('knowledge') {
+            <!-- 知识大脑：总览 | 知识管理 | 知识缺口 -->
+            <div class="max-w-5xl mx-auto space-y-4">
+              <div class="flex gap-1 bg-slate-800/50 p-1 rounded-xl w-fit">
+                <button (click)="knowledgeSubTab.set('overview')"
+                        class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                        [class.bg-pink-500/30]="knowledgeSubTab() === 'overview'"
+                        [class.text-white]="knowledgeSubTab() === 'overview'"
+                        [class.text-slate-400]="knowledgeSubTab() !== 'overview'"
+                        [class.hover:bg-slate-700/50]="knowledgeSubTab() !== 'overview'">
+                  📊 总览
+                </button>
+                <button (click)="knowledgeSubTab.set('manage')"
+                        class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                        [class.bg-pink-500/30]="knowledgeSubTab() === 'manage'"
+                        [class.text-white]="knowledgeSubTab() === 'manage'"
+                        [class.text-slate-400]="knowledgeSubTab() !== 'manage'"
+                        [class.hover:bg-slate-700/50]="knowledgeSubTab() !== 'manage'">
+                  📝 知识管理
+                </button>
+                <button (click)="knowledgeSubTab.set('gaps')"
+                        class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                        [class.bg-pink-500/30]="knowledgeSubTab() === 'gaps'"
+                        [class.text-white]="knowledgeSubTab() === 'gaps'"
+                        [class.text-slate-400]="knowledgeSubTab() !== 'gaps'"
+                        [class.hover:bg-slate-700/50]="knowledgeSubTab() !== 'gaps'">
+                  ❓ 知识缺口
+                </button>
+              </div>
+              @switch (knowledgeSubTab()) {
+                @case ('overview') {
+                  <div class="bg-gradient-to-br from-cyan-500/10 to-purple-500/10 rounded-xl border border-cyan-500/30 p-6">
+                    <h3 class="font-semibold text-white mb-4 flex items-center gap-2"><span>🧠</span> 知识大脑总览</h3>
+                    <div class="grid grid-cols-3 gap-4">
+                      <div class="bg-slate-800/50 rounded-lg p-4">
+                        <div class="text-sm text-slate-400 mb-1">知識庫</div>
+                        <div class="text-2xl font-bold text-blue-400">{{ smartSystemStats().knowledge }}</div>
+                        <div class="text-xs text-slate-500">條學習</div>
+                      </div>
+                      <div class="bg-slate-800/50 rounded-lg p-4">
+                        <div class="text-sm text-slate-400 mb-1">對話記憶</div>
+                        <div class="text-2xl font-bold text-cyan-400">{{ smartSystemStats().memories }}</div>
+                        <div class="text-xs text-slate-500">條記憶</div>
+                      </div>
+                      <div class="bg-slate-800/50 rounded-lg p-4">
+                        <div class="text-sm text-slate-400 mb-1">客戶標籤</div>
+                        <div class="text-2xl font-bold text-purple-400">{{ smartSystemStats().tags }}</div>
+                        <div class="text-xs text-slate-500">個標籤</div>
+                      </div>
+                    </div>
+                    <button (click)="refreshSmartSystemStats()" class="mt-4 px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-lg text-sm">🔄 刷新統計</button>
+                  </div>
+                }
+                @case ('manage') {
+                  <app-knowledge-manage />
+                }
+                @case ('gaps') {
+                  <app-knowledge-gaps />
+                }
+              }
+            </div>
+          }
         }
       </div>
       
@@ -1082,7 +1147,12 @@ export class AICenterComponent implements OnInit {
   private ipcService = inject(ElectronIpcService);  // 🔊 P1: 用於 TTS
   private navBridge = inject(NavBridgeService);
   
+  /** 由路由傳入：知识大脑总览/知识管理/知识缺口 對應 knowledge Tab + knowledgeSubTab */
+  initialTab = input<AITab | undefined>(undefined);
+  initialKnowledgeSub = input<KnowledgeSubTab | undefined>(undefined);
+  
   activeTab = signal<AITab>('models');  // 🆕 Phase 3-1: 默認顯示模型配置
+  knowledgeSubTab = signal<KnowledgeSubTab>('overview');
   
   // 🔧 Phase9-5: 視圖名稱 → Tab 映射（NavBridge 驅動）
   private static readonly VIEW_TAB_MAP: Record<string, AITab> = {
@@ -1091,9 +1161,9 @@ export class AICenterComponent implements OnInit {
     'ai-models': 'models',
     'ai-persona': 'persona',
     'ai-brain': 'quick',
-    'knowledge-brain': 'stats',
-    'knowledge-manage': 'stats',
-    'knowledge-gaps': 'stats',
+    'knowledge-brain': 'knowledge',
+    'knowledge-manage': 'knowledge',
+    'knowledge-gaps': 'knowledge',
   };
   showAddModel = signal(false);
   
@@ -1150,12 +1220,13 @@ export class AICenterComponent implements OnInit {
   customPersona = signal('');
   private originalStrategy: any = null;
   
-  // 🆕 Phase 3-1: 重新定義標籤為「智能引擎設置」焦點
+  // 🆕 Phase 3-1: 重新定義標籤為「智能引擎設置」焦點；🔧 知识大脑獨立 Tab
   tabs = [
-    { id: 'quick' as const, icon: '🚀', label: '引擎概覽' },   // 引擎概覽 + 快速導航
-    { id: 'models' as const, icon: '🤖', label: '模型配置' },  // AI 模型和 API 設置
-    { id: 'persona' as const, icon: '🎭', label: '人格風格' }, // AI 說話風格和策略
-    { id: 'stats' as const, icon: '📊', label: '使用統計' }    // 使用量和成本統計
+    { id: 'quick' as const, icon: '🚀', label: '引擎概覽' },
+    { id: 'models' as const, icon: '🤖', label: '模型配置' },
+    { id: 'persona' as const, icon: '🎭', label: '人格風格' },
+    { id: 'knowledge' as const, icon: '🧠', label: '知识大脑' },
+    { id: 'stats' as const, icon: '📊', label: '使用統計' }
   ];
   
   providers = [
@@ -2070,16 +2141,41 @@ A: 支持微信、支付寶、銀行卡`,
     if (autonomous !== null) this.autonomousModeEnabled.set(autonomous === 'true');
   }
   
+  constructor() {
+    // 路由切換時同步 Tab（知识大脑 总览/知识管理/知识缺口）
+    effect(() => {
+      const tab = this.initialTab();
+      const sub = this.initialKnowledgeSub();
+      if (tab) {
+        this.activeTab.set(tab);
+        if (tab === 'knowledge' && sub) this.knowledgeSubTab.set(sub);
+      }
+    });
+  }
+
   ngOnInit() {
     this.loadQuickSettings();
     this.loadSenderAccounts();
     this.loadStrategyFromLocalStorage();
     
-    // 🔧 Phase9-5: 根據 NavBridge 的視圖名稱自動切換到對應 tab
+    // 🔧 優先使用路由傳入的 initialTab
+    const fromRoute = this.initialTab();
+    if (fromRoute) {
+      this.activeTab.set(fromRoute);
+      const sub = this.initialKnowledgeSub();
+      if (fromRoute === 'knowledge' && sub) this.knowledgeSubTab.set(sub);
+      return;
+    }
+    // 否則根據 NavBridge 的視圖名稱自動切換到對應 tab
     const currentView = this.navBridge.currentView();
     const targetTab = AICenterComponent.VIEW_TAB_MAP[currentView];
     if (targetTab) {
       this.activeTab.set(targetTab);
+      if (targetTab === 'knowledge') {
+        if (currentView === 'knowledge-manage') this.knowledgeSubTab.set('manage');
+        else if (currentView === 'knowledge-gaps') this.knowledgeSubTab.set('gaps');
+        else this.knowledgeSubTab.set('overview');
+      }
     }
   }
   

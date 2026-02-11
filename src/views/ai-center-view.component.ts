@@ -3,10 +3,13 @@
  * AI 中心視圖組件 - 完整版
  * 
  * 🆕 Phase 29: 使用服務替代 @Input/@Output
+ * 🔧 知识大脑：根据路由 enginePanel 传入 initialTab / initialKnowledgeSub
  */
-import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { NavBridgeService, LegacyView } from '../services/nav-bridge.service';
 import { I18nService } from '../i18n.service';
 import { MembershipService } from '../membership.service';
@@ -26,31 +29,60 @@ import { AICenterComponent } from '../ai-center/ai-center.component';
   ],
   template: `
     <app-ai-center
+      [initialTab]="initialTab()"
+      [initialKnowledgeSub]="initialKnowledgeSub()"
       (tabChange)="setActiveTab($event)"
       (navigate)="navigateTo($event)">
     </app-ai-center>
   `
 })
-export class AiCenterViewComponent implements OnInit {
+export class AiCenterViewComponent implements OnInit, OnDestroy {
   // 服務注入
   private i18n = inject(I18nService);
   private nav = inject(NavBridgeService);
+  private route = inject(ActivatedRoute);
   public membershipService = inject(MembershipService);
   public aiService = inject(AiChatService);
-  
-  // 狀態
+  private routeDataSub: Subscription | null = null;
+
+  /** 由路由 data.enginePanel 決定：overview/knowledge/gaps → knowledge Tab，default → 不傳 */
+  initialTab = signal<'quick' | 'models' | 'persona' | 'stats' | 'knowledge' | undefined>(undefined);
+  initialKnowledgeSub = signal<'overview' | 'manage' | 'gaps' | undefined>(undefined);
+
+  private setPanelFromRoute(): void {
+    const panel = this.route.snapshot.data['enginePanel'] as string | undefined;
+    if (panel === 'overview') {
+      this.initialTab.set('knowledge');
+      this.initialKnowledgeSub.set('overview');
+    } else if (panel === 'knowledge') {
+      this.initialTab.set('knowledge');
+      this.initialKnowledgeSub.set('manage');
+    } else if (panel === 'gaps') {
+      this.initialTab.set('knowledge');
+      this.initialKnowledgeSub.set('gaps');
+    } else {
+      this.initialTab.set(undefined);
+      this.initialKnowledgeSub.set(undefined);
+    }
+  }
+
+  // 狀態（供 tabChange 回調）
   activeTab = signal<string>('config');
   
   ngOnInit(): void {
-    // 從 URL 參數讀取初始標籤
+    this.setPanelFromRoute();
+    this.routeDataSub = this.route.data.subscribe(() => this.setPanelFromRoute());
+    // 從 URL 參數讀取初始標籤（兼容舊邏輯）
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab');
-    if (tab) {
+    if (tab && !this.initialTab()) {
       this.activeTab.set(tab);
     }
-    
-    // 加載 AI 設置
     this.aiService.loadSettings();
+  }
+
+  ngOnDestroy(): void {
+    this.routeDataSub?.unsubscribe();
   }
   
   // 翻譯方法

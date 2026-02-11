@@ -10,7 +10,7 @@
  * - 流程簡化：從 8+ 步驟減少到 2 步驟
  */
 
-import { Component, signal, computed, inject, OnInit, effect } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, effect, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NavBridgeService } from '../services/nav-bridge.service';
@@ -518,6 +518,8 @@ export class SmartMarketingHubComponent implements OnInit {
   private navBridge = inject(NavBridgeService);
   
   // ============ 狀態 ============
+  /** 由路由傳入的預設 Tab（策略規劃→quick-start，自動執行→tasks） */
+  initialTab = input<'quick-start' | 'tasks' | 'monitor' | 'settings' | undefined>(undefined);
   
   activeTab = signal<'quick-start' | 'tasks' | 'monitor' | 'settings'>('quick-start');
   selectedGoal = signal<GoalType | null>(null);
@@ -617,10 +619,24 @@ export class SmartMarketingHubComponent implements OnInit {
     'marketing-report': 'settings',
   };
 
+  constructor() {
+    // 路由切換時同步 Tab（策略規劃 ↔ 自動執行）
+    effect(() => {
+      const tab = this.initialTab();
+      if (tab) this.activeTab.set(tab);
+    });
+  }
+
   ngOnInit(): void {
     this.loadSettings();
     
-    // 🔧 Phase9-5: 根據 NavBridge 的視圖名稱自動切換到對應 tab
+    // 🔧 優先使用路由傳入的 initialTab（策略規劃 / 自動執行 對應不同 Tab）
+    const fromRoute = this.initialTab();
+    if (fromRoute) {
+      this.activeTab.set(fromRoute);
+      return;
+    }
+    // 否則根據 NavBridge 的視圖名稱切換到對應 tab
     const currentView = this.navBridge.currentView();
     const targetTab = SmartMarketingHubComponent.VIEW_TAB_MAP[currentView];
     if (targetTab) {

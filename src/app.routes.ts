@@ -163,11 +163,20 @@ export const routes: Routes = [
   },
   // ============ 🆕 重構後的核心模塊 ============
   
-  // 營銷任務中心（核心入口）
+  // 營銷任務中心（策略規劃 = 快速啟動）
   {
     path: 'marketing-hub',
     loadComponent: () => import('./views/smart-marketing-view.component').then(m => m.SmartMarketingViewComponent),
-    title: '營銷任務中心',
+    title: '策略規劃',
+    data: { hubMode: 'strategy' },
+    canActivate: [membershipGuard]
+  },
+  // 營銷任務中心 - 自動執行（任務列表）
+  {
+    path: 'marketing-hub/execution',
+    loadComponent: () => import('./views/smart-marketing-view.component').then(m => m.SmartMarketingViewComponent),
+    title: '自動執行',
+    data: { hubMode: 'execution' },
     canActivate: [membershipGuard]
   },
   // 角色資源庫（原多角色協作的資產部分）
@@ -182,6 +191,29 @@ export const routes: Routes = [
     path: 'ai-engine',
     loadComponent: () => import('./views/ai-center-view.component').then(m => m.AiCenterViewComponent),
     title: '智能引擎',
+    data: { enginePanel: 'default' },
+    canActivate: [membershipGuard]
+  },
+  // 知识大脑 - 总览 / 知识管理 / 知识缺口（独立 URL 以正确高亮与切 Tab）
+  {
+    path: 'ai-engine/overview',
+    loadComponent: () => import('./views/ai-center-view.component').then(m => m.AiCenterViewComponent),
+    title: '知识大脑总览',
+    data: { enginePanel: 'overview' },
+    canActivate: [membershipGuard]
+  },
+  {
+    path: 'ai-engine/knowledge',
+    loadComponent: () => import('./views/ai-center-view.component').then(m => m.AiCenterViewComponent),
+    title: '知识管理',
+    data: { enginePanel: 'knowledge' },
+    canActivate: [membershipGuard]
+  },
+  {
+    path: 'ai-engine/gaps',
+    loadComponent: () => import('./views/ai-center-view.component').then(m => m.AiCenterViewComponent),
+    title: '知识缺口',
+    data: { enginePanel: 'gaps' },
     canActivate: [membershipGuard]
   },
   
@@ -271,7 +303,7 @@ export const VIEW_ROUTE_MAP: Record<string, string> = {
   'marketing-monitor': '/marketing-hub',
   'marketing-report': '/marketing-hub',
   'ai-assistant': '/marketing-hub',
-  'ai-team': '/marketing-hub',
+  'ai-team': '/marketing-hub/execution',
   'ads': '/automation',
   'campaigns': '/automation',
   
@@ -289,9 +321,9 @@ export const VIEW_ROUTE_MAP: Record<string, string> = {
   'ai-models': '/ai-engine',
   'ai-brain': '/ai-engine',
   'ai-persona': '/ai-engine',
-  'knowledge-brain': '/ai-engine',
-  'knowledge-gaps': '/ai-engine',
-  'knowledge-manage': '/ai-engine',
+  'knowledge-brain': '/ai-engine/overview',
+  'knowledge-gaps': '/ai-engine/gaps',
+  'knowledge-manage': '/ai-engine/knowledge',
   
   // ============ 觸發監控 ============
   'automation': '/automation',

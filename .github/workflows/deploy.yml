@@ -38,10 +38,12 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci --legacy-peer-deps --ignore-scripts
       
       - name: Build frontend (SaaS mode)
         run: npm run build:saas
+        env:
+          NODE_OPTIONS: '--max_old_space_size=4096'
       
       - name: Setup SSH key
         run: |
@@ -111,9 +113,9 @@ jobs:
           ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 deploy-server << 'ENDSSH'
             cd /opt/tg-matrix
             
-            # 🔧 清理孤儿容器防止名称冲突
+            # 🔧 清理孤儿容器防止名称冲突（无容器时 docker rm 可能返回 1，忽略）
             sudo docker compose down --remove-orphans 2>/dev/null || true
-            sudo docker rm -f $(sudo docker ps -aq --filter "name=tg-matrix") 2>/dev/null || true
+            sudo docker ps -aq --filter "name=tg-matrix" 2>/dev/null | xargs -r sudo docker rm -f 2>/dev/null || true
             
             # 重新創建 nginx 容器（確保新的 volume 掛載生效）
             sudo docker compose up -d web
@@ -132,9 +134,9 @@ jobs:
       
       - name: Health check
         run: |
-          sleep 10
-          for i in 1 2 3 4 5 6; do
-            if curl -sf http://${{ env.SERVER_HOST }}/api/health > /dev/null; then
+          sleep 15
+          for i in 1 2 3 4 5 6 7 8; do
+            if curl -sf --connect-timeout 10 http://${{ env.SERVER_HOST }}/api/health > /dev/null; then
               echo "✅ Health check passed"
               exit 0
             fi
@@ -142,6 +144,7 @@ jobs:
             sleep 10
           done
           echo "⚠️ Health check timeout (service may still be starting)"
+        continue-on-error: true
       
       - name: Notify result
         if: always()

@@ -238,6 +238,19 @@ class AlertManager:
             
             # Update last alert time
             self.last_alert_times[rule_key] = datetime.now()
+        else:
+            # 指標已恢復：自動將該類型的未解決告警標記為已解決，避免一直提示
+            try:
+                n = await self.database.resolve_alerts_by_type(alert_type.value)
+                if n > 0:
+                    import logging
+                    logging.getLogger(__name__).info(
+                        "Auto-resolved %d %s alert(s) (metric recovered)",
+                        n, alert_type.value
+                    )
+            except Exception as e:
+                import sys
+                print(f"Auto-resolve alerts error: {e}", file=sys.stderr)
     
     async def _get_current_value(self, alert_type: AlertType):
         """Get current value for an alert type"""

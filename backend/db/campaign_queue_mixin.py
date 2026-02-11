@@ -959,6 +959,24 @@ class CampaignQueueMixin:
             import sys
             print(f"Error acknowledging alert: {e}", file=sys.stderr)
             return False
+
+    async def acknowledge_all_alerts(self) -> int:
+        """將所有未解決的告警標記為已確認（用於「全部已讀」）
+        Returns: 被更新的告警數量
+        """
+        try:
+            await self.connect()
+            cursor = await self._connection.execute(
+                """UPDATE system_alerts 
+                   SET acknowledged = 1, acknowledged_at = CURRENT_TIMESTAMP 
+                   WHERE resolved = 0 AND (acknowledged IS NULL OR acknowledged = 0)"""
+            )
+            await self._connection.commit()
+            return cursor.rowcount if hasattr(cursor, 'rowcount') else 0
+        except Exception as e:
+            import sys
+            print(f"Error acknowledging all alerts: {e}", file=sys.stderr)
+            return 0
     
     async def resolve_alert(self, alert_id: int) -> bool:
         """解決告警
@@ -983,7 +1001,28 @@ class CampaignQueueMixin:
             import sys
             print(f"Error resolving alert: {e}", file=sys.stderr)
             return False
-    
+
+    async def resolve_alerts_by_type(self, alert_type: str) -> int:
+        """按類型批量標記告警為已解決（用於指標恢復後自動消除告警）
+        
+        Returns:
+            int: 被標記為已解決的告警數量
+        """
+        try:
+            await self.connect()
+            cursor = await self._connection.execute(
+                """UPDATE system_alerts 
+                   SET resolved = 1, resolved_at = CURRENT_TIMESTAMP 
+                   WHERE alert_type = ? AND resolved = 0""",
+                (alert_type,)
+            )
+            await self._connection.commit()
+            return cursor.rowcount if hasattr(cursor, 'rowcount') else 0
+        except Exception as e:
+            import sys
+            print(f"Error resolving alerts by type: {e}", file=sys.stderr)
+            return 0
+
     async def get_recent_alerts(self, limit: int = 50, level: Optional[str] = None) -> List[Dict[str, Any]]:
         """獲取最近告警（包括已解決）"""
         return await self.get_alerts(limit=limit, level=level, include_resolved=True)

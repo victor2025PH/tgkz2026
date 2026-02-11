@@ -127,8 +127,8 @@ describe('SettingsViewComponent', () => {
   
   describe('Translation', () => {
     it('should call i18n service for translation', () => {
-      component.t('settingsTitle');
-      expect(mockI18n.t).toHaveBeenCalledWith('settingsTitle');
+      component.t('settings.settingsTitle');
+      expect(mockI18n.t).toHaveBeenCalledWith('settings.settingsTitle');
     });
   });
 });

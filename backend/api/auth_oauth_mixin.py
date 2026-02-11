@@ -5,6 +5,8 @@ OAuth/social login handlers extracted from AuthRoutesMixin
 
 Contains: Telegram OAuth, Google OAuth, QR code login,
 Deep Link login token, WebSocket login
+
+Fix: restore missing imports (json, datetime, web) + empty bot_username handling
 """
 import json
 import logging

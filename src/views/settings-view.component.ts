@@ -1,52 +1,66 @@
 /**
  * Settings View Component
  * 設置視圖組件 - 完整版
- * 
- * 🆕 Phase 27: 完善為獨立視圖組件，使用服務
+ *
+ * 🆕 側欄優化：通知與提醒、使用幫助、語言與外觀統一在此；支持 ?tab= 深鏈
  */
-import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router, ActivatedRoute } from '@angular/router';
 import { I18nService, SupportedLocale, SUPPORTED_LOCALES } from '../i18n.service';
 import { MembershipService } from '../membership.service';
 import { AnimationSelectorComponent } from '../components/animation-selector.component';
-import { 
-  SettingsService, 
-  BackupService, 
+import { NotificationCenterComponent } from '../components/notification-center.component';
+import {
+  SettingsService,
+  BackupService,
   SchedulerService,
-  AnimationConfigService 
+  AnimationConfigService
 } from '../services';
+
+export type SettingsTab = 'appearance' | 'notifications' | 'help' | 'backup' | 'scheduler' | 'about';
 
 @Component({
   selector: 'app-settings-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, AnimationSelectorComponent],
+  imports: [CommonModule, FormsModule, AnimationSelectorComponent, NotificationCenterComponent],
   template: `
     <div class="max-w-6xl mx-auto p-6">
       <h2 class="text-4xl font-bold mb-8 text-white">{{ t('settingsTitle') }}</h2>
-      
-      <!-- 設置標籤 -->
-      <div class="flex gap-2 mb-6 bg-slate-800/50 p-1 rounded-lg w-fit">
-        <button (click)="activeTab.set('appearance')" 
+
+      <!-- 設置標籤（與 URL ?tab= 同步） -->
+      <div class="flex flex-wrap gap-2 mb-6 bg-slate-800/50 p-1 rounded-lg w-fit">
+        <button (click)="setTab('appearance')"
                 [class]="activeTab() === 'appearance' ? 'bg-slate-700 shadow' : 'text-slate-500 hover:text-white'"
                 class="px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-sm">
-          ✨ 外觀設置
+          ✨ {{ t('settings.tabs.appearance') }}
         </button>
-        <button (click)="activeTab.set('backup'); loadBackups()" 
+        <button (click)="setTab('notifications')"
+                [class]="activeTab() === 'notifications' ? 'bg-slate-700 shadow' : 'text-slate-500 hover:text-white'"
+                class="px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-sm">
+          🔔 {{ t('settings.tabs.notifications') }}
+        </button>
+        <button (click)="setTab('help')"
+                [class]="activeTab() === 'help' ? 'bg-slate-700 shadow' : 'text-slate-500 hover:text-white'"
+                class="px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-sm">
+          ❓ {{ t('settings.tabs.help') }}
+        </button>
+        <button (click)="setTab('backup'); loadBackups()"
                 [class]="activeTab() === 'backup' ? 'bg-slate-700 shadow' : 'text-slate-500 hover:text-white'"
                 class="px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-sm">
-          💾 備份管理
+          💾 {{ t('settings.tabs.backup') }}
         </button>
-        <button (click)="activeTab.set('scheduler'); loadSchedulerStatus()" 
+        <button (click)="setTab('scheduler'); loadSchedulerStatus()"
                 [class]="activeTab() === 'scheduler' ? 'bg-slate-700 shadow' : 'text-slate-500 hover:text-white'"
                 class="px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-sm">
-          ⏰ 任務調度
+          ⏰ {{ t('settings.tabs.scheduler') }}
         </button>
-        <button (click)="activeTab.set('about')" 
+        <button (click)="setTab('about')"
                 [class]="activeTab() === 'about' ? 'bg-slate-700 shadow' : 'text-slate-500 hover:text-white'"
                 class="px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-sm">
-          ℹ️ 關於
+          ℹ️ {{ t('settings.tabs.about') }}
         </button>
       </div>
       
@@ -123,7 +137,36 @@ import {
           </select>
         </div>
       }
-      
+
+      <!-- 通知與提醒標籤 -->
+      @if (activeTab() === 'notifications') {
+        <div class="bg-slate-900/50 backdrop-blur-sm border border-slate-700 p-6 rounded-xl shadow-lg mb-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-xl">🔔</span>
+            <h3 class="text-lg font-semibold text-white">{{ t('settings.tabs.notifications') }}</h3>
+          </div>
+          <p class="text-slate-400 text-sm mb-4">{{ t('settings.notificationsDesc') }}</p>
+          <app-notification-center></app-notification-center>
+        </div>
+      }
+
+      <!-- 使用幫助標籤 -->
+      @if (activeTab() === 'help') {
+        <div class="bg-slate-900/50 backdrop-blur-sm border border-slate-700 p-6 rounded-xl shadow-lg mb-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-xl">❓</span>
+            <h3 class="text-lg font-semibold text-white">{{ t('settings.tabs.help') }}</h3>
+          </div>
+          <p class="text-slate-400 text-sm mb-6">{{ t('settings.helpDesc') }}</p>
+          <div class="flex flex-wrap gap-3">
+            <button (click)="openOnboarding()"
+                    class="px-4 py-2.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 border border-cyan-500/40 text-cyan-400 rounded-xl transition-all text-sm font-medium">
+              {{ t('settings.openOnboarding') }}
+            </button>
+          </div>
+        </div>
+      }
+
       <!-- 備份管理標籤 -->
       @if (activeTab() === 'backup') {
         <div class="bg-slate-900/50 backdrop-blur-sm border border-slate-700 p-6 rounded-xl shadow-lg">
@@ -318,21 +361,52 @@ import {
     </div>
   `
 })
-export class SettingsViewComponent implements OnInit {
-  // 服務注入
+export class SettingsViewComponent implements OnInit, OnDestroy {
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
   public i18n = inject(I18nService);
   public membershipService = inject(MembershipService);
   public settings = inject(SettingsService);
   public backup = inject(BackupService);
   public scheduler = inject(SchedulerService);
   public animationConfig = inject(AnimationConfigService);
-  
-  // 狀態
-  activeTab = signal<'appearance' | 'backup' | 'scheduler' | 'about'>('appearance');
+
+  activeTab = signal<SettingsTab>('appearance');
   supportedLocales = SUPPORTED_LOCALES;
-  
+  private routeSub?: { unsubscribe: () => void };
+
   ngOnInit(): void {
     this.settings.loadSettings();
+    this.syncTabFromRoute();
+    this.routeSub = this.route.queryParams.subscribe(() => this.syncTabFromRoute());
+  }
+
+  ngOnDestroy(): void {
+    this.routeSub?.unsubscribe();
+  }
+
+  private syncTabFromRoute(): void {
+    const tab = this.route.snapshot.queryParams['tab'] as string | undefined;
+    const valid: SettingsTab[] = ['appearance', 'notifications', 'help', 'backup', 'scheduler', 'about'];
+    if (tab && valid.includes(tab as SettingsTab)) {
+      this.activeTab.set(tab as SettingsTab);
+      if (tab === 'backup') this.loadBackups();
+      if (tab === 'scheduler') this.loadSchedulerStatus();
+    }
+  }
+
+  setTab(tab: SettingsTab): void {
+    this.activeTab.set(tab);
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab },
+      queryParamsHandling: 'merge',
+      replaceUrl: true
+    });
+  }
+
+  openOnboarding(): void {
+    window.dispatchEvent(new CustomEvent('tg-open-onboarding'));
   }
   
   // 翻譯方法

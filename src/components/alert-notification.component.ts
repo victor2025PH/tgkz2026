@@ -428,8 +428,10 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
     
     switch (event.type) {
       case EventType.ALERT_NEW:
-        // 新告警
+        // 新告警（不再显示 CPU 使用率告警，避免刷屏）
         const alertData = event.data;
+        const alertType = alertData?.alert_type || alertData?.type || '';
+        if (alertType === 'cpu_high') return;
         const notification: AlertNotification = {
           id: alertData.id || event.id,
           type: alertData.type || 'system',
@@ -439,14 +441,10 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
           timestamp: event.timestamp,
           dismissed: false
         };
-        
-        // 添加到列表
         const current = this.allNotifications();
         if (!current.find(n => n.id === notification.id)) {
           this.allNotifications.set([notification, ...current]);
           this.unreadCount.update(c => c + 1);
-          
-          // 显示通知
           this.showNotification(notification);
         }
         break;
@@ -472,8 +470,9 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
       const result = await this.ipcService.invoke('alerts:get', {}) as { success?: boolean; data?: { active?: any[] } } | undefined;
 
       if (result?.success) {
-        const rawActive = result.data?.active || [];
-        
+        const rawActive = (result.data?.active || []).filter(
+          (a: any) => (a.alert_type || a.type) !== 'cpu_high'
+        );
         // 🔧 Fix: 将后端 DB 原始字段映射为 AlertNotification 接口
         const active: AlertNotification[] = rawActive.map((a: any) => ({
           id: String(a.id || a.alert_id || Math.random()),

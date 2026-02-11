@@ -128,13 +128,15 @@ class AlertManager:
             cooldown_seconds=300
         ))
         
+        # CPU 使用率告警已关闭，不再提示（用户要求去除过多 CPU 提示）
         self.add_rule(AlertRule(
             alert_type=AlertType.CPU_HIGH,
             level=AlertLevel.WARNING,
-            threshold=80.0,  # 80% CPU usage
+            threshold=80.0,
             condition='greater_than',
             message_template="CPU 使用率过高: {current_value}%",
-            cooldown_seconds=300
+            cooldown_seconds=300,
+            enabled=False  # 不再触发 CPU 告警
         ))
     
     def add_rule(self, rule: AlertRule):

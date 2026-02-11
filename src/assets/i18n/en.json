@@ -355,6 +355,17 @@
   },
   "settings": {
     "title": "Settings",
+    "tabs": {
+      "appearance": "Appearance",
+      "notifications": "Notifications",
+      "help": "Help",
+      "backup": "Backup",
+      "scheduler": "Scheduler",
+      "about": "About"
+    },
+    "notificationsDesc": "View system notifications and alerts here. Click the bell to expand the list.",
+    "helpDesc": "Onboarding and frequently asked questions.",
+    "openOnboarding": "Open onboarding guide",
     "appearance": "Appearance",
     "language": "Language",
     "theme": "Theme",

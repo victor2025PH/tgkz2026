@@ -2,7 +2,7 @@
 import { ChangeDetectionStrategy, Component, signal, WritableSignal, computed, inject, OnDestroy, effect, OnInit, ChangeDetectorRef, NgZone, HostListener, ViewChild } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterOutlet, RouterLink } from '@angular/router';
 import { VIEW_ROUTE_MAP } from './app.routes';
 import { filter } from 'rxjs/operators';
 // 路由動畫改用 CSS 過渡效果，不再使用 Angular animations
@@ -30,7 +30,6 @@ import { SecurityService } from './security.service';
 import { GlobalErrorHandler } from './services/error-handler.service';
 import { WebVitalsService } from './services/web-vitals.service';
 import { OfflineIndicatorComponent } from './components/offline-indicator.component';
-import { NotificationCenterComponent } from './components/notification-center.component';
 import { AuditTrackerService } from './services/audit-tracker.service';
 import { LoadingService } from './loading.service';
 import { OfflineCacheService } from './services/offline-cache.service';
@@ -39,7 +38,6 @@ import { SwManagerService } from './services/sw-manager.service';
 import { OnboardingComponent } from './onboarding.component';
 // BackupService 從 ./services 統一導入
 import { I18nService } from './i18n.service';
-import { LanguageSwitcherCompactComponent } from './language-switcher.component';
 // 新增：用戶認證相關 - 使用統一的 JWT 認證服務
 import { AuthService } from './core/auth.service';
 // 🔧 P4-1: Legacy LoginComponent 已移除，統一使用 /auth/login 路由（Core LoginComponent）
@@ -140,14 +138,13 @@ interface SuccessOverlayConfig {
   standalone: true,
   imports: [
     // 核心模組
-    CommonModule, FormsModule, RouterOutlet,
+    CommonModule, FormsModule, RouterOutlet, RouterLink,
     // 🔧 Phase7-1: 視圖組件已移除 — 全部透過 Router lazy-load
     // 通用組件（模板中使用）
     ToastComponent, GlobalConfirmDialogComponent, GlobalInputDialogComponent, ProgressDialogComponent,
     // 🔧 P8-1: 離線狀態指示器
     OfflineIndicatorComponent,
-    // 🔧 P8-4: 通知中心
-    NotificationCenterComponent,
+    // 🔧 通知中心已移入設置頁，側欄僅保留鈴鐺入口
     // 🆕 实时告警通知
     AlertNotificationComponent,
     // 🔧 P1-2: 統一會員等級徽章組件
@@ -155,7 +152,7 @@ interface SuccessOverlayConfig {
     // 會員相關（模板中使用）
     MembershipDialogComponent, UpgradePromptComponent, PaymentComponent,
     // 導航和佈局（模板中使用）
-    OnboardingComponent, LanguageSwitcherCompactComponent,
+    OnboardingComponent,
     // 帳號管理（模板中使用）
     QrLoginComponent,
     // 對話框（模板中使用）
@@ -2481,6 +2478,12 @@ export class AppComponent implements OnDestroy, OnInit {
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     this.theme.set(prefersDark ? 'dark' : 'light');
     effect(() => { this.document.documentElement.className = this.theme(); });
+    // 與設置服務同步主題（設置頁修改主題後全站生效）
+    effect(() => {
+      const t = this.settingsService.settings().theme;
+      const resolved = t === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
+      this.theme.set(resolved);
+    });
     
     // 🔧 P0: 監聽 NavBridgeService.currentView() 變化並同步到本地
     // 這樣子組件調用 nav.navigateTo() 時，AppComponent 的視圖也會切換
@@ -2505,6 +2508,7 @@ export class AppComponent implements OnDestroy, OnInit {
   // 🆕 性能優化：頁面可見性狀態
   private isPageVisible = true;
   private visibilityChangeHandler?: () => void;
+  private _handleOpenOnboardingBound?: () => void;
 
   // 點擊頁面其他地方時關閉資源菜單
   @HostListener('document:click', ['$event'])
@@ -2575,7 +2579,10 @@ export class AppComponent implements OnDestroy, OnInit {
         this.changeView(customEvent.detail as View);
       }
     });
-    
+
+    // 🆕 設置頁「使用幫助」內觸發新手引導（全局事件，避免依賴 ViewChild）
+    window.addEventListener('tg-open-onboarding', this._handleOpenOnboardingBound = () => this.openOnboarding());
+
     // 🆕 性能優化：設置頁面可見性監聯（Tab 不活躍時暫停刷新）
     this.setupVisibilityListener();
     
@@ -2938,7 +2945,10 @@ export class AppComponent implements OnDestroy, OnInit {
     if (this.membershipUpdateHandler) {
       window.removeEventListener('membership-updated', this.membershipUpdateHandler);
     }
-    
+    if (this._handleOpenOnboardingBound) {
+      window.removeEventListener('tg-open-onboarding', this._handleOpenOnboardingBound);
+    }
+
     // Clean up listeners to prevent memory leaks
     this.ipcService.cleanup('log-entry');
     this.ipcService.cleanup('monitoring-status-changed');

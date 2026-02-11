@@ -451,12 +451,20 @@ export class ApiService {
    * 處理 401 未授權錯誤
    * 注意：不再自動清除認證或重定向，只記錄日誌
    * 讓用戶手動重新登錄以避免意外登出
+   * 🔧 剛登入 20 秒內不發送登出事件，避免第一/第二用戶首屏 401 被踢回登入頁
    */
   private handleUnauthorized() {
+    const justLoggedIn = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('tgm_just_logged_in') : null;
+    if (justLoggedIn) {
+      const t = parseInt(justLoggedIn, 10);
+      if (!isNaN(t) && Date.now() - t < 20000) {
+        try { sessionStorage.removeItem('tgm_just_logged_in'); } catch (_) {}
+        console.warn('[ApiService] 401 shortly after login, skipping auth:unauthorized to avoid kicking user back');
+        return;
+      }
+    }
     console.warn('[ApiService] 401 Unauthorized - Token may be expired or invalid');
     console.warn('[ApiService] Please try logging out and logging back in');
-    
-    // 發送事件通知（不強制重定向）
     window.dispatchEvent(new CustomEvent('auth:unauthorized', { 
       detail: { message: '登錄已過期，請重新登錄' } 
     }));

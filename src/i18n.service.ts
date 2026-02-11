@@ -68,27 +68,22 @@ export class I18nService {
   
   /**
    * 初始化語言設置
-   * 🔧 優化：默認使用繁體中文，因為主要用戶群體是中文用戶
+   * 🔧 優先默認簡體中文：無存儲時登入及全站默認 zh-CN；僅瀏覽器明確 en 時用 en
    */
   private initLocale(): void {
-    // 優先從本地存儲讀取
     const stored = localStorage.getItem('tg-matrix-locale') as SupportedLocale;
     if (stored && SUPPORTED_LOCALES.some(l => l.code === stored)) {
       this._locale.set(stored);
       return;
     }
-    
-    // 自動檢測瀏覽器語言
     const browserLang = navigator.language;
     if (browserLang.startsWith('en')) {
-      // 只有明確是英文才使用英文
       this._locale.set('en');
     } else if (browserLang === 'zh-CN' || browserLang === 'zh-Hans') {
-      // 簡體中文
       this._locale.set('zh-CN');
     } else {
-      // 🔧 其他所有情況（包括繁體中文、未知語言）默認使用繁體中文
-      this._locale.set('zh-TW');
+      // 其餘（含 zh-TW、未識別）統一默認簡體中文
+      this._locale.set('zh-CN');
     }
   }
   

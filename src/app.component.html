@@ -292,14 +292,16 @@
             </div>
           }
         </div>
-        
-        <!-- 🔧 P8-4: 通知中心（鈴鐺 + 面板） -->
-        @if (!sidebarCollapsed()) {
-          <div class="px-3 mb-2 flex justify-end">
-            <app-notification-center></app-notification-center>
-          </div>
-        }
-        
+
+        <!-- 🔧 設置優化：鈴鐺僅作入口，點擊跳轉設置-通知與提醒 -->
+        <div class="px-3 mb-2 flex justify-end">
+          <a [routerLink]="['/settings']" [queryParams]="{ tab: 'notifications' }" 
+             class="p-2 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-cyan-400 transition-colors"
+             [title]="t('settings.tabs.notifications')">
+            <span class="text-lg" aria-hidden="true">🔔</span>
+          </a>
+        </div>
+
         <!-- 🔧 P3-4: 用戶信息區域 —— 帶骨架屏防止名稱閃爍 -->
         @if (!currentUser()) {
           <!-- 骨架屏：用戶數據未載入時顯示 -->
@@ -818,44 +820,8 @@
           }
         </div>
       </nav>
-    
-    <!-- 側邊欄底部（固定在底部） -->
-    <div class="flex-shrink-0 p-4 space-y-3 border-t" style="border-color: var(--border-default); background-color: var(--bg-sidebar);">
-        <!-- 🆕 帮助按钮 - 打开新手引导 -->
-        <button (click)="openOnboarding()"
-                class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 border border-cyan-500/30 hover:border-cyan-500/50 text-cyan-400 rounded-xl transition-all text-sm font-medium group">
-          <span class="text-lg group-hover:animate-bounce">❓</span>
-          <span>{{ t('menu.help') }}</span>
-        </button>
-        
-        <div>
-          <label class="block text-sm font-medium mb-2" style="color: var(--sidebar-group-title);">{{ t('language') }}</label>
-          <app-language-switcher-compact></app-language-switcher-compact>
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-2" style="color: var(--sidebar-group-title);">{{ t('appearance') }}</label>
-          <div class="flex rounded-md shadow-sm p-1" style="background-color: var(--bg-tertiary);">
-            <button (click)="theme.set('light')" 
-                    class="w-full text-sm py-1.5 rounded transition-colors flex items-center justify-center gap-2"
-                    [style.background-color]="theme() === 'light' ? 'var(--bg-card)' : 'transparent'"
-                    [style.color]="theme() === 'light' ? 'var(--primary)' : 'var(--text-muted)'"
-                    [style.box-shadow]="theme() === 'light' ? 'var(--shadow-sm)' : 'none'">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            </button>
-            <button (click)="theme.set('dark')" 
-                    class="w-full text-sm py-1.5 rounded transition-colors flex items-center justify-center gap-2"
-                    [style.background-color]="theme() === 'dark' ? 'var(--primary-bg)' : 'transparent'"
-                    [style.color]="theme() === 'dark' ? 'var(--primary)' : 'var(--text-muted)'"
-                    [style.box-shadow]="theme() === 'dark' ? 'var(--shadow-sm)' : 'none'">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-    </div>
+
+    <!-- 🔧 側欄瘦身：幫助、語言、外觀已移入「設置」頁，底部不再固定區塊，主菜單可顯示更多 -->
   </aside>
 
   <!-- 🔧 Phase7-1: Main Content — 使用 Router 替代 @switch（减少 ~170 行模板 + 30+ 死導入） -->

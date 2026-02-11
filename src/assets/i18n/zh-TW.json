@@ -355,6 +355,17 @@
   },
   "settings": {
     "title": "設定",
+    "tabs": {
+      "appearance": "外觀設置",
+      "notifications": "通知與提醒",
+      "help": "使用幫助",
+      "backup": "備份管理",
+      "scheduler": "任務調度",
+      "about": "關於"
+    },
+    "notificationsDesc": "在此查看系統通知與提醒，點擊鈴鐺展開列表。",
+    "helpDesc": "新手引導與常見問題。",
+    "openOnboarding": "開啟新手引導",
     "appearance": "外觀",
     "language": "語言",
     "theme": "主題",

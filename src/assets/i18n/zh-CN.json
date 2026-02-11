@@ -355,6 +355,17 @@
   },
   "settings": {
     "title": "设置",
+    "tabs": {
+      "appearance": "外观设置",
+      "notifications": "通知与提醒",
+      "help": "使用帮助",
+      "backup": "备份管理",
+      "scheduler": "任务调度",
+      "about": "关于"
+    },
+    "notificationsDesc": "在此查看系统通知与提醒，点击铃铛展开列表。",
+    "helpDesc": "新手引导与常见问题。",
+    "openOnboarding": "打开新手引导",
     "appearance": "外观",
     "language": "语言",
     "theme": "主题",

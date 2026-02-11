@@ -454,11 +454,11 @@ export class ApiService {
    * 🔧 剛登入 20 秒內不發送登出事件，避免第一/第二用戶首屏 401 被踢回登入頁
    */
   private handleUnauthorized() {
+    // 剛登入 20 秒內不發送登出事件（與攔截器一致，且不 removeItem 避免並發 401 時第二個請求觸發登出）
     const justLoggedIn = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('tgm_just_logged_in') : null;
     if (justLoggedIn) {
       const t = parseInt(justLoggedIn, 10);
       if (!isNaN(t) && Date.now() - t < 20000) {
-        try { sessionStorage.removeItem('tgm_just_logged_in'); } catch (_) {}
         console.warn('[ApiService] 401 shortly after login, skipping auth:unauthorized to avoid kicking user back');
         return;
       }

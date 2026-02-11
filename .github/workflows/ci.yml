@@ -230,6 +230,10 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: Verify Angular compiler-cli
+        run: |
+          ls -la node_modules/@angular/compiler-cli/package.json 2>/dev/null && echo "✅ compiler-cli present" || (echo "❌ compiler-cli missing"; ls node_modules/@angular/ 2>/dev/null || true)
+
       - name: Build (SaaS mode)
         run: |
           set -o pipefail
@@ -241,8 +245,10 @@ jobs:
       - name: Show build log on failure
         if: failure()
         run: |
-          echo "========== Last 200 lines of build output =========="
-          tail -200 build.log 2>/dev/null || true
+          echo "========== Last 300 lines of build output =========="
+          tail -300 build.log 2>/dev/null || true
+          echo "========== node_modules/@angular (first 30) =========="
+          ls node_modules/@angular 2>/dev/null | head -30 || true
 
       - name: Verify build output
         run: |

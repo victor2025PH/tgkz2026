@@ -558,7 +558,7 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
         # External module routes (admin_handlers, wallet, legacy)
         from api.admin_module_routes import register_admin_module_routes
         register_admin_module_routes(self.app)
-
+    
     # ==================== 核心方法 ====================
     
     async def _execute_command(self, command: str, payload: dict = None) -> dict:
@@ -757,13 +757,22 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
     # ==================== 帳號管理 ====================
     
     async def get_accounts(self, request):
-        """獲取帳號列表"""
-        result = await self._execute_command('get-accounts')
+        """獲取帳號列表。多租戶：傳入 owner_user_id 確保只返回當前用戶的帳號。"""
+        payload = {}
+        tenant = request.get('tenant')
+        if tenant and getattr(tenant, 'user_id', None):
+            payload['owner_user_id'] = tenant.user_id
+            payload['ownerUserId'] = tenant.user_id
+        result = await self._execute_command('get-accounts', payload)
         return self._json_response(result)
     
     async def add_account(self, request):
-        """添加帳號"""
-        data = await request.json()
+        """添加帳號。多租戶：從當前請求注入 ownerUserId，確保第二用戶等添加的帳號歸屬正確。"""
+        data = await request.json() or {}
+        tenant = request.get('tenant')
+        if tenant and getattr(tenant, 'user_id', None):
+            data['ownerUserId'] = tenant.user_id
+            data['owner_user_id'] = tenant.user_id
         result = await self._execute_command('add-account', data)
         return self._json_response(result)
     
@@ -802,7 +811,7 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
         return self._json_response(result)
     
     # P9-1: Auth routes extracted to api/auth_routes_mixin.py (~2,200 lines)
-
+    
     # ==================== API 憑證 ====================
     
     async def get_credentials(self, request):
@@ -887,7 +896,7 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
     # P9-1: Quota/usage routes extracted to api/quota_routes_mixin.py (~400 lines)
 
     # P9-1: Payment/subscription routes extracted to api/payment_routes_mixin.py (~700 lines)
-
+    
     # ==================== 數據導出和備份 ====================
     
     # P11-1: async def export_data(self, request):... -> mixin
@@ -919,7 +928,7 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
     # P11-1: async def openapi_json(self, request):... -> mixin
     
     # P10-2: 2FA + API Keys extracted to api/auth_routes_mixin.py
-
+    
     # ==================== 管理員 API ====================
     
     # P10-1: async def admin_dashboard(self, request):... -> admin_routes_mixin.py
@@ -1310,7 +1319,7 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
     
     # ==================== 服务器控制 ====================
     # 🔧 P8-2: 管理后台 Legacy 代码已提取到 api/admin_panel_legacy.py (约 860 行)
-
+    
     async def start(self):
         """啟動服務器"""
         runner = web.AppRunner(self.app)

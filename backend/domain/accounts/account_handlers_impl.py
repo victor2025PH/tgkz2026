@@ -151,6 +151,24 @@ async def handle_add_account(self, payload: Dict[str, Any]):
                     print(f"[Backend] Quota reservation rolled back (account already exists)", file=sys.stderr)
                 except: pass
             
+            # 🔧 多租戶：該手機號已被其他用戶添加時，不允許覆蓋或誤操作
+            existing_owner = existing_account.get('owner_user_id') or existing_account.get('ownerUserId') or ''
+            if not is_electron and owner_user_id and existing_owner and existing_owner not in ('', 'local_user'):
+                if existing_owner != owner_user_id:
+                    error_msg = "该手机号已被其他用户添加，无法重复添加。"
+                    self.send_log(error_msg, "error")
+                    self.send_event("account-validation-error", {
+                        "errors": [error_msg],
+                        "account_data": payload,
+                        "error_type": "phone_taken_by_other_user"
+                    })
+                    return {
+                        "success": False,
+                        "error": error_msg,
+                        "code": "PHONE_TAKEN_BY_OTHER_USER",
+                        "phone": phone
+                    }
+            
             existing_status = existing_account.get('status', 'Offline')
             existing_id = existing_account.get('id')
             
@@ -1927,10 +1945,13 @@ async def handle_remove_account(self, payload: Dict[str, Any]):
 
 # ==================== Monitoring Management Handlers ====================
 
-async def handle_get_accounts(self):
-    """獲取所有帳號列表（含每個帳號綁定的代理/IP 顯示用）"""
+async def handle_get_accounts(self, payload: Dict[str, Any] = None):
+    """獲取所有帳號列表（含每個帳號綁定的代理/IP 顯示用）。支持 payload.owner_user_id 多租戶過濾。"""
     try:
-        accounts = await db.get_all_accounts()
+        owner_user_id = None
+        if payload:
+            owner_user_id = payload.get('owner_user_id') or payload.get('ownerUserId')
+        accounts = await db.get_all_accounts(owner_user_id=owner_user_id)
         # 為每個帳號附加當前綁定的代理顯示（host:port），便於在 UI 查看 IP
         try:
             from admin.proxy_pool import get_proxy_pool

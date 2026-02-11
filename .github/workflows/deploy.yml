@@ -42,10 +42,17 @@ jobs:
       
       - name: Build frontend (SaaS mode)
         run: |
+          set -o pipefail
           echo "Node $(node -v) | npm $(npm -v)"
-          npm run build:saas
+          npm run build:saas 2>&1 | tee build.log
         env:
           NODE_OPTIONS: '--max_old_space_size=8192'
+
+      - name: Show build log on failure
+        if: failure()
+        run: |
+          echo "========== Last 200 lines of build output =========="
+          tail -200 build.log 2>/dev/null || true
 
       - name: Verify build output
         run: |

@@ -65,14 +65,27 @@ export interface Account {
               <span class="text-2xl">{{ initialView() === 'resource-center' ? '📦' : '🔍' }}</span>
               {{ initialView() === 'resource-center' ? '資源中心' : '搜索發現' }}
             </h1>
-            <!-- 快速統計 -->
+            <!-- 快速統計：資源中心強調已收藏 + 添加資源入口 -->
             <div class="flex items-center gap-2 text-sm">
-              <span class="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-lg">
-                {{ mergedResources().length }} 結果
-              </span>
-              <span class="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-lg">
-                {{ savedCount() }} 已收藏
-              </span>
+              @if (initialView() === 'resource-center') {
+                <span class="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-lg">
+                  {{ savedCount() }} 已收藏
+                </span>
+                <span class="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-lg">
+                  {{ mergedResources().length }} 項
+                </span>
+                <button (click)="goToSearchDiscovery()"
+                        class="px-3 py-1.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-400 hover:from-cyan-500/30 hover:to-blue-500/30 rounded-lg border border-cyan-500/50 transition-all flex items-center gap-1">
+                  ➕ 添加資源
+                </button>
+              } @else {
+                <span class="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-lg">
+                  {{ mergedResources().length }} 結果
+                </span>
+                <span class="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-lg">
+                  {{ savedCount() }} 已收藏
+                </span>
+              }
               <!-- Phase3: 操作歷史快捷按鈕 -->
               <button (click)="showOperationHistory.set(!showOperationHistory())"
                       class="px-3 py-1 rounded-lg text-sm transition-all"
@@ -167,7 +180,8 @@ export interface Account {
         </div>
       }
 
-      <!-- 搜索欄區域 -->
+      <!-- 搜索欄區域（僅搜索發現頁顯示；資源中心首屏以列表為主） -->
+      @if (initialView() !== 'resource-center') {
       <div class="flex-shrink-0 px-6 py-4 border-b border-slate-700/30 bg-slate-800/30">
         <!-- 搜索輸入 -->
         <div class="flex gap-3 mb-4">
@@ -258,6 +272,7 @@ export interface Account {
           </div>
         </div>
       </div>
+      }
       
       <!-- 結果統計和操作欄 -->
       @if (mergedResources().length > 0 || currentKeyword()) {
@@ -462,9 +477,19 @@ export interface Account {
             }
           </div>
         } @else if (filteredResources().length === 0) {
-          <!-- 空狀態 -->
+          <!-- 空狀態：資源中心專用 vs 搜索發現 -->
           <div class="flex flex-col items-center justify-center h-full text-center">
-            @if (mergedSearchError().hasError) {
+            @if (initialView() === 'resource-center') {
+              <div class="max-w-md">
+                <div class="text-6xl mb-4">📦</div>
+                <p class="text-slate-300 text-xl mb-2">還沒有收藏資源</p>
+                <p class="text-slate-500 mb-6">在「搜索發現」中搜索並收藏群組/頻道後，會出現在這裡統一管理</p>
+                <button (click)="goToSearchDiscovery()"
+                        class="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl font-medium transition-all">
+                  🔍 去搜索發現添加
+                </button>
+              </div>
+            } @else if (mergedSearchError().hasError) {
               <div class="max-w-md">
                 <div class="text-6xl mb-4">⚠️</div>
                 <p class="text-red-400 text-xl mb-2">搜索失敗</p>
@@ -1261,9 +1286,12 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   });
   
   // 🔧 P0: 合併的資源列表（全部）
+  // 資源中心模式且父組件傳入已收藏列表時，優先使用該列表；否則為搜索結果或父組件傳入的列表
   mergedResources = computed(() => {
-    const internal = this._internalResources();
+    const isResourceCenter = this.initialView() === 'resource-center';
     const fromInput = this.resources();
+    const internal = this._internalResources();
+    if (isResourceCenter && fromInput.length > 0) return fromInput;
     if (internal.length > 0) return internal;
     return fromInput;
   });
@@ -1330,6 +1358,7 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   joinResourceEvent = output<DiscoveredResource>();
   extractMembersEvent = output<DiscoveredResource>();
   clearResultsEvent = output<void>();
+  navigateTo = output<string>();
   
   // ============ 本地狀態 ============
   searchQuery = '';
@@ -2041,7 +2070,12 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     const d = new Date(timestamp);
     return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
   }
-  
+
+  /** 資源中心：跳轉到搜索發現頁添加資源 */
+  goToSearchDiscovery(): void {
+    this.navigateTo.emit('search-discovery');
+  }
+
   // 🆕 鍵盤事件處理
   private handleKeydown(event: KeyboardEvent): void {
     // 只在詳情彈窗打開時處理
@@ -2323,10 +2357,17 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   });
   
   toggleSave(resource: DiscoveredResource): void {
+    const tid = (resource.telegram_id || '').toString().trim();
     if (resource.is_saved) {
       this.unsaveResourceEvent.emit(resource);
+      this._internalResources.update(list =>
+        list.map(r => (r.telegram_id === tid || (r.telegram_id || '').toString().trim() === tid) ? { ...r, is_saved: false } : r)
+      );
     } else {
       this.saveResourceEvent.emit(resource);
+      this._internalResources.update(list =>
+        list.map(r => (r.telegram_id === tid || (r.telegram_id || '').toString().trim() === tid) ? { ...r, is_saved: true } : r)
+      );
     }
   }
   

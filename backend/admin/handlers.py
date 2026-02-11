@@ -1124,8 +1124,13 @@ class AdminHandlers:
         status = request.query.get('status')
         page = int(request.query.get('page', 1))
         page_size = int(request.query.get('page_size', 50))
+        proxy_source = request.query.get('proxy_source')
+        provider_id = request.query.get('provider_id')
         
-        result = pool.get_proxies(status=status, page=page, page_size=page_size)
+        result = pool.get_proxies(
+            status=status, page=page, page_size=page_size,
+            proxy_source=proxy_source, provider_id=provider_id,
+        )
         
         return success_response(data=result)
 

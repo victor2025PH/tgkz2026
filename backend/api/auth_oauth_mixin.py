@@ -6,7 +6,11 @@ OAuth/social login handlers extracted from AuthRoutesMixin
 Contains: Telegram OAuth, Google OAuth, QR code login,
 Deep Link login token, WebSocket login
 """
+import json
 import logging
+from datetime import datetime
+
+from aiohttp import web
 
 logger = logging.getLogger(__name__)
 
@@ -315,7 +319,6 @@ class AuthOAuthMixin:
             login_token = service.get_token(token)
             expires_in = 0
             if login_token and login_token.expires_at:
-                from datetime import datetime
                 remaining = (login_token.expires_at - datetime.utcnow()).total_seconds()
                 expires_in = max(0, int(remaining))
             

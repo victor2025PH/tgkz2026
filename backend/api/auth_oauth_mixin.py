@@ -193,7 +193,7 @@ class AuthOAuthMixin:
             )
             
             # 構建 URLs
-            bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', 'TGSmartKingBot')
+            bot_username = os.environ.get('TELEGRAM_BOT_USERNAME') or 'TGSmartKingBot'
             
             # 🆕 簡化方案：QR Code 直接使用 Deep Link
             # 新用戶掃碼會自動發送 /start login_xxx
@@ -312,7 +312,7 @@ class AuthOAuthMixin:
             # 其他狀態（pending, scanned）
             # 🆕 返回 deep_link_url 供中轉頁面使用
             import os
-            bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', 'TGSmartKingBot')
+            bot_username = os.environ.get('TELEGRAM_BOT_USERNAME') or 'TGSmartKingBot'
             deep_link_url = f"https://t.me/{bot_username}?start=login_{token}"
             
             # 獲取 Token 對象以計算剩餘時間

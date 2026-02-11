@@ -499,7 +499,7 @@ class AuthCoreMixin:
                 }, 400)
             
             # 發送確認消息到用戶 Telegram
-            bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', 'tgzkw_bot')
+            bot_username = os.environ.get('TELEGRAM_BOT_USERNAME') or 'TGSmartKingBot'
             
             # 🆕 獲取用戶語言偏好（從請求頭）
             accept_language = request.headers.get('Accept-Language', 'zh-TW')

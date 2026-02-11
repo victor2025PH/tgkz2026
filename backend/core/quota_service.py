@@ -443,7 +443,8 @@ class QuotaService:
                     excluded_statuses = ('deleted', 'banned', 'removed')
                     placeholders = ','.join(['?' for _ in excluded_statuses])
                     
-                    # 先嘗試帶狀態過濾的查詢
+                    # 只統計該用戶名下的有效帳號數（owner_user_id = user_id）
+                    # 不將「未歸屬」帳號計入任意用戶，否則會導致所有用戶配額超限無法添加
                     row = db.execute(
                         f'''SELECT COUNT(*) as count FROM accounts 
                             WHERE owner_user_id = ? 
@@ -451,19 +452,6 @@ class QuotaService:
                         (user_id, *excluded_statuses)
                     ).fetchone()
                     count = row['count'] if row else 0
-                    
-                    # 🔧 P0 修復：同時統計包含 local_user 和空 owner 的歷史帳號（兼容舊數據）
-                    # 如果用戶 ID 不是 local_user，也要統計 local_user 和空 owner 的帳號
-                    if user_id and user_id != 'local_user':
-                        row2 = db.execute(
-                            f'''SELECT COUNT(*) as count FROM accounts 
-                                WHERE (owner_user_id IS NULL OR owner_user_id = '' OR owner_user_id = 'local_user')
-                                AND (status IS NULL OR LOWER(status) NOT IN ({placeholders}))''',
-                            excluded_statuses
-                        ).fetchone()
-                        legacy_count = row2['count'] if row2 else 0
-                        count += legacy_count
-                    
                     logger.info(f"[QuotaService] tg_accounts usage for user {user_id}: {count}")
                     return count
                 except Exception as e:

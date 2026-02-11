@@ -258,6 +258,12 @@ jobs:
           tail -300 build.log 2>/dev/null || true
           echo "========== node_modules/@angular (first 30) =========="
           ls node_modules/@angular 2>/dev/null | head -30 || true
+          if [ -f build.log ]; then
+            echo "## Frontend Build Error (last 120 lines)" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -120 build.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Upload build log on failure
         if: failure() && hashFiles('build.log') != ''

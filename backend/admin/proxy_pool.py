@@ -284,19 +284,29 @@ class ProxyPoolManager:
         self,
         status: Optional[str] = None,
         page: int = 1,
-        page_size: int = 50
+        page_size: int = 50,
+        proxy_source: Optional[str] = None,
+        provider_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """獲取代理列表"""
+        """獲取代理列表（支持按狀態、來源、供應商篩選）"""
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
             
             # 構建查詢
-            where_clause = ""
+            conditions = []
             params = []
             if status:
-                where_clause = "WHERE status = ?"
+                conditions.append("status = ?")
                 params.append(status)
+            if proxy_source:
+                conditions.append("proxy_source = ?")
+                params.append(proxy_source)
+            if provider_id:
+                conditions.append("provider_id = ?")
+                params.append(provider_id)
+
+            where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
             
             # 總數
             cursor.execute(f"SELECT COUNT(*) FROM static_proxies {where_clause}", params)

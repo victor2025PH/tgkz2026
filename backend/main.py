@@ -388,15 +388,19 @@ def get_ErrorRecoveryManager():
 
 # 🆕 Phase 2: 命令路由器整合（延遲檢測）
 ROUTER_AVAILABLE = False
+try_route_command = None  # 🔧 Fix: 在模块级声明，避免 NameError
+
 def check_router_available():
-    global ROUTER_AVAILABLE
+    global ROUTER_AVAILABLE, try_route_command
     try:
-        from api.router_integration import setup_command_router, try_route_command
+        from api.router_integration import setup_command_router, try_route_command as _trc
         ROUTER_AVAILABLE = True
+        try_route_command = _trc
         return True
     except ImportError as e:
         print(f"[Backend] Command router not available: {e}", file=sys.stderr)
         ROUTER_AVAILABLE = False
+        try_route_command = None
         return False
 
 # 🔧 Phase4: 嘗試立即檢測（模塊加載時）

@@ -1044,7 +1044,8 @@ export class LoginComponent implements OnInit, OnDestroy {
   private qrToken = '';
   private qrWebSocket: WebSocket | null = null;
   private qrCountdownInterval: any = null;
-  
+  private qrPollInterval: any = null;  // 🆕 驗證碼/掃碼確認的 HTTP 輪詢後備
+
   // 🆕 Phase 3: 登入成功動畫
   loginSuccess = signal(false);
   successUserName = signal('');
@@ -1554,7 +1555,10 @@ export class LoginComponent implements OnInit, OnDestroy {
       // 3. 建立 WebSocket 連接
       this.connectWebSocket(token || '');
       
-      // 4. 開始倒計時
+      // 🆕 4. 啟動 HTTP 輪詢後備（驗證碼輸入後即使 WebSocket 未收到也能拿到 token）
+      this.startQRCodePolling(token || '');
+      
+      // 5. 開始倒計時
       this.startQRCountdown();
       
     } catch (e: any) {
@@ -1596,6 +1600,12 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.qrWebSocket = null;
     }
     
+    // 清理輪詢
+    if (this.qrPollInterval) {
+      clearInterval(this.qrPollInterval);
+      this.qrPollInterval = null;
+    }
+    
     // 清理倒計時
     if (this.qrCountdownInterval) {
       clearInterval(this.qrCountdownInterval);
@@ -1607,6 +1617,41 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.qrCodeUrl.set(null);
     this.qrCodeExpired.set(false);
     this.wsConnected.set(false);
+  }
+
+  /**
+   * 🆕 QR 碼/驗證碼登入的 HTTP 輪詢後備
+   * 用戶在 Bot 輸入驗證碼或掃碼確認後，即使 WebSocket 未推送也能拿到 JWT 並進入後台
+   */
+  private startQRCodePolling(token: string) {
+    if (this.qrPollInterval) {
+      clearInterval(this.qrPollInterval);
+    }
+    const poll = async () => {
+      if (this.qrCodeExpired()) return;
+      try {
+        const res = await fetch(`/api/v1/auth/login-token/${token}`);
+        const result = await res.json();
+        if (!result?.success || !result.data) return;
+        const { status, access_token, refresh_token, user } = result.data;
+        if (status === 'confirmed' && access_token) {
+          if (this.qrPollInterval) {
+            clearInterval(this.qrPollInterval);
+            this.qrPollInterval = null;
+          }
+          this.handleLoginSuccess({ access_token, refresh_token, user });
+        } else if (status === 'expired') {
+          if (this.qrPollInterval) {
+            clearInterval(this.qrPollInterval);
+            this.qrPollInterval = null;
+          }
+        }
+      } catch (_e) {
+        // 忽略單次輪詢錯誤
+      }
+    };
+    this.qrPollInterval = setInterval(poll, 2000);
+    poll(); // 立即執行一次
   }
   
   /**

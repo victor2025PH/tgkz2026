@@ -4,7 +4,7 @@
  * 
  * 🆕 Phase 28: 使用服務替代 @Input/@Output
  */
-import { Component, inject, signal, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '../i18n.service';
@@ -20,6 +20,7 @@ import { NavBridgeService, LegacyView } from '../services/nav-bridge.service';
 
 // 子組件導入
 import { AccountCardListComponent } from '../account-card-list.component';
+import { AddAccountSimpleComponent } from '../add-account-simple.component';
 
 @Component({
   selector: 'app-accounts-view',
@@ -28,9 +29,14 @@ import { AccountCardListComponent } from '../account-card-list.component';
   imports: [
     CommonModule,
     FormsModule,
-    AccountCardListComponent
+    AccountCardListComponent,
+    AddAccountSimpleComponent
   ],
   template: `
+    <!-- 添加帳號表單（點擊「添加帳號」時顯示，解決第二用戶點擊無響應） -->
+    @if (showAddForm()) {
+      <app-add-account-simple (back)="navigateTo('accounts')" />
+    } @else {
     <!-- 帳戶管理頁面 - 使用卡片視圖 -->
     <div class="flex items-center justify-between mb-6">
       <h2 id="accounts-section" class="text-4xl font-bold text-slate-900 dark:text-white">{{ t('accounts.manageAccounts') }}</h2>
@@ -105,6 +111,7 @@ import { AccountCardListComponent } from '../account-card-list.component';
       (accountExport)="exportAccount($event.phone)"
       (accountEdit)="editAccount($event)">
     </app-account-card-list>
+    }
   `
 })
 export class AccountsViewComponent implements OnInit, OnDestroy {
@@ -112,6 +119,8 @@ export class AccountsViewComponent implements OnInit, OnDestroy {
   private i18n = inject(I18nService);
   private nav = inject(NavBridgeService);
   private ipc = inject(ElectronIpcService);
+  /** 是否顯示添加帳號表單（導航為 add-account 時為 true，解決點擊「添加帳號」無響應） */
+  showAddForm = computed(() => this.nav.currentView() === 'add-account');
   private toast = inject(ToastService);
   private dialog = inject(DialogService);
   public membershipService = inject(MembershipService);

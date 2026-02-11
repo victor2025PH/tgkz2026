@@ -1627,11 +1627,18 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (this.qrPollInterval) {
       clearInterval(this.qrPollInterval);
     }
+    const base = window.location.origin;
     const poll = async () => {
       if (this.qrCodeExpired()) return;
       try {
-        const res = await fetch(`/api/v1/auth/login-token/${token}`);
-        const result = await res.json();
+        const res = await fetch(`${base}/api/v1/auth/login-token/${token}`);
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (res.status >= 500 && !this.error()) {
+            this.error.set(result?.error || '服務暫時不可用，請稍後重試');
+          }
+          return;
+        }
         if (!result?.success || !result.data) return;
         const { status, access_token, refresh_token, user } = result.data;
         if (status === 'confirmed' && access_token) {
@@ -1797,23 +1804,12 @@ export class LoginComponent implements OnInit, OnDestroy {
     // 記住登入方式偏好
     this.saveLoginPreference();
     
-    // 🔧 使用 Angular Router 跳轉（避免完全刷新頁面）
     const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
-    console.log('[Login] Will navigate to:', returnUrl, 'in 1.5 seconds');
-    
+    console.log('[Login] Will redirect to:', returnUrl, 'in 1.5 seconds');
+    // 🔧 掃碼/驗證碼登入後使用整頁跳轉，確保前端重新載入並讀取 localStorage 的 token，避免「輸入驗證碼無法進入前端」
     setTimeout(() => {
-      console.log('[Login] Navigating now...');
-      console.log('[Login] Final check - isAuthenticated:', this.authService.isAuthenticated());
-      console.log('[Login] Final check - accessToken:', !!this.authService.accessToken());
-      
-      // 使用 Angular Router 導航（保持 SPA 狀態）
-      this.router.navigateByUrl(returnUrl).then(() => {
-        console.log('[Login] ✅ Navigation complete');
-      }).catch(err => {
-        console.error('[Login] Navigation error:', err);
-        // 備用：使用 location.href
-        window.location.href = returnUrl;
-      });
+      const url = returnUrl.startsWith('/') ? `${window.location.origin}${returnUrl}` : returnUrl;
+      window.location.href = url;
     }, 1500);  // 1.5 秒後跳轉
   }
   

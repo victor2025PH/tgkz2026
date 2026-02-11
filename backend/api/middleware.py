@@ -176,9 +176,14 @@ async def rate_limit_middleware(request, handler):
     - Electron 模式跳過
     """
     path = request.path
+    method = request.method
     
     # 跳過不需要限流的路徑
     if path in SKIP_RATE_LIMIT_PATHS or path.startswith('/static/'):
+        return await handler(request)
+    
+    # 🔧 掃碼/驗證碼登入輪詢：GET login-token 不計入限流，避免第二用戶同 IP 被「請求過於頻繁」
+    if method == 'GET' and path.startswith('/api/v1/auth/login-token/'):
         return await handler(request)
     
     # Electron 模式跳過

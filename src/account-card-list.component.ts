@@ -395,7 +395,7 @@ export const PROXY_TYPES = [
             <input 
               type="text" 
               [(ngModel)]="searchQuery"
-              placeholder="搜索手机号、名称..."
+              [placeholder]="t('accounts.searchPlaceholder')"
               class="search-input">
           </div>
           
@@ -409,7 +409,7 @@ export const PROXY_TYPES = [
 
           <select [(ngModel)]="groupFilter" class="filter-select">
             <option value="all">{{ t('accounts.allGroups') }}</option>
-            <option value="_ungrouped">📁 未分组</option>
+            <option value="_ungrouped">📁 {{ t('accounts.ungrouped') }}</option>
             @for (group of groups(); track group.id) {
               <option [value]="group.id">📁 {{ group.name }}</option>
             }
@@ -417,13 +417,13 @@ export const PROXY_TYPES = [
 
           <div class="tag-filter-dropdown">
             <button class="filter-btn" (click)="toggleTagFilter()">
-              🏷️ 标签 @if (tagFilter.length > 0) { <span class="tag-count">{{ tagFilter.length }}</span> }
+              🏷️ {{ t('accounts.tags') }} @if (tagFilter.length > 0) { <span class="tag-count">{{ tagFilter.length }}</span> }
             </button>
             @if (showTagFilter()) {
               <div class="tag-dropdown">
                 <div class="tag-dropdown-header">
-                  <span>选择标签</span>
-                  <button (click)="clearTagFilter()" class="clear-btn">清除</button>
+                  <span>{{ t('accounts.selectTags') }}</span>
+                  <button (click)="clearTagFilter()" class="clear-btn">{{ t('common.clear') }}</button>
                 </div>
                 @for (tag of availableTags(); track tag.id) {
                   <label class="tag-option" [style.--tag-color]="tag.color">
@@ -432,7 +432,7 @@ export const PROXY_TYPES = [
                     <span>{{ tag.name }}</span>
                   </label>
                 }
-                <button class="manage-tags-btn" (click)="openTagManager()">⚙️ 管理标签</button>
+                <button class="manage-tags-btn" (click)="openTagManager()">⚙️ {{ t('accounts.manageTags') }}</button>
               </div>
             }
           </div>
@@ -444,7 +444,7 @@ export const PROXY_TYPES = [
               (click)="viewMode.set('card')"
               [class.active]="viewMode() === 'card'"
               class="toggle-btn"
-              title="卡片视图">
+              [title]="t('accounts.gridView')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="3" y="3" width="7" height="7" rx="1"/>
                 <rect x="14" y="3" width="7" height="7" rx="1"/>
@@ -456,7 +456,7 @@ export const PROXY_TYPES = [
               (click)="viewMode.set('table')"
               [class.active]="viewMode() === 'table'"
               class="toggle-btn"
-              title="表格视图">
+              [title]="t('accounts.listView')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="3" y="4" width="18" height="3" rx="1"/>
                 <rect x="3" y="10" width="18" height="3" rx="1"/>

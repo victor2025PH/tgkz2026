@@ -8,6 +8,8 @@ on:
       - '*.md'
       - '.gitignore'
       - '.cursorrules'
+      # 僅後端變更時不觸發本工作流，由 Deploy Backend Only 負責，避免並發衝突
+      - 'backend/**'
   workflow_dispatch:  # 允許手動觸發
 
 concurrency:

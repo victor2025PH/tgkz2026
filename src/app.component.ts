@@ -429,6 +429,7 @@ export class AppComponent implements OnDestroy, OnInit {
   declare handleBatchSendComplete: (result: any) => void;
   declare handleBatchInviteComplete: (result: any) => void;
   declare closeMemberExtractionDialogUnified: () => void;
+  declare openOnboarding: () => void;
 
   // --- 認證狀態 ---
   isAuthenticated = computed(() => this.authService.isAuthenticated());

@@ -104,12 +104,12 @@ async function handle401Error(
       }
     }
     
-    // 🔧 第二用戶登入後載入前台時：短時間內不因 401 清除會話並跳轉，避免「載入到一半又回登入頁」
+    // 🔧 登入後載入前台時：短時間內不因 401 清除會話並跳轉，避免「進入頁面秒回登入頁」
+    // 注意：不要在此處 removeItem，否則並發多個 401 時第二個會因看不到標記而執行登出並跳轉
     const justLoggedIn = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('tgm_just_logged_in') : null;
     if (justLoggedIn) {
       const t = parseInt(justLoggedIn, 10);
       if (!isNaN(t) && Date.now() - t < 20000) {
-        try { sessionStorage.removeItem('tgm_just_logged_in'); } catch (_) {}
         console.warn('[AuthInterceptor] 401 shortly after login, skipping redirect to avoid kicking user back');
         throw new Error('Session expired');
       }

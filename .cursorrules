@@ -211,12 +211,78 @@ search_history.db
 - `database.py`: 遷移兼容性、表定義
 - `unified_contacts.py`: 跨表同步邏輯
 
+---
+
+## 🔴 認證與會話管理規範（嚴格遵守）
+
+### Token 驗證規則
+1. **永遠不要只靠 `token.length` 判斷認證狀態** — 必須解析 JWT payload 檢查 `exp` 過期時間
+2. **前端判斷 Token 有效性的標準方法**：
+   ```typescript
+   // ✅ 正確：解析 JWT 檢查過期
+   function isTokenAlive(token: string | null): boolean {
+     if (!token || token.length < 20) return false;
+     const parts = token.split('.');
+     if (parts.length !== 3) return false;
+     try {
+       let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+       while (base64.length % 4) base64 += '=';
+       const payload = JSON.parse(atob(base64));
+       return !(payload.exp && Date.now() >= payload.exp * 1000);
+     } catch { return false; }
+   }
+   
+   // ❌ 錯誤：只檢查長度
+   if (token && token.length > 10) { /* 已認證 */ }
+   ```
+3. **Guard 認證邏輯三步驟**：
+   - Access Token 有效 → 放行
+   - Access Token 過期 + Refresh Token 有效 → 放行（背景刷新）
+   - 兩個都過期 → 清除 localStorage + 重定向登入頁
+4. **`restoreSession()` 恢復時**：必須檢查 Token 過期，過期的 Token 不要設入 Signal
+5. **App 啟動後必須調用 `fetchCurrentUser()`** 向後端驗證 Token，如果返回 null/401，清除會話並跳轉登入頁
+
+### 🚫 認證嚴禁事項
+1. **禁止在 localStorage 存放密碼或密鑰** — 只存 JWT Token
+2. **禁止硬編碼 JWT Secret** — 必須從環境變量 `JWT_SECRET` 讀取
+3. **禁止在 AuthGuard 中只檢查 token.length** — 必須用 `isTokenAlive()` 解析過期
+4. **禁止在 401 處理中添加過長的寬限期** — 最多 5 秒
+5. **禁止繞過認證的後門代碼** — Electron 模式例外需要同時滿足 `apiMode === 'ipc' && isElectron`
+
+### 多租戶（SaaS）數據隔離規則
+1. **帳號查詢必須帶 `owner_user_id` 過濾** — SaaS 模式下每個用戶只能看到自己的帳號
+2. **添加帳號時必須設置 `owner_user_id`** — 綁定到當前登入用戶
+3. **兼容歷史數據** — 查詢時包含 `owner_user_id IS NULL OR owner_user_id = 'local_user'`
+4. **測試多租戶時** — 使用不同用戶登入，確認數據隔離正確
+
+---
+
+## 🔴 數據庫持久化防護規範
+
+### 防止數據丟失的檢查清單
+1. **部署後檢查數據庫路徑** — `docker exec` 進容器確認 `/app/data/tgmatrix.db` 存在
+2. **Docker Volume 必須掛載** — `docker-compose.yml` 中 `./data:/app/data` 不可刪除
+3. **數據庫操作必須用事務** — 多步驟更新使用 `BEGIN/COMMIT`
+4. **WAL 模式保持開啟** — `PRAGMA journal_mode=WAL` 防止並發寫入衝突
+5. **重啟前檢查 WAL 文件** — 確保 `-wal` 文件已 checkpoint
+
+### 數據庫路徑解析優先級
+| 環境 | 路徑 | 注意事項 |
+|------|------|----------|
+| 開發 | `backend/data/tgmatrix.db` | 本地直接訪問 |
+| Docker | `/app/data/tgmatrix.db` | 必須掛載 Volume |
+| Electron | `{userData}/backend-data/tgmatrix.db` | 由 Electron 傳遞路徑 |
+
+---
+
 ## 測試建議
 修改功能後，簡述如何手動測試：
 1. 正常流程
 2. 邊界情況（空值、超長文本、並發）
 3. 錯誤恢復（斷網、API 失敗）
 4. **數據庫持久化**（重啟後數據是否還在）
+5. **認證有效性**（Token 過期後是否正確跳轉登入頁，而非顯示空界面）
+6. **多租戶隔離**（不同用戶登入後，數據是否正確隔離）
 
 ---
 

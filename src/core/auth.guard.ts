@@ -11,53 +11,87 @@
 import { inject } from '@angular/core';
 import { Router, CanActivateFn, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
 import { AuthService } from './auth.service';
+import { AuthEventsService } from './auth-events.service';
 import { environment } from '../environments/environment';
 
 /**
+ * 🔧 輔助函數：本地解析 JWT Payload，檢查是否已過期
+ * 不需要訪問後端，完全在前端完成
+ * 返回: true = Token 未過期且格式有效, false = Token 已過期或格式無效
+ */
+function isTokenAlive(token: string | null): boolean {
+  if (!token || token.length < 20) return false;
+  
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  
+  try {
+    // URL-safe Base64 解碼
+    let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) base64 += '=';
+    const payload = JSON.parse(atob(base64));
+    
+    // 檢查 exp（過期時間）
+    if (payload.exp && Date.now() >= payload.exp * 1000) {
+      console.warn('[AuthGuard] Access token expired at', new Date(payload.exp * 1000).toISOString());
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 基礎認證守衛
- * 檢查用戶是否已登入
+ * 🔧 修復：檢查 JWT 是否真的未過期，而非僅檢查長度
+ * 
+ * 邏輯：
+ * 1. Electron 模式 → 放行
+ * 2. Access Token 未過期 → 放行
+ * 3. Access Token 過期但 Refresh Token 未過期 → 放行（背景會自動刷新）
+ * 4. 兩個都過期/不存在 → 清除殘留 Token 並重定向到登入頁
  */
 export const authGuard: CanActivateFn = (
   route: ActivatedRouteSnapshot,
   state: RouterStateSnapshot
 ) => {
   const authService = inject(AuthService);
+  const authEvents = inject(AuthEventsService);
   const router = inject(Router);
   
   // 本地版（Electron）不需要認證
-  // 必須同時滿足：1) apiMode 為 ipc 2) 在 Electron 環境中
   const isElectron = !!(window as any).electronAPI || !!(window as any).electron;
   if (environment.apiMode === 'ipc' && isElectron) {
     return true;
   }
   
-  // SaaS 模式：檢查認證狀態
-  // 🔧 修復：只檢查 Token 是否存在，不要清除可能有效的會話
-  const token = authService.accessToken();
-  
-  // 也檢查 localStorage 中的 Token（可能尚未同步到 AuthService）
-  const localToken = localStorage.getItem('tgm_access_token');
+  // 🔧 取得 Access Token 和 Refresh Token
+  const accessToken = authService.accessToken() || localStorage.getItem('tgm_access_token');
+  const refreshToken = localStorage.getItem('tgm_refresh_token');
   
   console.log('[AuthGuard] Checking auth:', {
-    isAuthenticated: authService.isAuthenticated(),
-    hasServiceToken: !!token,
-    hasLocalToken: !!localToken
+    hasAccessToken: !!accessToken,
+    accessTokenAlive: isTokenAlive(accessToken),
+    hasRefreshToken: !!refreshToken,
+    refreshTokenAlive: isTokenAlive(refreshToken)
   });
   
-  if (token && token.length > 10) {
+  // ✅ Access Token 存在且未過期 → 放行
+  if (isTokenAlive(accessToken)) {
     return true;
   }
   
-  // 🔧 備用檢查：如果 localStorage 中有 Token，允許訪問
-  if (localToken && localToken.length > 10) {
-    console.log('[AuthGuard] Using localStorage token fallback');
+  // ⚠️ Access Token 過期，但 Refresh Token 未過期 → 放行（背景自動刷新）
+  if (isTokenAlive(refreshToken)) {
+    console.log('[AuthGuard] Access token expired but refresh token valid, allowing with background refresh');
     return true;
   }
   
-  // 🔧 只有在確定沒有 Token 時才清除（不要過早清除）
-  // authService.clearSession();  // 移除這行，避免過早清除有效會話
+  // ❌ 兩個都過期/不存在 → 清除殘留 Token，重定向登入頁
+  console.warn('[AuthGuard] All tokens expired or missing, clearing and redirecting to login');
+  authEvents.clearAllAuthStorage();
   
-  // 保存原始 URL 用於登入後重定向
   const returnUrl = state.url;
   router.navigate(['/auth/login'], { queryParams: { returnUrl } });
   return false;
@@ -71,15 +105,16 @@ export const guestGuard: CanActivateFn = () => {
   const authService = inject(AuthService);
   const router = inject(Router);
   
-  // 嚴格檢查認證狀態
-  const isAuthenticated = authService.isAuthenticated();
-  const hasValidToken = authService.accessToken() && (authService.accessToken()?.length || 0) > 10;
+  // 🔧 修復：使用 JWT 過期檢測判斷是否真的已登入
+  const token = authService.accessToken();
+  const refreshToken = localStorage.getItem('tgm_refresh_token');
   
-  if (!isAuthenticated || !hasValidToken) {
+  if (!isTokenAlive(token) && !isTokenAlive(refreshToken)) {
+    // Token 不存在或已過期 → 允許訪問登入頁
     return true;
   }
   
-  // 已登入，重定向到首頁
+  // 確實已登入且 Token 有效，重定向到首頁
   router.navigate(['/dashboard']);
   return false;
 };

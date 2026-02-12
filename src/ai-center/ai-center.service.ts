@@ -158,36 +158,18 @@ export class AICenterService {
       }
     });
     
-    // 監聽模型測試結果
+    // 監聽模型測試結果（IPC 回調路徑，REST 路徑由 _handleTestResult 直接處理）
     this.ipcService.on('ai-model-tested', (data: any) => {
-      console.log('[AI] 測試結果:', data);
+      console.log('[AI] IPC 測試結果:', data);
       
-      // 🔧 移除測試中狀態
-      if (data.modelId) {
-        this._testingModelIds.update(set => {
-          const newSet = new Set(set);
-          newSet.delete(String(data.modelId));
-          return newSet;
-        });
+      // 🔧 如果 REST 已經處理過（模型已不在 testingIds 中），跳過避免重複 Toast
+      if (data.modelId && !this._testingModelIds().has(String(data.modelId))) {
+        console.log('[AI] 測試結果已由 REST 處理，跳過 IPC 回調');
+        return;
       }
       
-      if (data.isConnected) {
-        // 🔧 P0+P2 優化：顯示延遲時間、回覆預覽和可用模型
-        const latency = data.latencyMs ? `延遲: ${data.latencyMs}ms` : '';
-        const preview = data.responsePreview ? `\n回覆: "${data.responsePreview.substring(0, 50)}${data.responsePreview.length > 50 ? '...' : ''}"` : '';
-        const models = data.availableModels?.length > 0 ? `\n可用模型: ${data.availableModels.slice(0, 3).join(', ')}${data.availableModels.length > 3 ? '...' : ''}` : '';
-        this.toastService.success(`✓ AI 模型 ${data.modelName || ''} 連接成功！\n${latency}${preview}${models}`);
-      } else {
-        this.toastService.error(`連接失敗: ${data.error || '未知錯誤'}`);
-      }
-      // 更新本地狀態
-      if (data.modelId) {
-        this.updateModel(String(data.modelId), { 
-          isConnected: data.isConnected,
-          // 🔧 P0 優化：存儲最後測試時間
-          lastTestedAt: new Date().toISOString()
-        });
-      }
+      // IPC 路徑處理（Electron 模式 / REST fallback 場景）
+      this._handleTestResult(data);
     });
     
     // 監聽模型用途分配加載
@@ -337,9 +319,11 @@ export class AICenterService {
     if (res.success) {
       // 重新從後端加載，獲取真實 ID
       await this.loadModelsFromBackend();
-      this.toastService.success('模型已保存');
+      // 🔧 Toast 由 IPC 'ai-model-saved' 事件統一處理，避免重複通知
+      // SaaS 模式下如果 IPC 事件不觸發，模型列表刷新本身就是成功反饋
     } else {
-      // Fallback IPC
+      // REST 失敗，Fallback 到 IPC
+      console.warn('[AI] REST 保存失敗，fallback 到 IPC:', res.error);
       this.ipcService.send('save-ai-model', {
         provider: model.provider,
         modelName: model.modelName,
@@ -524,7 +508,8 @@ export class AICenterService {
   }
   
   /**
-   * 測試模型連接（通過後端測試）
+   * 測試模型連接
+   * 🔧 P2 優化：REST 優先（後端自動從 DB 補全模型信息），IPC 作為 fallback
    */
   async testModelConnection(id: string): Promise<boolean> {
     const model = this.config().models.find(m => m.id === id);
@@ -543,9 +528,32 @@ export class AICenterService {
       return newSet;
     });
     
-    const extModel = model as ExtendedAIModelConfig;
+    // 🔧 REST 優先（SaaS 模式 + 已持久化的模型）
+    if (!isNaN(Number(id))) {
+      try {
+        const result = await this.aiSettings.testModel(Number(id));
+        if (result.success) {
+          // REST 成功 — 直接處理結果（_handleTestResult 會移除 testingId）
+          this._handleTestResult({
+            modelId: id,
+            isConnected: result.isConnected,
+            latencyMs: result.latencyMs,
+            responsePreview: result.responsePreview,
+            availableModels: result.availableModels,
+            modelName: result.modelName || model.modelName,
+            error: result.error,
+          });
+          return result.isConnected ?? false;
+        }
+        // REST 返回失敗（如後端未就緒），fall through 到 IPC
+        console.warn('[AI] REST 測試返回失敗，嘗試 IPC:', result.error);
+      } catch (e) {
+        console.warn('[AI] REST 測試異常，fallback 到 IPC:', e);
+      }
+    }
     
-    // 通過後端測試連接
+    // Fallback: IPC（Electron 模式 / 未持久化的模型）
+    const extModel = model as ExtendedAIModelConfig;
     this.ipcService.send('test-ai-model', {
       id: !isNaN(Number(id)) ? Number(id) : undefined,
       provider: model.provider,
@@ -564,7 +572,6 @@ export class AICenterService {
       });
     }, 60000);
     
-    // 返回 true 表示測試請求已發送，實際結果通過事件返回
     return true;
   }
   
@@ -968,6 +975,47 @@ export class AICenterService {
     }
   }
   
+  // ========== 測試結果處理（REST 和 IPC 共用） ==========
+
+  /**
+   * 統一處理模型測試結果
+   * 可從 REST 響應或 IPC 事件中調用
+   */
+  private _handleTestResult(data: any): void {
+    const modelId = data.modelId ? String(data.modelId) : '';
+    
+    // 移除測試中狀態
+    if (modelId) {
+      this._testingModelIds.update(set => {
+        const newSet = new Set(set);
+        newSet.delete(modelId);
+        return newSet;
+      });
+    }
+    
+    // Toast 通知
+    if (data.isConnected) {
+      const latency = data.latencyMs ? `延遲: ${data.latencyMs}ms` : '';
+      const preview = data.responsePreview
+        ? `\n回覆: "${data.responsePreview.substring(0, 50)}${data.responsePreview.length > 50 ? '...' : ''}"`
+        : '';
+      const models = data.availableModels?.length > 0
+        ? `\n可用模型: ${data.availableModels.slice(0, 3).join(', ')}${data.availableModels.length > 3 ? '...' : ''}`
+        : '';
+      this.toastService.success(`✓ AI 模型 ${data.modelName || ''} 連接成功！\n${latency}${preview}${models}`);
+    } else {
+      this.toastService.error(`連接失敗: ${data.error || '未知錯誤'}`);
+    }
+    
+    // 更新本地模型狀態
+    if (modelId) {
+      this.updateModel(modelId, {
+        isConnected: data.isConnected,
+        lastTestedAt: new Date().toISOString()
+      });
+    }
+  }
+
   // ========== 重置 ==========
   
   resetToDefault() {

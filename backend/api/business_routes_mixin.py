@@ -95,7 +95,7 @@ class BusinessRoutesMixin:
             return self._json_response({'success': True, 'data': result})
         except Exception as e:
             logger.error(f"[AI Models] Get error: {e}")
-            return self._json_response({'success': True, 'data': []})
+            return self._json_response({'success': False, 'error': str(e), 'data': []}, status=500)
 
     async def save_ai_model_api(self, request):
         """添加 AI 模型（帶 user_id）"""

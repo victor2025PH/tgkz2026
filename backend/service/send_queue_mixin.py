@@ -579,13 +579,21 @@ class SendQueueMixin:
         """Create callback for when message is sent"""
         async def callback(message, result):
             if result.get('success'):
-                await db.add_interaction(lead_id, 'Message Sent', message.text)
-                await db.add_log(f"Message sent to lead {lead_id}", "success")
+                # 🔧 P0：區分確認送達 vs 不確定送達
+                is_uncertain = result.get('uncertain', False)
+                action_type = 'Message Sent (Uncertain)' if is_uncertain else 'Message Sent'
                 
-                # 🆕 自動狀態流轉：發送消息後自動變為「已聯繫」
+                await db.add_interaction(lead_id, action_type, message.text)
+                
+                if is_uncertain:
+                    await db.add_log(f"Message to lead {lead_id}: delivery uncertain (no message_id)", "warning")
+                else:
+                    await db.add_log(f"Message sent to lead {lead_id}", "success")
+                
+                # 🆕 自動狀態流轉：只有確認送達才自動變為「已聯繫」
                 lead = await db.get_lead(lead_id)
                 status_changed = False
-                if lead and lead.get('status') == 'New':
+                if lead and lead.get('status') == 'New' and not is_uncertain:
                     await db.update_lead_status(lead_id, 'Contacted')
                     status_changed = True
                     await db.add_log(f"Lead {lead_id} 狀態自動更新: New → Contacted", "info")
@@ -596,8 +604,9 @@ class SendQueueMixin:
                     "accountPhone": message.phone,
                     "userId": message.user_id,
                     "success": True,
+                    "uncertain": is_uncertain,
                     "messageId": message.id,
-                    "statusChanged": status_changed  # 🆕 通知前端狀態已變更
+                    "statusChanged": status_changed
                 })
                 
                 # 🆕 如果狀態變更，通知前端刷新 leads 數據

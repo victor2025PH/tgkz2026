@@ -19,11 +19,38 @@ from database import db
 # This is a transitional pattern - later, replace self.xxx with ctx.xxx
 
 
+# ==================== Payload 標準化工具 ====================
+
+# 前端 REST API 使用 snake_case，IPC 使用 camelCase
+# 此映射確保 handler 不管接收哪種格式都能正常工作
+_SNAKE_TO_CAMEL = {
+    'model_name':   'modelName',
+    'display_name': 'displayName',
+    'api_key':      'apiKey',
+    'api_endpoint': 'apiEndpoint',
+    'is_local':     'isLocal',
+    'is_default':   'isDefault',
+    'is_connected': 'isConnected',
+    'config_json':  'configJson',
+}
+
+def _normalize_payload(data: Dict[str, Any]) -> Dict[str, Any]:
+    """將 snake_case 鍵轉換為 camelCase，確保 handler 內部統一使用 camelCase。
+    如果 camelCase 鍵已存在則不覆蓋（camelCase 優先）。"""
+    result = dict(data)
+    for snake, camel in _SNAKE_TO_CAMEL.items():
+        if snake in result and camel not in result:
+            result[camel] = result.pop(snake)
+    return result
+
+
 # ==================== AI Model Configuration Handlers ====================
 
 async def handle_save_ai_model(self, payload: Dict[str, Any]):
     """保存 AI 模型配置到數據庫（按 user_id 隔離）"""
     try:
+        payload = _normalize_payload(payload)
+        
         user_id = payload.get('_user_id', '')  # 由 HTTP API 或 IPC 注入
         provider = payload.get('provider', '')
         model_name = payload.get('modelName', '')
@@ -36,11 +63,9 @@ async def handle_save_ai_model(self, payload: Dict[str, Any]):
         config_json = json.dumps(payload.get('config', {}))
         
         if not provider or not model_name:
-            self.send_event("ai-model-saved", {
-                "success": False,
-                "error": "供應商和模型名稱不能為空"
-            })
-            return
+            err = {"success": False, "error": "供應商和模型名稱不能為空"}
+            self.send_event("ai-model-saved", err)
+            return err
         
         # 如果設為默認，先取消該用戶的其他默認
         if is_default:
@@ -74,19 +99,23 @@ async def handle_save_ai_model(self, payload: Dict[str, Any]):
             model_id = (await db.fetch_one("SELECT last_insert_rowid() as id"))['id']
         
         self.send_log(f"✅ AI 模型已保存: {display_name} ({provider})", "success")
-        self.send_event("ai-model-saved", {
+        result = {
             "success": True,
             "modelId": model_id,
             "provider": provider,
             "modelName": model_name
-        })
+        }
+        self.send_event("ai-model-saved", result)
         
         # 同時發送更新後的模型列表（帶 user_id）
         await handle_get_ai_models(self, payload)
+        return result
         
     except Exception as e:
         self.send_log(f"❌ 保存 AI 模型失敗: {e}", "error")
-        self.send_event("ai-model-saved", {"success": False, "error": str(e)})
+        err = {"success": False, "error": str(e)}
+        self.send_event("ai-model-saved", err)
+        return err
 
 
 async def handle_get_ai_models(self, payload: Dict[str, Any] = None):
@@ -102,13 +131,13 @@ async def handle_get_ai_models(self, payload: Dict[str, Any] = None):
             (user_id,)
         )
         
-        result = []
+        model_list = []
         for model in models:
             # 隱藏 API Key 的大部分內容
             api_key = model.get('api_key', '') or ''
             masked_key = f"{api_key[:8]}...{api_key[-4:]}" if len(api_key) > 12 else '***'
             
-            result.append({
+            model_list.append({
                 "id": model['id'],
                 "provider": model['provider'],
                 "modelName": model['model_name'],
@@ -126,25 +155,32 @@ async def handle_get_ai_models(self, payload: Dict[str, Any] = None):
                 "updatedAt": model['updated_at']
             })
         
-        self.send_event("ai-models-list", {
+        result = {
             "success": True,
-            "models": result,
-            "count": len(result)
-        })
+            "models": model_list,
+            "count": len(model_list)
+        }
+        self.send_event("ai-models-list", result)
+        return result
         
     except Exception as e:
         self.send_log(f"❌ 獲取 AI 模型列表失敗: {e}", "error")
-        self.send_event("ai-models-list", {"success": False, "error": str(e), "models": []})
+        err = {"success": False, "error": str(e), "models": []}
+        self.send_event("ai-models-list", err)
+        return err
 
 
 async def handle_update_ai_model(self, payload: Dict[str, Any]):
     """更新 AI 模型配置（按 user_id 隔離）"""
     try:
+        payload = _normalize_payload(payload)
+        
         user_id = payload.get('_user_id', '')
         model_id = payload.get('id')
         if not model_id:
-            self.send_event("ai-model-updated", {"success": False, "error": "缺少模型 ID"})
-            return
+            err = {"success": False, "error": "缺少模型 ID"}
+            self.send_event("ai-model-updated", err)
+            return err
         
         updates = []
         params = []
@@ -179,11 +215,15 @@ async def handle_update_ai_model(self, payload: Dict[str, Any]):
                 tuple(params)
             )
         
-        self.send_event("ai-model-updated", {"success": True, "modelId": model_id})
+        result = {"success": True, "modelId": model_id}
+        self.send_event("ai-model-updated", result)
         await handle_get_ai_models(self, payload)
+        return result
         
     except Exception as e:
-        self.send_event("ai-model-updated", {"success": False, "error": str(e)})
+        err = {"success": False, "error": str(e)}
+        self.send_event("ai-model-updated", err)
+        return err
 
 
 async def handle_delete_ai_model(self, payload: Dict[str, Any]):
@@ -192,29 +232,51 @@ async def handle_delete_ai_model(self, payload: Dict[str, Any]):
         user_id = payload.get('_user_id', '')
         model_id = payload.get('id')
         if not model_id:
-            self.send_event("ai-model-deleted", {"success": False, "error": "缺少模型 ID"})
-            return
+            err = {"success": False, "error": "缺少模型 ID"}
+            self.send_event("ai-model-deleted", err)
+            return err
         
         await db.execute("DELETE FROM ai_models WHERE id = ? AND user_id = ?", (model_id, user_id))
         
         self.send_log(f"✅ AI 模型已刪除: ID={model_id}", "success")
-        self.send_event("ai-model-deleted", {"success": True, "modelId": model_id})
+        result = {"success": True, "modelId": model_id}
+        self.send_event("ai-model-deleted", result)
         await handle_get_ai_models(self, payload)
+        return result
         
     except Exception as e:
-        self.send_event("ai-model-deleted", {"success": False, "error": str(e)})
+        err = {"success": False, "error": str(e)}
+        self.send_event("ai-model-deleted", err)
+        return err
 
 
 async def handle_test_ai_model(self, payload: Dict[str, Any]):
     """測試 AI 模型連接 - 支持多種 API 格式"""
     try:
         import sys
+        payload = _normalize_payload(payload)
+        
         model_id = payload.get('id')
         provider = payload.get('provider', '')
         api_key = payload.get('apiKey', '')
         api_endpoint = payload.get('apiEndpoint', '')
         model_name = payload.get('modelName', '')
         is_local = payload.get('isLocal', False)
+        
+        # 🔧 如果只有 model_id 但缺少模型詳情（HTTP API 場景），從數據庫補全
+        if model_id and not provider and not model_name:
+            user_id = payload.get('_user_id', '')
+            row = await db.fetch_one(
+                "SELECT provider, model_name, api_key, api_endpoint, is_local FROM ai_models WHERE id = ? AND user_id = ?",
+                (model_id, user_id)
+            )
+            if row:
+                provider = row.get('provider', '')
+                model_name = row.get('model_name', '')
+                api_key = row.get('api_key', '')
+                api_endpoint = row.get('api_endpoint', '')
+                is_local = bool(row.get('is_local', 0))
+                print(f"[AI Test] 從數據庫補全模型信息: provider={provider}, model={model_name}", file=sys.stderr)
         
         import time as time_module
         test_start_time = time_module.time()
@@ -582,7 +644,7 @@ async def handle_test_ai_model(self, payload: Dict[str, Any]):
             self.send_log(f"❌ AI 模型連接失敗: {model_name} - {error_message}", "error")
         
         # 🔧 P0+P2 優化：包含延遲時間和可用模型列表
-        self.send_event("ai-model-tested", {
+        result = {
             "success": True,
             "modelId": model_id,
             "isConnected": is_connected,
@@ -591,12 +653,16 @@ async def handle_test_ai_model(self, payload: Dict[str, Any]):
             "modelName": model_name,
             "latencyMs": latency_ms if 'latency_ms' in dir() else None,
             "availableModels": available_models if 'available_models' in dir() else []
-        })
+        }
+        self.send_event("ai-model-tested", result)
+        return result
         
     except Exception as e:
         import traceback
         print(f"[AI Test] 測試過程異常: {traceback.format_exc()}", file=__import__('sys').stderr)
-        self.send_event("ai-model-tested", {"success": False, "error": str(e)})
+        err = {"success": False, "error": str(e)}
+        self.send_event("ai-model-tested", err)
+        return err
 
 
 async def handle_set_default_ai_model(self, payload: Dict[str, Any]):
@@ -604,8 +670,9 @@ async def handle_set_default_ai_model(self, payload: Dict[str, Any]):
     try:
         model_id = payload.get('id')
         if not model_id:
-            self.send_event("ai-model-default-set", {"success": False, "error": "缺少模型 ID"})
-            return
+            err = {"success": False, "error": "缺少模型 ID"}
+            self.send_event("ai-model-default-set", err)
+            return err
         
         # 先取消所有默認
         await db.execute("UPDATE ai_models SET is_default = 0")
@@ -613,11 +680,15 @@ async def handle_set_default_ai_model(self, payload: Dict[str, Any]):
         await db.execute("UPDATE ai_models SET is_default = 1 WHERE id = ?", (model_id,))
         
         self.send_log(f"✅ 已設置默認 AI 模型: ID={model_id}", "success")
-        self.send_event("ai-model-default-set", {"success": True, "modelId": model_id})
+        result = {"success": True, "modelId": model_id}
+        self.send_event("ai-model-default-set", result)
         await self.handle_get_ai_models()
+        return result
         
     except Exception as e:
-        self.send_event("ai-model-default-set", {"success": False, "error": str(e)})
+        err = {"success": False, "error": str(e)}
+        self.send_event("ai-model-default-set", err)
+        return err
 
 
 async def handle_save_model_usage(self, payload: Dict[str, Any]):
@@ -641,11 +712,15 @@ async def handle_save_model_usage(self, payload: Dict[str, Any]):
         """, (user_id, value))
         
         print(f"[AI] 模型用途分配已保存 (user={user_id}): intent={intent_recognition}", file=sys.stderr)
-        self.send_event("model-usage-saved", {"success": True})
+        result = {"success": True}
+        self.send_event("model-usage-saved", result)
+        return result
         
     except Exception as e:
         print(f"[AI] 保存模型用途分配失敗: {e}", file=sys.stderr)
-        self.send_event("model-usage-saved", {"success": False, "error": str(e)})
+        err = {"success": False, "error": str(e)}
+        self.send_event("model-usage-saved", err)
+        return err
 
 
 async def handle_get_model_usage(self, data=None):
@@ -667,9 +742,13 @@ async def handle_get_model_usage(self, data=None):
             }
         
         print(f"[AI] 模型用途分配已加載 (user={user_id}): {usage}", file=sys.stderr)
-        self.send_event("model-usage-loaded", {"success": True, "usage": usage})
+        result = {"success": True, "usage": usage}
+        self.send_event("model-usage-loaded", result)
+        return result
         
     except Exception as e:
         print(f"[AI] 獲取模型用途分配失敗: {e}", file=sys.stderr)
-        self.send_event("model-usage-loaded", {"success": False, "error": str(e)})
+        err = {"success": False, "error": str(e)}
+        self.send_event("model-usage-loaded", err)
+        return err
 

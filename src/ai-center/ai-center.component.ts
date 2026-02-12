@@ -337,11 +337,32 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
                 }
               </div>
               
-              <!-- 保存按鈕 -->
-              <div class="flex justify-end">
+              <!-- 🔧 P0-2: 保存按鈕（REST 持久化） -->
+              <div class="sticky bottom-0 z-10 mt-6 -mx-6 px-6 py-4 bg-slate-800/95 backdrop-blur-sm border-t border-slate-700/50 flex items-center justify-between rounded-b-xl">
+                <div class="flex items-center gap-3 text-sm">
+                  @if (quickSaving()) {
+                    <span class="flex items-center gap-2 text-cyan-400">
+                      <span class="inline-block w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></span>
+                      保存中...
+                    </span>
+                  } @else if (quickSaved()) {
+                    <span class="flex items-center gap-2 text-emerald-400">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                      引擎設置已保存
+                    </span>
+                  } @else {
+                    <span class="text-slate-500">設置保存到雲端，下次登錄自動恢復</span>
+                  }
+                </div>
                 <button (click)="saveQuickSettings()"
-                        class="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium rounded-xl hover:from-purple-400 hover:to-pink-400 transition-all shadow-lg">
-                  💾 保存設置
+                        [disabled]="quickSaving()"
+                        class="px-6 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium rounded-xl hover:from-purple-400 hover:to-pink-400 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                  @if (quickSaving()) {
+                    <span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  } @else {
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                  }
+                  保存設置
                 </button>
               </div>
             </div>
@@ -615,6 +636,40 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
                     <p class="text-sm">開啟後可配置 GPT-SoVITS 等語音服務，讓 AI 擁有語音能力</p>
                   </div>
                 }
+              </div>
+              
+              <!-- 🔧 P0-2: 固定底部保存欄 -->
+              <div class="sticky bottom-0 z-10 mt-6 -mx-6 px-6 py-4 bg-slate-800/95 backdrop-blur-sm border-t border-slate-700/50 flex items-center justify-between rounded-b-xl">
+                <div class="flex items-center gap-3 text-sm">
+                  @if (aiService.isSaving()) {
+                    <span class="flex items-center gap-2 text-cyan-400">
+                      <span class="inline-block w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></span>
+                      保存中...
+                    </span>
+                  } @else if (aiService.justSaved()) {
+                    <span class="flex items-center gap-2 text-emerald-400">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                      設置已保存
+                    </span>
+                  } @else if (aiService.isDirty()) {
+                    <span class="flex items-center gap-2 text-amber-400">
+                      <span class="w-2 h-2 bg-amber-400 rounded-full"></span>
+                      有未保存的更改
+                    </span>
+                  } @else {
+                    <span class="text-slate-500">模型配置自動同步到雲端</span>
+                  }
+                </div>
+                <button (click)="saveModelTabSettings()"
+                        [disabled]="aiService.isSaving()"
+                        class="px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium rounded-xl hover:from-cyan-400 hover:to-blue-400 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                  @if (aiService.isSaving()) {
+                    <span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  } @else {
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                  }
+                  保存設置
+                </button>
               </div>
             </div>
           }
@@ -1213,6 +1268,10 @@ export class AICenterComponent implements OnInit {
   isSavingUsage = signal(false);
   usageSaved = signal(false);
   private usageSaveTimeout: any = null;
+
+  // 🔧 P0-2: 引擎概覽頁保存狀態
+  quickSaving = signal(false);
+  quickSaved = signal(false);
   
   // 🔧 對話策略狀態
   strategyDirty = signal(false);
@@ -1354,10 +1413,10 @@ export class AICenterComponent implements OnInit {
     // TODO: 實現編輯功能
   }
   
-  saveNewModel() {
+  async saveNewModel() {
     if (!this.newModelName || !this.newModelApiKey) return;
     
-    this.aiService.addModel({
+    await this.aiService.addModel({
       provider: this.newModelProvider(),
       modelName: this.newModelName,
       apiKey: this.newModelApiKey,
@@ -1374,13 +1433,13 @@ export class AICenterComponent implements OnInit {
   
   // ========== 本地 AI 方法 ==========
   
-  saveLocalModel() {
+  async saveLocalModel() {
     if (!this.localModelEndpoint || !this.localModelName) {
       alert('請填寫 API 端點和模型名稱');
       return;
     }
     
-    this.aiService.addLocalModel({
+    await this.aiService.addLocalModel({
       modelName: this.localModelName,
       displayName: this.localModelDisplayName || this.localModelName,
       apiEndpoint: this.localModelEndpoint,
@@ -1408,12 +1467,13 @@ export class AICenterComponent implements OnInit {
   // ========== 🔊 P1: TTS 語音方法 ==========
   
   saveTtsSettings() {
-    // 通過 IPC 保存 TTS 設置到後端
+    // 🔧 P0-2: 標記為 dirty，等用戶點保存按鈕一起提交
+    this.aiService.markSettingsDirty();
+    // 兼容 IPC
     this.ipcService.send('save-ai-settings', {
       ttsEndpoint: this.ttsEndpoint,
       ttsEnabled: this.ttsEnabled
     });
-    this.toastService.success('TTS 設置已保存');
   }
   
   async testTtsConnection() {
@@ -2105,8 +2165,8 @@ A: 支持微信、支付寶、銀行卡`,
     this.saveQuickSettings(false);
   }
   
-  saveQuickSettings(showAlert = true) {
-    // 發送設置到後端
+  async saveQuickSettings(showAlert = true) {
+    // 🔧 P0-2: REST API 持久化 + localStorage 雙寫
     const settings = {
       auto_chat_enabled: this.autoChatEnabled() ? 1 : 0,
       auto_chat_mode: this.autoChatMode(),
@@ -2114,23 +2174,45 @@ A: 支持微信、支付寶、銀行卡`,
       auto_reply: this.autoReplyEnabled() ? 1 : 0
     };
     
-    // 保存到 localStorage
+    // localStorage 仍保留（離線可用 + 即時讀取）
     localStorage.setItem('ai_auto_chat_enabled', String(this.autoChatEnabled()));
     localStorage.setItem('ai_auto_chat_mode', this.autoChatMode());
     localStorage.setItem('ai_auto_greeting', String(this.autoGreetingEnabled()));
     localStorage.setItem('ai_auto_reply', String(this.autoReplyEnabled()));
     
-    // 發送到後端（通過 window 事件）
-    window.dispatchEvent(new CustomEvent('save-ai-settings', { detail: settings }));
-    
-    // 顯示成功提示（只在手動保存時顯示）
     if (showAlert) {
-      alert('設置已保存！');
+      this.quickSaving.set(true);
+      this.quickSaved.set(false);
     }
+    
+    // REST API 保存到後端（用戶級持久化）
+    const ok = await this.aiService.saveQuickTabSettings(settings);
+    
+    if (showAlert) {
+      this.quickSaving.set(false);
+      if (ok) {
+        this.quickSaved.set(true);
+        setTimeout(() => this.quickSaved.set(false), 3000);
+      }
+    }
+    
+    // 兼容：仍發送 window 事件
+    window.dispatchEvent(new CustomEvent('save-ai-settings', { detail: settings }));
   }
   
+  /**
+   * 🔧 P0-2: 模型配置頁「保存設置」按鈕
+   */
+  async saveModelTabSettings() {
+    const extraSettings: Record<string, any> = {
+      tts_enabled: this.ttsEnabled ? 1 : 0,
+      tts_endpoint: this.ttsEndpoint
+    };
+    await this.aiService.saveAllModelTabSettings(extraSettings);
+  }
+
   loadQuickSettings() {
-    // 從 localStorage 加載設置
+    // 先從 localStorage 加載（秒開）
     const enabled = localStorage.getItem('ai_auto_chat_enabled');
     const mode = localStorage.getItem('ai_auto_chat_mode') as 'full' | 'semi' | 'assist' | null;
     const greeting = localStorage.getItem('ai_auto_greeting');
@@ -2142,6 +2224,17 @@ A: 支持微信、支付寶、銀行卡`,
     if (greeting !== null) this.autoGreetingEnabled.set(greeting === 'true');
     if (reply !== null) this.autoReplyEnabled.set(reply === 'true');
     if (autonomous !== null) this.autonomousModeEnabled.set(autonomous === 'true');
+    
+    // 🔧 P0-2: 監聽 REST 加載的設置（覆蓋 localStorage）
+    window.addEventListener('ai-settings-loaded', ((e: CustomEvent) => {
+      const s = e.detail;
+      if (s.auto_chat_enabled !== undefined) this.autoChatEnabled.set(Number(s.auto_chat_enabled) === 1);
+      if (s.auto_chat_mode) this.autoChatMode.set(s.auto_chat_mode);
+      if (s.auto_greeting !== undefined) this.autoGreetingEnabled.set(Number(s.auto_greeting) === 1);
+      if (s.auto_reply !== undefined) this.autoReplyEnabled.set(Number(s.auto_reply) === 1);
+      if (s.tts_enabled !== undefined) this.ttsEnabled = Number(s.tts_enabled) === 1;
+      if (s.tts_endpoint) this.ttsEndpoint = s.tts_endpoint;
+    }) as EventListener);
   }
   
   constructor() {

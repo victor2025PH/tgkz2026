@@ -515,6 +515,81 @@ export class ApiService {
     }
   }
   
+  /**
+   * HTTP PUT 請求
+   */
+  async put<T = any>(endpoint: string, body: any = {}): Promise<ApiResponse<T>> {
+    const config = this._config();
+    const url = endpoint.startsWith('http') ? endpoint : `${config.baseUrl}${endpoint}`;
+    
+    const token = localStorage.getItem('tgm_access_token');
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(body)
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          this.handleUnauthorized();
+          return { success: false, error: '登錄已過期，請重新登錄' };
+        }
+        const errorData = await response.json().catch(() => ({}));
+        return { 
+          success: false, 
+          error: errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}` 
+        };
+      }
+      
+      const result = await response.json();
+      return this.normalizeResponse(result);
+    } catch (error: any) {
+      console.error(`[ApiService] PUT ${endpoint} error:`, error);
+      return { success: false, error: error.message || 'Network error' };
+    }
+  }
+
+  /**
+   * HTTP DELETE 請求
+   */
+  async delete<T = any>(endpoint: string): Promise<ApiResponse<T>> {
+    const config = this._config();
+    const url = endpoint.startsWith('http') ? endpoint : `${config.baseUrl}${endpoint}`;
+    
+    const token = localStorage.getItem('tgm_access_token');
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          this.handleUnauthorized();
+          return { success: false, error: '登錄已過期，請重新登錄' };
+        }
+        const errorData = await response.json().catch(() => ({}));
+        return { 
+          success: false, 
+          error: errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}` 
+        };
+      }
+      
+      const result = await response.json();
+      return this.normalizeResponse(result);
+    } catch (error: any) {
+      console.error(`[ApiService] DELETE ${endpoint} error:`, error);
+      return { success: false, error: error.message || 'Network error' };
+    }
+  }
+
   // ==================== 常用 API 快捷方法 ====================
   
   // 帳號

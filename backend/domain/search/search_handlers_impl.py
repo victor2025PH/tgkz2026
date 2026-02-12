@@ -70,6 +70,31 @@ async def handle_get_search_history(self, payload: Dict[str, Any]):
         })
 
 
+async def handle_get_keyword_suggestions(self, payload: Dict[str, Any]):
+    """🔧 Phase3: 獲取搜索關鍵詞推薦"""
+    try:
+        from search_history_service import get_search_history_service
+        search_history = get_search_history_service()
+        
+        current = payload.get('keyword', '')
+        limit = payload.get('limit', 10)
+        
+        suggestions = search_history.get_keyword_suggestions(current, limit)
+        
+        self.send_event("keyword-suggestions", {
+            "success": True,
+            "suggestions": suggestions,
+            "keyword": current
+        })
+        
+    except Exception as e:
+        self.send_event("keyword-suggestions", {
+            "success": False,
+            "error": str(e),
+            "suggestions": []
+        })
+
+
 async def handle_get_search_results_by_id(self, payload: Dict[str, Any]):
     """獲取某次搜索的結果"""
     try:

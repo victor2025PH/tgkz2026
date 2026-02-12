@@ -955,6 +955,94 @@ async def handle_add_monitored_group(self, payload: Dict[str, Any]):
         return {"success": False, "error": str(e)}
 
 
+
+# 🔧 Phase2: 搜索結果內存緩存（同關鍵詞+渠道 5 分鐘內不重複搜索）
+_search_cache: Dict[str, Any] = {}
+_SEARCH_CACHE_TTL = 300  # 5 分鐘
+
+
+def _smart_merge_results(self, groups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    🔧 Phase3: 智能去重合併 — 多來源相同群組合併為一條記錄
+    
+    合併規則：
+    1. 以 username（去除 @）為主鍵匹配
+    2. 以 telegram_id 為次級匹配
+    3. 以 title 精確匹配為末級匹配（僅相同 source 時不觸發）
+    4. 合併時取最優數據（最大成員數、最完整信息、最高分數）
+    5. 記錄所有來源到 sources 數組
+    """
+    # 建立索引: username → index, telegram_id → index
+    username_index: Dict[str, int] = {}
+    tid_index: Dict[str, int] = {}
+    merged: List[Dict[str, Any]] = []
+    
+    for g in groups:
+        uname = (g.get('username') or '').strip().lower().lstrip('@')
+        tid = str(g.get('telegram_id') or '').strip()
+        source = g.get('source', 'unknown')
+        
+        # 嘗試找到已有記錄
+        existing_idx = None
+        if uname and uname in username_index:
+            existing_idx = username_index[uname]
+        elif tid and tid in tid_index:
+            existing_idx = tid_index[tid]
+        
+        if existing_idx is not None:
+            # 合併到已有記錄
+            existing = merged[existing_idx]
+            existing_sources = existing.get('sources', [existing.get('source', 'unknown')])
+            if source not in existing_sources:
+                existing_sources.append(source)
+            existing['sources'] = existing_sources
+            
+            # 取最大成員數
+            if (g.get('member_count') or 0) > (existing.get('member_count') or 0):
+                existing['member_count'] = g['member_count']
+            
+            # 補全缺失字段
+            if not existing.get('telegram_id') and g.get('telegram_id'):
+                existing['telegram_id'] = g['telegram_id']
+                tid_new = str(g['telegram_id']).strip()
+                if tid_new:
+                    tid_index[tid_new] = existing_idx
+            if not existing.get('username') and g.get('username'):
+                existing['username'] = g['username']
+                uname_new = g['username'].strip().lower().lstrip('@')
+                if uname_new:
+                    username_index[uname_new] = existing_idx
+            if not existing.get('description') and g.get('description'):
+                existing['description'] = g['description']
+            if not existing.get('link') and g.get('link'):
+                existing['link'] = g['link']
+            if not existing.get('invite_link') and g.get('invite_link'):
+                existing['invite_link'] = g['invite_link']
+            
+            # 取最高分數
+            if (g.get('score') or 0) > (existing.get('score') or 0):
+                existing['score'] = g['score']
+            if (g.get('_relevance_score') or 0) > (existing.get('_relevance_score') or 0):
+                existing['_relevance_score'] = g['_relevance_score']
+            
+            # 更新可達性（取最優）
+            access_order = {'public': 0, 'invite_only': 1, 'id_only': 2, 'unknown': 3}
+            if access_order.get(g.get('accessibility'), 3) < access_order.get(existing.get('accessibility'), 3):
+                existing['accessibility'] = g['accessibility']
+        else:
+            # 新記錄
+            g['sources'] = [source]
+            idx = len(merged)
+            merged.append(g)
+            
+            if uname:
+                username_index[uname] = idx
+            if tid:
+                tid_index[tid] = idx
+    
+    return merged
+
+
 async def handle_search_groups(self, payload: Dict[str, Any]):
     """
     🔧 P0: 處理 search-groups 命令 - 搜索 Telegram 群組/頻道
@@ -976,6 +1064,7 @@ async def handle_search_groups(self, payload: Dict[str, Any]):
         sources = payload.get('sources', ['telegram'])
         account_phone = payload.get('account_phone')
         limit = payload.get('limit', 50)
+        force_refresh = payload.get('force_refresh', False)
         
         if not keyword:
             self.send_event("search-results", {
@@ -984,6 +1073,20 @@ async def handle_search_groups(self, payload: Dict[str, Any]):
                 "groups": []
             })
             return
+        
+        # 🔧 Phase2: 檢查搜索緩存
+        cache_key = f"{keyword.lower().strip()}|{'|'.join(sorted(sources))}"
+        if not force_refresh and cache_key in _search_cache:
+            cached = _search_cache[cache_key]
+            age = time.time() - cached.get('timestamp', 0)
+            if age < _SEARCH_CACHE_TTL:
+                self.send_log(f"📋 命中搜索緩存: {keyword} ({int(age)}s 前), {len(cached['groups'])} 個結果", "info")
+                # 直接返回緩存結果
+                self.send_event("search-results", cached['data'])
+                return
+            else:
+                # 緩存過期，刪除
+                del _search_cache[cache_key]
         
         # 🔧 P0: 顯示搜索源
         sources_str = ', '.join(sources) if sources else 'telegram'
@@ -1018,6 +1121,8 @@ async def handle_search_groups(self, payload: Dict[str, Any]):
             # 搜索源 1: Telegram 官方 API (telegram, official)
             if any(s in sources for s in ['telegram', 'official']):
                 self.send_log("📱 使用 Telegram 官方 API 搜索...", "info")
+                self.send_event("search-source-status", {"source": "telegram", "status": "searching", "count": 0})
+                tg_start = time.time()
                 try:
                     telegram_results = await asyncio.wait_for(
                         group_search_service.search_groups(
@@ -1028,6 +1133,7 @@ async def handle_search_groups(self, payload: Dict[str, Any]):
                         ),
                         timeout=30.0
                     )
+                    tg_count = 0
                     if telegram_results:
                         for r in telegram_results:
                             tid = str(r.telegram_id) if hasattr(r, 'telegram_id') else str(r.id)
@@ -1044,6 +1150,7 @@ async def handle_search_groups(self, payload: Dict[str, Any]):
                                     "score": r.score if hasattr(r, 'score') else 0,
                                     "source": "telegram"
                                 })
+                                tg_count += 1
                         self.send_log(f"📱 Telegram API 找到 {len(telegram_results)} 個結果", "info")
                         
                         # 🔧 P1: 流式返回 - Telegram 結果先發送
@@ -1056,14 +1163,19 @@ async def handle_search_groups(self, payload: Dict[str, Any]):
                                 "isPartial": True,
                                 "message": f"官方搜索找到 {len(all_groups)} 個結果，正在繼續搜索..."
                             })
+                    tg_elapsed = int((time.time() - tg_start) * 1000)
+                    self.send_event("search-source-status", {"source": "telegram", "status": "completed", "count": tg_count, "elapsed_ms": tg_elapsed})
                 except asyncio.TimeoutError:
                     self.send_log("⚠️ Telegram API 搜索超時", "warning")
+                    self.send_event("search-source-status", {"source": "telegram", "status": "timeout", "count": 0, "elapsed_ms": 30000})
                 except Exception as e:
                     self.send_log(f"⚠️ Telegram API 搜索失敗: {e}", "warning")
+                    self.send_event("search-source-status", {"source": "telegram", "status": "failed", "count": 0, "error": str(e)})
             
             # 搜索源 2: Jiso 中文搜索 (jiso, chinese)
             if any(s in sources for s in ['jiso', 'chinese']):
                 self.send_log("🔍 使用極搜 (Jiso) 中文搜索...", "info")
+                self.send_event("search-source-status", {"source": "jiso", "status": "searching", "count": 0})
                 jiso_start = time.time()
                 try:
                     # 🔧 P0: 增加超時時間到 90 秒（Jiso 搜索包含詳情獲取，需要更長時間）
@@ -1081,10 +1193,10 @@ async def handle_search_groups(self, payload: Dict[str, Any]):
                     # 🔧 P0: 添加詳細日誌
                     print(f"[Backend] Jiso result success={jiso_result.get('success')}, results_count={len(jiso_result.get('results', []))}", file=sys.stderr)
                     
+                    added = 0
+                    skipped_dup = 0
                     if jiso_result.get('success') and jiso_result.get('results'):
                         jiso_groups = jiso_result['results']
-                        added = 0
-                        skipped_dup = 0
                         for g in jiso_groups:
                             # 🔧 P0: 使用專門的 dedup_key 進行去重
                             dedup_key = g.get('dedup_key', '')
@@ -1135,19 +1247,25 @@ async def handle_search_groups(self, payload: Dict[str, Any]):
                     else:
                         error_msg = jiso_result.get('error', '無結果')
                         self.send_log(f"🔍 極搜搜索: {error_msg}", "info")
+                    jiso_elapsed = int((time.time() - jiso_start) * 1000)
+                    self.send_event("search-source-status", {"source": "jiso", "status": "completed", "count": added, "elapsed_ms": jiso_elapsed})
                 except asyncio.TimeoutError:
                     self.send_log("⚠️ 極搜搜索超時", "warning")
+                    self.send_event("search-source-status", {"source": "jiso", "status": "timeout", "count": 0, "elapsed_ms": 90000})
                 except Exception as e:
                     self.send_log(f"⚠️ 極搜搜索失敗: {e}", "warning")
+                    self.send_event("search-source-status", {"source": "jiso", "status": "failed", "count": 0, "error": str(e)})
             
             # 搜索源 3: 本地資源庫 (local)
             if 'local' in sources:
                 self.send_log("📂 搜索本地資源庫...", "info")
+                self.send_event("search-source-status", {"source": "local", "status": "searching", "count": 0})
+                local_start = time.time()
                 try:
                     # 從資源發現數據庫搜索
                     local_results = await resource_discovery.search_resources(keyword, limit=limit)
+                    local_added = 0
                     if local_results:
-                        added = 0
                         for r in local_results:
                             tid = str(r.telegram_id) if r.telegram_id else ''
                             if tid and tid not in seen_ids:
@@ -1163,10 +1281,13 @@ async def handle_search_groups(self, payload: Dict[str, Any]):
                                     "score": r.overall_score or 0,
                                     "source": "local"
                                 })
-                                added += 1
-                        self.send_log(f"📂 本地資源庫找到 {added} 個結果", "info")
+                                local_added += 1
+                        self.send_log(f"📂 本地資源庫找到 {local_added} 個結果", "info")
+                    local_elapsed = int((time.time() - local_start) * 1000)
+                    self.send_event("search-source-status", {"source": "local", "status": "completed", "count": local_added, "elapsed_ms": local_elapsed})
                 except Exception as e:
                     self.send_log(f"⚠️ 本地搜索失敗: {e}", "warning")
+                    self.send_event("search-source-status", {"source": "local", "status": "failed", "count": 0, "error": str(e)})
             
             # 🔧 P0: 添加詳細日誌
             total_before_sort = len(all_groups)
@@ -1215,11 +1336,71 @@ async def handle_search_groups(self, payload: Dict[str, Any]):
             total_after_limit = min(len(all_groups), MAX_RESULTS)
             all_groups = all_groups[:MAX_RESULTS]
             
+            # 🔧 Phase2: 標記每個結果的可達性 (accessibility)
+            for g in all_groups:
+                username = g.get('username', '')
+                link = g.get('link', '') or ''
+                telegram_id = g.get('telegram_id')
+                if username:
+                    g['accessibility'] = 'public'
+                elif link and ('/+' in link or 'joinchat' in link):
+                    g['accessibility'] = 'invite_only'
+                elif telegram_id:
+                    g['accessibility'] = 'id_only'
+                else:
+                    g['accessibility'] = 'unknown'
+            
+            # 🔧 Phase2: 輕量驗證 Jiso 結果 — 對有 username 的結果嘗試 ResolveUsername
+            jiso_with_username = [g for g in all_groups if g.get('source') == 'jiso' and g.get('username')]
+            if jiso_with_username and connected_clients:
+                self.send_log(f"🔍 驗證 {len(jiso_with_username)} 個極搜結果的可達性...", "info")
+                # 取第一個可用 client
+                verify_client = None
+                for c in connected_clients.values():
+                    if c.is_connected:
+                        verify_client = c
+                        break
+                
+                if verify_client:
+                    validated = 0
+                    invalid = 0
+                    # 限制最多驗證 20 個，避免太慢
+                    for g in jiso_with_username[:20]:
+                        try:
+                            chat = await asyncio.wait_for(
+                                verify_client.get_chat(g['username']),
+                                timeout=3.0
+                            )
+                            if chat:
+                                # 驗證成功 — 更新真實數據
+                                if not g.get('telegram_id') and chat.id:
+                                    g['telegram_id'] = str(chat.id)
+                                if hasattr(chat, 'members_count') and chat.members_count:
+                                    g['member_count'] = chat.members_count
+                                validated += 1
+                        except Exception:
+                            # 驗證失敗 — 標記為 invalid
+                            g['accessibility'] = 'unknown'
+                            g['_invalid'] = True
+                            invalid += 1
+                    
+                    if validated > 0 or invalid > 0:
+                        self.send_log(f"🔍 驗證完成: {validated} 有效, {invalid} 不可達", "info")
+            
+            # 🔧 Phase3: 智能去重合併 — 多來源同群組基於 username/telegram_id 合併
+            before_merge = len(all_groups)
+            all_groups = self._smart_merge_results(all_groups)
+            merged_count = before_merge - len(all_groups)
+            if merged_count > 0:
+                self.send_log(f"🔗 智能去重: 合併 {merged_count} 個重複結果 ({before_merge} → {len(all_groups)})", "info")
+            
             # 統計各來源結果數
             source_counts = {}
             for g in all_groups:
-                src = g.get('source', 'unknown')
-                source_counts[src] = source_counts.get(src, 0) + 1
+                # 統計合併後的來源（可能包含多來源）
+                sources_list = g.get('sources', [g.get('source', 'unknown')])
+                for src in (sources_list if isinstance(sources_list, list) else [sources_list]):
+                    source_counts[src] = source_counts.get(src, 0) + 1
             
             source_summary = ', '.join([f"{k}: {v}" for k, v in source_counts.items()])
             print(f"[Backend] 🔍 最終結果: {len(all_groups)} 個 ({source_summary})", file=sys.stderr)
@@ -1323,7 +1504,7 @@ async def handle_search_groups(self, payload: Dict[str, Any]):
                         g['status'] = 'discovered'
                         g['joined_phone'] = None
             
-            self.send_event("search-results", {
+            result_data = {
                 "success": True,
                 "keyword": keyword,
                 "groups": all_groups,
@@ -1332,7 +1513,20 @@ async def handle_search_groups(self, payload: Dict[str, Any]):
                 "source_counts": source_counts,
                 "new_count": new_count,           # 🆕 新發現數量
                 "existing_count": existing_count  # 🆕 已知數量
-            })
+            }
+            
+            # 🔧 Phase2: 存入搜索緩存
+            _search_cache[cache_key] = {
+                'timestamp': time.time(),
+                'groups': all_groups,
+                'data': result_data
+            }
+            # 清理過期緩存（避免內存泄漏）
+            expired = [k for k, v in _search_cache.items() if time.time() - v.get('timestamp', 0) > _SEARCH_CACHE_TTL * 2]
+            for k in expired:
+                del _search_cache[k]
+            
+            self.send_event("search-results", result_data)
             
         except asyncio.TimeoutError:
             self.send_log("⚠️ 搜索超時", "warning")
@@ -1755,19 +1949,29 @@ async def handle_join_resource(self, payload: Dict[str, Any]):
         resource_id = payload.get('resourceId')
         username = payload.get('username')
         telegram_id = payload.get('telegramId')
+        invite_link = payload.get('inviteLink') or payload.get('invite_link')
         title = payload.get('title', '')
         phone = payload.get('phone')
         
-        if not username and not telegram_id:
-            raise ValueError("需要 username 或 telegramId")
+        if not username and not telegram_id and not invite_link:
+            raise ValueError("需要 username、telegramId 或 inviteLink")
         
-        # 構建群組 URL
+        # 🔧 構建群組 URL：優先 username → invite_link → telegram_id
         if username:
             group_url = f"https://t.me/{username.lstrip('@')}"
+        elif invite_link:
+            # 支持完整 URL 或 +hash 格式
+            if invite_link.startswith('http'):
+                group_url = invite_link
+            elif invite_link.startswith('+') or invite_link.startswith('joinchat'):
+                group_url = f"https://t.me/{invite_link}"
+            else:
+                group_url = invite_link
+            self.send_log(f"🔗 使用邀請鏈接加入: {group_url[:30]}...", "info")
         elif telegram_id:
             group_url = str(telegram_id)
         else:
-            raise ValueError("需要 username 或 telegramId")
+            raise ValueError("需要 username、telegramId 或 inviteLink")
         
         # 🆕 Phase3: 智能帳號選擇
         if not phone:
@@ -1872,10 +2076,20 @@ async def handle_join_resource(self, payload: Dict[str, Any]):
         error_str = str(e)
         friendly_error = self._get_friendly_join_error(error_str)
         
-        self.send_log(f"❌ 加入失敗: {friendly_error}", "error")
+        # 🔧 Phase2: 提取 error_code 供前端精細處理
+        import re as _re
+        code_match = _re.match(r'\[(\w+)\]\s*(.*)', friendly_error)
+        error_code = code_match.group(1) if code_match else 'UNKNOWN'
+        error_msg = code_match.group(2) if code_match else friendly_error
+        
+        self.send_log(f"❌ 加入失敗: {error_msg}", "error")
         self.send_event("join-and-monitor-complete", {
             "success": False,
-            "error": friendly_error
+            "error": error_msg,
+            "error_code": error_code,
+            "resourceId": payload.get('resourceId'),
+            "username": payload.get('username'),
+            "telegramId": payload.get('telegramId')
         })
 
 

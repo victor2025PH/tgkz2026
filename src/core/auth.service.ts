@@ -1151,13 +1151,34 @@ export class AuthService implements OnDestroy {
       
       console.log('[Auth] restoreSession - accessToken:', !!accessToken, 'refreshToken:', !!refreshToken, 'user:', !!userJson);
       
-      // 🔧 修復「進入前台秒回登入頁」：恢復時不因格式/過期清除會話，避免首屏未渲染就被踢回登入頁
-      // 僅做最小長度檢查；過期與有效性交給後端與 refresh 處理
-      if (accessToken && accessToken.length >= 10) {
-        console.log('[Auth] Setting accessToken signal');
-        this._accessToken.set(accessToken);
+      // 🔧 修復：檢查 Token 是否真的未過期，而非僅檢查長度
+      // 如果 Access Token 過期但 Refresh Token 有效 → 設置 refreshToken，由背景刷新機制更新
+      // 如果兩個都過期 → 清除所有 Token，讓用戶重新登入
+      const accessAlive = accessToken ? this.isValidTokenFormat(accessToken) : false;
+      const refreshAlive = refreshToken ? this.isValidTokenFormat(refreshToken) : false;
+      
+      console.log('[Auth] Token status - accessAlive:', accessAlive, 'refreshAlive:', refreshAlive);
+      
+      if (accessAlive) {
+        // ✅ Access Token 有效，正常恢復
+        this._accessToken.set(accessToken!);
+      } else if (refreshAlive) {
+        // ⚠️ Access Token 過期但 Refresh Token 有效，觸發背景刷新
+        console.warn('[Auth] Access token expired, will attempt background refresh');
+        // 暫時設置過期的 access token（讓 isAuthenticated 為 true，避免閃爍）
+        if (accessToken) this._accessToken.set(accessToken);
+      } else if (accessToken || refreshToken) {
+        // ❌ 兩個都過期，清除殘留 Token
+        console.warn('[Auth] All tokens expired, clearing stale session');
+        localStorage.removeItem(TOKEN_KEYS.ACCESS_TOKEN);
+        localStorage.removeItem(TOKEN_KEYS.REFRESH_TOKEN);
+        localStorage.removeItem(TOKEN_KEYS.USER);
+        localStorage.removeItem(TOKEN_KEYS.SESSION_ID);
+        // 不設置 signal，保持未認證狀態
+        return;
       }
-      if (refreshToken && refreshToken.length >= 10) {
+      
+      if (refreshToken && refreshAlive) {
         this._refreshToken.set(refreshToken);
       }
       if (userJson) {
@@ -1185,20 +1206,22 @@ export class AuthService implements OnDestroy {
       // 🔧 修復：Token 有效性會在實際 API 請求時由後端驗證
       console.log('[Auth] Session restored successfully');
       
-      // 🔧 優化：如果有 Token 但沒有用戶信息，立即獲取（不等待）
-      if (accessToken && !userJson) {
-        console.log('[Auth] Token exists but no user info, fetching immediately...');
-        // 使用 queueMicrotask 確保在構造函數完成後執行
+      // 🔧 修復：恢復 Token 後，立即向後端驗證有效性
+      // 如果後端返回 401，說明 Token 真的無效，清除並跳轉登入頁
+      if (this._accessToken()) {
         queueMicrotask(() => {
           if (this._accessToken()) {
             this.fetchCurrentUser().then(user => {
               if (user) {
-                console.log('[Auth] User info fetched successfully:', user.username);
+                console.log('[Auth] Token validated, user:', user.username);
               } else {
-                console.warn('[Auth] Failed to fetch user info');
+                // 🔧 關鍵修復：fetchCurrentUser 返回 null 說明 Token 無效
+                console.warn('[Auth] Token validation failed, clearing session');
+                this.clearAuthStateInternal();
+                this.router.navigate(['/auth/login']);
               }
             }).catch(e => {
-              console.warn('[Auth] Error fetching user info:', e);
+              console.warn('[Auth] Token validation error:', e);
             });
           }
         });

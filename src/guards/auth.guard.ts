@@ -15,7 +15,24 @@ import {
 import { MembershipService } from '../membership.service';
 import { ToastService } from '../toast.service';
 import { AuthService } from '../core/auth.service';
+import { AuthEventsService } from '../core/auth-events.service';
 import { environment } from '../environments/environment';
+
+/**
+ * 🔧 輔助函數：本地解析 JWT Payload，檢查是否已過期
+ */
+function isTokenAlive(token: string | null): boolean {
+  if (!token || token.length < 20) return false;
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  try {
+    let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) base64 += '=';
+    const payload = JSON.parse(atob(base64));
+    if (payload.exp && Date.now() >= payload.exp * 1000) return false;
+    return true;
+  } catch { return false; }
+}
 
 /**
  * 會員功能權限映射
@@ -121,14 +138,20 @@ export const membershipGuard: CanActivateFn = (
   const router = inject(Router);
   const authService = inject(AuthService);
 
-  // 🔧 FIX: 先檢查認證狀態（之前缺失，導致無痕模式下未登錄用戶可直接進入前端）
+  // 🔧 FIX: 先檢查認證狀態 —— 使用 JWT 過期檢測（不僅僅是長度檢查）
   const isElectron = !!(window as any).electronAPI || !!(window as any).electron;
   if (!(environment.apiMode === 'ipc' && isElectron)) {
-    // SaaS / HTTP 模式：必須有 Token
+    const authEvents = inject(AuthEventsService);
     const token = authService.accessToken();
     const localToken = localStorage.getItem('tgm_access_token');
-    if ((!token || token.length <= 10) && (!localToken || localToken.length <= 10)) {
-      console.log('[MembershipGuard] No auth token, redirecting to login');
+    const refreshToken = localStorage.getItem('tgm_refresh_token');
+    
+    const accessAlive = isTokenAlive(token) || isTokenAlive(localToken);
+    const refreshAlive = isTokenAlive(refreshToken);
+    
+    if (!accessAlive && !refreshAlive) {
+      console.warn('[MembershipGuard] All tokens expired, clearing and redirecting to login');
+      authEvents.clearAllAuthStorage();
       router.navigate(['/auth/login'], { queryParams: { returnUrl: state.url } });
       return false;
     }

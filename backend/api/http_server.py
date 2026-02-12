@@ -1186,6 +1186,7 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
         """WebSocket 處理器 - 實時通訊，支持心跳
         
         🆕 優化：注入租戶上下文到 WebSocket 會話
+        🔧 安全修復：未認證連接僅允許心跳，拒絕數據命令
         """
         ws = web.WebSocketResponse(
             heartbeat=30.0,  # 服務器端心跳間隔
@@ -1199,6 +1200,10 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
         # 🆕 獲取租戶信息（如果已認證）
         tenant_id = request.get('tenant_id')
         tenant_info = None
+        auth_ctx = request.get('auth')
+        is_authenticated = bool(auth_ctx and auth_ctx.is_authenticated)
+        is_electron = os.environ.get('ELECTRON_MODE', 'false').lower() == 'true'
+        
         if tenant_id:
             tenant = request.get('tenant')
             if tenant:
@@ -1213,16 +1218,17 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
         if tenant_id:
             self.websocket_tenant_map[ws] = tenant_id
         
-        logger.info(f"WebSocket client {client_id} connected (tenant: {tenant_id}). Total: {len(self.websocket_clients)}")
+        logger.info(f"WebSocket client {client_id} connected (tenant: {tenant_id}, auth: {is_authenticated}). Total: {len(self.websocket_clients)}")
         
-        # 發送連接確認
+        # 發送連接確認（包含認證狀態，前端可據此決定是否發送命令）
         await ws.send_json({
             'type': 'connected',
             'event': 'connected',
             'data': {
                 'client_id': client_id,
                 'timestamp': datetime.now().isoformat(),
-                'tenant': tenant_info  # 🆕 包含租戶信息
+                'tenant': tenant_info,
+                'authenticated': is_authenticated  # 🔧 告知前端是否已認證
             }
         })
         
@@ -1248,6 +1254,18 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
                         request_id = data.get('request_id')
                         
                         if command:
+                            # 🔧 安全修復：未認證的 WebSocket 不允許執行數據命令
+                            # Electron 模式例外（本地桌面版不需要認證）
+                            if not is_authenticated and not is_electron:
+                                logger.warning(f"[WS] Unauthenticated command rejected: {command} (client: {client_id})")
+                                await ws.send_json({
+                                    'success': False,
+                                    'error': '需要登入',
+                                    'code': 'UNAUTHORIZED',
+                                    'request_id': request_id
+                                })
+                                continue
+                            
                             # 🔧 修復：在執行命令前設置租戶上下文
                             tenant_token = None
                             try:

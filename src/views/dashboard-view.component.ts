@@ -22,13 +22,14 @@ import { QuickWorkflowComponent } from '../quick-workflow.component';
 import { QuickActionsPanelComponent } from '../components/quick-actions-panel.component';
 
 export interface SystemStatus {
-  accounts?: { online: number; total: number };
+  accounts?: { online: number; total: number; senders_online?: number; senders_total?: number };
   monitoring?: { groups: number; active: boolean };
   ai?: { enabled: boolean; mode?: string };
   campaigns?: { active: number; total: number };
   triggerRules?: { active: number; total: number };
   keywords?: { sets: number };
   templates?: { active: number; total: number };
+  warnings?: { code: string; message: string; fix?: string }[];
 }
 
 @Component({
@@ -165,6 +166,16 @@ export interface SystemStatus {
               </div>
             </div>
           </div>
+          
+          <!-- P1: AI 已啟用但無發送帳號時提示 -->
+          @if (status().warnings?.some(w => w.code === 'NO_SENDER_ACCOUNT')) {
+            <div class="rounded-lg p-3 mb-4 flex items-center justify-between gap-3" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.5);">
+              <span class="text-amber-200 text-sm">⚠️ {{ status().warnings?.find(w => w.code === 'NO_SENDER_ACCOUNT')?.message }}</span>
+              <button (click)="navigateTo('accounts')" class="px-3 py-1.5 text-sm rounded-lg transition-colors" style="background: rgba(245, 158, 11, 0.3); color: var(--text-primary);">
+                前往帳號管理
+              </button>
+            </div>
+          }
           
           <!-- 🔧 P1: 增強版一鍵啟動進度 -->
           @if (starting()) {

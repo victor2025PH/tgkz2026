@@ -763,6 +763,17 @@ class Database(UserAdminMixin, AccountMixin, KeywordGroupMixin, CampaignQueueMix
             )
         ''')
         
+        # ============ P0: AI 運行設置表（按用戶，儀表盤/觸發規則統一數據源） ============
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ai_settings (
+                user_id TEXT DEFAULT '',
+                key TEXT NOT NULL,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, key)
+            )
+        ''')
+        
         # ============ 🆕 AI 知識庫表 ============
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS ai_knowledge_base (

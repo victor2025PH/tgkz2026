@@ -14,6 +14,8 @@ import {
 } from '@angular/router';
 import { MembershipService } from '../membership.service';
 import { ToastService } from '../toast.service';
+import { AuthService } from '../core/auth.service';
+import { environment } from '../environments/environment';
 
 /**
  * 會員功能權限映射
@@ -117,7 +119,21 @@ export const membershipGuard: CanActivateFn = (
   const membershipService = inject(MembershipService);
   const toastService = inject(ToastService);
   const router = inject(Router);
-  
+  const authService = inject(AuthService);
+
+  // 🔧 FIX: 先檢查認證狀態（之前缺失，導致無痕模式下未登錄用戶可直接進入前端）
+  const isElectron = !!(window as any).electronAPI || !!(window as any).electron;
+  if (!(environment.apiMode === 'ipc' && isElectron)) {
+    // SaaS / HTTP 模式：必須有 Token
+    const token = authService.accessToken();
+    const localToken = localStorage.getItem('tgm_access_token');
+    if ((!token || token.length <= 10) && (!localToken || localToken.length <= 10)) {
+      console.log('[MembershipGuard] No auth token, redirecting to login');
+      router.navigate(['/auth/login'], { queryParams: { returnUrl: state.url } });
+      return false;
+    }
+  }
+
   // ========== 全功能開放模式 ==========
   // 當 membership.level 為 'king' 時，直接放行所有路由
   const currentLevel = membershipService.level();

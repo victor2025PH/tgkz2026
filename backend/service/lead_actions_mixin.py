@@ -126,10 +126,13 @@ class LeadActionsMixin:
             render_template_content = None
             build_lead_context = None
 
+        tenant_token = None
         try:
             rules = await db.get_all_trigger_rules()
             active = [r for r in rules if r.get('isActive', r.get('is_active', True))]
             if not active:
+                print(f"[LeadActions] 觸發規則: 無活躍規則（共 {len(rules)} 條），未發送。請在「觸發規則」中啟用至少一條。", file=sys.stderr)
+                self.send_log("[觸發規則] 無活躍規則，未發送。請在「觸發規則」中啟用至少一條。", "info")
                 return
 
             user_id = str(lead_data.get('user_id', ''))
@@ -139,6 +142,17 @@ class LeadActionsMixin:
                 return
             if not getattr(self, 'message_queue', None):
                 return
+
+            # P1: 使用規則所屬用戶的租戶上下文取帳號與 AI 設置，確保多用戶下用對發送號
+            rule = active[0]
+            owner_user_id = rule.get('owner_user_id') or ''
+            if owner_user_id:
+                try:
+                    from core.tenant_context import TenantContext, set_current_tenant, clear_current_tenant
+                    tenant = TenantContext(user_id=owner_user_id)
+                    tenant_token = set_current_tenant(tenant)
+                except Exception:
+                    pass
 
             accounts = await db.get_all_accounts()
             sender = None
@@ -160,8 +174,7 @@ class LeadActionsMixin:
             triggered_keyword = lead_data.get('triggered_keyword', '')
             context = build_lead_context(lead_data, triggered_keyword, '') if build_lead_context else {}
 
-            # P0：同一事件只執行一條規則（已按 priority DESC 排序，取第一條）
-            rule = active[0]
+            # P0：同一事件只執行一條規則（已按 priority DESC 排序，取第一條）；rule 已在上方取得
             rule_id = rule.get('id')
             # P1 冷卻：同一 user_id + rule_id 在冷卻期內不重複發
             cooldown_key = (user_id, rule_id)
@@ -237,6 +250,13 @@ class LeadActionsMixin:
             print(f"[LeadActions] execute_matching_trigger_rules error: {e}", file=sys.stderr)
             self.send_log(f"[觸發規則] 失敗: {e}", "error")
             await db.add_log(f"觸發規則失敗 lead_id={lead_id}: {e}", "error")
+        finally:
+            if tenant_token:
+                try:
+                    from core.tenant_context import clear_current_tenant
+                    clear_current_tenant(tenant_token)
+                except Exception:
+                    pass
 
     async def execute_matching_campaigns(self, lead_id: int, lead_data: Dict[str, Any]) -> None:
         """

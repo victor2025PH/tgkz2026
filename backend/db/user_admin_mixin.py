@@ -704,72 +704,94 @@ class UserAdminMixin:
             print(f"Error getting all settings: {e}")
             return {}
     
-    # ============ AI Settings Methods ============
+    # ============ AI Settings Methods (P0: 統一數據源 — 按用戶 ai_settings) ============
     
+    def _normalize_ai_setting_value(self, key: str, value: Any) -> Any:
+        """將存儲值轉為 int/bool/str，與前端和引擎一致"""
+        if value is None or value == '':
+            return 0 if key in ('auto_chat_enabled', 'auto_greeting') else ''
+        if isinstance(value, str):
+            if value.isdigit():
+                return int(value)
+            if value.lower() in ('true', '1'):
+                return 1
+            if value.lower() in ('false', '0'):
+                return 0
+        return value
+
     async def get_ai_settings(self) -> Dict[str, Any]:
-        """獲取 AI 相關設置"""
+        """獲取當前用戶的 AI 運行設置（開關、模式等）。數據源：ai_settings 表按 user_id；無數據時回退到舊 settings 表。"""
+        defaults = {
+            'auto_chat_enabled': 0,
+            'auto_chat_mode': 'semi',
+            'auto_greeting': 0,
+            'local_ai_endpoint': '',
+            'local_ai_model': ''
+        }
+        try:
+            from core.tenant_filter import get_owner_user_id
+            user_id = get_owner_user_id()
+        except Exception:
+            user_id = 'local_user'
+        try:
+            rows = await self.fetch_all(
+                "SELECT key, value FROM ai_settings WHERE user_id = ?",
+                (user_id,)
+            )
+            key_aliases = {'autoChatEnabled': 'auto_chat_enabled', 'autoChatMode': 'auto_chat_mode', 'autoGreeting': 'auto_greeting'}
+            settings = {}
+            for row in rows:
+                k = row.get('key') or row[0]
+                v = row.get('value') if hasattr(row, 'get') else row[1]
+                k = key_aliases.get(k, k)
+                settings[k] = self._normalize_ai_setting_value(k, v)
+            if settings:
+                for k, v in defaults.items():
+                    if k not in settings:
+                        settings[k] = v
+                return settings
+        except Exception as e:
+            import sys
+            print(f"[Database] get_ai_settings from ai_settings: {e}", file=sys.stderr)
         try:
             rows = await self.fetch_all('''
-                SELECT setting_key, setting_value FROM settings 
-                WHERE category = 'ai' OR setting_key LIKE 'auto_chat%' 
-                   OR setting_key LIKE 'local_ai%' OR setting_key LIKE 'auto_greeting%'
+                SELECT setting_key, setting_value FROM settings
+                WHERE category = 'ai' OR setting_key LIKE 'auto_chat%%'
+                   OR setting_key LIKE 'local_ai%%' OR setting_key LIKE 'auto_greeting%%'
             ''')
-            
             settings = {}
             for row in rows:
                 key = row['setting_key']
                 value = row['setting_value']
-                # 嘗試轉換數值
-                if value is not None:
-                    if value.isdigit():
-                        value = int(value)
-                    elif value.lower() in ('true', 'false'):
-                        value = 1 if value.lower() == 'true' else 0
-                settings[key] = value
-            
-            # 設置默認值
-            if 'auto_chat_enabled' not in settings:
-                settings['auto_chat_enabled'] = 0
-            if 'auto_chat_mode' not in settings:
-                settings['auto_chat_mode'] = 'semi'
-            if 'auto_greeting' not in settings:
-                settings['auto_greeting'] = 0
-            if 'local_ai_endpoint' not in settings:
-                settings['local_ai_endpoint'] = ''
-            if 'local_ai_model' not in settings:
-                settings['local_ai_model'] = ''
-            
+                settings[key] = self._normalize_ai_setting_value(key, value)
+            for k, v in defaults.items():
+                if k not in settings:
+                    settings[k] = v
             return settings
         except Exception as e:
             import sys
             print(f"[Database] Error getting AI settings: {e}", file=sys.stderr)
-            # 返回默認設置
-            return {
-                'auto_chat_enabled': 0,
-                'auto_chat_mode': 'semi',
-                'auto_greeting': 0,
-                'local_ai_endpoint': '',
-                'local_ai_model': ''
-            }
-    
+            return defaults.copy()
+
     async def update_ai_settings(self, settings: Dict[str, Any]) -> bool:
-        """更新 AI 相關設置"""
+        """更新當前用戶的 AI 運行設置。寫入 ai_settings 表（user_id, key），儀表盤與觸發規則從此讀取。"""
         import sys
         try:
+            from core.tenant_filter import get_owner_user_id
+            user_id = get_owner_user_id()
+        except Exception:
+            user_id = 'local_user'
+        try:
             for key, value in settings.items():
-                # 將值轉換為字符串存儲
                 str_value = str(value) if value is not None else ''
-                
                 await self.execute('''
-                    INSERT INTO settings (setting_key, setting_value, category, updated_at)
-                    VALUES (?, ?, 'ai', CURRENT_TIMESTAMP)
-                    ON CONFLICT(setting_key) DO UPDATE SET
-                        setting_value = excluded.setting_value,
-                        category = 'ai',
+                    INSERT INTO ai_settings (user_id, key, value, updated_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(user_id, key) DO UPDATE SET
+                        value = excluded.value,
                         updated_at = CURRENT_TIMESTAMP
-                ''', (key, str_value))
-            
-            print(f"[Database] AI settings updated: {list(settings.keys())}", file=sys.stderr)
+                ''', (user_id, key, str_value))
+            print(f"[Database] AI settings updated for user={user_id!r} keys={list(settings.keys())}", file=sys.stderr)
             return True
         except Exception as e:
             print(f"[Database] Error updating AI settings: {e}", file=sys.stderr)

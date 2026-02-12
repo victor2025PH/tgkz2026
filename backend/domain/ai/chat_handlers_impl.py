@@ -54,6 +54,14 @@ async def handle_update_ai_chat_settings(self, payload: Dict[str, Any]):
                 payload.get('localAiModel', '')
             )
         
+        # P0: 保存後立即推送系統狀態，使儀表盤「AI 聊天」即時顯示已啟用
+        try:
+            status = await self.handle_get_system_status()
+            if isinstance(status, dict) and 'error' not in status:
+                self.send_event("system-status", status)
+        except Exception:
+            pass
+        
         self.send_event("ai-chat-settings-updated", {"success": True})
         self.send_log("AI 自動聊天設置已更新", "success")
     except Exception as e:

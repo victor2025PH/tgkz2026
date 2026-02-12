@@ -1279,6 +1279,8 @@ async def handle_get_system_status(self):
         # 獲取帳號狀態
         accounts = await db.get_all_accounts()
         online_count = sum(1 for a in accounts if a.get('status') == 'Online')
+        sender_accounts = [a for a in accounts if a.get('role') == 'Sender']
+        senders_online = sum(1 for a in sender_accounts if a.get('status') == 'Online')
         
         # 獲取關鍵詞集
         keyword_sets = await db.get_all_keyword_sets()
@@ -1311,7 +1313,9 @@ async def handle_get_system_status(self):
             'accounts': {
                 'total': len(accounts),
                 'online': online_count,
-                'offline': len(accounts) - online_count
+                'offline': len(accounts) - online_count,
+                'senders_total': len(sender_accounts),
+                'senders_online': senders_online
             },
             'monitoring': {
                 'active': self.is_monitoring,
@@ -1340,8 +1344,15 @@ async def handle_get_system_status(self):
             },
             'poller': {
                 'running': private_message_poller._running if hasattr(private_message_poller, '_running') else False
-            }
+            },
+            'warnings': []
         }
+        if ai_enabled and senders_online == 0:
+            status['warnings'].append({
+                'code': 'NO_SENDER_ACCOUNT',
+                'message': 'AI 已啟用但沒有可用的發送帳號，觸發規則無法發送回覆',
+                'fix': '請在「帳號管理」中將至少一個帳號設為「發送」角色'
+            })
         
         self.send_event("system-status", status)
         return status

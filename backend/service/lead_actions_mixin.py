@@ -1,13 +1,19 @@
 """
 P0: Lead 捕獲後的動作 — 問候、觸發規則、活動
 保證監控到 Lead 後鏈路不斷：_handle_ai_auto_greeting、execute_matching_trigger_rules、execute_matching_campaigns
+P0 優化：統一模板變量替換、同一事件只執行一條觸發規則、Lead+規則冷卻去重。
 """
 import sys
 import json
 import asyncio
+import time
 from typing import Dict, Any, List, Optional
 
 from database import db
+
+# P1 冷卻：同一 (user_id, rule_id) 在 COOLDOWN_SEC 內只發一條
+_lead_rule_cooldown: Dict[tuple, float] = {}
+_COOLDOWN_SEC = 600  # 10 分鐘
 
 
 def _get_MessagePriority():
@@ -111,9 +117,15 @@ class LeadActionsMixin:
 
     async def execute_matching_trigger_rules(self, lead_id: int, lead_data: Dict[str, Any]) -> None:
         """
-        執行匹配的觸發規則：取所有啟用規則，對每條生成/取模板內容並入隊發送。
-        P0：先實現「所有啟用規則各發一條」，後續可細化為按 keyword_set_id / source_group 精準匹配。
+        執行匹配的觸發規則。P0 優化：同一關鍵詞匹配只執行優先級最高的一條規則；
+        模板使用統一變量替換（{{username}}/{{keyword}}/{{date}} 等）；Lead+規則冷卻去重。
         """
+        try:
+            from core.template_render import render_template_content, build_lead_context
+        except ImportError:
+            render_template_content = None
+            build_lead_context = None
+
         try:
             rules = await db.get_all_trigger_rules()
             active = [r for r in rules if r.get('isActive', r.get('is_active', True))]
@@ -123,13 +135,11 @@ class LeadActionsMixin:
             user_id = str(lead_data.get('user_id', ''))
             username = lead_data.get('username', '') or ''
             source_group = lead_data.get('source_group_url') or lead_data.get('source_group', '')
-            account_phone = lead_data.get('account_phone', '')
             if not user_id:
                 return
             if not getattr(self, 'message_queue', None):
                 return
 
-            # 選發送帳號
             accounts = await db.get_all_accounts()
             sender = None
             for acc in accounts:
@@ -148,60 +158,81 @@ class LeadActionsMixin:
             phone = sender.get('phone')
             first_name = lead_data.get('first_name', '') or username
             triggered_keyword = lead_data.get('triggered_keyword', '')
+            context = build_lead_context(lead_data, triggered_keyword, '') if build_lead_context else {}
 
-            for rule in active:
-                try:
-                    response_type = rule.get('responseType', rule.get('response_type', 'ai_chat'))
-                    response_config = rule.get('responseConfig', rule.get('response_config')) or {}
-                    if isinstance(response_config, str):
-                        try:
-                            response_config = json.loads(response_config)
-                        except Exception:
-                            response_config = {}
+            # P0：同一事件只執行一條規則（已按 priority DESC 排序，取第一條）
+            rule = active[0]
+            rule_id = rule.get('id')
+            # P1 冷卻：同一 user_id + rule_id 在冷卻期內不重複發
+            cooldown_key = (user_id, rule_id)
+            now_ts = time.time()
+            if cooldown_key in _lead_rule_cooldown and (now_ts - _lead_rule_cooldown[cooldown_key]) < _COOLDOWN_SEC:
+                self.send_log(f"[觸發規則] 冷卻中，跳過 rule={rule.get('name')} → {user_id}", "info")
+                return
+            # 清理過期冷卻鍵
+            for k in list(_lead_rule_cooldown.keys()):
+                if now_ts - _lead_rule_cooldown[k] >= _COOLDOWN_SEC:
+                    _lead_rule_cooldown.pop(k, None)
 
-                    text: Optional[str] = None
-                    if response_type == 'template' and response_config.get('templateId'):
-                        tpl_id = response_config.get('templateId')
-                        tpl = None
-                        try:
-                            if hasattr(db, 'fetch_one'):
-                                row = await db.fetch_one('SELECT id, content, name FROM chat_templates WHERE id = ?', (tpl_id,))
-                                if row:
-                                    tpl = dict(row) if hasattr(row, 'keys') else {'content': row[1] if len(row) > 1 else ''}
-                        except Exception:
-                            pass
-                        if tpl and tpl.get('content'):
-                            text = (tpl.get('content') or '').replace('{firstName}', first_name).replace('{username}', username).replace('{keyword}', triggered_keyword)
-                    if not text and (response_type == 'ai_chat' or not text):
-                        ai = _get_ai_auto_chat()
-                        if ai and getattr(ai, '_generate_response_with_prompt', None):
-                            text = await ai._generate_response_with_prompt(
-                                user_id=user_id,
-                                user_message=f"用戶剛觸發關鍵詞「{triggered_keyword}」，請用一句話友好回覆。",
-                                custom_prompt="簡短友好一句話回覆，不要長篇。",
-                                usage_type='dailyChat'
-                            )
+            try:
+                response_type = rule.get('responseType', rule.get('response_type', 'ai_chat'))
+                response_config = rule.get('responseConfig', rule.get('response_config')) or {}
+                if isinstance(response_config, str):
+                    try:
+                        response_config = json.loads(response_config)
+                    except Exception:
+                        response_config = {}
+
+                text: Optional[str] = None
+                if response_type == 'template' and response_config.get('templateId'):
+                    tpl_id = response_config.get('templateId')
+                    tpl = None
+                    try:
+                        if hasattr(db, 'fetch_one'):
+                            row = await db.fetch_one('SELECT id, content, name FROM chat_templates WHERE id = ?', (tpl_id,))
+                            if row:
+                                tpl = dict(row) if hasattr(row, 'keys') else {'content': row[1] if len(row) > 1 else ''}
+                    except Exception:
+                        pass
+                    if tpl and tpl.get('content'):
+                        raw = (tpl.get('content') or '').strip()
+                        if render_template_content and context:
+                            text = render_template_content(raw, context)
+                        else:
+                            text = raw.replace('{{username}}', context.get('username', username)).replace('{{firstName}}', context.get('firstName', first_name)).replace('{{keyword}}', context.get('keyword', triggered_keyword)).replace('{username}', username).replace('{firstName}', first_name).replace('{keyword}', triggered_keyword)
                         if not text:
-                            text = f"你好 {first_name or username}，看到你對「{triggered_keyword}」感興趣，有需要可以私聊我～"
+                            text = raw
+                if not text and (response_type == 'ai_chat' or not text):
+                    ai = _get_ai_auto_chat()
+                    if ai and getattr(ai, '_generate_response_with_prompt', None):
+                        text = await ai._generate_response_with_prompt(
+                            user_id=user_id,
+                            user_message=f"用戶剛觸發關鍵詞「{triggered_keyword}」，請用一句話友好回覆。",
+                            custom_prompt="簡短友好一句話回覆，不要長篇。",
+                            usage_type='dailyChat'
+                        )
+                    if not text:
+                        text = f"你好 {first_name or username}，看到你對「{triggered_keyword}」感興趣，有需要可以私聊我～"
 
-                    if not text or not text.strip():
-                        continue
-                    await self.message_queue.add_message(
-                        phone=phone,
-                        user_id=user_id,
-                        text=text.strip(),
-                        attachment=None,
-                        source_group=source_group,
-                        target_username=username,
-                        priority=_get_MessagePriority().NORMAL,
-                        scheduled_at=None,
-                        callback=self._on_message_sent_callback(lead_id)
-                    )
-                    self.send_log(f"[觸發規則] 已入隊 rule={rule.get('name', rule.get('id'))} → {user_id}", "success")
-                except Exception as rule_err:
-                    print(f"[LeadActions] trigger rule error: {rule_err}", file=sys.stderr)
-                    self.send_log(f"[觸發規則] 單條失敗: {rule_err}", "warning")
-                    await db.add_log(f"觸發規則執行失敗 lead_id={lead_id} rule_id={rule.get('id')}: {rule_err}", "error")
+                if not text or not text.strip():
+                    return
+                await self.message_queue.add_message(
+                    phone=phone,
+                    user_id=user_id,
+                    text=text.strip(),
+                    attachment=None,
+                    source_group=source_group,
+                    target_username=username,
+                    priority=_get_MessagePriority().NORMAL,
+                    scheduled_at=None,
+                    callback=self._on_message_sent_callback(lead_id, rule_id=rule_id)
+                )
+                _lead_rule_cooldown[cooldown_key] = time.time()
+                self.send_log(f"[觸發規則] 已入隊 rule={rule.get('name', rule.get('id'))} → {user_id}", "success")
+            except Exception as rule_err:
+                print(f"[LeadActions] trigger rule error: {rule_err}", file=sys.stderr)
+                self.send_log(f"[觸發規則] 單條失敗: {rule_err}", "warning")
+                await db.add_log(f"觸發規則執行失敗 lead_id={lead_id} rule_id={rule.get('id')}: {rule_err}", "error")
         except Exception as e:
             print(f"[LeadActions] execute_matching_trigger_rules error: {e}", file=sys.stderr)
             self.send_log(f"[觸發規則] 失敗: {e}", "error")
@@ -243,6 +274,13 @@ class LeadActionsMixin:
             phone = sender.get('phone')
             first_name = lead_data.get('first_name', '') or username
 
+            try:
+                from core.template_render import render_template_content, build_lead_context
+            except ImportError:
+                render_template_content = None
+                build_lead_context = None
+            ctx = build_lead_context(lead_data, lead_data.get('triggered_keyword', ''), '') if build_lead_context else {'username': username, 'firstName': first_name, 'firstname': first_name, 'keyword': lead_data.get('triggered_keyword', '')}
+
             for camp in active:
                 try:
                     # 活動可能含 message_template、message、first_message 等
@@ -260,7 +298,10 @@ class LeadActionsMixin:
                             pass
                     if not text or not text.strip():
                         continue
-                    text = text.replace('{firstName}', first_name).replace('{username}', username)
+                    if render_template_content and ctx:
+                        text = render_template_content(text, ctx)
+                    else:
+                        text = text.replace('{firstName}', first_name).replace('{username}', username).replace('{{username}}', username).replace('{{firstName}}', first_name)
                     await self.message_queue.add_message(
                         phone=phone,
                         user_id=user_id,

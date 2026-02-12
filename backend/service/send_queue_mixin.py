@@ -575,9 +575,16 @@ class SendQueueMixin:
     
     # ========== End Partial Update Functions ==========
 
-    def _on_message_sent_callback(self, lead_id: int):
-        """Create callback for when message is sent"""
+    def _on_message_sent_callback(self, lead_id: int, rule_id: Optional[int] = None):
+        """Create callback for when message is sent. rule_id 用於觸發規則發送成功後回寫統計。"""
         async def callback(message, result):
+            if rule_id is not None:
+                try:
+                    from database import db
+                    await db.increment_trigger_rule_stats(rule_id, success=result.get('success', False))
+                except Exception as e:
+                    import sys
+                    print(f"[Backend] increment_trigger_rule_stats error: {e}", file=sys.stderr)
             if result.get('success'):
                 # 🔧 P0：區分確認送達 vs 不確定送達
                 is_uncertain = result.get('uncertain', False)

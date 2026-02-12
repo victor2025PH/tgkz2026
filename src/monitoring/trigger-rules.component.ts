@@ -45,6 +45,8 @@ interface TriggerRule {
   lastTriggered?: string;
   createdAt?: string;
   updatedAt?: string;
+  /** P2: 與其他規則重疊時後端返回的提示 */
+  overlapWarning?: string;
 }
 
 @Component({
@@ -202,6 +204,9 @@ interface TriggerRule {
                             </span>
                           </div>
                           <p class="text-sm text-slate-400 mt-0.5">{{ rule.description || '無描述' }}</p>
+                          @if (rule.overlapWarning) {
+                            <p class="text-sm text-amber-400/90 mt-1">⚠️ {{ rule.overlapWarning }}</p>
+                          }
                         </div>
                       </div>
                       <div class="flex items-center gap-2">

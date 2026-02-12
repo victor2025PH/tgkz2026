@@ -286,7 +286,7 @@ export const COMMAND_REGISTRY: CommandConfig[] = [
   {
     command: 'get-system-status',
     httpMethod: 'GET',
-    endpoint: '/api/v1/system/health',
+    endpoint: '/api/v1/system/status',
     responseEvents: ['system-status']
   },
 

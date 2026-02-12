@@ -168,9 +168,9 @@ export interface SystemStatus {
           </div>
           
           <!-- P1: AI 已啟用但無發送帳號時提示 -->
-          @if (status().warnings?.some(w => w.code === 'NO_SENDER_ACCOUNT')) {
+          @if (noSenderAccountWarning()) {
             <div class="rounded-lg p-3 mb-4 flex items-center justify-between gap-3" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.5);">
-              <span class="text-amber-200 text-sm">⚠️ {{ status().warnings?.find(w => w.code === 'NO_SENDER_ACCOUNT')?.message }}</span>
+              <span class="text-amber-200 text-sm">⚠️ {{ noSenderAccountWarning()?.message }}</span>
               <button (click)="navigateTo('accounts')" class="px-3 py-1.5 text-sm rounded-lg transition-colors" style="background: rgba(245, 158, 11, 0.3); color: var(--text-primary);">
                 前往帳號管理
               </button>
@@ -417,6 +417,13 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
     const tr = this.status().triggerRules;
     if (tr && typeof tr.total === 'number') return tr.total;
     return this.status().campaigns?.total ?? 0;
+  });
+
+  /** P1: 無發送帳號警告（模板不可用箭頭函數，故用 computed） */
+  noSenderAccountWarning = computed(() => {
+    const w = this.status().warnings;
+    if (!w?.length) return null;
+    return w.find((x: { code: string }) => x.code === 'NO_SENDER_ACCOUNT') ?? null;
   });
   
   private ipcCleanup: (() => void)[] = [];

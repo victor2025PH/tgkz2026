@@ -451,6 +451,7 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
         ('GET',    '/api/v1/admin/ops/error-patterns', 'error_patterns'),
 
         # === 系統 / 健康檢查 / 文檔 ===
+        ('GET',    '/api/v1/system/status',            'get_system_status'),  # 儀表盤完整狀態（帳號/AI/規則等），帶租戶
         ('GET',    '/api/v1/system/health',            'system_health'),
         ('GET',    '/api/v1/system/metrics',           'system_metrics'),
         ('GET',    '/api/v1/system/alerts',            'system_alerts'),
@@ -870,6 +871,11 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
     
     # ==================== 監控 ====================
     
+    async def get_system_status(self, request):
+        """獲取儀表盤完整系統狀態（帳號、AI 開關、觸發規則等）。Web 模式須帶租戶，否則儀表盤「AI 聊天」會一直顯示未啟用。"""
+        result = await self._execute_command_with_tenant(request, 'get-system-status')
+        return self._json_response(result)
+
     async def get_monitoring_status(self, request):
         """獲取監控狀態"""
         result = await self._execute_command('get-monitoring-status')

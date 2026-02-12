@@ -87,9 +87,11 @@ class KeywordGroupMixin:
             ''')
             
             # AI 模型配置表 - 持久化存儲 API Key 和模型配置
+            # 🔧 P0: 加 user_id 實現每用戶獨立 AI 設置
             await self.execute('''
                 CREATE TABLE IF NOT EXISTS ai_models (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT DEFAULT '',
                     provider TEXT NOT NULL,
                     model_name TEXT NOT NULL,
                     display_name TEXT,
@@ -107,13 +109,23 @@ class KeywordGroupMixin:
             ''')
             
             # AI 設置表 - 存儲模型用途分配等 AI 相關設置
+            # 🔧 P0: 改為 (user_id, key) 複合主鍵，每用戶獨立設置
             await self.execute('''
                 CREATE TABLE IF NOT EXISTS ai_settings (
-                    key TEXT PRIMARY KEY,
+                    key TEXT NOT NULL,
                     value TEXT,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    user_id TEXT DEFAULT '',
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, key)
                 )
             ''')
+            
+            # 🔧 P0: 遷移 — 給已有表補 user_id 列（SQLite ALTER TABLE 安全，列已存在時忽略）
+            for tbl in ('ai_models', 'ai_settings'):
+                try:
+                    await self.execute(f"ALTER TABLE {tbl} ADD COLUMN user_id TEXT DEFAULT ''")
+                except Exception:
+                    pass  # 列已存在
             
             # 關鍵詞表
             await self.execute('''

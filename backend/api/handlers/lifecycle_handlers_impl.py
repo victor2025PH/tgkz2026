@@ -24,7 +24,12 @@ from service_locator import scheduler
 # ==================== Command Handlers ====================
 
 async def handle_get_initial_state(self):
-    """Handle get-initial-state command and restore monitoring state if needed"""
+    """Handle get-initial-state command and restore monitoring state if needed
+    
+    🔧 安全修復：依賴租戶上下文進行數據隔離。
+    如果無租戶上下文（未認證），各數據庫查詢會返回空數據或全量數據，
+    WebSocket 層已在此之前攔截未認證命令。
+    """
     try:
         import sys
         import time

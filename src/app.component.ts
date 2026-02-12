@@ -2601,8 +2601,10 @@ export class AppComponent implements OnDestroy, OnInit {
     
     // 🆕 P2-3: 監聽頁面可見性變更
     window.addEventListener('page-became-visible', () => {
-      console.log('[App] Page became visible, refreshing data...');
-      this.ipcService.send('get-initial-state');
+      if (this.isAuthenticated()) {
+        console.log('[App] Page became visible, refreshing data...');
+        this.ipcService.send('get-initial-state');
+      }
     });
     
     // 🆕 P2-4: 監聽離線操作同步
@@ -2613,8 +2615,12 @@ export class AppComponent implements OnDestroy, OnInit {
     // 路由調試
     console.log('[App] Current URL:', window.location.href);
     
-    // Request initial state from the backend once the app is ready
-    this.ipcService.send('get-initial-state');
+    // 🔧 安全修復：僅在已認證時請求初始狀態（防止無痕模式下未登錄卻載入其他用戶數據）
+    if (this.isAuthenticated()) {
+      this.ipcService.send('get-initial-state');
+    } else {
+      console.log('[App] Not authenticated, skipping get-initial-state');
+    }
     
     // 🔧 P0 修復：刷新用戶數據 —— 移除 500ms 延遲，立即執行以避免菜單欄顯示閃爍
     if (this.isAuthenticated()) {

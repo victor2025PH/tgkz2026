@@ -279,6 +279,11 @@ def create_auth_middleware():
                             'error': '需要登入',
                             'code': 'UNAUTHORIZED'
                         }, status=401)
+                    # 🔧 安全修復：WebSocket 連接也標記認證狀態
+                    # 注意：不阻塞 WebSocket 連接本身（需要心跳），
+                    # 但命令級別的認證檢查在 websocket_handler 中進行
+                    if path in ('/ws', '/api/v1/ws'):
+                        logger.info(f"[Auth] Unauthenticated WebSocket connection from {request.remote}")
             
             return await handler(request)
             

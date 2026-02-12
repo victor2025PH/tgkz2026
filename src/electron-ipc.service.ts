@@ -226,6 +226,13 @@ export class ElectronIpcService implements OnDestroy {
   private refreshStateAfterReconnect(): void {
     console.log('[Web Mode] 🔄 Refreshing state after reconnect...');
     
+    // 🔧 安全修復：僅在已認證時刷新狀態
+    const token = this.authToken || localStorage.getItem('tgm_access_token');
+    if (!token) {
+      console.log('[Web Mode] No auth token, skipping state refresh after reconnect');
+      return;
+    }
+    
     // 延遲 500ms 發送，確保 WebSocket 已完全就緒
     setTimeout(() => {
       // 核心狀態恢復：獲取所有關鍵數據

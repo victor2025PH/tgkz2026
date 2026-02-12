@@ -80,7 +80,15 @@ class UnifiedContactsManager:
         """
         self.db = db
         self._initialized = False
-    
+
+    def _owner_id(self):
+        """多用户一库：当前租户 ID，用于 INSERT/UPDATE 归属"""
+        try:
+            from core.tenant_filter import get_owner_user_id
+            return get_owner_user_id()
+        except ImportError:
+            return 'local_user'
+
     async def initialize(self):
         """初始化 - 驗證 unified_contacts 表存在
         
@@ -160,14 +168,12 @@ class UnifiedContactsManager:
                     if member.get('response_status') == 'replied':
                         status = 'interested'
                     
-                    # 嘗試插入或更新
+                    owner_id = self._owner_id()
                     existing = await self.db.fetch_one(
-                        'SELECT id FROM unified_contacts WHERE telegram_id = ?',
-                        (telegram_id,)
+                        'SELECT id FROM unified_contacts WHERE telegram_id = ? AND (owner_user_id = ? OR owner_user_id IS NULL)',
+                        (telegram_id, owner_id)
                     )
-                    
                     if existing:
-                        # 更新現有記錄
                         await self.db.execute('''
                             UPDATE unified_contacts SET
                                 username = COALESCE(?, username),
@@ -187,8 +193,9 @@ class UnifiedContactsManager:
                                 is_verified = ?,
                                 last_seen = COALESCE(?, last_seen),
                                 updated_at = ?,
-                                synced_at = ?
-                            WHERE telegram_id = ?
+                                synced_at = ?,
+                                owner_user_id = ?
+                            WHERE telegram_id = ? AND (owner_user_id = ? OR owner_user_id IS NULL)
                         ''', (
                             member.get('username'),
                             display_name,
@@ -207,11 +214,12 @@ class UnifiedContactsManager:
                             member.get('last_online'),
                             now,
                             now,
-                            telegram_id
+                            owner_id,
+                            telegram_id,
+                            owner_id,
                         ))
                         stats['updated'] += 1
                     else:
-                        # 插入新記錄 - 🔧 FIX: 添加 captured_at 列
                         print(f"[UnifiedContacts] INSERT member: {telegram_id}, {display_name}", file=sys.stderr)
                         result = await self.db.execute('''
                             INSERT INTO unified_contacts (
@@ -219,8 +227,8 @@ class UnifiedContactsManager:
                                 contact_type, source_type, source_id, source_name,
                                 status, tags, activity_score, value_level,
                                 is_bot, is_premium, is_verified, last_seen,
-                                created_at, updated_at, synced_at, captured_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                created_at, updated_at, synced_at, captured_at, owner_user_id
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (
                             telegram_id,
                             member.get('username'),
@@ -243,7 +251,8 @@ class UnifiedContactsManager:
                             member.get('created_at', now),
                             now,
                             now,
-                            member.get('extracted_at', now)  # 🔧 FIX: captured_at
+                            member.get('extracted_at', now),
+                            owner_id,
                         ))
                         print(f"[UnifiedContacts] INSERT result: {result}", file=sys.stderr)
                         if result == 0:
@@ -280,11 +289,11 @@ class UnifiedContactsManager:
                     elif status == 'joined':
                         status = 'contacted'
                     
+                    owner_id = self._owner_id()
                     existing = await self.db.fetch_one(
-                        'SELECT id FROM unified_contacts WHERE telegram_id = ?',
-                        (telegram_id,)
+                        'SELECT id FROM unified_contacts WHERE telegram_id = ? AND (owner_user_id = ? OR owner_user_id IS NULL)',
+                        (telegram_id, owner_id)
                     )
-                    
                     if existing:
                         await self.db.execute('''
                             UPDATE unified_contacts SET
@@ -297,8 +306,9 @@ class UnifiedContactsManager:
                                 member_count = ?,
                                 bio = COALESCE(?, bio),
                                 updated_at = ?,
-                                synced_at = ?
-                            WHERE telegram_id = ?
+                                synced_at = ?,
+                                owner_user_id = ?
+                            WHERE telegram_id = ? AND (owner_user_id = ? OR owner_user_id IS NULL)
                         ''', (
                             resource.get('username'),
                             display_name,
@@ -309,18 +319,19 @@ class UnifiedContactsManager:
                             resource.get('description'),
                             now,
                             now,
-                            telegram_id
+                            owner_id,
+                            telegram_id,
+                            owner_id,
                         ))
                         stats['updated'] += 1
                     else:
-                        # 🔧 FIX: 添加 captured_at 列
                         await self.db.execute('''
                             INSERT INTO unified_contacts (
                                 telegram_id, username, display_name,
                                 contact_type, source_type, source_id, source_name,
                                 status, ai_score, activity_score, member_count, bio,
-                                created_at, updated_at, synced_at, captured_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                created_at, updated_at, synced_at, captured_at, owner_user_id
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (
                             telegram_id,
                             resource.get('username'),
@@ -337,12 +348,12 @@ class UnifiedContactsManager:
                             resource.get('discovered_at', now),
                             now,
                             now,
-                            resource.get('discovered_at', now)  # 🔧 FIX: captured_at
+                            resource.get('discovered_at', now),
+                            owner_id,
                         ))
                         stats['synced'] += 1
-                    
                     stats['from_resources'] += 1
-                    
+
                 except Exception as e:
                     print(f"[UnifiedContacts] Sync resource error: {e}", file=sys.stderr)
                     stats['errors'] += 1
@@ -698,9 +709,9 @@ class UnifiedContactsManager:
             set_clauses.append('updated_at = ?')
             params.append(datetime.now().isoformat())
             params.append(telegram_id)
-            
+            params.append(self._owner_id())
             await self.db.execute(
-                f'UPDATE unified_contacts SET {", ".join(set_clauses)} WHERE telegram_id = ?',
+                f'UPDATE unified_contacts SET {", ".join(set_clauses)} WHERE telegram_id = ? AND owner_user_id = ?',
                 tuple(params)
             )
             
@@ -714,25 +725,23 @@ class UnifiedContactsManager:
         """批量添加標籤"""
         await self.initialize()
         
+        owner_id = self._owner_id()
         updated = 0
         for tid in telegram_ids:
             try:
                 contact = await self.db.fetch_one(
-                    'SELECT tags FROM unified_contacts WHERE telegram_id = ?',
-                    (tid,)
+                    'SELECT tags FROM unified_contacts WHERE telegram_id = ? AND owner_user_id = ?',
+                    (tid, owner_id)
                 )
                 if contact:
                     try:
                         current_tags = json.loads(contact.get('tags', '[]'))
                     except:
                         current_tags = []
-                    
-                    # 合併標籤
                     merged_tags = list(set(current_tags + new_tags))
-                    
                     await self.db.execute(
-                        'UPDATE unified_contacts SET tags = ?, updated_at = ? WHERE telegram_id = ?',
-                        (json.dumps(merged_tags), datetime.now().isoformat(), tid)
+                        'UPDATE unified_contacts SET tags = ?, updated_at = ? WHERE telegram_id = ? AND owner_user_id = ?',
+                        (json.dumps(merged_tags), datetime.now().isoformat(), tid, owner_id)
                     )
                     updated += 1
             except Exception as e:
@@ -748,10 +757,11 @@ class UnifiedContactsManager:
             return 0
         
         try:
+            owner_id = self._owner_id()
             placeholders = ','.join(['?' for _ in telegram_ids])
             await self.db.execute(
-                f'UPDATE unified_contacts SET status = ?, updated_at = ? WHERE telegram_id IN ({placeholders})',
-                (new_status, datetime.now().isoformat(), *telegram_ids)
+                f'UPDATE unified_contacts SET status = ?, updated_at = ? WHERE telegram_id IN ({placeholders}) AND owner_user_id = ?',
+                (new_status, datetime.now().isoformat(), *telegram_ids, owner_id)
             )
             return len(telegram_ids)
         except Exception as e:
@@ -776,11 +786,10 @@ class UnifiedContactsManager:
                 return result
                 
             placeholders = ','.join(['?' for _ in telegram_ids])
-            
-            # 1. 刪除 unified_contacts 表
+            owner_id = self._owner_id()
             await self.db.execute(
-                f'DELETE FROM unified_contacts WHERE telegram_id IN ({placeholders})',
-                tuple(telegram_ids)
+                f'DELETE FROM unified_contacts WHERE telegram_id IN ({placeholders}) AND owner_user_id = ?',
+                (*telegram_ids, owner_id)
             )
             result['unified_deleted'] = len(telegram_ids)
             

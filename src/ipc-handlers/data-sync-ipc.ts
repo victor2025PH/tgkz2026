@@ -608,13 +608,12 @@ export function setupDataSyncIpcHandlers(this: any): void {
             this.leadsTotal.set(data.total);
             this.leadsHasMore.set(data.hasMore);
             
-            // 🆕 強制同步到資源中心（使用已映射的數據）
             this.contactsService.importLeadsDirectly(mappedLeads);
             console.log('[Frontend] ✅ Synced to resource center:', mappedLeads.length, 'leads');
-            
-            // 🆕 顯示提示
-            if (!data.hasMore) {
+            // 多用户一库：同一会话内仅弹一次「数据加载完成」，避免切换标签/窗口重复提示
+            if (!data.hasMore && !(this as any).hasShownLeadsLoadedToast) {
                 this.toastService.success(`數據加載完成：共 ${mappedLeads.length} 條`);
+                (this as any).hasShownLeadsLoadedToast = true;
             }
         }
     });

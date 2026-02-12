@@ -31,68 +31,54 @@ class CampaignQueueMixin:
             return False
     
     async def get_all_leads(self, limit: int = 500) -> List[Dict]:
-        """獲取潛在客戶（🔧 FIX: 從 unified_contacts 讀取）"""
+        """獲取潛在客戶（從 unified_contacts 讀取，多用户一库按 owner_user_id 隔離）"""
         import sys
         try:
-            # 🔧 FIX: 優先從 unified_contacts 表讀取（與資源中心同步）
-            results = await self.fetch_all(f'''
-                SELECT 
-                    id, telegram_id as user_id, username, first_name, last_name, phone,
-                    display_name, contact_type, source_type, source_id as source_chat_id, 
-                    source_name as source_chat_title, status, tags, ai_score, activity_score,
-                    value_level, is_online, last_seen, is_premium, is_verified,
-                    created_at, updated_at
-                FROM unified_contacts 
-                WHERE contact_type = 'user'
-                ORDER BY created_at DESC 
-                LIMIT {limit}
-            ''')
+            from core.tenant_filter import add_tenant_filter
+            query = (
+                "SELECT id, telegram_id as user_id, username, first_name, last_name, phone, "
+                "display_name, contact_type, source_type, source_id as source_chat_id, "
+                "source_name as source_chat_title, status, tags, ai_score, activity_score, "
+                "value_level, is_online, last_seen, is_premium, is_verified, created_at, updated_at "
+                "FROM unified_contacts WHERE contact_type = 'user' "
+                "ORDER BY created_at DESC LIMIT " + str(int(limit))
+            )
+            query, params = add_tenant_filter(query, 'unified_contacts', [])
+            results = await self.fetch_all(query, tuple(params))
             print(f"[Database] get_all_leads: Returning {len(results)} records from unified_contacts (limit={limit})", file=sys.stderr)
             return results
         except Exception as e:
             print(f"Error getting leads: {e}", file=sys.stderr)
-            # 備用：嘗試從舊表讀取
-            try:
-                results = await self.fetch_all(f'SELECT * FROM extracted_members ORDER BY created_at DESC LIMIT {limit}')
-                return results
-            except:
-                return []
+            return []
     
     async def get_leads_with_total(self, limit: int = 500, initial_load: bool = False) -> Dict:
         """
-        獲取潛在客戶及總數
-        
-        Args:
-            limit: 最大返回數量
-            initial_load: 🆕 是否為初始加載（true 時只返回 limit 條，用於快速啟動）
+        獲取潛在客戶及總數（多用户一库按 owner_user_id 隔離）
         """
         import sys
         try:
-            # 🔧 FIX: 從 unified_contacts 表讀取（與資源中心同步）
-            count_result = await self.fetch_one("SELECT COUNT(*) as total FROM unified_contacts WHERE contact_type = 'user'")
+            from core.tenant_filter import add_tenant_filter
+            count_query = "SELECT COUNT(*) as total FROM unified_contacts WHERE contact_type = 'user'"
+            count_query, count_params = add_tenant_filter(count_query, 'unified_contacts', [])
+            count_result = await self.fetch_one(count_query, tuple(count_params))
             total_count = count_result['total'] if count_result else 0
-            
-            # 🆕 初始加載時只返回 limit 條，否則返回所有
+
             if initial_load:
                 actual_limit = limit
             else:
                 actual_limit = max(limit, total_count)
-            
-            # 🔧 FIX: 從 unified_contacts 讀取並轉換字段名
-            results = await self.fetch_all(f'''
-                SELECT 
-                    id, telegram_id as user_id, username, first_name, last_name, phone,
-                    display_name, contact_type, source_type, source_id as source_chat_id, 
-                    source_name as source_chat_title, status, tags, ai_score, activity_score,
-                    value_level, is_online, last_seen, is_premium, is_verified,
-                    created_at, updated_at
-                FROM unified_contacts 
-                WHERE contact_type = 'user'
-                ORDER BY created_at DESC 
-                LIMIT {actual_limit}
-            ''')
-            print(f"[Database] get_leads_with_total: Total={total_count}, Returning {len(results)} records from unified_contacts (initial_load={initial_load})", file=sys.stderr)
-            
+
+            data_query = (
+                "SELECT id, telegram_id as user_id, username, first_name, last_name, phone, "
+                "display_name, contact_type, source_type, source_id as source_chat_id, "
+                "source_name as source_chat_title, status, tags, ai_score, activity_score, "
+                "value_level, is_online, last_seen, is_premium, is_verified, created_at, updated_at "
+                "FROM unified_contacts WHERE contact_type = 'user' "
+                "ORDER BY created_at DESC LIMIT " + str(int(actual_limit))
+            )
+            data_query, data_params = add_tenant_filter(data_query, 'unified_contacts', [])
+            results = await self.fetch_all(data_query, tuple(data_params))
+            print(f"[Database] get_leads_with_total: Total={total_count}, Returning {len(results)} records (initial_load={initial_load})", file=sys.stderr)
             return {
                 'leads': results,
                 'total': total_count,
@@ -118,37 +104,32 @@ class CampaignQueueMixin:
         """
         import sys
         try:
-            # 🔧 FIX: 從 unified_contacts 讀取
+            from core.tenant_filter import add_tenant_filter
             base_query = "FROM unified_contacts WHERE contact_type = 'user'"
             params = []
-            
             if status and status != 'all':
                 base_query += ' AND status = ?'
                 params.append(status)
-            
             if search:
                 base_query += ' AND (username LIKE ? OR first_name LIKE ? OR display_name LIKE ? OR telegram_id LIKE ?)'
                 search_term = f'%{search}%'
                 params.extend([search_term, search_term, search_term, search_term])
-            
-            # 獲取總數
-            count_result = await self.fetch_one(f'SELECT COUNT(*) as total {base_query}', tuple(params))
+
+            count_query = f'SELECT COUNT(*) as total {base_query}'
+            count_query, count_params = add_tenant_filter(count_query, 'unified_contacts', list(params))
+            count_result = await self.fetch_one(count_query, tuple(count_params))
             total = count_result['total'] if count_result else 0
-            
-            # 獲取分頁數據（轉換字段名以兼容前端）
-            data_query = f'''
-                SELECT 
-                    id, telegram_id as user_id, username, first_name, last_name, phone,
-                    display_name, contact_type, source_type, source_id as source_chat_id, 
-                    source_name as source_chat_title, status, tags, ai_score, activity_score,
-                    value_level, is_online, last_seen, is_premium, is_verified,
-                    created_at, updated_at
-                {base_query} 
-                ORDER BY created_at DESC 
-                LIMIT ? OFFSET ?
-            '''
-            params.extend([limit, offset])
-            leads = await self.fetch_all(data_query, tuple(params))
+
+            data_query = (
+                "SELECT id, telegram_id as user_id, username, first_name, last_name, phone, "
+                "display_name, contact_type, source_type, source_id as source_chat_id, "
+                "source_name as source_chat_title, status, tags, ai_score, activity_score, "
+                "value_level, is_online, last_seen, is_premium, is_verified, created_at, updated_at "
+                f"{base_query} ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            )
+            data_query, data_params = add_tenant_filter(data_query, 'unified_contacts', list(params))
+            data_params.extend([limit, offset])
+            leads = await self.fetch_all(data_query, tuple(data_params))
             
             page = (offset // limit) + 1 if limit > 0 else 1
             

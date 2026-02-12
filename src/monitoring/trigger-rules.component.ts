@@ -879,7 +879,11 @@ export class TriggerRulesComponent implements OnInit, OnDestroy {
         this.toastService.success(data.message || '規則已保存');
         this.closeWizard();
       } else {
-        this.toastService.error(data.error || '保存失敗');
+        const msg = (data.error || '保存失敗') as string;
+        const friendly = msg.toLowerCase().includes('locked') || msg.toLowerCase().includes('database is locked')
+          ? '系統繁忙，請稍後再試'
+          : msg;
+        this.toastService.error(friendly);
       }
     });
     this.listeners.push(cleanup2);

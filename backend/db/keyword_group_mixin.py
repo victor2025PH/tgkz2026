@@ -434,34 +434,10 @@ class KeywordGroupMixin:
             raise e
     
     async def get_all_keyword_sets(self) -> List[Dict]:
-        """獲取所有關鍵詞集
-        
-        🔧 修復：同時從兩個來源讀取關鍵詞並合併：
-        1. keyword_sets.keywords JSON 字段（新格式）
-        2. keywords 關聯表（舊格式）
-        
-        🔧 格式統一：同時包含 'keyword' 和 'text' 字段，確保匹配器和前端都能使用
-        
-        🆕 P1: 添加租戶過濾，只返回當前用戶的關鍵詞集
-        """
+        """獲取所有關鍵詞集（多用户一库按 owner_user_id 隔離，不再改寫歷史歸屬）"""
         await self._ensure_keyword_tables()
         import sys
-        
         try:
-            # 🔧 Phase7 修復: 將歷史數據歸屬當前用戶
-            try:
-                from core.tenant_filter import get_owner_user_id, should_apply_tenant_filter
-                if should_apply_tenant_filter('keyword_sets'):
-                    _ks_owner = get_owner_user_id()
-                    if _ks_owner and _ks_owner != 'local_user':
-                        await self.execute(
-                            "UPDATE keyword_sets SET owner_user_id = ? WHERE owner_user_id IS NULL OR owner_user_id = '' OR owner_user_id = 'local_user'",
-                            (_ks_owner,)
-                        )
-            except ImportError:
-                pass
-            
-            # 🆕 P1: 應用租戶過濾
             query = 'SELECT * FROM keyword_sets ORDER BY created_at DESC'
             try:
                 from core.tenant_filter import add_tenant_filter
@@ -764,28 +740,10 @@ class KeywordGroupMixin:
             raise e
     
     async def get_all_groups(self) -> List[Dict]:
-        """獲取所有監控群組
-        
-        🆕 P1: 添加租戶過濾，只返回當前用戶的群組
-        🔧 Phase7: 自動修復 NULL owner_user_id 的歷史數據
-        """
+        """獲取所有監控群組（多用户一库按 owner_user_id 隔離，不再改寫歷史歸屬）"""
         import sys
         await self._ensure_keyword_tables()
         try:
-            # 🔧 Phase7 修復: 將歷史數據（NULL 或 'local_user'）歸屬當前用戶
-            try:
-                from core.tenant_filter import get_owner_user_id, should_apply_tenant_filter
-                if should_apply_tenant_filter('monitored_groups'):
-                    owner_id = get_owner_user_id()
-                    if owner_id and owner_id != 'local_user':
-                        await self.execute(
-                            "UPDATE monitored_groups SET owner_user_id = ? WHERE owner_user_id IS NULL OR owner_user_id = '' OR owner_user_id = 'local_user'",
-                            (owner_id,)
-                        )
-            except ImportError:
-                pass
-            
-            # 🆕 P1: 應用租戶過濾
             query = 'SELECT * FROM monitored_groups ORDER BY created_at DESC'
             try:
                 from core.tenant_filter import add_tenant_filter
@@ -917,17 +875,18 @@ class KeywordGroupMixin:
     # ============ 觸發規則操作 ============
     
     async def get_all_trigger_rules(self) -> List[Dict]:
-        """獲取所有觸發規則"""
+        """獲取所有觸發規則（多用户一库按 owner_user_id 隔離）"""
         await self._ensure_keyword_tables()
         try:
-            # 🔧 FIX: 執行 WAL checkpoint 確保讀取最新數據
             await self.connect()
             try:
                 await self._connection.execute("PRAGMA wal_checkpoint(PASSIVE)")
             except Exception:
-                pass  # 忽略 checkpoint 錯誤，繼續查詢
-            
-            rows = await self.fetch_all('SELECT * FROM trigger_rules ORDER BY priority DESC, created_at DESC')
+                pass
+            from core.tenant_filter import add_tenant_filter
+            query = 'SELECT * FROM trigger_rules ORDER BY priority DESC, created_at DESC'
+            query, params = add_tenant_filter(query, 'trigger_rules', [])
+            rows = await self.fetch_all(query, tuple(params))
             result = []
             for row in rows:
                 rule = dict(row) if hasattr(row, 'keys') else row
@@ -964,10 +923,15 @@ class KeywordGroupMixin:
             return []
     
     async def get_trigger_rule(self, rule_id: int) -> Optional[Dict]:
-        """獲取單個觸發規則"""
+        """獲取單個觸發規則（僅當前用戶的規則）"""
         await self._ensure_keyword_tables()
         try:
-            row = await self.fetch_one('SELECT * FROM trigger_rules WHERE id = ?', (rule_id,))
+            from core.tenant_filter import get_owner_user_id
+            owner_id = get_owner_user_id()
+            row = await self.fetch_one(
+                'SELECT * FROM trigger_rules WHERE id = ? AND owner_user_id = ?',
+                (rule_id, owner_id)
+            )
             if row:
                 rule = dict(row) if hasattr(row, 'keys') else row
                 for field in ['source_group_ids', 'keyword_set_ids', 'conditions', 'response_config', 'sender_account_ids']:
@@ -1028,10 +992,12 @@ class KeywordGroupMixin:
             raise e
     
     async def update_trigger_rule(self, rule_id: int, rule_data: Dict) -> bool:
-        """更新觸發規則"""
+        """更新觸發規則（僅可更新當前用戶的規則）"""
         await self._ensure_keyword_tables()
         try:
-            await self.execute('''
+            from core.tenant_filter import get_owner_user_id
+            owner_id = get_owner_user_id()
+            n = await self.execute('''
                 UPDATE trigger_rules SET
                     name = ?, description = ?, priority = ?, is_active = ?,
                     source_type = ?, source_group_ids = ?, keyword_set_ids = ?, conditions = ?,
@@ -1039,7 +1005,7 @@ class KeywordGroupMixin:
                     sender_type = ?, sender_account_ids = ?, delay_min = ?, delay_max = ?, daily_limit = ?,
                     auto_add_lead = ?, notify_me = ?,
                     updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
+                WHERE id = ? AND owner_user_id = ?
             ''', (
                 rule_data.get('name', ''),
                 rule_data.get('description', ''),
@@ -1058,67 +1024,76 @@ class KeywordGroupMixin:
                 rule_data.get('dailyLimit', 50),
                 1 if rule_data.get('autoAddLead', True) else 0,
                 1 if rule_data.get('notifyMe', False) else 0,
-                rule_id
+                rule_id,
+                owner_id,
             ))
-            return True
+            return n > 0
         except Exception as e:
             print(f"Error updating trigger rule: {e}")
             return False
     
     async def delete_trigger_rule(self, rule_id: int) -> bool:
-        """刪除觸發規則"""
+        """刪除觸發規則（僅可刪除當前用戶的規則）"""
         await self._ensure_keyword_tables()
         try:
-            await self.execute('DELETE FROM trigger_rules WHERE id = ?', (rule_id,))
-            return True
+            from core.tenant_filter import get_owner_user_id
+            n = await self.execute(
+                'DELETE FROM trigger_rules WHERE id = ? AND owner_user_id = ?',
+                (rule_id, get_owner_user_id())
+            )
+            return n > 0
         except Exception as e:
             print(f"Error deleting trigger rule: {e}")
             return False
     
     async def toggle_trigger_rule(self, rule_id: int, is_active: bool) -> bool:
-        """啟用/停用觸發規則"""
+        """啟用/停用觸發規則（僅當前用戶的規則）"""
         await self._ensure_keyword_tables()
         try:
-            await self.execute(
-                'UPDATE trigger_rules SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                (1 if is_active else 0, rule_id)
+            from core.tenant_filter import get_owner_user_id
+            n = await self.execute(
+                'UPDATE trigger_rules SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_user_id = ?',
+                (1 if is_active else 0, rule_id, get_owner_user_id())
             )
-            return True
+            return n > 0
         except Exception as e:
             print(f"Error toggling trigger rule: {e}")
             return False
     
     async def increment_trigger_rule_stats(self, rule_id: int, success: bool = True) -> bool:
-        """更新觸發規則統計"""
+        """更新觸發規則統計（僅當前用戶的規則）"""
         await self._ensure_keyword_tables()
         try:
+            from core.tenant_filter import get_owner_user_id
+            owner_id = get_owner_user_id()
             if success:
-                await self.execute('''
+                n = await self.execute('''
                     UPDATE trigger_rules SET 
                         trigger_count = trigger_count + 1,
                         success_count = success_count + 1,
                         last_triggered = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                ''', (rule_id,))
+                    WHERE id = ? AND owner_user_id = ?
+                ''', (rule_id, owner_id))
             else:
-                await self.execute('''
+                n = await self.execute('''
                     UPDATE trigger_rules SET 
                         trigger_count = trigger_count + 1,
                         last_triggered = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                ''', (rule_id,))
-            return True
+                    WHERE id = ? AND owner_user_id = ?
+                ''', (rule_id, owner_id))
+            return n > 0
         except Exception as e:
             print(f"Error updating trigger rule stats: {e}")
             return False
     
     async def get_active_trigger_rules(self) -> List[Dict]:
-        """獲取所有活躍的觸發規則"""
+        """獲取所有活躍的觸發規則（多用户一库按 owner_user_id 隔離）"""
         await self._ensure_keyword_tables()
         try:
-            rows = await self.fetch_all(
-                'SELECT * FROM trigger_rules WHERE is_active = 1 ORDER BY priority DESC, created_at DESC'
-            )
+            from core.tenant_filter import add_tenant_filter
+            query = 'SELECT * FROM trigger_rules WHERE is_active = 1 ORDER BY priority DESC, created_at DESC'
+            query, params = add_tenant_filter(query, 'trigger_rules', [])
+            rows = await self.fetch_all(query, tuple(params))
             result = []
             for row in rows:
                 rule = dict(row) if hasattr(row, 'keys') else row

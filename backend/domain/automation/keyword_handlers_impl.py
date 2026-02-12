@@ -124,86 +124,96 @@ async def handle_get_keyword_sets(self):
 
 
 async def handle_save_keyword_set(self, payload: Dict[str, Any]):
-    """保存關鍵詞集"""
+    """保存關鍵詞集（遇 database is locked 時自動重試，並向用戶展示友好提示）"""
     import sys
+    import asyncio
     print(f"[Backend] ========== handle_save_keyword_set ==========", file=sys.stderr)
     print(f"[Backend] Payload: {payload}", file=sys.stderr)
-    
+
+    def _is_lock_error(e: Exception) -> bool:
+        s = str(e).lower()
+        return "locked" in s or "busy" in s or "sqlite_busy" in s
+
     try:
         set_id = payload.get('id')
         name = payload.get('name', '').strip()
         description = payload.get('description', '')
         keywords = payload.get('keywords', [])
         is_active = payload.get('isActive', True)
-        match_mode = payload.get('matchMode', 'fuzzy')  # 🔧 新增：獲取匹配模式
-        
+        match_mode = payload.get('matchMode', 'fuzzy')
+
         print(f"[Backend] set_id={set_id}, name={name}, keywords_count={len(keywords)}, match_mode={match_mode}", file=sys.stderr)
-        
+
         if not name:
             self.send_event("save-keyword-set-result", {
                 "success": False,
                 "error": "詞集名稱不能為空"
             })
             return
-        
-        # 🔧 將關鍵詞列表轉為 JSON 字符串（保存完整對象，包含 text 和 keyword 字段）
+
         keywords_list = []
         for k in keywords:
             if isinstance(k, dict):
                 text = k.get('text', k.get('keyword', ''))
                 keywords_list.append({
                     'text': text,
-                    'keyword': text,  # 🔧 同時保存 keyword 字段供匹配器使用
+                    'keyword': text,
                     'isRegex': k.get('isRegex', False)
                 })
             elif isinstance(k, str):
-                keywords_list.append({
-                    'text': k,
-                    'keyword': k,
-                    'isRegex': False
-                })
-        
+                keywords_list.append({'text': k, 'keyword': k, 'isRegex': False})
         keywords_json = json.dumps(keywords_list, ensure_ascii=False)
-        
         print(f"[Backend] keywords_json: {keywords_json}", file=sys.stderr)
-        
-        if set_id:
-            # 更新現有詞集
-            print(f"[Backend] Updating existing set id={set_id}", file=sys.stderr)
-            await db.execute(
-                """UPDATE keyword_sets 
-                   SET name=?, description=?, keywords=?, match_mode=?, is_active=?, updated_at=CURRENT_TIMESTAMP
-                   WHERE id=?""",
-                (name, description, keywords_json, match_mode, 1 if is_active else 0, set_id)
-            )
-        else:
-            # 創建新詞集
-            print(f"[Backend] Creating new set", file=sys.stderr)
-            # 🔧 Phase8-P1: 包含 owner_user_id
+
+        last_error = None
+        for attempt in range(3):
             try:
-                from core.tenant_filter import get_owner_user_id
-                _ks_owner = get_owner_user_id()
-            except ImportError:
-                _ks_owner = 'local_user'
-            cursor = await db.execute_insert(
-                """INSERT INTO keyword_sets (name, description, keywords, match_mode, is_active, owner_user_id)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (name, description, keywords_json, match_mode, 1 if is_active else 0, _ks_owner)
-            )
-            set_id = cursor
-            print(f"[Backend] New set created with id={set_id}", file=sys.stderr)
-        
+                if set_id:
+                    print(f"[Backend] Updating existing set id={set_id}", file=sys.stderr)
+                    await db.execute(
+                        """UPDATE keyword_sets 
+                           SET name=?, description=?, keywords=?, match_mode=?, is_active=?, updated_at=CURRENT_TIMESTAMP
+                           WHERE id=?""",
+                        (name, description, keywords_json, match_mode, 1 if is_active else 0, set_id)
+                    )
+                else:
+                    print(f"[Backend] Creating new set", file=sys.stderr)
+                    try:
+                        from core.tenant_filter import get_owner_user_id
+                        _ks_owner = get_owner_user_id()
+                    except ImportError:
+                        _ks_owner = 'local_user'
+                    set_id = await db.execute_insert(
+                        """INSERT INTO keyword_sets (name, description, keywords, match_mode, is_active, owner_user_id)
+                           VALUES (?, ?, ?, ?, ?, ?)""",
+                        (name, description, keywords_json, match_mode, 1 if is_active else 0, _ks_owner)
+                    )
+                    print(f"[Backend] New set created with id={set_id}", file=sys.stderr)
+                break
+            except Exception as e:
+                last_error = e
+                if _is_lock_error(e) and attempt < 2:
+                    wait = 0.3 * (attempt + 1)
+                    print(f"[Backend] save_keyword_set lock retry {attempt + 1}/3 in {wait}s: {e}", file=sys.stderr)
+                    await asyncio.sleep(wait)
+                else:
+                    raise
+        else:
+            if last_error:
+                raise last_error
+
         self.send_event("save-keyword-set-result", {"success": True, "id": set_id})
         self.send_log(f"✅ 已保存關鍵詞集: {name} ({len(keywords_list)} 個關鍵詞)", "success")
-        
-        # 刷新列表
         await self.handle_get_keyword_sets()
-        
+
     except Exception as e:
         self.send_log(f"❌ 保存關鍵詞集失敗: {e}", "error")
+        err_msg = str(e)
+        if _is_lock_error(e):
+            err_msg = "系統繁忙，請稍後再試"
         self.send_event("save-keyword-set-result", {
             "success": False,
-            "error": str(e)
+            "error": err_msg
         })
 
 

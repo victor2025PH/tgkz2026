@@ -5,6 +5,13 @@
 import { LogEntry, TelegramAccount, CapturedLead, KeywordConfig, QueueStatus, QueueMessage, Alert } from '../models';
 import { TimeSeriesData } from '../analytics-charts.component';
 
+function shouldSkipStateByOwner(ctx: any, state: any): boolean {
+    const responseOwnerId = state?.owner_user_id;
+    const currentUserId = ctx.authService?.user()?.id;
+    if (responseOwnerId === undefined || responseOwnerId === '' || currentUserId === undefined || currentUserId === null) return false;
+    return String(responseOwnerId) !== String(currentUserId);
+}
+
 export function setupDataSyncIpcHandlers(this: any): void {
     // === Session 導入事件 ===
     this.ipcService.on('session-import-result', (data: {success: boolean, message: string, phone?: string, count?: number}) => {
@@ -309,6 +316,7 @@ export function setupDataSyncIpcHandlers(this: any): void {
 
     // 🆕 漸進式載入：分階段接收數據，讓 UI 盡快顯示
     this.ipcService.on('initial-state-core', (state: any) => {
+        if (shouldSkipStateByOwner(this, state)) return;
         console.log('[Frontend] 🚀 Received initial-state-core (accounts + settings)');
         if (state?.accounts) {
             this.accounts.set(state.accounts);
@@ -331,6 +339,7 @@ export function setupDataSyncIpcHandlers(this: any): void {
     });
     
     this.ipcService.on('initial-state-config', (state: any) => {
+        if (shouldSkipStateByOwner(this, state)) return;
         console.log('[Frontend] 📋 Received initial-state-config');
         if (state?.keywordSets) {
             this.keywordSets.set(state.keywordSets);
@@ -347,6 +356,7 @@ export function setupDataSyncIpcHandlers(this: any): void {
     });
     
     this.ipcService.on('initial-state-data', (state: any) => {
+        if (shouldSkipStateByOwner(this, state)) return;
         console.log('[Frontend] 📊 Received initial-state-data (leads + logs)');
         console.log('[Frontend] leads count:', state?.leads?.length, 'total:', state?.leadsTotal, 'hasMore:', state?.leadsHasMore);
         
@@ -376,6 +386,7 @@ export function setupDataSyncIpcHandlers(this: any): void {
     });
     
     this.ipcService.on('initial-state', (state: any) => {
+        if (shouldSkipStateByOwner(this, state)) return;
         console.log('[Frontend] ★★★ Received initial-state event ★★★');
         console.log('[Frontend] initial-state payload:', state);
         console.log('[Frontend] accounts in payload:', state?.accounts?.length || 0);

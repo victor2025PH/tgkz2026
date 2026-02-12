@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from service_context import get_service_context
 from database import db
 from core.logging import mask_phone
+from core.tenant_filter import get_owner_user_id
 
 from service_locator import scheduler
 # All handlers receive (self, payload) where self is BackendService instance.
@@ -282,9 +283,10 @@ async def handle_get_initial_state(self):
             # 延遲 1 秒後在後台恢復監控
             asyncio.get_event_loop().call_later(1.0, lambda: asyncio.create_task(restore_monitoring_background()))
         
-        # 🆕 返回 HTTP 響應（Web 模式需要）
+        # 🆕 返回 HTTP 響應（Web 模式需要）；帶 owner_user_id 供前端校驗，避免錯用其他用戶數據
         return {
             "success": True,
+            "owner_user_id": get_owner_user_id() or "",
             "accounts": accounts,
             "keywordSets": keyword_sets,
             "monitoredGroups": monitored_groups,

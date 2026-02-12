@@ -112,8 +112,12 @@ async def handle_get_keyword_sets(self):
         for ks in keyword_sets:
             kw_texts = [k.get('text', k.get('keyword', '')) for k in ks.get('keywords', [])]
             print(f"[Backend]   - {ks.get('name')}: {len(ks.get('keywords', []))} keywords: {kw_texts}", file=sys.stderr)
-        
-        self.send_event("get-keyword-sets-result", {"keywordSets": keyword_sets})
+        try:
+            from core.tenant_filter import get_owner_user_id
+            owner_id = get_owner_user_id() or ""
+        except Exception:
+            owner_id = ""
+        self.send_event("get-keyword-sets-result", {"keywordSets": keyword_sets, "owner_user_id": owner_id})
         
     except Exception as e:
         import traceback

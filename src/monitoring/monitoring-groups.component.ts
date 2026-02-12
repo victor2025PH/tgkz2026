@@ -1091,7 +1091,7 @@ export class MonitoringGroupsComponent implements OnInit {
     setTimeout(() => {
       if (this.isReassigning()) {
         this.isReassigning.set(false);
-        this.toastService.warning('操作超時，請重試');
+        this.toastService.warning('切換監控帳號操作超時，系統可能仍在處理，請稍後點「刷新群組列表」確認結果。');
       }
     }, 15000);
   }

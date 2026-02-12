@@ -1734,7 +1734,7 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   
   // 🔧 Phase3: 搜索推薦
   keywordSuggestions = signal<any[]>([]);
-  showSuggestions = signal(false);
+  // showSuggestions 已在上方聲明，此處不再重複
   private _suggestionTimer: any = null;
   
   // 🔧 Phase3: 資源健康檢查
@@ -3112,17 +3112,9 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     }, 300);
   }
   
-  /** 選中推薦詞直接搜索 */
-  selectSuggestion(keyword: string): void {
-    this.searchQuery = keyword;
-    this.showSuggestions.set(false);
-    this.doSearch();
-  }
-  
-  /** 隱藏推薦 */
-  hideSuggestions(): void {
-    // 延遲隱藏以允許點擊事件觸發
-    setTimeout(() => this.showSuggestions.set(false), 200);
+  /** 選中推薦詞直接搜索（復用 quickSearch）*/
+  selectSuggestion(kw: string): void {
+    this.quickSearch(kw);
   }
   
   // ============ Phase3: 資源健康檢查 ============
@@ -3533,7 +3525,7 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       描述: (r.description || '').replace(/"/g, '""').substring(0, 200),
       連結: r.username ? `https://t.me/${r.username}` : (r.invite_link || r.link || ''),
       來源: (r.sources && r.sources.length > 0) ? r.sources.join('+') : ((r as any).source || 'search'),
-      可達性: this.getAccessibilityLabel(r.accessibility || this.getAccessibility(r)),
+      可達性: this.getAccessibilityLabel(r),
       邀請鏈接: r.invite_link || '',
       標籤: this.getResourceTags(r).join(', '),
       狀態: r.status === 'monitoring' ? '監控中' : r.status === 'joined' ? '已加入' : '未加入',

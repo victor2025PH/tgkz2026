@@ -829,6 +829,9 @@ class KeywordGroupMixin:
                 # 🆕 添加群組類型和提取權限（前端期望的格式）
                 group['resourceType'] = group.get('resource_type', 'group') or 'group'
                 group['canExtractMembers'] = bool(group.get('can_extract_members', 1))
+                # 前端請求「群組內容」統計時需要 telegramId 查詢 chat_history / discussion_messages
+                if 'telegramId' not in group and group.get('telegram_id') is not None:
+                    group['telegramId'] = group.get('telegram_id')
                 groups.append(group)
             
             return groups

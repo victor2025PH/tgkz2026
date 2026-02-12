@@ -749,8 +749,12 @@ export class ElectronIpcService implements OnDestroy {
     
     // ==================== 群組相關 ====================
     if (command === 'get-monitored-groups') {
-      // 🔧 修復：同時觸發兩個事件名，確保所有監聽器都能收到
-      const groups = result.groups || result.data || result;
+      // 🔧 修復：僅在 result.groups 為數組時使用，避免 HTTP 返回 { success: true } 時被當成列表導致監控群組變空
+      const groups = Array.isArray(result.groups)
+        ? result.groups
+        : Array.isArray(result.data)
+          ? result.data
+          : [];
       this.triggerEvent('monitored-groups-updated', { groups });
       this.triggerEvent('get-groups-result', { groups });
     }

@@ -763,17 +763,26 @@ export class BatchSendDialogComponent implements OnInit, OnDestroy {
       this.isSending.set(false);
       this.sendComplete.emit({ success: data.success, failed: data.failed });
       
-      // 顯示詳細的完成信息
+      // 🔧 P0：顯示詳細的完成信息（區分確認送達 vs 不確定）
+      const confirmed = data.confirmed ?? data.success;
+      const uncertain = data.uncertain ?? 0;
+      
       if (data.error) {
         // 有錯誤（如沒有可用帳號）
         this.toast.error(`❌ 發送失敗：${data.error}`);
-      } else if (data.failed > 0) {
-        // 部分失敗
-        const summary = data.failureSummary || `失敗 ${data.failed} 個`;
-        this.toast.warning(`⚠️ 批量發送完成：成功 ${data.success}，${summary}`);
+      } else if (data.failed > 0 || uncertain > 0) {
+        // 有失敗或不確定
+        const parts: string[] = [];
+        if (confirmed > 0) parts.push(`確認送達 ${confirmed}`);
+        if (uncertain > 0) parts.push(`可能送達 ${uncertain}`);
+        if (data.failed > 0) {
+          const summary = data.failureSummary || `失敗 ${data.failed}`;
+          parts.push(summary);
+        }
+        this.toast.warning(`⚠️ 批量發送完成：${parts.join('，')}`);
       } else {
-        // 全部成功
-        this.toast.success(`✅ 批量發送完成：成功 ${data.success} 個`);
+        // 全部確認成功
+        this.toast.success(`✅ 批量發送完成：全部確認送達 ${data.success} 個`);
       }
       
       // 保存失敗信息用於顯示

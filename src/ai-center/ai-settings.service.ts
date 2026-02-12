@@ -95,12 +95,12 @@ export class AiSettingsService {
     this._modelSaveState.set('saving');
     const res = await this.api.post('/api/v1/ai/models', {
       provider: model.provider,
-      model_name: model.modelName,
-      display_name: model.displayName,
-      api_key: model.apiKey,
-      api_endpoint: model.apiEndpoint,
-      is_local: model.isLocal ? 1 : 0,
-      is_default: model.isDefault ? 1 : 0,
+      modelName: model.modelName,
+      displayName: model.displayName,
+      apiKey: model.apiKey,
+      apiEndpoint: model.apiEndpoint,
+      isLocal: model.isLocal ? 1 : 0,
+      isDefault: model.isDefault ? 1 : 0,
       priority: model.priority || 0,
     });
     if (res.success) {
@@ -118,12 +118,12 @@ export class AiSettingsService {
     this._modelSaveState.set('saving');
     const body: any = {};
     if (updates.provider !== undefined) body.provider = updates.provider;
-    if (updates.modelName !== undefined) body.model_name = updates.modelName;
-    if (updates.displayName !== undefined) body.display_name = updates.displayName;
-    if (updates.apiKey !== undefined) body.api_key = updates.apiKey;
-    if (updates.apiEndpoint !== undefined) body.api_endpoint = updates.apiEndpoint;
-    if (updates.isLocal !== undefined) body.is_local = updates.isLocal ? 1 : 0;
-    if (updates.isDefault !== undefined) body.is_default = updates.isDefault ? 1 : 0;
+    if (updates.modelName !== undefined) body.modelName = updates.modelName;
+    if (updates.displayName !== undefined) body.displayName = updates.displayName;
+    if (updates.apiKey !== undefined) body.apiKey = updates.apiKey;
+    if (updates.apiEndpoint !== undefined) body.apiEndpoint = updates.apiEndpoint;
+    if (updates.isLocal !== undefined) body.isLocal = updates.isLocal ? 1 : 0;
+    if (updates.isDefault !== undefined) body.isDefault = updates.isDefault ? 1 : 0;
     if (updates.priority !== undefined) body.priority = updates.priority;
 
     const res = await this.api.put(`/api/v1/ai/models/${id}`, body);
@@ -147,11 +147,27 @@ export class AiSettingsService {
     return { success: false, error: res.error };
   }
 
-  /** 測試模型連接 */
-  async testModel(id: number | string): Promise<{ success: boolean; latency?: number; error?: string }> {
-    const res = await this.api.post<{ latency?: number }>(`/api/v1/ai/models/${id}/test`, {});
-    if (res.success) {
-      return { success: true, latency: (res.data as any)?.latency };
+  /** 測試模型連接（REST API，後端自動從 DB 補全模型信息） */
+  async testModel(id: number | string): Promise<{
+    success: boolean;
+    isConnected?: boolean;
+    latencyMs?: number;
+    responsePreview?: string;
+    availableModels?: string[];
+    modelName?: string;
+    error?: string;
+  }> {
+    const res = await this.api.post<any>(`/api/v1/ai/models/${id}/test`, {});
+    if (res.success && res.data) {
+      return {
+        success: true,
+        isConnected: res.data.isConnected,
+        latencyMs: res.data.latencyMs,
+        responsePreview: res.data.responsePreview,
+        availableModels: res.data.availableModels,
+        modelName: res.data.modelName,
+        error: res.data.error,  // 測試可能成功但連接失敗，error 裡有原因
+      };
     }
     return { success: false, error: res.error };
   }

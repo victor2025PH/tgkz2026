@@ -1408,6 +1408,8 @@ export class ElectronIpcService implements OnDestroy {
     'keyword-added', 'keyword-removed',
     'lead-added', 'lead-deleted', 'lead-status-updated',
     'settings-saved', 'backup-created', 'backup-restored',
+    // 🔧 P2: AI 模型事件去重（REST + WebSocket 可能同時觸發）
+    'ai-model-saved', 'ai-model-updated', 'ai-model-deleted', 'ai-model-tested',
   ]);
 
   // 🔧 Phase5: 高頻進度事件節流（限制觸發頻率，減少 Angular 變更檢測）

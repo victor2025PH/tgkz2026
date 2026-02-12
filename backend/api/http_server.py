@@ -583,6 +583,8 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
                 result = await self.backend_service.handle_command(command, payload)
                 # 兼容不返回值的 handler（只靠 send_event 推送）
                 if result is None:
+                    logger.debug(f"[_execute_command] handler '{command}' returned None, assuming success. "
+                                 "Consider adding explicit return for better error propagation.")
                     return {'success': True}
                 return result
             except Exception as e:

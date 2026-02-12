@@ -582,6 +582,7 @@ async def _batch_send_worker(self, payload: Dict[str, Any]):
             return
         
         success_count = 0
+        uncertain_count = 0  # 🔧 P0：追蹤不確定送達的數量
         failed_count = 0
         failure_reasons = {}
         failed_targets = []
@@ -593,8 +594,8 @@ async def _batch_send_worker(self, payload: Dict[str, Any]):
                 failure_reasons['cancelled'] = failure_reasons.get('cancelled', 0) + remaining
                 break
             
-            # 提取目標信息
-            user_id = target.get('telegramId')
+            # 🔧 P0：提取目標信息（兼容多種字段名）
+            user_id = target.get('telegramId') or target.get('userId') or target.get('user_id') or target.get('id')
             username = target.get('username', '')
             first_name = target.get('firstName', target.get('first_name', ''))
             last_name = target.get('lastName', target.get('last_name', ''))
@@ -698,8 +699,14 @@ async def _batch_send_worker(self, payload: Dict[str, Any]):
                 )
                 
                 if send_result.get('success'):
-                    success_count += 1
-                    print(f"[BatchSend] ✓ 發送成功: {user_id}", file=sys.stderr)
+                    if send_result.get('uncertain') or not send_result.get('message_id'):
+                        # 🔧 P0：不確定是否送達（無 message_id 確認）
+                        uncertain_count += 1
+                        success_count += 1  # 計入成功總數，但 uncertain 另行追蹤
+                        print(f"[BatchSend] ⚠ 送達不確定: {user_id} ({send_result.get('note', 'no message_id')})", file=sys.stderr)
+                    else:
+                        success_count += 1
+                        print(f"[BatchSend] ✓ 確認送達: {user_id} (msg_id={send_result['message_id']})", file=sys.stderr)
                 else:
                     raise Exception(send_result.get('error', '發送失敗'))
                 
@@ -783,18 +790,34 @@ async def _batch_send_worker(self, payload: Dict[str, Any]):
             label = reason_labels.get(reason, reason)
             reason_summary.append(f"{label}: {count}")
         
+        # 🔧 P0：區分確認送達 vs 不確定送達
+        confirmed_count = success_count - uncertain_count
+        
         self.send_event("batch-send:complete", {
             "success": success_count,
+            "confirmed": confirmed_count,
+            "uncertain": uncertain_count,
             "failed": failed_count,
             "failureReasons": failure_reasons,
             "failureSummary": ", ".join(reason_summary) if reason_summary else None,
             "failedTargets": failed_targets[:10]
         })
         
-        if failed_count > 0:
-            self.send_log(f"⚠️ 批量發送完成: 成功 {success_count}, 失敗 {failed_count} ({', '.join(reason_summary)})", "warning")
+        # 🔧 P0：日誌中明確區分確認 vs 不確定
+        if failed_count > 0 or uncertain_count > 0:
+            parts = []
+            if confirmed_count > 0:
+                parts.append(f"確認送達 {confirmed_count}")
+            if uncertain_count > 0:
+                parts.append(f"可能送達 {uncertain_count}")
+            if failed_count > 0:
+                parts.append(f"失敗 {failed_count}")
+            summary = ", ".join(parts)
+            if reason_summary:
+                summary += f" ({', '.join(reason_summary)})"
+            self.send_log(f"⚠️ 批量發送完成: {summary}", "warning")
         else:
-            self.send_log(f"✅ 批量發送完成: 成功 {success_count}", "success")
+            self.send_log(f"✅ 批量發送完成: 全部確認送達 {success_count} 個", "success")
         
     except Exception as e:
         print(f"[BatchSend] 錯誤: {e}", file=sys.stderr)

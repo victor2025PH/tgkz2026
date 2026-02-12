@@ -95,6 +95,21 @@ async def handle_start_monitoring(self):
         monitored_groups = await db.get_all_monitored_groups()
         keyword_sets = await db.get_all_keyword_sets()
         
+        # 🔧 P0+：早期檢查關鍵詞集是否真正有內容
+        total_keywords = sum(len(ks.get('keywords', [])) for ks in keyword_sets)
+        print(f"[Backend] 📋 關鍵詞集: {len(keyword_sets)} 集, 共 {total_keywords} 個關鍵詞", file=sys.stderr)
+        if total_keywords == 0:
+            warning_msg = "⚠ 關鍵詞集為空或所有關鍵詞集沒有關鍵詞！監控將無法匹配任何消息。"
+            self.send_log(warning_msg, "warning")
+            print(f"[Backend] {warning_msg}", file=sys.stderr)
+        else:
+            # 輸出關鍵詞樣本以便調試
+            for ks in keyword_sets:
+                kw_list = ks.get('keywords', [])
+                kw_texts = [k.get('keyword', k.get('text', '?')) for k in kw_list[:5]]
+                print(f"[Backend]   關鍵詞集 '{ks.get('name', '?')}' (id={ks.get('id')}): "
+                      f"{len(kw_list)} 詞: {kw_texts}", file=sys.stderr)
+        
         # ========== 新增：檢查監控號是否已加入群組 ==========
         group_urls = [g.get('url') for g in monitored_groups if g.get('url')]
         self.send_log(f"正在檢查 {len(listener_accounts)} 個監控賬號對 {len(group_urls)} 個群組的成員狀態...", "info")
@@ -335,9 +350,13 @@ async def handle_start_monitoring(self):
             
             try:
                 import sys
+                # 🔧 P0+：詳細診斷日誌
+                kw_total = sum(len(ks.get('keywords', [])) for ks in keyword_sets_list)
                 print(f"[Backend] Attempting to start monitoring for account {phone}", file=sys.stderr)
-                print(f"[Backend] Group URLs: {group_urls}", file=sys.stderr)
-                print(f"[Backend] Keyword sets count: {len(keyword_sets_list)}", file=sys.stderr)
+                print(f"[Backend] Group URLs ({len(group_urls)}): {group_urls}", file=sys.stderr)
+                print(f"[Backend] Keyword sets: {len(keyword_sets_list)} 集, 共 {kw_total} 個關鍵詞", file=sys.stderr)
+                if kw_total == 0:
+                    self.send_log(f"⚠ 帳號 {phone}: 關鍵詞集為空，監控將無法匹配消息", "warning")
                 
                 # 嘗試啟動監控
                 result = await self.telegram_manager.start_monitoring(

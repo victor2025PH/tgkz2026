@@ -1665,6 +1665,21 @@ class TelegramClientManager:
         print(f"[TelegramClient] send_message called: phone={phone}, user_id={user_id}, source_group={source_group}, target_username={target_username}", file=sys.stderr)
         print(f"[TelegramClient] Available clients: {list(self.clients.keys())}", file=sys.stderr)
         
+        # 🔧 P0：早期驗證 — 防止空 user_id 導致的靜默失敗
+        if not user_id or (isinstance(user_id, str) and not user_id.strip()):
+            print(f"[TelegramClient] ✗ user_id 為空，無法發送！", file=sys.stderr)
+            return {
+                "success": False,
+                "error": "user_id 為空，請確認目標用戶 ID"
+            }
+        
+        if not text and not attachment:
+            print(f"[TelegramClient] ✗ 消息內容和附件都為空！", file=sys.stderr)
+            return {
+                "success": False,
+                "error": "消息內容和附件都為空"
+            }
+        
         try:
             if phone not in self.clients:
                 print(f"[TelegramClient] ERROR: Client {phone} not in self.clients!", file=sys.stderr)
@@ -2012,19 +2027,21 @@ class TelegramClientManager:
                     "date": sent.date.isoformat() if sent.date else None
                 }
             elif send_success:
-                # 附件發送時可能因 Pyrogram 解析問題 sent=None，但實際已發送
-                print(f"[TelegramClient] Message likely sent (Pyrogram parsing issue)", file=sys.stderr)
+                # 附件發送時可能因 Pyrogram 解析問題 sent=None，但實際是否送達不確定
+                # 🔧 P0 修復：降級為 uncertain，不再假設成功
+                print(f"[TelegramClient] ⚠ Message send_success=True but sent=None (uncertain delivery)", file=sys.stderr)
                 return {
                     "success": True,
+                    "uncertain": True,
                     "message_id": None,
                     "date": None,
-                    "note": "Message sent but response parsing failed"
+                    "note": "Message possibly sent but response parsing failed - delivery uncertain"
                 }
             else:
-                print(f"[TelegramClient] Send returned None", file=sys.stderr)
+                print(f"[TelegramClient] ✗ Send returned None - message NOT delivered", file=sys.stderr)
                 return {
                     "success": False,
-                    "error": "Send returned None - message may not have been delivered"
+                    "error": "Send returned None - message was not delivered"
                 }
         
         except FloodWait as e:
@@ -2033,19 +2050,19 @@ class TelegramClientManager:
                 "error": f"Flood wait: Please wait {e.value} seconds"
             }
         except AttributeError as e:
-            # Pyrogram 內部可能會拋出 AttributeError，特別是 is_premium 相關的錯誤
-            # 這通常是 Pyrogram 解析返回的 Message 時 from_user 為 None
-            # 但消息本身通常已經發送成功
+            # Pyrogram 內部可能會拋出 AttributeError（is_premium、from_user=None 等）
+            # 🔧 P0 修復：不再假設成功，降級為 uncertain
             error_str = str(e)
-            print(f"[TelegramClient] AttributeError during send: {error_str}", file=sys.stderr)
+            print(f"[TelegramClient] ⚠ AttributeError during send: {error_str}", file=sys.stderr)
             if 'is_premium' in error_str or 'NoneType' in error_str:
-                # 消息很可能已發送，只是響應解析失敗
-                print(f"[TelegramClient] Message likely sent successfully despite parsing error", file=sys.stderr)
+                # Pyrogram 解析失敗，但 API 調用可能已完成 — 標記為 uncertain
+                print(f"[TelegramClient] ⚠ Delivery uncertain due to Pyrogram parsing error", file=sys.stderr)
                 return {
                     "success": True,
+                    "uncertain": True,
                     "message_id": None,
                     "date": None,
-                    "note": f"Message sent but Pyrogram failed to parse response: {error_str}"
+                    "note": f"Delivery uncertain - Pyrogram parse error: {error_str}"
                 }
             return {
                 "success": False,
@@ -2672,7 +2689,8 @@ class TelegramClientManager:
                 continue
             
             if result.get('success') and result.get('chat_id'):
-                chat_id = result['chat_id']
+                # 🔧 P0：強制標準化為 int，確保後續比對一致
+                chat_id = int(result['chat_id'])
                 monitored_chat_ids.add(chat_id)
                 chat_id_to_url_map[chat_id] = str(group_url)
                 
@@ -2750,6 +2768,18 @@ class TelegramClientManager:
             'on_lead_captured': on_lead_captured  # Store callback for handler
         }
         
+        # 🔧 P0：診斷日誌 — 輸出監控配置摘要
+        total_kw = sum(len(ks.get('keywords', [])) for ks in keyword_sets) if keyword_sets else 0
+        kw_samples = []
+        for ks in (keyword_sets or []):
+            for kw in ks.get('keywords', [])[:3]:
+                kw_samples.append(kw.get('keyword', kw.get('text', '?')))
+        print(f"[TelegramClient] 📋 監控配置摘要 {phone}:", file=sys.stderr)
+        print(f"[TelegramClient]   chat_ids (int): {sorted(monitored_chat_ids)}", file=sys.stderr)
+        print(f"[TelegramClient]   keyword_sets: {len(keyword_sets or [])} 集, 共 {total_kw} 個關鍵詞", file=sys.stderr)
+        print(f"[TelegramClient]   關鍵詞樣本: {kw_samples[:5]}", file=sys.stderr)
+        print(f"[TelegramClient]   has callback: {on_lead_captured is not None}", file=sys.stderr)
+        
         # Ensure message_handlers is initialized (defensive check)
         if not hasattr(self, 'message_handlers'):
             self.message_handlers: Dict[str, MessageHandler] = {}
@@ -2802,9 +2832,20 @@ class TelegramClientManager:
                     print(f"[TelegramClient] From User: {message.from_user.username if message.from_user else 'None'}", file=sys.stderr)
                     print(f"[TelegramClient] =====================================", file=sys.stderr)
                 
-                # 快速過濾：如果不在監控列表中，靜默返回（不輸出冗長日誌）
+                # 快速過濾：如果不在監控列表中
                 if not is_monitored:
-                    # 只在首次收到來自新群組的消息時記錄一次
+                    # 🔧 P0：首次收到未匹配群組消息時輸出診斷（幫助排查 ID 不匹配）
+                    if not hasattr(self, '_unmatched_chat_ids_logged'):
+                        self._unmatched_chat_ids_logged = set()
+                    if chat_id and chat_id not in self._unmatched_chat_ids_logged:
+                        self._unmatched_chat_ids_logged.add(chat_id)
+                        print(f"[TelegramClient] 📋 首次未匹配: chat_id={chat_id} (type={type(chat_id).__name__}), "
+                              f"title='{chat_title}', "
+                              f"monitored_ids={list(mon_chat_ids_normalized)[:5]}{'...' if len(mon_chat_ids_normalized) > 5 else ''}",
+                              file=sys.stderr)
+                        # 限制日誌數量：最多記錄 20 個未匹配群組
+                        if len(self._unmatched_chat_ids_logged) > 20:
+                            self._unmatched_chat_ids_logged.clear()
                     return
                 
                 # 獲取完整的監控信息
@@ -2886,17 +2927,31 @@ class TelegramClientManager:
                     print(f"[TelegramClient] Ad detection error (non-blocking): {collect_err}", file=sys.stderr)
                 # ==================== 收集發言者結束 ====================
                 
+                # 🔧 P0：檢查關鍵詞集是否為空
+                if not kw_sets or all(not ks for ks in kw_sets):
+                    print(f"[TelegramClient] ⚠ keyword_sets 為空！phone={phone}, 無法匹配任何關鍵詞", file=sys.stderr)
+                    if self.event_callback:
+                        self.event_callback("log-entry", {
+                            "message": f"[監控] ⚠ 關鍵詞集為空，無法匹配: {phone}",
+                            "type": "warning"
+                        })
+                    return
+                
                 # 使用優化的 Trie 匹配器（更快的匹配速度）
                 if phone not in self.trie_matchers:
                     trie_matcher = TrieKeywordMatcher()
                     trie_matcher.compile_keywords(kw_sets)
                     self.trie_matchers[phone] = trie_matcher
+                    print(f"[TelegramClient] ✓ Trie 匹配器已初始化: phone={phone}, "
+                          f"kw_sets_count={len(kw_sets)}, "
+                          f"total_keywords={sum(len(ks) for ks in kw_sets if ks)}", file=sys.stderr)
                 else:
                     trie_matcher = self.trie_matchers[phone]
                     # 只在關鍵詞集變化時重新編譯
                     if not hasattr(trie_matcher, '_last_keyword_sets') or trie_matcher._last_keyword_sets != kw_sets:
                         trie_matcher.compile_keywords(kw_sets)
                         trie_matcher._last_keyword_sets = kw_sets
+                        print(f"[TelegramClient] ✓ Trie 匹配器已更新: phone={phone}", file=sys.stderr)
                 
                 # 關鍵詞匹配（使用優化的 Trie 樹，O(n) 時間複雜度）
                 # 對於短文本，直接匹配更快；對於長文本，可以使用線程池
@@ -3005,19 +3060,21 @@ class TelegramClientManager:
         import sys
         
         try:
-            # Check if dispatcher is already running
+            # 🔧 P0 修復：嚴格檢查 dispatcher 是否真正在運行
             dispatcher_running = False
             try:
                 if hasattr(client, 'dispatcher') and client.dispatcher is not None:
-                    # Try to check if dispatcher is actually running
+                    # 只信任 is_running 屬性，不用 handlers 數量作為 fallback
                     if hasattr(client.dispatcher, 'is_running'):
                         dispatcher_running = client.dispatcher.is_running
-                    else:
-                        # Dispatcher exists, check if it has handlers (indicates it's active)
-                        if hasattr(client.dispatcher, 'handlers') and len(client.dispatcher.handlers) > 0:
-                            dispatcher_running = True
-                        else:
+                    # 額外驗證：檢查 updates_worker_task 是否存在且未完成
+                    if dispatcher_running and hasattr(client.dispatcher, 'updates_worker_task'):
+                        task = client.dispatcher.updates_worker_task
+                        if task is not None and task.done():
+                            print(f"[TelegramClient] ⚠ Dispatcher task is done (crashed?), marking as not running", file=sys.stderr)
                             dispatcher_running = False
+                print(f"[TelegramClient] Dispatcher check for {phone}: running={dispatcher_running}, "
+                      f"connected={client.is_connected}", file=sys.stderr)
             except Exception as check_err:
                 print(f"[TelegramClient] Error checking dispatcher status: {check_err}", file=sys.stderr)
                 dispatcher_running = False
@@ -3141,18 +3198,54 @@ class TelegramClientManager:
                     "type": "success"
                 })
             
-            # Verify handler was registered
-            if phone in self.message_handlers:
-                handler = self.message_handlers[phone]
-                print(f"[TelegramClient] Handler registered for {phone}, dispatcher is running: {dispatcher_running or True}", file=sys.stderr)
+            # 🔧 P0 修復：啟動後最終驗證 — 確保 dispatcher 真正在運行
+            final_dispatcher_ok = False
+            try:
+                if hasattr(client, 'dispatcher') and client.dispatcher is not None:
+                    if hasattr(client.dispatcher, 'is_running'):
+                        final_dispatcher_ok = client.dispatcher.is_running
+                    else:
+                        # 沒有 is_running 屬性，嘗試其他方式驗證
+                        final_dispatcher_ok = client.is_connected
+            except Exception:
+                final_dispatcher_ok = False
+            
+            if phone in self.message_handlers and final_dispatcher_ok:
+                print(f"[TelegramClient] ✓ 監控就緒: handler={True}, dispatcher={True}, connected={client.is_connected}, phone={phone}", file=sys.stderr)
+                print(f"[TelegramClient] ✓ 監控 chat_ids: {list(monitored_chat_ids)}", file=sys.stderr)
                 
                 if self.event_callback:
                     self.event_callback("log-entry", {
-                        "message": f"[監控] ✓ 客戶端已啟動並註冊處理器: {phone}",
+                        "message": f"[監控] ✓ 監控已就緒: {phone} — dispatcher 運行中，監控 {len(monitored_chat_ids)} 個群組",
                         "type": "success"
                     })
+            elif phone in self.message_handlers and not final_dispatcher_ok:
+                # 🔧 關鍵：handler 已註冊但 dispatcher 沒運行 = 消息不會被派發
+                print(f"[TelegramClient] ✗✗✗ CRITICAL: Handler registered BUT dispatcher NOT running for {phone}!", file=sys.stderr)
+                print(f"[TelegramClient] ✗✗✗ Messages will NOT be received! Attempting restart...", file=sys.stderr)
+                
+                if self.event_callback:
+                    self.event_callback("log-entry", {
+                        "message": f"[監控] ✗ 嚴重問題: {phone} handler 已註冊但 dispatcher 未運行！消息將無法接收",
+                        "type": "error"
+                    })
+                
+                # 嘗試緊急重啟 dispatcher
+                try:
+                    if client.is_connected:
+                        await client.disconnect()
+                        await asyncio.sleep(1.0)
+                    await client.start()
+                    print(f"[TelegramClient] ✓ Emergency restart successful for {phone}", file=sys.stderr)
+                    if self.event_callback:
+                        self.event_callback("log-entry", {
+                            "message": f"[監控] ✓ 緊急重啟成功: {phone}",
+                            "type": "success"
+                        })
+                except Exception as restart_err:
+                    print(f"[TelegramClient] ✗ Emergency restart failed: {restart_err}", file=sys.stderr)
             else:
-                print(f"[TelegramClient] WARNING: Handler not found in message_handlers for {phone}", file=sys.stderr)
+                print(f"[TelegramClient] ✗ Handler not found in message_handlers for {phone}", file=sys.stderr)
                 
         except Exception as start_error:
             error_str = str(start_error).lower()

@@ -20,6 +20,7 @@ import {
 } from './ai-center.models';
 import { ElectronIpcService } from '../electron-ipc.service';
 import { ToastService } from '../toast.service';
+import { AiSettingsService, SaveState } from './ai-settings.service';
 
 // 擴展 AIModelConfig 以支持本地 AI
 export interface ExtendedAIModelConfig extends AIModelConfig {
@@ -33,6 +34,7 @@ export interface ExtendedAIModelConfig extends AIModelConfig {
 export class AICenterService {
   private ipcService = inject(ElectronIpcService);
   private toastService = inject(ToastService);
+  private aiSettings = inject(AiSettingsService);
   
   // 配置狀態
   private config = signal<AICenterConfig>(DEFAULT_AI_CONFIG);
@@ -101,6 +103,13 @@ export class AICenterService {
   
   // 模型用途分配
   modelUsage = computed(() => this.config().modelUsage);
+
+  // 🔧 P0-2: REST 保存狀態（供組件顯示保存按鈕狀態）
+  modelSaveState = computed(() => this.aiSettings.modelSaveState());
+  settingsSaveState = computed(() => this.aiSettings.settingsSaveState());
+  isDirty = computed(() => this.aiSettings.isDirty());
+  isSaving = computed(() => this.aiSettings.isSaving());
+  justSaved = computed(() => this.aiSettings.justSaved());
   
   constructor() {
     this.setupIpcListeners();
@@ -264,9 +273,32 @@ export class AICenterService {
   
   /**
    * 從後端加載已保存的模型配置
+   * 🔧 P0-2: 優先使用 REST API，fallback 到 IPC
    */
-  loadModelsFromBackend(): void {
+  async loadModelsFromBackend(): Promise<void> {
     this._isLoading.set(true);
+    try {
+      const models = await this.aiSettings.getModels();
+      if (models.length > 0 || true) {  // 即使為空也用 REST 結果（代表用戶確實沒有模型）
+        const mapped: AIModelConfig[] = models.map((m: any) => ({
+          id: String(m.id),
+          provider: m.provider as AIProvider,
+          modelName: m.modelName,
+          apiKey: m.apiKey || '',
+          apiEndpoint: m.apiEndpoint || '',
+          isConnected: m.isConnected || false,
+          usageToday: 0,
+          costToday: 0
+        }));
+        this.config.update(c => ({ ...c, models: mapped }));
+        this._isLoading.set(false);
+        console.log('[AI] REST 加載模型成功:', mapped.length, '個');
+        return;
+      }
+    } catch (e) {
+      console.warn('[AI] REST 加載模型失敗，fallback 到 IPC:', e);
+    }
+    // Fallback: IPC
     this.ipcService.send('get-ai-models', {});
   }
   
@@ -275,7 +307,7 @@ export class AICenterService {
   /**
    * 添加新模型（持久化到後端）
    */
-  addModel(model: Omit<AIModelConfig, 'id' | 'isConnected' | 'usageToday' | 'costToday'> & { isLocal?: boolean; displayName?: string; isDefault?: boolean }): string {
+  async addModel(model: Omit<AIModelConfig, 'id' | 'isConnected' | 'usageToday' | 'costToday'> & { isLocal?: boolean; displayName?: string; isDefault?: boolean }): Promise<string> {
     const id = `model_${Date.now()}`;
     const newModel: AIModelConfig = {
       ...model,
@@ -291,16 +323,33 @@ export class AICenterService {
       models: [...c.models, newModel]
     }));
     
-    // 持久化到後端
-    this.ipcService.send('save-ai-model', {
+    // 🔧 P0-2: 優先 REST API 持久化
+    const res = await this.aiSettings.addModel({
       provider: model.provider,
       modelName: model.modelName,
-      displayName: model.displayName || model.modelName,
+      displayName: (model as any).displayName || model.modelName,
       apiKey: model.apiKey,
       apiEndpoint: model.apiEndpoint,
-      isLocal: model.isLocal || false,
-      isDefault: model.isDefault || false
+      isLocal: (model as any).isLocal || false,
+      isDefault: (model as any).isDefault || false
     });
+    
+    if (res.success) {
+      // 重新從後端加載，獲取真實 ID
+      await this.loadModelsFromBackend();
+      this.toastService.success('模型已保存');
+    } else {
+      // Fallback IPC
+      this.ipcService.send('save-ai-model', {
+        provider: model.provider,
+        modelName: model.modelName,
+        displayName: (model as any).displayName || model.modelName,
+        apiKey: model.apiKey,
+        apiEndpoint: model.apiEndpoint,
+        isLocal: (model as any).isLocal || false,
+        isDefault: (model as any).isDefault || false
+      });
+    }
     
     return id;
   }
@@ -308,13 +357,13 @@ export class AICenterService {
   /**
    * 添加本地 AI 模型
    */
-  addLocalModel(config: {
+  async addLocalModel(config: {
     modelName: string;
     displayName?: string;
     apiEndpoint: string;
     isDefault?: boolean;
-  }): string {
-    return this.addModel({
+  }): Promise<string> {
+    return await this.addModel({
       provider: 'custom' as AIProvider,
       modelName: config.modelName,
       displayName: config.displayName || config.modelName,
@@ -325,31 +374,44 @@ export class AICenterService {
     });
   }
   
-  updateModel(id: string, updates: Partial<AIModelConfig>) {
+  async updateModel(id: string, updates: Partial<AIModelConfig>): Promise<void> {
     this.config.update(c => ({
       ...c,
       models: c.models.map(m => m.id === id ? { ...m, ...updates } : m)
     }));
     
-    // 如果是數據庫 ID，同步到後端
+    // 🔧 P0-2: 優先 REST 更新
     if (!isNaN(Number(id))) {
-      this.ipcService.send('update-ai-model', {
-        id: Number(id),
-        ...updates
+      const res = await this.aiSettings.updateModel(Number(id), {
+        provider: updates.provider,
+        modelName: updates.modelName,
+        apiKey: updates.apiKey,
+        apiEndpoint: updates.apiEndpoint
       });
+      if (!res.success) {
+        // Fallback IPC
+        this.ipcService.send('update-ai-model', {
+          id: Number(id),
+          ...updates
+        });
+      }
     }
   }
   
-  removeModel(id: string) {
+  async removeModel(id: string): Promise<void> {
     this.config.update(c => ({
       ...c,
       models: c.models.filter(m => m.id !== id),
       defaultModelId: c.defaultModelId === id ? '' : c.defaultModelId
     }));
     
-    // 如果是數據庫 ID，從後端刪除
+    // 🔧 P0-2: 優先 REST 刪除
     if (!isNaN(Number(id))) {
-      this.ipcService.send('delete-ai-model', { id: Number(id) });
+      const res = await this.aiSettings.deleteModel(Number(id));
+      if (!res.success) {
+        // Fallback IPC
+        this.ipcService.send('delete-ai-model', { id: Number(id) });
+      }
     }
   }
   
@@ -374,19 +436,91 @@ export class AICenterService {
   
   /**
    * 保存模型用途分配到後端
+   * 🔧 P0-2: 使用 REST API
    */
   async saveModelUsageToBackend(): Promise<void> {
     const usage = this.config().modelUsage;
     console.log('[AI] 保存模型用途分配:', usage);
+    // REST API 保存
+    await this.aiSettings.saveSettings({
+      model_usage_intent: usage.intentRecognition,
+      model_usage_chat: usage.dailyChat,
+      model_usage_script: usage.multiRoleScript
+    });
+    // 同時 IPC 保持兼容
     this.ipcService.send('save-model-usage', usage);
   }
   
   /**
    * 從後端加載模型用途分配
+   * 🔧 P0-2: 優先 REST，fallback IPC
    */
-  loadModelUsageFromBackend(): void {
+  async loadModelUsageFromBackend(): Promise<void> {
     console.log('[AI] 加載模型用途分配...');
+    try {
+      const settings = await this.aiSettings.getSettings();
+      if (settings.model_usage_intent || settings.model_usage_chat || settings.model_usage_script) {
+        this.config.update(c => ({
+          ...c,
+          modelUsage: {
+            ...c.modelUsage,
+            intentRecognition: settings.model_usage_intent || c.modelUsage.intentRecognition,
+            dailyChat: settings.model_usage_chat || c.modelUsage.dailyChat,
+            multiRoleScript: settings.model_usage_script || c.modelUsage.multiRoleScript
+          }
+        }));
+        console.log('[AI] REST 加載用途分配成功');
+        
+        // 同時加載其他持久化設置
+        if (settings.tts_enabled !== undefined) {
+          // 觸發事件供組件消費
+          window.dispatchEvent(new CustomEvent('ai-settings-loaded', { detail: settings }));
+        }
+        return;
+      }
+    } catch (e) {
+      console.warn('[AI] REST 加載用途失敗，fallback IPC:', e);
+    }
     this.ipcService.send('get-model-usage', {});
+  }
+
+  /**
+   * 🔧 P0-2: 一鍵保存模型配置頁全部設置
+   * 包含：模型用途分配 + TTS + 其他通用設置
+   */
+  async saveAllModelTabSettings(extraSettings: Record<string, any> = {}): Promise<boolean> {
+    const usage = this.config().modelUsage;
+    const allSettings: Record<string, any> = {
+      model_usage_intent: usage.intentRecognition,
+      model_usage_chat: usage.dailyChat,
+      model_usage_script: usage.multiRoleScript,
+      ...extraSettings
+    };
+    console.log('[AI] 一鍵保存模型配置頁設置:', allSettings);
+    const ok = await this.aiSettings.saveSettings(allSettings);
+    if (ok) {
+      this.toastService.success('模型配置已保存');
+    }
+    return ok;
+  }
+
+  /**
+   * 🔧 P0-2: 保存引擎概覽頁設置（自動聊天、模式等）
+   */
+  async saveQuickTabSettings(settings: Record<string, any>): Promise<boolean> {
+    console.log('[AI] 保存引擎概覽設置:', settings);
+    const ok = await this.aiSettings.saveSettings(settings);
+    if (ok) {
+      this.toastService.success('引擎設置已保存');
+    }
+    return ok;
+  }
+
+  /**
+   * 🔧 P0-2: 標記有未保存更改
+   */
+  markSettingsDirty(): void {
+    this.aiSettings.markDirty('settings');
   }
   
   /**
@@ -668,7 +802,15 @@ export class AICenterService {
   }): Promise<void> {
     console.log('[AI] 保存對話策略:', strategy);
     
-    // 發送到後端
+    // 🔧 P0-2: REST 持久化
+    await this.aiSettings.saveSettings({
+      persona_style: strategy.style,
+      persona_length: strategy.responseLength,
+      persona_emoji: strategy.useEmoji ? 1 : 0,
+      persona_custom: strategy.customPersona
+    });
+    
+    // 兼容 IPC
     this.ipcService.send('save-conversation-strategy', strategy);
     
     // 同時更新本地狀態

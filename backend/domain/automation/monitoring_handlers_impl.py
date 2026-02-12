@@ -1351,7 +1351,11 @@ async def handle_get_system_status(self):
         self.send_event("system-status", {'error': str(e)})
 
 async def handle_get_monitored_groups(self):
-    """獲取所有監控群組列表（附帶健康狀態）"""
+    """獲取所有監控群組列表（附帶健康狀態）
+    
+    🔧 修復：同時 return 結果，供 HTTP/Web 模式使用（GET /api/v1/groups 需要響應體包含 groups，
+    否則前端只收到 { success: true }，會把 result 當成 groups 導致列表變空）。
+    """
     try:
         groups = await db.get_all_monitored_groups()
         
@@ -1371,10 +1375,14 @@ async def handle_get_monitored_groups(self):
             if g.get('is_active', True):
                 health["active"] += 1
         
-        self.send_event("get-groups-result", {"groups": groups, "health": health})
+        payload = {"groups": groups, "health": health}
+        self.send_event("get-groups-result", payload)
+        # 供 HTTP 響應體返回，避免 Web 模式下前端收不到 groups
+        return {"success": True, "groups": groups, "health": health}
     except Exception as e:
         self.send_log(f"❌ 獲取監控群組失敗: {e}", "error")
         self.send_event("get-groups-result", {"groups": [], "error": str(e)})
+        return {"success": False, "groups": [], "error": str(e)}
 
 async def handle_pause_monitoring(self, payload: Dict[str, Any]):
     """暫停監控群組"""

@@ -391,12 +391,21 @@ async def handle_analyze_time_effectiveness(self, payload: Dict[str, Any]):
         self.send_event("time-analysis", {"success": False, "error": str(e)})
 
 async def handle_get_group_collected_stats(self, payload: Dict[str, Any]):
-    """🔧 Phase8-P1: 獲取群組可收集用戶統計（優先讀緩存，fallback 到 COUNT 查詢）"""
+    """🔧 Phase8-P1: 獲取群組可收集用戶統計（優先讀緩存，fallback 到 COUNT 查詢）
+    
+    同時 return 統計結果，供 HTTP/Web 模式使用（前端依賴響應體中的 groupId/collectedUsers/monitoredMessages 更新「監控群組內容」）。
+    """
     import sys
     
     group_id = payload.get('groupId')
     telegram_id = payload.get('telegramId')
     use_cache = payload.get('useCache', True)  # 默認使用緩存
+    
+    def _payload(gid, users, messages, from_cache=False):
+        d = {"groupId": gid, "collectedUsers": users, "monitoredMessages": messages}
+        if from_cache:
+            d["fromCache"] = True
+        return d
     
     try:
         from database import db
@@ -417,13 +426,9 @@ async def handle_get_group_collected_stats(self, payload: Dict[str, Any]):
                     cm = cached['cached_msg_count'] if isinstance(cached, dict) else 0
                     cu = cached['cached_user_count'] if isinstance(cached, dict) else 0
                     if cm > 0:
-                        self.send_event("group-collected-stats", {
-                            "groupId": group_id,
-                            "collectedUsers": cu,
-                            "monitoredMessages": cm,
-                            "fromCache": True
-                        })
-                        return
+                        out = _payload(group_id, cu, cm, from_cache=True)
+                        self.send_event("group-collected-stats", out)
+                        return {"success": True, **out}
             except Exception:
                 pass  # 列可能不存在，繼續查詢
         
@@ -488,8 +493,10 @@ async def handle_get_group_collected_stats(self, payload: Dict[str, Any]):
                         cu_count = max(cu_count, c)
                 except Exception:
                     pass
-        
-        final_users = cu_count if cu_count > 0 else collected_users
+            
+            final_users = cu_count if cu_count > 0 else collected_users
+        else:
+            final_users = collected_users
         
         # 🔧 Phase8-P1-2: 寫入緩存
         if group_id and monitored_messages > 0:
@@ -501,21 +508,17 @@ async def handle_get_group_collected_stats(self, payload: Dict[str, Any]):
             except Exception:
                 pass
         
-        self.send_event("group-collected-stats", {
-            "groupId": group_id,
-            "collectedUsers": final_users,
-            "monitoredMessages": monitored_messages
-        })
+        out = _payload(group_id, final_users, monitored_messages)
+        self.send_event("group-collected-stats", out)
+        return {"success": True, **out}
         
     except Exception as e:
         import traceback
         traceback.print_exc(file=sys.stderr)
-        self.send_event("group-collected-stats", {
-            "groupId": group_id,
-            "collectedUsers": 0,
-            "monitoredMessages": 0,
-            "error": str(e)
-        })
+        out = _payload(group_id, 0, 0)
+        out["error"] = str(e)
+        self.send_event("group-collected-stats", out)
+        return {"success": False, **out}
 
 async def handle_get_history_collection_stats(self, payload: Dict[str, Any]):
     """🆕 獲取歷史消息收集統計（用於收集對話框）"""

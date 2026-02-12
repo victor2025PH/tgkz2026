@@ -6,6 +6,17 @@ import { LogEntry, TelegramAccount, CapturedLead, KeywordConfig, QueueStatus, Qu
 import { TimeSeriesData } from '../analytics-charts.component';
 
 export function setupCoreIpcHandlers(this: any): void {
+    // 🔧 超時命令 → 功能名稱映射，方便給用戶看得懂的提示
+    const getCommandDisplayName = (command: string): string => {
+      const map: Record<string, string> = {
+        'get-account-recommendations': '獲取監控帳號推薦',
+        'reassign-group-account':      '切換監控帳號',
+        'start-monitoring':            '啟動監控',
+        'collect-users-from-history':  '從歷史消息收集用戶',
+      };
+      return map[command] || `操作 (${command})`;
+    };
+
     // 🆕 P0 優化：監聽連接確認事件（HTTP 成功即連接成功）
     this.ipcService.on('connection-confirmed', (data: { mode: string; timestamp: number }) => {
       console.log('[Frontend] ✅ Connection confirmed:', data);
@@ -42,10 +53,14 @@ export function setupCoreIpcHandlers(this: any): void {
       
       if (silentCommands.includes(data.command)) return;
       
-      // 超時提示用較溫和的方式
+      // 超時提示用較溫和的方式（帶功能名稱 + 背景說明）
       if (data.isTimeout) {
+        const feature = getCommandDisplayName(data.command);
         console.warn(`[App] Command timeout: ${data.command}`, data.error);
-        this.toastService.warning(`操作超時：${data.error}`, 5000);
+        this.toastService.warning(
+          `${feature} 操作超時，後端可能仍在處理，請稍候片刻後點「刷新」查看最新結果。`,
+          8000
+        );
       } else {
         console.error(`[App] Command error: ${data.command}`, data.error);
         this.toastService.error(`操作失敗 (${data.command}): ${data.error}`, 5000);

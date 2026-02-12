@@ -570,6 +570,20 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
     
     # ==================== 核心方法 ====================
     
+    async def _execute_command_with_tenant(self, request, command: str, payload: dict = None) -> dict:
+        """在當前請求的租戶上下文中執行命令（用於 HTTP 路由，確保多用戶數據隔離）"""
+        tenant = request.get('tenant') if request else None
+        token = None
+        try:
+            if tenant:
+                from core.tenant_context import set_current_tenant, clear_current_tenant
+                token = set_current_tenant(tenant)
+            return await self._execute_command(command, payload)
+        finally:
+            if token:
+                from core.tenant_context import clear_current_tenant
+                clear_current_tenant(token)
+
     async def _execute_command(self, command: str, payload: dict = None) -> dict:
         """執行命令 - 核心方法
         
@@ -875,27 +889,33 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
     # ==================== 關鍵詞 ====================
     
     async def get_keywords(self, request):
-        """獲取關鍵詞集"""
-        result = await self._execute_command('get-keyword-sets')
+        """獲取關鍵詞集（多租戶：在請求租戶上下文中執行）"""
+        result = await self._execute_command_with_tenant(request, 'get-keyword-sets')
         return self._json_response(result)
     
     async def add_keyword_set(self, request):
-        """添加關鍵詞集"""
-        data = await request.json()
-        result = await self._execute_command('add-keyword-set', data)
+        """添加關鍵詞集（多租戶：注入 owner 並在租戶上下文中執行）"""
+        data = await request.json() or {}
+        tenant = request.get('tenant')
+        if tenant and getattr(tenant, 'user_id', None):
+            data['owner_user_id'] = tenant.user_id
+        result = await self._execute_command_with_tenant(request, 'add-keyword-set', data)
         return self._json_response(result)
     
     # ==================== 群組 ====================
     
     async def get_groups(self, request):
-        """獲取群組列表"""
-        result = await self._execute_command('get-monitored-groups')
+        """獲取群組列表（多租戶：在請求租戶上下文中執行）"""
+        result = await self._execute_command_with_tenant(request, 'get-monitored-groups')
         return self._json_response(result)
     
     async def add_group(self, request):
-        """添加群組"""
-        data = await request.json()
-        result = await self._execute_command('add-group', data)
+        """添加群組（多租戶：注入 owner 並在租戶上下文中執行）"""
+        data = await request.json() or {}
+        tenant = request.get('tenant')
+        if tenant and getattr(tenant, 'user_id', None):
+            data['owner_user_id'] = tenant.user_id
+        result = await self._execute_command_with_tenant(request, 'add-group', data)
         return self._json_response(result)
     
     # ==================== 設置 ====================
@@ -1174,12 +1194,8 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
     # P11-1: async def get_system_info(self, request):... -> mixin
     
     async def get_initial_state(self, request):
-        """獲取初始狀態"""
-        # 🔍 調試：檢查 Authorization header
-        auth_header = request.headers.get('Authorization', '')
-        logger.info(f"[Debug] get_initial_state - Auth header: {auth_header[:50] if auth_header else 'MISSING'}...")
-        
-        result = await self._execute_command('get-initial-state')
+        """獲取初始狀態（多租戶：在請求租戶上下文中執行，確保數據隔離）"""
+        result = await self._execute_command_with_tenant(request, 'get-initial-state')
         return self._json_response(result)
     
     # ==================== WebSocket ====================

@@ -8,7 +8,10 @@
  * 3. 廣播狀態更新到所有訂閱者
  */
 import { Injectable, signal, computed, inject, OnDestroy } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { ElectronIpcService } from '../electron-ipc.service';
+import { AuthEventsService } from '../core/auth-events.service';
+import { AuthService } from '../core/auth.service';
 
 // 帳號數據接口
 export interface MonitoringAccount {
@@ -106,7 +109,10 @@ export interface ConfigStatus {
 })
 export class MonitoringStateService implements OnDestroy {
   private ipcService = inject(ElectronIpcService);
-  
+  private authEvents = inject(AuthEventsService);
+  private authService = inject(AuthService, { optional: true });
+  private authSubscription: Subscription | null = null;
+
   // === 核心數據 Signals ===
   private _accounts = signal<MonitoringAccount[]>([]);
   private _groups = signal<MonitoringGroup[]>([]);
@@ -265,10 +271,26 @@ export class MonitoringStateService implements OnDestroy {
   
   constructor() {
     this.setupListeners();
+    this.authSubscription = this.authEvents.authEvents$.subscribe(event => {
+      if (event.type === 'logout') {
+        this.clearMonitoringData();
+      }
+    });
   }
-  
+
   ngOnDestroy() {
+    this.authSubscription?.unsubscribe();
     this.listeners.forEach(cleanup => cleanup());
+  }
+
+  /** 登出時清空監控數據，避免下一用戶看到上一用戶的數據 */
+  clearMonitoringData(): void {
+    this._accounts.set([]);
+    this._groups.set([]);
+    this._keywordSets.set([]);
+    this._chatTemplates.set([]);
+    this._triggerRules.set([]);
+    this._lastUpdated.set(null);
   }
   
   private setupListeners() {
@@ -310,6 +332,16 @@ export class MonitoringStateService implements OnDestroy {
     });
     this.listeners.push(cleanup3b);
     
+    // 🔧 FIX: Web/監控中心使用的事件為 monitored-groups-result，需同步到 StateService
+    const cleanup3c = this.ipcService.on('monitored-groups-result', (data: any) => {
+      const groups = data.groups || data.monitoredGroups;
+      if (groups && Array.isArray(groups)) {
+        console.log('[StateService] monitored-groups-result received:', groups.length, 'groups');
+        this.updateGroups(groups);
+      }
+    });
+    this.listeners.push(cleanup3c);
+    
     // 🔧 修復：監聽添加/移除群組的操作結果事件
     const cleanup3c = this.ipcService.on('monitored-group-added', (data: any) => {
       if (data.success) {
@@ -320,8 +352,15 @@ export class MonitoringStateService implements OnDestroy {
     });
     this.listeners.push(cleanup3c);
     
-    // 監聯 keyword-sets 更新
+    // 監聯 keyword-sets 更新（多租戶：僅在響應屬於當前用戶時應用）
     const cleanup4 = this.ipcService.on('get-keyword-sets-result', (data: any) => {
+      const responseOwnerId = data?.owner_user_id;
+      const currentUserId = this.authService?.user()?.id;
+      if (responseOwnerId !== undefined && responseOwnerId !== '' && currentUserId != null) {
+        if (String(responseOwnerId) !== String(currentUserId)) {
+          return;
+        }
+      }
       if (data.keywordSets) {
         this.updateKeywordSets(data.keywordSets);
       }
@@ -474,7 +513,14 @@ export class MonitoringStateService implements OnDestroy {
   
   private processInitialState(data: any) {
     console.log('[StateService] Processing initial state, keys:', Object.keys(data));
-    
+    const responseOwnerId = data?.owner_user_id;
+    const currentUserId = this.authService?.user()?.id;
+    if (responseOwnerId !== undefined && responseOwnerId !== '' && currentUserId !== undefined && currentUserId !== null) {
+      if (String(responseOwnerId) !== String(currentUserId)) {
+        console.warn('[StateService] Ignoring initial-state: owner_user_id does not match current user');
+        return;
+      }
+    }
     if (data.accounts) {
       this.updateAccounts(data.accounts);
     }

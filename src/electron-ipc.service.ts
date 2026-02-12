@@ -1298,9 +1298,11 @@ export class ElectronIpcService implements OnDestroy {
     
     // ==================== 初始狀態 ====================
     if (command === 'get-initial-state') {
+      const ownerUserId = result.owner_user_id ?? '';
       // 觸發 initial-state-core 事件
       if (result.accounts || result.settings) {
         this.triggerEvent('initial-state-core', {
+          owner_user_id: ownerUserId,
           accounts: result.accounts || [],
           settings: result.settings || {},
           isMonitoring: result.isMonitoring || false
@@ -1310,6 +1312,7 @@ export class ElectronIpcService implements OnDestroy {
       // 觸發 initial-state-config 事件
       if (result.keywordSets || result.monitoredGroups || result.campaigns) {
         this.triggerEvent('initial-state-config', {
+          owner_user_id: ownerUserId,
           keywordSets: result.keywordSets || [],
           monitoredGroups: result.monitoredGroups || [],
           campaigns: result.campaigns || [],
@@ -1322,6 +1325,7 @@ export class ElectronIpcService implements OnDestroy {
       // 觸發 initial-state-data 事件
       if (result.leads || result.logs) {
         this.triggerEvent('initial-state-data', {
+          owner_user_id: ownerUserId,
           leads: result.leads || [],
           leadsTotal: result.leadsTotal || 0,
           leadsHasMore: result.leadsHasMore || false,

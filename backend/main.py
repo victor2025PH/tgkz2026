@@ -44,7 +44,7 @@ from text_utils import safe_json_dumps, sanitize_dict
 from lazy_imports import lazy_imports, get_lazy_imports
 
 # Phase 9-3: BackendService Mixins
-from service import InitStartupMixin, SendQueueMixin, AiServiceMixin, ConfigExecMixin
+from service import InitStartupMixin, SendQueueMixin, AiServiceMixin, ConfigExecMixin, LeadActionsMixin
 
 # 註冊所有非核心模塊（只註冊，不加載）
 # === Telegram 服務 ===
@@ -954,7 +954,7 @@ def _register_all_handlers(cls):
             setattr(cls, method_name, _make(module_path, func_name, takes_payload, method_name))
 
 
-class BackendService(InitStartupMixin, SendQueueMixin, AiServiceMixin, ConfigExecMixin):
+class BackendService(InitStartupMixin, SendQueueMixin, AiServiceMixin, ConfigExecMixin, LeadActionsMixin):
     """Main backend service handling commands and events"""
     
     def __init__(self):

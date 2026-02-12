@@ -313,15 +313,31 @@ async def handle_start_monitoring(self):
                     # 新 Lead 總是發送問候
                     should_greet = True
                 
-                # AI Auto Chat: Handle greeting (for new leads or existing leads not yet contacted)
+                # P0: 各步驟獨立 try/except，避免單步失敗導致後續不執行
                 if should_greet:
-                    await self._handle_ai_auto_greeting(lead_data, lead_id)
+                    try:
+                        await self._handle_ai_auto_greeting(lead_data, lead_id)
+                    except Exception as greeting_err:
+                        print(f"[Backend] greeting_error lead_id={lead_id}: {greeting_err}", file=sys.stderr)
+                        self.send_log(f"[問候] 失敗: {greeting_err}", "error")
+                        await db.add_log(f"Lead 問候失敗 lead_id={lead_id}: {greeting_err}", "error")
+                        self.send_event("monitoring-error", {"step": "greeting", "leadId": lead_id, "error": str(greeting_err)})
                 
-                # 執行匹配的觸發規則（新系統）
-                await self.execute_matching_trigger_rules(lead_id, lead_data)
+                try:
+                    await self.execute_matching_trigger_rules(lead_id, lead_data)
+                except Exception as trigger_err:
+                    print(f"[Backend] trigger_rules_error lead_id={lead_id}: {trigger_err}", file=sys.stderr)
+                    self.send_log(f"[觸發規則] 失敗: {trigger_err}", "error")
+                    await db.add_log(f"觸發規則失敗 lead_id={lead_id}: {trigger_err}", "error")
+                    self.send_event("monitoring-error", {"step": "trigger_rules", "leadId": lead_id, "error": str(trigger_err)})
                 
-                # Check for matching campaigns and execute them (舊系統，保持兼容)
-                await self.execute_matching_campaigns(lead_id, lead_data)
+                try:
+                    await self.execute_matching_campaigns(lead_id, lead_data)
+                except Exception as campaign_err:
+                    print(f"[Backend] campaigns_error lead_id={lead_id}: {campaign_err}", file=sys.stderr)
+                    self.send_log(f"[活動] 失敗: {campaign_err}", "error")
+                    await db.add_log(f"活動執行失敗 lead_id={lead_id}: {campaign_err}", "error")
+                    self.send_event("monitoring-error", {"step": "campaigns", "leadId": lead_id, "error": str(campaign_err)})
             
             except Exception as e:
                 import sys

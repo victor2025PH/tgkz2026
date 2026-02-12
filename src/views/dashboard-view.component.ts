@@ -26,6 +26,7 @@ export interface SystemStatus {
   monitoring?: { groups: number; active: boolean };
   ai?: { enabled: boolean; mode?: string };
   campaigns?: { active: number; total: number };
+  triggerRules?: { active: number; total: number };
   keywords?: { sets: number };
   templates?: { active: number; total: number };
 }
@@ -145,18 +146,18 @@ export interface SystemStatus {
               </div>
             </div>
             
-            <!-- 觸發規則狀態 -->
+            <!-- 觸發規則狀態（優先顯示 triggerRules，與「觸發規則」頁一致） -->
             <div class="rounded-lg p-4 text-center relative overflow-hidden" style="background-color: var(--bg-card);">
-              @if ((status().campaigns?.active || 0) > 0) {
+              @if (triggerRulesActiveCount() > 0) {
                 <div class="absolute inset-0 bg-gradient-to-t from-orange-500/10 to-transparent"></div>
               }
               <div class="relative">
                 <div class="text-2xl mb-1">⚡</div>
                 <div class="text-sm" style="color: var(--text-muted);">觸發規則</div>
-                <div class="text-xl font-bold" [style.color]="(status().campaigns?.active || 0) > 0 ? 'var(--success)' : 'var(--warning)'">
-                  {{ status().campaigns?.active || 0 }}/{{ status().campaigns?.total || 0 }}
+                <div class="text-xl font-bold" [style.color]="triggerRulesActiveCount() > 0 ? 'var(--success)' : 'var(--warning)'">
+                  {{ triggerRulesActiveCount() }}/{{ triggerRulesTotalCount() }}
                 </div>
-                @if ((status().campaigns?.active || 0) === 0) {
+                @if (triggerRulesTotalCount() === 0) {
                   <div class="text-xs text-yellow-400 mt-1 cursor-pointer hover:underline" (click)="navigateTo('trigger-rules')">
                     ⚠️ 需配置規則
                   </div>
@@ -394,6 +395,18 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
   });
   
   totalAccountsCount = computed(() => this.accountService.accounts().length);
+  
+  /** 觸發規則數量：優先使用 triggerRules，與後端/觸發規則頁一致 */
+  triggerRulesActiveCount = computed(() => {
+    const tr = this.status().triggerRules;
+    if (tr && typeof tr.active === 'number') return tr.active;
+    return this.status().campaigns?.active ?? 0;
+  });
+  triggerRulesTotalCount = computed(() => {
+    const tr = this.status().triggerRules;
+    if (tr && typeof tr.total === 'number') return tr.total;
+    return this.status().campaigns?.total ?? 0;
+  });
   
   private ipcCleanup: (() => void)[] = [];
   

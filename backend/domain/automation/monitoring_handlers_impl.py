@@ -1344,11 +1344,13 @@ async def handle_get_system_status(self):
         }
         
         self.send_event("system-status", status)
-        
+        return status
     except Exception as e:
         import sys
         print(f"[Backend] 獲取系統狀態錯誤: {e}", file=sys.stderr)
-        self.send_event("system-status", {'error': str(e)})
+        err_payload = {'error': str(e)}
+        self.send_event("system-status", err_payload)
+        return err_payload
 
 async def handle_get_monitored_groups(self):
     """獲取所有監控群組列表（附帶健康狀態）
@@ -1482,7 +1484,7 @@ async def handle_get_monitoring_status(self):
         campaigns = await db.get_all_campaigns()
         active_campaigns = [c for c in campaigns if c.get('isActive') or c.get('is_active')]
         
-        self.send_event("monitoring-status", {
+        payload = {
             "success": True,
             "isMonitoring": self.is_monitoring,
             "listenerAccounts": monitoring_status,
@@ -1491,12 +1493,13 @@ async def handle_get_monitoring_status(self):
             "keywordSets": len(keyword_sets),
             "activeCampaigns": len(active_campaigns),
             "totalCampaigns": len(campaigns)
-        })
+        }
+        self.send_event("monitoring-status", payload)
+        return payload
     except Exception as e:
-        self.send_event("monitoring-status", {
-            "success": False,
-            "error": str(e)
-        })
+        err_payload = {"success": False, "error": str(e)}
+        self.send_event("monitoring-status", err_payload)
+        return err_payload
 
 async def handle_check_monitoring_health(self):
     """檢查監控健康狀態"""

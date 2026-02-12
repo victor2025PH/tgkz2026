@@ -415,6 +415,12 @@ export class MonitoringManagementService {
       console.log('[MonitoringManagement] monitoring-status:', isActive);
       this.monitoringActive.set(isActive);
     });
+    // 從 system-status 同步監控狀態（刷新/HTTP 模式時可還原「運行中」）
+    this.ipcService.on('system-status', (data: { monitoring?: { active?: boolean }; error?: string }) => {
+      if (data.error) return;
+      const active = data.monitoring?.active ?? false;
+      this.monitoringActive.set(active);
+    });
     this.ipcService.on('group-added-to-monitor', (data: any) => this.handleGroupAdded(data));
     this.ipcService.on('keyword-set-created', (data: any) => this.handleKeywordSetCreated(data));
     this.ipcService.on('batch-join-progress', (data: any) => this.handleBatchJoinProgress(data));

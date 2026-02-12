@@ -103,15 +103,10 @@ async def select_best_account(telegram_manager, db_conn, operation: str = 'join'
     if len(connected) == 1:
         return list(connected.keys())[0]
     
-    # 從 DB 獲取角色信息
+    # 從 DB 獲取角色信息（統一走 get_all_accounts，多租戶安全）
     try:
-        await db_conn.connect()
-        accounts = await db_conn.fetch_all(
-            "SELECT phone, role, health_score FROM accounts WHERE phone IN ({}) AND status = 'Online'".format(
-                ','.join(['?' for _ in connected])
-            ),
-            tuple(connected.keys())
-        )
+        all_accounts = await db_conn.get_all_accounts()
+        accounts = [a for a in all_accounts if a.get('phone') in connected]
         role_map = {a['phone']: a.get('role', 'Unassigned') for a in accounts} if accounts else {}
         health_map = {a['phone']: a.get('health_score', 100) for a in accounts} if accounts else {}
     except Exception:
@@ -165,11 +160,8 @@ async def get_account_recommendations(telegram_manager, db_conn) -> List[Dict[st
     recommendations = []
     
     try:
-        await db_conn.connect()
-        accounts = await db_conn.fetch_all(
-            "SELECT id, phone, role, status, health_score, username, first_name "
-            "FROM accounts ORDER BY id"
-        )
+        # 統一使用 get_all_accounts（多租戶安全），避免直接查 accounts 表
+        accounts = await db_conn.get_all_accounts()
         if not accounts:
             return []
         

@@ -889,15 +889,11 @@ async def handle_extract_members(self, payload: Dict[str, Any]):
             if not phone and self.telegram_manager.clients:
                 try:
                     from database import db as _db
-                    await _db.connect()
                     connected_phones = [p for p, c in self.telegram_manager.clients.items() if c and c.is_connected]
                     if connected_phones:
-                        accounts = await _db.fetch_all(
-                            "SELECT phone, role FROM accounts WHERE phone IN ({}) AND status = 'Online'".format(
-                                ','.join(['?' for _ in connected_phones])
-                            ),
-                            tuple(connected_phones)
-                        )
+                        # 統一使用 get_all_accounts，多租戶安全，然後按連接中的 phone 過濾
+                        all_accounts = await _db.get_all_accounts()
+                        accounts = [a for a in all_accounts if a.get('phone') in connected_phones]
                         role_map = {a['phone']: a.get('role', 'Unassigned') for a in accounts} if accounts else {}
                         
                         # 優先 Listener（監控號通常已加入群組）

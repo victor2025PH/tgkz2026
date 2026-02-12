@@ -21,17 +21,47 @@ from database import db
 
 # ==================== Trigger Rules Handlers ====================
 
+def _trigger_rule_overlap_hint(rules: List[Dict]) -> None:
+    """P2：為每條規則附加重疊提示（相同關鍵詞集+同一模板時可能重複發送）。原地修改 rules。"""
+    def _kw_set(r):
+        ids = r.get('keyword_set_ids') or r.get('keywordSetIds') or []
+        return tuple(sorted(ids)) if isinstance(ids, list) else ()
+    def _tpl_id(r):
+        cfg = r.get('response_config') or r.get('responseConfig') or {}
+        if isinstance(cfg, str):
+            try:
+                cfg = json.loads(cfg)
+            except Exception:
+                cfg = {}
+        return cfg.get('templateId') or cfg.get('template_id')
+    for r in rules:
+        r['overlapWarning'] = ''
+        my_kw = _kw_set(r)
+        my_tpl = _tpl_id(r)
+        if not my_kw and my_tpl is None:
+            continue
+        others = [o for o in rules if o.get('id') != r.get('id') and (o.get('is_active') or o.get('isActive'))]
+        overlap_names = []
+        for o in others:
+            if _kw_set(o) == my_kw and _tpl_id(o) == my_tpl:
+                overlap_names.append(o.get('name', o.get('id', '')))
+        if overlap_names:
+            r['overlapWarning'] = f"與規則「{'」「'.join(overlap_names[:3])}{'等' if len(overlap_names) > 3 else ''}」使用相同關鍵詞集與模板，同一事件僅會執行優先級最高的一條。"
+
+
 async def handle_get_trigger_rules(self):
-    """獲取所有觸發規則"""
+    """獲取所有觸發規則。P2：附加 overlapWarning 供前端顯示重疊提示。"""
     import sys
     print("[Backend] handle_get_trigger_rules called", file=sys.stderr)
     try:
         rules = await db.get_all_trigger_rules()
+        _trigger_rule_overlap_hint(rules)
         print(f"[Backend] Loaded {len(rules)} trigger rules", file=sys.stderr)
         self.send_event("trigger-rules-result", {
             "success": True,
             "rules": rules
         })
+        return {"success": True, "rules": rules}
     except Exception as e:
         import traceback
         print(f"[Backend] ❌ Error getting trigger rules: {e}", file=sys.stderr)
@@ -42,6 +72,7 @@ async def handle_get_trigger_rules(self):
             "rules": [],
             "error": str(e)
         })
+        return {"success": False, "rules": [], "error": str(e)}
 
 
 async def handle_get_trigger_rule(self, payload: Dict[str, Any]):

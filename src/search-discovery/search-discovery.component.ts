@@ -17,6 +17,7 @@ import { AccountManagementService } from '../services';
 import { DialogService } from '../services/dialog.service';
 import { OperationHistoryService } from '../services/operation-history.service';
 import { NavBridgeService } from '../services/nav-bridge.service';
+import { SavedResourcesService } from '../services/saved-resources.service';
 
 // 資源類型定義
 export interface DiscoveredResource {
@@ -31,6 +32,7 @@ export interface DiscoveredResource {
   overall_score?: number;
   is_saved?: boolean;
   invite_link?: string;
+  link?: string;             // 🔧 原始連結（來自 Jiso 等第三方）
   discovery_source?: string;
   discovery_keyword?: string;
   created_at?: string;
@@ -39,6 +41,22 @@ export interface DiscoveredResource {
   member_change?: number;    // 成員數變化（與上次相比）
   // 🔧 P0-1: 已加入狀態相關
   joined_phone?: string;     // 加入時使用的帳號電話
+  // 🔧 可達性標記
+  accessibility?: 'public' | 'invite_only' | 'id_only' | 'unknown';
+  source?: string;           // 搜索來源（telegram/jiso/local）
+  sources?: string[];        // 🔧 Phase3: 多來源合併後的所有來源
+  // 🔧 Phase3: 標籤系統
+  tags?: string[];
+}
+
+// 🔧 渠道搜索狀態
+export interface SourceStatus {
+  source: string;
+  label: string;
+  status: 'waiting' | 'searching' | 'completed' | 'failed' | 'timeout';
+  count: number;
+  elapsed_ms?: number;
+  error?: string;
 }
 
 // 搜索渠道類型
@@ -78,6 +96,40 @@ export interface Account {
                         class="px-3 py-1.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-400 hover:from-cyan-500/30 hover:to-blue-500/30 rounded-lg border border-cyan-500/50 transition-all flex items-center gap-1">
                   ➕ 添加資源
                 </button>
+                @if (mergedResources().length > 0) {
+                  <button (click)="exportResults()"
+                          class="px-3 py-1.5 bg-green-500/20 text-green-400 hover:bg-green-500/30 rounded-lg text-sm transition-all flex items-center gap-1">
+                    📤 導出
+                  </button>
+                  <button (click)="checkResourcesHealth()"
+                          [disabled]="healthCheckRunning()"
+                          class="px-3 py-1.5 bg-teal-500/20 text-teal-400 hover:bg-teal-500/30 rounded-lg text-sm transition-all flex items-center gap-1 disabled:opacity-40 disabled:cursor-wait"
+                          title="驗證收藏資源的可達性">
+                    {{ healthCheckRunning() ? '⏳ 檢查中...' : '🏥 健康檢查' }}
+                  </button>
+                  <button (click)="batchUnsaveAll()"
+                          class="px-3 py-1.5 bg-red-500/10 text-red-400/60 hover:bg-red-500/20 hover:text-red-400 rounded-lg text-sm transition-all flex items-center gap-1">
+                    🗑️ 清空收藏
+                  </button>
+                }
+                <!-- 🔧 Phase3: 標籤篩選 -->
+                @if (allTags().length > 0) {
+                  <div class="flex items-center gap-1 ml-2 pl-2 border-l border-slate-700/50">
+                    <span class="text-xs text-slate-500">標籤:</span>
+                    <button (click)="filterByTag.set('')"
+                            class="px-2 py-0.5 rounded text-xs transition-all"
+                            [ngClass]="{'bg-cyan-500/20 text-cyan-400': !filterByTag(), 'bg-slate-700/30 text-slate-500 hover:text-slate-300': filterByTag()}">
+                      全部
+                    </button>
+                    @for (tag of allTags(); track tag) {
+                      <button (click)="filterByTag.set(filterByTag() === tag ? '' : tag)"
+                              class="px-2 py-0.5 rounded text-xs transition-all"
+                              [ngClass]="{'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/30': filterByTag() === tag, 'bg-slate-700/30 text-slate-400 hover:text-slate-200': filterByTag() !== tag}">
+                        🏷️ {{ tag }}
+                      </button>
+                    }
+                  </div>
+                }
               } @else {
                 <span class="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-lg">
                   {{ mergedResources().length }} 結果
@@ -188,18 +240,45 @@ export interface Account {
           <div class="flex-1 relative">
             <input type="text" 
                    [(ngModel)]="searchQuery"
-                   (keyup.enter)="doSearch()"
-                   (focus)="showSuggestions.set(true)"
+                   (keyup.enter)="doSearch(); showSuggestions.set(false)"
+                   (input)="onSearchInputChange($any($event.target).value)"
+                   (focus)="onSearchInputChange(searchQuery); showSuggestions.set(true)"
                    (blur)="hideSuggestions()"
                    placeholder="輸入關鍵詞搜索群組和頻道..."
                    class="w-full bg-slate-700/50 border border-slate-600 rounded-xl py-3 px-4 pl-12 text-white text-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all">
             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">🔍</span>
             
-            <!-- 搜索建議下拉 -->
+            <!-- 🔧 Phase3: 智能搜索建議下拉 -->
             @if (showSuggestions() && !mergedSearching()) {
-              <div class="absolute top-full left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+              <div class="absolute top-full left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden max-h-80 overflow-y-auto">
+                <!-- 後端智能推薦（有輸入時顯示） -->
+                @if (keywordSuggestions().length > 0) {
+                  <div class="p-3 border-b border-slate-700/50">
+                    <div class="text-xs text-slate-500 mb-2">💡 智能推薦</div>
+                    @for (sg of keywordSuggestions(); track sg.keyword) {
+                      <button (mousedown)="selectSuggestion(sg.keyword)" 
+                              class="w-full text-left px-3 py-2 hover:bg-cyan-500/10 rounded-lg text-sm transition-all flex items-center justify-between group">
+                        <div class="flex items-center gap-2">
+                          <span class="text-white group-hover:text-cyan-400">{{ sg.keyword }}</span>
+                          @if (sg.type === 'related') {
+                            <span class="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs">相關</span>
+                          } @else if (sg.type === 'popular') {
+                            <span class="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded text-xs">熱門</span>
+                          } @else if (sg.type === 'recent') {
+                            <span class="px-1.5 py-0.5 bg-slate-600/50 text-slate-400 rounded text-xs">最近</span>
+                          }
+                        </div>
+                        @if (sg.total_results > 0) {
+                          <span class="text-xs text-slate-500">{{ sg.total_results }} 結果</span>
+                        }
+                      </button>
+                    }
+                  </div>
+                }
+                
+                <!-- 最近搜索（本地歷史） -->
                 @if (mergedHistoryKeywords().length > 0) {
-                  <div class="p-3 border-b border-slate-700">
+                  <div class="p-3 border-b border-slate-700/50">
                     <div class="text-xs text-slate-500 mb-2">🕐 最近搜索</div>
                     <div class="flex flex-wrap gap-2">
                       @for (kw of mergedHistoryKeywords().slice(0, 5); track kw) {
@@ -265,6 +344,11 @@ export interface Account {
                     class="text-xs px-2 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded transition-all">
               推薦組合
             </button>
+            <button (click)="forceRefreshSearch()"
+                    class="text-xs px-2 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded transition-all"
+                    title="忽略緩存重新搜索">
+              🔄 強制刷新
+            </button>
             <button (click)="clearResults()"
                     class="text-xs px-2 py-1 bg-slate-600/50 hover:bg-slate-600 text-slate-400 rounded transition-all">
               清空結果
@@ -290,17 +374,39 @@ export interface Account {
               <span class="text-slate-400 text-sm flex items-center gap-3">
                 共 <span class="font-bold text-white">{{ mergedResources().length }}</span> 個結果
                 <!-- 🆕 顯示新發現/已知統計 -->
+                @if (isFromCache()) {
+                  <span class="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded text-xs">
+                    📋 緩存
+                  </span>
+                }
                 @if (newDiscoveredCount() > 0 || existingCount() > 0) {
                   <span class="text-green-400 text-xs">🆕 {{ newDiscoveredCount() }} 個新發現</span>
                   <span class="text-slate-500 text-xs">🔄 {{ existingCount() }} 個已知</span>
                 }
               </span>
-              <!-- 🆕 搜索進度提示 -->
-              @if (searchProgress()) {
-                <span class="text-cyan-400 text-sm flex items-center gap-1">
-                  <span class="animate-spin">⏳</span>
-                  {{ searchProgress() }}
-                </span>
+              <!-- 🔧 渠道級搜索進度 -->
+              @if (sourceStatuses().length > 0 && mergedSearching()) {
+                <div class="flex items-center gap-2 flex-wrap">
+                  @for (ss of sourceStatuses(); track ss.source) {
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
+                          [ngClass]="{
+                            'bg-slate-700/50 text-slate-500': ss.status === 'waiting',
+                            'bg-cyan-500/20 text-cyan-400': ss.status === 'searching',
+                            'bg-green-500/20 text-green-400': ss.status === 'completed',
+                            'bg-red-500/20 text-red-400': ss.status === 'failed',
+                            'bg-amber-500/20 text-amber-400': ss.status === 'timeout'
+                          }">
+                      @if (ss.status === 'waiting') { ⏸ }
+                      @else if (ss.status === 'searching') { <span class="animate-spin">⏳</span> }
+                      @else if (ss.status === 'completed') { ✅ }
+                      @else if (ss.status === 'failed') { ❌ }
+                      @else if (ss.status === 'timeout') { ⚠️ }
+                      {{ ss.label }}
+                      @if (ss.count > 0) { ({{ ss.count }}) }
+                    </span>
+                  }
+                  <span class="text-slate-500 text-xs">{{ sourceProgressText() }}</span>
+                </div>
               }
               @if (isFetchingDetails()) {
                 <span class="text-amber-400 text-sm flex items-center gap-1">
@@ -334,12 +440,27 @@ export interface Account {
                       class="px-3 py-1.5 bg-yellow-500/20 text-yellow-400 rounded-lg hover:bg-yellow-500/30 text-sm flex items-center gap-1">
                 ⭐ 批量收藏
               </button>
-              <button (click)="exportResults()" 
-                      [disabled]="filteredResources().length === 0"
-                      class="px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-all"
-                      [class]="filteredResources().length > 0 ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-slate-600/30 text-slate-500 cursor-not-allowed'">
-                📤 導出全部 ({{ filteredResources().length }})
-              </button>
+              <!-- 🔧 Phase3: 導出格式選擇 -->
+              <div class="relative">
+                <button (click)="toggleExportMenu($event)" 
+                        [disabled]="filteredResources().length === 0"
+                        class="px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-all"
+                        [class]="filteredResources().length > 0 ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-slate-600/30 text-slate-500 cursor-not-allowed'">
+                  📤 導出 ({{ filteredResources().length }}) ▾
+                </button>
+                @if (showExportMenu()) {
+                  <div class="absolute top-full right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-30 overflow-hidden min-w-32">
+                    <button (click)="exportResults('csv'); showExportMenu.set(false)"
+                            class="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">
+                      📄 CSV 格式
+                    </button>
+                    <button (click)="exportResults('json'); showExportMenu.set(false)"
+                            class="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">
+                      📋 JSON 格式
+                    </button>
+                  </div>
+                }
+              </div>
             </div>
           </div>
           
@@ -401,6 +522,13 @@ export interface Account {
                            class="rounded border-slate-500 bg-slate-700 text-cyan-500">
                     <span class="text-sm text-slate-300">只顯示有 ID</span>
                   </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" 
+                           [checked]="filterHideUnreachable()"
+                           (change)="filterHideUnreachable.set($any($event.target).checked)"
+                           class="rounded border-slate-500 bg-slate-700 text-cyan-500">
+                    <span class="text-sm text-slate-300">隱藏不可操作群組</span>
+                  </label>
                   <button (click)="resetFilters()"
                           class="text-xs text-slate-400 hover:text-white underline">
                     重置篩選
@@ -451,6 +579,12 @@ export interface Account {
                           class="px-2 py-1 text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded transition-all">
                     📡 批量監控
                   </button>
+                  @if (initialView() === 'resource-center') {
+                    <button (click)="batchUnsaveSelected()" 
+                            class="px-2 py-1 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-all">
+                      🗑️ 取消收藏
+                    </button>
+                  }
                 </div>
               }
             </div>
@@ -480,14 +614,47 @@ export interface Account {
           <!-- 空狀態：資源中心專用 vs 搜索發現 -->
           <div class="flex flex-col items-center justify-center h-full text-center">
             @if (initialView() === 'resource-center') {
-              <div class="max-w-md">
+              <div class="max-w-lg">
                 <div class="text-6xl mb-4">📦</div>
-                <p class="text-slate-300 text-xl mb-2">還沒有收藏資源</p>
-                <p class="text-slate-500 mb-6">在「搜索發現」中搜索並收藏群組/頻道後，會出現在這裡統一管理</p>
+                <p class="text-slate-300 text-xl mb-2">歡迎來到資源中心</p>
+                <p class="text-slate-500 mb-6">這裡是你的群組與頻道資產庫。收藏的資源可在此統一管理、批量操作。</p>
+                
+                <!-- 🔧 3 步引導流程 -->
+                <div class="grid grid-cols-3 gap-4 mb-6 text-sm">
+                  <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                    <div class="text-3xl mb-2">🔍</div>
+                    <div class="text-cyan-400 font-medium mb-1">第一步</div>
+                    <div class="text-slate-400">去搜索發現搜索群組</div>
+                  </div>
+                  <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                    <div class="text-3xl mb-2">⭐</div>
+                    <div class="text-yellow-400 font-medium mb-1">第二步</div>
+                    <div class="text-slate-400">點擊收藏感興趣的群組</div>
+                  </div>
+                  <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                    <div class="text-3xl mb-2">📦</div>
+                    <div class="text-green-400 font-medium mb-1">第三步</div>
+                    <div class="text-slate-400">回到這裡統一管理</div>
+                  </div>
+                </div>
+                
                 <button (click)="goToSearchDiscovery()"
-                        class="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl font-medium transition-all">
-                  🔍 去搜索發現添加
+                        class="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl font-medium transition-all shadow-lg shadow-cyan-500/25">
+                  🔍 去搜索發現添加資源
                 </button>
+                
+                <!-- 🔧 快捷搜索提示 -->
+                @if (mergedHistoryKeywords().length > 0) {
+                  <div class="mt-4 text-sm">
+                    <span class="text-slate-500">最近搜索過：</span>
+                    @for (kw of mergedHistoryKeywords().slice(0, 3); track kw) {
+                      <button (click)="goToSearchDiscovery()"
+                              class="ml-2 px-3 py-1 bg-slate-700/50 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-400 rounded-full text-xs transition-all">
+                        {{ kw }}
+                      </button>
+                    }
+                  </div>
+                }
               </div>
             } @else if (mergedSearchError().hasError) {
               <div class="max-w-md">
@@ -560,6 +727,14 @@ export interface Account {
                             [title]="resource.is_saved ? '取消收藏' : '收藏'">
                       {{ resource.is_saved ? '⭐' : '☆' }}
                     </button>
+                    <!-- 🔧 Phase3: 標籤按鈕（僅已收藏資源顯示）-->
+                    @if (resource.is_saved) {
+                      <button (click)="openTagEditor(resource, $event)"
+                              class="p-2 rounded-lg bg-slate-700/50 text-slate-400 hover:bg-amber-500/20 hover:text-amber-400 transition-all"
+                              title="管理標籤">
+                        🏷️
+                      </button>
+                    }
                   </div>
                   
                   <!-- 主要信息 -->
@@ -607,11 +782,10 @@ export interface Account {
                       }
                     </div>
                     
-                    <!-- 🆕 第二行：群組 ID（重點顯示，優化後的友好提示） -->
+                    <!-- 🆕 第二行：群組 ID + 可達性標記 -->
                     <div class="flex items-center gap-3 mb-2 bg-slate-900/50 rounded-lg px-3 py-2">
                       <span class="text-slate-400 text-sm">ID:</span>
                       @if (resource.telegram_id) {
-                        <!-- 有數字 ID -->
                         <code class="font-mono text-cyan-300 text-sm select-all">{{ resource.telegram_id }}</code>
                         <button (click)="copyId(resource, $event)"
                                 class="px-2 py-1 text-xs rounded transition-all"
@@ -620,15 +794,27 @@ export interface Account {
                           {{ copiedId() === resource.telegram_id ? '✓ 已複製' : '📋 複製' }}
                         </button>
                       } @else if (resource.username) {
-                        <!-- 無 ID 但有 username -->
                         <code class="font-mono text-slate-400 text-sm">@{{ resource.username }}</code>
-                        <span class="text-xs text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded" title="加入群組後可獲取完整數字 ID">
-                          ⚠️ 需加入獲取
+                        <span class="text-xs text-blue-400/80 bg-blue-500/10 px-2 py-0.5 rounded" title="加入後自動獲取數字 ID">
+                          加入後自動獲取
+                        </span>
+                      } @else if (resource.invite_link || resource.link) {
+                        <span class="text-xs text-blue-400/80 bg-blue-500/10 px-2 py-0.5 rounded">
+                          有邀請鏈接，可加入
                         </span>
                       } @else {
-                        <!-- 都沒有 -->
-                        <span class="text-slate-500 text-sm">需通過邀請鏈接加入</span>
+                        <span class="text-slate-500 text-sm bg-red-500/10 px-2 py-0.5 rounded text-red-400/60">信息不完整</span>
                       }
+                      <!-- 可達性 chip -->
+                      <span class="text-xs px-2 py-0.5 rounded"
+                            [ngClass]="{
+                              'bg-green-500/10 text-green-400': (resource.accessibility || getAccessibility(resource)) === 'public',
+                              'bg-blue-500/10 text-blue-400': (resource.accessibility || getAccessibility(resource)) === 'invite_only',
+                              'bg-amber-500/10 text-amber-400': (resource.accessibility || getAccessibility(resource)) === 'id_only',
+                              'bg-red-500/10 text-red-400': (resource.accessibility || getAccessibility(resource)) === 'unknown'
+                            }">
+                        {{ getAccessibilityLabel(resource) }}
+                      </span>
                       @if (resource.username) {
                         <span class="text-slate-600">|</span>
                         <button (click)="copyLink(resource, $event)"
@@ -680,8 +866,21 @@ export interface Account {
                         </span>
                       </span>
                       
-                      <!-- 來源標記 -->
-                      @if (resource.discovery_source) {
+                      <!-- 來源標記 (支持多來源合併顯示) -->
+                      @if (resource.sources && resource.sources.length > 1) {
+                        @for (src of resource.sources; track src) {
+                          <span class="px-2 py-0.5 bg-slate-700/50 text-slate-400 rounded text-xs">
+                            {{ getSourceLabel(src) }}
+                          </span>
+                        }
+                        <span class="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-xs" title="多來源驗證">
+                          🔗 多源
+                        </span>
+                      } @else if (resource.source) {
+                        <span class="px-2 py-0.5 bg-slate-700/50 text-slate-400 rounded text-xs">
+                          {{ getSourceLabel(resource.source) }}
+                        </span>
+                      } @else if (resource.discovery_source) {
                         <span class="px-2 py-0.5 bg-slate-700/50 text-slate-400 rounded text-xs">
                           {{ getSourceLabel(resource.discovery_source) }}
                         </span>
@@ -692,6 +891,13 @@ export interface Account {
                         <span class="px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs">● 監控中</span>
                       } @else if (resource.status === 'joined' || resource.status === 'paused') {
                         <span class="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">✓ 已加入</span>
+                      }
+                      
+                      <!-- 🔧 Phase3: 標籤顯示 -->
+                      @for (tag of getResourceTags(resource); track tag) {
+                        <span class="px-2 py-0.5 bg-amber-500/15 text-amber-400 rounded text-xs">
+                          🏷️ {{ tag }}
+                        </span>
                       }
                     </div>
                   </div>
@@ -736,6 +942,13 @@ export interface Account {
                       <button disabled
                               class="px-4 py-2 bg-slate-600 text-slate-300 rounded-lg text-sm font-medium cursor-wait flex items-center gap-1">
                         <span class="animate-spin">⏳</span> 加入中...
+                      </button>
+                    } @else if (!canJoin(resource)) {
+                      <!-- 🔧 不可操作群組：按鈕置灰 -->
+                      <button disabled
+                              class="px-4 py-2 bg-slate-600/30 text-slate-500 rounded-lg text-sm cursor-not-allowed"
+                              title="該群組信息不完整，無法加入">
+                        🚫 無法加入
                       </button>
                     } @else {
                       <!-- 未加入：顯示加入和加入並監控兩個選項 -->
@@ -824,6 +1037,19 @@ export interface Account {
               <span class="ml-2 text-sm text-slate-400">
                 第 {{ currentPage() }} / {{ totalPages() }} 頁
               </span>
+            </div>
+          }
+          
+          <!-- 🔧 被隱藏的不可達群組提示 -->
+          @if (hiddenUnreachableCount() > 0) {
+            <div class="mt-3 py-2 px-4 bg-slate-800/30 rounded-lg border border-slate-700/30 text-center">
+              <span class="text-slate-500 text-sm">
+                還有 {{ hiddenUnreachableCount() }} 個信息不完整的群組已隱藏
+              </span>
+              <button (click)="filterHideUnreachable.set(false)" 
+                      class="ml-2 text-xs text-cyan-400 hover:text-cyan-300 underline">
+                顯示全部
+              </button>
             </div>
           }
         }
@@ -918,18 +1144,15 @@ export interface Account {
                         </button>
                       } @else if (resource.username) {
                         <code class="font-mono text-slate-400">@{{ resource.username }}</code>
-                        <!-- 只在未加入時顯示「需加入」提示，避免狀態矛盾 -->
                         @if (resource.status !== 'joined' && resource.status !== 'monitoring') {
-                          <span class="text-xs text-amber-400/80" title="加入群組後可獲取完整數字 ID">⚠️ 需加入獲取ID</span>
+                          <span class="text-xs text-blue-400/80" title="加入群組後系統會自動獲取完整數字 ID">加入後自動獲取</span>
                         } @else {
                           <span class="text-xs text-blue-400/80" title="正在同步ID...">🔄 同步中</span>
                         }
+                      } @else if (resource.invite_link || resource.link) {
+                        <span class="text-xs text-blue-400/80">私有群組（可通過邀請鏈接加入）</span>
                       } @else {
-                        @if (resource.status !== 'joined' && resource.status !== 'monitoring') {
-                          <span class="text-slate-500">需加入獲取</span>
-                        } @else {
-                          <span class="text-blue-400">🔄 同步中</span>
-                        }
+                        <span class="text-slate-500 text-xs">信息不完整（來自第三方索引）</span>
                       }
                     </div>
                   </div>
@@ -954,9 +1177,23 @@ export interface Account {
                          class="text-cyan-400 hover:underline text-sm">
                         t.me/{{ resource.username }}
                       </a>
+                    } @else if (resource.invite_link || resource.link) {
+                      <span class="text-blue-400 text-sm">有邀請鏈接（私有群組）</span>
                     } @else {
-                      <span class="text-slate-500">無公開連結</span>
+                      <span class="text-slate-500">無公開連結（第三方索引數據）</span>
                     }
+                  </div>
+                  <div>
+                    <div class="text-slate-500 text-sm mb-1">可達性</div>
+                    <span class="text-xs px-2 py-1 rounded"
+                          [ngClass]="{
+                            'bg-green-500/10 text-green-400': (resource.accessibility || getAccessibility(resource)) === 'public',
+                            'bg-blue-500/10 text-blue-400': (resource.accessibility || getAccessibility(resource)) === 'invite_only',
+                            'bg-amber-500/10 text-amber-400': (resource.accessibility || getAccessibility(resource)) === 'id_only',
+                            'bg-red-500/10 text-red-400': (resource.accessibility || getAccessibility(resource)) === 'unknown'
+                          }">
+                      {{ getAccessibilityLabel(resource) }}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1021,7 +1258,22 @@ export interface Account {
                   <span>🏷️</span> 來源信息
                 </h4>
                 <div class="flex flex-wrap gap-2">
-                  @if (resource.discovery_source) {
+                  @if (resource.sources && resource.sources.length > 0) {
+                    @for (src of resource.sources; track src) {
+                      <span class="px-3 py-1 bg-slate-700 text-slate-300 rounded-full text-sm">
+                        {{ getSourceLabel(src) }}
+                      </span>
+                    }
+                    @if (resource.sources.length > 1) {
+                      <span class="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm">
+                        🔗 多來源交叉驗證
+                      </span>
+                    }
+                  } @else if (resource.source) {
+                    <span class="px-3 py-1 bg-slate-700 text-slate-300 rounded-full text-sm">
+                      來源：{{ getSourceLabel(resource.source) }}
+                    </span>
+                  } @else if (resource.discovery_source) {
                     <span class="px-3 py-1 bg-slate-700 text-slate-300 rounded-full text-sm">
                       來源：{{ getSourceLabel(resource.discovery_source) }}
                     </span>
@@ -1062,15 +1314,22 @@ export interface Account {
                 </button>
                 
                 @if (resource.status !== 'joined' && resource.status !== 'monitoring') {
-                  <!-- 未加入：加入 + 加入並監控 -->
-                  <button (click)="addToMonitoring(resource); closeDetail()"
-                          class="px-5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg font-medium transition-all">
-                    📡 監控
-                  </button>
-                  <button (click)="openJoinDialog(resource); closeDetail()"
-                          class="px-6 py-2 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg font-medium transition-all shadow-lg shadow-cyan-500/20">
-                    🚀 加入群組
-                  </button>
+                  @if (canJoin(resource)) {
+                    <!-- 可加入：加入 + 監控 -->
+                    <button (click)="addToMonitoring(resource); closeDetail()"
+                            class="px-5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg font-medium transition-all">
+                      📡 監控
+                    </button>
+                    <button (click)="openJoinDialog(resource); closeDetail()"
+                            class="px-6 py-2 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg font-medium transition-all shadow-lg shadow-cyan-500/20">
+                      🚀 加入群組
+                    </button>
+                  } @else {
+                    <!-- 不可加入 -->
+                    <span class="px-4 py-2 bg-red-500/10 text-red-400/60 rounded-lg text-sm">
+                      信息不完整，無法加入
+                    </span>
+                  }
                 } @else if (resource.status === 'joined') {
                   <!-- 已加入未監控：加入監控 + 提取成員 -->
                   <button (click)="addToMonitoring(resource); closeDetail()"
@@ -1180,6 +1439,67 @@ export interface Account {
           </div>
         </div>
       }
+      
+      <!-- 🔧 Phase3: 標籤編輯器彈窗 -->
+      @if (showTagEditor() && tagEditorTarget(); as resource) {
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4"
+             (click)="closeTagEditor()">
+          <div class="bg-slate-800 rounded-2xl border border-slate-700/50 shadow-2xl w-full max-w-md overflow-hidden"
+               (click)="$event.stopPropagation()">
+            <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+              <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                🏷️ 管理標籤
+              </h3>
+              <button (click)="closeTagEditor()" class="text-slate-400 hover:text-white text-xl">✕</button>
+            </div>
+            <div class="px-6 py-4">
+              <div class="text-sm text-slate-400 mb-3">{{ resource.title }}</div>
+              
+              <!-- 已有標籤 -->
+              <div class="flex flex-wrap gap-2 mb-4">
+                @for (tag of getResourceTags(resource); track tag) {
+                  <span class="px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full text-sm flex items-center gap-1 group">
+                    🏷️ {{ tag }}
+                    <button (click)="removeTagFromResource(resource, tag)"
+                            class="ml-1 text-amber-500/50 hover:text-red-400 transition-all">✕</button>
+                  </span>
+                }
+                @if (getResourceTags(resource).length === 0) {
+                  <span class="text-slate-500 text-sm">暫無標籤</span>
+                }
+              </div>
+              
+              <!-- 添加新標籤 -->
+              <div class="flex items-center gap-2 mb-4">
+                <input type="text" 
+                       [value]="newTagInput()"
+                       (input)="newTagInput.set($any($event.target).value)"
+                       (keyup.enter)="addTagToResource()"
+                       placeholder="輸入新標籤..."
+                       class="flex-1 bg-slate-700/50 border border-slate-600 rounded-lg py-2 px-3 text-white text-sm placeholder-slate-500 focus:border-amber-500/50 focus:outline-none">
+                <button (click)="addTagToResource()"
+                        [disabled]="!newTagInput().trim()"
+                        class="px-4 py-2 bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 rounded-lg text-sm transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                  添加
+                </button>
+              </div>
+              
+              <!-- 預設標籤快速添加 -->
+              <div class="border-t border-slate-700/30 pt-3">
+                <div class="text-xs text-slate-500 mb-2">快速添加：</div>
+                <div class="flex flex-wrap gap-1.5">
+                  @for (tag of presetTags; track tag) {
+                    <button (click)="addTagToResource(tag)"
+                            class="px-2.5 py-1 bg-slate-700/40 text-slate-400 hover:bg-amber-500/20 hover:text-amber-400 rounded text-xs transition-all">
+                      + {{ tag }}
+                    </button>
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -1227,6 +1547,7 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   private dialogService = inject(DialogService);
   opHistory = inject(OperationHistoryService);
   private navBridge = inject(NavBridgeService);
+  private savedResourcesService = inject(SavedResourcesService);
   
   // 🆕 Phase3: 操作歷史面板開關
   showOperationHistory = signal(false);
@@ -1261,9 +1582,23 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   
   // 🔧 P0: 動態超時+心跳保活機制
   private searchTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  private readonly SEARCH_BASE_TIMEOUT_MS = 60000;    // 基礎超時 60 秒
-  private readonly HEARTBEAT_TIMEOUT_MS = 15000;      // 心跳超時 15 秒（收到進度事件後重置）
+  private readonly SEARCH_BASE_TIMEOUT_MS = 120000;   // 基礎超時 120 秒（對齊 Jiso 90s + 緩衝）
+  private readonly HEARTBEAT_TIMEOUT_MS = 120000;     // 🔧 修復: 心跳超時 120 秒（不再誤報超時）
   private lastProgressTime: number = 0;               // 最後收到進度事件的時間
+  
+  // 🔧 渠道級搜索進度
+  sourceStatuses = signal<SourceStatus[]>([]);
+  allSourcesDone = computed(() => {
+    const statuses = this.sourceStatuses();
+    if (statuses.length === 0) return false;
+    return statuses.every(s => s.status === 'completed' || s.status === 'failed' || s.status === 'timeout');
+  });
+  sourceProgressText = computed(() => {
+    const statuses = this.sourceStatuses();
+    if (statuses.length === 0) return '';
+    const done = statuses.filter(s => s.status === 'completed' || s.status === 'failed' || s.status === 'timeout').length;
+    return `${done}/${statuses.length} 個渠道已完成`;
+  });
   
   // ============ 輸入信號 ============
   initialView = input<string>('search-discovery');  // 🔧 Phase9-5: 區分「資源中心」vs「搜索發現」
@@ -1387,7 +1722,30 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   filterSource = signal<string>('all'); // 'all' | 'telegram' | 'jiso' | 'local'
   filterJoinStatus = signal<string>('all'); // 'all' | 'joined' | 'not_joined'
   filterHasId = signal<boolean>(false); // 只顯示有完整 ID 的結果
+  filterHideUnreachable = signal<boolean>(true); // 🔧 默認隱藏不可操作的群組
   filterSavedOnly = signal<boolean>(false); // 🔧 Phase9-5: 只顯示收藏的資源（資源中心模式）
+  
+  // 🔧 Phase3: 標籤系統
+  filterByTag = signal<string>('');  // 按標籤篩選（空 = 全部）
+  showTagEditor = signal<boolean>(false);  // 顯示標籤編輯器
+  tagEditorTarget = signal<DiscoveredResource | null>(null);  // 標籤編輯目標資源
+  newTagInput = signal<string>('');  // 新標籤輸入框
+  allTags = computed(() => this.savedResourcesService.allTags());
+  
+  // 🔧 Phase3: 搜索推薦
+  keywordSuggestions = signal<any[]>([]);
+  showSuggestions = signal(false);
+  private _suggestionTimer: any = null;
+  
+  // 🔧 Phase3: 資源健康檢查
+  healthCheckRunning = signal(false);
+  healthResults = signal<any[]>([]);
+  
+  // 🔧 Phase2: 搜索緩存控制
+  private _lastSearchKey = '';
+  private _forceRefresh = false;
+  private _searchStartTime = 0;
+  isFromCache = signal(false);  // 是否為緩存結果
 
   constructor() {
     // 路由切換時同步：資源中心只顯示收藏，搜索發現顯示全部
@@ -1460,9 +1818,36 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       result = result.filter(r => r.telegram_id && r.telegram_id.trim() !== '');
     }
     
+    // 🔧 默認隱藏完全不可操作的群組（三項標識全無）
+    if (this.filterHideUnreachable()) {
+      result = result.filter(r => {
+        const a = r.accessibility || this.getAccessibility(r);
+        return a !== 'unknown';
+      });
+    }
+    
+    // 🔧 按可達性排序：public > invite_only > id_only > unknown
+    const accessOrder: Record<string, number> = { public: 0, invite_only: 1, id_only: 2, unknown: 3 };
+    result = [...result].sort((a, b) => {
+      const aAccess = accessOrder[a.accessibility || this.getAccessibility(a)] ?? 3;
+      const bAccess = accessOrder[b.accessibility || this.getAccessibility(b)] ?? 3;
+      if (aAccess !== bAccess) return aAccess - bAccess;
+      return 0;  // 保持原有排序
+    });
+    
     // 🔧 Phase9-5: 資源中心模式 - 只顯示收藏的資源
     if (this.filterSavedOnly()) {
       result = result.filter(r => r.is_saved);
+    }
+    
+    // 🔧 Phase3: 按標籤篩選
+    const tagFilter = this.filterByTag();
+    if (tagFilter) {
+      result = result.filter(r => {
+        const tid = (r.telegram_id || '').toString().trim();
+        const tags = this.savedResourcesService.getTags(tid);
+        return tags.includes(tagFilter);
+      });
     }
     
     return result;
@@ -1710,24 +2095,40 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       this.resetHeartbeat();
       
       if (data.success && data.groups) {
-        const resources: DiscoveredResource[] = data.groups.map((g: any, idx: number) => ({
-          id: idx + 1,  // 使用序號作為內部 ID
-          telegram_id: g.telegram_id || null,  // 🔧 P0: 保持真實 ID（可為 null）
-          title: g.title,
-          username: g.username,
-          description: g.description,
-          member_count: g.member_count || g.members_count || 0,
-          resource_type: g.type || 'group',
-          status: 'discovered',
-          overall_score: g.score,
-          discovery_source: 'search',
-          discovery_keyword: this.searchQuery,
-          source: g.source,  // 保留來源標記
-          link: g.link       // 🔧 保留連結
-        }));
+        const resources: DiscoveredResource[] = data.groups.map((g: any, idx: number) => {
+          const r: DiscoveredResource = {
+            id: idx + 1,
+            telegram_id: g.telegram_id || null,
+            title: g.title,
+            username: g.username,
+            description: g.description,
+            member_count: g.member_count || g.members_count || 0,
+            resource_type: g.type || 'group',
+            status: 'discovered',
+            overall_score: g.score,
+            discovery_source: 'search',
+            discovery_keyword: this.searchQuery,
+            source: g.source,
+            sources: g.sources || (g.source ? [g.source] : []),  // 🔧 Phase3: 多來源
+            link: g.link,
+            invite_link: g.invite_link || g.link || undefined  // 🔧 統一映射 link → invite_link
+          };
+          r.accessibility = g.accessibility || this.getAccessibility(r);
+          return r;
+        });
         
         // 更新結果（累加顯示）
         this._internalResources.set(resources);
+        
+        // 🔧 更新渠道狀態
+        if (data.source) {
+          this.sourceStatuses.update(statuses =>
+            statuses.map(s => s.source === data.source
+              ? { ...s, status: 'completed' as const, count: data.groups?.filter((g: any) => g.source === data.source).length || 0 }
+              : s.status === 'waiting' ? { ...s, status: 'searching' as const } : s
+            )
+          );
+        }
         
         // 顯示進度提示
         if (data.message) {
@@ -1746,28 +2147,37 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       this.searchProgress.set('');
       this.isFetchingDetails.set(false);
       
+      // 🔧 標記所有渠道完成
+      this.sourceStatuses.update(statuses =>
+        statuses.map(s => s.status === 'searching' || s.status === 'waiting'
+          ? { ...s, status: 'completed' as const } : s)
+      );
+      
       if (data.success && data.groups) {
-        const resources: DiscoveredResource[] = data.groups.map((g: any, idx: number) => ({
-          id: idx + 1,  // 使用序號作為內部 ID
-          telegram_id: g.telegram_id || null,  // 🔧 P0: 保持真實 ID（可為 null）
-          title: g.title,
-          username: g.username,
-          description: g.description,
-          member_count: g.member_count || g.members_count || 0,
-          resource_type: g.type || 'group',
-          // 🔧 P0-1: 從後端獲取狀態（已加入/未加入）
-          status: g.status || 'discovered',
-          // 🔧 FIX: 同時檢查 joined_phone（前端）和 joined_by_phone（後端數據庫）
-          joined_phone: g.joined_phone || g.joined_by_phone || null,
-          overall_score: g.score,
-          discovery_source: 'search',
-          discovery_keyword: this.searchQuery,
-          source: g.source,  // 保留來源標記
-          link: g.link,      // 🔧 保留連結
-          // 🆕 搜索歷史相關
-          is_new: g.is_new,           // 是否為新發現
-          member_change: g.member_change  // 成員數變化
-        }));
+        const resources: DiscoveredResource[] = data.groups.map((g: any, idx: number) => {
+          const r: DiscoveredResource = {
+            id: idx + 1,
+            telegram_id: g.telegram_id || null,
+            title: g.title,
+            username: g.username,
+            description: g.description,
+            member_count: g.member_count || g.members_count || 0,
+            resource_type: g.type || 'group',
+            status: g.status || 'discovered',
+            joined_phone: g.joined_phone || g.joined_by_phone || null,
+            overall_score: g.score,
+            discovery_source: 'search',
+            discovery_keyword: this.searchQuery,
+            source: g.source,
+            sources: g.sources || (g.source ? [g.source] : []),  // 🔧 Phase3: 多來源
+            link: g.link,
+            invite_link: g.invite_link || g.link || undefined,  // 🔧 統一映射
+            is_new: g.is_new,
+            member_change: g.member_change
+          };
+          r.accessibility = this.getAccessibility(r);
+          return r;
+        });
         this._internalResources.set(resources);
         this._internalSearchError.set({ hasError: false, message: '' });
         
@@ -1780,9 +2190,16 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
         this.newDiscoveredCount.set(newCount);
         this.existingCount.set(existingCount);
         
+        // 🔧 Phase2: 判斷是否命中緩存
+        const elapsed = this._searchStartTime ? Date.now() - this._searchStartTime : 99999;
+        const isCached = elapsed < 2000;  // 2秒內返回視為緩存命中
+        this.isFromCache.set(isCached);
+        
         // 🆕 改進的提示消息
-        let message = `搜索完成！共找到 ${resources.length} 個結果`;
-        if (newCount > 0) {
+        let message = isCached 
+          ? `📋 緩存命中：${resources.length} 個結果（${Math.round(elapsed)}ms）`
+          : `搜索完成！共找到 ${resources.length} 個結果`;
+        if (!isCached && newCount > 0) {
           message += `，其中 ${newCount} 個為新發現`;
         }
         this.toast.success(message);
@@ -1815,23 +2232,35 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       
       this.searchProgress.set(data.message);
       
+      // 🔧 更新 Jiso 渠道狀態
+      if (data.status === 'searching' || data.status === 'basic_results' || data.status === 'fetching_details') {
+        this.sourceStatuses.update(statuses =>
+          statuses.map(s => s.source === 'jiso' ? { ...s, status: 'searching' as const } : s)
+        );
+      }
+      
       // 根據狀態更新 UI
       if (data.status === 'basic_results' && data.data?.results) {
         // 🔧 P0: 收到基礎結果，立即顯示（不等待詳情）
-        const basicResources: DiscoveredResource[] = data.data.results.map((g: any, idx: number) => ({
-          id: idx + 1,  // 使用序號作為內部 ID
-          telegram_id: g.telegram_id || null,  // 🔧 保持真實 ID（可為 null）
-          title: g.title,
-          username: g.username,
-          description: g.description,
-          member_count: g.member_count || 0,  // 可能為0，等待詳情更新
-          resource_type: g.chat_type || g.type || 'group',
-          link: g.link,  // 🔧 保留連結
-          status: 'discovered',
-          overall_score: g.score,
-          discovery_source: 'search',
-          discovery_keyword: this.searchQuery
-        }));
+        const basicResources: DiscoveredResource[] = data.data.results.map((g: any, idx: number) => {
+          const r: DiscoveredResource = {
+            id: idx + 1,
+            telegram_id: g.telegram_id || null,
+            title: g.title,
+            username: g.username,
+            description: g.description,
+            member_count: g.member_count || 0,
+            resource_type: g.chat_type || g.type || 'group',
+            link: g.link,
+            invite_link: g.invite_link || g.link || undefined,
+            status: 'discovered',
+            overall_score: g.score,
+            discovery_source: 'search',
+            discovery_keyword: this.searchQuery
+          };
+          r.accessibility = this.getAccessibility(r);
+          return r;
+        });
         this._internalResources.set(basicResources);
         this.isFetchingDetails.set(true);
         this.toast.info(`已載入 ${basicResources.length} 個基礎結果，正在獲取詳情...`);
@@ -1840,8 +2269,23 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       } else if (data.status === 'completed') {
         this.isFetchingDetails.set(false);
         this.searchProgress.set('');
+        // 🔧 標記 Jiso 完成
+        this.sourceStatuses.update(statuses =>
+          statuses.map(s => s.source === 'jiso' ? { ...s, status: 'completed' as const } : s)
+        );
       }
     });
+    
+    // 🔧 監聽渠道級搜索狀態（後端新增事件）
+    const cleanup4b = this.ipc.on('search-source-status', (data: { source: string; status: string; count?: number; elapsed_ms?: number; error?: string }) => {
+      this.resetHeartbeat();
+      this.sourceStatuses.update(statuses =>
+        statuses.map(s => s.source === data.source 
+          ? { ...s, status: data.status as any, count: data.count || s.count, elapsed_ms: data.elapsed_ms, error: data.error } 
+          : s)
+      );
+    });
+    this.ipcCleanup.push(cleanup4b);
     
     // 🔧 P0: 監聯加入群組完成事件，更新本地資源狀態
     const cleanup5 = this.ipc.on('join-and-monitor-complete', (data: any) => {
@@ -1891,10 +2335,11 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
         console.log(`[SearchDiscovery] 資源狀態已更新: ${data.username || data.telegramId} → joined (${data.phone})`);
       } else {
         // 🔧 P0: 加入失敗時也清除 Loading 狀態
-        if (data.username || data.telegramId) {
+        if (data.username || data.telegramId || data.resourceId) {
           const currentResources = this._internalResources();
           currentResources.forEach(r => {
-            if ((data.username && r.username === data.username) ||
+            if ((data.resourceId && r.id === data.resourceId) ||
+                (data.username && r.username === data.username) ||
                 (data.telegramId && r.telegram_id === data.telegramId)) {
               this.joiningResourceIds.update(ids => {
                 const newIds = new Set(ids);
@@ -1904,6 +2349,11 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
             }
           });
         }
+        
+        // 🔧 Phase2: 根據 error_code 顯示精確錯誤提示
+        const errorCode = data.error_code || 'UNKNOWN';
+        const errorMsg = data.error || '加入失敗';
+        this.showJoinError(errorCode, errorMsg);
       }
     });
     
@@ -2038,7 +2488,53 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       }
     });
     
-    this.ipcCleanup.push(cleanup1, cleanup2a, cleanup2, cleanup3, cleanup4, cleanup5, cleanup6, cleanup7, cleanup8, cleanup8b, cleanup9);
+    // 🔧 Phase3: 監聽搜索關鍵詞推薦
+    const cleanupSuggestions = this.ipc.on('keyword-suggestions', (data: any) => {
+      if (data.success && Array.isArray(data.suggestions)) {
+        this.keywordSuggestions.set(data.suggestions);
+      }
+    });
+    
+    // 🔧 Phase3: 監聽資源健康檢查結果
+    const cleanupHealth = this.ipc.on('resources-health-result', (data: any) => {
+      this.healthCheckRunning.set(false);
+      if (data.success && Array.isArray(data.results)) {
+        this.healthResults.set(data.results);
+        const { healthy, unhealthy, total } = data;
+        if (unhealthy > 0) {
+          this.toast.warning(`健康檢查完成：${healthy} 健康, ${unhealthy} 異常（共 ${total}）`);
+        } else {
+          this.toast.success(`健康檢查完成：全部 ${total} 個資源正常`);
+        }
+        
+        // 更新資源的健康狀態到列表
+        this._internalResources.update(list => list.map(r => {
+          const tid = (r.telegram_id || '').toString().trim();
+          const healthInfo = data.results.find((h: any) => 
+            (h.telegram_id || '').toString().trim() === tid ||
+            (h.username && r.username && h.username === r.username)
+          );
+          if (healthInfo) {
+            const newAccessibility = healthInfo.status === 'healthy' ? (r.accessibility || 'public') :
+              healthInfo.status === 'private' ? 'invite_only' :
+              healthInfo.status === 'deleted' || healthInfo.status === 'not_found' ? 'unknown' :
+              r.accessibility;
+            return {
+              ...r,
+              accessibility: newAccessibility,
+              member_count: healthInfo.member_count || r.member_count,
+              _healthStatus: healthInfo.status,
+              _healthError: healthInfo.error
+            } as DiscoveredResource;
+          }
+          return r;
+        }));
+      } else if (!data.success) {
+        this.toast.error(`健康檢查失敗: ${data.error || '未知錯誤'}`);
+      }
+    });
+    
+    this.ipcCleanup.push(cleanup1, cleanup2a, cleanup2, cleanup3, cleanup4, cleanup5, cleanup6, cleanup7, cleanup8, cleanup8b, cleanup9, cleanupSuggestions, cleanupHealth);
   }
   
   // 🔧 P0: 加載搜索歷史
@@ -2149,14 +2645,32 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     this.lastProgressTime = Date.now();
     this.startHeartbeatCheck();
     
+    // 🔧 初始化渠道級搜索狀態
+    const sourceLabels: Record<string, string> = { telegram: 'TG官方', jiso: '中文搜索', tgstat: 'TGStat', local: '本地索引' };
+    this.sourceStatuses.set(sources.map(s => ({
+      source: s,
+      label: sourceLabels[s] || s,
+      status: 'waiting' as const,
+      count: 0
+    })));
+    
+    // 🔧 Phase2: 檢查是否為重複搜索，告知後端可用緩存
+    const searchKey = `${query.toLowerCase()}|${sources.sort().join('|')}`;
+    const isRepeat = searchKey === this._lastSearchKey;
+    this._lastSearchKey = searchKey;
+    this._searchStartTime = Date.now();
+    this.isFromCache.set(false);
+    
     // 🔧 P0: 發送 IPC 搜索請求 - 不限制數量，返回全部結果
     this.ipc.send('search-groups', {
       keyword: query,
       sources: sources,
       account_id: selectedAcc.id,
       account_phone: selectedAcc.phone,
-      limit: 500  // 🔧 增加到 500，支持更多結果（後端會分頁返回）
+      limit: 500,
+      force_refresh: this._forceRefresh  // 🔧 Phase2: 強制刷新標記
     });
+    this._forceRefresh = false;  // 重置
     
     // 同時發出事件（兼容父組件監聽）
     this.searchEvent.emit({
@@ -2198,17 +2712,30 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     }, 5000); // 每5秒檢查一次
   }
   
-  // 🔧 P0: 處理搜索超時
+  // 🔧 修復: 搜索超時 - 不再彈出誤導性 toast
   private handleSearchTimeout(): void {
     this.clearSearchTimeout();
-    this._internalSearching.set(false);
-    this.searchProgress.set('');
-    this.isFetchingDetails.set(false);
-    this._internalSearchError.set({
-      hasError: true,
-      message: '搜索超時，請稍後重試'
-    });
-    this.toast.warning('搜索超時，請稍後重試');
+    // 🔧 如果已有部分結果，不算失敗
+    const hasResults = this._internalResources().length > 0;
+    if (hasResults) {
+      this._internalSearching.set(false);
+      this.searchProgress.set('');
+      this.isFetchingDetails.set(false);
+      // 標記未完成的渠道為超時
+      this.sourceStatuses.update(statuses => 
+        statuses.map(s => s.status === 'searching' || s.status === 'waiting' 
+          ? { ...s, status: 'timeout' as const } : s)
+      );
+      this.toast.info(`搜索完成，部分渠道響應較慢`);
+    } else {
+      this._internalSearching.set(false);
+      this.searchProgress.set('');
+      this.isFetchingDetails.set(false);
+      this._internalSearchError.set({
+        hasError: true,
+        message: '所有搜索渠道均未返回結果，請檢查網路後重試'
+      });
+    }
   }
   
   // 🔧 P0: 重置心跳時間（收到進度事件時調用）
@@ -2279,6 +2806,14 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   
   clearResults(): void {
     this.clearResultsEvent.emit();
+  }
+  
+  // 🔧 Phase2: 強制刷新搜索（忽略緩存）
+  forceRefreshSearch(): void {
+    this._forceRefresh = true;
+    if (this.searchQuery.trim()) {
+      this.doSearch();
+    }
   }
   
   // ============ 帳號操作 ============
@@ -2374,12 +2909,12 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   // 🔧 P0: 待加入的資源（用於帳號選擇後繼續加入）
   private pendingJoinResource: DiscoveredResource | null = null;
   
-  // 🔧 P0-2: 打開帳號選擇對話框
+  // 🔧 P0-2: 打開帳號選擇對話框（支持 invite_link）
   openJoinDialog(resource: DiscoveredResource): void {
     console.log('[SearchDiscovery] 打開加入對話框:', resource.title);
     
-    if (!resource.username && !resource.telegram_id) {
-      this.toast.warning('無法加入：缺少群組標識');
+    if (!this.canJoin(resource)) {
+      this.toast.warning('無法加入：該群組信息不完整，缺少用戶名、邀請鏈接和 ID');
       return;
     }
     
@@ -2440,8 +2975,8 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   joinResource(resource: DiscoveredResource): void {
     console.log('[SearchDiscovery] 加入群組:', resource.title, resource.username);
     
-    if (!resource.username && !resource.telegram_id) {
-      this.toast.warning('無法加入：缺少群組標識');
+    if (!this.canJoin(resource)) {
+      this.toast.warning('無法加入：該群組信息不完整，缺少用戶名、邀請鏈接和 ID');
       return;
     }
     
@@ -2487,10 +3022,12 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     this.toast.info(`正在使用 ${phone.slice(0, 4)}**** 加入群組: ${resource.title || resource.username}...`);
     
     // 🆕 Phase2: 使用 join-resource 命令（僅加入，不自動添加到監控）
+    // 🔧 新增 inviteLink 支持，讓後端可用邀請鏈接加入
     this.ipc.send('join-resource', {
       resourceId: resource.id || 0,
       username: resource.username,
       telegramId: resource.telegram_id,
+      inviteLink: resource.invite_link || resource.link || null,
       title: resource.title,
       phone: phone
     });
@@ -2511,6 +3048,159 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   isAddingMonitor(resource: DiscoveredResource): boolean {
     return this.monitoringResourceIds().has(resource.id);
   }
+  
+  // ============ Phase3: 標籤系統 ============
+  
+  /** 打開標籤編輯器 */
+  openTagEditor(resource: DiscoveredResource, event?: Event): void {
+    if (event) event.stopPropagation();
+    this.tagEditorTarget.set(resource);
+    this.showTagEditor.set(true);
+    this.newTagInput.set('');
+  }
+  
+  /** 關閉標籤編輯器 */
+  closeTagEditor(): void {
+    this.showTagEditor.set(false);
+    this.tagEditorTarget.set(null);
+    this.newTagInput.set('');
+  }
+  
+  /** 添加標籤到目標資源 */
+  addTagToResource(tag?: string): void {
+    const resource = this.tagEditorTarget();
+    if (!resource) return;
+    const tagValue = (tag || this.newTagInput()).trim();
+    if (!tagValue) return;
+    
+    const tid = (resource.telegram_id || '').toString().trim();
+    this.savedResourcesService.addTag(tid, tagValue);
+    this.newTagInput.set('');
+    this.toast.success(`已添加標籤「${tagValue}」`);
+  }
+  
+  /** 從資源移除標籤 */
+  removeTagFromResource(resource: DiscoveredResource, tag: string): void {
+    const tid = (resource.telegram_id || '').toString().trim();
+    this.savedResourcesService.removeTag(tid, tag);
+  }
+  
+  /** 獲取資源的標籤 */
+  getResourceTags(resource: DiscoveredResource): string[] {
+    const tid = (resource.telegram_id || '').toString().trim();
+    return this.savedResourcesService.getTags(tid);
+  }
+  
+  /** 常用預設標籤 */
+  readonly presetTags = ['區塊鏈', '電商', '金融', '社交', '新聞', '技術', '營銷', '遊戲', 'NFT', 'DeFi'];
+  
+  // ============ Phase3: 搜索關鍵詞推薦 ============
+  
+  /** 輸入關鍵詞時請求推薦（防抖 300ms）*/
+  onSearchInputChange(value: string): void {
+    this.searchQuery = value;
+    this.showSuggestions.set(value.trim().length > 0);
+    
+    if (this._suggestionTimer) clearTimeout(this._suggestionTimer);
+    this._suggestionTimer = setTimeout(() => {
+      if (value.trim()) {
+        this.ipc.send('get-keyword-suggestions', { keyword: value.trim(), limit: 8 });
+      } else {
+        // 空輸入時請求最近和熱門
+        this.ipc.send('get-keyword-suggestions', { keyword: '', limit: 8 });
+      }
+    }, 300);
+  }
+  
+  /** 選中推薦詞直接搜索 */
+  selectSuggestion(keyword: string): void {
+    this.searchQuery = keyword;
+    this.showSuggestions.set(false);
+    this.doSearch();
+  }
+  
+  /** 隱藏推薦 */
+  hideSuggestions(): void {
+    // 延遲隱藏以允許點擊事件觸發
+    setTimeout(() => this.showSuggestions.set(false), 200);
+  }
+  
+  // ============ Phase3: 資源健康檢查 ============
+  
+  /** 啟動健康檢查 */
+  checkResourcesHealth(): void {
+    const resources = this.mergedResources().filter(r => r.is_saved);
+    if (resources.length === 0) {
+      this.toast.info('沒有收藏的資源需要檢查');
+      return;
+    }
+    
+    this.healthCheckRunning.set(true);
+    this.toast.info(`正在檢查 ${resources.length} 個資源...`);
+    
+    this.ipc.send('check-resources-health', {
+      resources: resources.map(r => ({
+        telegram_id: r.telegram_id,
+        username: r.username,
+        title: r.title
+      }))
+    });
+  }
+  
+  /** 推薦類型標籤 */
+  getSuggestionTypeLabel(type: string): string {
+    switch (type) {
+      case 'match': return '匹配';
+      case 'recent': return '最近';
+      case 'popular': return '熱門';
+      case 'related': return '相關';
+      default: return '';
+    }
+  }
+  
+  // 🔧 Phase2: 根據 error_code 顯示精確的加入失敗提示
+  private showJoinError(errorCode: string, errorMsg: string): void {
+    switch (errorCode) {
+      case 'INVITE_EXPIRED':
+        this.toast.error(`邀請鏈接已過期：${errorMsg}`);
+        break;
+      case 'INVITE_INVALID':
+        this.toast.error(`邀請鏈接無效：${errorMsg}`);
+        break;
+      case 'INVITE_PENDING':
+        this.toast.info(`已發送加入申請，等待管理員審核`);
+        break;
+      case 'ALREADY_MEMBER':
+        this.toast.info(`已經是該群組的成員`);
+        break;
+      case 'USER_BANNED':
+        this.toast.error(`帳號已被該群組封禁，請嘗試使用其他帳號`);
+        break;
+      case 'CHANNEL_PRIVATE':
+        this.toast.warning(`私有群組，需要邀請鏈接才能加入`);
+        break;
+      case 'USERNAME_NOT_FOUND':
+        this.toast.error(`群組不存在或已被刪除`);
+        break;
+      case 'FLOOD_WAIT':
+        this.toast.warning(`操作過於頻繁，系統會自動重試`);
+        break;
+      case 'TOO_MANY_CHANNELS':
+        this.toast.error(`已加入過多群組，請先退出一些再試`);
+        break;
+      case 'GROUP_FULL':
+        this.toast.error(`群組已滿，無法加入`);
+        break;
+      case 'NOT_CONNECTED':
+        this.toast.warning(`帳號未連接，請先登錄帳號`);
+        break;
+      case 'PEER_INVALID':
+        this.toast.error(`群組 ID 無效，該群組可能已被刪除`);
+        break;
+      default:
+        this.toast.error(`加入失敗：${errorMsg}`);
+    }
+  }
 
   // 🔧 Phase2: 添加到監控列表（帶 Loading 狀態閉環）
   addToMonitoring(resource: DiscoveredResource): void {
@@ -2528,8 +3218,8 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       return;
     }
     
-    if (!resource.username && !resource.telegram_id) {
-      this.toast.warning('無法監控：缺少群組標識');
+    if (!this.canJoin(resource)) {
+      this.toast.warning('無法監控：該群組信息不完整，缺少用戶名、邀請鏈接和 ID');
       return;
     }
     
@@ -2783,13 +3473,55 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     this.toast.success(`已收藏 ${unsaved.length} 個資源`);
   }
   
-  // 🔧 P0: 增強版導出功能 - 導出全部結果
-  exportResults(): void {
+  // 🔧 Phase2: 批量取消收藏（選中的）
+  batchUnsaveSelected(): void {
+    const selected = this.filteredResources().filter(r => 
+      this.selectedForBatch().has(r.telegram_id || String(r.id)) && r.is_saved
+    );
+    if (selected.length === 0) {
+      this.toast.info('未選中可取消的收藏');
+      return;
+    }
+    selected.forEach(r => this.unsaveResourceEvent.emit(r));
+    this._internalResources.update(list =>
+      list.map(r => {
+        const tid = (r.telegram_id || '').toString().trim();
+        if (selected.some(s => (s.telegram_id || '').toString().trim() === tid)) {
+          return { ...r, is_saved: false };
+        }
+        return r;
+      })
+    );
+    this.toast.success(`已取消收藏 ${selected.length} 個資源`);
+    this.clearSelection();
+  }
+  
+  // 🔧 Phase2: 清空全部收藏
+  batchUnsaveAll(): void {
+    const saved = this.mergedResources().filter(r => r.is_saved);
+    if (saved.length === 0) {
+      this.toast.info('沒有已收藏的資源');
+      return;
+    }
+    // 確認操作
+    if (!confirm(`確定清空全部 ${saved.length} 個收藏？此操作不可撤銷。`)) return;
+    saved.forEach(r => this.unsaveResourceEvent.emit(r));
+    this._internalResources.update(list =>
+      list.map(r => ({ ...r, is_saved: false }))
+    );
+    this.toast.success(`已清空 ${saved.length} 個收藏`);
+  }
+  
+  // 🔧 Phase3: 增強版導出功能 — CSV + JSON + 完整字段
+  exportResults(format: 'csv' | 'json' = 'csv'): void {
     const results = this.filteredResources();
     if (results.length === 0) {
       this.toast.warning('沒有可導出的結果');
       return;
     }
+    
+    const keyword = this.searchQuery || 'all';
+    const dateStr = new Date().toISOString().split('T')[0];
     
     const data = results.map((r, index) => ({
       序號: index + 1,
@@ -2799,34 +3531,62 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       類型: r.resource_type === 'channel' ? '頻道' : '群組',
       成員數: r.member_count || 0,
       描述: (r.description || '').replace(/"/g, '""').substring(0, 200),
-      連結: r.username ? `https://t.me/${r.username}` : '',
-      來源: (r as any).source || 'search'
+      連結: r.username ? `https://t.me/${r.username}` : (r.invite_link || r.link || ''),
+      來源: (r.sources && r.sources.length > 0) ? r.sources.join('+') : ((r as any).source || 'search'),
+      可達性: this.getAccessibilityLabel(r.accessibility || this.getAccessibility(r)),
+      邀請鏈接: r.invite_link || '',
+      標籤: this.getResourceTags(r).join(', '),
+      狀態: r.status === 'monitoring' ? '監控中' : r.status === 'joined' ? '已加入' : '未加入',
+      收藏: r.is_saved ? '是' : '否'
     }));
     
-    const headers = ['序號', 'ID', '名稱', 'Username', '類型', '成員數', '描述', '連結', '來源'];
-    const csv = [
-      headers.join(','),
-      ...data.map(d => [
-        d.序號,
-        `"${d.ID}"`,
-        `"${d.名稱}"`,
-        d.Username,
-        d.類型,
-        d.成員數,
-        `"${d.描述}"`,
-        d.連結,
-        d.來源
-      ].join(','))
-    ].join('\n');
+    if (format === 'json') {
+      // JSON 導出
+      const jsonStr = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `telegram-search-${keyword}-${results.length}條-${dateStr}.json`;
+      link.click();
+    } else {
+      // CSV 導出
+      const headers = ['序號', 'ID', '名稱', 'Username', '類型', '成員數', '描述', '連結', '來源', '可達性', '邀請鏈接', '標籤', '狀態', '收藏'];
+      const csv = [
+        headers.join(','),
+        ...data.map(d => [
+          d.序號,
+          `"${d.ID}"`,
+          `"${d.名稱}"`,
+          d.Username,
+          d.類型,
+          d.成員數,
+          `"${d.描述}"`,
+          `"${d.連結}"`,
+          d.來源,
+          d.可達性,
+          `"${d.邀請鏈接}"`,
+          `"${d.標籤}"`,
+          d.狀態,
+          d.收藏
+        ].join(','))
+      ].join('\n');
+      
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `telegram-search-${keyword}-${results.length}條-${dateStr}.csv`;
+      link.click();
+    }
     
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    const keyword = this.searchQuery || 'all';
-    link.download = `telegram-search-${keyword}-${results.length}條-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    
-    this.toast.success(`已導出 ${results.length} 條搜索結果`);
+    this.toast.success(`已導出 ${results.length} 條結果 (${format.toUpperCase()})`);
+  }
+  
+  // 🔧 Phase3: 導出格式選擇
+  showExportMenu = signal(false);
+  
+  toggleExportMenu(event: Event): void {
+    event.stopPropagation();
+    this.showExportMenu.update(v => !v);
   }
   
   // ============ 複製功能 ============
@@ -2874,9 +3634,44 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
       telegram: 'TG官方',
       jiso: '中文搜索',
       tgstat: 'TGStat',
-      local: '本地'
+      local: '本地',
+      search: '搜索'
     };
     return labels[source] || source;
+  }
+  
+  // 🔧 計算資源可達性
+  getAccessibility(r: DiscoveredResource): 'public' | 'invite_only' | 'id_only' | 'unknown' {
+    if (r.username) return 'public';
+    const inviteLink = r.invite_link || r.link || '';
+    if (inviteLink && (inviteLink.includes('/+') || inviteLink.includes('joinchat'))) return 'invite_only';
+    if (r.telegram_id) return 'id_only';
+    return 'unknown';
+  }
+  
+  // 🔧 獲取可達性標籤
+  getAccessibilityLabel(r: DiscoveredResource): string {
+    const a = r.accessibility || this.getAccessibility(r);
+    switch (a) {
+      case 'public': return '公開群組';
+      case 'invite_only': return '邀請鏈接';
+      case 'id_only': return '僅有ID';
+      case 'unknown': return '信息不完整';
+    }
+  }
+  
+  // 🔧 獲取有效的加入鏈接
+  getEffectiveJoinLink(r: DiscoveredResource): string | null {
+    if (r.username) return `https://t.me/${r.username.replace('@', '')}`;
+    const inviteLink = r.invite_link || r.link || '';
+    if (inviteLink) return inviteLink;
+    if (r.telegram_id) return String(r.telegram_id);
+    return null;
+  }
+  
+  // 🔧 判斷是否可以加入
+  canJoin(r: DiscoveredResource): boolean {
+    return !!(r.username || r.invite_link || r.link || r.telegram_id);
   }
   
   // 🆕 格式化分數顯示
@@ -2895,6 +3690,7 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     this.filterSource.set('all');
     this.filterJoinStatus.set('all');
     this.filterHasId.set(false);
+    this.filterHideUnreachable.set(true);
   }
   
   // 🆕 計算活躍篩選數量
@@ -2906,6 +3702,16 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
     if (this.filterSource() !== 'all') count++;
     if (this.filterJoinStatus() !== 'all') count++;
     if (this.filterHasId()) count++;
+    if (!this.filterHideUnreachable()) count++;  // 如果手動關閉了，算一個篩選
     return count;
+  });
+  
+  // 🔧 計算被隱藏的不可達群組數量
+  hiddenUnreachableCount = computed(() => {
+    if (!this.filterHideUnreachable()) return 0;
+    return this.mergedResources().filter(r => {
+      const a = r.accessibility || this.getAccessibility(r);
+      return a === 'unknown';
+    }).length;
   });
 }

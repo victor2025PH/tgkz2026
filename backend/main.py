@@ -856,6 +856,7 @@ _HANDLER_REGISTRY = {
         'handle_get_resource_stats handle_add_resource_manually handle_save_resource '
         'handle_unsave_resource handle_delete_resource handle_delete_resources_batch '
         'handle_verify_resource_type handle_batch_verify_resource_types '
+        'handle_check_resources_health '
         'handle_clear_all_resources handle_batch_join_resources'
     ),
     'domain.search.search_handlers_impl': (
@@ -863,7 +864,8 @@ _HANDLER_REGISTRY = {
         'handle_get_search_results_by_id handle_get_search_statistics '
         'handle_cleanup_search_history handle_search_jiso handle_check_jiso_availability '
         'handle_get_search_channels handle_add_search_channel handle_update_search_channel '
-        'handle_delete_search_channel handle_test_search_channel'
+        'handle_delete_search_channel handle_test_search_channel '
+        'handle_get_keyword_suggestions'
     ),
 }
 

@@ -754,6 +754,125 @@ async def handle_clear_all_resources(self):
         })
 
 
+async def handle_check_resources_health(self, payload: Dict[str, Any]):
+    """
+    🔧 Phase3: 資源健康檢查 — 批量驗證已收藏資源的有效性
+    
+    通過 Telegram API 驗證每個資源是否仍然可達（未刪除、未封禁）
+    """
+    try:
+        resources = payload.get('resources', [])
+        if not resources:
+            self.send_event("resources-health-result", {"success": True, "results": [], "total": 0})
+            return
+        
+        # 獲取可用的 Telegram 客戶端
+        connected_clients = {p: c for p, c in self.telegram_manager.clients.items() if c.is_connected}
+        if not connected_clients:
+            self.send_event("resources-health-result", {
+                "success": False, "error": "沒有已連接的帳號"
+            })
+            return
+        
+        # 取第一個可用客戶端
+        client = None
+        for c in connected_clients.values():
+            if c.is_connected:
+                client = c
+                break
+        
+        if not client:
+            self.send_event("resources-health-result", {
+                "success": False, "error": "沒有可用的客戶端"
+            })
+            return
+        
+        results = []
+        checked = 0
+        healthy = 0
+        unhealthy = 0
+        
+        self.send_log(f"🏥 開始健康檢查: {len(resources)} 個資源...", "info")
+        
+        for i, res in enumerate(resources[:50]):  # 限制最多 50 個
+            username = res.get('username', '')
+            telegram_id = res.get('telegram_id', '')
+            title = res.get('title', '')
+            
+            health = {
+                'telegram_id': telegram_id,
+                'username': username,
+                'title': title,
+                'status': 'unknown',
+                'member_count': 0,
+                'error': None
+            }
+            
+            try:
+                identifier = username or telegram_id
+                if not identifier:
+                    health['status'] = 'no_identifier'
+                    health['error'] = '缺少標識符'
+                    results.append(health)
+                    continue
+                
+                chat = await asyncio.wait_for(
+                    client.get_chat(identifier),
+                    timeout=5.0
+                )
+                
+                if chat:
+                    health['status'] = 'healthy'
+                    health['member_count'] = getattr(chat, 'members_count', 0) or 0
+                    health['title'] = chat.title or title
+                    healthy += 1
+                else:
+                    health['status'] = 'not_found'
+                    unhealthy += 1
+                    
+            except Exception as e:
+                error_str = str(e).lower()
+                if 'channel_private' in error_str or 'private' in error_str:
+                    health['status'] = 'private'
+                    health['error'] = '群組已變為私有'
+                elif 'not_occupied' in error_str or 'not found' in error_str:
+                    health['status'] = 'deleted'
+                    health['error'] = '群組已刪除或不存在'
+                elif 'banned' in error_str:
+                    health['status'] = 'banned'
+                    health['error'] = '帳號被此群組封禁'
+                else:
+                    health['status'] = 'error'
+                    health['error'] = str(e)[:100]
+                unhealthy += 1
+            
+            results.append(health)
+            checked += 1
+            
+            # 每檢查 10 個發送進度
+            if checked % 10 == 0:
+                self.send_log(f"🏥 已檢查 {checked}/{len(resources)} 個...", "info")
+            
+            # 避免觸發 FloodWait
+            await asyncio.sleep(0.5)
+        
+        self.send_log(f"🏥 健康檢查完成: {healthy} 健康, {unhealthy} 異常, 共 {checked} 個", "info")
+        self.send_event("resources-health-result", {
+            "success": True,
+            "results": results,
+            "total": checked,
+            "healthy": healthy,
+            "unhealthy": unhealthy
+        })
+        
+    except Exception as e:
+        self.send_log(f"❌ 健康檢查失敗: {e}", "error")
+        self.send_event("resources-health-result", {
+            "success": False,
+            "error": str(e)
+        })
+
+
 async def handle_batch_join_resources(self, payload: Dict[str, Any]):
     """批量加入資源"""
     try:

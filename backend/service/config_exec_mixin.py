@@ -676,40 +676,48 @@ class ConfigExecMixin:
             print(f"[Backend] Error in auto-verify task: {e}", file=sys.stderr)
 
     def _get_friendly_join_error(self, error: str) -> str:
-        """將技術錯誤轉換為用戶友好的信息"""
+        """將技術錯誤轉換為用戶友好的信息（帶 error_code）"""
         error_lower = error.lower()
         
-        # 常見錯誤映射
+        # 🔧 Phase2: 增強錯誤映射 — 包含 error_code 供前端區分處理
         error_mappings = {
-            'flood_wait': '操作過於頻繁，請稍後再試',
-            'floodwait': '操作過於頻繁，請稍後再試',
-            'user_already_participant': '您已經是該群組的成員',
-            'invite_hash_expired': '邀請鏈接已失效或過期',
-            'invite_hash_invalid': '邀請鏈接無效',
-            'user_not_participant': '您不是該群組的成員',
-            'chat_write_forbidden': '沒有權限發送消息到該群組',
-            'peer_id_invalid': '群組 ID 無效，請檢查鏈接是否正確',
-            'username_not_occupied': '找不到該群組，用戶名不存在',
-            'username_invalid': '群組用戶名格式無效',
-            'channel_private': '這是私有群組，需要邀請鏈接才能加入',
-            'channel_invalid': '無效的頻道/群組',
-            'chat_invalid': '無效的聊天',
-            'no attribute': '功能暫時不可用，請重啟應用後重試',
-            'not connected': '帳號未連接，請先登錄帳號',
-            'account not connected': '帳號未連接，請先登錄帳號',
-            '沒有可用的已連接帳號': '請先在「帳號管理」中登錄至少一個帳號',
-            'timeout': '連接超時，請檢查網絡後重試',
+            'flood_wait': ('FLOOD_WAIT', '操作過於頻繁，請稍後再試'),
+            'floodwait': ('FLOOD_WAIT', '操作過於頻繁，請稍後再試'),
+            'user_already_participant': ('ALREADY_MEMBER', '您已經是該群組的成員'),
+            'invite_hash_expired': ('INVITE_EXPIRED', '邀請鏈接已失效或過期，請聯繫群主獲取新鏈接'),
+            'invitehashexpired': ('INVITE_EXPIRED', '邀請鏈接已失效或過期，請聯繫群主獲取新鏈接'),
+            'invite_hash_invalid': ('INVITE_INVALID', '邀請鏈接無效，可能已被撤銷或格式錯誤'),
+            'invitehashinvalid': ('INVITE_INVALID', '邀請鏈接無效，可能已被撤銷或格式錯誤'),
+            'invite_request_sent': ('INVITE_PENDING', '已發送加入申請，等待管理員審核'),
+            'user_not_participant': ('NOT_MEMBER', '您不是該群組的成員'),
+            'chat_write_forbidden': ('WRITE_FORBIDDEN', '沒有權限發送消息到該群組'),
+            'peer_id_invalid': ('PEER_INVALID', '群組 ID 無效，該群組可能已被刪除或遷移'),
+            'username_not_occupied': ('USERNAME_NOT_FOUND', '找不到該群組，用戶名不存在或已更改'),
+            'username_invalid': ('USERNAME_INVALID', '群組用戶名格式無效'),
+            'channel_private': ('CHANNEL_PRIVATE', '這是私有群組，需要邀請鏈接才能加入'),
+            'channel_invalid': ('CHANNEL_INVALID', '無效的頻道/群組，可能已被刪除'),
+            'chat_invalid': ('CHAT_INVALID', '無效的聊天，該群組可能已不存在'),
+            'user_banned_in_channel': ('USER_BANNED', '您的帳號已被該群組封禁'),
+            'userbannedin': ('USER_BANNED', '您的帳號已被該群組封禁'),
+            'chat_admin_required': ('ADMIN_REQUIRED', '需要管理員邀請才能加入'),
+            'channels_too_much': ('TOO_MANY_CHANNELS', '已加入太多群組/頻道，請先退出一些'),
+            'users_too_much': ('GROUP_FULL', '群組成員已滿，無法加入'),
+            'no attribute': ('SYSTEM_ERROR', '功能暫時不可用，請重啟應用後重試'),
+            'not connected': ('NOT_CONNECTED', '帳號未連接，請先登錄帳號'),
+            'account not connected': ('NOT_CONNECTED', '帳號未連接，請先登錄帳號'),
+            '沒有可用的已連接帳號': ('NOT_CONNECTED', '請先在「帳號管理」中登錄至少一個帳號'),
+            'timeout': ('TIMEOUT', '連接超時，請檢查網絡後重試'),
         }
         
-        for key, friendly_msg in error_mappings.items():
+        for key, (code, friendly_msg) in error_mappings.items():
             if key in error_lower:
-                return friendly_msg
+                return f"[{code}] {friendly_msg}"
         
         # 如果沒有匹配，返回原始錯誤（但清理技術細節）
         if 'object has no attribute' in error_lower:
-            return '系統功能異常，請重啟應用後重試'
+            return '[SYSTEM_ERROR] 系統功能異常，請重啟應用後重試'
         
-        return error
+        return f"[UNKNOWN] {error}"
 
     def get_ai_team_executor(self):
         """獲取或創建 AI 團隊執行器"""

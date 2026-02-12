@@ -502,6 +502,114 @@ class SearchHistoryService:
             'top_keywords': top_keywords
         }
     
+    def get_keyword_suggestions(self, current_keyword: str = '', limit: int = 10) -> List[Dict]:
+        """
+        🔧 Phase3: 智能搜索推薦
+        
+        策略：
+        1. 最近搜索過的關鍵詞（按時間降序）
+        2. 高頻搜索關鍵詞（按次數降序）
+        3. 與當前輸入相關的關鍵詞（模糊匹配）
+        4. 基於搜索共現的相關推薦（搜 A 的人也搜了 B）
+        """
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        suggestions = []
+        seen = set()
+        
+        # 1. 與當前輸入匹配的歷史關鍵詞
+        if current_keyword.strip():
+            cursor.execute('''
+                SELECT keyword, COUNT(*) as freq, MAX(search_time) as last_time,
+                       SUM(result_count) as total_results
+                FROM search_history
+                WHERE keyword LIKE ?
+                GROUP BY keyword
+                ORDER BY freq DESC, last_time DESC
+                LIMIT ?
+            ''', (f'%{current_keyword}%', limit))
+            for row in cursor.fetchall():
+                kw = row['keyword']
+                if kw not in seen:
+                    seen.add(kw)
+                    suggestions.append({
+                        'keyword': kw,
+                        'type': 'match',
+                        'freq': row['freq'],
+                        'total_results': row['total_results'] or 0,
+                        'last_time': row['last_time']
+                    })
+        
+        # 2. 最近搜索（不重複）
+        cursor.execute('''
+            SELECT keyword, COUNT(*) as freq, MAX(search_time) as last_time,
+                   SUM(result_count) as total_results
+            FROM search_history
+            GROUP BY keyword
+            ORDER BY MAX(search_time) DESC
+            LIMIT ?
+        ''', (limit * 2,))
+        for row in cursor.fetchall():
+            kw = row['keyword']
+            if kw not in seen and len(suggestions) < limit:
+                seen.add(kw)
+                suggestions.append({
+                    'keyword': kw,
+                    'type': 'recent',
+                    'freq': row['freq'],
+                    'total_results': row['total_results'] or 0,
+                    'last_time': row['last_time']
+                })
+        
+        # 3. 高頻搜索（不重複）
+        cursor.execute('''
+            SELECT keyword, COUNT(*) as freq, MAX(search_time) as last_time,
+                   SUM(result_count) as total_results
+            FROM search_history
+            GROUP BY keyword
+            ORDER BY freq DESC
+            LIMIT ?
+        ''', (limit * 2,))
+        for row in cursor.fetchall():
+            kw = row['keyword']
+            if kw not in seen and len(suggestions) < limit:
+                seen.add(kw)
+                suggestions.append({
+                    'keyword': kw,
+                    'type': 'popular',
+                    'freq': row['freq'],
+                    'total_results': row['total_results'] or 0,
+                    'last_time': row['last_time']
+                })
+        
+        # 4. 共現推薦：搜過 A 的人也搜了 B
+        if current_keyword.strip():
+            cursor.execute('''
+                SELECT h2.keyword, COUNT(*) as co_freq
+                FROM search_history h1
+                JOIN search_history h2 ON h1.account_phone = h2.account_phone
+                    AND h2.keyword != h1.keyword
+                    AND ABS(julianday(h1.search_time) - julianday(h2.search_time)) < 1
+                WHERE h1.keyword LIKE ?
+                GROUP BY h2.keyword
+                ORDER BY co_freq DESC
+                LIMIT ?
+            ''', (f'%{current_keyword}%', 5))
+            for row in cursor.fetchall():
+                kw = row['keyword']
+                if kw not in seen and len(suggestions) < limit:
+                    seen.add(kw)
+                    suggestions.append({
+                        'keyword': kw,
+                        'type': 'related',
+                        'freq': row['co_freq'],
+                        'total_results': 0,
+                        'last_time': ''
+                    })
+        
+        conn.close()
+        return suggestions[:limit]
+    
     def cleanup_old_records(self, days: int = 30):
         """清理舊的搜索記錄（保留資源主記錄）"""
         conn = self._get_conn()

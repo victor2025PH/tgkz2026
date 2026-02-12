@@ -392,7 +392,11 @@ export class KeywordSetsComponent implements OnInit, OnDestroy {
         this.isEditing.set(false);
         this.newKeyword = '';
       } else {
-        this.toastService.error(`❌ 保存失敗: ${data.error || '未知錯誤'}`);
+        const msg = (data.error || '未知錯誤') as string;
+        const friendly = (msg.includes('locked') || msg.includes('busy') || msg.includes('繁忙'))
+          ? '系統繁忙，請稍後再試'
+          : msg;
+        this.toastService.error(`❌ 保存失敗: ${friendly}`);
       }
     });
     this.listeners.push(cleanup1);

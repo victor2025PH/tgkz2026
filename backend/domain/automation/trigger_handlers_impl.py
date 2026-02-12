@@ -122,7 +122,14 @@ async def handle_save_trigger_rule(self, payload: Dict[str, Any]):
             return
         
         if rule_id:
-            # 更新
+            # 更新（僅可更新當前用戶的規則）
+            existing = await db.get_trigger_rule(rule_id)
+            if not existing:
+                self.send_event("save-trigger-rule-result", {
+                    "success": False,
+                    "error": "無權限修改該規則或規則不存在"
+                })
+                return
             success = await db.update_trigger_rule(rule_id, payload)
             if success:
                 self.send_log(f"✅ 已更新觸發規則: {name}", "success")

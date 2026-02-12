@@ -20,9 +20,10 @@ except ImportError:
 
 
 # 需要租戶隔離的表列表
+# 多用户一库方案：所有业务数据表按 owner_user_id 行级隔离
 TENANT_ISOLATED_TABLES = {
     'accounts',
-    'keyword_sets', 
+    'keyword_sets',
     'monitored_groups',
     'leads',
     'campaigns',
@@ -34,6 +35,7 @@ TENANT_ISOLATED_TABLES = {
     'discovered_resources',
     'knowledge_items',
     'api_credentials',
+    'unified_contacts',  # 发送控制台客户名单数据源，必须隔离
 }
 
 

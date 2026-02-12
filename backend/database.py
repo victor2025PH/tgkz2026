@@ -422,6 +422,11 @@ class Database(UserAdminMixin, AccountMixin, KeywordGroupMixin, CampaignQueueMix
                         print(f"[Database] Adding column: unified_contacts.{col_name}", file=sys.stderr)
                         cursor.execute(f'ALTER TABLE unified_contacts ADD COLUMN {col_name} {col_def}')
                         conn.commit()
+                # 多用户一库：owner_user_id 用于客户名单按用户隔离（Migration 0029 同逻辑）
+                if 'owner_user_id' not in uc_columns:
+                    print("[Database] Adding column: unified_contacts.owner_user_id", file=sys.stderr)
+                    cursor.execute("ALTER TABLE unified_contacts ADD COLUMN owner_user_id TEXT DEFAULT 'local_user'")
+                    conn.commit()
             
             # ============ funnel_stages 表遷移 ============
             cursor.execute("PRAGMA table_info(funnel_stages)")

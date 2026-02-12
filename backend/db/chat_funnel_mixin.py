@@ -13,24 +13,18 @@ class ChatFunnelMixin:
     # ============ 聊天模板相關 ============
     
     async def get_chat_templates(self) -> List[Dict[str, Any]]:
-        """獲取所有聊天模板
-        
-        Returns:
-            List[Dict]: 模板列表
-        """
+        """獲取所有聊天模板（多用户一库按 owner_user_id 隔離）"""
         try:
             await self.connect()
-            # 🔧 FIX: 執行 WAL checkpoint 確保讀取最新數據
             try:
                 await self._connection.execute("PRAGMA wal_checkpoint(PASSIVE)")
             except Exception:
-                pass  # 忽略 checkpoint 錯誤，繼續查詢
-            
-            cursor = await self._connection.execute(
-                "SELECT * FROM chat_templates ORDER BY usage_count DESC, created_at DESC"
-            )
-            rows = await cursor.fetchall()
-            
+                pass
+            from core.tenant_filter import add_tenant_filter
+            query = "SELECT * FROM chat_templates ORDER BY usage_count DESC, created_at DESC"
+            query, params = add_tenant_filter(query, 'chat_templates', [])
+            rows = await self.fetch_all(query, tuple(params))
+
             templates = []
             import json
             for row in rows:
@@ -116,21 +110,17 @@ class ChatFunnelMixin:
             return {'success': False, 'error': str(e)}
     
     async def delete_chat_template(self, template_id: int) -> bool:
-        """刪除聊天模板
-        
-        Args:
-            template_id: 模板 ID
-            
-        Returns:
-            bool: 是否成功
-        """
+        """刪除聊天模板（僅可刪除當前用戶的模板）"""
         try:
             await self.connect()
-            await self._connection.execute(
-                "DELETE FROM chat_templates WHERE id=?", (template_id,)
+            from core.tenant_filter import get_owner_user_id
+            owner_id = get_owner_user_id()
+            cursor = await self._connection.execute(
+                "DELETE FROM chat_templates WHERE id=? AND owner_user_id=?",
+                (template_id, owner_id)
             )
             await self._connection.commit()
-            return True
+            return cursor.rowcount > 0
         except Exception as e:
             import sys
             print(f"Error deleting chat template: {e}", file=sys.stderr)

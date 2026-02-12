@@ -343,14 +343,14 @@ export class MonitoringStateService implements OnDestroy {
     this.listeners.push(cleanup3c);
     
     // 🔧 修復：監聽添加/移除群組的操作結果事件
-    const cleanup3c = this.ipcService.on('monitored-group-added', (data: any) => {
+    const cleanup3d = this.ipcService.on('monitored-group-added', (data: any) => {
       if (data.success) {
         console.log('[StateService] monitored-group-added, refreshing...');
         // 操作成功後主動請求最新列表（保底機制）
         this.ipcService.send('get-monitored-groups', {});
       }
     });
-    this.listeners.push(cleanup3c);
+    this.listeners.push(cleanup3d);
     
     // 監聯 keyword-sets 更新（多租戶：僅在響應屬於當前用戶時應用）
     const cleanup4 = this.ipcService.on('get-keyword-sets-result', (data: any) => {

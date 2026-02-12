@@ -468,6 +468,15 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
         ('GET',    '/api/redoc',                       'redoc_ui'),
         ('GET',    '/api/openapi.json',                'openapi_json'),
 
+        # === AI 設置 (P0: 用戶級獨立 AI 配置) ===
+        ('GET',    '/api/v1/ai/settings',              'get_ai_settings_api'),
+        ('PUT',    '/api/v1/ai/settings',              'save_ai_settings_api'),
+        ('GET',    '/api/v1/ai/models',                'get_ai_models_api'),
+        ('POST',   '/api/v1/ai/models',                'save_ai_model_api'),
+        ('PUT',    '/api/v1/ai/models/{id}',           'update_ai_model_api'),
+        ('DELETE', '/api/v1/ai/models/{id}',           'delete_ai_model_api'),
+        ('POST',   '/api/v1/ai/models/{id}/test',      'test_ai_model_api'),
+
         # === 性能指標 (P13-3) / 缓存 (P14-3) ===
         ('GET',    '/api/v1/metrics/api',              'api_perf_metrics'),
         ('GET',    '/api/v1/metrics/cache',            'api_cache_stats'),
@@ -751,6 +760,13 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
         if not command:
             return self._json_response({'success': False, 'error': 'Missing command'}, 400)
         
+        # 🔧 P0: 為 AI 相關命令注入 _user_id，實現用戶級隔離
+        tenant = request.get('tenant')
+        if tenant and getattr(tenant, 'user_id', None):
+            if command.startswith(('save-ai-', 'get-ai-', 'update-ai-', 'delete-ai-', 'test-ai-',
+                                   'save-model-', 'save-conversation-')):
+                payload['_user_id'] = tenant.user_id
+        
         result = await self._execute_command(command, payload)
         return self._json_response(result)
     
@@ -893,6 +909,125 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
         result = await self._execute_command('save-settings', data)
         return self._json_response(result)
     
+    # ==================== AI 設置 (P0: 用戶級獨立配置) ====================
+    
+    async def get_ai_settings_api(self, request):
+        """獲取當前用戶的 AI 設置（模型用途分配、對話策略等）"""
+        tenant = request.get('tenant')
+        user_id = getattr(tenant, 'user_id', '') if tenant else ''
+        try:
+            rows = await db.fetch_all(
+                "SELECT key, value FROM ai_settings WHERE user_id = ?", (user_id,)
+            )
+            settings = {}
+            for row in rows:
+                val = row['value']
+                # 嘗試解析 JSON 值
+                try:
+                    import json as _json
+                    settings[row['key']] = _json.loads(val)
+                except (ValueError, TypeError):
+                    settings[row['key']] = val
+            return self._json_response({'success': True, 'data': settings})
+        except Exception as e:
+            logger.error(f"[AI Settings] Get error: {e}")
+            return self._json_response({'success': True, 'data': {}})
+    
+    async def save_ai_settings_api(self, request):
+        """批量保存當前用戶的 AI 設置"""
+        tenant = request.get('tenant')
+        user_id = getattr(tenant, 'user_id', '') if tenant else ''
+        data = await request.json()
+        settings = data.get('settings', data)
+        try:
+            import json as _json
+            for key, value in settings.items():
+                if key.startswith('_'): continue  # 跳過內部字段
+                str_value = _json.dumps(value) if isinstance(value, (dict, list)) else str(value)
+                await db.execute('''
+                    INSERT INTO ai_settings (user_id, key, value, updated_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(user_id, key) DO UPDATE SET
+                        value = excluded.value,
+                        updated_at = CURRENT_TIMESTAMP
+                ''', (user_id, key, str_value))
+            return self._json_response({'success': True})
+        except Exception as e:
+            logger.error(f"[AI Settings] Save error: {e}")
+            return self._json_response({'success': False, 'error': str(e)}, status=500)
+    
+    async def get_ai_models_api(self, request):
+        """獲取當前用戶的 AI 模型列表"""
+        tenant = request.get('tenant')
+        user_id = getattr(tenant, 'user_id', '') if tenant else ''
+        try:
+            import json as _json
+            models = await db.fetch_all(
+                """SELECT id, provider, model_name, display_name, api_key, api_endpoint,
+                   is_local, is_default, priority, is_connected, last_tested_at, config_json,
+                   created_at, updated_at
+                   FROM ai_models WHERE user_id = ?
+                   ORDER BY is_default DESC, priority DESC, created_at DESC""",
+                (user_id,)
+            )
+            result = []
+            for m in models:
+                api_key = m.get('api_key', '') or ''
+                masked = f"{api_key[:8]}...{api_key[-4:]}" if len(api_key) > 12 else '***'
+                result.append({
+                    'id': m['id'], 'provider': m['provider'],
+                    'modelName': m['model_name'], 'displayName': m['display_name'] or m['model_name'],
+                    'apiKey': api_key, 'apiKeyMasked': masked,
+                    'apiEndpoint': m['api_endpoint'],
+                    'isLocal': bool(m['is_local']), 'isDefault': bool(m['is_default']),
+                    'priority': m['priority'], 'isConnected': bool(m['is_connected']),
+                    'lastTestedAt': m['last_tested_at'],
+                    'config': _json.loads(m['config_json'] or '{}'),
+                })
+            return self._json_response({'success': True, 'data': result})
+        except Exception as e:
+            logger.error(f"[AI Models] Get error: {e}")
+            return self._json_response({'success': True, 'data': []})
+    
+    async def save_ai_model_api(self, request):
+        """添加 AI 模型（帶 user_id）"""
+        tenant = request.get('tenant')
+        user_id = getattr(tenant, 'user_id', '') if tenant else ''
+        data = await request.json()
+        data['_user_id'] = user_id
+        result = await self._execute_command('save-ai-model', data)
+        return self._json_response(result or {'success': True})
+    
+    async def update_ai_model_api(self, request):
+        """更新 AI 模型"""
+        tenant = request.get('tenant')
+        user_id = getattr(tenant, 'user_id', '') if tenant else ''
+        model_id = request.match_info['id']
+        data = await request.json()
+        data['id'] = int(model_id)
+        data['_user_id'] = user_id
+        result = await self._execute_command('update-ai-model', data)
+        return self._json_response(result or {'success': True})
+    
+    async def delete_ai_model_api(self, request):
+        """刪除 AI 模型"""
+        tenant = request.get('tenant')
+        user_id = getattr(tenant, 'user_id', '') if tenant else ''
+        model_id = request.match_info['id']
+        result = await self._execute_command('delete-ai-model', {'id': int(model_id), '_user_id': user_id})
+        return self._json_response(result or {'success': True})
+    
+    async def test_ai_model_api(self, request):
+        """測試 AI 模型連接"""
+        tenant = request.get('tenant')
+        user_id = getattr(tenant, 'user_id', '') if tenant else ''
+        model_id = request.match_info['id']
+        data = await request.json() if request.content_length else {}
+        data['id'] = int(model_id)
+        data['_user_id'] = user_id
+        result = await self._execute_command('test-ai-model', data)
+        return self._json_response(result or {'success': True})
+
     # P9-1: Quota/usage routes extracted to api/quota_routes_mixin.py (~400 lines)
 
     # P9-1: Payment/subscription routes extracted to api/payment_routes_mixin.py (~700 lines)

@@ -22,8 +22,9 @@ from database import db
 # ==================== AI Model Configuration Handlers ====================
 
 async def handle_save_ai_model(self, payload: Dict[str, Any]):
-    """保存 AI 模型配置到數據庫"""
+    """保存 AI 模型配置到數據庫（按 user_id 隔離）"""
     try:
+        user_id = payload.get('_user_id', '')  # 由 HTTP API 或 IPC 注入
         provider = payload.get('provider', '')
         model_name = payload.get('modelName', '')
         display_name = payload.get('displayName', model_name)
@@ -41,18 +42,17 @@ async def handle_save_ai_model(self, payload: Dict[str, Any]):
             })
             return
         
-        # 如果設為默認，先取消其他默認
+        # 如果設為默認，先取消該用戶的其他默認
         if is_default:
-            await db.execute("UPDATE ai_models SET is_default = 0")
+            await db.execute("UPDATE ai_models SET is_default = 0 WHERE user_id = ?", (user_id,))
         
-        # 檢查是否已存在
+        # 檢查該用戶是否已存在同一模型
         existing = await db.fetch_one(
-            "SELECT id FROM ai_models WHERE provider = ? AND model_name = ?",
-            (provider, model_name)
+            "SELECT id FROM ai_models WHERE provider = ? AND model_name = ? AND user_id = ?",
+            (provider, model_name, user_id)
         )
         
         if existing:
-            # 更新現有記錄
             await db.execute(
                 """UPDATE ai_models SET 
                    display_name = ?, api_key = ?, api_endpoint = ?, 
@@ -63,13 +63,12 @@ async def handle_save_ai_model(self, payload: Dict[str, Any]):
             )
             model_id = existing['id']
         else:
-            # 插入新記錄
             await db.execute(
                 """INSERT INTO ai_models 
-                   (provider, model_name, display_name, api_key, api_endpoint, 
+                   (user_id, provider, model_name, display_name, api_key, api_endpoint, 
                     is_local, is_default, priority, config_json, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
-                (provider, model_name, display_name, api_key, api_endpoint, 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
+                (user_id, provider, model_name, display_name, api_key, api_endpoint, 
                  is_local, is_default, priority, config_json)
             )
             model_id = (await db.fetch_one("SELECT last_insert_rowid() as id"))['id']
@@ -82,22 +81,25 @@ async def handle_save_ai_model(self, payload: Dict[str, Any]):
             "modelName": model_name
         })
         
-        # 同時發送更新後的模型列表
-        await self.handle_get_ai_models()
+        # 同時發送更新後的模型列表（帶 user_id）
+        await handle_get_ai_models(self, payload)
         
     except Exception as e:
         self.send_log(f"❌ 保存 AI 模型失敗: {e}", "error")
         self.send_event("ai-model-saved", {"success": False, "error": str(e)})
 
 
-async def handle_get_ai_models(self):
-    """獲取所有已保存的 AI 模型配置"""
+async def handle_get_ai_models(self, payload: Dict[str, Any] = None):
+    """獲取該用戶已保存的 AI 模型配置"""
     try:
+        user_id = (payload or {}).get('_user_id', '')
         models = await db.fetch_all(
             """SELECT id, provider, model_name, display_name, api_key, api_endpoint,
                is_local, is_default, priority, is_connected, last_tested_at, config_json,
                created_at, updated_at
-               FROM ai_models ORDER BY is_default DESC, priority DESC, created_at DESC"""
+               FROM ai_models WHERE user_id = ?
+               ORDER BY is_default DESC, priority DESC, created_at DESC""",
+            (user_id,)
         )
         
         result = []
@@ -136,8 +138,9 @@ async def handle_get_ai_models(self):
 
 
 async def handle_update_ai_model(self, payload: Dict[str, Any]):
-    """更新 AI 模型配置"""
+    """更新 AI 模型配置（按 user_id 隔離）"""
     try:
+        user_id = payload.get('_user_id', '')
         model_id = payload.get('id')
         if not model_id:
             self.send_event("ai-model-updated", {"success": False, "error": "缺少模型 ID"})
@@ -157,7 +160,7 @@ async def handle_update_ai_model(self, payload: Dict[str, Any]):
             params.append(payload['apiEndpoint'])
         if 'isDefault' in payload:
             if payload['isDefault']:
-                await db.execute("UPDATE ai_models SET is_default = 0")
+                await db.execute("UPDATE ai_models SET is_default = 0 WHERE user_id = ?", (user_id,))
             updates.append("is_default = ?")
             params.append(1 if payload['isDefault'] else 0)
         if 'priority' in payload:
@@ -170,32 +173,33 @@ async def handle_update_ai_model(self, payload: Dict[str, Any]):
         
         if updates:
             updates.append("updated_at = CURRENT_TIMESTAMP")
-            params.append(model_id)
+            params.extend([model_id, user_id])
             await db.execute(
-                f"UPDATE ai_models SET {', '.join(updates)} WHERE id = ?",
+                f"UPDATE ai_models SET {', '.join(updates)} WHERE id = ? AND user_id = ?",
                 tuple(params)
             )
         
         self.send_event("ai-model-updated", {"success": True, "modelId": model_id})
-        await self.handle_get_ai_models()
+        await handle_get_ai_models(self, payload)
         
     except Exception as e:
         self.send_event("ai-model-updated", {"success": False, "error": str(e)})
 
 
 async def handle_delete_ai_model(self, payload: Dict[str, Any]):
-    """刪除 AI 模型配置"""
+    """刪除 AI 模型配置（按 user_id 隔離）"""
     try:
+        user_id = payload.get('_user_id', '')
         model_id = payload.get('id')
         if not model_id:
             self.send_event("ai-model-deleted", {"success": False, "error": "缺少模型 ID"})
             return
         
-        await db.execute("DELETE FROM ai_models WHERE id = ?", (model_id,))
+        await db.execute("DELETE FROM ai_models WHERE id = ? AND user_id = ?", (model_id, user_id))
         
         self.send_log(f"✅ AI 模型已刪除: ID={model_id}", "success")
         self.send_event("ai-model-deleted", {"success": True, "modelId": model_id})
-        await self.handle_get_ai_models()
+        await handle_get_ai_models(self, payload)
         
     except Exception as e:
         self.send_event("ai-model-deleted", {"success": False, "error": str(e)})
@@ -617,23 +621,26 @@ async def handle_set_default_ai_model(self, payload: Dict[str, Any]):
 
 
 async def handle_save_model_usage(self, payload: Dict[str, Any]):
-    """保存模型用途分配"""
+    """保存模型用途分配（按 user_id 隔離）"""
     try:
+        user_id = payload.get('_user_id', '')
         intent_recognition = payload.get('intentRecognition', '')
         daily_chat = payload.get('dailyChat', '')
         multi_role_script = payload.get('multiRoleScript', '')
         
-        # 保存到 ai_settings 表
-        await db.execute("""
-            INSERT INTO ai_settings (key, value) VALUES ('model_usage', ?)
-            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
-        """, (json.dumps({
+        value = json.dumps({
             'intentRecognition': intent_recognition,
             'dailyChat': daily_chat,
             'multiRoleScript': multi_role_script
-        }),))
+        })
+        # 保存到 ai_settings 表（按 user_id 隔離）
+        await db.execute("""
+            INSERT INTO ai_settings (user_id, key, value, updated_at)
+            VALUES (?, 'model_usage', ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+        """, (user_id, value))
         
-        print(f"[AI] 模型用途分配已保存: intent={intent_recognition}, chat={daily_chat}, multi={multi_role_script}", file=sys.stderr)
+        print(f"[AI] 模型用途分配已保存 (user={user_id}): intent={intent_recognition}", file=sys.stderr)
         self.send_event("model-usage-saved", {"success": True})
         
     except Exception as e:
@@ -642,10 +649,12 @@ async def handle_save_model_usage(self, payload: Dict[str, Any]):
 
 
 async def handle_get_model_usage(self, data=None):
-    """獲取模型用途分配"""
+    """獲取模型用途分配（按 user_id 隔離）"""
     try:
+        user_id = (data or {}).get('_user_id', '')
         row = await db.fetch_one(
-            "SELECT value FROM ai_settings WHERE key = 'model_usage'"
+            "SELECT value FROM ai_settings WHERE user_id = ? AND key = 'model_usage'",
+            (user_id,)
         )
         
         if row and row.get('value'):
@@ -657,7 +666,7 @@ async def handle_get_model_usage(self, data=None):
                 'multiRoleScript': ''
             }
         
-        print(f"[AI] 模型用途分配已加載: {usage}", file=sys.stderr)
+        print(f"[AI] 模型用途分配已加載 (user={user_id}): {usage}", file=sys.stderr)
         self.send_event("model-usage-loaded", {"success": True, "usage": usage})
         
     except Exception as e:

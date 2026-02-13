@@ -65,10 +65,16 @@ class BusinessRoutesMixin:
             return self._json_response({'success': False, 'error': str(e)}, status=500)
 
     async def get_ai_models_api(self, request):
-        """獲取當前用戶的 AI 模型列表"""
+        """獲取當前用戶的 AI 模型列表；無 tenant 時回退 get_owner_user_id 以兼容 Electron/舊路徑。"""
         from database import db
         tenant = request.get('tenant')
         user_id = getattr(tenant, 'user_id', '') if tenant else ''
+        if not user_id:
+            try:
+                from core.tenant_filter import get_owner_user_id
+                user_id = get_owner_user_id() or ''
+            except Exception:
+                pass
         try:
             models = await db.fetch_all(
                 """SELECT id, provider, model_name, display_name, api_key, api_endpoint,
@@ -79,7 +85,9 @@ class BusinessRoutesMixin:
                 (user_id,)
             )
             result = []
+            has_connected = False
             for m in models:
+                has_connected = has_connected or bool(m.get('is_connected'))
                 api_key = m.get('api_key', '') or ''
                 masked = f"{api_key[:8]}...{api_key[-4:]}" if len(api_key) > 12 else '***'
                 result.append({
@@ -92,10 +100,20 @@ class BusinessRoutesMixin:
                     'lastTestedAt': m['last_tested_at'],
                     'config': json.loads(m['config_json'] or '{}'),
                 })
-            return self._json_response({'success': True, 'data': result})
+            # 統一「已配置」：有任一已連接模型，或 ai_settings 中有 local_ai_endpoint
+            ai_configured = has_connected
+            if not ai_configured and user_id:
+                try:
+                    ai_settings = await db.get_ai_settings()
+                    ep = (ai_settings or {}).get('local_ai_endpoint') or ''
+                    if isinstance(ep, str) and ep.strip():
+                        ai_configured = True
+                except Exception:
+                    pass
+            return self._json_response({'success': True, 'data': result, 'aiConfigured': ai_configured})
         except Exception as e:
             logger.error(f"[AI Models] Get error: {e}")
-            return self._json_response({'success': False, 'error': str(e), 'data': []}, status=500)
+            return self._json_response({'success': False, 'error': str(e), 'data': [], 'aiConfigured': False}, status=500)
 
     async def save_ai_model_api(self, request):
         """添加 AI 模型（帶 user_id）"""

@@ -201,10 +201,23 @@ async def handle_start_monitoring(self):
         
         # ========== 結束新增 ==========
         
+        # 🔧 綁定「監控所屬用戶」：回調執行時無請求上下文，必須在啟動時捕獲並在回調內注入
+        try:
+            from core.tenant_filter import get_owner_user_id
+            _monitoring_owner_user_id = get_owner_user_id() or 'local_user'
+        except Exception:
+            _monitoring_owner_user_id = 'local_user'
+        import sys
+        print(f"[Backend] 監控所屬用戶(回調將注入): {_monitoring_owner_user_id!r}", file=sys.stderr)
+        
         # Start monitoring for each account
         async def on_lead_captured(lead_data):
-            """Callback when a lead is captured - optimized with batch query"""
+            """Callback when a lead is captured - optimized with batch query. 在正確租戶下執行 Lead 寫入與觸發規則。"""
+            tenant_token = None
             try:
+                from core.tenant_context import TenantContext, set_current_tenant, clear_current_tenant
+                if _monitoring_owner_user_id:
+                    tenant_token = set_current_tenant(TenantContext(user_id=_monitoring_owner_user_id))
                 # Batch check: get lead and DNC status in one query
                 existing_lead, is_dnc = await db.check_lead_and_dnc(lead_data['user_id'])
                 
@@ -348,6 +361,13 @@ async def handle_start_monitoring(self):
                 self.send_log(f"處理潛在客戶時出錯: {str(e)}", "error")
                 # 記錄詳細錯誤到數據庫
                 await db.add_log(f"Lead callback error: {str(e)}", "error")
+            finally:
+                if tenant_token is not None:
+                    try:
+                        from core.tenant_context import clear_current_tenant
+                        clear_current_tenant(tenant_token)
+                    except Exception:
+                        pass
         
         # Start monitoring for each listener account
         successful_starts = 0

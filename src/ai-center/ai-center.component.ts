@@ -2272,6 +2272,8 @@ A: 支持微信、支付寶、銀行卡`,
     this.loadQuickSettings();
     this.loadSenderAccounts();
     this.loadStrategyFromLocalStorage();
+    // 🔧 AI 持久化：每次進入智能引擎頁面強制用當前用戶刷新模型列表，避免切換菜單後仍顯示「未配置 AI」
+    setTimeout(() => this.aiService.loadModelsFromBackend(), 200);
     
     // 🔧 優先使用路由傳入的 initialTab
     const fromRoute = this.initialTab();

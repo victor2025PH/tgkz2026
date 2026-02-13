@@ -273,7 +273,10 @@ export class AICenterService {
         usageToday: 0,
         costToday: 0
       }));
-      this.config.update(c => ({ ...c, models: mapped }));
+      // 🔧 從後端還原默認模型 ID，否則切菜單再返回引擎概覽會顯示「未配置 AI 模型」
+      const defaultModel = (models || []).find((m: any) => m.isDefault);
+      const defaultId = defaultModel != null ? String(defaultModel.id) : (mapped.length > 0 ? mapped[0].id : '');
+      this.config.update(c => ({ ...c, models: mapped, defaultModelId: defaultId || c.defaultModelId }));
       this._aiConfiguredFromBackend.set(aiConfigured === true);
       this._isLoading.set(false);
       console.log('[AI] REST 加載模型成功:', mapped.length, '個, aiConfigured=', aiConfigured);

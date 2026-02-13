@@ -274,7 +274,7 @@ class AIAutoChatService:
     
     async def get_model_for_usage(self, usage_type: str = 'dailyChat') -> Optional[Dict[str, Any]]:
         """
-        🔧 根據用途類型獲取對應的 AI 模型配置
+        🔧 根據用途類型獲取對應的 AI 模型配置（按當前用戶隔離；無配置時回退默認模型）
         
         Args:
             usage_type: 用途類型 ('intentRecognition', 'dailyChat', 'multiRoleScript')
@@ -283,52 +283,81 @@ class AIAutoChatService:
             模型配置 dict 或 None
         """
         import sys
-        
-        # 確保 model_usage 已載入
-        if not hasattr(self, 'model_usage') or not self.model_usage:
-            try:
-                row = await db.fetch_one(
-                    "SELECT value FROM ai_settings WHERE key = 'model_usage'"
-                )
-                if row and row.get('value'):
-                    self.model_usage = json.loads(row['value'])
-                else:
-                    self.model_usage = {}
-            except Exception as e:
-                print(f"[AIAutoChat] 獲取 model_usage 失敗: {e}", file=sys.stderr)
-                self.model_usage = {}
-        
-        # 獲取該用途對應的模型 ID
-        model_id = self.model_usage.get(usage_type, '')
-        
-        if not model_id:
-            print(f"[AIAutoChat] ⚠ 用途 '{usage_type}' 未配置模型，使用默認模型", file=sys.stderr)
-            return None
-        
-        # 從 ai_models 表獲取模型配置
+        user_id = ''
         try:
-            model = await db.fetch_one(
-                """SELECT id, provider, model_name, display_name, api_key, api_endpoint, is_local
-                   FROM ai_models WHERE id = ?""",
-                (model_id,)
+            from core.tenant_filter import get_owner_user_id
+            user_id = get_owner_user_id() or ''
+        except Exception:
+            try:
+                from core.tenant_context import get_user_id
+                user_id = get_user_id() or ''
+            except Exception:
+                pass
+        
+        # 按當前用戶載入 model_usage（多租戶必須帶 user_id）
+        try:
+            row = await db.fetch_one(
+                "SELECT value FROM ai_settings WHERE user_id = ? AND key = 'model_usage'",
+                (user_id,)
             )
-            
-            if model:
-                model_dict = dict(model) if hasattr(model, 'keys') else {
-                    'id': model[0], 'provider': model[1], 'model_name': model[2],
-                    'display_name': model[3], 'api_key': model[4], 'api_endpoint': model[5],
-                    'is_local': model[6] if len(model) > 6 else 0
-                }
-                
-                print(f"[AIAutoChat] ✓ 用途 '{usage_type}' 使用模型: {model_dict.get('display_name')} (ID={model_id}, provider={model_dict.get('provider')})", file=sys.stderr)
-                return model_dict
-            else:
-                print(f"[AIAutoChat] ⚠ 模型 ID={model_id} 不存在", file=sys.stderr)
-                return None
-                
+            model_usage = json.loads(row['value']) if row and row.get('value') else {}
         except Exception as e:
-            print(f"[AIAutoChat] 獲取模型配置失敗: {e}", file=sys.stderr)
+            print(f"[AIAutoChat] 獲取 model_usage 失敗 (user={user_id!r}): {e}", file=sys.stderr)
+            model_usage = {}
+        
+        model_id = (model_usage or {}).get(usage_type, '')
+        
+        # 無該用途時回退：使用當前用戶的默認模型（is_default=1）
+        if not model_id:
+            print(f"[AIAutoChat] ⚠ 用途 '{usage_type}' 未配置模型，嘗試使用默認模型", file=sys.stderr)
+            try:
+                default_row = await db.fetch_one(
+                    """SELECT id, provider, model_name, display_name, api_key, api_endpoint, is_local
+                       FROM ai_models WHERE user_id = ? AND is_default = 1
+                       ORDER BY priority DESC LIMIT 1""",
+                    (user_id,)
+                )
+                if default_row:
+                    model = default_row
+                    model_id = model.get('id') or model[0]
+                else:
+                    default_row = await db.fetch_one(
+                        """SELECT id, provider, model_name, display_name, api_key, api_endpoint, is_local
+                           FROM ai_models WHERE user_id = ? AND (api_key != '' OR is_local = 1)
+                           ORDER BY priority DESC, created_at DESC LIMIT 1""",
+                        (user_id,)
+                    )
+                    model = default_row
+                    if model:
+                        model_id = model.get('id') if hasattr(model, 'get') else (model[0] if model else None)
+            except Exception as e:
+                print(f"[AIAutoChat] 獲取默認模型失敗: {e}", file=sys.stderr)
+                model = None
+                model_id = None
+            if not model:
+                return None
+        else:
+            try:
+                model = await db.fetch_one(
+                    """SELECT id, provider, model_name, display_name, api_key, api_endpoint, is_local
+                       FROM ai_models WHERE id = ? AND user_id = ?""",
+                    (model_id, user_id)
+                )
+            except Exception as e:
+                print(f"[AIAutoChat] 獲取模型配置失敗: {e}", file=sys.stderr)
+                return None
+        
+        if not model:
+            print(f"[AIAutoChat] ⚠ 模型 ID={model_id} 不存在或非當前用戶", file=sys.stderr)
             return None
+        
+        model_dict = dict(model) if hasattr(model, 'keys') else {
+            'id': model[0], 'provider': model[1], 'model_name': model[2],
+            'display_name': model[3], 'api_key': model[4], 'api_endpoint': model[5],
+            'is_local': model[6] if len(model) > 6 else 0
+        }
+        print(f"[AIAutoChat] ✓ 用途 '{usage_type}' 使用模型: {model_dict.get('display_name')} (ID={model_id})", file=sys.stderr)
+        return model_dict
     
     def set_callbacks(self, send_callback: Callable, log_callback: Callable = None,
                       event_callback: Callable = None):

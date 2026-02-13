@@ -24,7 +24,7 @@ import { QuickActionsPanelComponent } from '../components/quick-actions-panel.co
 export interface SystemStatus {
   accounts?: { online: number; total: number; senders_online?: number; senders_total?: number };
   monitoring?: { groups: number; active: boolean };
-  ai?: { enabled: boolean; mode?: string };
+  ai?: { enabled: boolean; mode?: string; canReply?: boolean };
   campaigns?: { active: number; total: number };
   triggerRules?: { active: number; total: number };
   keywords?: { sets: number };
@@ -173,6 +173,14 @@ export interface SystemStatus {
               <span class="text-amber-200 text-sm">⚠️ {{ noSenderAccountWarning()?.message }}</span>
               <button (click)="navigateTo('accounts')" class="px-3 py-1.5 text-sm rounded-lg transition-colors" style="background: rgba(245, 158, 11, 0.3); color: var(--text-primary);">
                 前往帳號管理
+              </button>
+            </div>
+          }
+          @if (aiFullButNoModelWarning()) {
+            <div class="rounded-lg p-3 mb-4 flex items-center justify-between gap-3" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.5);">
+              <span class="text-amber-200 text-sm">⚠️ {{ aiFullButNoModelWarning()?.message }}</span>
+              <button (click)="navigateTo('ai-engine')" class="px-3 py-1.5 text-sm rounded-lg transition-colors" style="background: rgba(245, 158, 11, 0.3); color: var(--text-primary);">
+                前往智能引擎
               </button>
             </div>
           }
@@ -425,6 +433,12 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
     if (!w?.length) return null;
     return w.find((x: { code: string }) => x.code === 'NO_SENDER_ACCOUNT') ?? null;
   });
+
+  aiFullButNoModelWarning = computed(() => {
+    const w = this.status().warnings;
+    if (!w?.length) return null;
+    return w.find((x: { code: string }) => x.code === 'AI_FULL_BUT_NO_MODEL') ?? null;
+  });
   
   private ipcCleanup: (() => void)[] = [];
   
@@ -569,6 +583,7 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
       'leads': 'leads',
       'nurturing-analytics': 'nurturing-analytics',
       'ai-center': 'aiCenter',
+      'ai-engine': 'aiCenter',
       'multi-role': 'multi-role'
     };
     const view = viewMap[rawView] || rawView;

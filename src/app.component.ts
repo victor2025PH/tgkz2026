@@ -2486,16 +2486,20 @@ export class AppComponent implements OnDestroy, OnInit {
       this.theme.set(resolved);
     });
     
-    // 🔧 P0: 監聽 NavBridgeService.currentView() 變化並同步到本地
-    // 這樣子組件調用 nav.navigateTo() 時，AppComponent 的視圖也會切換
+    // 🔧 P0: 監聽 NavBridgeService.currentView() 變化並同步到本地，並觸發 Router 導航
+    // 這樣子組件調用 nav.navigateTo() 時（如「前往智能引擎」），URL 與主內容會切換到對應頁面
     effect(() => {
       const navView = this.navBridge.currentView();
       const localView = this.currentView();
       
-      // 只有當 NavBridge 視圖與本地視圖不同時才同步
-      if (navView && navView !== localView) {
-        console.log('[AppComponent] 同步導航:', navView, '← from NavBridge');
-        this.currentView.set(navView as View);
+      if (!navView || navView === localView) return;
+      
+      console.log('[AppComponent] 同步導航:', navView, '← from NavBridge');
+      this.currentView.set(navView as View);
+      // Web 模式下主內容由 RouterOutlet 決定，必須觸發路由導航否則按鈕無跳轉
+      const routePath = VIEW_ROUTE_MAP[navView as keyof typeof VIEW_ROUTE_MAP];
+      if (routePath) {
+        this.router.navigate([routePath]);
       }
     });
   }

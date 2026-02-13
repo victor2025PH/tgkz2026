@@ -582,8 +582,8 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
       'ads': 'leads',  // 批量發送導向發送控制台
       'leads': 'leads',
       'nurturing-analytics': 'nurturing-analytics',
-      'ai-center': 'aiCenter',
-      'ai-engine': 'aiCenter',
+      'ai-center': 'ai-engine',
+      'ai-engine': 'ai-engine',
       'multi-role': 'multi-role'
     };
     const view = viewMap[rawView] || rawView;

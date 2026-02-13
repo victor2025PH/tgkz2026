@@ -90,6 +90,14 @@ export class AiSettingsService {
     return [];
   }
 
+  /** 獲取模型列表及後端「已配置」狀態（模型 is_connected 或 ai_settings 有 local_ai_endpoint） */
+  async getModelsWithMeta(): Promise<{ models: AiModelRest[]; aiConfigured?: boolean }> {
+    const res = await this.api.get<AiModelRest[]>('/api/v1/ai/models', { cache: false });
+    const models = res.success && res.data ? res.data : [];
+    const aiConfigured = (res as { aiConfigured?: boolean }).aiConfigured;
+    return { models, aiConfigured };
+  }
+
   /** 添加新模型 */
   async addModel(model: Partial<AiModelRest>): Promise<{ success: boolean; error?: string }> {
     this._modelSaveState.set('saving');

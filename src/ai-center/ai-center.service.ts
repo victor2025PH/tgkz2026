@@ -82,9 +82,11 @@ export class AICenterService {
   strategy = computed(() => this.config().conversationStrategy);
   settings = computed(() => this.config().settings);
   
-  // 連接狀態
+  // 後端返回的「已配置」狀態（模型 is_connected 或 ai_settings 有 local_ai_endpoint）
+  private _aiConfiguredFromBackend = signal<boolean>(false);
+  // 連接狀態：任一模型已連接，或後端標記已配置（避免切換菜單後誤顯示未配置）
   isConnected = computed(() => 
-    this.config().models.some(m => m.isConnected)
+    this.config().models.some(m => m.isConnected) || this._aiConfiguredFromBackend()
   );
   
   // 🔧 正在測試的模型 ID 列表
@@ -260,23 +262,22 @@ export class AICenterService {
   async loadModelsFromBackend(): Promise<void> {
     this._isLoading.set(true);
     try {
-      const models = await this.aiSettings.getModels();
-      if (models.length > 0 || true) {  // 即使為空也用 REST 結果（代表用戶確實沒有模型）
-        const mapped: AIModelConfig[] = models.map((m: any) => ({
-          id: String(m.id),
-          provider: m.provider as AIProvider,
-          modelName: m.modelName,
-          apiKey: m.apiKey || '',
-          apiEndpoint: m.apiEndpoint || '',
-          isConnected: m.isConnected || false,
-          usageToday: 0,
-          costToday: 0
-        }));
-        this.config.update(c => ({ ...c, models: mapped }));
-        this._isLoading.set(false);
-        console.log('[AI] REST 加載模型成功:', mapped.length, '個');
-        return;
-      }
+      const { models, aiConfigured } = await this.aiSettings.getModelsWithMeta();
+      const mapped: AIModelConfig[] = (models || []).map((m: any) => ({
+        id: String(m.id),
+        provider: m.provider as AIProvider,
+        modelName: m.modelName,
+        apiKey: m.apiKey || '',
+        apiEndpoint: m.apiEndpoint || '',
+        isConnected: m.isConnected || false,
+        usageToday: 0,
+        costToday: 0
+      }));
+      this.config.update(c => ({ ...c, models: mapped }));
+      this._aiConfiguredFromBackend.set(aiConfigured === true);
+      this._isLoading.set(false);
+      console.log('[AI] REST 加載模型成功:', mapped.length, '個, aiConfigured=', aiConfigured);
+      return;
     } catch (e) {
       console.warn('[AI] REST 加載模型失敗，fallback 到 IPC:', e);
     }

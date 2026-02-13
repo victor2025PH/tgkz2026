@@ -444,21 +444,23 @@ export class AICenterService {
     console.log('[AI] 加載模型用途分配...');
     try {
       const settings = await this.aiSettings.getSettings();
-      if (settings.model_usage_intent || settings.model_usage_chat || settings.model_usage_script) {
+      // 支持兩種後端格式：單一 model_usage 對象 或 分散的 model_usage_* 鍵
+      const usageObj = settings.model_usage as Record<string, string> | undefined;
+      const intent = settings.model_usage_intent ?? usageObj?.intentRecognition ?? '';
+      const daily = settings.model_usage_chat ?? usageObj?.dailyChat ?? '';
+      const script = settings.model_usage_script ?? usageObj?.multiRoleScript ?? '';
+      if (intent || daily || script) {
         this.config.update(c => ({
           ...c,
           modelUsage: {
             ...c.modelUsage,
-            intentRecognition: settings.model_usage_intent || c.modelUsage.intentRecognition,
-            dailyChat: settings.model_usage_chat || c.modelUsage.dailyChat,
-            multiRoleScript: settings.model_usage_script || c.modelUsage.multiRoleScript
+            intentRecognition: intent || c.modelUsage.intentRecognition,
+            dailyChat: daily || c.modelUsage.dailyChat,
+            multiRoleScript: script || c.modelUsage.multiRoleScript
           }
         }));
         console.log('[AI] REST 加載用途分配成功');
-        
-        // 同時加載其他持久化設置
         if (settings.tts_enabled !== undefined) {
-          // 觸發事件供組件消費
           window.dispatchEvent(new CustomEvent('ai-settings-loaded', { detail: settings }));
         }
         return;
@@ -994,16 +996,18 @@ export class AICenterService {
       });
     }
     
-    // Toast 通知
+    // Toast 通知（有 responsePreview 時明確標示「已連接且可回覆」）
     if (data.isConnected) {
       const latency = data.latencyMs ? `延遲: ${data.latencyMs}ms` : '';
+      const canReply = !!data.responsePreview;
       const preview = data.responsePreview
-        ? `\n回覆: "${data.responsePreview.substring(0, 50)}${data.responsePreview.length > 50 ? '...' : ''}"`
+        ? `\n測試回覆: "${data.responsePreview.substring(0, 80)}${data.responsePreview.length > 80 ? '...' : ''}"`
         : '';
       const models = data.availableModels?.length > 0
         ? `\n可用模型: ${data.availableModels.slice(0, 3).join(', ')}${data.availableModels.length > 3 ? '...' : ''}`
         : '';
-      this.toastService.success(`✓ AI 模型 ${data.modelName || ''} 連接成功！\n${latency}${preview}${models}`);
+      const statusLine = canReply ? '已連接，可正常生成回覆' : '連接成功';
+      this.toastService.success(`✓ AI 模型 ${data.modelName || ''} ${statusLine}${latency ? `（${latency}）` : ''}${preview}${models}`);
     } else {
       this.toastService.error(`連接失敗: ${data.error || '未知錯誤'}`);
     }

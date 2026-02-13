@@ -566,6 +566,16 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
                         </select>
                       </div>
                     </div>
+                    @if (!aiService.modelUsage().dailyChat && aiService.defaultModel() && aiService.models().length > 0) {
+                      <div class="mt-3 p-3 rounded-lg flex items-center justify-between gap-3" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4);">
+                        <span class="text-amber-200 text-sm">請為「日常對話」選擇模型，否則觸發規則不會使用 AI 回覆。</span>
+                        <button (click)="fillDailyChatWithDefault()"
+                                class="px-3 py-1.5 text-sm rounded-lg transition-colors flex-shrink-0"
+                                style="background: rgba(245, 158, 11, 0.3); color: var(--text-primary);">
+                          用默認模型填充
+                        </button>
+                      </div>
+                    }
                     <p class="text-xs text-slate-500 mt-3">💡 選擇後自動保存，不同用途可以使用不同的 AI 模型</p>
                   </div>
                 }
@@ -1560,7 +1570,28 @@ export class AICenterComponent implements OnInit {
       setTimeout(() => this.usageSaved.set(false), 3000);
     }, 300);
   }
-  
+
+  /** 一鍵用默認模型填充「日常對話」 */
+  async fillDailyChatWithDefault() {
+    const def = this.aiService.defaultModel();
+    if (!def) {
+      this.toastService.warning('請先設為默認一個 AI 模型');
+      return;
+    }
+    this.aiService.updateModelUsage({ dailyChat: def.id });
+    this.isSavingUsage.set(true);
+    try {
+      await this.aiService.saveModelUsageToBackend();
+      this.usageSaved.set(true);
+      this.toastService.success('已用默認模型填充「日常對話」');
+      setTimeout(() => this.usageSaved.set(false), 3000);
+    } catch (e) {
+      this.toastService.error('保存失敗');
+    } finally {
+      this.isSavingUsage.set(false);
+    }
+  }
+
   deleteModel(model: AIModelConfig) {
     if (confirm(`確定要刪除模型「${(model as any).displayName || model.modelName}」嗎？`)) {
       this.aiService.removeModel(model.id);
@@ -2272,8 +2303,11 @@ A: 支持微信、支付寶、銀行卡`,
     this.loadQuickSettings();
     this.loadSenderAccounts();
     this.loadStrategyFromLocalStorage();
-    // 🔧 AI 持久化：每次進入智能引擎頁面強制用當前用戶刷新模型列表，避免切換菜單後仍顯示「未配置 AI」
-    setTimeout(() => this.aiService.loadModelsFromBackend(), 200);
+    // 🔧 AI 持久化：每次進入智能引擎頁面強制用當前用戶刷新模型列表與用途分配，避免登錄後/切菜單後需重設
+    setTimeout(() => {
+      this.aiService.loadModelsFromBackend();
+      this.aiService.loadModelUsageFromBackend();
+    }, 200);
     
     // 🔧 優先使用路由傳入的 initialTab
     const fromRoute = this.initialTab();

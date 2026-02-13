@@ -1325,6 +1325,33 @@ async def handle_get_system_status(self):
         ai_enabled = ai_settings.get('auto_chat_enabled', 0) == 1 if ai_settings else False
         ai_mode = ai_settings.get('auto_chat_mode', 'semi') if ai_settings else 'semi'
         
+        # 是否具備可用 AI 回覆能力（日常對話有已連接模型或默認模型已連接）
+        ai_can_reply = False
+        try:
+            from core.tenant_filter import get_owner_user_id
+            _uid = get_owner_user_id() or ''
+            row = await db.fetch_one(
+                "SELECT value FROM ai_settings WHERE user_id = ? AND key = 'model_usage'",
+                (_uid,)
+            )
+            usage = json.loads(row['value']) if row and row.get('value') else {}
+            model_id = (usage or {}).get('dailyChat', '')
+            if not model_id:
+                default_row = await db.fetch_one(
+                    "SELECT id, is_connected FROM ai_models WHERE user_id = ? AND is_default = 1 LIMIT 1",
+                    (_uid,)
+                )
+                if default_row:
+                    model_id = default_row.get('id') or default_row[0]
+            if model_id:
+                m = await db.fetch_one(
+                    "SELECT is_connected FROM ai_models WHERE id = ? AND user_id = ?",
+                    (model_id, _uid)
+                )
+                ai_can_reply = bool(m and (m.get('is_connected') or (m[0] if m else 0)))
+        except Exception:
+            pass
+        
         # 獲取模板
         templates = await db.get_all_templates()
         active_templates = sum(1 for t in templates if t.get('isActive'))
@@ -1344,6 +1371,7 @@ async def handle_get_system_status(self):
             'ai': {
                 'enabled': ai_enabled,
                 'mode': ai_mode,
+                'canReply': ai_can_reply,
                 'endpoint': ai_settings.get('local_ai_endpoint', '') if ai_settings else ''
             },
             'keywords': {
@@ -1372,6 +1400,12 @@ async def handle_get_system_status(self):
                 'code': 'NO_SENDER_ACCOUNT',
                 'message': 'AI 已啟用但沒有可用的發送帳號，觸發規則無法發送回覆',
                 'fix': '請在「帳號管理」中將至少一個帳號設為「發送」角色'
+            })
+        if ai_enabled and ai_mode == 'full' and not ai_can_reply:
+            status['warnings'].append({
+                'code': 'AI_FULL_BUT_NO_MODEL',
+                'message': '已設為全自動，但尚未配置可用 AI 模型，目前回覆將使用模板',
+                'fix': '請在「智能引擎」→「模型配置」中為「日常對話」選擇並測試一個模型'
             })
         
         self.send_event("system-status", status)

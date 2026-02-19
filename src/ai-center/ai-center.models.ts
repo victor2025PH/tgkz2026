@@ -6,6 +6,9 @@
 // AI 模型提供商
 export type AIProvider = 'openai' | 'claude' | 'gemini' | 'custom';
 
+// AI 模型連接狀態枚舉（P0+P1）
+export type AIConnectionStatus = 'unknown' | 'checking' | 'connected' | 'stale' | 'disconnected';
+
 // AI 模型配置
 export interface AIModelConfig {
   id: string;
@@ -15,6 +18,8 @@ export interface AIModelConfig {
   apiEndpoint?: string;
   isConnected: boolean;
   lastTestedAt?: string;
+  latencyMs?: number;           // P1: 最後測試延遲（ms）
+  lastErrorMessage?: string;    // P1: 最後測試錯誤信息
   usageToday: number;
   costToday: number;
 }

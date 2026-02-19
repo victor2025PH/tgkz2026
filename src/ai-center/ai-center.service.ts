@@ -8,7 +8,8 @@
 import { Injectable, signal, computed, inject, OnDestroy } from '@angular/core';
 import { 
   AICenterConfig, 
-  AIModelConfig, 
+  AIModelConfig,
+  AIConnectionStatus,
   KnowledgeBase, 
   KnowledgeItem,
   SmartRule, 
@@ -87,12 +88,27 @@ export class AICenterService implements OnDestroy {
   strategy = computed(() => this.config().conversationStrategy);
   settings = computed(() => this.config().settings);
   
-  // 後端返回的「已配置」狀態（模型 is_connected 或 ai_settings 有 local_ai_endpoint）
+  // 後端返回的「已配置」狀態（有模型記錄或 ai_settings 有 local_ai_endpoint）
   private _aiConfiguredFromBackend = signal<boolean>(false);
-  // 連接狀態：任一模型已連接，或後端標記已配置（避免切換菜單後誤顯示未配置）
-  isConnected = computed(() => 
-    this.config().models.some(m => m.isConnected) || this._aiConfiguredFromBackend()
+
+  // P0-1 FIX: isConnected 嚴格要求：至少一個模型 isConnected=true 且 lastTestedAt 不過期
+  // 不再用 || _aiConfiguredFromBackend()，避免「有配置≠已連接」的誤報
+  isConnected = computed(() =>
+    this.config().models.some(m => m.isConnected && !this._isTestedAtStale(m.lastTestedAt))
   );
+
+  // 「已配置但可能未連接」：有模型記錄 or 後端有端點設定（用於顯示「未測試」提示）
+  isConfigured = computed(() =>
+    this.config().models.length > 0 || this._aiConfiguredFromBackend()
+  );
+
+  // P0-2: 是否有任何模型需要重新驗證（connected 但 >30 分鐘未測試）
+  hasStaleConnections = computed(() =>
+    this.config().models.some(m => m.isConnected && this._isTestedAtStale(m.lastTestedAt))
+  );
+
+  // P1-4: 靜默健康檢查是否進行中（避免顯示 Toast）
+  private _silentCheckInProgress = signal(false);
   
   // 🔧 正在測試的模型 ID 列表
   private _testingModelIds = signal<Set<string>>(new Set());
@@ -118,6 +134,58 @@ export class AICenterService implements OnDestroy {
   isSaving = computed(() => this.aiSettings.isSaving());
   justSaved = computed(() => this.aiSettings.justSaved());
   
+  // ========== P0-2 + P1-4: 輔助方法 ==========
+
+  /** P0-2: last_tested_at 是否過期（超過 30 分鐘視為 stale） */
+  _isTestedAtStale(lastTestedAt?: string): boolean {
+    if (!lastTestedAt) return true;  // 從未測試 = stale
+    try {
+      const tested = new Date(lastTestedAt).getTime();
+      const now = Date.now();
+      return (now - tested) > 30 * 60 * 1000;  // 30 分鐘
+    } catch {
+      return true;
+    }
+  }
+
+  /** P1-4: 計算單個模型的連接狀態枚舉 */
+  getModelConnectionStatus(model: AIModelConfig): AIConnectionStatus {
+    const id = model.id;
+    if (this._testingModelIds().has(id)) return 'checking';
+    if (!model.isConnected && !model.lastTestedAt) return 'unknown';
+    if (!model.isConnected && model.lastTestedAt) return 'disconnected';
+    if (model.isConnected && this._isTestedAtStale(model.lastTestedAt)) return 'stale';
+    if (model.isConnected) return 'connected';
+    return 'unknown';
+  }
+
+  /** P1-4: 連接狀態標籤文字 */
+  getConnectionStatusLabel(model: AIModelConfig): string {
+    const status = this.getModelConnectionStatus(model);
+    const lastTested = model.lastTestedAt ? this._formatRelativeTime(model.lastTestedAt) : '';
+    const latency = model.latencyMs ? ` · ${model.latencyMs}ms` : '';
+    switch (status) {
+      case 'checking':     return '檢測中...';
+      case 'connected':    return `已連接${latency}${lastTested ? ' · ' + lastTested : ''}`;
+      case 'stale':        return `待複驗${lastTested ? ' · ' + lastTested : ''}`;
+      case 'disconnected': return model.lastErrorMessage ? `連線失敗: ${model.lastErrorMessage.slice(0, 40)}` : '連線失敗';
+      case 'unknown':      return '點擊測試';
+    }
+  }
+
+  /** P1-4: 格式化相對時間 */
+  private _formatRelativeTime(dateStr: string): string {
+    try {
+      const diffMs = Date.now() - new Date(dateStr).getTime();
+      const diffMin = Math.floor(diffMs / 60000);
+      if (diffMin < 1) return '剛剛';
+      if (diffMin < 60) return `${diffMin}分鐘前`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr}小時前`;
+      return `${Math.floor(diffHr / 24)}天前`;
+    } catch { return ''; }
+  }
+
   constructor() {
     this.setupIpcListeners();
     // 🔧 登錄後 AI 持久化：延遲 300ms 再拉取，確保認證已就緒
@@ -136,6 +204,28 @@ export class AICenterService implements OnDestroy {
           }, 300);
         });
     }
+  }
+
+  /**
+   * P1-3: 觸發靜默啟動健康檢查
+   * 在 loadModelsFromBackend 完成後延遲 10 秒調用
+   * 後端測試所有 is_connected=1 的模型，結果通過 ai-health-check-result 更新
+   */
+  triggerStartupHealthCheck(): void {
+    if (this._silentCheckInProgress()) return;
+    const connectedModels = this.config().models.filter(m =>
+      m.isConnected && this._isTestedAtStale(m.lastTestedAt)
+    );
+    if (connectedModels.length === 0) return;
+
+    this._silentCheckInProgress.set(true);
+    // 標記所有 stale 模型為 'checking'（在 _testingModelIds 中）
+    this._testingModelIds.update(set => {
+      const newSet = new Set(set);
+      connectedModels.forEach(m => newSet.add(m.id));
+      return newSet;
+    });
+    this.ipcService.send('startup-ai-health-check', {});
   }
 
   ngOnDestroy(): void {
@@ -181,6 +271,44 @@ export class AICenterService implements OnDestroy {
       }
     });
     
+    // P1-3: 靜默健康檢查結果（不彈 Toast，只更新狀態徽章）
+    this.ipcService.on('ai-health-check-result', (data: any) => {
+      const modelId = data.modelId ? String(data.modelId) : '';
+      if (!modelId) return;
+      // 移除 checking 狀態
+      this._testingModelIds.update(set => {
+        const s = new Set(set); s.delete(modelId); return s;
+      });
+      // 更新模型連接狀態 + latency
+      this.config.update(c => ({
+        ...c,
+        models: c.models.map(m => m.id === modelId
+          ? { ...m, isConnected: !!data.isConnected, latencyMs: data.latencyMs || m.latencyMs,
+              lastTestedAt: new Date().toISOString(),
+              lastErrorMessage: data.isConnected ? undefined : (data.error || m.lastErrorMessage) }
+          : m
+        )
+      }));
+      // 所有模型檢查完成後清除靜默標記
+      if (this._testingModelIds().size === 0) {
+        this._silentCheckInProgress.set(false);
+        // 若有模型剛失去連接，顯示一次 Warning Toast
+        const nowDisconnected = this.config().models.filter(
+          m => String(m.id) === modelId && !data.isConnected
+        );
+        if (nowDisconnected.length > 0) {
+          const m = nowDisconnected[0];
+          const name = (m as any).displayName || m.modelName;
+          this.toastService.warningWithAction(
+            `⚠️ AI 模型「${name}」連接失效，請重新測試`,
+            '立即測試',
+            () => this.testModelConnection(modelId),
+            0
+          );
+        }
+      }
+    });
+
     // 監聽模型測試結果（IPC 回調路徑，REST 路徑由 _handleTestResult 直接處理）
     this.ipcService.on('ai-model-tested', (data: any) => {
       console.log('[AI] IPC 測試結果:', data);
@@ -291,16 +419,26 @@ export class AICenterService implements OnDestroy {
         apiKey: m.apiKey || '',
         apiEndpoint: m.apiEndpoint || '',
         isConnected: m.isConnected || false,
+        lastTestedAt: m.lastTestedAt || undefined,   // P0-2: 必須映射！
+        latencyMs: m.latencyMs || undefined,          // P1: 延遲
+        lastErrorMessage: m.lastErrorMessage || undefined, // P1: 最後錯誤
         usageToday: 0,
-        costToday: 0
+        costToday: 0,
+        // 擴展屬性
+        isLocal: m.isLocal,
+        displayName: m.displayName
       }));
-      // 🔧 從後端還原默認模型 ID，否則切菜單再返回引擎概覽會顯示「未配置 AI 模型」
+      // 🔧 從後端還原默認模型 ID
       const defaultModel = (models || []).find((m: any) => m.isDefault);
       const defaultId = defaultModel != null ? String(defaultModel.id) : (mapped.length > 0 ? mapped[0].id : '');
       this.config.update(c => ({ ...c, models: mapped, defaultModelId: defaultId || c.defaultModelId }));
+      // P0-1: aiConfigured 僅代表「有模型/端點記錄」，不等於已連接
       this._aiConfiguredFromBackend.set(aiConfigured === true);
       this._isLoading.set(false);
-      console.log('[AI] REST 加載模型成功:', mapped.length, '個, aiConfigured=', aiConfigured);
+      console.log('[AI] REST 加載模型成功:', mapped.length, '個, aiConfigured=', aiConfigured,
+                  ', isConnected=', this.isConnected(), ', hasStale=', this.hasStaleConnections());
+      // P1-3: 加載完成後 10 秒觸發靜默健康檢查（只對 stale 模型）
+      setTimeout(() => this.triggerStartupHealthCheck(), 10000);
       return;
     } catch (e) {
       console.warn('[AI] REST 加載模型失敗，fallback 到 IPC:', e);
@@ -1036,12 +1174,14 @@ export class AICenterService implements OnDestroy {
       this.toastService.error(`連接失敗: ${data.error || '未知錯誤'}`);
     }
     
-    // 更新本地模型狀態
+    // 更新本地模型狀態（P1: 含 latencyMs + lastErrorMessage）
     if (modelId) {
       this.updateModel(modelId, {
         isConnected: data.isConnected,
-        lastTestedAt: new Date().toISOString()
-      });
+        lastTestedAt: new Date().toISOString(),
+        latencyMs: data.latencyMs || undefined,
+        lastErrorMessage: data.isConnected ? undefined : (data.error || undefined)
+      } as Partial<AIModelConfig>);
     }
   }
 

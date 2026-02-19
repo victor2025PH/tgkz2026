@@ -55,7 +55,7 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
               智能引擎設置
             </h1>
             
-            <!-- 連接狀態：加載中不顯示未配置，避免閃爍 -->
+            <!-- P0+P1: 連接狀態徽章（5 種狀態） -->
             <div class="flex items-center gap-2">
               @if (aiService.isLoading()) {
                 <span class="flex items-center gap-2 px-3 py-1 bg-slate-600/50 text-slate-400 rounded-full text-sm">
@@ -63,12 +63,27 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
                   加載中...
                 </span>
               } @else if (aiService.isConnected()) {
-                <span class="flex items-center gap-2 px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm">
-                  <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                  AI 已連接
+                <span class="flex items-center gap-2 px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm cursor-default"
+                      [title]="getConnectedModelsSummary()">
+                  <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                  AI 已就緒
+                </span>
+              } @else if (aiService.hasStaleConnections()) {
+                <!-- 有模型之前成功但超過 30 分鐘未複驗 -->
+                <button class="flex items-center gap-2 px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full text-sm hover:bg-amber-500/30 transition-colors"
+                        (click)="reVerifyAllModels()"
+                        title="上次測試已超過 30 分鐘，點擊重新驗證">
+                  <span class="w-2 h-2 bg-amber-400 rounded-full"></span>
+                  待複驗 ↺
+                </button>
+              } @else if (aiService.isConfigured()) {
+                <!-- 有模型但尚未測試或測試失敗 -->
+                <span class="px-3 py-1 bg-orange-500/20 text-orange-400 rounded-full text-sm"
+                      title="已有 AI 模型配置，請點擊「測試」驗證連接">
+                  ⚠️ AI 未驗證
                 </span>
               } @else {
-                <span class="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-sm">
+                <span class="px-3 py-1 bg-slate-600/50 text-slate-500 rounded-full text-sm">
                   未配置 AI
                 </span>
               }
@@ -329,10 +344,34 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
                       <div class="font-medium text-white">{{ aiService.defaultModel()!.modelName }}</div>
                       <div class="text-sm text-slate-400">{{ getProviderName(aiService.defaultModel()!.provider) }}</div>
                     </div>
-                    <span class="flex items-center gap-1 text-emerald-400">
-                      <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                      已連接
-                    </span>
+                    <!-- P0+P1: 默認模型狀態依賴 getModelConnectionStatus -->
+                    @switch (aiService.getModelConnectionStatus(aiService.defaultModel()!)) {
+                      @case ('connected') {
+                        <span class="flex items-center gap-1 text-emerald-400 text-sm">
+                          <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                          已就緒@if (aiService.defaultModel()!.latencyMs) {
+                            <span class="text-slate-500 ml-1">· {{aiService.defaultModel()!.latencyMs}}ms</span>}
+                        </span>
+                      }
+                      @case ('stale') {
+                        <span class="flex items-center gap-1 text-amber-400 text-sm">
+                          <span class="w-2 h-2 bg-amber-400 rounded-full"></span>
+                          待複驗
+                        </span>
+                      }
+                      @case ('checking') {
+                        <span class="flex items-center gap-1 text-slate-400 text-sm">
+                          <span class="inline-block w-2 h-2 border border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+                          校驗中
+                        </span>
+                      }
+                      @default {
+                        <span class="flex items-center gap-1 text-orange-400 text-sm">
+                          <span class="w-2 h-2 bg-orange-500 rounded-full"></span>
+                          未驗證
+                        </span>
+                      }
+                    }
                   </div>
                 } @else {
                   <div class="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
@@ -408,13 +447,38 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
                       </div>
                       
                       <div class="flex items-center gap-3">
-                        @if (model.isConnected) {
-                          <span class="flex items-center gap-1 text-emerald-400 text-sm">
-                            <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                            已連接
-                          </span>
-                        } @else {
-                          <span class="text-amber-400 text-sm">未測試</span>
+                        <!-- P0+P1: 本地模型連接狀態徽章 -->
+                        @switch (aiService.getModelConnectionStatus(model)) {
+                          @case ('checking') {
+                            <span class="flex items-center gap-1 text-slate-400 text-sm">
+                              <span class="inline-block w-2 h-2 border border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+                              校驗中...
+                            </span>
+                          }
+                          @case ('connected') {
+                            <span class="flex items-center gap-1 text-emerald-400 text-sm"
+                                  [title]="aiService.getConnectionStatusLabel(model)">
+                              <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                              已連接@if (model.latencyMs) {<span class="text-slate-500 ml-1">· {{model.latencyMs}}ms</span>}
+                            </span>
+                          }
+                          @case ('stale') {
+                            <span class="flex items-center gap-1 text-amber-400 text-sm"
+                                  [title]="'上次測試: ' + aiService.getConnectionStatusLabel(model)">
+                              <span class="w-2 h-2 bg-amber-400 rounded-full"></span>
+                              待複驗
+                            </span>
+                          }
+                          @case ('disconnected') {
+                            <span class="flex items-center gap-1 text-red-400 text-sm"
+                                  [title]="model.lastErrorMessage || '連線失敗'">
+                              <span class="w-2 h-2 bg-red-500 rounded-full"></span>
+                              失敗
+                            </span>
+                          }
+                          @default {
+                            <span class="text-slate-500 text-sm">未測試</span>
+                          }
                         }
                         
                         <button (click)="testModel(model)"
@@ -479,13 +543,38 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
                       </div>
                       
                       <div class="flex items-center gap-3">
-                        @if (model.isConnected) {
-                          <span class="flex items-center gap-1 text-emerald-400 text-sm">
-                            <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                            已連接
-                          </span>
-                        } @else {
-                          <span class="text-slate-500 text-sm">未連接</span>
+                        <!-- P0+P1: 雲端模型連接狀態徽章 -->
+                        @switch (aiService.getModelConnectionStatus(model)) {
+                          @case ('checking') {
+                            <span class="flex items-center gap-1 text-slate-400 text-sm">
+                              <span class="inline-block w-2 h-2 border border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+                              校驗中...
+                            </span>
+                          }
+                          @case ('connected') {
+                            <span class="flex items-center gap-1 text-emerald-400 text-sm"
+                                  [title]="aiService.getConnectionStatusLabel(model)">
+                              <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                              已連接@if (model.latencyMs) {<span class="text-slate-500 ml-1">· {{model.latencyMs}}ms</span>}
+                            </span>
+                          }
+                          @case ('stale') {
+                            <span class="flex items-center gap-1 text-amber-400 text-sm"
+                                  [title]="'上次測試: ' + aiService.getConnectionStatusLabel(model)">
+                              <span class="w-2 h-2 bg-amber-400 rounded-full"></span>
+                              待複驗
+                            </span>
+                          }
+                          @case ('disconnected') {
+                            <span class="flex items-center gap-1 text-red-400 text-sm"
+                                  [title]="model.lastErrorMessage || '連線失敗'">
+                              <span class="w-2 h-2 bg-red-500 rounded-full"></span>
+                              失敗
+                            </span>
+                          }
+                          @default {
+                            <span class="text-slate-500 text-sm">未測試</span>
+                          }
                         }
                         
                         <button (click)="testModel(model)"
@@ -1423,7 +1512,26 @@ export class AICenterComponent implements OnInit {
   getProviderName(provider: AIProvider): string {
     return this.providers.find(p => p.id === provider)?.name || provider;
   }
-  
+
+  /** P0+P1: 頂部徽章 tooltip — 顯示已連接模型摘要 */
+  getConnectedModelsSummary(): string {
+    const models = this.aiService.models().filter(m => m.isConnected && !this.aiService._isTestedAtStale(m.lastTestedAt));
+    if (models.length === 0) return '';
+    return models.map(m => {
+      const name = (m as any).displayName || m.modelName;
+      const latency = m.latencyMs ? ` (${m.latencyMs}ms)` : '';
+      return `${name}${latency}`;
+    }).join(', ');
+  }
+
+  /** P0+P1: 一鍵重新驗證所有待複驗模型 */
+  reVerifyAllModels(): void {
+    const staleModels = this.aiService.models().filter(m =>
+      m.isConnected && this.aiService._isTestedAtStale(m.lastTestedAt)
+    );
+    staleModels.forEach(m => this.aiService.testModelConnection(m.id));
+  }
+
   testModel(model: AIModelConfig) {
     // 🔧 測試狀態由 service 管理
     this.aiService.testModelConnection(model.id);

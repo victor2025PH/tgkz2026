@@ -107,6 +107,15 @@ class KeywordGroupMixin:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+            # P0+P1: 遷移：為舊版 ai_models 添加新字段（SQLite ALTER TABLE 不支持 IF NOT EXISTS，用 try/except）
+            for _col_sql in [
+                "ALTER TABLE ai_models ADD COLUMN latency_ms INTEGER DEFAULT 0",
+                "ALTER TABLE ai_models ADD COLUMN last_error_message TEXT",
+            ]:
+                try:
+                    await self.execute(_col_sql)
+                except Exception:
+                    pass  # 字段已存在時忽略
             
             # AI 設置表 - 存儲模型用途分配等 AI 相關設置
             # 🔧 P0: 改為 (user_id, key) 複合主鍵，每用戶獨立設置

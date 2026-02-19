@@ -98,10 +98,16 @@ class BusinessRoutesMixin:
                     'isLocal': bool(m['is_local']), 'isDefault': bool(m['is_default']),
                     'priority': m['priority'], 'isConnected': bool(m['is_connected']),
                     'lastTestedAt': m['last_tested_at'],
+                    # P0+P1: 新增字段 — 延遲 + 最後錯誤（舊 DB 無此列時 .get() 返回 None）
+                    'latencyMs': m.get('latency_ms') or 0,
+                    'lastErrorMessage': m.get('last_error_message') or None,
                     'config': json.loads(m['config_json'] or '{}'),
                 })
-            # 統一「已配置」：有任一已連接模型，或 ai_settings 中有 local_ai_endpoint
-            ai_configured = has_connected
+            # P0: 修復 aiConfigured 誤報 —— 「已配置」僅表示有模型記錄，不代表連線正常
+            # 前端 isConnected 使用 isConnected 欄位 + last_tested_at 判斷過期
+            # aiConfigured 只是告訴前端「有模型/端點存在，尚未測試」的輔助提示
+            has_models = len(result) > 0
+            ai_configured = has_models
             if not ai_configured and user_id:
                 try:
                     ai_settings = await db.get_ai_settings()
@@ -110,7 +116,8 @@ class BusinessRoutesMixin:
                         ai_configured = True
                 except Exception:
                     pass
-            return self._json_response({'success': True, 'data': result, 'aiConfigured': ai_configured})
+            return self._json_response({'success': True, 'data': result, 'aiConfigured': ai_configured,
+                                        'hasConnectedModel': has_connected})
         except Exception as e:
             logger.error(f"[AI Models] Get error: {e}")
             return self._json_response({'success': False, 'error': str(e), 'data': [], 'aiConfigured': False}, status=500)

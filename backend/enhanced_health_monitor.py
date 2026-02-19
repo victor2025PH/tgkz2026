@@ -467,6 +467,92 @@ class EnhancedHealthMonitor:
         """获取账户指标"""
         return self.account_metrics.get(account_id)
     
+    def compute_health_score(self, account_id: int) -> Optional[float]:
+        """
+        P2-2: 根据发送指标计算 0-100 健康分
+        
+        综合考虑:
+        - 发送成功率（权重 40%）
+        - FloodWait 频率（权重 30%）
+        - 错误率（权重 20%）
+        - 连接错误（权重 10%）
+        
+        若该账户无指标记录，返回 None（保持 DB 中现有值）
+        """
+        metrics = self.account_metrics.get(account_id)
+        if not metrics or metrics.total_sends == 0:
+            return None
+        
+        score = 100.0
+        
+        # 发送成功率：低于 80% 开始扣分
+        sr = metrics.send_success_rate
+        if sr < 0.5:
+            score -= 40
+        elif sr < 0.7:
+            score -= 25
+        elif sr < 0.8:
+            score -= 15
+        elif sr < 0.9:
+            score -= 5
+        
+        # Flood Wait 频率：每触发一次扣 5 分，上限 -30
+        flood_penalty = min(30.0, metrics.flood_wait_count * 5.0)
+        score -= flood_penalty
+        
+        # 错误率
+        er = metrics.error_rate
+        if er > 0.3:
+            score -= 20
+        elif er > 0.2:
+            score -= 12
+        elif er > 0.1:
+            score -= 6
+        
+        # 连接错误 / 认证错误
+        if metrics.auth_errors > 0:
+            score -= min(15.0, metrics.auth_errors * 5.0)
+        if metrics.connection_errors > 5:
+            score -= min(10.0, (metrics.connection_errors - 5) * 1.0)
+        
+        return max(0.0, min(100.0, round(score, 1)))
+
+    async def start_periodic_sync(
+        self,
+        db_update_callback,      # async (account_id: int, health_score: float) -> None
+        check_interval: Optional[int] = None
+    ):
+        """
+        P2-2: 启动后台周期任务，每隔 check_interval 秒把 compute_health_score 写回 DB
+        
+        Args:
+            db_update_callback: 异步函数 (account_id, health_score)
+            check_interval: 覆盖初始化时的间隔（秒）；默认使用 self.check_interval
+        """
+        import asyncio
+        interval = check_interval or self.check_interval
+        print(f"[EnhancedHealthMonitor] Periodic health sync started (interval={interval}s)", file=sys.stderr)
+        
+        while True:
+            try:
+                await asyncio.sleep(interval)
+                synced = 0
+                for account_id in list(self.account_metrics.keys()):
+                    score = self.compute_health_score(account_id)
+                    if score is not None:
+                        try:
+                            await db_update_callback(account_id, score)
+                            synced += 1
+                        except Exception as cb_err:
+                            print(f"[EnhancedHealthMonitor] DB callback error for {account_id}: {cb_err}", file=sys.stderr)
+                if synced > 0:
+                    print(f"[EnhancedHealthMonitor] Synced health scores for {synced} account(s)", file=sys.stderr)
+            except asyncio.CancelledError:
+                print("[EnhancedHealthMonitor] Periodic sync cancelled", file=sys.stderr)
+                break
+            except Exception as e:
+                print(f"[EnhancedHealthMonitor] Periodic sync error: {e}", file=sys.stderr)
+
     def get_all_metrics_summary(self) -> Dict[str, Any]:
         """获取所有账户指标摘要"""
         if not self.account_metrics:

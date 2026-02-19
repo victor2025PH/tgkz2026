@@ -314,6 +314,52 @@ export function setupDataSyncIpcHandlers(this: any): void {
         // The accounts-updated event will be sent separately
     });
 
+    // P2-1: Session 過期全局通知 + 快速登入 Action
+    this.ipcService.on('account-session-expired', (data: { accountId: number; phone: string; timestamp: string }) => {
+        console.log('[Frontend] Account session expired:', data);
+        const maskedPhone = data.phone ? data.phone.replace(/(\d{3})\d+(\d{3})/, '$1****$2') : String(data.accountId);
+        
+        this.toastService.withActions(
+            'warning',
+            `⚠️ 帳號 ${maskedPhone} Session 已過期，需要重新登入`,
+            [
+                {
+                    label: '立即登入',
+                    variant: 'primary',
+                    handler: () => {
+                        // 從 accounts 列表找到該帳號並直接觸發登入（account-card-list 會自動打開驗證碼 modal）
+                        const accounts = this.accounts();
+                        const account = accounts.find((a: any) => a.id === data.accountId);
+                        if (account) {
+                            this.ipcService.send('login-account', {
+                                phone: account.phone,
+                                apiId: account.apiId,
+                                apiHash: account.apiHash
+                            });
+                            this.toastService.info(`正在為 ${maskedPhone} 發送驗證碼...`, 3000);
+                        } else {
+                            // 帳號不在列表，刷新後再試
+                            this.ipcService.send('get-accounts', {});
+                            this.toastService.info('正在刷新帳號列表，請稍後再點擊登入', 3000);
+                        }
+                    }
+                },
+                {
+                    label: '稍後',
+                    variant: 'secondary',
+                    handler: () => {}
+                }
+            ],
+            0  // 不自動關閉，直到用戶操作
+        );
+    });
+
+    // P2-1: 重連成功通知（來自 connection monitor）
+    this.ipcService.on('account-reconnected', (data: { phone: string; accountId: number }) => {
+        const maskedPhone = data.phone ? data.phone.replace(/(\d{3})\d+(\d{3})/, '$1****$2') : String(data.accountId);
+        this.toastService.success(`✅ 帳號 ${maskedPhone} 已自動重連成功`, 4000);
+    });
+
     // 🆕 漸進式載入：分階段接收數據，讓 UI 盡快顯示
     this.ipcService.on('initial-state-core', (state: any) => {
         if (shouldSkipStateByOwner(this, state)) return;

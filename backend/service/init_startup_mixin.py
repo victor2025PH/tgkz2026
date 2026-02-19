@@ -1486,8 +1486,21 @@ class InitStartupMixin:
                 alert_callback=alert_callback,
                 check_interval_seconds=300  # 5 分钟检查一次
             )
+
+            # P2-2: 启动周期性健康分同步任务（将指标写回 DB healthScore）
+            async def _db_health_score_update(account_id: int, health_score: float):
+                try:
+                    await db.update_account(account_id, {"healthScore": health_score})
+                except Exception as e:
+                    print(f"[EnhancedHealthMonitor] DB update error for {account_id}: {e}", file=sys.stderr)
+
+            asyncio.ensure_future(
+                self.enhanced_health_monitor.start_periodic_sync(
+                    db_update_callback=_db_health_score_update
+                )
+            )
             
-            print("[Backend] Enhanced health monitor initialized", file=sys.stderr)
+            print("[Backend] Enhanced health monitor initialized (with periodic DB sync)", file=sys.stderr)
         except Exception as e:
             print(f"[Backend] Failed to initialize enhanced health monitor: {e}", file=sys.stderr)
             # Don't fail initialization if health monitor fails

@@ -430,6 +430,21 @@ class InitStartupMixin:
         await db.initialize()
         await db.connect()
         
+        # Cleanup zombie login states from previous session
+        try:
+            all_accounts = await db.get_all_accounts()
+            zombie_statuses = ['Logging in...', 'Waiting Code', 'Waiting 2FA']
+            zombie_ids = [
+                acc['id'] for acc in all_accounts
+                if acc.get('status') in zombie_statuses
+            ]
+            if zombie_ids:
+                count = await db.batch_update_account_status(zombie_ids, 'Offline')
+                print(f"[Backend] Cleaned up {count} zombie account(s) stuck in login state", file=sys.stderr)
+                self.send_log(f"已清理 {count} 個卡在登入狀態的帳號", "info")
+        except Exception as e:
+            print(f"[Backend] Zombie cleanup error: {e}", file=sys.stderr)
+        
         # Initialize full-text search engine
         try:
             from config import DATABASE_PATH

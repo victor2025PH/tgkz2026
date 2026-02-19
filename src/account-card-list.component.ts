@@ -626,21 +626,32 @@ export const PROXY_TYPES = [
               @if (isLoggingIn(account.id) || account.status === 'Logging in...' || account.status === 'Waiting Code' || account.status === 'Waiting 2FA') {
                 <div class="login-progress-overlay" (click)="$event.stopPropagation()">
                   @if (account.status === 'Waiting Code') {
-                    <span class="login-status-text">📲 請輸入驗證碼</span>
-                    <div class="code-input-row">
-                      <input type="text" 
-                        class="code-input" 
-                        placeholder="驗證碼" 
-                        maxlength="6"
-                        [value]="getPendingCode(account.id)"
-                        (input)="onCodeInput(account.id, $event)"
-                        (keydown.enter)="submitCode(account)">
-                      <button class="code-submit-btn" 
-                        [disabled]="!getPendingCode(account.id) || isSubmittingCode(account.id)"
-                        (click)="submitCode(account)">
-                        @if (isSubmittingCode(account.id)) { ⏳ } @else { ✓ }
+                    @if (hasPendingCodeHash(account.id)) {
+                      <span class="login-status-text">📲 請輸入 Telegram 收到的驗證碼</span>
+                      <div class="code-input-row">
+                        <input type="text" 
+                          class="code-input" 
+                          placeholder="驗證碼" 
+                          maxlength="6"
+                          [value]="getPendingCode(account.id)"
+                          (input)="onCodeInput(account.id, $event)"
+                          (keydown.enter)="submitCode(account)">
+                        <button class="code-submit-btn" 
+                          [disabled]="!getPendingCode(account.id) || isSubmittingCode(account.id)"
+                          (click)="submitCode(account)">
+                          @if (isSubmittingCode(account.id)) { ⏳ } @else { ✓ }
+                        </button>
+                      </div>
+                      <button class="code-resend-btn" (click)="resendCode(account)">重新發送驗證碼</button>
+                    } @else {
+                      <span class="login-status-text">📲 需要驗證碼才能登入</span>
+                      <button class="code-resend-btn primary" 
+                        [disabled]="isResendingCode(account.id)"
+                        (click)="resendCode(account)">
+                        @if (isResendingCode(account.id)) { ⏳ 發送中... } @else { 📤 發送驗證碼 }
                       </button>
-                    </div>
+                      <button class="code-cancel-btn" (click)="cancelLogin(account)">取消</button>
+                    }
                   } @else {
                     <div class="login-spinner"></div>
                     <span class="login-status-text">
@@ -2494,6 +2505,39 @@ export const PROXY_TYPES = [
       opacity: 0.4;
       cursor: not-allowed;
     }
+
+    .code-resend-btn {
+      margin-top: 0.25rem;
+      padding: 0.25rem 0.75rem;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 0.375rem;
+      background: transparent;
+      color: rgba(255,255,255,0.6);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .code-resend-btn:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+    .code-resend-btn.primary {
+      background: linear-gradient(135deg, #06b6d4, #3b82f6);
+      border: none;
+      color: #fff;
+      font-size: 0.9rem;
+      padding: 0.5rem 1.25rem;
+    }
+    .code-resend-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .code-cancel-btn {
+      margin-top: 0.25rem;
+      padding: 0.25rem 0.75rem;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 0.375rem;
+      background: transparent;
+      color: rgba(255,255,255,0.5);
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .code-cancel-btn:hover { color: #fff; }
 
     .login-spinner {
       width: 32px;
@@ -4607,9 +4651,17 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
     this.pendingCodes.set(codes);
   }
 
+  hasPendingCodeHash(accountId: number): boolean {
+    return !!(this.pendingCodes().get(accountId)?.phoneCodeHash);
+  }
+
+  isResendingCode(accountId: number): boolean {
+    return this.pendingCodes().get(accountId)?.submitting === true && !this.pendingCodes().get(accountId)?.phoneCodeHash;
+  }
+
   submitCode(account: Account): void {
     const pending = this.pendingCodes().get(account.id);
-    if (!pending?.code) return;
+    if (!pending?.code || !pending?.phoneCodeHash) return;
 
     const codes = new Map(this.pendingCodes());
     codes.set(account.id, { ...pending, submitting: true });
@@ -4622,6 +4674,24 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
       apiId: account.apiId,
       apiHash: account.apiHash
     });
+  }
+
+  resendCode(account: Account): void {
+    const codes = new Map(this.pendingCodes());
+    codes.set(account.id, { code: '', phoneCodeHash: '', submitting: true });
+    this.pendingCodes.set(codes);
+
+    this.ipcService.send('login-account', {
+      phone: account.phone,
+      apiId: account.apiId,
+      apiHash: account.apiHash
+    });
+    this.toast.info('正在發送驗證碼到您的 Telegram 應用...', 5000);
+  }
+
+  cancelLogin(account: Account): void {
+    this.onLoginComplete(account.id);
+    this.ipcService.send('update-account-status', { accountId: account.id, status: 'Offline' });
   }
 
   onLogout(account: Account): void {

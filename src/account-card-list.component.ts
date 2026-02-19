@@ -624,16 +624,33 @@ export const PROXY_TYPES = [
               
               <!-- 登入進度指示器 -->
               @if (isLoggingIn(account.id) || account.status === 'Logging in...' || account.status === 'Waiting Code' || account.status === 'Waiting 2FA') {
-                <div class="login-progress-overlay">
-                  <div class="login-spinner"></div>
-                  <span class="login-status-text">
-                    @switch (account.status) {
-                      @case ('Logging in...') { 正在連接... }
-                      @case ('Waiting Code') { 等待驗證碼 }
-                      @case ('Waiting 2FA') { 等待2FA密碼 }
-                      @default { {{ getLoginProgress(account.id)?.step || '處理中...' }} }
-                    }
-                  </span>
+                <div class="login-progress-overlay" (click)="$event.stopPropagation()">
+                  @if (account.status === 'Waiting Code') {
+                    <span class="login-status-text">📲 請輸入驗證碼</span>
+                    <div class="code-input-row">
+                      <input type="text" 
+                        class="code-input" 
+                        placeholder="驗證碼" 
+                        maxlength="6"
+                        [value]="getPendingCode(account.id)"
+                        (input)="onCodeInput(account.id, $event)"
+                        (keydown.enter)="submitCode(account)">
+                      <button class="code-submit-btn" 
+                        [disabled]="!getPendingCode(account.id) || isSubmittingCode(account.id)"
+                        (click)="submitCode(account)">
+                        @if (isSubmittingCode(account.id)) { ⏳ } @else { ✓ }
+                      </button>
+                    </div>
+                  } @else {
+                    <div class="login-spinner"></div>
+                    <span class="login-status-text">
+                      @switch (account.status) {
+                        @case ('Logging in...') { 正在連接... }
+                        @case ('Waiting 2FA') { 等待2FA密碼 }
+                        @default { {{ getLoginProgress(account.id)?.step || '處理中...' }} }
+                      }
+                    </span>
+                  }
                 </div>
               }
 
@@ -2439,6 +2456,45 @@ export const PROXY_TYPES = [
       border-radius: 0.75rem;
     }
 
+    .code-input-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      margin-top: 0.25rem;
+    }
+
+    .code-input {
+      width: 120px;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid rgba(6, 182, 212, 0.5);
+      border-radius: 0.375rem;
+      background: rgba(15, 23, 42, 0.8);
+      color: #fff;
+      font-size: 1.1rem;
+      letter-spacing: 0.3rem;
+      text-align: center;
+      outline: none;
+    }
+    .code-input:focus {
+      border-color: #06b6d4;
+      box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.25);
+    }
+
+    .code-submit-btn {
+      padding: 0.4rem 0.75rem;
+      border: none;
+      border-radius: 0.375rem;
+      background: linear-gradient(135deg, #06b6d4, #3b82f6);
+      color: #fff;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .code-submit-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
     .login-spinner {
       width: 32px;
       height: 32px;
@@ -4061,6 +4117,9 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
   // 登入狀態追踪
   loggingInAccounts = signal<Set<number>>(new Set());
   loginProgress = signal<Map<number, { step: string; progress: number }>>(new Map());
+  
+  // 驗證碼輸入狀態（帳號ID → { code, phoneCodeHash }）
+  pendingCodes = signal<Map<number, { code: string; phoneCodeHash: string; submitting: boolean }>>(new Map());
 
   // 标签和分組状态
   showTagFilter = signal(false);
@@ -4253,6 +4312,14 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
       }
     });
     this.ipcChannels.push('login-success');
+
+    // 監聽需要驗證碼事件 → 保存 phoneCodeHash 到卡片
+    this.ipcService.on('login-requires-code', (data: any) => {
+      if (data.accountId && data.phoneCodeHash) {
+        this.setPendingCodeHash(data.accountId, data.phoneCodeHash);
+      }
+    });
+    this.ipcChannels.push('login-requires-code');
   }
 
   loadTagsAndGroups(): void {
@@ -4510,6 +4577,51 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
     const progress = new Map(this.loginProgress());
     progress.delete(accountId);
     this.loginProgress.set(progress);
+    
+    const codes = new Map(this.pendingCodes());
+    codes.delete(accountId);
+    this.pendingCodes.set(codes);
+  }
+
+  // 驗證碼輸入相關
+  getPendingCode(accountId: number): string {
+    return this.pendingCodes().get(accountId)?.code || '';
+  }
+
+  isSubmittingCode(accountId: number): boolean {
+    return this.pendingCodes().get(accountId)?.submitting || false;
+  }
+
+  onCodeInput(accountId: number, event: Event): void {
+    const value = (event.target as HTMLInputElement).value.replace(/\D/g, '');
+    const codes = new Map(this.pendingCodes());
+    const existing = codes.get(accountId) || { code: '', phoneCodeHash: '', submitting: false };
+    codes.set(accountId, { ...existing, code: value });
+    this.pendingCodes.set(codes);
+  }
+
+  setPendingCodeHash(accountId: number, phoneCodeHash: string): void {
+    const codes = new Map(this.pendingCodes());
+    const existing = codes.get(accountId) || { code: '', phoneCodeHash: '', submitting: false };
+    codes.set(accountId, { ...existing, phoneCodeHash });
+    this.pendingCodes.set(codes);
+  }
+
+  submitCode(account: Account): void {
+    const pending = this.pendingCodes().get(account.id);
+    if (!pending?.code) return;
+
+    const codes = new Map(this.pendingCodes());
+    codes.set(account.id, { ...pending, submitting: true });
+    this.pendingCodes.set(codes);
+
+    this.ipcService.send('login-account', {
+      phone: account.phone,
+      code: pending.code,
+      phoneCodeHash: pending.phoneCodeHash,
+      apiId: account.apiId,
+      apiHash: account.apiHash
+    });
   }
 
   onLogout(account: Account): void {

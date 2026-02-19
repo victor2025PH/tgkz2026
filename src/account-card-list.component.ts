@@ -4310,6 +4310,7 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
     switch (status) {
       case 'Online': return '在线';
       case 'Offline': return '离线';
+      case 'Disconnected': return '已断开';
       case 'Banned': return '封禁';
       case 'Warming Up': return '预热中';
       case 'Cooldown': return '冷却中';
@@ -4472,15 +4473,15 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
       'error',
       'Proxy Error',
       'Session Expired',
-      'Auth Error'
+      'Auth Error',
+      'Disconnected'
     ];
-    // 不是在線狀態且不是登入中狀態
     const isNotOnline = account.status !== 'Online';
     const isNotLoggingIn = !['Logging in...', 'Waiting Code', 'Waiting 2FA'].includes(account.status);
-    // 狀態在允許登入列表中，或者狀態包含 'error'（不區分大小寫）
     const isAllowedStatus = loginAllowedStatuses.includes(account.status) || 
                            account.status.toLowerCase().includes('error') ||
-                           account.status.toLowerCase().includes('offline');
+                           account.status.toLowerCase().includes('offline') ||
+                           account.status.toLowerCase().includes('disconnected');
     return isNotOnline && isNotLoggingIn && isAllowedStatus;
   }
 

@@ -55,9 +55,14 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
               智能引擎設置
             </h1>
             
-            <!-- 連接狀態 -->
+            <!-- 連接狀態：加載中不顯示未配置，避免閃爍 -->
             <div class="flex items-center gap-2">
-              @if (aiService.isConnected()) {
+              @if (aiService.isLoading()) {
+                <span class="flex items-center gap-2 px-3 py-1 bg-slate-600/50 text-slate-400 rounded-full text-sm">
+                  <span class="inline-block w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+                  加載中...
+                </span>
+              } @else if (aiService.isConnected()) {
                 <span class="flex items-center gap-2 px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm">
                   <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
                   AI 已連接
@@ -310,7 +315,12 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
                   </button>
                 </div>
                 
-                @if (aiService.defaultModel()) {
+                @if (aiService.isLoading()) {
+                  <div class="p-4 bg-slate-700/30 border border-slate-600/50 rounded-xl flex items-center gap-3">
+                    <span class="inline-block w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></span>
+                    <span class="text-slate-400">正在加載 AI 模型...</span>
+                  </div>
+                } @else if (aiService.defaultModel()) {
                   <div class="flex items-center gap-4 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
                     <div class="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center text-2xl">
                       {{ getProviderIcon(aiService.defaultModel()!.provider) }}

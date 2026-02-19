@@ -590,4 +590,86 @@ class AccountMixin:
         except Exception as e:
             print(f"Error ensuring accounts table: {e}")
     
+    # ============ P1-5: 帳號事件記錄（登入/斷開/重連/過期） ============
+    
+    async def _ensure_account_events_table(self, db_path: Path):
+        """確保 account_events 表存在"""
+        create_sql = '''
+            CREATE TABLE IF NOT EXISTS account_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                reason TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (account_id) REFERENCES accounts(id)
+            )
+        '''
+        try:
+            if not HAS_AIOSQLITE:
+                conn = sqlite3.connect(str(db_path))
+                conn.execute(create_sql)
+                conn.commit()
+                conn.close()
+            else:
+                async with aiosqlite.connect(str(db_path)) as conn:
+                    await conn.execute(create_sql)
+                    await conn.commit()
+        except Exception as e:
+            print(f"Error ensuring account_events table: {e}", file=sys.stderr)
+    
+    async def add_account_event(self, account_id: int, event_type: str, reason: Optional[str] = None) -> bool:
+        """記錄帳號事件（login / logout / disconnect / session_expired / reconnect_ok）"""
+        try:
+            db_path = self._get_accounts_db_path()
+            await self._ensure_accounts_table(db_path)
+            await self._ensure_account_events_table(db_path)
+            if not HAS_AIOSQLITE:
+                conn = sqlite3.connect(str(db_path))
+                conn.execute(
+                    'INSERT INTO account_events (account_id, event_type, reason) VALUES (?, ?, ?)',
+                    (account_id, event_type, reason or '')
+                )
+                conn.commit()
+                conn.close()
+                return True
+            async with aiosqlite.connect(str(db_path)) as conn:
+                await conn.execute(
+                    'INSERT INTO account_events (account_id, event_type, reason) VALUES (?, ?, ?)',
+                    (account_id, event_type, reason or '')
+                )
+                await conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error adding account event: {e}", file=sys.stderr)
+            return False
+    
+    async def get_account_events(self, account_id: int, limit: int = 50) -> List[Dict]:
+        """獲取帳號最近事件列表（用於診斷）"""
+        try:
+            db_path = self._get_accounts_db_path()
+            if not db_path.exists():
+                return []
+            await self._ensure_account_events_table(db_path)
+            if not HAS_AIOSQLITE:
+                conn = sqlite3.connect(str(db_path))
+                conn.row_factory = sqlite3.Row
+                cursor = conn.execute(
+                    'SELECT id, account_id, event_type, reason, created_at FROM account_events WHERE account_id = ? ORDER BY id DESC LIMIT ?',
+                    (account_id, limit)
+                )
+                rows = cursor.fetchall()
+                conn.close()
+                return [dict(r) for r in rows]
+            async with aiosqlite.connect(str(db_path)) as conn:
+                conn.row_factory = aiosqlite.Row
+                cursor = await conn.execute(
+                    'SELECT id, account_id, event_type, reason, created_at FROM account_events WHERE account_id = ? ORDER BY id DESC LIMIT ?',
+                    (account_id, limit)
+                )
+                rows = await cursor.fetchall()
+                return [dict(r) for r in rows]
+        except Exception as e:
+            print(f"Error getting account events: {e}", file=sys.stderr)
+            return []
+    
     # ============ 異步 SQL 執行方法 ============

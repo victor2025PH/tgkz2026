@@ -851,6 +851,24 @@ export const PROXY_TYPES = [
             </div>
           </div>
 
+          <!-- P1-5: 最近事件 -->
+          <div class="detail-section">
+            <h4>📜 最近事件</h4>
+            @if (accountEvents().length > 0) {
+              <ul class="detail-events-list">
+                @for (ev of accountEvents(); track ev.created_at + ev.event_type) {
+                  <li>
+                    <span class="event-type">{{ getAccountEventLabel(ev.event_type) }}</span>
+                    @if (ev.reason) { <span class="event-reason">— {{ ev.reason }}</span> }
+                    <span class="event-time">{{ ev.created_at }}</span>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="detail-events-empty">暫無記錄</p>
+            }
+          </div>
+
           <!-- 设备信息 -->
           <div class="detail-section">
             <h4>🔧 设备信息</h4>
@@ -1489,6 +1507,67 @@ export const PROXY_TYPES = [
               <button (click)="retryLogin()" class="btn-save">重試</button>
             }
           }
+        </div>
+      </div>
+    }
+
+    <!-- P1-4: 批量登入結果彈窗 -->
+    @if (showBatchLoginModal()) {
+      <div class="modal-overlay" (click)="closeBatchLoginModal()"></div>
+      <div class="modal-container batch-login-modal">
+        <div class="modal-header">
+          <h3>📋 批量登入結果</h3>
+          <button (click)="closeBatchLoginModal()" class="close-btn">×</button>
+        </div>
+        <div class="modal-content batch-login-content">
+          <p class="batch-login-summary">
+            共 {{ batchLoginTotal() }} 個帳號 ·
+            @if (batchLoggingIn()) { 正在發送請求... }
+            @else { 已全部發送 }
+          </p>
+          <div class="batch-login-stats">
+            <div class="batch-stat success">
+              <span class="stat-num">{{ batchLoginSuccessIds().length }}</span>
+              <span class="stat-label">成功</span>
+            </div>
+            <div class="batch-stat need-code">
+              <span class="stat-num">{{ batchLoginNeedCodeIds().length }}</span>
+              <span class="stat-label">需驗證碼</span>
+            </div>
+            <div class="batch-stat failed">
+              <span class="stat-num">{{ batchLoginFailed().length }}</span>
+              <span class="stat-label">失敗</span>
+            </div>
+          </div>
+          @if (batchLoginNeedCodeIds().length > 0) {
+            <div class="batch-login-section">
+              <h4>📲 需要輸入驗證碼（點擊打開登入彈窗）</h4>
+              <ul class="batch-account-list">
+                @for (id of batchLoginNeedCodeIds(); track id) {
+                  @if (getAccountById(id); as acc) {
+                    <li>
+                      <button type="button" class="batch-account-btn" (click)="openLoginModal(acc)">
+                        {{ acc.phone }}
+                      </button>
+                    </li>
+                  }
+                }
+              </ul>
+            </div>
+          }
+          @if (batchLoginFailed().length > 0) {
+            <div class="batch-login-section">
+              <h4>❌ 登入失敗</h4>
+              <ul class="batch-failed-list">
+                @for (item of batchLoginFailed(); track item.accountId) {
+                  <li><span class="phone">{{ item.phone }}</span> — {{ item.message }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button (click)="closeBatchLoginModal()" class="btn-save">關閉</button>
         </div>
       </div>
     }
@@ -2710,6 +2789,76 @@ export const PROXY_TYPES = [
       font-size: 0.75rem;
       color: var(--text-muted, #64748b);
     }
+
+    /* P1-4: 批量登入結果彈窗 */
+    .batch-login-modal { max-width: 480px; }
+    .batch-login-content { padding: 1rem 1.5rem; }
+    .batch-login-summary {
+      color: #94a3b8;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .batch-login-stats {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .batch-stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .batch-stat .stat-num { font-size: 1.5rem; font-weight: 700; }
+    .batch-stat.success .stat-num { color: #22c55e; }
+    .batch-stat.need-code .stat-num { color: #06b6d4; }
+    .batch-stat.failed .stat-num { color: #f87171; }
+    .batch-stat .stat-label { font-size: 0.75rem; color: #64748b; }
+    .batch-login-section {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(148, 163, 184, 0.2);
+    }
+    .batch-login-section h4 { font-size: 0.9rem; margin-bottom: 0.5rem; color: #e2e8f0; }
+    .batch-account-list, .batch-failed-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .batch-account-list li, .batch-failed-list li { margin-bottom: 0.35rem; }
+    .batch-account-btn {
+      background: none;
+      border: none;
+      color: #06b6d4;
+      cursor: pointer;
+      font-size: 0.875rem;
+      padding: 0.2rem 0;
+      text-align: left;
+      transition: color 0.2s;
+    }
+    .batch-account-btn:hover { color: #22d3ee; text-decoration: underline; }
+    .batch-failed-list .phone { color: #94a3b8; margin-right: 0.25rem; }
+    .batch-failed-list li { font-size: 0.85rem; color: #f87171; }
+
+    /* P1-5: 詳情面板最近事件 */
+    .detail-events-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-size: 0.8rem;
+    }
+    .detail-events-list li {
+      padding: 0.35rem 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: center;
+    }
+    .detail-events-list .event-type { color: #06b6d4; font-weight: 500; }
+    .detail-events-list .event-reason { color: #94a3b8; }
+    .detail-events-list .event-time { color: #64748b; margin-left: auto; }
+    .detail-events-empty { color: #64748b; font-size: 0.85rem; margin: 0; }
 
     .login-spinner {
       width: 32px;
@@ -4330,6 +4479,16 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
   batchLoggingIn = signal(false);
   batchLoggingOut = signal(false);
 
+  // P1-4: 批量登入進度
+  showBatchLoginModal = signal(false);
+  batchLoginTotal = signal(0);
+  batchLoginSuccessIds = signal<number[]>([]);
+  batchLoginNeedCodeIds = signal<number[]>([]);
+  batchLoginFailed = signal<{ accountId: number; phone: string; message: string }[]>([]);
+
+  // P1-5: 帳號事件記錄（詳情面板）
+  accountEvents = signal<{ event_type: string; reason: string; created_at: string }[]>([]);
+
   // 登入狀態追踪
   loggingInAccounts = signal<Set<number>>(new Set());
   loginProgress = signal<Map<number, { step: string; progress: number }>>(new Map());
@@ -4529,6 +4688,16 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
     this.ipcService.on('account-login-error', (data: any) => {
       if (data.accountId) {
         this.onLoginComplete(data.accountId);
+        if (this.batchLoggingIn()) {
+          const ids = this.batchLoginSuccessIds().concat(this.batchLoginNeedCodeIds());
+          if (!ids.includes(data.accountId)) {
+            const acc = this.accounts.find(a => a.id === data.accountId);
+            this.batchLoginFailed.set([
+              ...this.batchLoginFailed(),
+              { accountId: data.accountId, phone: acc?.phone ?? String(data.accountId), message: data.friendlyMessage || data.message || '登入失敗' }
+            ]);
+          }
+        }
         const modalAcc = this.loginModalAccount();
         if (modalAcc && modalAcc.id === data.accountId) {
           this.clearLoginTimeout();
@@ -4545,6 +4714,11 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
     this.ipcService.on('login-success', (data: any) => {
       if (data.accountId) {
         this.onLoginComplete(data.accountId);
+        if (this.batchLoggingIn()) {
+          if (!this.batchLoginSuccessIds().includes(data.accountId)) {
+            this.batchLoginSuccessIds.set([...this.batchLoginSuccessIds(), data.accountId]);
+          }
+        }
         const modalAcc = this.loginModalAccount();
         if (modalAcc && modalAcc.id === data.accountId) {
           this.clearLoginTimeout();
@@ -4558,6 +4732,11 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
 
     this.ipcService.on('login-requires-code', (data: any) => {
       if (data.accountId && data.phoneCodeHash) {
+        if (this.batchLoggingIn() && !this.batchLoginSuccessIds().includes(data.accountId)) {
+          if (!this.batchLoginNeedCodeIds().includes(data.accountId)) {
+            this.batchLoginNeedCodeIds.set([...this.batchLoginNeedCodeIds(), data.accountId]);
+          }
+        }
         const modalAcc = this.loginModalAccount();
         if (modalAcc && modalAcc.id === data.accountId) {
           this.clearLoginTimeout();
@@ -4630,6 +4809,10 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
     }
     const fullName = `${account.firstName || ''} ${account.lastName || ''}`.trim();
     return fullName || account.phone;
+  }
+
+  getAccountById(id: number): Account | undefined {
+    return this.accounts.find(a => a.id === id);
   }
 
   getStatusClass(status: string): string {
@@ -4716,6 +4899,28 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
   selectAccount(account: Account): void {
     this.selectedAccount.set(account);
     this.accountSelected.emit(account);
+    this.loadAccountEvents(account.id);
+  }
+
+  loadAccountEvents(accountId: number): void {
+    this.accountEvents.set([]);
+    this.ipcService.once('get-account-events-result', (result: any) => {
+      if (result.success && result.events && result.accountId === accountId) {
+        this.accountEvents.set(result.events);
+      }
+    });
+    this.ipcService.send('get-account-events', { accountId, limit: 20 });
+  }
+
+  getAccountEventLabel(eventType: string): string {
+    const map: Record<string, string> = {
+      login: '登入',
+      logout: '登出',
+      disconnect: '斷開',
+      session_expired: 'Session 過期',
+      reconnect_ok: '重連成功'
+    };
+    return map[eventType] || eventType;
   }
 
   closeDetail(): void {
@@ -5593,7 +5798,6 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
       return;
     }
 
-    // 過濾出離線的帳號
     const offlineAccounts = this.accounts.filter(a => 
       this.selectedIds.has(a.id) && (a.status === 'Offline' || a.status === 'Banned')
     );
@@ -5604,34 +5808,39 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
     }
 
     this.batchLoggingIn.set(true);
-    this.toast.info(`正在批量登入 ${offlineAccounts.length} 個帳號...`);
+    this.batchLoginTotal.set(offlineAccounts.length);
+    this.batchLoginSuccessIds.set([]);
+    this.batchLoginNeedCodeIds.set([]);
+    this.batchLoginFailed.set([]);
+    this.showBatchLoginModal.set(true);
 
-    // 添加到登入中列表
     const loggingIn = new Set(this.loggingInAccounts());
-    offlineAccounts.forEach(account => {
-      loggingIn.add(account.id);
-      // 依序發送登入請求（間隔 1 秒避免觸發限制）
-    });
+    offlineAccounts.forEach(account => loggingIn.add(account.id));
     this.loggingInAccounts.set(loggingIn);
 
-    // 逐個登入（間隔發送避免觸發 Flood Wait）
     let index = 0;
     const loginNext = () => {
       if (index >= offlineAccounts.length) {
         this.batchLoggingIn.set(false);
-        this.toast.success(`已發送 ${offlineAccounts.length} 個帳號的登入請求`);
+        this.toast.success(`已發送 ${offlineAccounts.length} 個登入請求，請在彈窗中查看結果`);
         return;
       }
 
       const account = offlineAccounts[index];
       this.accountLogin.emit(account);
       index++;
-
-      // 間隔 2 秒發送下一個請求
       setTimeout(loginNext, 2000);
     };
 
     loginNext();
+  }
+
+  closeBatchLoginModal(): void {
+    this.showBatchLoginModal.set(false);
+    this.batchLoginTotal.set(0);
+    this.batchLoginSuccessIds.set([]);
+    this.batchLoginNeedCodeIds.set([]);
+    this.batchLoginFailed.set([]);
   }
 
   batchLogout(): void {

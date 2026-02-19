@@ -2821,6 +2821,9 @@ class TelegramClientManager:
                 
                 is_monitored = chat_id in mon_chat_ids_normalized
                 
+                # 🔧 每次收到群消息都輸出一行，便於在後端窗口確認「有無監控群消息日誌」
+                print(f"[監控群消息] chat_id={chat_id} title={chat_title!r} 監控中={is_monitored} 有文字={bool(message_text and message_text != '(no text)')}", file=sys.stderr)
+                
                 # 只在調試模式或監控消息時輸出詳細日誌
                 if is_monitored:
                     print(f"[TelegramClient] ========== MESSAGE RECEIVED ==========", file=sys.stderr)

@@ -5,7 +5,7 @@
  * 更新：支持持久化存儲和本地 AI
  */
 
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Injectable, signal, computed, inject, OnDestroy } from '@angular/core';
 import { 
   AICenterConfig, 
   AIModelConfig, 
@@ -21,6 +21,9 @@ import {
 import { ElectronIpcService } from '../electron-ipc.service';
 import { ToastService } from '../toast.service';
 import { AiSettingsService, SaveState } from './ai-settings.service';
+import { AuthEventsService } from '../core/auth-events.service';
+import { filter, takeUntil } from 'rxjs/operators';
+import { Subject } from 'rxjs';
 
 // 擴展 AIModelConfig 以支持本地 AI
 export interface ExtendedAIModelConfig extends AIModelConfig {
@@ -31,10 +34,12 @@ export interface ExtendedAIModelConfig extends AIModelConfig {
 @Injectable({
   providedIn: 'root'
 })
-export class AICenterService {
+export class AICenterService implements OnDestroy {
   private ipcService = inject(ElectronIpcService);
   private toastService = inject(ToastService);
   private aiSettings = inject(AiSettingsService);
+  private authEvents = inject(AuthEventsService, { optional: true });
+  private destroy$ = new Subject<void>();
   
   // 配置狀態
   private config = signal<AICenterConfig>(DEFAULT_AI_CONFIG);
@@ -115,11 +120,27 @@ export class AICenterService {
   
   constructor() {
     this.setupIpcListeners();
-    // 延遲加載模型配置和用途分配
+    // 🔧 登錄後 AI 持久化：延遲 300ms 再拉取，確保認證已就緒
     setTimeout(() => {
       this.loadModelsFromBackend();
       this.loadModelUsageFromBackend();
-    }, 100);
+    }, 300);
+    // 監聽登錄成功事件，延遲刷新 AI 配置（儀表盤等依賴 isConnected）
+    if (this.authEvents) {
+      this.authEvents.authEvents$
+        .pipe(filter(e => e.type === 'login'), takeUntil(this.destroy$))
+        .subscribe(() => {
+          setTimeout(() => {
+            this.loadModelsFromBackend();
+            this.loadModelUsageFromBackend();
+          }, 300);
+        });
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
   
   private setupIpcListeners(): void {
@@ -489,7 +510,7 @@ export class AICenterService {
     console.log('[AI] 一鍵保存模型配置頁設置:', allSettings);
     const ok = await this.aiSettings.saveSettings(allSettings);
     if (ok) {
-      this.toastService.success('模型配置已保存');
+      this.toastService.success('模型配置已保存。已保存到雲端，返回概覽或下次登錄將自動恢復', 5000);
     }
     return ok;
   }
@@ -501,7 +522,7 @@ export class AICenterService {
     console.log('[AI] 保存引擎概覽設置:', settings);
     const ok = await this.aiSettings.saveSettings(settings);
     if (ok) {
-      this.toastService.success('引擎設置已保存');
+      this.toastService.success('引擎設置已保存。已保存到雲端，返回概覽或下次登錄將自動恢復', 5000);
     }
     return ok;
   }

@@ -851,21 +851,39 @@ export const PROXY_TYPES = [
             </div>
           </div>
 
-          <!-- P1-5: 最近事件 -->
+          <!-- P1-5 + P2-3: 最近事件（含篩選 + 相對時間） -->
           <div class="detail-section">
-            <h4>📜 最近事件</h4>
-            @if (accountEvents().length > 0) {
+            <div class="detail-events-header">
+              <h4>📜 最近事件</h4>
+              <div class="event-filter-tabs">
+                @for (f of [
+                  {id: 'all',             label: '全部'},
+                  {id: 'login',           label: '登入'},
+                  {id: 'logout',          label: '登出'},
+                  {id: 'disconnect',      label: '斷開'},
+                  {id: 'session_expired', label: '過期'},
+                  {id: 'reconnect_ok',    label: '重連'}
+                ]; track f.id) {
+                  <button
+                    class="event-filter-tab"
+                    [class.active]="accountEventsFilter() === f.id"
+                    (click)="accountEventsFilter.set($any(f.id))"
+                  >{{ f.label }}</button>
+                }
+              </div>
+            </div>
+            @if (filteredAccountEvents().length > 0) {
               <ul class="detail-events-list">
-                @for (ev of accountEvents(); track ev.created_at + ev.event_type) {
+                @for (ev of filteredAccountEvents(); track ev.created_at + ev.event_type) {
                   <li>
-                    <span class="event-type">{{ getAccountEventLabel(ev.event_type) }}</span>
+                    <span class="event-type" [ngClass]="getEventTypeClass(ev.event_type)">{{ getAccountEventLabel(ev.event_type) }}</span>
                     @if (ev.reason) { <span class="event-reason">— {{ ev.reason }}</span> }
-                    <span class="event-time">{{ ev.created_at }}</span>
+                    <span class="event-time" [title]="ev.created_at">{{ formatRelativeTime(ev.created_at) }}</span>
                   </li>
                 }
               </ul>
             } @else {
-              <p class="detail-events-empty">暫無記錄</p>
+              <p class="detail-events-empty">{{ accountEvents().length === 0 ? '暫無記錄' : '此類型無記錄' }}</p>
             }
           </div>
 
@@ -1541,7 +1559,18 @@ export const PROXY_TYPES = [
           </div>
           @if (batchLoginNeedCodeIds().length > 0) {
             <div class="batch-login-section">
-              <h4>📲 需要輸入驗證碼（點擊打開登入彈窗）</h4>
+              <div class="batch-need-code-header">
+                <h4>📲 需要輸入驗證碼</h4>
+                @if (batchLoginNeedCodeIds().length > 1) {
+                  <!-- P2-5: 一鍵逐個補驗證碼 -->
+                  <button
+                    type="button"
+                    class="btn-batch-fill-code"
+                    (click)="startBatchCodeQueue()"
+                    title="依序打開每個帳號的驗證碼輸入視窗"
+                  >⚡ 逐個輸入 ({{ batchLoginNeedCodeIds().length }})</button>
+                }
+              </div>
               <ul class="batch-account-list">
                 @for (id of batchLoginNeedCodeIds(); track id) {
                   @if (getAccountById(id); as acc) {
@@ -2840,7 +2869,33 @@ export const PROXY_TYPES = [
     .batch-failed-list .phone { color: #94a3b8; margin-right: 0.25rem; }
     .batch-failed-list li { font-size: 0.85rem; color: #f87171; }
 
-    /* P1-5: 詳情面板最近事件 */
+    /* P1-5 + P2-3: 詳情面板最近事件 */
+    .detail-events-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .detail-events-header h4 { margin: 0; }
+    .event-filter-tabs {
+      display: flex;
+      gap: 0.25rem;
+      flex-wrap: wrap;
+    }
+    .event-filter-tab {
+      background: rgba(148, 163, 184, 0.1);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 10px;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 0.7rem;
+      padding: 0.15rem 0.5rem;
+      transition: all 0.15s;
+    }
+    .event-filter-tab:hover { background: rgba(6, 182, 212, 0.15); color: #06b6d4; }
+    .event-filter-tab.active { background: rgba(6, 182, 212, 0.2); border-color: #06b6d4; color: #06b6d4; font-weight: 600; }
     .detail-events-list {
       list-style: none;
       padding: 0;
@@ -2855,10 +2910,36 @@ export const PROXY_TYPES = [
       gap: 0.35rem;
       align-items: center;
     }
-    .detail-events-list .event-type { color: #06b6d4; font-weight: 500; }
-    .detail-events-list .event-reason { color: #94a3b8; }
-    .detail-events-list .event-time { color: #64748b; margin-left: auto; }
+    .detail-events-list .event-type { font-weight: 500; }
+    .detail-events-list .event-type-login    { color: #4ade80; }
+    .detail-events-list .event-type-logout   { color: #94a3b8; }
+    .detail-events-list .event-type-disconnect { color: #f87171; }
+    .detail-events-list .event-type-expired  { color: #fb923c; }
+    .detail-events-list .event-type-reconnect { color: #06b6d4; }
+    .detail-events-list .event-reason { color: #94a3b8; font-size: 0.75rem; }
+    .detail-events-list .event-time { color: #64748b; margin-left: auto; font-size: 0.75rem; }
     .detail-events-empty { color: #64748b; font-size: 0.85rem; margin: 0; }
+
+    /* P2-5: 批量補碼一鍵按鈕 */
+    .batch-need-code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .batch-need-code-header h4 { margin: 0; font-size: 0.9rem; color: #e2e8f0; }
+    .btn-batch-fill-code {
+      background: linear-gradient(135deg, #06b6d4, #0e7490);
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.3rem 0.75rem;
+      transition: opacity 0.2s;
+    }
+    .btn-batch-fill-code:hover { opacity: 0.85; }
 
     .login-spinner {
       width: 32px;
@@ -4489,6 +4570,12 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
   // P1-5: 帳號事件記錄（詳情面板）
   accountEvents = signal<{ event_type: string; reason: string; created_at: string }[]>([]);
 
+  // P2-3: 事件篩選
+  accountEventsFilter = signal<'all' | 'login' | 'logout' | 'disconnect' | 'session_expired' | 'reconnect_ok'>('all');
+
+  // P2-5: 批量補驗證碼隊列
+  batchCodeQueue = signal<number[]>([]);  // 待補碼帳號 ID 隊列
+
   // 登入狀態追踪
   loggingInAccounts = signal<Set<number>>(new Set());
   loginProgress = signal<Map<number, { step: string; progress: number }>>(new Map());
@@ -4904,23 +4991,89 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
 
   loadAccountEvents(accountId: number): void {
     this.accountEvents.set([]);
+    this.accountEventsFilter.set('all');
     this.ipcService.once('get-account-events-result', (result: any) => {
       if (result.success && result.events && result.accountId === accountId) {
         this.accountEvents.set(result.events);
       }
     });
-    this.ipcService.send('get-account-events', { accountId, limit: 20 });
+    this.ipcService.send('get-account-events', { accountId, limit: 50 });
   }
 
+  // P2-3: 篩選後的事件列表
+  filteredAccountEvents(): { event_type: string; reason: string; created_at: string }[] {
+    const filter = this.accountEventsFilter();
+    const events = this.accountEvents();
+    if (filter === 'all') return events;
+    return events.filter(ev => ev.event_type === filter);
+  }
+
+  // P2-3: 相對時間格式化
+  formatRelativeTime(dateStr: string): string {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr.replace(' ', 'T'));
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffSec = Math.floor(diffMs / 1000);
+      if (diffSec < 60) return '剛剛';
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin} 分鐘前`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr} 小時前`;
+      const diffDay = Math.floor(diffHr / 24);
+      if (diffDay < 30) return `${diffDay} 天前`;
+      return dateStr.slice(0, 16).replace('T', ' ');
+    } catch {
+      return dateStr.slice(0, 16);
+    }
+  }
+
+  // P2-3: 事件標籤（含圖示）
   getAccountEventLabel(eventType: string): string {
     const map: Record<string, string> = {
-      login: '登入',
-      logout: '登出',
-      disconnect: '斷開',
-      session_expired: 'Session 過期',
-      reconnect_ok: '重連成功'
+      login: '🔑 登入',
+      logout: '🚪 登出',
+      disconnect: '📵 斷開',
+      session_expired: '⚠️ Session 過期',
+      reconnect_ok: '🔄 重連成功'
     };
     return map[eventType] || eventType;
+  }
+
+  // P2-3: 事件類型顏色 class
+  getEventTypeClass(eventType: string): string {
+    const map: Record<string, string> = {
+      login: 'event-type-login',
+      logout: 'event-type-logout',
+      disconnect: 'event-type-disconnect',
+      session_expired: 'event-type-expired',
+      reconnect_ok: 'event-type-reconnect'
+    };
+    return map[eventType] || '';
+  }
+
+  // P2-5: 啟動逐個補驗證碼隊列
+  startBatchCodeQueue(): void {
+    const queue = [...this.batchLoginNeedCodeIds()];
+    if (queue.length === 0) return;
+    this.batchCodeQueue.set(queue);
+    this.openNextFromCodeQueue();
+  }
+
+  // P2-5: 打開隊列中下一個需要驗證碼的帳號
+  openNextFromCodeQueue(): void {
+    const queue = this.batchCodeQueue();
+    if (queue.length === 0) return;
+    const [nextId, ...rest] = queue;
+    this.batchCodeQueue.set(rest);
+    const acc = this.getAccountById(nextId);
+    if (acc) {
+      this.openLoginModal(acc);
+    } else {
+      // 帳號找不到，跳過
+      this.openNextFromCodeQueue();
+    }
   }
 
   closeDetail(): void {
@@ -5109,6 +5262,10 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
     if (this.loginResendTimer) {
       clearInterval(this.loginResendTimer);
       this.loginResendTimer = null;
+    }
+    // P2-5: 若在逐個補碼隊列模式，自動打開下一個
+    if (this.batchCodeQueue().length > 0) {
+      setTimeout(() => this.openNextFromCodeQueue(), 300);
     }
   }
 

@@ -33,14 +33,18 @@ class ConnectionMonitor:
         self._background_task: Optional[asyncio.Task] = None
         self._check_interval = 60  # 檢查間隔（秒）
         self._reconnect_attempts: Dict[str, int] = {}
-        self._max_reconnect_attempts = 5  # 主流程最大重連次數（提高以配合退避）
         self._last_retry_at: Dict[str, datetime] = {}  # 上次重連時間（用於指數退避）
         self._last_check_time: Optional[datetime] = None
         self._connection_stats: Dict[str, Dict] = {}
         # P1-1: 標記為 Disconnected 後進入後台恢復隊列，低頻重試
         self._background_recovery: Dict[str, Dict[str, Any]] = {}  # phone -> { account_id, account, next_retry_at, attempts }
-        self._background_interval = 300  # 後台重試間隔 5 分鐘
-        self._max_background_attempts = 3  # 後台最多再試 3 次
+
+        # P2-4: 可通過環境變量覆蓋恢復參數
+        import os
+        self._max_reconnect_attempts: int = int(os.getenv('RECONNECT_MAX_ATTEMPTS', '5'))
+        self._background_interval: int = int(os.getenv('RECONNECT_BACKGROUND_INTERVAL', '300'))
+        self._max_background_attempts: int = int(os.getenv('RECONNECT_MAX_BACKGROUND_ATTEMPTS', '3'))
+        self._backoff_base: int = int(os.getenv('RECONNECT_BACKOFF_BASE', '30'))
     
     def log(self, message: str, level: str = "info"):
         """記錄日誌"""
@@ -57,8 +61,8 @@ class ConnectionMonitor:
         self.telegram_manager = manager
     
     def _backoff_seconds(self, attempts: int) -> int:
-        """指數退避：30, 60, 120, 240, 最多 600 秒"""
-        return min(30 * (2 ** attempts), 600)
+        """指數退避：base, base*2, base*4...，最多 600 秒。base 由 RECONNECT_BACKOFF_BASE 環境變量控制"""
+        return min(self._backoff_base * (2 ** attempts), 600)
     
     async def start(self, check_interval: int = 60):
         """啟動連接監控"""

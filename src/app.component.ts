@@ -119,7 +119,7 @@ import {
 import { RAGBrainService } from './services/rag-brain.service';
 
 // 視圖類型定義
-type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'resource-discovery' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-engine' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps' | 'settings' | 'analytics' | 'analytics-center' | 'marketing-report' | 'profile' | 'membership-center' | 'wallet' | 'wallet-recharge' | 'wallet-withdraw' | 'wallet-transactions' | 'wallet-orders' | 'wallet-analytics' | 'monitoring' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules' | 'collected-users';
+type View = 'home' | 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'resource-discovery' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-engine' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps' | 'settings' | 'analytics' | 'analytics-center' | 'marketing-report' | 'profile' | 'membership-center' | 'wallet' | 'wallet-recharge' | 'wallet-withdraw' | 'wallet-transactions' | 'wallet-orders' | 'wallet-analytics' | 'monitoring' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules' | 'collected-users';
 type LeadDetailView = 'sendMessage' | 'history';
 type LeadsViewMode = 'kanban' | 'list';
 
@@ -440,7 +440,7 @@ export class AppComponent implements OnDestroy, OnInit {
   // 使用 I18nService 進行翻譯（支持多語言切換）
   t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
   theme = signal<'light' | 'dark'>('dark');
-  currentView: WritableSignal<View> = signal('dashboard');
+  currentView: WritableSignal<View> = signal('home');
   dashboardMode = signal<'smart' | 'classic'>('smart');  // 儀表板模式：智能/經典
   
   // 🆕 用於調試的路由 URL

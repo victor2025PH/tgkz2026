@@ -249,14 +249,50 @@ import { LeadScoringPanelComponent } from '../lead-nurturing/lead-scoring-panel.
       <!-- 客戶列表 / 卡片 -->
       <div class="rounded-xl overflow-hidden" style="background-color: var(--bg-card); border: 1px solid var(--border-color);">
         @if (filteredContacts().length === 0) {
-          <div class="p-12 text-center" style="color: var(--text-muted);">
-            <span class="text-5xl mb-4 block">📭</span>
-            <p class="text-lg mb-2">暫無客戶數據</p>
-            <p class="text-sm mb-4">請先到「資源中心」添加客戶，或從監控群組自動收集</p>
-            <button (click)="goToResourceCenter()" 
-                    class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition-colors">
-              前往資源中心 →
-            </button>
+          <!-- 🆕 Phase 1: 豐富的空狀態設計 -->
+          <div class="p-10 text-center">
+            <div class="text-6xl mb-4">📭</div>
+            <h3 class="text-xl font-semibold mb-2" style="color: var(--text-primary);">
+              發送列表還是空的
+            </h3>
+            <p class="text-sm mb-8 max-w-sm mx-auto" style="color: var(--text-muted);">
+              您需要先將客戶加入發送列表，才能批量發送消息
+            </p>
+
+            <!-- 數據來源引導 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-xl mx-auto mb-6">
+              <div class="p-4 rounded-xl border border-slate-700/50 bg-slate-800/40 text-center">
+                <div class="text-2xl mb-2">📡</div>
+                <div class="text-sm font-medium mb-1" style="color: var(--text-primary);">監控採集</div>
+                <div class="text-xs mb-3" style="color: var(--text-muted);">從群組自動收集用戶</div>
+                <button (click)="navigateTo('monitoring-groups')"
+                        class="text-xs px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors border border-cyan-500/20">
+                  去設置 →
+                </button>
+              </div>
+              <div class="p-4 rounded-xl border border-slate-700/50 bg-slate-800/40 text-center">
+                <div class="text-2xl mb-2">📦</div>
+                <div class="text-sm font-medium mb-1" style="color: var(--text-primary);">資源中心</div>
+                <div class="text-xs mb-3" style="color: var(--text-muted);">手動導入聯絡人</div>
+                <button (click)="goToResourceCenter()"
+                        class="text-xs px-3 py-1.5 rounded-lg bg-slate-600/50 text-slate-300 hover:bg-slate-600 transition-colors border border-slate-600/30">
+                  去添加 →
+                </button>
+              </div>
+              <div class="p-4 rounded-xl border border-slate-700/50 bg-slate-800/40 text-center">
+                <div class="text-2xl mb-2">👥</div>
+                <div class="text-sm font-medium mb-1" style="color: var(--text-primary);">廣告識別</div>
+                <div class="text-xs mb-3" style="color: var(--text-muted);">從廣告點擊自動識別</div>
+                <button (click)="navigateTo('collected-users')"
+                        class="text-xs px-3 py-1.5 rounded-lg bg-slate-600/50 text-slate-300 hover:bg-slate-600 transition-colors border border-slate-600/30">
+                  去查看 →
+                </button>
+              </div>
+            </div>
+
+            <p class="text-xs" style="color: var(--text-muted);">
+              💡 建議先開啟監控群組，AI 會自動識別並添加感興趣的用戶
+            </p>
           </div>
         } @else if (viewMode() === 'card') {
           <!-- 卡片視圖 -->
@@ -557,6 +593,11 @@ export class LeadsViewComponent implements OnInit, OnDestroy {
   // 前往資源中心
   goToResourceCenter(): void {
     this.nav.navigateTo('resource-center');
+  }
+
+  // 通用導航
+  navigateTo(view: string): void {
+    window.dispatchEvent(new CustomEvent('changeView', { detail: view }));
   }
   
   // 選擇相關方法

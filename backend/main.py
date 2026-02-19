@@ -639,7 +639,8 @@ _HANDLER_REGISTRY = {
     'domain.ai.model_handlers_impl': (
         'handle_save_ai_model handle_get_ai_models handle_update_ai_model '
         'handle_delete_ai_model handle_test_ai_model handle_set_default_ai_model '
-        'handle_save_model_usage handle_get_model_usage'
+        'handle_save_model_usage handle_get_model_usage '
+        'handle_startup_ai_health_check'
     ),
     'domain.ai.qa_handlers_impl': 'handle_add_qa_pair handle_get_qa_pairs handle_import_qa',
     'domain.ai.rag_handlers_impl': (

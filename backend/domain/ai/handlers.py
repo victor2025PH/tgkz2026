@@ -93,6 +93,11 @@ def register_ai_handlers(backend_service):
     async def handle_test_ai_model(payload: Dict[str, Any], context: CommandContext):
         """測試 AI 模型連接"""
         return await backend_service.handle_test_ai_model(payload)
+
+    @router.register('startup-ai-health-check', category=CommandCategory.AI, description='啟動靜默 AI 健康檢查')
+    async def handle_startup_ai_health_check(payload: Dict[str, Any], context: CommandContext):
+        """P1-3: 啟動靜默健康檢查，測試所有 is_connected=1 的模型"""
+        return await backend_service.handle_startup_ai_health_check(payload)
     
     @router.register('set-default-ai-model', category=CommandCategory.AI, description='設置默認 AI 模型')
     async def handle_set_default_ai_model(payload: Dict[str, Any], context: CommandContext):

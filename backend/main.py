@@ -580,7 +580,7 @@ _HANDLER_REGISTRY = {
         'handle_check_account_status handle_update_account_data handle_update_account '
         'handle_test_proxy handle_sync_account_info handle_logout_account handle_save_tags '
         'handle_save_groups handle_get_tags handle_get_groups handle_save_personas '
-        'handle_get_personas handle_batch_update_accounts handle_bulk_assign_role '
+        'handle_get_personas handle_get_account_events handle_batch_update_accounts handle_bulk_assign_role '
         'handle_bulk_assign_group handle_bulk_delete_accounts handle_remove_account '
         'handle_get_accounts'
     ),

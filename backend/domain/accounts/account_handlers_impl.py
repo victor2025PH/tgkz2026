@@ -845,6 +845,7 @@ async def handle_login_account(self, payload: Any):
             else:
                 # Successfully logged in
                 await db.update_account(account_id, {"status": result.get('status', 'Online')})
+                await db.add_account_event(account_id, "login", None)
                 self.send_log(f"Account {phone} logged in successfully", "success")
                 
                 # 🔧 P1: 獲取用戶資料（跳過 bio 避免 FloodWait）
@@ -1547,6 +1548,7 @@ async def handle_logout_account(self, payload: Dict[str, Any]):
 
         # 更新数据库状态为离线
         await db.update_account(account_id, {"status": "Offline"})
+        await db.add_account_event(account_id, "logout", None)
 
         # 刷新账户列表
         await self._send_accounts_updated()
@@ -1626,6 +1628,20 @@ async def handle_get_personas(self, payload: Dict[str, Any]):
         self.send_event("get-personas-result", {"success": True, "personas": personas})
     except Exception as e:
         self.send_event("get-personas-result", {"success": False, "error": str(e), "personas": []})
+
+
+async def handle_get_account_events(self, payload: Dict[str, Any]):
+    """P1-5: 獲取帳號登入/斷開事件列表（用於診斷）"""
+    try:
+        account_id = payload.get('accountId') or payload.get('account_id')
+        if not account_id:
+            self.send_event("get-account-events-result", {"success": False, "error": "缺少 accountId", "events": []})
+            return
+        limit = int(payload.get('limit', 30))
+        events = await db.get_account_events(account_id, limit=limit)
+        self.send_event("get-account-events-result", {"success": True, "accountId": account_id, "events": events})
+    except Exception as e:
+        self.send_event("get-account-events-result", {"success": False, "error": str(e), "events": []})
 
 
 async def handle_batch_update_accounts(self, payload: Dict[str, Any]):

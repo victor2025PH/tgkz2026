@@ -196,6 +196,11 @@ def register_account_handlers(backend_service):
         """獲取 AI 人設"""
         return await backend_service.handle_get_personas(payload)
     
+    @router.register('get-account-events', category=CommandCategory.ACCOUNTS, description='獲取帳號事件記錄')
+    async def handle_get_account_events(payload: Dict[str, Any], context: CommandContext):
+        """P1-5: 獲取帳號登入/斷開事件（診斷用）"""
+        return await backend_service.handle_get_account_events(payload)
+    
     # ==================== 批量操作 ====================
     
     @router.register('batch-update-accounts', category=CommandCategory.ACCOUNTS, description='批量更新帳號')

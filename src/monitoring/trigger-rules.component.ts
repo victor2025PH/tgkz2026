@@ -278,23 +278,46 @@ interface TriggerRule {
                 }
               </div>
             } @else {
-              <!-- 空狀態 -->
-              <div class="flex flex-col items-center justify-center h-full text-center py-12">
-                <div class="w-20 h-20 bg-slate-700/50 rounded-full flex items-center justify-center mb-4">
-                  <span class="text-4xl">⚡</span>
+              <!-- 🆕 Phase 1: 豐富的空狀態 -->
+              <div class="flex flex-col items-center justify-center h-full text-center py-10 px-6">
+                <!-- 圖示 -->
+                <div class="w-24 h-24 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center mb-5 shadow-lg">
+                  <span class="text-5xl">⚡</span>
                 </div>
-                <h3 class="text-lg font-medium text-white mb-2">還沒有觸發規則</h3>
-                <p class="text-slate-400 mb-6 max-w-md">
-                  觸發規則定義了當關鍵詞匹配後系統的響應方式。<br>
-                  您可以為不同的關鍵詞設置不同的響應動作。
+                <h3 class="text-xl font-semibold text-white mb-2">還沒有觸發規則</h3>
+                <p class="text-slate-400 mb-4 max-w-sm text-sm leading-relaxed">
+                  觸發規則讓 AI 在偵測到特定關鍵詞時自動採取行動——
+                  回覆消息、發送模板、或開始私聊培育
                 </p>
+
                 @if (aiChatEnabled()) {
-                  <p class="text-emerald-400 text-sm mb-4">
-                    💡 AI 自動聊天已開啟，將作為默認響應方式
-                  </p>
+                  <div class="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-sm mb-5">
+                    <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                    AI 自動聊天已開啟，作為兜底響應方式
+                  </div>
                 }
+
+                <!-- 使用場景示例 -->
+                <div class="grid grid-cols-3 gap-3 max-w-lg mb-6 text-left">
+                  <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                    <div class="text-base mb-1.5">🔑</div>
+                    <div class="text-xs font-medium text-white mb-0.5">詢盤識別</div>
+                    <div class="text-xs text-slate-500">「多少錢」→ 發送報價</div>
+                  </div>
+                  <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                    <div class="text-base mb-1.5">🤝</div>
+                    <div class="text-xs font-medium text-white mb-0.5">意向跟進</div>
+                    <div class="text-xs text-slate-500">「有興趣」→ 私聊邀請</div>
+                  </div>
+                  <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                    <div class="text-base mb-1.5">🚫</div>
+                    <div class="text-xs font-medium text-white mb-0.5">異議處理</div>
+                    <div class="text-xs text-slate-500">「太貴了」→ AI 話術</div>
+                  </div>
+                </div>
+
                 <button (click)="openCreateWizard()"
-                        class="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl transition-colors flex items-center gap-2">
+                        class="px-8 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 flex items-center gap-2 font-medium">
                   <span>🚀</span> 創建第一個規則
                 </button>
               </div>

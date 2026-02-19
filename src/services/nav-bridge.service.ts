@@ -13,7 +13,7 @@ import { UnifiedNavService, ViewId, ModuleId, NAV_MODULES, NavModule } from '../
  * 舊視圖類型（與 app.component.ts 中的 View 類型保持一致）
  */
 export type LegacyView = 
-  | 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' 
+  | 'home' | 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' 
   | 'resources' | 'member-database' | 'resource-center' | 'search-discovery' 
   | 'ai-assistant' | 'automation' | 'automation-legacy' 
   | 'leads' | 'lead-nurturing' | 'nurturing-analytics' 
@@ -31,7 +31,7 @@ export class NavBridgeService {
   private unifiedNav = inject(UnifiedNavService);
   
   // 當前視圖（與舊系統兼容）
-  private _currentView = signal<LegacyView>('dashboard');
+  private _currentView = signal<LegacyView>('home');
   currentView = this._currentView.asReadonly();
   
   // 同步標誌
@@ -114,7 +114,7 @@ export class NavBridgeService {
    */
   private isValidLegacyView(view: string): view is LegacyView {
     const validViews: LegacyView[] = [
-      'dashboard', 'accounts', 'add-account', 'api-credentials',
+      'home', 'dashboard', 'accounts', 'add-account', 'api-credentials',
       'resources', 'member-database', 'resource-center', 'search-discovery',
       'ai-assistant', 'automation', 'automation-legacy',
       'leads', 'lead-nurturing', 'nurturing-analytics',

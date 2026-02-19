@@ -38,8 +38,15 @@ export const routes: Routes = [
   },
   {
     path: '',
-    redirectTo: 'dashboard',
+    redirectTo: 'home',
     pathMatch: 'full'
+  },
+  // 🆕 Phase 1: 情景感知首頁 - 默認首頁
+  {
+    path: 'home',
+    loadComponent: () => import('./home-dashboard/home-dashboard.component').then(m => m.HomeDashboardComponent),
+    title: '首頁',
+    canActivate: [authGuard]
   },
   // 核心功能 - SaaS 模式需要登入
   {
@@ -260,7 +267,7 @@ export const routes: Routes = [
   // 404 fallback
   {
     path: '**',
-    redirectTo: 'dashboard'
+    redirectTo: 'home'
   }
 ];
 
@@ -279,6 +286,7 @@ export const routes: Routes = [
  */
 export const VIEW_ROUTE_MAP: Record<string, string> = {
   // ============ 核心 ============
+  'home': '/home',
   'dashboard': '/dashboard',
   'accounts': '/accounts',
   'add-account': '/accounts',

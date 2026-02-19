@@ -634,15 +634,20 @@ async def handle_one_click_start(self, payload: Dict[str, Any] = None):
             account_result = {
                 'phone': phone,
                 'success': False,
-                'message': ''
+                'message': '',
+                'needs_code': False
             }
+            
+            def _needs_manual_auth(result: dict) -> bool:
+                """檢查登入結果是否需要手動驗證（驗證碼/2FA）"""
+                status = (result.get('status') or '').lower()
+                return status in ('waiting_code', 'waiting_2fa') or result.get('requires_code') or result.get('requires_2fa')
             
             try:
                 if not api_id or not api_hash:
                     account_result['message'] = "未配置 API"
                     return account_result
                 
-                # 檢查實際客戶端狀態
                 client = self.telegram_manager.get_client(phone)
                 is_actually_connected = False
                 
@@ -652,7 +657,6 @@ async def handle_one_click_start(self, payload: Dict[str, Any] = None):
                     except:
                         is_actually_connected = False
                 
-                # 如果客戶端不存在或未連接，強制重新登入
                 if not client or not is_actually_connected:
                     login_result = await self.telegram_manager.login_account(
                         phone=phone,
@@ -660,7 +664,11 @@ async def handle_one_click_start(self, payload: Dict[str, Any] = None):
                         api_hash=api_hash
                     )
                     
-                    if login_result.get('success') or login_result.get('status') == 'Online':
+                    if _needs_manual_auth(login_result):
+                        account_result['message'] = "需要驗證碼，請到帳號管理手動登入"
+                        account_result['needs_code'] = True
+                        await db.update_account(account_id, {"status": "Offline"})
+                    elif login_result.get('status') == 'Online':
                         try:
                             client = self.telegram_manager.get_client(phone)
                             if client and client.is_connected:
@@ -677,10 +685,7 @@ async def handle_one_click_start(self, payload: Dict[str, Any] = None):
                             account_result['message'] = f"驗證失敗: {verify_err}"
                             await db.update_account(account_id, {"status": "Offline"})
                     else:
-                        if login_result.get('status') == 'Code Required':
-                            account_result['message'] = "需要驗證碼"
-                        else:
-                            account_result['message'] = login_result.get('error', '登入失敗')
+                        account_result['message'] = login_result.get('message') or login_result.get('error', '登入失敗')
                         await db.update_account(account_id, {"status": "Offline"})
                 else:
                     # 客戶端已連接，驗證會話
@@ -701,12 +706,24 @@ async def handle_one_click_start(self, payload: Dict[str, Any] = None):
                             phone=phone, api_id=api_id, api_hash=api_hash
                         )
                         
-                        if login_result.get('success') or login_result.get('status') == 'Online':
-                            account_result['success'] = True
-                            account_result['message'] = "重新連接成功"
-                            await db.update_account(account_id, {"status": "Online"})
+                        if _needs_manual_auth(login_result):
+                            account_result['message'] = "Session 已過期，需要驗證碼，請到帳號管理手動登入"
+                            account_result['needs_code'] = True
+                            await db.update_account(account_id, {"status": "Offline"})
+                        elif login_result.get('status') == 'Online':
+                            try:
+                                client = self.telegram_manager.get_client(phone)
+                                if client and client.is_connected:
+                                    account_result['success'] = True
+                                    account_result['message'] = "重新連接成功"
+                                    await db.update_account(account_id, {"status": "Online"})
+                                else:
+                                    raise Exception("重連後客戶端未正確連接")
+                            except Exception as re_verify_err:
+                                account_result['message'] = f"重連驗證失敗: {re_verify_err}"
+                                await db.update_account(account_id, {"status": "Offline"})
                         else:
-                            account_result['message'] = "重連失敗"
+                            account_result['message'] = login_result.get('message') or "重連失敗"
                             await db.update_account(account_id, {"status": "Offline"})
                 
             except Exception as acc_err:
@@ -765,6 +782,18 @@ async def handle_one_click_start(self, payload: Dict[str, Any] = None):
             results['accounts']['details'].append(result)
         
         results['timing']['accounts'] = time_module.time() - step_start
+        
+        needs_code_accounts = [r for r in results['accounts']['details'] if r.get('needs_code')]
+        if needs_code_accounts:
+            phones = ', '.join(r['phone'] for r in needs_code_accounts)
+            self.send_log(f"⚠ 以下帳號 Session 已過期，需要手動登入: {phones}", "warning")
+            self.send_event("one-click-start-progress", {
+                "step": "accounts_need_code",
+                "message": f"⚠ {len(needs_code_accounts)} 個帳號需要手動登入驗證",
+                "progress": 38,
+                "needs_code_phones": [r['phone'] for r in needs_code_accounts]
+            })
+        
         self.send_event("one-click-start-progress", {
             "step": "accounts_done",
             "message": f"✅ 帳號連接: {results['accounts']['success']}/{results['accounts']['total']} (用時 {results['timing']['accounts']:.1f}秒)",

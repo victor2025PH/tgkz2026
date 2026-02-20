@@ -22,7 +22,8 @@ export type LegacyView =
   | 'settings' | 'analytics' | 'analytics-center' 
   | 'logs' | 'performance' | 'alerts' | 'profile' | 'membership-center'
   | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' 
-  | 'chat-templates' | 'trigger-rules' | 'collected-users';
+  | 'chat-templates' | 'trigger-rules' | 'collected-users'
+  | 'messages';
 
 @Injectable({
   providedIn: 'root'
@@ -31,7 +32,7 @@ export class NavBridgeService {
   private unifiedNav = inject(UnifiedNavService);
   
   // 當前視圖（與舊系統兼容）
-  private _currentView = signal<LegacyView>('home');
+  private _currentView = signal<LegacyView>('dashboard');
   currentView = this._currentView.asReadonly();
   
   // 同步標誌
@@ -123,7 +124,8 @@ export class NavBridgeService {
       'settings', 'analytics', 'analytics-center',
       'logs', 'performance', 'alerts', 'profile', 'membership-center',
       'monitoring-accounts', 'monitoring-groups', 'keyword-sets',
-      'chat-templates', 'trigger-rules', 'collected-users'
+      'chat-templates', 'trigger-rules', 'collected-users',
+      'messages'
     ];
     return validViews.includes(view as LegacyView);
   }

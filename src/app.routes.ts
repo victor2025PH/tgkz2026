@@ -246,11 +246,25 @@ export const routes: Routes = [
     redirectTo: 'marketing-hub',
     pathMatch: 'full'
   },
+  // 客戶培育（線索管理）
+  {
+    path: 'lead-nurturing',
+    loadComponent: () => import('./lead-nurturing/lead-management.component').then(m => m.LeadManagementComponent),
+    title: '線索管理',
+    canActivate: [membershipGuard]
+  },
   // 數據分析 - 需要高級會員
   {
     path: 'analytics',
     loadComponent: () => import('./views/analytics-view.component').then(m => m.AnalyticsViewComponent),
-    title: '數據分析',
+    title: '數據洞察',
+    canActivate: [membershipGuard]
+  },
+  // 數據報告（分析中心詳細版）
+  {
+    path: 'analytics-center',
+    loadComponent: () => import('./analytics/analytics-center.component').then(m => m.AnalyticsCenterComponent),
+    title: '數據報告',
     canActivate: [membershipGuard]
   },
   // 系統功能 - 無權限限制
@@ -358,14 +372,14 @@ export const VIEW_ROUTE_MAP: Record<string, string> = {
   
   // ============ 客戶管理 ============
   'leads': '/leads',
-  'lead-nurturing': '/leads',
+  'lead-nurturing': '/lead-nurturing',
   'member-database': '/leads',
   'user-tracking': '/leads',
   'nurturing-analytics': '/analytics',
   
   // ============ 數據分析 ============
   'analytics': '/analytics',
-  'analytics-center': '/analytics',
+  'analytics-center': '/analytics-center',
   
   // ============ 系統/兼容 ============
   'performance': '/settings',

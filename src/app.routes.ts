@@ -38,14 +38,20 @@ export const routes: Routes = [
   },
   {
     path: '',
-    redirectTo: 'home',
+    redirectTo: 'dashboard',
     pathMatch: 'full'
   },
-  // 🆕 Phase 1: 情景感知首頁 - 默認首頁
+  // 兼容舊首頁路徑 → 重定向到運控中心
   {
     path: 'home',
-    loadComponent: () => import('./home-dashboard/home-dashboard.component').then(m => m.HomeDashboardComponent),
-    title: '首頁',
+    redirectTo: 'dashboard',
+    pathMatch: 'full'
+  },
+  // 我的消息
+  {
+    path: 'messages',
+    loadComponent: () => import('./views/messages-view.component').then(m => m.MessagesViewComponent),
+    title: '我的消息',
     canActivate: [authGuard]
   },
   // 核心功能 - SaaS 模式需要登入
@@ -286,8 +292,9 @@ export const routes: Routes = [
  */
 export const VIEW_ROUTE_MAP: Record<string, string> = {
   // ============ 核心 ============
-  'home': '/home',
+  'home': '/dashboard',
   'dashboard': '/dashboard',
+  'messages': '/messages',
   'accounts': '/accounts',
   'add-account': '/accounts',
   'add-account-advanced': '/accounts',

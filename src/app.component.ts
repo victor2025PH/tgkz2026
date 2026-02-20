@@ -65,7 +65,7 @@ import { InviteGroupDialogComponent } from './dialogs/invite-group-dialog.compon
 import { LeadDetailDialogComponent } from './dialogs/lead-detail-dialog.component';
 import { AIStrategyResult } from './ai-assistant/ai-marketing-assistant.component';
 import { CommandPaletteComponent } from './components/command-palette.component';
-import { NotificationBellComponent } from './components/notification-bell.component';
+// NotificationBellComponent removed - messages now at /messages route
 import { UserLevelBadgeComponent } from './components/user-level-badge.component';
 import { NetworkStatusComponent } from './core/network-status.component';
 import { AuthTransitionComponent } from './core/auth-transition.component';
@@ -120,7 +120,7 @@ import {
 import { RAGBrainService } from './services/rag-brain.service';
 
 // 視圖類型定義
-type View = 'home' | 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'resource-discovery' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-engine' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps' | 'settings' | 'analytics' | 'analytics-center' | 'marketing-report' | 'profile' | 'membership-center' | 'wallet' | 'wallet-recharge' | 'wallet-withdraw' | 'wallet-transactions' | 'wallet-orders' | 'wallet-analytics' | 'monitoring' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules' | 'collected-users';
+type View = 'home' | 'dashboard' | 'messages' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'resource-discovery' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-engine' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps' | 'settings' | 'analytics' | 'analytics-center' | 'marketing-report' | 'profile' | 'membership-center' | 'wallet' | 'wallet-recharge' | 'wallet-withdraw' | 'wallet-transactions' | 'wallet-orders' | 'wallet-analytics' | 'monitoring' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules' | 'collected-users';
 type LeadDetailView = 'sendMessage' | 'history';
 type LeadsViewMode = 'kanban' | 'list';
 
@@ -165,7 +165,7 @@ interface SuccessOverlayConfig {
     // 命令面板（模板中使用）
     CommandPaletteComponent,
     // 🆕 P4-3: 智能通知鈴鐺
-    NotificationBellComponent,
+
     // 🆕 網絡狀態和認證過渡動畫
     NetworkStatusComponent, AuthTransitionComponent,
   ],
@@ -443,7 +443,7 @@ export class AppComponent implements OnDestroy, OnInit {
   // 使用 I18nService 進行翻譯（支持多語言切換）
   t = (key: string, params?: Record<string, string | number>) => this.i18n.t(key, params);
   theme = signal<'light' | 'dark'>('dark');
-  currentView: WritableSignal<View> = signal('home');
+  currentView: WritableSignal<View> = signal('dashboard');
   dashboardMode = signal<'smart' | 'classic'>('smart');  // 儀表板模式：智能/經典
   
   // 🆕 用於調試的路由 URL

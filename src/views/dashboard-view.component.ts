@@ -17,9 +17,7 @@ import { MonitoringManagementService } from '../services/monitoring-management.s
 import { AutomationWorkflowService } from '../services/automation-workflow.service';
 
 // 子組件導入
-import { SmartDashboardComponent } from '../components/smart-dashboard.component';
 import { QuickWorkflowComponent } from '../quick-workflow.component';
-import { QuickActionsPanelComponent } from '../components/quick-actions-panel.component';
 
 export interface SystemStatus {
   accounts?: { online: number; total: number; senders_online?: number; senders_total?: number };
@@ -39,54 +37,58 @@ export interface SystemStatus {
   imports: [
     CommonModule,
     FormsModule,
-    SmartDashboardComponent,
     QuickWorkflowComponent,
-    QuickActionsPanelComponent
   ],
   template: `
     <div class="page-content">
-      <!-- 儀表板模式切換 -->
+      <!-- 🆕 簡化標題列 -->
       <div class="flex items-center justify-between mb-6">
-        <h2 class="text-4xl font-bold" style="color: var(--text-primary);">{{ t('dashboard') }}</h2>
-        <div class="flex items-center gap-2 bg-slate-800/50 rounded-xl p-1">
-          <button (click)="switchMode('smart')"
-                  class="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1"
-                  [class.bg-gradient-to-r]="mode() === 'smart'"
-                  [class.from-cyan-500]="mode() === 'smart'"
-                  [class.to-blue-500]="mode() === 'smart'"
-                  [class.text-white]="mode() === 'smart'"
-                  [class.text-slate-400]="mode() !== 'smart'"
-                  [class.opacity-60]="!membershipService.hasFeature('smartMode')"
-                  [title]="!membershipService.hasFeature('smartMode') ? '需要 黃金大師 或以上會員' : ''">
-            🤖 智能模式
-            @if (!membershipService.hasFeature('smartMode')) {
-              <span class="text-xs">🔒</span>
-            }
-          </button>
-          <button (click)="switchMode('classic')"
-                  class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
-                  [class.bg-slate-700]="mode() === 'classic'"
-                  [class.text-white]="mode() === 'classic'"
-                  [class.text-slate-400]="mode() !== 'classic'">
-            📊 經典模式
-          </button>
-        </div>
+        <h2 class="text-4xl font-bold" style="color: var(--text-primary);">運控中心</h2>
+        <button (click)="refreshStatus()"
+                class="flex items-center gap-2 px-4 py-2 bg-slate-700/60 hover:bg-slate-700
+                       border border-slate-600/50 rounded-xl text-sm text-slate-300
+                       hover:text-white transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          刷新狀態
+        </button>
       </div>
-      
-      @if (mode() === 'smart') {
-        <app-smart-dashboard 
-          class="block -mx-8 -mb-8" 
-          style="height: calc(100vh - 140px);"
-          (navigateTo)="navigateTo($event)">
-        </app-smart-dashboard>
-      } @else {
-        <!-- 🆕 P3: 快捷操作面板 -->
-        <app-quick-actions-panel
-          class="mb-6"
-          (startMarketing)="handleQuickStart($event)"
-          (navigateTo)="navigateTo($event)"
-          (viewAlerts)="navigateTo('monitoring')">
-        </app-quick-actions-panel>
+
+      <!-- 🆕 快速新建（3 個核心場景，直接可操作） -->
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <button (click)="navigateTo('campaigns')"
+                class="flex items-center gap-4 p-4 rounded-2xl border transition-all text-left
+                       bg-gradient-to-br from-purple-500/10 to-slate-800/60 border-purple-500/20
+                       hover:from-purple-500/20 hover:border-purple-500/40 group">
+          <div class="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform">📢</div>
+          <div>
+            <div class="font-semibold text-white group-hover:text-purple-300 transition-colors">群廣播</div>
+            <div class="text-xs text-slate-400 mt-0.5">向監控群組批量發送</div>
+          </div>
+        </button>
+        <button (click)="navigateTo('lead-nurturing')"
+                class="flex items-center gap-4 p-4 rounded-2xl border transition-all text-left
+                       bg-gradient-to-br from-pink-500/10 to-slate-800/60 border-pink-500/20
+                       hover:from-pink-500/20 hover:border-pink-500/40 group">
+          <div class="w-12 h-12 rounded-xl bg-pink-500/20 flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform">💌</div>
+          <div>
+            <div class="font-semibold text-white group-hover:text-pink-300 transition-colors">私信跟進</div>
+            <div class="text-xs text-slate-400 mt-0.5">跟進線索，推進轉化</div>
+          </div>
+        </button>
+        <button (click)="navigateTo('trigger-rules')"
+                class="flex items-center gap-4 p-4 rounded-2xl border transition-all text-left
+                       bg-gradient-to-br from-amber-500/10 to-slate-800/60 border-amber-500/20
+                       hover:from-amber-500/20 hover:border-amber-500/40 group">
+          <div class="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform">⚡</div>
+          <div>
+            <div class="font-semibold text-white group-hover:text-amber-300 transition-colors">設置規則</div>
+            <div class="text-xs text-slate-400 mt-0.5">關鍵詞觸發自動回覆</div>
+          </div>
+        </button>
+      </div>
         
         <!-- 🚀 一鍵運行中心 -->
         <div class="rounded-xl p-6 mb-8" style="background: linear-gradient(to right, var(--primary-bg), rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1)); border: 1px solid var(--primary); box-shadow: var(--shadow-lg);">
@@ -321,47 +323,6 @@ export interface SystemStatus {
             </div>
           </div>
           
-          <!-- ⚡ 快速操作 -->
-          <div class="rounded-xl p-6" style="background-color: var(--bg-card); border: 1px solid var(--border-color);">
-            <div class="flex items-center gap-3 mb-4">
-              <span class="text-2xl">⚡</span>
-              <h3 class="text-lg font-bold" style="color: var(--text-primary);">快速操作</h3>
-            </div>
-            
-            <div class="grid grid-cols-2 gap-3">
-              <button (click)="navigateTo('multi-role')" 
-                      class="p-4 rounded-lg text-left transition-colors hover:bg-purple-500/10 border border-transparent hover:border-purple-500/30"
-                      style="background-color: var(--bg-secondary);">
-                <div class="text-xl mb-1">🎭</div>
-                <div class="font-medium text-sm" style="color: var(--text-primary);">手動策劃</div>
-                <div class="text-xs" style="color: var(--text-muted);">開始 AI 多角色協作</div>
-              </button>
-              
-              <button (click)="navigateTo('monitoring-groups')" 
-                      class="p-4 rounded-lg text-left transition-colors hover:bg-cyan-500/10 border border-transparent hover:border-cyan-500/30"
-                      style="background-color: var(--bg-secondary);">
-                <div class="text-xl mb-1">👥</div>
-                <div class="font-medium text-sm" style="color: var(--text-primary);">監控群組</div>
-                <div class="text-xs" style="color: var(--text-muted);">配置監控來源</div>
-              </button>
-              
-              <button (click)="navigateTo('keyword-sets')" 
-                      class="p-4 rounded-lg text-left transition-colors hover:bg-amber-500/10 border border-transparent hover:border-amber-500/30"
-                      style="background-color: var(--bg-secondary);">
-                <div class="text-xl mb-1">🔑</div>
-                <div class="font-medium text-sm" style="color: var(--text-primary);">關鍵詞集</div>
-                <div class="text-xs" style="color: var(--text-muted);">設置觸發詞</div>
-              </button>
-              
-              <button (click)="navigateTo('leads')" 
-                      class="p-4 rounded-lg text-left transition-colors hover:bg-emerald-500/10 border border-transparent hover:border-emerald-500/30"
-                      style="background-color: var(--bg-secondary);">
-                <div class="text-xl mb-1">📋</div>
-                <div class="font-medium text-sm" style="color: var(--text-primary);">查看線索</div>
-                <div class="text-xs" style="color: var(--text-muted);">管理潛在客戶</div>
-              </button>
-            </div>
-          </div>
         </div>
         
         <!-- 快速工作流 -->
@@ -372,7 +333,6 @@ export interface SystemStatus {
           (startMonitoring)="startMonitoring()"
           (stopMonitoring)="stopMonitoring()">
         </app-quick-workflow>
-      }
     </div>
   `
 })

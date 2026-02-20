@@ -35,19 +35,32 @@ const CATEGORY_CONFIG: Record<MsgCategory, { label: string; icon: string; bg: st
       </h1>
       <p class="text-slate-400 text-sm mt-1">系統通知、規則觸發、線索動態一覽 · 重啟後消息自動保留</p>
     </div>
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2">
       @if (svc.unreadCount() > 0) {
         <button (click)="svc.markAllRead()"
-                class="px-4 py-2 text-sm text-slate-300 hover:text-white bg-slate-700/50
+                class="px-3 py-2 text-sm text-slate-300 hover:text-white bg-slate-700/50
                        hover:bg-slate-700 border border-slate-600/50 rounded-xl transition-all">
-          全部標為已讀
+          全部已讀
         </button>
       }
+      <!-- 提示音開關 -->
+      <button (click)="svc.toggleSound()"
+              class="px-3 py-2 text-sm rounded-xl border transition-all flex items-center gap-1.5"
+              [class.bg-cyan-500/15]="svc.soundEnabled()"
+              [class.border-cyan-500/30]="svc.soundEnabled()"
+              [class.text-cyan-300]="svc.soundEnabled()"
+              [class.bg-slate-700/30]="!svc.soundEnabled()"
+              [class.border-slate-600/30]="!svc.soundEnabled()"
+              [class.text-slate-500]="!svc.soundEnabled()"
+              [title]="svc.soundEnabled() ? '點擊關閉提示音' : '點擊開啟提示音'">
+        {{ svc.soundEnabled() ? '🔔' : '🔕' }}
+        <span class="hidden sm:inline">{{ svc.soundEnabled() ? '提示音開' : '提示音關' }}</span>
+      </button>
       <button (click)="svc.clearCategory(activeTab())"
-              class="px-4 py-2 text-sm text-slate-400 hover:text-red-400
+              class="px-3 py-2 text-sm text-slate-400 hover:text-red-400
                      hover:bg-red-500/10 border border-transparent hover:border-red-500/20
                      rounded-xl transition-all">
-        {{ activeTab() === 'all' ? '清空全部' : '清空此分類' }}
+        {{ activeTab() === 'all' ? '清空全部' : '清空此類' }}
       </button>
     </div>
   </div>
@@ -200,7 +213,8 @@ export class MessagesViewComponent {
 
   formatTime(isoStr: string): string {
     const time = new Date(isoStr);
-    const diff = Date.now() - time.getTime();
+    // 讀取 nowMs signal 以建立響應式依賴 — 每分鐘自動重算
+    const diff = this.svc.nowMs() - time.getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return '剛剛';
     if (mins < 60) return `${mins} 分鐘前`;

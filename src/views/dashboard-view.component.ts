@@ -244,51 +244,58 @@ export interface SystemStatus {
             </div>
           }
           
-          <!-- 🔧 P1: 增強版一鍵啟動進度 -->
+          <!-- P3-2: 增強版啟動進度面板 -->
           @if (starting()) {
-            <div class="bg-slate-800/50 rounded-lg p-4 mb-4 border border-cyan-500/30">
-              <!-- 當前步驟 -->
+            <div class="rounded-xl p-4 mb-4 border border-cyan-500/30 bg-slate-800/60">
               <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-3">
-                  <div class="animate-spin h-5 w-5 border-2 border-cyan-500 border-t-transparent rounded-full"></div>
-                  <span class="text-cyan-300 font-medium">{{ startMessage() }}</span>
+                  <div class="animate-spin h-5 w-5 border-2 border-cyan-400 border-t-transparent rounded-full flex-shrink-0"></div>
+                  <span class="text-cyan-200 font-medium text-sm">{{ startMessage() }}</span>
                 </div>
-                <!-- 🔧 P1: 手動刷新/取消按鈕 -->
-                <button (click)="cancelAndRefresh()" 
-                        class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors flex items-center gap-1"
-                        title="取消並刷新狀態">
-                  <span>✕</span>
-                  <span>取消</span>
+                <button (click)="cancelAndRefresh()"
+                        class="px-3 py-1 text-xs bg-slate-700 hover:bg-red-500/20 text-slate-400
+                               hover:text-red-400 border border-slate-600/50 hover:border-red-500/30
+                               rounded-lg transition-all flex items-center gap-1">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                  取消
                 </button>
               </div>
-              
-              <!-- 進度條 -->
-              <div class="w-full bg-slate-700 rounded-full h-2.5 mb-3">
-                <div class="bg-gradient-to-r from-cyan-500 to-purple-500 h-2.5 rounded-full transition-all duration-300" [style.width.%]="startProgress()"></div>
+              <!-- 進度條（帶動態光暈） -->
+              <div class="w-full bg-slate-700/60 rounded-full h-2 mb-4 overflow-hidden">
+                <div class="h-full rounded-full transition-all duration-500 relative overflow-hidden"
+                     style="background: linear-gradient(90deg, #06b6d4, #8b5cf6)"
+                     [style.width.%]="startProgress()">
+                  <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
+                </div>
               </div>
-              
-              <!-- 分步指示器 -->
-              <div class="flex justify-between text-xs">
-                <div class="flex items-center gap-1" [class.text-emerald-400]="startProgress() >= 10" [class.text-slate-500]="startProgress() < 10">
-                  <span>{{ startProgress() >= 10 ? '✓' : '○' }}</span>
-                  <span>帳號</span>
-                </div>
-                <div class="flex items-center gap-1" [class.text-emerald-400]="startProgress() >= 40" [class.text-slate-500]="startProgress() < 40">
-                  <span>{{ startProgress() >= 40 ? '✓' : '○' }}</span>
-                  <span>群組</span>
-                </div>
-                <div class="flex items-center gap-1" [class.text-emerald-400]="startProgress() >= 60" [class.text-slate-500]="startProgress() < 60">
-                  <span>{{ startProgress() >= 60 ? '✓' : '○' }}</span>
-                  <span>監控</span>
-                </div>
-                <div class="flex items-center gap-1" [class.text-emerald-400]="startProgress() >= 80" [class.text-slate-500]="startProgress() < 80">
-                  <span>{{ startProgress() >= 80 ? '✓' : '○' }}</span>
-                  <span>AI</span>
-                </div>
-                <div class="flex items-center gap-1" [class.text-emerald-400]="startProgress() >= 100" [class.text-slate-500]="startProgress() < 100">
-                  <span>{{ startProgress() >= 100 ? '✓' : '○' }}</span>
-                  <span>完成</span>
-                </div>
+              <!-- 步驟指示器 -->
+              <div class="flex items-center justify-between px-1">
+                @for (step of startSteps; track step.label) {
+                  <div class="flex flex-col items-center gap-1"
+                       [class.opacity-100]="startProgress() >= step.threshold"
+                       [class.opacity-40]="startProgress() < step.threshold">
+                    <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all"
+                         [class.bg-emerald-500]="startProgress() >= step.threshold"
+                         [class.text-white]="startProgress() >= step.threshold"
+                         [class.bg-slate-700]="startProgress() < step.threshold"
+                         [class.text-slate-400]="startProgress() < step.threshold">
+                      @if (startProgress() >= step.threshold) { ✓ } @else { {{ step.num }} }
+                    </div>
+                    <span class="text-[10px] text-slate-400">{{ step.label }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+          <!-- P3-2: 啟動完成成功橫幅（顯示 3 秒後消失） -->
+          @if (startJustCompleted()) {
+            <div class="rounded-xl p-4 mb-4 border border-emerald-500/40 bg-emerald-500/10 flex items-center gap-3 animate-pulse">
+              <div class="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-lg flex-shrink-0">✅</div>
+              <div>
+                <div class="font-semibold text-emerald-300 text-sm">所有服務已啟動</div>
+                <div class="text-emerald-400/70 text-xs mt-0.5">監控運行中 · AI 已就緒 · 規則已激活</div>
               </div>
             </div>
           }
@@ -408,6 +415,16 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
   starting = signal(false);
   startProgress = signal(0);
   startMessage = signal('');
+  /** P3-2: 啟動剛完成的成功橫幅（顯示 3 秒） */
+  startJustCompleted = signal(false);
+  /** P3-2: 啟動步驟定義 */
+  readonly startSteps = [
+    { num: '1', label: '帳號', threshold: 10  },
+    { num: '2', label: '群組', threshold: 40  },
+    { num: '3', label: '監控', threshold: 60  },
+    { num: '4', label: 'AI',  threshold: 80  },
+    { num: '5', label: '完成', threshold: 100 },
+  ];
   // 🔧 P0修復: 使用共享服務的監控狀態，而不是本地 signal
   private monitoringService = inject(MonitoringManagementService);
   isMonitoring = computed(() => this.monitoringService.monitoringActive());
@@ -536,11 +553,15 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
       this.startProgress.set(data.progress);
       this.startMessage.set(data.message);
       
-      // 如果是完成或錯誤狀態，重置 starting
+      // 完成或錯誤：重置 starting
       if (data.step === 'complete' || data.step === 'error' || data.progress >= 100) {
         setTimeout(() => {
           this.starting.set(false);
-          this.refreshStatus(); // 刷新狀態確保 UI 同步
+          if (data.step === 'complete') {
+            this.startJustCompleted.set(true);
+            setTimeout(() => this.startJustCompleted.set(false), 3000);
+          }
+          this.refreshStatus();
         }, 500);
       }
     });
@@ -548,23 +569,24 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
     // 🔧 P0: 監聽一鍵啟動結果事件（確保狀態重置）
     const cleanup4 = this.ipc.on('one-click-start-result', (data: any) => {
       console.log('[DashboardView] 收到一鍵啟動結果:', data);
-      this.clearStartTimeout(); // 🔧 P1: 清除超時計時器
+      this.clearStartTimeout();
       this.starting.set(false);
       this.startProgress.set(100);
-      this.startMessage.set(data.overall_success ? '✅ 啟動完成' : '⚠️ 部分啟動失敗');
-      
-      // 🔧 P0修復: 監控狀態由 MonitoringManagementService 統一管理
+      this.startMessage.set('');
+
       if (data.monitoring?.success !== undefined) {
         console.log('[DashboardView] 一鍵啟動結果監控狀態:', data.monitoring.success);
       }
-      
-      // 🔧 P0: 立即刷新狀態（不等待）
+
+      if (data.overall_success) {
+        // P3-2: 顯示成功橫幅 3 秒
+        this.startJustCompleted.set(true);
+        setTimeout(() => this.startJustCompleted.set(false), 3000);
+      } else {
+        this.toast.warning(data.message || '部分服務啟動失敗，請查看狀態卡片');
+      }
+
       this.refreshStatus();
-      
-      // 延遲清除消息
-      setTimeout(() => {
-        this.startMessage.set('');
-      }, 3000);
     });
     
     this.ipcCleanup.push(cleanup1, cleanup2c, cleanup2d, cleanup2e, cleanup3, cleanup4);

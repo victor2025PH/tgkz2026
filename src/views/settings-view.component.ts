@@ -78,6 +78,14 @@ export type SettingsTab = 'appearance' | 'notifications' | 'help' | 'backup' | '
             <h3 class="text-lg font-semibold text-white">{{ t('settings.themeSettings') }}</h3>
           </div>
           
+          <!-- P7-4: 主題套用確認提示 -->
+          @if (settingApplied() === 'theme') {
+            <div class="flex items-center gap-1.5 mb-3 text-emerald-400 text-sm font-medium
+                         animate-[fadeIn_0.2s_ease]">
+              <span>✅</span><span>主題已套用</span>
+            </div>
+          }
+
           <div class="grid grid-cols-3 gap-4">
             <button (click)="setTheme('dark')"
                     class="p-4 rounded-xl border-2 transition-all"
@@ -127,6 +135,13 @@ export type SettingsTab = 'appearance' | 'notifications' | 'help' | 'backup' | '
             <h3 class="text-lg font-semibold text-white">{{ t('settings.languageSettings') }}</h3>
           </div>
           
+          <!-- P7-4: 語言切換確認提示 -->
+          @if (settingApplied() === 'language') {
+            <div class="flex items-center gap-1.5 mb-3 text-emerald-400 text-sm font-medium">
+              <span>✅</span><span>語言已切換，部分文字需重啟後完整生效</span>
+            </div>
+          }
+
           <select (change)="onLocaleChange($event)"
                   class="w-full max-w-xs py-3 px-4 rounded-lg bg-slate-800 text-white border border-slate-600">
             @for (locale of supportedLocales; track locale.code) {
@@ -375,6 +390,15 @@ export class SettingsViewComponent implements OnInit, OnDestroy {
   supportedLocales = SUPPORTED_LOCALES;
   private routeSub?: { unsubscribe: () => void };
 
+  /** P7-4: 最近套用的設置類型（'theme' | 'language' | ''），顯示短暫確認提示 */
+  settingApplied = signal('');
+  private _settingTimer?: ReturnType<typeof setTimeout>;
+  private _flashSetting(key: string): void {
+    this.settingApplied.set(key);
+    clearTimeout(this._settingTimer);
+    this._settingTimer = setTimeout(() => this.settingApplied.set(''), 2500);
+  }
+
   ngOnInit(): void {
     this.settings.loadSettings();
     this.syncTabFromRoute();
@@ -383,6 +407,7 @@ export class SettingsViewComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.routeSub?.unsubscribe();
+    clearTimeout(this._settingTimer); // P7-4
   }
 
   private syncTabFromRoute(): void {
@@ -417,6 +442,7 @@ export class SettingsViewComponent implements OnInit, OnDestroy {
   // 主題設置
   setTheme(theme: 'dark' | 'light' | 'system'): void {
     this.settings.setTheme(theme);
+    this._flashSetting('theme'); // P7-4
   }
   
   // 語言切換
@@ -424,6 +450,7 @@ export class SettingsViewComponent implements OnInit, OnDestroy {
     const locale = (event.target as HTMLSelectElement).value as SupportedLocale;
     this.i18n.setLocale(locale);
     this.settings.setLanguage(locale as any);
+    this._flashSetting('language'); // P7-4
   }
   
   // 備份操作

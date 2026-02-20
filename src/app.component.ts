@@ -86,6 +86,7 @@ import { setupAllIpcHandlers } from './ipc-handlers';
 // 🔧 Phase 9-1b: Business methods 提取到外部文件（5 個域模塊）
 import { applyMethodMixins } from './app-methods';
 import { UnifiedNavService } from './components/unified-nav.service';
+import { MessagesService } from './services/messages.service';
 // 🆕 Phase 4: 統一導航組件
 // 注意：UnifiedNavComponent 和 UnifiedSidebarComponent 暫時未使用
 // 未來將用於替代現有導航
@@ -369,6 +370,7 @@ export class AppComponent implements OnDestroy, OnInit {
   navShortcuts = inject(NavShortcutsService);
   unifiedNav = inject(UnifiedNavService);
   sidebarState = inject(SidebarStateService);  // 🔧 Phase8-P1-3
+  messagesService = inject(MessagesService);   // 消息中心（常駐IPC + 持久化）
   
   // 🆕 Phase 19-22: 專用服務
   navigationService = inject(NavigationService);

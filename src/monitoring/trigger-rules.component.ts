@@ -153,26 +153,43 @@ interface TriggerRule {
       <!-- 主內容區 -->
       <div class="flex-1 overflow-hidden">
         <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden h-full flex flex-col">
-          <div class="p-4 border-b border-slate-700/50 flex items-center justify-between">
-            <h3 class="font-semibold text-white flex items-center gap-2">
-              <span>⚡</span> 觸發規則列表
-              <span class="text-xs text-slate-500">({{ rules().length }})</span>
-            </h3>
-            <div class="flex items-center gap-2">
-              <select [(ngModel)]="filterStatus" 
+          <!-- 🆕 Phase 2: 場景分類標籤頁 + 狀態篩選 -->
+          <div class="p-4 border-b border-slate-700/50">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-semibold text-white flex items-center gap-2">
+                <span>⚡</span> 觸發規則列表
+                <span class="text-xs text-slate-500">({{ scenedRules().length }}/{{ rules().length }})</span>
+              </h3>
+              <select [(ngModel)]="filterStatus"
                       class="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white">
                 <option value="all">全部狀態</option>
                 <option value="active">活躍中</option>
                 <option value="inactive">已停用</option>
               </select>
             </div>
+            <!-- 場景分類標籤 -->
+            <div class="flex items-center gap-2 flex-wrap">
+              @for (tab of sceneTabs; track tab.value) {
+                <button (click)="sceneFilter.set(tab.value)"
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border"
+                        [class.text-white]="sceneFilter() === tab.value"
+                        [class.border-transparent]="sceneFilter() !== tab.value"
+                        [style.background-color]="sceneFilter() === tab.value ? tab.activeColor : 'transparent'"
+                        [style.border-color]="sceneFilter() === tab.value ? tab.activeColor : 'rgba(100,116,139,0.3)'"
+                        [style.color]="sceneFilter() === tab.value ? 'white' : '#94a3b8'">
+                  <span>{{ tab.icon }}</span>
+                  <span>{{ tab.label }}</span>
+                  <span class="ml-0.5 opacity-70">({{ getRuleCountForScene(tab.value) }})</span>
+                </button>
+              }
+            </div>
           </div>
           
           <!-- 規則列表 -->
           <div class="flex-1 overflow-y-auto p-4">
-            @if (filteredRules().length > 0) {
+            @if (scenedRules().length > 0) {
               <div class="space-y-4">
-                @for (rule of filteredRules(); track rule.id) {
+                @for (rule of scenedRules(); track rule.id) {
                   <div class="bg-slate-700/50 rounded-xl border transition-all hover:border-amber-500/30"
                        [class.border-slate-600/50]="rule.isActive"
                        [class.border-slate-700/50]="!rule.isActive"
@@ -186,7 +203,7 @@ interface TriggerRule {
                           <span class="text-lg">{{ getResponseIcon(rule.responseType) }}</span>
                         </div>
                         <div>
-                          <div class="flex items-center gap-2">
+                          <div class="flex items-center gap-2 flex-wrap">
                             <span class="font-medium text-white">{{ rule.name }}</span>
                             @if (rule.isActive) {
                               <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-full">活躍</span>
@@ -202,6 +219,22 @@ interface TriggerRule {
                                   [class.text-slate-400]="rule.priority === 1">
                               {{ getPriorityLabel(rule.priority) }}
                             </span>
+                            <!-- 🆕 Phase 2: 命中率健康徽章 -->
+                            @if (rule.triggerCount && rule.triggerCount > 0) {
+                              <span class="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full"
+                                    [class]="getRuleHealthClass(rule)"
+                                    [title]="'命中率: ' + getRuleSuccessRate(rule) + '% (' + rule.successCount + '/' + rule.triggerCount + '次)'">
+                                <span class="w-1.5 h-1.5 rounded-full inline-block"
+                                      [class.bg-emerald-400]="getRuleSuccessRate(rule) >= 70"
+                                      [class.bg-amber-400]="getRuleSuccessRate(rule) >= 30 && getRuleSuccessRate(rule) < 70"
+                                      [class.bg-red-400]="getRuleSuccessRate(rule) < 30"></span>
+                                {{ getRuleSuccessRate(rule) }}% 命中
+                              </span>
+                            } @else if (rule.triggerCount === 0 && rule.isActive) {
+                              <span class="px-2 py-0.5 bg-slate-600/50 text-slate-500 text-xs rounded-full" title="尚無觸發記錄">
+                                未觸發
+                              </span>
+                            }
                           </div>
                           <p class="text-sm text-slate-400 mt-0.5">{{ rule.description || '無描述' }}</p>
                           @if (rule.overlapWarning) {
@@ -848,12 +881,56 @@ export class TriggerRulesComponent implements OnInit, OnDestroy {
     return Math.round(total / rules.length);
   });
   
+  // 🆕 Phase 2: 場景分類標籤
+  sceneFilter = signal<'all' | 'ai' | 'template' | 'record' | 'high'>('all');
+
+  readonly sceneTabs = [
+    { value: 'all' as const,      icon: '⚡', label: '全部',    activeColor: 'rgba(245,158,11,0.7)' },
+    { value: 'ai' as const,       icon: '🤖', label: 'AI 響應', activeColor: 'rgba(139,92,246,0.7)' },
+    { value: 'template' as const, icon: '📝', label: '模板發送', activeColor: 'rgba(6,182,212,0.7)'  },
+    { value: 'record' as const,   icon: '📊', label: '僅記錄',  activeColor: 'rgba(100,116,139,0.7)' },
+    { value: 'high' as const,     icon: '🔥', label: '高優先',  activeColor: 'rgba(239,68,68,0.7)'  },
+  ];
+
   filteredRules = computed(() => {
     const all = this.rules();
     if (this.filterStatus === 'active') return all.filter(r => r.isActive);
     if (this.filterStatus === 'inactive') return all.filter(r => !r.isActive);
     return all;
   });
+
+  scenedRules = computed(() => {
+    const base = this.filteredRules();
+    const scene = this.sceneFilter();
+    if (scene === 'all') return base;
+    if (scene === 'ai') return base.filter(r => r.responseType === 'ai_chat');
+    if (scene === 'template') return base.filter(r => r.responseType === 'template' || r.responseType === 'script');
+    if (scene === 'record') return base.filter(r => r.responseType === 'record_only');
+    if (scene === 'high') return base.filter(r => r.priority === 3);
+    return base;
+  });
+
+  getRuleCountForScene(scene: string): number {
+    const base = this.filteredRules();
+    if (scene === 'all') return base.length;
+    if (scene === 'ai') return base.filter(r => r.responseType === 'ai_chat').length;
+    if (scene === 'template') return base.filter(r => r.responseType === 'template' || r.responseType === 'script').length;
+    if (scene === 'record') return base.filter(r => r.responseType === 'record_only').length;
+    if (scene === 'high') return base.filter(r => r.priority === 3).length;
+    return 0;
+  }
+
+  getRuleSuccessRate(rule: TriggerRule): number {
+    if (!rule.triggerCount || rule.triggerCount === 0) return 0;
+    return Math.round((rule.successCount || 0) / rule.triggerCount * 100);
+  }
+
+  getRuleHealthClass(rule: TriggerRule): string {
+    const rate = this.getRuleSuccessRate(rule);
+    if (rate >= 70) return 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20';
+    if (rate >= 30) return 'bg-amber-500/15 text-amber-400 border border-amber-500/20';
+    return 'bg-red-500/15 text-red-400 border border-red-500/20';
+  }
   
   private listeners: (() => void)[] = [];
   // 🔧 FIX: 添加重試計數

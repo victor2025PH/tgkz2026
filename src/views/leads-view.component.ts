@@ -120,19 +120,29 @@ import { LeadScoringPanelComponent } from '../lead-nurturing/lead-scoring-panel.
         </select>
         <!-- 視圖切換按鈕 -->
         <div class="flex rounded-lg overflow-hidden" style="border: 1px solid var(--border-color);">
-          <button (click)="viewMode.set('list')" 
-                  class="p-2 px-3 transition-colors"
+          <button (click)="viewMode.set('list')"
+                  class="p-2 px-3 transition-colors text-sm"
                   [class.bg-cyan-500]="viewMode() === 'list'"
                   [class.text-white]="viewMode() === 'list'"
-                  [style.background-color]="viewMode() !== 'list' ? 'var(--bg-tertiary)' : ''">
+                  [style.background-color]="viewMode() !== 'list' ? 'var(--bg-tertiary)' : ''"
+                  title="列表視圖">
             📋
           </button>
-          <button (click)="viewMode.set('card')" 
-                  class="p-2 px-3 transition-colors"
+          <button (click)="viewMode.set('card')"
+                  class="p-2 px-3 transition-colors text-sm"
                   [class.bg-cyan-500]="viewMode() === 'card'"
                   [class.text-white]="viewMode() === 'card'"
-                  [style.background-color]="viewMode() !== 'card' ? 'var(--bg-tertiary)' : ''">
+                  [style.background-color]="viewMode() !== 'card' ? 'var(--bg-tertiary)' : ''"
+                  title="卡片視圖">
             🃏
+          </button>
+          <button (click)="viewMode.set('kanban')"
+                  class="p-2 px-3 transition-colors text-sm"
+                  [class.bg-purple-500]="viewMode() === 'kanban'"
+                  [class.text-white]="viewMode() === 'kanban'"
+                  [style.background-color]="viewMode() !== 'kanban' ? 'var(--bg-tertiary)' : ''"
+                  title="旅程看板">
+            🗂️
           </button>
         </div>
       </div>
@@ -294,6 +304,160 @@ import { LeadScoringPanelComponent } from '../lead-nurturing/lead-scoring-panel.
               💡 建議先開啟監控群組，AI 會自動識別並添加感興趣的用戶
             </p>
           </div>
+        } @else if (viewMode() === 'kanban') {
+          <!-- 🆕 Phase 2: 線索旅程看板 -->
+          <div class="p-4 overflow-x-auto">
+            <div class="flex gap-4 min-w-max pb-2">
+              @for (col of kanbanColumns; track col.status) {
+                <div class="w-64 flex-shrink-0">
+                  <!-- 列標題 -->
+                  <div class="rounded-xl p-3 mb-3"
+                       [style.background]="col.headerBg">
+                    <div class="flex items-center justify-between mb-1">
+                      <div class="flex items-center gap-2">
+                        <span class="text-base">{{ col.icon }}</span>
+                        <span class="font-semibold text-white text-sm">{{ col.label }}</span>
+                      </div>
+                      <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-black/20 text-white">
+                        {{ getContactsByStatus(col.status).length }}
+                      </span>
+                    </div>
+                    <!-- AI 建議下一步 -->
+                    <div class="text-xs text-white/70 flex items-center gap-1">
+                      <span>💡</span>
+                      <span>{{ col.aiHint }}</span>
+                    </div>
+                  </div>
+
+                  <!-- 聯絡人卡片列 -->
+                  <div class="space-y-2 max-h-[calc(100vh-360px)] overflow-y-auto pr-1
+                              scrollbar-thin scrollbar-thumb-slate-700">
+                    @for (contact of getContactsByStatus(col.status); track contact.id) {
+                      <div class="rounded-xl border transition-all cursor-pointer"
+                           [class.ring-2]="isSelected(contact.id)"
+                           [class.ring-purple-500]="isSelected(contact.id)"
+                           [style.background-color]="'var(--bg-card)'"
+                           [style.border-color]="isSelected(contact.id) ? 'rgb(168 85 247)' : 'var(--border-color)'"
+                           (click)="toggleSelect(contact.id)">
+                        <!-- 卡片主體 -->
+                        <div class="p-3">
+                          <div class="flex items-center gap-2 mb-2">
+                            <!-- 頭像 -->
+                            <div class="w-9 h-9 rounded-full flex items-center justify-center
+                                        text-white text-sm font-bold flex-shrink-0"
+                                 [style.background]="col.avatarBg">
+                              {{ getInitial(contact) }}
+                            </div>
+                            <div class="flex-1 min-w-0">
+                              <p class="font-medium text-sm truncate" style="color: var(--text-primary);">
+                                {{ contact.display_name || contact.username || contact.telegram_id }}
+                              </p>
+                              @if (contact.username) {
+                                <p class="text-xs truncate" style="color: var(--text-muted);">
+                                  &#64;{{ contact.username }}
+                                </p>
+                              }
+                            </div>
+                            <!-- AI 評分 -->
+                            @if (contact.ai_score > 0) {
+                              <div class="flex-shrink-0 text-right">
+                                <div class="text-xs font-bold"
+                                     [class.text-emerald-400]="contact.ai_score >= 70"
+                                     [class.text-amber-400]="contact.ai_score >= 40 && contact.ai_score < 70"
+                                     [class.text-slate-400]="contact.ai_score < 40">
+                                  {{ contact.ai_score }}
+                                </div>
+                                <div class="text-xs" style="color: var(--text-muted);">分</div>
+                              </div>
+                            }
+                          </div>
+
+                          <!-- 來源 + 最後聯繫 -->
+                          <div class="flex items-center justify-between text-xs" style="color: var(--text-muted);">
+                            <span>{{ contact.source_name || contact.source_type || '未知' }}</span>
+                            @if (contact.last_contact_at) {
+                              <span>{{ formatKanbanDate(contact.last_contact_at) }}</span>
+                            } @else {
+                              <span>從未聯繫</span>
+                            }
+                          </div>
+                        </div>
+
+                        <!-- AI 軌跡展開區 (Phase 2-3) -->
+                        @if (expandedKanbanId() === contact.id) {
+                          <div class="border-t px-3 pb-3 pt-2 space-y-1.5"
+                               style="border-color: var(--border-color);">
+                            <p class="text-xs font-semibold" style="color: var(--text-muted);">
+                              🤖 AI 決策軌跡
+                            </p>
+                            <!-- 評分條 -->
+                            <div class="flex items-center gap-2">
+                              <span class="text-xs w-14 flex-shrink-0" style="color: var(--text-muted);">AI 評分</span>
+                              <div class="flex-1 h-1.5 rounded-full bg-slate-700">
+                                <div class="h-1.5 rounded-full transition-all"
+                                     [class.bg-emerald-400]="contact.ai_score >= 70"
+                                     [class.bg-amber-400]="contact.ai_score >= 40 && contact.ai_score < 70"
+                                     [class.bg-red-400]="contact.ai_score < 40"
+                                     [style.width.%]="contact.ai_score || 0"></div>
+                              </div>
+                              <span class="text-xs font-bold flex-shrink-0"
+                                    [class.text-emerald-400]="contact.ai_score >= 70"
+                                    [class.text-amber-400]="contact.ai_score >= 40 && contact.ai_score < 70"
+                                    [class.text-slate-400]="contact.ai_score < 40">
+                                {{ contact.ai_score || 0 }}
+                              </span>
+                            </div>
+                            <!-- 統計 -->
+                            <div class="grid grid-cols-2 gap-1 text-xs">
+                              <div class="flex items-center gap-1" style="color: var(--text-muted);">
+                                <span>💬</span>
+                                <span>{{ contact.message_count || 0 }} 條消息</span>
+                              </div>
+                              @if (contact.last_message_at) {
+                                <div class="flex items-center gap-1" style="color: var(--text-muted);">
+                                  <span>🕐</span>
+                                  <span>{{ formatKanbanDate(contact.last_message_at) }}</span>
+                                </div>
+                              }
+                            </div>
+                            <!-- 建議行動 -->
+                            <div class="p-2 rounded-lg text-xs"
+                                 style="background-color: var(--bg-tertiary); color: var(--text-muted);">
+                              {{ getContactActionHint(contact.status) }}
+                            </div>
+                          </div>
+                        }
+
+                        <!-- 卡片底部操作 -->
+                        <div class="border-t flex items-center" style="border-color: var(--border-color);">
+                          <button (click)="sendMessage(contact); $event.stopPropagation()"
+                                  class="flex-1 py-1.5 text-xs text-center hover:bg-cyan-500/10
+                                         text-cyan-400 transition-colors rounded-bl-xl">
+                            💬 發送
+                          </button>
+                          <button (click)="toggleKanbanExpand(contact.id, $event)"
+                                  class="flex-1 py-1.5 text-xs text-center transition-colors rounded-br-xl"
+                                  [class.text-purple-400]="expandedKanbanId() === contact.id"
+                                  [class.text-slate-500]="expandedKanbanId() !== contact.id"
+                                  [class.bg-purple-500/10]="expandedKanbanId() === contact.id"
+                                  style="hover:background-color: var(--bg-tertiary)">
+                            {{ expandedKanbanId() === contact.id ? '▲ 收起' : '▼ 軌跡' }}
+                          </button>
+                        </div>
+                      </div>
+                    }
+
+                    @if (getContactsByStatus(col.status).length === 0) {
+                      <div class="p-4 text-center rounded-xl border border-dashed"
+                           style="border-color: var(--border-color);">
+                        <p class="text-xs" style="color: var(--text-muted);">此階段暫無線索</p>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
         } @else if (viewMode() === 'card') {
           <!-- 卡片視圖 -->
           <div class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -448,7 +612,52 @@ export class LeadsViewComponent implements OnInit, OnDestroy {
   searchTerm = signal('');
   statusFilter = signal('');
   selectedIds = signal<Set<number>>(new Set());
-  viewMode = signal<'list' | 'card'>('card');  // 🔧 P0: 默認卡片視圖
+  viewMode = signal<'list' | 'card' | 'kanban'>('card');  // 🔧 P0: 默認卡片視圖
+  expandedKanbanId = signal<number | null>(null);  // 🆕 Phase 2: 看板展開的聯絡人 ID
+
+  // 🆕 Phase 2: 線索旅程看板列定義
+  readonly kanbanColumns = [
+    {
+      status: 'new',
+      label: '新線索',
+      icon: '🌱',
+      headerBg: 'linear-gradient(135deg, rgba(6,182,212,0.6), rgba(37,99,235,0.6))',
+      avatarBg: 'linear-gradient(135deg, #06b6d4, #2563eb)',
+      aiHint: '建議：發送開場白消息',
+    },
+    {
+      status: 'contacted',
+      label: '已接觸',
+      icon: '💬',
+      headerBg: 'linear-gradient(135deg, rgba(139,92,246,0.6), rgba(168,85,247,0.6))',
+      avatarBg: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
+      aiHint: '建議：跟進對方興趣點',
+    },
+    {
+      status: 'interested',
+      label: '有意向',
+      icon: '🎯',
+      headerBg: 'linear-gradient(135deg, rgba(245,158,11,0.6), rgba(217,119,6,0.6))',
+      avatarBg: 'linear-gradient(135deg, #f59e0b, #d97706)',
+      aiHint: '建議：發送產品方案或案例',
+    },
+    {
+      status: 'negotiating',
+      label: '談判中',
+      icon: '🤝',
+      headerBg: 'linear-gradient(135deg, rgba(236,72,153,0.6), rgba(219,39,119,0.6))',
+      avatarBg: 'linear-gradient(135deg, #ec4899, #db2777)',
+      aiHint: '建議：解答疑慮，促成決策',
+    },
+    {
+      status: 'converted',
+      label: '已轉化',
+      icon: '✅',
+      headerBg: 'linear-gradient(135deg, rgba(16,185,129,0.6), rgba(5,150,105,0.6))',
+      avatarBg: 'linear-gradient(135deg, #10b981, #059669)',
+      aiHint: '建議：維護關係，要求轉介紹',
+    },
+  ];
   showToolsPanel = signal(false);  // 🔧 P13-3: 評分 & 去重面板
   
   // 🔧 P1: 操作 loading 狀態
@@ -486,6 +695,21 @@ export class LeadsViewComponent implements OnInit, OnDestroy {
     return result;
   });
   
+  // 🆕 Phase 2: 看板用聯絡人（只按搜索詞過濾，不按狀態過濾）
+  kanbanContacts = computed(() => {
+    let result = this.contacts().filter(c => c.contact_type === 'user');
+    const search = this.searchTerm().toLowerCase();
+    if (search) {
+      result = result.filter(c =>
+        (c.display_name?.toLowerCase().includes(search)) ||
+        (c.username?.toLowerCase().includes(search)) ||
+        (c.telegram_id?.toString().includes(search)) ||
+        (c.source_name?.toLowerCase().includes(search))
+      );
+    }
+    return result;
+  });
+
   // 統計計算
   pendingCount = computed(() => this.contacts().filter(c => c.contact_type === 'user' && c.status === 'new').length);
   sentCount = computed(() => this.contacts().filter(c => c.contact_type === 'user' && c.status === 'contacted').length);
@@ -598,6 +822,48 @@ export class LeadsViewComponent implements OnInit, OnDestroy {
   // 通用導航
   navigateTo(view: string): void {
     window.dispatchEvent(new CustomEvent('changeView', { detail: view }));
+  }
+
+  // 🆕 Phase 2: 看板相關方法
+
+  /** 按狀態獲取聯絡人（看板列數據，不受狀態篩選影響） */
+  getContactsByStatus(status: string): ReturnType<typeof this.kanbanContacts>[number][] {
+    return this.kanbanContacts().filter(c => c.status === status);
+  }
+
+  /** 切換看板卡片的軌跡展開 */
+  toggleKanbanExpand(id: number, event: Event): void {
+    event.stopPropagation();
+    this.expandedKanbanId.update(cur => cur === id ? null : id);
+  }
+
+  /** 格式化看板日期（相對時間） */
+  formatKanbanDate(dateStr: string): string {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffDays === 0) return '今天';
+    if (diffDays === 1) return '昨天';
+    if (diffDays < 7) return `${diffDays}天前`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}週前`;
+    return `${Math.floor(diffDays / 30)}個月前`;
+  }
+
+  /** 獲取聯絡人行動建議（AI 決策軌跡） */
+  getContactActionHint(status: string): string {
+    const hints: Record<string, string> = {
+      'new':         '🌱 尚未接觸，建議發送個性化開場消息，表達您的誠意',
+      'contacted':   '💬 已有初次接觸，建議詢問對方的具體需求和痛點',
+      'replied':     '🎉 對方有回覆！建議趁熱打鐵，深入了解意向',
+      'interested':  '🎯 意向明確！建議發送成功案例或客製化方案',
+      'negotiating': '🤝 談判階段，建議主動解答疑慮，提供限時優惠',
+      'converted':   '✅ 恭喜成交！建議維護好關係，爭取轉介紹資源',
+      'lost':        '💔 已流失，建議間隔 30 天後嘗試重新激活',
+      'failed':      '❌ 發送失敗，建議檢查帳號狀態後重試',
+    };
+    return hints[status] || '暫無 AI 建議';
   }
   
   // 選擇相關方法

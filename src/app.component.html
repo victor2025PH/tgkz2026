@@ -293,13 +293,9 @@
           }
         </div>
 
-        <!-- 🔧 設置優化：鈴鐺僅作入口，點擊跳轉設置-通知與提醒 -->
+        <!-- 🆕 P4-3: 智能通知鈴鐺（帶未讀徽章 + 抽屜面板） -->
         <div class="px-3 mb-2 flex justify-end">
-          <a [routerLink]="['/settings']" [queryParams]="{ tab: 'notifications' }" 
-             class="p-2 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-cyan-400 transition-colors"
-             [title]="t('settings.tabs.notifications')">
-            <span class="text-lg" aria-hidden="true">🔔</span>
-          </a>
+          <app-notification-bell></app-notification-bell>
         </div>
 
         <!-- 🔧 P3-4: 用戶信息區域 —— 帶骨架屏防止名稱閃爍 -->

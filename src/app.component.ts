@@ -65,6 +65,7 @@ import { InviteGroupDialogComponent } from './dialogs/invite-group-dialog.compon
 import { LeadDetailDialogComponent } from './dialogs/lead-detail-dialog.component';
 import { AIStrategyResult } from './ai-assistant/ai-marketing-assistant.component';
 import { CommandPaletteComponent } from './components/command-palette.component';
+import { NotificationBellComponent } from './components/notification-bell.component';
 import { UserLevelBadgeComponent } from './components/user-level-badge.component';
 import { NetworkStatusComponent } from './core/network-status.component';
 import { AuthTransitionComponent } from './core/auth-transition.component';
@@ -163,6 +164,8 @@ interface SuccessOverlayConfig {
     DeleteConfirmDialogComponent, InviteGroupDialogComponent, LeadDetailDialogComponent,
     // 命令面板（模板中使用）
     CommandPaletteComponent,
+    // 🆕 P4-3: 智能通知鈴鐺
+    NotificationBellComponent,
     // 🆕 網絡狀態和認證過渡動畫
     NetworkStatusComponent, AuthTransitionComponent,
   ],

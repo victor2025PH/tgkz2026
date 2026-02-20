@@ -279,6 +279,87 @@ interface QuickAction {
       </div>
     </div>
 
+    <!-- ══════════════════ P4-1: 任務啟動器 ══════════════════ -->
+    <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+          <span>🚀</span> 快速啟動行銷場景
+        </h2>
+        <button (click)="navigate('campaigns')"
+                class="text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
+          查看所有任務 →
+        </button>
+      </div>
+
+      @if (activeCampaignCount() > 0) {
+        <!-- 有活躍任務時展示 -->
+        <div class="mb-4 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="text-xl animate-pulse">⚡</span>
+            <div>
+              <span class="text-cyan-300 font-medium text-sm">{{ activeCampaignCount() }} 個任務執行中</span>
+              <p class="text-xs text-slate-400 mt-0.5">今日已觸達 {{ campaignStats().contacted }} 人，轉化 {{ campaignStats().converted }} 人</p>
+            </div>
+          </div>
+          <button (click)="navigate('multi-role')"
+                  class="px-3 py-1.5 text-xs bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 rounded-lg transition-colors">
+            查看進度
+          </button>
+        </div>
+      }
+
+      <!-- 3大場景快速入口 -->
+      <div class="grid grid-cols-3 gap-3">
+        <button (click)="navigate('campaigns')"
+                class="group flex flex-col items-center gap-2 p-4 rounded-xl border border-slate-600/40
+                       bg-gradient-to-b from-purple-500/10 to-slate-700/20
+                       hover:from-purple-500/20 hover:border-purple-500/40 transition-all text-center">
+          <span class="text-2xl group-hover:scale-110 transition-transform">📢</span>
+          <div>
+            <div class="text-xs font-semibold text-white group-hover:text-purple-300">群廣播</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">向所有監控群發送</div>
+          </div>
+          @if (monitoringCount() > 0) {
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">
+              {{ monitoringCount() }} 群
+            </span>
+          }
+        </button>
+
+        <button (click)="navigate('lead-nurturing')"
+                class="group flex flex-col items-center gap-2 p-4 rounded-xl border border-slate-600/40
+                       bg-gradient-to-b from-pink-500/10 to-slate-700/20
+                       hover:from-pink-500/20 hover:border-pink-500/40 transition-all text-center">
+          <span class="text-2xl group-hover:scale-110 transition-transform">💌</span>
+          <div>
+            <div class="text-xs font-semibold text-white group-hover:text-pink-300">線索培育</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">私信跟進潛在客戶</div>
+          </div>
+          @if (totalLeadsCount() > 0) {
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-pink-500/20 text-pink-400 border border-pink-500/30">
+              {{ totalLeadsCount() }} 線索
+            </span>
+          }
+        </button>
+
+        <button (click)="navigate('trigger-rules')"
+                class="group flex flex-col items-center gap-2 p-4 rounded-xl border border-slate-600/40
+                       bg-gradient-to-b from-amber-500/10 to-slate-700/20
+                       hover:from-amber-500/20 hover:border-amber-500/40 transition-all text-center">
+          <span class="text-2xl group-hover:scale-110 transition-transform">⏰</span>
+          <div>
+            <div class="text-xs font-semibold text-white group-hover:text-amber-300">自動觸發</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">規則驅動定時回覆</div>
+          </div>
+          @if (activeRulesCount() > 0) {
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              {{ activeRulesCount() }} 規則
+            </span>
+          }
+        </button>
+      </div>
+    </div>
+
     <!-- ══════════════════ Lead Journey Funnel ══════════════════ -->
     @if (funnelStages().some(s => s.count > 0)) {
       <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5">
@@ -412,6 +493,11 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   // 🆕 Phase 3: 線索旅程數據
   contactStageMap = signal<Record<string, number>>({});
   _showGuide = signal(true);
+
+  // 🆕 P4-1: 行銷任務數據
+  activeCampaignCount = signal(0);
+  campaignStats = signal({ contacted: 0, converted: 0 });
+  totalLeadsCount = computed(() => Object.values(this.contactStageMap()).reduce((s, v) => s + v, 0));
 
   private cleanups: Array<() => void> = [];
 
@@ -717,6 +803,18 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     });
     this.cleanups.push(cleanupStats);
     this.ipc.send('get-today-stats', {});
+
+    // 🆕 P4-1: Load campaign / task overview
+    const cleanupCampaigns = this.ipc.on('campaigns-data', (data: any) => {
+      const list: any[] = Array.isArray(data) ? data : (data?.campaigns ?? []);
+      const active = list.filter((c: any) => c.status === 'running' || c.status === 'scheduled');
+      this.activeCampaignCount.set(active.length);
+      const contacted = active.reduce((s: number, c: any) => s + (c.stats?.totalSent || c.stats?.contacted || 0), 0);
+      const converted = active.reduce((s: number, c: any) => s + (c.stats?.successCount || c.stats?.converted || 0), 0);
+      this.campaignStats.set({ contacted, converted });
+    });
+    this.cleanups.push(cleanupCampaigns);
+    this.ipc.send('get-campaigns', {});
 
     // 🆕 Phase 3: Load contact stage distribution for funnel
     const cleanupContacts = this.ipc.on('unified-contacts-loaded', (data: any) => {

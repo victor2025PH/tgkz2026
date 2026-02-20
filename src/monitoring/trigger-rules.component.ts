@@ -134,6 +134,33 @@ interface TriggerRule {
         </div>
       </div>
 
+      <!-- 🆕 P4-2: 主視圖模式切換 -->
+      <div class="flex items-center gap-1 mb-4 p-1 bg-slate-800/60 rounded-xl border border-slate-700/50 w-fit">
+        <button (click)="mainView.set('rules')"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                [class.bg-amber-500]="mainView() === 'rules'"
+                [class.text-white]="mainView() === 'rules'"
+                [class.shadow-lg]="mainView() === 'rules'"
+                [class.text-slate-400]="mainView() !== 'rules'"
+                [class.hover:text-white]="mainView() !== 'rules'">
+          📋 規則列表
+        </button>
+        <button (click)="mainView.set('history')"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
+                [class.bg-purple-500]="mainView() === 'history'"
+                [class.text-white]="mainView() === 'history'"
+                [class.shadow-lg]="mainView() === 'history'"
+                [class.text-slate-400]="mainView() !== 'history'"
+                [class.hover:text-white]="mainView() !== 'history'">
+          📜 觸發歷史
+          @if (sessionLog().length > 0) {
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20">{{ sessionLog().length }}</span>
+          }
+        </button>
+      </div>
+
+      @if (mainView() === 'rules') {
+
       <!-- AI 自動聊天提示 -->
       @if (aiChatEnabled()) {
         <div class="mb-4 p-4 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 rounded-xl border border-emerald-500/30">
@@ -530,6 +557,137 @@ interface TriggerRule {
           </div>
         </div>
       </div>
+    </div>
+
+      } @else {
+      <!-- 🆕 P4-2: 觸發歷史視圖 -->
+      <div class="flex-1 overflow-y-auto space-y-4">
+
+        <!-- 今日規則活躍概覽 -->
+        <div class="grid grid-cols-3 gap-3">
+          <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 text-center">
+            <div class="text-2xl font-bold text-purple-400">{{ sessionLog().length }}</div>
+            <div class="text-xs text-slate-500 mt-1">本次會話觸發</div>
+          </div>
+          <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 text-center">
+            <div class="text-2xl font-bold text-emerald-400">{{ sessionLog().filter(e => e.success).length }}</div>
+            <div class="text-xs text-slate-500 mt-1">成功執行</div>
+          </div>
+          <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 text-center">
+            <div class="text-2xl font-bold text-amber-400">{{ totalTriggerCount() }}</div>
+            <div class="text-xs text-slate-500 mt-1">累計觸發</div>
+          </div>
+        </div>
+
+        <!-- 本次會話事件流 -->
+        <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+          <div class="p-4 border-b border-slate-700/50 flex items-center justify-between">
+            <h3 class="font-semibold text-white flex items-center gap-2">
+              <span>⚡</span> 本次會話觸發記錄
+            </h3>
+            @if (sessionLog().length > 0) {
+              <button (click)="clearSessionLog()"
+                      class="text-xs text-slate-500 hover:text-red-400 transition-colors">
+                清除記錄
+              </button>
+            }
+          </div>
+          <div class="max-h-64 overflow-y-auto">
+            @if (sessionLog().length === 0) {
+              <div class="p-8 text-center">
+                <div class="text-4xl mb-3">📭</div>
+                <p class="text-slate-400 text-sm">本次會話尚無觸發記錄</p>
+                <p class="text-slate-500 text-xs mt-1">規則匹配關鍵詞後，記錄將實時顯示在此</p>
+              </div>
+            } @else {
+              <div class="divide-y divide-slate-700/50">
+                @for (event of sessionLog(); track event.id) {
+                  <div class="flex items-center gap-4 px-4 py-3 hover:bg-slate-700/20 transition-colors">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm"
+                         [class.bg-emerald-500/20]="event.success"
+                         [class.bg-red-500/20]="!event.success">
+                      {{ event.success ? '✅' : '❌' }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="text-sm font-medium text-white truncate">{{ event.ruleName }}</div>
+                      <div class="text-xs text-slate-500 mt-0.5">
+                        <span class="text-slate-400">{{ event.keyword }}</span>
+                        <span class="mx-1.5">→</span>
+                        <span>{{ getActionLabel(event.responseType) }}</span>
+                      </div>
+                    </div>
+                    <div class="text-xs text-slate-500 flex-shrink-0">
+                      {{ formatEventTime(event.time) }}
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- 全局規則活躍度排行 -->
+        <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+          <div class="p-4 border-b border-slate-700/50">
+            <h3 class="font-semibold text-white flex items-center gap-2">
+              <span>🏆</span> 規則活躍度排行
+              <span class="text-xs text-slate-500 font-normal">(按觸發次數排序)</span>
+            </h3>
+          </div>
+          <div class="divide-y divide-slate-700/50">
+            @if (rules().length === 0) {
+              <div class="p-8 text-center">
+                <p class="text-slate-400 text-sm">尚未創建任何規則</p>
+              </div>
+            } @else {
+              @for (rule of sortedByTriggerCount(); track rule.id) {
+                <div class="flex items-center gap-4 px-4 py-3 hover:bg-slate-700/20 transition-colors">
+                  <div class="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center text-sm font-bold"
+                       [class.bg-amber-500/20]="rule.isActive"
+                       [class.bg-slate-700/50]="!rule.isActive"
+                       [class.text-amber-400]="rule.isActive"
+                       [class.text-slate-500]="!rule.isActive">
+                    {{ getResponseTypeIcon(rule.responseType) }}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-medium text-white truncate">{{ rule.name }}</span>
+                      @if (!rule.isActive) {
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-500">已停用</span>
+                      }
+                    </div>
+                    <div class="flex items-center gap-3 mt-1">
+                      <!-- 命中率條形 -->
+                      <div class="flex-1 h-1.5 bg-slate-700/60 rounded-full overflow-hidden max-w-32">
+                        <div class="h-full rounded-full transition-all"
+                             [class.bg-emerald-400]="getRuleSuccessRate(rule) >= 70"
+                             [class.bg-amber-400]="getRuleSuccessRate(rule) >= 40 && getRuleSuccessRate(rule) < 70"
+                             [class.bg-red-400]="getRuleSuccessRate(rule) < 40"
+                             [style.width.%]="getRuleSuccessRate(rule)">
+                        </div>
+                      </div>
+                      <span class="text-xs text-slate-500">{{ getRuleSuccessRate(rule) }}% 命中率</span>
+                    </div>
+                  </div>
+                  <div class="text-right flex-shrink-0">
+                    <div class="text-sm font-bold text-white">{{ rule.triggerCount || 0 }}</div>
+                    <div class="text-[10px] text-slate-500">觸發次數</div>
+                  </div>
+                  @if (rule.lastTriggered) {
+                    <div class="text-xs text-slate-500 flex-shrink-0 w-20 text-right">
+                      {{ formatLastTriggered(rule.lastTriggered) }}
+                    </div>
+                  } @else {
+                    <div class="text-xs text-slate-600 flex-shrink-0 w-20 text-right">從未觸發</div>
+                  }
+                </div>
+              }
+            }
+          </div>
+        </div>
+
+      </div>
+      } <!-- end mainView history -->
     </div>
     
     <!-- 創建/編輯規則對話框 -->
@@ -1085,6 +1243,18 @@ export class TriggerRulesComponent implements OnInit, OnDestroy {
   // 🆕 Phase 3: 規則效果分析
   showAnalysisPanel = signal(true);
 
+  // 🆕 P4-2: 觸發歷史視圖
+  mainView = signal<'rules' | 'history'>('rules');
+
+  sessionLog = signal<Array<{
+    id: string; time: Date; ruleName: string;
+    keyword: string; responseType: string; success: boolean;
+  }>>([]);
+
+  sortedByTriggerCount = computed(() =>
+    [...this.rules()].sort((a, b) => (b.triggerCount || 0) - (a.triggerCount || 0))
+  );
+
   /** 沉睡規則：啟用中但從未觸發，或最近 7 天未觸發 */
   sleepingRules = computed(() => {
     const now = Date.now();
@@ -1150,6 +1320,46 @@ export class TriggerRulesComponent implements OnInit, OnDestroy {
     }
     return tips;
   });
+
+  // 🆕 P4-2: History view helpers
+  clearSessionLog() {
+    this.sessionLog.set([]);
+  }
+
+  getActionLabel(responseType: string): string {
+    const map: Record<string, string> = {
+      'ai_chat': '🤖 AI 回覆',
+      'template': '📄 模板發送',
+      'script': '📝 腳本執行',
+      'record_only': '📋 僅記錄'
+    };
+    return map[responseType] || responseType;
+  }
+
+  getResponseTypeIcon(responseType: string): string {
+    const map: Record<string, string> = {
+      'ai_chat': '🤖',
+      'template': '📄',
+      'script': '📝',
+      'record_only': '📋'
+    };
+    return map[responseType] || '⚡';
+  }
+
+  formatEventTime(time: Date): string {
+    return time.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  formatLastTriggered(dateStr: string): string {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}分鐘前`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}小時前`;
+    return `${Math.floor(hrs / 24)}天前`;
+  }
 
   getRuleCountForScene(scene: string): number {
     const base = this.filteredRules();
@@ -1245,6 +1455,21 @@ export class TriggerRulesComponent implements OnInit, OnDestroy {
 
     
     
+    // 🆕 P4-2: 實時觸發事件監聽（累積本次會話記錄）
+    const cleanupTrigger = this.ipcService.on('rule-triggered', (data: any) => {
+      if (data?.ruleName || data?.rule_name) {
+        this.sessionLog.update(prev => [{
+          id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          time: new Date(),
+          ruleName: data.ruleName || data.rule_name || '未知規則',
+          keyword: data.keyword || data.matched_keyword || '',
+          responseType: data.responseType || data.response_type || 'record_only',
+          success: data.success !== false
+        }, ...prev].slice(0, 50));
+      }
+    });
+    this.listeners.push(cleanupTrigger);
+
     // AI 設置監聽
     const cleanup5 = this.ipcService.on('ai-settings-loaded', (data: any) => {
       if (data) {

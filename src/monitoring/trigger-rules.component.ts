@@ -557,7 +557,6 @@ interface TriggerRule {
           </div>
         </div>
       </div>
-    </div>
 
       } @else {
       <!-- 🆕 P4-2: 觸發歷史視圖 -->
@@ -687,7 +686,8 @@ interface TriggerRule {
         </div>
 
       </div>
-      } <!-- end mainView history -->
+      } <!-- end mainView @if/@else -->
+
     </div>
     
     <!-- 創建/編輯規則對話框 -->

@@ -16,7 +16,7 @@ import { NavBridgeService, LegacyView } from '../services/nav-bridge.service';
 import { MonitoringManagementService } from '../services/monitoring-management.service';
 import { AutomationWorkflowService } from '../services/automation-workflow.service';
 import { MessagesService } from '../services/messages.service';
-import { AiCenterService } from '../ai-center/ai-center.service';
+import { AICenterService } from '../ai-center/ai-center.service';
 
 // 子組件導入
 import { QuickWorkflowComponent } from '../quick-workflow.component';
@@ -523,11 +523,7 @@ export interface SystemStatus {
         
         <!-- 快速工作流 -->
         <app-quick-workflow
-          [systemStatus]="status()"
-          [isMonitoring]="isMonitoring()"
-          (navigateTo)="navigateTo($event)"
-          (startMonitoring)="startMonitoring()"
-          (stopMonitoring)="stopMonitoring()">
+          (navigateTo)="navigateTo($event)">
         </app-quick-workflow>
     </div>
   `
@@ -542,7 +538,7 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
   public membershipService = inject(MembershipService);
   public automationWorkflow = inject(AutomationWorkflowService);
   public messagesService    = inject(MessagesService);
-  public aiService          = inject(AiCenterService);
+  public aiService          = inject(AICenterService);
 
   /** P4-4: 最近 3 條未讀消息（快照條） */
   recentUnread = computed(() =>

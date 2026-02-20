@@ -569,7 +569,7 @@ interface TriggerRule {
             <div class="text-xs text-slate-500 mt-1">本次會話觸發</div>
           </div>
           <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 text-center">
-            <div class="text-2xl font-bold text-emerald-400">{{ sessionLog().filter(e => e.success).length }}</div>
+            <div class="text-2xl font-bold text-emerald-400">{{ sessionSuccessCount() }}</div>
             <div class="text-xs text-slate-500 mt-1">成功執行</div>
           </div>
           <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 text-center">
@@ -1254,6 +1254,8 @@ export class TriggerRulesComponent implements OnInit, OnDestroy {
   sortedByTriggerCount = computed(() =>
     [...this.rules()].sort((a, b) => (b.triggerCount || 0) - (a.triggerCount || 0))
   );
+
+  sessionSuccessCount = computed(() => this.sessionLog().filter(e => e.success).length);
 
   /** 沉睡規則：啟用中但從未觸發，或最近 7 天未觸發 */
   sleepingRules = computed(() => {

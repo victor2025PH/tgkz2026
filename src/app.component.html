@@ -412,16 +412,26 @@
            <span>{{ t('menu.myWallet') }}</span>
         </a>
 
-        <!-- 我的消息 -->
+        <!-- 我的消息（帶未讀角標） -->
         <a (click)="changeView('messages')"
            class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1 relative"
            [class.active]="view === 'messages'"
            [style.background-color]="view === 'messages' ? 'var(--sidebar-item-active)' : 'transparent'"
            [style.color]="view === 'messages' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
-          <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-          </svg>
+          <div class="relative flex-shrink-0">
+            <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            @if (messagesService.unreadCount() > 0) {
+              <span class="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5
+                           flex items-center justify-center
+                           text-[9px] font-bold text-white bg-red-500 rounded-full
+                           animate-pulse shadow-lg shadow-red-500/50">
+                {{ messagesService.unreadCount() > 99 ? '99+' : messagesService.unreadCount() }}
+              </span>
+            }
+          </div>
           <span>我的消息</span>
         </a>
         

@@ -56,7 +56,41 @@ export interface SystemStatus {
         </button>
       </div>
 
-      <!-- 🆕 快速新建（3 個核心場景，直接可操作） -->
+      <!-- 🆕 新手引導橫幅（無帳號時顯示，帶 3 步走引導） -->
+      @if (totalAccountsCount() === 0) {
+        <div class="mb-6 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-5">
+          <div class="flex items-start gap-4">
+            <div class="text-3xl flex-shrink-0">🚦</div>
+            <div class="flex-1">
+              <div class="font-semibold text-white text-base mb-1">開始前，先完成 3 個準備步驟</div>
+              <div class="flex items-center gap-6 mt-3 flex-wrap">
+                <button (click)="navigateTo('accounts')"
+                        class="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/40
+                               border border-amber-500/30 text-amber-300 text-sm font-medium transition-all">
+                  <span class="w-5 h-5 rounded-full bg-amber-500 text-white text-xs flex items-center justify-center font-bold">1</span>
+                  新增帳號
+                </button>
+                <span class="text-slate-600 text-sm">→</span>
+                <button (click)="navigateTo('monitoring-groups')"
+                        class="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-700/50 hover:bg-slate-700
+                               border border-slate-600/30 text-slate-300 text-sm font-medium transition-all">
+                  <span class="w-5 h-5 rounded-full bg-slate-600 text-white text-xs flex items-center justify-center font-bold">2</span>
+                  添加監控群組
+                </button>
+                <span class="text-slate-600 text-sm">→</span>
+                <button (click)="navigateTo('trigger-rules')"
+                        class="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-700/50 hover:bg-slate-700
+                               border border-slate-600/30 text-slate-300 text-sm font-medium transition-all">
+                  <span class="w-5 h-5 rounded-full bg-slate-600 text-white text-xs flex items-center justify-center font-bold">3</span>
+                  設置觸發規則
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- 快速新建（3 個核心場景，直接可操作） -->
       <div class="grid grid-cols-3 gap-4 mb-6">
         <button (click)="navigateTo('campaigns')"
                 class="flex items-center gap-4 p-4 rounded-2xl border transition-all text-left
@@ -102,10 +136,13 @@ export interface SystemStatus {
             </button>
           </div>
           
-          <!-- 快速狀態指示器 -->
+          <!-- 快速狀態指示器（點擊跳轉） -->
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <!-- 帳號狀態 -->
-            <div class="rounded-lg p-4 text-center relative overflow-hidden" style="background-color: var(--bg-card);">
+            <div class="rounded-lg p-4 text-center relative overflow-hidden cursor-pointer group transition-all hover:scale-[1.03] hover:shadow-lg"
+                 style="background-color: var(--bg-card);"
+                 (click)="navigateTo('accounts')"
+                 title="點擊管理帳號">
               @if (onlineAccountsCount() > 0) {
                 <div class="absolute inset-0 bg-gradient-to-t from-emerald-500/10 to-transparent"></div>
               }
@@ -115,11 +152,17 @@ export interface SystemStatus {
                 <div class="text-xl font-bold" [style.color]="onlineAccountsCount() > 0 ? 'var(--success)' : 'var(--error)'">
                   {{ onlineAccountsCount() }}/{{ totalAccountsCount() }}
                 </div>
+                <div class="text-[10px] mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400">
+                  點擊管理 →
+                </div>
               </div>
             </div>
             
             <!-- 監控狀態 -->
-            <div class="rounded-lg p-4 text-center relative overflow-hidden" style="background-color: var(--bg-card);">
+            <div class="rounded-lg p-4 text-center relative overflow-hidden cursor-pointer group transition-all hover:scale-[1.03] hover:shadow-lg"
+                 style="background-color: var(--bg-card);"
+                 (click)="navigateTo('monitoring-groups')"
+                 title="點擊設置監控群組">
               @if (isMonitoring()) {
                 <div class="absolute inset-0 bg-gradient-to-t from-cyan-500/10 to-transparent"></div>
               }
@@ -132,11 +175,17 @@ export interface SystemStatus {
                   }
                   {{ isMonitoring() ? '運行中' : '未啟動' }}
                 </div>
+                <div class="text-[10px] mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400">
+                  點擊設置 →
+                </div>
               </div>
             </div>
             
             <!-- AI 聊天狀態 -->
-            <div class="rounded-lg p-4 text-center relative overflow-hidden" style="background-color: var(--bg-card);">
+            <div class="rounded-lg p-4 text-center relative overflow-hidden cursor-pointer group transition-all hover:scale-[1.03] hover:shadow-lg"
+                 style="background-color: var(--bg-card);"
+                 (click)="navigateTo('ai-engine')"
+                 title="點擊配置 AI">
               @if (status().ai?.enabled) {
                 <div class="absolute inset-0 bg-gradient-to-t from-purple-500/10 to-transparent"></div>
               }
@@ -146,11 +195,17 @@ export interface SystemStatus {
                 <div class="text-xl font-bold" [style.color]="status().ai?.enabled ? 'var(--success)' : 'var(--error)'">
                   {{ status().ai?.enabled ? (status().ai?.mode === 'full' ? '全自動' : '半自動') : '未啟用' }}
                 </div>
+                <div class="text-[10px] mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400">
+                  點擊配置 →
+                </div>
               </div>
             </div>
             
-            <!-- 觸發規則狀態（優先顯示 triggerRules，與「觸發規則」頁一致） -->
-            <div class="rounded-lg p-4 text-center relative overflow-hidden" style="background-color: var(--bg-card);">
+            <!-- 觸發規則狀態 -->
+            <div class="rounded-lg p-4 text-center relative overflow-hidden cursor-pointer group transition-all hover:scale-[1.03] hover:shadow-lg"
+                 style="background-color: var(--bg-card);"
+                 (click)="navigateTo('trigger-rules')"
+                 title="點擊管理觸發規則">
               @if (triggerRulesActiveCount() > 0) {
                 <div class="absolute inset-0 bg-gradient-to-t from-orange-500/10 to-transparent"></div>
               }
@@ -158,13 +213,15 @@ export interface SystemStatus {
                 <div class="text-2xl mb-1">⚡</div>
                 <div class="text-sm" style="color: var(--text-muted);">觸發規則</div>
                 <div class="text-xl font-bold" [style.color]="triggerRulesActiveCount() > 0 ? 'var(--success)' : 'var(--warning)'">
-                  {{ triggerRulesActiveCount() }}/{{ triggerRulesTotalCount() }}
+                  @if (triggerRulesTotalCount() === 0) {
+                    <span class="text-yellow-400 text-base">待設置</span>
+                  } @else {
+                    {{ triggerRulesActiveCount() }}/{{ triggerRulesTotalCount() }}
+                  }
                 </div>
-                @if (triggerRulesTotalCount() === 0) {
-                  <div class="text-xs text-yellow-400 mt-1 cursor-pointer hover:underline" (click)="navigateTo('trigger-rules')">
-                    ⚠️ 需配置規則
-                  </div>
-                }
+                <div class="text-[10px] mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400">
+                  點擊管理 →
+                </div>
               </div>
             </div>
           </div>

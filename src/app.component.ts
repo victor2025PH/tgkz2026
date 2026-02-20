@@ -2493,18 +2493,28 @@ export class AppComponent implements OnDestroy, OnInit {
     
     // 🔧 P0: 監聽 NavBridgeService.currentView() 變化並同步到本地，並觸發 Router 導航
     // 這樣子組件調用 nav.navigateTo() 時（如「前往智能引擎」），URL 與主內容會切換到對應頁面
+    // 🔧 nav-fix: effect 在 NgZone 外執行，router.navigate 必須包裹在 ngZone.run() 中
     effect(() => {
       const navView = this.navBridge.currentView();
       const localView = this.currentView();
       
       if (!navView || navView === localView) return;
       
-      console.log('[AppComponent] 同步導航:', navView, '← from NavBridge');
       this.currentView.set(navView as View);
       // Web 模式下主內容由 RouterOutlet 決定，必須觸發路由導航否則按鈕無跳轉
       const routePath = VIEW_ROUTE_MAP[navView as keyof typeof VIEW_ROUTE_MAP];
       if (routePath) {
-        this.router.navigate([routePath]);
+        const MONITORING_SUB_VIEWS = new Set([
+          'monitoring-accounts', 'monitoring-groups', 'keyword-sets',
+          'chat-templates', 'trigger-rules', 'collected-users'
+        ]);
+        const extras = MONITORING_SUB_VIEWS.has(navView)
+          ? { queryParams: { v: navView }, queryParamsHandling: '' as const }
+          : undefined;
+        this.ngZone.run(() => {
+          this.router.navigate([routePath], extras);
+          this.cdr.markForCheck();
+        });
       }
     });
   }
@@ -2571,22 +2581,33 @@ export class AppComponent implements OnDestroy, OnInit {
           }
           return;
         }
+        // 🔧 nav-fix2: 監控子視圖有 ?v= 參數，優先從 query param 還原精確視圖
+        if (path === '/monitoring') {
+          const qParam = url.includes('?v=') ? url.split('?v=')[1]?.split('&')[0] : null;
+          if (qParam && this.currentView() !== qParam) {
+            this.currentView.set(qParam as View);
+            this.cdr.markForCheck();
+          }
+          return;
+        }
         // 其他路由：反查 VIEW_ROUTE_MAP（用 path 匹配，忽略 query）
         const viewEntry = Object.entries(VIEW_ROUTE_MAP).find(([, route]) => route === path);
         if (viewEntry) {
           const viewName = viewEntry[0] as View;
           if (this.currentView() !== viewName) {
             this.currentView.set(viewName);
+            this.cdr.markForCheck();
           }
         }
       }
     });
 
     // 🆕 監聽視圖切換事件（從子組件觸發）
+    // 🔧 nav-fix: window 事件回調在 NgZone 外執行，必須用 ngZone.run() 包裹
     window.addEventListener('changeView', (event: Event) => {
       const customEvent = event as CustomEvent;
       if (customEvent.detail) {
-        this.changeView(customEvent.detail as View);
+        this.ngZone.run(() => this.changeView(customEvent.detail as View));
       }
     });
 
@@ -3277,9 +3298,23 @@ export class AppComponent implements OnDestroy, OnInit {
     this.navBridge.navigateTo(view as any);
     
     // 🔧 Phase7-1: 使用 Router 導航（替代 @switch）
+    // 🔧 nav-fix: 必須在 NgZone 內執行，確保 OnPush 組件的 router-outlet 能正確更新
     const routePath = VIEW_ROUTE_MAP[view];
     if (routePath) {
-      this.router.navigate([routePath]);
+      // 🔧 nav-fix2: 監控子視圖都指向同一路由 '/monitoring'，加 queryParam 確保每次都是唯一 URL
+      // 避免 Angular 的 onSameUrlNavigation:'ignore' 默認行為導致重複點擊無效
+      const MONITORING_SUB_VIEWS = new Set([
+        'monitoring-accounts', 'monitoring-groups', 'keyword-sets',
+        'chat-templates', 'trigger-rules', 'collected-users'
+      ]);
+      const extras = MONITORING_SUB_VIEWS.has(view)
+        ? { queryParams: { v: view }, queryParamsHandling: '' as const }
+        : undefined;
+      this.ngZone.run(() => {
+        this.router.navigate([routePath], extras);
+        // 導航後強制 OnPush 重新檢測，確保 router-outlet 渲染新組件
+        this.cdr.markForCheck();
+      });
     }
     
     // 保留 currentView 信號用於側邊欄高亮

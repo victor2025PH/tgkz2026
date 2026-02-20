@@ -359,14 +359,36 @@ export interface SystemStatus {
           </div>
         }
 
-        <!-- 🆕 Phase1: 自動化工作流控制 -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- P5-1: 自動化工作流控制（可折疊） -->
+        <div class="mb-6 rounded-xl overflow-hidden" style="border: 1px solid var(--border-color);">
+          <!-- 折疊標題欄 -->
+          <button (click)="workflowExpanded.set(!workflowExpanded())"
+                  class="w-full flex items-center justify-between px-5 py-3 transition-colors hover:bg-white/5"
+                  style="background-color: var(--bg-card);">
+            <div class="flex items-center gap-3">
+              <span class="text-lg">🤖</span>
+              <span class="font-semibold text-sm" style="color: var(--text-primary);">自動化工作流</span>
+              <span class="text-xs px-2 py-0.5 rounded-full"
+                    style="background: var(--bg-tertiary); color: var(--text-muted);">
+                {{ automationWorkflow.workflows().length }} 個流程 · {{ enabledWorkflowCount() }} 個啟用
+              </span>
+            </div>
+            <svg class="w-4 h-4 transition-transform duration-200"
+                 [class.rotate-180]="workflowExpanded()"
+                 style="color: var(--text-muted);"
+                 viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+
+          @if (workflowExpanded()) {
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 p-5" style="background-color: var(--bg-secondary);">
           <!-- 🎯 引導式工作流 -->
           <div class="rounded-xl p-6" style="background-color: var(--bg-card); border: 1px solid var(--border-color);">
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center gap-3">
                 <span class="text-2xl">🎯</span>
-                <h3 class="text-lg font-bold" style="color: var(--text-primary);">引導式工作流</h3>
+                <h3 class="text-lg font-bold" style="color: var(--text-primary);">工作流詳情</h3>
               </div>
             </div>
             <p class="text-sm mb-4" style="color: var(--text-muted);">
@@ -425,7 +447,9 @@ export interface SystemStatus {
             </div>
           </div>
           
-        </div>
+          </div><!-- /grid -->
+          }<!-- /@if workflowExpanded -->
+        </div><!-- /collapsible outer -->
         
         <!-- 快速工作流 -->
         <app-quick-workflow
@@ -453,9 +477,16 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
   recentUnread = computed(() =>
     this.messagesService.messages().filter(m => !m.read).slice(0, 3)
   );
+
+  /** P5-1: 已啟用的工作流數量 */
+  enabledWorkflowCount = computed(() =>
+    this.automationWorkflow.workflows().filter(w => w.enabled).length
+  );
   
   // 內部狀態
   mode = signal<'smart' | 'classic'>('classic');
+  /** P5-1: 自動化工作流區塊展開狀態（預設折疊以減少視覺噪音） */
+  workflowExpanded = signal(false);
   starting = signal(false);
   startProgress = signal(0);
   startMessage = signal('');

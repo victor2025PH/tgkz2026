@@ -442,7 +442,10 @@
            [style.background-color]="view === 'dashboard' ? 'var(--sidebar-item-active)' : 'transparent'"
            [style.color]="view === 'dashboard' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
           <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-          <span>運控中心</span>
+          <span class="flex-1">運控中心</span>
+          @if (messagesService.hasUnreadAlerts()) {
+            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" title="有未讀告警"></span>
+          }
         </a>
         
         <!-- 分組：🔧 手動操作（可折疊） -->
@@ -517,6 +520,11 @@
             <span class="sidebar-group-title text-xs uppercase tracking-wider font-semibold flex items-center gap-1" style="color: var(--sidebar-group-title);">
               <span class="inline-block w-5 h-5 rounded bg-gradient-to-br from-cyan-500 to-blue-500 text-center leading-5 text-[10px]">📡</span>
               {{ t('menu.monitoringCenter') }}
+              @if (messagesService.unreadByCategory()['alert'] > 0) {
+                <span class="ml-1 px-1 py-0.5 text-[9px] font-bold bg-red-500/90 text-white rounded-full leading-none">
+                  {{ messagesService.unreadByCategory()['alert'] }}
+                </span>
+              }
             </span>
             <svg class="w-3.5 h-3.5 transition-transform duration-200" 
                  [class.rotate-180]="!isSidebarGroupExpanded('monitoring')"

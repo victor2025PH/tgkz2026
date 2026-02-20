@@ -22,6 +22,22 @@ const CATEGORY_CONFIG: Record<MsgCategory, {
   alert:  { label: '告警',     icon: '🚨', bg: 'bg-red-500/10 border-red-500/20',         activeColor: 'rgba(239,68,68,0.30)'    },
 };
 
+/** P6-1: 各分類空狀態配置（引導意義） */
+const EMPTY_STATE: Record<MsgCategory | 'all', {
+  emoji: string; title: string; desc: string;
+  action?: { label: string; view: string };
+}> = {
+  all:    { emoji: '📭', title: '消息箱是空的',       desc: '當有告警、規則觸發或新線索時，消息會在這裡出現' },
+  system: { emoji: '🔧', title: '沒有系統通知',       desc: '系統目前運行正常，無需處理' },
+  rule:   { emoji: '⚡', title: '還沒有規則觸發記錄',  desc: '設置觸發規則並啟動監控後，關鍵詞命中時會記錄在這裡',
+            action: { label: '去設置觸發規則 →', view: 'trigger-rules' } },
+  lead:   { emoji: '👤', title: '還沒有新線索',       desc: '啟動監控後，有人回覆關鍵詞時系統會自動捕獲線索',
+            action: { label: '去設置監控群組 →', view: 'monitoring-groups' } },
+  task:   { emoji: '📋', title: '沒有任務進度通知',   desc: '創建群發任務後，完成時系統會在這裡通知你',
+            action: { label: '去創建群發任務 →', view: 'campaigns' } },
+  alert:  { emoji: '✅', title: '目前沒有告警',       desc: '帳號全部在線，AI 運行正常 — 一切良好！' },
+};
+
 @Component({
   selector: 'app-messages-view',
   standalone: true,
@@ -173,16 +189,33 @@ const CATEGORY_CONFIG: Record<MsgCategory, {
   <div class="flex-1 overflow-y-auto">
 
     @if (filteredMessages().length === 0) {
-      <div class="flex flex-col items-center justify-center h-64 text-center px-6">
-        <div class="text-5xl mb-4 opacity-30">{{ searchTerm() ? '🔍' : '📭' }}</div>
-        <p class="text-slate-400 text-sm">
-          {{ searchTerm() ? '沒有符合的消息' : (activeTab() === 'all' ? '暫無消息' : '該分類暫無消息') }}
-        </p>
-        @if (searchTerm()) {
+      <!-- P6-1: 引導式空狀態 -->
+      @if (searchTerm()) {
+        <!-- 搜索無結果 -->
+        <div class="flex flex-col items-center justify-center h-64 text-center px-6">
+          <div class="text-5xl mb-4 opacity-25">🔍</div>
+          <p class="text-slate-300 text-sm font-medium">沒有符合「{{ searchTerm() }}」的消息</p>
           <button (click)="searchTerm.set('')"
-                  class="mt-3 text-xs text-cyan-400 hover:underline">清除搜索</button>
-        }
-      </div>
+                  class="mt-3 text-xs text-cyan-400 hover:text-cyan-300 hover:underline transition-colors">
+            清除搜索
+          </button>
+        </div>
+      } @else {
+        <!-- 分類空狀態 -->
+        <div class="flex flex-col items-center justify-center py-20 text-center px-8">
+          <div class="text-6xl mb-5 opacity-20 select-none">{{ emptyState().emoji }}</div>
+          <h3 class="text-white text-base font-semibold mb-2">{{ emptyState().title }}</h3>
+          <p class="text-slate-500 text-sm max-w-xs leading-relaxed">{{ emptyState().desc }}</p>
+          @if (emptyState().action) {
+            <button (click)="navigateTo(emptyState().action!.view)"
+                    class="mt-5 px-4 py-2 text-sm rounded-xl bg-cyan-500/15 hover:bg-cyan-500/30
+                           border border-cyan-500/30 text-cyan-400 hover:text-cyan-300
+                           transition-all font-medium">
+              {{ emptyState().action!.label }}
+            </button>
+          }
+        </div>
+      }
     } @else {
       @if (todayMessages().length > 0) {
         <div class="px-6 pt-4 pb-1 flex items-center gap-3">
@@ -324,6 +357,14 @@ export class MessagesViewComponent {
     const msgs = this.filteredMessages();
     return msgs.length > 0 && msgs.every(m => this.selectedIds().has(m.id));
   });
+
+  /** P6-1: 當前分類的空狀態配置 */
+  emptyState = computed(() => EMPTY_STATE[this.activeTab()] ?? EMPTY_STATE['all']);
+
+  /** P6-1: 發出全局導航事件（empty state 按鈕使用） */
+  navigateTo(view: string) {
+    window.dispatchEvent(new CustomEvent('changeView', { detail: view }));
+  }
 
   // ── Tab 切換（清空搜索） ──────────────────────────────────
   setTab(tab: TabCategory) {

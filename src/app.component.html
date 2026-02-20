@@ -850,7 +850,10 @@
   </aside>
 
   <!-- 🔧 Phase7-1: Main Content — 使用 Router 替代 @switch（减少 ~170 行模板 + 30+ 死導入） -->
-  <main role="main" aria-label="主要內容" class="flex-1 overflow-y-auto" [class.pt-14]="isMobile()" [class.pl-0]="isMobile()" style="background-color: var(--bg-primary);">
+  <main role="main" aria-label="主要內容" class="flex-1 overflow-y-auto"
+        [class.pt-14]="isMobile()" [class.pl-0]="isMobile()"
+        [class.pb-16]="isMobile()"
+        style="background-color: var(--bg-primary);">
     <router-outlet></router-outlet>
   </main>
 
@@ -954,6 +957,78 @@
         (cancel)="cancelNewKeywordSet()"
         (submit)="submitNewKeywordSet()"
         (nameChange)="newKeywordSet.set({ name: $event })" />
+    }
+
+    <!-- P6-4: 移動端底部 TabBar（僅在小螢幕顯示） -->
+    @if (isMobile()) {
+      <nav class="fixed bottom-0 left-0 right-0 z-[999] flex items-center justify-around
+                  px-2 py-1 border-t"
+           style="background-color: var(--bg-sidebar); border-color: var(--border-default); height: 56px;">
+        @let v = currentView();
+
+        <!-- 運控中心 -->
+        <button (click)="changeView('dashboard')"
+                class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors min-w-0"
+                [style.color]="v === 'dashboard' ? '#22d3ee' : 'var(--sidebar-text)'">
+          <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+          </svg>
+          <span class="text-[10px] whitespace-nowrap">運控中心</span>
+        </button>
+
+        <!-- 監控中心 -->
+        <button (click)="changeView('automation')"
+                class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors min-w-0"
+                [style.color]="v === 'automation' || v === 'monitoring-groups' || v === 'trigger-rules' ? '#22d3ee' : 'var(--sidebar-text)'">
+          <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>
+          </svg>
+          <span class="text-[10px] whitespace-nowrap">監控</span>
+        </button>
+
+        <!-- AI 設置 -->
+        <button (click)="changeView('ai-engine')"
+                class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors min-w-0"
+                [style.color]="isAiEngineView() ? '#c084fc' : 'var(--sidebar-text)'">
+          <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2"/>
+          </svg>
+          <span class="text-[10px] whitespace-nowrap">AI</span>
+        </button>
+
+        <!-- 我的消息（帶角標） -->
+        <button (click)="changeView('messages')"
+                class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors min-w-0 relative"
+                [style.color]="v === 'messages' ? '#22d3ee' : 'var(--sidebar-text)'">
+          <div class="relative">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            @if (messagesService.unreadCount() > 0) {
+              <span class="absolute -top-1.5 -right-1.5 min-w-[14px] h-3.5 px-0.5
+                           flex items-center justify-center text-[9px] font-bold
+                           text-white bg-red-500 rounded-full">
+                {{ messagesService.unreadCount() > 9 ? '9+' : messagesService.unreadCount() }}
+              </span>
+            }
+          </div>
+          <span class="text-[10px] whitespace-nowrap">消息</span>
+        </button>
+
+        <!-- 更多（展開側邊欄） -->
+        <button (click)="mobileMenuOpen.set(true)"
+                class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors min-w-0"
+                style="color: var(--sidebar-text);">
+          <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+          <span class="text-[10px] whitespace-nowrap">更多</span>
+        </button>
+      </nav>
     }
   </div>
 } @else {

@@ -273,45 +273,127 @@ type KnowledgeSubTab = 'overview' | 'manage' | 'gaps';
                 </div>
               </div>
               
-              <!-- 發送帳號配置 -->
+              <!-- 🆕 Phase 3: 發送帳號配置（增強版，含配額視覺化） -->
               <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
-                <div class="flex items-center gap-3 mb-4">
-                  <span class="text-2xl">📤</span>
-                  <div>
-                    <h3 class="font-semibold text-white">發送帳號</h3>
-                    <p class="text-sm text-slate-400">選擇用於發送消息的帳號</p>
-                  </div>
-                </div>
-                
-                <div class="space-y-2">
-                  @for (account of senderAccounts(); track account.phone) {
-                    <div class="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                      <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center overflow-hidden">
-                          @if (account.avatar) {
-                            <img [src]="account.avatar" alt="Avatar" class="w-full h-full object-cover">
-                          } @else {
-                            <span class="text-cyan-400">{{ account.username?.charAt(0) || '?' }}</span>
-                          }
-                        </div>
-                        <div>
-                          <div class="font-medium text-white">{{ account.username || account.phone }}</div>
-                          <div class="text-xs text-slate-400">今日: {{ account.sentToday || 0 }}/{{ account.dailyLimit || 50 }} 條</div>
-                        </div>
-                      </div>
-                      <span class="flex items-center gap-1 text-emerald-400 text-sm">
-                        <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                        在線
-                      </span>
+                <div class="flex items-center justify-between mb-4">
+                  <div class="flex items-center gap-3">
+                    <span class="text-2xl">📤</span>
+                    <div>
+                      <h3 class="font-semibold text-white">發送帳號</h3>
+                      <p class="text-sm text-slate-400">用於自動發送消息的帳號配額</p>
                     </div>
-                  } @empty {
-                    <div class="text-center py-8 text-slate-400">
-                      <div class="text-3xl mb-2">📤</div>
-                      <p>沒有可用的發送帳號</p>
-                      <p class="text-sm text-slate-500">請在帳號管理中添加並設置為「發送」角色</p>
+                  </div>
+                  <!-- 總容量摘要 -->
+                  @if (senderAccounts().length > 0) {
+                    <div class="text-right">
+                      <div class="text-lg font-bold text-white">
+                        {{ totalSentToday() }}
+                        <span class="text-slate-500 font-normal text-sm">/ {{ totalDailyCapacity() }}</span>
+                      </div>
+                      <div class="text-xs text-slate-500">今日已發 / 總配額</div>
                     </div>
                   }
                 </div>
+
+                @if (senderAccounts().length > 0) {
+                  <!-- 總配額進度條 -->
+                  <div class="mb-4">
+                    <div class="flex items-center justify-between text-xs mb-1">
+                      <span class="text-slate-400">今日總配額使用</span>
+                      <span [class.text-emerald-400]="totalQuotaUsedPct() < 70"
+                            [class.text-amber-400]="totalQuotaUsedPct() >= 70 && totalQuotaUsedPct() < 90"
+                            [class.text-red-400]="totalQuotaUsedPct() >= 90">
+                        {{ totalQuotaUsedPct() }}%
+                      </span>
+                    </div>
+                    <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
+                      <div class="h-2 rounded-full transition-all"
+                           [class.bg-emerald-500]="totalQuotaUsedPct() < 70"
+                           [class.bg-amber-500]="totalQuotaUsedPct() >= 70 && totalQuotaUsedPct() < 90"
+                           [class.bg-red-500]="totalQuotaUsedPct() >= 90"
+                           [style.width.%]="totalQuotaUsedPct()">
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 帳號列表 -->
+                  <div class="space-y-3">
+                    @for (account of senderAccounts(); track account.phone) {
+                      @let sent = account.sentToday || 0;
+                      @let limit = account.dailyLimit || 50;
+                      @let pct = limit > 0 ? Math.min(Math.round(sent / limit * 100), 100) : 0;
+                      <div class="p-3 bg-slate-700/40 rounded-xl border border-slate-600/30">
+                        <div class="flex items-center justify-between mb-2">
+                          <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-full bg-cyan-500/20 flex items-center justify-center overflow-hidden flex-shrink-0">
+                              @if (account.avatar) {
+                                <img [src]="account.avatar" alt="Avatar" class="w-full h-full object-cover">
+                              } @else {
+                                <span class="text-cyan-400 text-sm font-bold">
+                                  {{ account.username?.charAt(0)?.toUpperCase() || '?' }}
+                                </span>
+                              }
+                            </div>
+                            <div>
+                              <div class="font-medium text-white text-sm">
+                                {{ account.username || account.phone }}
+                              </div>
+                              <div class="text-xs text-slate-500">
+                                今日: {{ sent }}/{{ limit }} 條
+                              </div>
+                            </div>
+                          </div>
+                          <div class="flex items-center gap-2 flex-shrink-0">
+                            <!-- 配額百分比 -->
+                            <span class="text-xs font-medium"
+                                  [class.text-emerald-400]="pct < 70"
+                                  [class.text-amber-400]="pct >= 70 && pct < 90"
+                                  [class.text-red-400]="pct >= 90">
+                              {{ pct }}%
+                            </span>
+                            <!-- 連線狀態 -->
+                            <span class="flex items-center gap-1 text-xs text-emerald-400">
+                              <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                              在線
+                            </span>
+                          </div>
+                        </div>
+                        <!-- 配額進度條 -->
+                        <div class="h-1.5 bg-slate-600/60 rounded-full overflow-hidden">
+                          <div class="h-1.5 rounded-full transition-all"
+                               [class.bg-emerald-400]="pct < 70"
+                               [class.bg-amber-400]="pct >= 70 && pct < 90"
+                               [class.bg-red-400]="pct >= 90"
+                               [style.width.%]="pct">
+                          </div>
+                        </div>
+                      </div>
+                    }
+                  </div>
+
+                  <!-- 底部配置入口 -->
+                  <div class="mt-4 flex items-center justify-between">
+                    <p class="text-xs text-slate-500">
+                      {{ senderAccounts().length }} 個發送帳號，
+                      剩餘容量 {{ totalDailyCapacity() - totalSentToday() }} 條
+                    </p>
+                    <button (click)="activeTab.set('settings')"
+                            class="text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
+                      配置發送設置 →
+                    </button>
+                  </div>
+                } @else {
+                  <div class="text-center py-8 text-slate-400">
+                    <div class="text-4xl mb-3">📤</div>
+                    <p class="font-medium mb-1">沒有可用的發送帳號</p>
+                    <p class="text-sm text-slate-500 mb-4">請在帳號管理中添加帳號並設置為「發送」角色</p>
+                    <button (click)="navigateToAccounts()"
+                            class="px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400
+                                   border border-cyan-500/30 rounded-xl text-sm transition-colors">
+                      前往帳號管理 →
+                    </button>
+                  </div>
+                }
               </div>
               
               <!-- AI 模型狀態 -->
@@ -1338,7 +1420,28 @@ export class AICenterComponent implements OnInit {
   autoGreetingEnabled = signal(true);
   autoReplyEnabled = signal(true);
   senderAccounts = signal<{phone: string; username?: string; avatar?: string; sentToday?: number; dailyLimit?: number}[]>([]);
-  
+
+  // 🆕 Phase 3: 發送帳號配額計算
+  Math = Math; // expose Math for template use
+
+  totalSentToday = computed(() =>
+    this.senderAccounts().reduce((s, a) => s + (a.sentToday ?? 0), 0)
+  );
+
+  totalDailyCapacity = computed(() =>
+    this.senderAccounts().reduce((s, a) => s + (a.dailyLimit ?? 50), 0)
+  );
+
+  totalQuotaUsedPct = computed(() => {
+    const cap = this.totalDailyCapacity();
+    if (cap === 0) return 0;
+    return Math.min(Math.round(this.totalSentToday() / cap * 100), 100);
+  });
+
+  navigateToAccounts(): void {
+    window.dispatchEvent(new CustomEvent('changeView', { detail: 'accounts' }));
+  }
+
   // 🆕 AI 自主模式
   autonomousModeEnabled = signal(false);
   

@@ -21,6 +21,15 @@ import { AiCenterService } from '../ai-center/ai-center.service';
 // 子組件導入
 import { QuickWorkflowComponent } from '../quick-workflow.component';
 
+/** P7-1: 一鍵啟動失敗可操作問題條目 */
+export interface StartIssue {
+  icon: string;
+  label: string;
+  reason: string;
+  fixLabel: string;
+  fixView: string;
+}
+
 export interface SystemStatus {
   accounts?: { online: number; total: number; senders_online?: number; senders_total?: number };
   monitoring?: { groups: number; active: boolean };
@@ -242,6 +251,12 @@ export interface SystemStatus {
                     {{ triggerRulesActiveCount() }}/{{ triggerRulesTotalCount() }}
                   }
                 </div>
+                <!-- P7-3: 今日命中次數 -->
+                @if (triggerRulesTodayCount() > 0) {
+                  <div class="text-[10px] text-orange-400 mt-0.5 font-medium">
+                    今日 {{ triggerRulesTodayCount() }} 次
+                  </div>
+                }
                 <div class="text-[10px] mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400">
                   點擊管理 →
                 </div>
@@ -323,6 +338,39 @@ export interface SystemStatus {
             </div>
           }
           
+          <!-- P7-1: 失敗診斷卡片（有問題時顯示，可手動關閉） -->
+          @if (startIssues().length > 0) {
+            <div class="rounded-xl mb-4 border border-red-500/30 bg-red-500/5 overflow-hidden">
+              <div class="flex items-center justify-between px-4 py-2.5 bg-red-500/10 border-b border-red-500/20">
+                <div class="flex items-center gap-2 text-sm font-medium text-red-300">
+                  <span>🔍</span>
+                  <span>診斷發現 {{ startIssues().length }} 個問題，請逐一處理</span>
+                </div>
+                <button (click)="startIssues.set([])"
+                        class="text-red-500/60 hover:text-red-400 transition-colors text-lg leading-none">×</button>
+              </div>
+              <div class="divide-y divide-red-500/10">
+                @for (issue of startIssues(); track issue.label) {
+                  <div class="flex items-center justify-between gap-3 px-4 py-3">
+                    <div class="flex items-start gap-3 flex-1 min-w-0">
+                      <span class="text-xl flex-shrink-0">{{ issue.icon }}</span>
+                      <div class="min-w-0">
+                        <div class="text-sm font-medium text-white">{{ issue.label }}</div>
+                        <div class="text-xs text-slate-400 mt-0.5 leading-relaxed">{{ issue.reason }}</div>
+                      </div>
+                    </div>
+                    <button (click)="navigateTo(issue.fixView)"
+                            class="flex-shrink-0 px-3 py-1.5 text-xs rounded-lg bg-red-500/20
+                                   hover:bg-red-500/35 border border-red-500/30 text-red-300
+                                   hover:text-red-200 transition-all whitespace-nowrap">
+                      {{ issue.fixLabel }}
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
           <!-- 一鍵啟動按鈕 -->
           <div class="flex gap-4">
             @if (!isMonitoring() || !status().ai?.enabled) {
@@ -510,6 +558,8 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
   mode = signal<'smart' | 'classic'>('classic');
   /** P5-1: 自動化工作流區塊展開狀態（預設折疊以減少視覺噪音） */
   workflowExpanded = signal(false);
+  /** P7-1: 最近一次一鍵啟動的失敗診斷（用戶手動關閉後清空） */
+  startIssues = signal<StartIssue[]>([]);
   starting = signal(false);
   startProgress = signal(0);
   startMessage = signal('');
@@ -576,6 +626,12 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
     const tr = this.status().triggerRules;
     if (tr && typeof tr.total === 'number') return tr.total;
     return 0;
+  });
+
+  /** P7-3: 今日全部規則合計觸發次數（用於儀表板卡片補充資訊） */
+  triggerRulesTodayCount = computed(() => {
+    const rules = this.monitoringService.triggerRules();
+    return rules.reduce((sum: number, r: any) => sum + (r.triggerCount ?? r.trigger_count ?? 0), 0);
   });
 
   /** P6-2: AI 狀態 — 使用 AiCenterService（真實連線狀態，與 AI 設置頁一致） */
@@ -704,11 +760,47 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
       }
 
       if (data.overall_success) {
-        // P3-2: 顯示成功橫幅 3 秒
+        // P3-2: 顯示成功橫幅 3 秒；清除舊失敗診斷
+        this.startIssues.set([]);
         this.startJustCompleted.set(true);
         setTimeout(() => this.startJustCompleted.set(false), 3000);
       } else {
-        this.toast.warning(data.message || '部分服務啟動失敗，請查看狀態卡片');
+        // P7-1: 解析失敗原因為可操作問題卡片
+        const issues: StartIssue[] = [];
+        if (data.accounts_result?.success === false || this.onlineAccountsCount() === 0) {
+          issues.push({
+            icon: '🔑', label: '帳號未在線',
+            reason: data.accounts_result?.error || '沒有可用的在線帳號，監控和發送都無法工作',
+            fixLabel: '去帳號管理', fixView: 'accounts',
+          });
+        }
+        if (data.monitoring?.success === false) {
+          const r = data.monitoring?.reason ?? '';
+          issues.push({
+            icon: '📡', label: '監控啟動失敗',
+            reason: r === 'no_accessible_groups' ? '帳號未加入任何監控群組'
+                  : r === 'all_accounts_failed'  ? '所有監控帳號都無法啟動'
+                  : data.monitoring?.message || '監控服務啟動遇到問題',
+            fixLabel: '去設置監控群組', fixView: 'monitoring-groups',
+          });
+        }
+        if (data.ai?.success === false || !this.aiService.isConnected()) {
+          issues.push({
+            icon: '🤖', label: 'AI 未連接',
+            reason: this.aiService.isConfigured()
+              ? '已配置 AI 模型但連線測試未通過，請重新測試連線'
+              : '尚未配置任何 AI 模型',
+            fixLabel: '去配置 AI', fixView: 'ai-engine',
+          });
+        }
+        if (issues.length === 0 && data.message) {
+          issues.push({
+            icon: '⚠️', label: '啟動異常',
+            reason: data.message,
+            fixLabel: '刷新狀態', fixView: 'dashboard',
+          });
+        }
+        this.startIssues.set(issues);
       }
 
       this.refreshStatus();

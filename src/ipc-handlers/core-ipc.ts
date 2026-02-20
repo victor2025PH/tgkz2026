@@ -41,17 +41,36 @@ export function setupCoreIpcHandlers(this: any): void {
     });
     
     // 🔧 Phase3: 全局 IPC 錯誤邊界 - 捕獲所有未被特定組件處理的命令錯誤
+    // P7-fix: 追蹤上次「離線」toast 時間，避免多個並發請求同時失敗時重複彈窗
+    let _lastOfflineToastAt = 0;
+    const OFFLINE_TOAST_COOLDOWN_MS = 8000;
+
     this.ipcService.on('ipc-command-error', (data: { command: string; error: string; isTimeout: boolean }) => {
-      // 排除已被特定組件處理的命令（避免重複 toast）
+      // 背景資料加載類命令：靜默失敗（已有全局連線指示器提示用戶）
       const silentCommands = [
         'get-system-status', 'get-initial-state', 'get-accounts', 
         'get-monitored-groups', 'get-keyword-sets', 'get-queue-status',
         'get-monitoring-status', 'get-logs', 'get-alerts',
         'add-monitored-group', 'add-group',  // 搜索頁已處理
         'batch-send:start',                   // 批量發送對話框已處理
+        // 多角色協作資料加載（批量並發，後端離線時不重複彈窗）
+        'get-role-templates', 'get-all-roles', 'get-script-templates',
+        'get-collab-groups', 'get-collab-stats', 'get-role-stats',
       ];
       
       if (silentCommands.includes(data.command)) return;
+
+      // P7-fix: 「離線/網路不可用」錯誤去重 — 任意命令失敗，8 秒內只彈一次
+      const isOfflineError = typeof data.error === 'string' &&
+        (data.error.includes('Offline') || data.error.includes('網路不可用') ||
+         data.error.includes('offline') || data.error.includes('NetworkError'));
+      if (isOfflineError) {
+        const now = Date.now();
+        if (now - _lastOfflineToastAt < OFFLINE_TOAST_COOLDOWN_MS) return;
+        _lastOfflineToastAt = now;
+        this.toastService.warning('後端暫時無法連線，請稍後重試', 5000);
+        return;
+      }
       
       // 超時提示用較溫和的方式（帶功能名稱 + 背景說明）
       if (data.isTimeout) {

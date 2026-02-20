@@ -1,96 +1,171 @@
 /**
  * 我的消息 — 統一消息中心（UI 層）
- * 業務邏輯全部委託給 MessagesService
+ *
+ * P4 升級：
+ *  - 搜索框：實時過濾標題 + 摘要（忽略大小寫），切換 Tab 自動清除搜索
+ *  - 批量操作：選擇模式 → 勾選 → 批量已讀 / 批量刪除 / 全選
  */
-import { Component, signal, computed, inject, ChangeDetectionStrategy } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import {
+  Component, signal, computed, inject, ChangeDetectionStrategy
+} from '@angular/core';
+import { CommonModule, NgTemplateOutlet } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { MessagesService, AppMessage, TabCategory, MsgCategory } from '../services/messages.service';
 
-const CATEGORY_CONFIG: Record<MsgCategory, { label: string; icon: string; bg: string; activeColor: string }> = {
-  system: { label: '系統通知', icon: '🔧', bg: 'bg-blue-500/10 border-blue-500/20',    activeColor: 'rgba(59,130,246,0.30)'  },
-  rule:   { label: '規則觸發', icon: '⚡', bg: 'bg-amber-500/10 border-amber-500/20',   activeColor: 'rgba(245,158,11,0.30)'  },
-  lead:   { label: '新線索',   icon: '👤', bg: 'bg-emerald-500/10 border-emerald-500/20', activeColor: 'rgba(16,185,129,0.30)' },
-  task:   { label: '任務進度', icon: '📋', bg: 'bg-purple-500/10 border-purple-500/20',  activeColor: 'rgba(168,85,247,0.30)'  },
-  alert:  { label: '告警',     icon: '🚨', bg: 'bg-red-500/10 border-red-500/20',        activeColor: 'rgba(239,68,68,0.30)'   },
+const CATEGORY_CONFIG: Record<MsgCategory, {
+  label: string; icon: string; bg: string; activeColor: string
+}> = {
+  system: { label: '系統通知', icon: '🔧', bg: 'bg-blue-500/10 border-blue-500/20',      activeColor: 'rgba(59,130,246,0.30)'   },
+  rule:   { label: '規則觸發', icon: '⚡', bg: 'bg-amber-500/10 border-amber-500/20',     activeColor: 'rgba(245,158,11,0.30)'   },
+  lead:   { label: '新線索',   icon: '👤', bg: 'bg-emerald-500/10 border-emerald-500/20', activeColor: 'rgba(16,185,129,0.30)'   },
+  task:   { label: '任務進度', icon: '📋', bg: 'bg-purple-500/10 border-purple-500/20',   activeColor: 'rgba(168,85,247,0.30)'   },
+  alert:  { label: '告警',     icon: '🚨', bg: 'bg-red-500/10 border-red-500/20',         activeColor: 'rgba(239,68,68,0.30)'    },
 };
 
 @Component({
   selector: 'app-messages-view',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule, NgTemplateOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
 <div class="h-full flex flex-col bg-slate-900 text-white">
 
   <!-- ── 頁頭 ────────────────────────────────────────────── -->
-  <div class="flex items-center justify-between px-6 py-5 border-b border-slate-700/50 flex-shrink-0">
-    <div>
-      <h1 class="text-2xl font-bold text-white flex items-center gap-3">
-        <span class="text-2xl">🔔</span> 我的消息
+  <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700/50 flex-shrink-0 gap-4">
+    <div class="flex-shrink-0">
+      <h1 class="text-2xl font-bold text-white flex items-center gap-2">
+        <span>🔔</span> 我的消息
         @if (svc.unreadCount() > 0) {
           <span class="px-2 py-0.5 text-xs font-bold bg-cyan-500 text-white rounded-full">
-            {{ svc.unreadCount() }} 未讀
+            {{ svc.unreadCount() }}
           </span>
         }
       </h1>
-      <p class="text-slate-400 text-sm mt-1">系統通知、規則觸發、線索動態一覽 · 重啟後消息自動保留</p>
+      <p class="text-slate-500 text-xs mt-0.5">重啟後自動保留 · 點擊消息可跳轉</p>
     </div>
-    <div class="flex items-center gap-2">
-      @if (svc.unreadCount() > 0) {
-        <button (click)="svc.markAllRead()"
-                class="px-3 py-2 text-sm text-slate-300 hover:text-white bg-slate-700/50
-                       hover:bg-slate-700 border border-slate-600/50 rounded-xl transition-all">
-          全部已讀
+
+    <!-- ── 搜索框（P4-2）──────────────────────────────── -->
+    <div class="flex-1 max-w-sm relative">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none"
+           fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input [(ngModel)]="searchTerm"
+             type="text" placeholder="搜索消息…"
+             class="w-full pl-9 pr-8 py-2 text-sm bg-slate-800/60 border border-slate-700/50
+                    rounded-xl text-white placeholder-slate-500 focus:outline-none
+                    focus:border-cyan-500/50 focus:bg-slate-800 transition-all" />
+      @if (searchTerm()) {
+        <button (click)="searchTerm.set('')"
+                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
         </button>
       }
-      <!-- 提示音開關 -->
-      <button (click)="svc.toggleSound()"
-              class="px-3 py-2 text-sm rounded-xl border transition-all flex items-center gap-1.5"
-              [class.bg-cyan-500/15]="svc.soundEnabled()"
-              [class.border-cyan-500/30]="svc.soundEnabled()"
-              [class.text-cyan-300]="svc.soundEnabled()"
-              [class.bg-slate-700/30]="!svc.soundEnabled()"
-              [class.border-slate-600/30]="!svc.soundEnabled()"
-              [class.text-slate-500]="!svc.soundEnabled()"
-              [title]="svc.soundEnabled() ? '點擊關閉提示音' : '點擊開啟提示音'">
-        {{ svc.soundEnabled() ? '🔔' : '🔕' }}
-        <span class="hidden sm:inline">{{ svc.soundEnabled() ? '提示音開' : '提示音關' }}</span>
-      </button>
-      <button (click)="svc.clearCategory(activeTab())"
-              class="px-3 py-2 text-sm text-slate-400 hover:text-red-400
-                     hover:bg-red-500/10 border border-transparent hover:border-red-500/20
-                     rounded-xl transition-all">
-        {{ activeTab() === 'all' ? '清空全部' : '清空此類' }}
-      </button>
+    </div>
+
+    <!-- ── 操作按鈕 ─────────────────────────────────── -->
+    <div class="flex items-center gap-2 flex-shrink-0">
+      @if (!selectMode()) {
+        @if (svc.unreadCount() > 0) {
+          <button (click)="svc.markAllRead()"
+                  class="px-3 py-2 text-sm text-slate-300 hover:text-white bg-slate-700/50
+                         hover:bg-slate-700 border border-slate-600/50 rounded-xl transition-all">
+            全部已讀
+          </button>
+        }
+        <!-- 提示音 -->
+        <button (click)="svc.toggleSound()"
+                class="px-2.5 py-2 text-sm rounded-xl border transition-all"
+                [class.bg-cyan-500/15]="svc.soundEnabled()"
+                [class.border-cyan-500/30]="svc.soundEnabled()"
+                [class.text-cyan-300]="svc.soundEnabled()"
+                [class.bg-slate-700/30]="!svc.soundEnabled()"
+                [class.border-slate-600/30]="!svc.soundEnabled()"
+                [class.text-slate-500]="!svc.soundEnabled()"
+                [title]="svc.soundEnabled() ? '關閉提示音' : '開啟提示音'">
+          {{ svc.soundEnabled() ? '🔔' : '🔕' }}
+        </button>
+        <!-- 進入選擇模式 -->
+        @if (filteredMessages().length > 0) {
+          <button (click)="enterSelectMode()"
+                  class="px-3 py-2 text-sm text-slate-400 hover:text-white bg-slate-700/30
+                         hover:bg-slate-700/60 border border-slate-600/30 rounded-xl transition-all">
+            選擇
+          </button>
+        }
+        <button (click)="svc.clearCategory(activeTab())"
+                class="px-3 py-2 text-sm text-slate-500 hover:text-red-400
+                       hover:bg-red-500/10 border border-transparent hover:border-red-500/20
+                       rounded-xl transition-all">
+          清空
+        </button>
+      } @else {
+        <!-- 選擇模式操作欄 -->
+        <span class="text-sm text-slate-400 mr-1">已選 {{ selectedCount() }} 條</span>
+        <button (click)="toggleSelectAll()"
+                class="px-3 py-2 text-sm text-slate-300 hover:text-white bg-slate-700/50
+                       border border-slate-600/50 rounded-xl transition-all">
+          {{ allPageSelected() ? '取消全選' : '全選' }}
+        </button>
+        @if (selectedCount() > 0) {
+          <button (click)="batchMarkRead()"
+                  class="px-3 py-2 text-sm bg-cyan-500/20 hover:bg-cyan-500/40
+                         border border-cyan-500/30 text-cyan-300 rounded-xl transition-all">
+            標為已讀
+          </button>
+          <button (click)="batchDelete()"
+                  class="px-3 py-2 text-sm bg-red-500/15 hover:bg-red-500/30
+                         border border-red-500/20 text-red-400 rounded-xl transition-all">
+            刪除
+          </button>
+        }
+        <button (click)="exitSelectMode()"
+                class="px-3 py-2 text-sm text-slate-400 hover:text-white border border-slate-600/30
+                       rounded-xl transition-all">
+          取消
+        </button>
+      }
     </div>
   </div>
 
   <!-- ── 分類 Tab ─────────────────────────────────────────── -->
-  <div class="flex items-center gap-1 px-6 py-3 border-b border-slate-700/50 flex-shrink-0 overflow-x-auto">
-    <button (click)="activeTab.set('all')"
-            class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap"
+  <div class="flex items-center gap-1 px-6 py-2.5 border-b border-slate-700/50 flex-shrink-0 overflow-x-auto">
+    <button (click)="setTab('all')"
+            class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm font-medium
+                   transition-all whitespace-nowrap"
             [class.bg-cyan-500]="activeTab() === 'all'"
             [class.text-white]="activeTab() === 'all'"
             [class.text-slate-400]="activeTab() !== 'all'">
-      <span>📬</span> 全部
+      📬 全部
       @if (svc.unreadCount() > 0) {
-        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20 font-bold">{{ svc.unreadCount() }}</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20 font-bold">
+          {{ svc.unreadCount() }}
+        </span>
       }
     </button>
-
     @for (cat of categoryList; track cat.key) {
-      <button (click)="activeTab.set(cat.key)"
-              class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap"
+      <button (click)="setTab(cat.key)"
+              class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm font-medium
+                     transition-all whitespace-nowrap"
               [class.text-white]="activeTab() === cat.key"
               [class.text-slate-400]="activeTab() !== cat.key"
               [style.background]="activeTab() === cat.key ? cat.activeColor : 'transparent'">
-        <span>{{ cat.icon }}</span> {{ cat.label }}
+        {{ cat.icon }} {{ cat.label }}
         @if ((svc.unreadByCategory()[cat.key] ?? 0) > 0) {
           <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20 font-bold">
             {{ svc.unreadByCategory()[cat.key] }}
           </span>
         }
       </button>
+    }
+
+    <!-- 搜索結果計數 -->
+    @if (searchTerm()) {
+      <span class="ml-auto text-xs text-slate-500 whitespace-nowrap">
+        找到 {{ filteredMessages().length }} 條
+      </span>
     }
   </div>
 
@@ -99,26 +174,33 @@ const CATEGORY_CONFIG: Record<MsgCategory, { label: string; icon: string; bg: st
 
     @if (filteredMessages().length === 0) {
       <div class="flex flex-col items-center justify-center h-64 text-center px-6">
-        <div class="text-5xl mb-4 opacity-30">📭</div>
-        <p class="text-slate-400 text-sm">{{ activeTab() === 'all' ? '暫無消息' : '該分類暫無消息' }}</p>
-        <p class="text-slate-600 text-xs mt-2">系統事件會自動收集到此處</p>
+        <div class="text-5xl mb-4 opacity-30">{{ searchTerm() ? '🔍' : '📭' }}</div>
+        <p class="text-slate-400 text-sm">
+          {{ searchTerm() ? '沒有符合的消息' : (activeTab() === 'all' ? '暫無消息' : '該分類暫無消息') }}
+        </p>
+        @if (searchTerm()) {
+          <button (click)="searchTerm.set('')"
+                  class="mt-3 text-xs text-cyan-400 hover:underline">清除搜索</button>
+        }
       </div>
     } @else {
       @if (todayMessages().length > 0) {
-        <div class="px-6 pt-4 pb-1">
+        <div class="px-6 pt-4 pb-1 flex items-center gap-3">
           <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">今天</span>
+          <div class="flex-1 h-px bg-slate-700/50"></div>
         </div>
-        <div class="divide-y divide-slate-700/30">
+        <div class="divide-y divide-slate-700/20">
           @for (msg of todayMessages(); track msg.id) {
             <ng-container *ngTemplateOutlet="msgRow; context: { msg: msg }"></ng-container>
           }
         </div>
       }
       @if (earlierMessages().length > 0) {
-        <div class="px-6 pt-4 pb-1">
+        <div class="px-6 pt-4 pb-1 flex items-center gap-3">
           <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">更早</span>
+          <div class="flex-1 h-px bg-slate-700/50"></div>
         </div>
-        <div class="divide-y divide-slate-700/30">
+        <div class="divide-y divide-slate-700/20">
           @for (msg of earlierMessages(); track msg.id) {
             <ng-container *ngTemplateOutlet="msgRow; context: { msg: msg }"></ng-container>
           }
@@ -129,42 +211,68 @@ const CATEGORY_CONFIG: Record<MsgCategory, { label: string; icon: string; bg: st
 
   <!-- ── 消息行模板 ─────────────────────────────────────────── -->
   <ng-template #msgRow let-msg="msg">
-    <div class="flex items-start gap-4 px-6 py-4 cursor-pointer transition-colors hover:bg-slate-800/40 group"
-         [class.bg-slate-800/20]="!msg.read"
-         (click)="onMsgClick(msg)">
+    <div class="flex items-start gap-3 px-6 py-3.5 transition-colors group"
+         [class.bg-slate-800/25]="!msg.read"
+         [class.cursor-pointer]="!selectMode()"
+         [class.hover:bg-slate-800/40]="!selectMode()"
+         [class.cursor-default]="selectMode()"
+         [class.bg-cyan-500/5]="selectedIds().has(msg.id)"
+         (click)="onRowClick(msg)">
 
-      <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg border"
-           [class]="getCategoryBg(msg.category)">
-        {{ msg.icon }}
-      </div>
+      <!-- 複選框（選擇模式）或 分類圖標 -->
+      @if (selectMode()) {
+        <div class="w-5 h-5 flex-shrink-0 mt-0.5 rounded border-2 flex items-center justify-center transition-all"
+             [class.border-cyan-500]="selectedIds().has(msg.id)"
+             [class.bg-cyan-500]="selectedIds().has(msg.id)"
+             [class.border-slate-600]="!selectedIds().has(msg.id)">
+          @if (selectedIds().has(msg.id)) {
+            <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+            </svg>
+          }
+        </div>
+      } @else {
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base border"
+             [class]="getCategoryBg(msg.category)">
+          {{ msg.icon }}
+        </div>
+      }
 
+      <!-- 正文 -->
       <div class="flex-1 min-w-0">
-        <div class="flex items-start justify-between gap-3">
-          <span class="text-sm font-semibold text-white leading-snug group-hover:text-cyan-300 transition-colors">
+        <div class="flex items-start justify-between gap-2">
+          <!-- 高亮搜索詞 -->
+          <span class="text-sm font-medium leading-snug"
+                [class.text-white]="!msg.read"
+                [class.text-slate-300]="msg.read"
+                [class.group-hover:text-cyan-300]="!selectMode()">
             {{ msg.title }}
           </span>
-          <div class="flex items-center gap-2 flex-shrink-0">
-            <span class="text-[11px] text-slate-500">{{ formatTime(msg.time) }}</span>
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            <span class="text-[11px] text-slate-600">{{ formatTime(msg.time) }}</span>
             @if (!msg.read) {
-              <span class="w-2 h-2 rounded-full bg-cyan-400 flex-shrink-0"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 flex-shrink-0"></span>
             }
           </div>
         </div>
-        <p class="text-sm text-slate-400 mt-1 leading-relaxed">{{ msg.summary }}</p>
-        @if (msg.actionView) {
-          <span class="text-xs text-cyan-400/70 mt-1 inline-block group-hover:text-cyan-400 transition-colors">
+        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed line-clamp-2">{{ msg.summary }}</p>
+        @if (msg.actionView && !selectMode()) {
+          <span class="text-[11px] text-cyan-500/60 mt-0.5 inline-block group-hover:text-cyan-400 transition-colors">
             點擊前往處理 →
           </span>
         }
       </div>
 
-      <button (click)="removeMsg(msg.id, $event)"
-              class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-600
-                     hover:text-red-400 hover:bg-red-500/10 transition-all flex-shrink-0">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-      </button>
+      <!-- 刪除（非選擇模式） -->
+      @if (!selectMode()) {
+        <button (click)="removeMsg(msg.id, $event)"
+                class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-600
+                       hover:text-red-400 hover:bg-red-500/10 transition-all flex-shrink-0 mt-0.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      }
     </div>
   </ng-template>
 
@@ -174,28 +282,99 @@ const CATEGORY_CONFIG: Record<MsgCategory, { label: string; icon: string; bg: st
 export class MessagesViewComponent {
   protected svc = inject(MessagesService);
 
-  activeTab = signal<TabCategory>('all');
+  activeTab  = signal<TabCategory>('all');
+  searchTerm = signal('');
 
-  readonly categoryList = (Object.entries(CATEGORY_CONFIG) as [MsgCategory, typeof CATEGORY_CONFIG[MsgCategory]][])
-    .map(([key, cfg]) => ({ key, ...cfg }));
+  // ── 選擇模式 ─────────────────────────────────────────────
+  selectMode  = signal(false);
+  selectedIds = signal(new Set<string>());
 
+  readonly categoryList = (
+    Object.entries(CATEGORY_CONFIG) as [MsgCategory, typeof CATEGORY_CONFIG[MsgCategory]][]
+  ).map(([key, cfg]) => ({ key, ...cfg }));
+
+  // ── Computed ─────────────────────────────────────────────
   filteredMessages = computed(() => {
-    const tab = this.activeTab();
-    const all = this.svc.messages();
-    return tab === 'all' ? all : all.filter(m => m.category === tab);
+    const tab    = this.activeTab();
+    const search = this.searchTerm().toLowerCase().trim();
+    let msgs = this.svc.messages();
+    if (tab !== 'all') msgs = msgs.filter(m => m.category === tab);
+    if (search) {
+      msgs = msgs.filter(m =>
+        m.title.toLowerCase().includes(search) ||
+        m.summary.toLowerCase().includes(search)
+      );
+    }
+    return msgs;
   });
 
   todayMessages = computed(() => {
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    return this.filteredMessages().filter(m => new Date(m.time) >= todayStart);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return this.filteredMessages().filter(m => new Date(m.time) >= today);
   });
 
   earlierMessages = computed(() => {
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    return this.filteredMessages().filter(m => new Date(m.time) < todayStart);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return this.filteredMessages().filter(m => new Date(m.time) < today);
   });
 
-  onMsgClick(msg: AppMessage) {
+  selectedCount = computed(() => this.selectedIds().size);
+
+  allPageSelected = computed(() => {
+    const msgs = this.filteredMessages();
+    return msgs.length > 0 && msgs.every(m => this.selectedIds().has(m.id));
+  });
+
+  // ── Tab 切換（清空搜索） ──────────────────────────────────
+  setTab(tab: TabCategory) {
+    this.activeTab.set(tab);
+    this.searchTerm.set('');
+    this.exitSelectMode();
+  }
+
+  // ── 選擇模式 ──────────────────────────────────────────────
+  enterSelectMode() {
+    this.selectMode.set(true);
+    this.selectedIds.set(new Set());
+  }
+
+  exitSelectMode() {
+    this.selectMode.set(false);
+    this.selectedIds.set(new Set());
+  }
+
+  toggleSelectAll() {
+    if (this.allPageSelected()) {
+      this.selectedIds.set(new Set());
+    } else {
+      this.selectedIds.set(new Set(this.filteredMessages().map(m => m.id)));
+    }
+  }
+
+  toggleSelect(id: string) {
+    this.selectedIds.update(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  batchMarkRead() {
+    this.selectedIds().forEach(id => this.svc.markRead(id));
+    this.exitSelectMode();
+  }
+
+  batchDelete() {
+    this.selectedIds().forEach(id => this.svc.remove(id));
+    this.exitSelectMode();
+  }
+
+  // ── 行點擊 ───────────────────────────────────────────────
+  onRowClick(msg: AppMessage) {
+    if (this.selectMode()) {
+      this.toggleSelect(msg.id);
+      return;
+    }
     this.svc.markRead(msg.id);
     if (msg.actionView) {
       window.dispatchEvent(new CustomEvent('changeView', { detail: msg.actionView }));
@@ -213,7 +392,6 @@ export class MessagesViewComponent {
 
   formatTime(isoStr: string): string {
     const time = new Date(isoStr);
-    // 讀取 nowMs signal 以建立響應式依賴 — 每分鐘自動重算
     const diff = this.svc.nowMs() - time.getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return '剛剛';

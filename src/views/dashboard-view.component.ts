@@ -15,6 +15,7 @@ import { AccountManagementService } from '../services/account-management.service
 import { NavBridgeService, LegacyView } from '../services/nav-bridge.service';
 import { MonitoringManagementService } from '../services/monitoring-management.service';
 import { AutomationWorkflowService } from '../services/automation-workflow.service';
+import { MessagesService } from '../services/messages.service';
 
 // 子組件導入
 import { QuickWorkflowComponent } from '../quick-workflow.component';
@@ -321,6 +322,43 @@ export interface SystemStatus {
           </div>
         </div>
         
+        <!-- P4-4: 未讀消息快照條 -->
+        @if (recentUnread().length > 0) {
+          <div class="mb-6 rounded-xl border border-slate-700/50 bg-slate-800/40 overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2.5 border-b border-slate-700/40">
+              <div class="flex items-center gap-2 text-sm font-medium" style="color: var(--text-primary);">
+                <span>🔔</span>
+                <span>未讀消息</span>
+                <span class="px-1.5 py-0.5 text-[10px] font-bold bg-cyan-500/20 text-cyan-400 rounded-full">
+                  {{ messagesService.unreadCount() }}
+                </span>
+              </div>
+              <button (click)="navigateTo('messages')"
+                      class="text-xs text-cyan-400/70 hover:text-cyan-400 transition-colors">
+                查看全部 →
+              </button>
+            </div>
+            <div class="divide-y divide-slate-700/30">
+              @for (msg of recentUnread(); track msg.id) {
+                <div class="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-700/30 transition-colors group"
+                     (click)="navigateTo(msg.actionView || 'messages')">
+                  <span class="text-base flex-shrink-0">{{ msg.icon }}</span>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm text-white truncate group-hover:text-cyan-300 transition-colors">
+                      {{ msg.title }}
+                    </div>
+                    <div class="text-xs text-slate-500 truncate">{{ msg.summary }}</div>
+                  </div>
+                  <div class="flex items-center gap-2 flex-shrink-0">
+                    <span class="text-[11px] text-slate-600">{{ formatMsgTime(msg.time) }}</span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
         <!-- 🆕 Phase1: 自動化工作流控制 -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <!-- 🎯 引導式工作流 -->
@@ -409,6 +447,12 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
   private accountService = inject(AccountManagementService);
   public membershipService = inject(MembershipService);
   public automationWorkflow = inject(AutomationWorkflowService);
+  public messagesService    = inject(MessagesService);
+
+  /** P4-4: 最近 3 條未讀消息（快照條） */
+  recentUnread = computed(() =>
+    this.messagesService.messages().filter(m => !m.read).slice(0, 3)
+  );
   
   // 內部狀態
   mode = signal<'smart' | 'classic'>('classic');
@@ -681,6 +725,17 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
   refreshStatus(): void {
     this.ipc.send('get-system-status');
     this.ipc.send('get-monitoring-status');
+  }
+
+  /** P4-4: 消息快照條時間格式 */
+  formatMsgTime(isoStr: string): string {
+    const diff = Date.now() - new Date(isoStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return '剛剛';
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h`;
+    return `${Math.floor(hrs / 24)}d`;
   }
   
   // 🔧 P0 v2: 一鍵啟動（不在前端阻止，讓後端處理帳號連接）

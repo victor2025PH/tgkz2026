@@ -16,6 +16,7 @@ import { NavBridgeService, LegacyView } from '../services/nav-bridge.service';
 import { MonitoringManagementService } from '../services/monitoring-management.service';
 import { AutomationWorkflowService } from '../services/automation-workflow.service';
 import { MessagesService } from '../services/messages.service';
+import { AiCenterService } from '../ai-center/ai-center.service';
 
 // 子組件導入
 import { QuickWorkflowComponent } from '../quick-workflow.component';
@@ -137,6 +138,22 @@ export interface SystemStatus {
             </button>
           </div>
           
+          <!-- P6-3: 後端靜默警告（超過 90 秒未收到回應） -->
+          @if (backendSilent()) {
+            <div class="flex items-center justify-between mb-4 px-4 py-3 rounded-xl
+                         bg-amber-500/10 border border-amber-500/30">
+              <div class="flex items-center gap-2 text-amber-300 text-sm">
+                <span>⚠️</span>
+                <span>後端超過 {{ statusStaleSec() }}秒 未回應，狀態可能不準確</span>
+              </div>
+              <button (click)="refreshStatus()"
+                      class="px-3 py-1 text-xs rounded-lg bg-amber-500/20 hover:bg-amber-500/40
+                             border border-amber-500/40 text-amber-200 transition-all">
+                重試
+              </button>
+            </div>
+          }
+
           <!-- 快速狀態指示器（點擊跳轉） -->
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <!-- 帳號狀態 -->
@@ -182,19 +199,24 @@ export interface SystemStatus {
               </div>
             </div>
             
-            <!-- AI 聊天狀態 -->
+            <!-- AI 聊天狀態 (P6-2: 使用 AiCenterService 真實連線狀態) -->
             <div class="rounded-lg p-4 text-center relative overflow-hidden cursor-pointer group transition-all hover:scale-[1.03] hover:shadow-lg"
                  style="background-color: var(--bg-card);"
                  (click)="navigateTo('ai-engine')"
                  title="點擊配置 AI">
-              @if (status().ai?.enabled) {
+              @if (aiCardStatus() === 'connected') {
                 <div class="absolute inset-0 bg-gradient-to-t from-purple-500/10 to-transparent"></div>
               }
               <div class="relative">
                 <div class="text-2xl mb-1">🤖</div>
                 <div class="text-sm" style="color: var(--text-muted);">AI 聊天</div>
-                <div class="text-xl font-bold" [style.color]="status().ai?.enabled ? 'var(--success)' : 'var(--error)'">
-                  {{ status().ai?.enabled ? (status().ai?.mode === 'full' ? '全自動' : '半自動') : '未啟用' }}
+                <div class="text-xl font-bold"
+                     [style.color]="aiCardStatus() === 'connected' ? 'var(--success)' : aiCardStatus() === 'configured' ? 'var(--warning)' : 'var(--error)'">
+                  @switch (aiCardStatus()) {
+                    @case ('connected')    { <span>已連接</span> }
+                    @case ('configured')   { <span class="text-base text-yellow-400">未測試</span> }
+                    @default               { <span>未配置</span> }
+                  }
                 </div>
                 <div class="text-[10px] mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400">
                   點擊配置 →
@@ -472,6 +494,7 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
   public membershipService = inject(MembershipService);
   public automationWorkflow = inject(AutomationWorkflowService);
   public messagesService    = inject(MessagesService);
+  public aiService          = inject(AiCenterService);
 
   /** P4-4: 最近 3 條未讀消息（快照條） */
   recentUnread = computed(() =>
@@ -511,7 +534,19 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
   // 🔧 P2: 狀態心跳機制
   private heartbeatIntervalId: ReturnType<typeof setInterval> | null = null;
   private readonly HEARTBEAT_INTERVAL_MS = 30000; // 30秒心跳
-  
+
+  // P6-3: 後端連線靜默偵測
+  private _lastStatusAt = signal(0); // 上次收到 system-status 的時間
+  private _tickNow = signal(Date.now()); // 每 30 秒驅動一次重算
+  /** 距離上次後端回應的秒數（0 表示尚未嘗試） */
+  statusStaleSec = computed(() => {
+    this._tickNow(); // 訂閱時間 tick
+    const last = this._lastStatusAt();
+    return last === 0 ? 0 : Math.floor((Date.now() - last) / 1000);
+  });
+  /** 超過 90 秒未回應則顯示警告 */
+  backendSilent = computed(() => this._lastStatusAt() > 0 && this.statusStaleSec() > 90);
+
   private _status = signal<SystemStatus>({});
   status = this._status.asReadonly();
   
@@ -524,16 +559,30 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
   
   totalAccountsCount = computed(() => this.accountService.accounts().length);
   
-  /** 觸發規則數量：優先使用 triggerRules，與後端/觸發規則頁一致 */
+  /** P6-2: 觸發規則數量 — 直接使用 MonitoringManagementService（與觸發規則頁面數據一致） */
   triggerRulesActiveCount = computed(() => {
+    const rules = this.monitoringService.triggerRules();
+    if (rules.length > 0) {
+      return rules.filter((r: any) => r.active || r.enabled || r.is_active).length;
+    }
+    // fallback: IPC system-status
     const tr = this.status().triggerRules;
     if (tr && typeof tr.active === 'number') return tr.active;
-    return this.status().campaigns?.active ?? 0;
+    return 0;
   });
   triggerRulesTotalCount = computed(() => {
+    const rules = this.monitoringService.triggerRules();
+    if (rules.length > 0) return rules.length;
     const tr = this.status().triggerRules;
     if (tr && typeof tr.total === 'number') return tr.total;
-    return this.status().campaigns?.total ?? 0;
+    return 0;
+  });
+
+  /** P6-2: AI 狀態 — 使用 AiCenterService（真實連線狀態，與 AI 設置頁一致） */
+  aiCardStatus = computed<'connected' | 'configured' | 'unconfigured'>(() => {
+    if (this.aiService.isConnected()) return 'connected';
+    if (this.aiService.isConfigured()) return 'configured';
+    return 'unconfigured';
   });
 
   /** P1: 無發送帳號警告（模板不可用箭頭函數，故用 computed） */
@@ -568,8 +617,8 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
   private startHeartbeat(): void {
     this.stopHeartbeat(); // 確保不重複
     this.heartbeatIntervalId = setInterval(() => {
-      console.log('[DashboardView] 心跳：刷新狀態');
       this.refreshStatus();
+      this._tickNow.set(Date.now()); // P6-3: 驅動靜默時鐘重算
     }, this.HEARTBEAT_INTERVAL_MS);
   }
   
@@ -588,6 +637,7 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
   private setupIpcListeners(): void {
     const cleanup1 = this.ipc.on('system-status', (data: SystemStatus) => {
       this._status.set(data);
+      this._lastStatusAt.set(Date.now()); // P6-3: 記錄最後回應時間
     });
     
     // 🔧 P0修復: 狀態由 MonitoringManagementService 統一管理

@@ -3769,7 +3769,6 @@ ${goal}
     
     // 4. 持久化任務記錄並切換到「協作任務」tab
     const accounts = this.accountMatchResults();
-    const targetUsers = this.selectedTargetUsers();
     if (result && (accounts.length > 0 || targetUsers.length > 0)) {
       this.multiRoleService.addTaskRecord({
         goal: this.aiPlannerGoal,

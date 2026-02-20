@@ -279,6 +279,67 @@ interface QuickAction {
       </div>
     </div>
 
+    <!-- ══════════════════ Lead Journey Funnel ══════════════════ -->
+    @if (funnelStages().some(s => s.count > 0)) {
+      <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <span>🔽</span> 線索旅程分布
+          </h2>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-500">總轉化率</span>
+            <span class="text-sm font-bold text-emerald-400">{{ overallConversionRate() }}%</span>
+            <button (click)="navigate('lead-nurturing')"
+                    class="text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
+              查看看板 →
+            </button>
+          </div>
+        </div>
+
+        <!-- 漏斗條形圖 -->
+        <div class="space-y-2">
+          @for (stage of funnelStages(); track stage.key) {
+            <div class="flex items-center gap-3">
+              <div class="w-20 text-right text-xs flex-shrink-0">
+                <span [class]="stage.textClass">{{ stage.icon }} {{ stage.label }}</span>
+              </div>
+              <div class="flex-1 relative h-7 bg-slate-700/50 rounded-lg overflow-hidden">
+                <div class="absolute inset-y-0 left-0 rounded-lg transition-all duration-700 flex items-center"
+                     [class]="stage.barClass"
+                     [style.width.%]="stage.pct">
+                </div>
+                <div class="absolute inset-0 flex items-center px-3 justify-between">
+                  <span class="text-xs font-bold text-white mix-blend-luminosity">
+                    {{ stage.count }} 人
+                  </span>
+                  <span class="text-xs text-white/70">{{ stage.pct }}%</span>
+                </div>
+              </div>
+              @if (stage.dropRate !== null && stage.dropRate > 0) {
+                <div class="w-16 text-xs text-right flex-shrink-0"
+                     [class.text-red-400]="stage.dropRate > 60"
+                     [class.text-amber-400]="stage.dropRate > 30 && stage.dropRate <= 60"
+                     [class.text-slate-500]="stage.dropRate <= 30">
+                  ↓{{ stage.dropRate }}%
+                </div>
+              } @else {
+                <div class="w-16"></div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- 底部說明 -->
+        <div class="flex items-center gap-4 mt-4 pt-3 border-t border-slate-700/50">
+          <span class="text-xs text-slate-500">↓ 表示從上一階段的流失率</span>
+          <button (click)="navigate('analytics-center')"
+                  class="ml-auto text-xs text-slate-500 hover:text-slate-300 transition-colors">
+            查看詳細報告 →
+          </button>
+        </div>
+      </div>
+    }
+
     <!-- ══════════════════ Workflow Guide (first-time / low engagement) ══════════════════ -->
     @if (showWorkflowGuide()) {
       <div class="bg-gradient-to-r from-indigo-900/40 to-purple-900/40
@@ -347,6 +408,9 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   activeRulesCount = signal(0);
   totalRulesCount = signal(0);
   todayStats = signal({ autoReplies: 0, rulesFired: 0, capturedUsers: 0, messagesSent: 0 });
+
+  // 🆕 Phase 3: 線索旅程數據
+  contactStageMap = signal<Record<string, number>>({});
   _showGuide = signal(true);
 
   private cleanups: Array<() => void> = [];
@@ -406,6 +470,32 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     if (this.aiService.hasStaleConnections()) return 'text-amber-400';
     if (this.aiService.isConfigured()) return 'text-orange-400';
     return 'text-slate-400';
+  });
+
+  // ── Lead Journey Funnel ───────────────────────────────────
+  funnelStages = computed(() => {
+    const m = this.contactStageMap();
+    const stages = [
+      { key: 'new',         label: '新線索', icon: '🌱', barClass: 'bg-cyan-500/70',    textClass: 'text-cyan-400'    },
+      { key: 'contacted',   label: '已接觸', icon: '💬', barClass: 'bg-purple-500/70',  textClass: 'text-purple-400'  },
+      { key: 'interested',  label: '有意向', icon: '🎯', barClass: 'bg-amber-500/70',   textClass: 'text-amber-400'   },
+      { key: 'negotiating', label: '談判中', icon: '🤝', barClass: 'bg-pink-500/70',    textClass: 'text-pink-400'    },
+      { key: 'converted',   label: '已轉化', icon: '✅', barClass: 'bg-emerald-500/70', textClass: 'text-emerald-400' },
+    ];
+    const total = stages.reduce((s, st) => s + (m[st.key] ?? 0), 0) || 1;
+    return stages.map((st, i) => {
+      const count = m[st.key] ?? 0;
+      const prev = i === 0 ? total : (m[stages[i - 1].key] ?? 0);
+      const dropRate = i > 0 && prev > 0 ? Math.round((1 - count / prev) * 100) : null;
+      return { ...st, count, pct: Math.round(count / total * 100), dropRate };
+    });
+  });
+
+  overallConversionRate = computed(() => {
+    const m = this.contactStageMap();
+    const total = Object.values(m).reduce((s, v) => s + v, 0);
+    if (total === 0) return 0;
+    return Math.round((m['converted'] ?? 0) / total * 100);
   });
 
   // ── Needs Attention ───────────────────────────────────────
@@ -627,6 +717,20 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     });
     this.cleanups.push(cleanupStats);
     this.ipc.send('get-today-stats', {});
+
+    // 🆕 Phase 3: Load contact stage distribution for funnel
+    const cleanupContacts = this.ipc.on('unified-contacts-loaded', (data: any) => {
+      const contacts: any[] = Array.isArray(data) ? data : (data?.contacts ?? []);
+      const users = contacts.filter((c: any) => c.contact_type === 'user' || !c.contact_type);
+      const stageMap: Record<string, number> = {};
+      users.forEach((c: any) => {
+        const st = c.status || 'new';
+        stageMap[st] = (stageMap[st] ?? 0) + 1;
+      });
+      this.contactStageMap.set(stageMap);
+    });
+    this.cleanups.push(cleanupContacts);
+    this.ipc.send('get-unified-contacts', { limit: 2000 });
 
     // Fallback: mark loading done after 3 seconds if IPC doesn't respond
     setTimeout(() => this.loading.set(false), 3000);

@@ -361,7 +361,7 @@ interface QuickAction {
     </div>
 
     <!-- ══════════════════ Lead Journey Funnel ══════════════════ -->
-    @if (funnelStages().some(s => s.count > 0)) {
+    @if (hasFunnelData()) {
       <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
@@ -576,6 +576,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       return { ...st, count, pct: Math.round(count / total * 100), dropRate };
     });
   });
+
+  hasFunnelData = computed(() => this.funnelStages().some(s => s.count > 0));
 
   overallConversionRate = computed(() => {
     const m = this.contactStageMap();

@@ -204,8 +204,9 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
   private setupListeners() {
     // 帳號狀態變更
     const c1 = this.ipc.on('accounts-data', (accounts: any[]) => {
-      const offline = (accounts || []).filter(
-        (a: any) => a.status === 'disconnected' || a.status === 'error'
+      const list: any[] = accounts || [];
+      const offline = list.filter(
+        (a: any) => String(a.status) === 'disconnected' || String(a.status) === 'error'
       );
       if (offline.length > 0) {
         this.addNotification({

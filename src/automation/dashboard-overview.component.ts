@@ -91,7 +91,7 @@ interface ActivityItem {
                     </button>
                   }
                   @if (!hasActiveRules()) {
-                    <button (click)="navigateTo('automation-rules')"
+                    <button (click)="navigateTo('trigger-rules')"
                             class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-sm rounded-lg transition-colors flex items-center gap-1">
                       <span>⚡</span> 配置觸發規則
                     </button>
@@ -175,7 +175,7 @@ interface ActivityItem {
                   </span>
                 </div>
                 <div class="flex items-center gap-2">
-                  <button (click)="navigateTo('automation-rules')" 
+                  <button (click)="navigateTo('trigger-rules')" 
                           class="text-xs px-2 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded transition-colors">
                     ⚙️ 配置規則
                   </button>
@@ -220,7 +220,7 @@ interface ActivityItem {
                           <span>▶️</span> 開始監控
                         </button>
                       }
-                      <button (click)="navigateTo('automation-rules')"
+                      <button (click)="navigateTo('trigger-rules')"
                               class="text-sm px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors flex items-center gap-2">
                         <span>⚙️</span> 配置觸發規則
                       </button>
@@ -340,15 +340,15 @@ interface ActivityItem {
                   <span class="text-2xl">📚</span>
                   <span class="text-sm text-slate-300">資料庫</span>
                 </button>
-                <button (click)="navigateTo('rules')"
+                <button (click)="navigateTo('trigger-rules')"
                         class="flex flex-col items-center gap-2 p-4 bg-slate-700/30 hover:bg-slate-700/50 rounded-xl transition-colors">
                   <span class="text-2xl">⚡</span>
-                  <span class="text-sm text-slate-300">自動規則</span>
+                  <span class="text-sm text-slate-300">觸發規則</span>
                 </button>
-                <button (click)="navigateTo('send-settings')"
+                <button (click)="navigateTo('leads')"
                         class="flex flex-col items-center gap-2 p-4 bg-slate-700/30 hover:bg-slate-700/50 rounded-xl transition-colors">
                   <span class="text-2xl">📤</span>
-                  <span class="text-sm text-slate-300">發送設置</span>
+                  <span class="text-sm text-slate-300">群發管理</span>
                 </button>
                 <button (click)="navigateTo('analytics')"
                         class="flex flex-col items-center gap-2 p-4 bg-slate-700/30 hover:bg-slate-700/50 rounded-xl transition-colors">

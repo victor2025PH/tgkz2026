@@ -760,13 +760,14 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     this.loading.set(true);
 
     // Load accounts
-    const cleanupAccounts = this.ipc.on('accounts-data', (accounts: TelegramAccount[]) => {
+    const cleanupAccounts = this.ipc.on('accounts-data', (rawAccounts: any[]) => {
+      const accounts: any[] = rawAccounts || [];
       const total = accounts.length;
       const online = accounts.filter(a =>
-        a.status === 'connected' || a.status === 'online' || (a as any).isConnected
+        String(a.status) === 'connected' || String(a.status) === 'online' || a.isConnected
       ).length;
       const disconnected = accounts.filter(a =>
-        a.status === 'disconnected' || a.status === 'error'
+        String(a.status) === 'disconnected' || String(a.status) === 'error'
       ).length;
       this.accountSummary.set({ total, online, disconnected });
       this.loading.set(false);

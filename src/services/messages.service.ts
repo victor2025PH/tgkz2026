@@ -8,6 +8,7 @@
  *  - 提示音：Web Audio API 生成，無需音頻文件；soundEnabled 持久化至 localStorage
  */
 import { Injectable, signal, computed, effect, inject } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { ElectronIpcService } from '../electron-ipc.service';
 
 export type MsgCategory = 'system' | 'rule' | 'lead' | 'task' | 'alert';
@@ -33,6 +34,7 @@ const TICK_INTERVAL_MS = 60_000;
 @Injectable({ providedIn: 'root' })
 export class MessagesService {
   private ipc = inject(ElectronIpcService);
+  private doc = inject(DOCUMENT);
 
   // ── 消息狀態 ─────────────────────────────────────────────────
   private _messages = signal<AppMessage[]>(this.loadFromStorage());
@@ -75,6 +77,12 @@ export class MessagesService {
 
     // 每分鐘更新時鐘（驅動相對時間刷新）
     setInterval(() => this.nowMs.set(Date.now()), TICK_INTERVAL_MS);
+
+    // P4-1: 瀏覽器 Tab 標題同步未讀數
+    effect(() => {
+      const n = this.unreadCount();
+      this.doc.title = n > 0 ? `(${n}) TG 智控王` : 'TG 智控王';
+    });
 
     this.setupIpcListeners();
   }

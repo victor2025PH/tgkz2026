@@ -60,6 +60,9 @@ export class MessagesService {
     return result;
   });
 
+  /** P5-2: 是否有未讀告警（用於側邊欄紅點） */
+  readonly hasUnreadAlerts = computed(() => this.unreadByCategory()['alert'] > 0);
+
   private idCnt = 0;
   private dedup = new Map<string, number>();
 
@@ -83,6 +86,10 @@ export class MessagesService {
       const n = this.unreadCount();
       this.doc.title = n > 0 ? `(${n}) TG 智控王` : 'TG 智控王';
     });
+
+    // P5-3: 消息自動過期（啟動時執行一次 + 每小時清理）
+    this.runAutoExpire();
+    setInterval(() => this.runAutoExpire(), 3_600_000);
 
     this.setupIpcListeners();
   }
@@ -261,6 +268,33 @@ export class MessagesService {
           : data?.message || '任務已結束',
         actionView: 'campaigns',
       });
+    });
+  }
+
+  // ── P5-3: 自動過期清理 ──────────────────────────────────────
+  /**
+   * 7 天前 → 自動標為已讀（不打擾，但保留記錄）
+   * 30 天前 → 自動刪除（清理 localStorage 空間）
+   */
+  private runAutoExpire(): void {
+    const now = Date.now();
+    const DAY7  = 7  * 24 * 3_600_000;
+    const DAY30 = 30 * 24 * 3_600_000;
+
+    this._messages.update(prev => {
+      let changed = false;
+      const next = prev
+        .map(m => {
+          const age = now - new Date(m.time).getTime();
+          if (!m.read && age > DAY7) { changed = true; return { ...m, read: true }; }
+          return m;
+        })
+        .filter(m => {
+          const age = now - new Date(m.time).getTime();
+          if (age > DAY30) { changed = true; return false; }
+          return true;
+        });
+      return changed ? next : prev;   // 避免無意義的 signal 更新
     });
   }
 

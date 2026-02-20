@@ -25,12 +25,8 @@ import { DynamicScriptEngineService } from './dynamic-script-engine.service';
 import { CollaborationOrchestratorService, RoleEntryConfig } from './collaboration-orchestrator.service';
 import { RoleEditorComponent } from './components/role-editor.component';
 import { ScriptEditorComponent } from './components/script-editor.component';
-import { CollaborationDashboardComponent } from './components/collaboration-dashboard.component';
 import { RoleLibraryComponent } from './components/role-library.component';
 import { ScenarioSelectorComponent } from './components/scenario-selector.component';
-import { WorkflowConfigComponent } from '../components/workflow-config.component';
-import { WorkflowMonitorComponent } from '../components/workflow-monitor.component';
-import { WorkflowAnalyticsComponent } from '../components/workflow-analytics.component';
 import { ToastService } from '../toast.service';
 import { UnifiedContactsService, UnifiedContact } from '../services/unified-contacts.service';
 import { AccountManagementService } from '../services/account-management.service';
@@ -162,12 +158,12 @@ interface TargetUser {
   source?: string;
 }
 
-type MultiRoleTab = 'dashboard' | 'library' | 'roles' | 'scenarios' | 'scripts' | 'groups' | 'workflow' | 'monitor' | 'analytics' | 'settings';
+type MultiRoleTab = 'overview' | 'roles' | 'scripts' | 'tasks';
 
 @Component({
   selector: 'app-multi-role-center',
   standalone: true,
-  imports: [CommonModule, FormsModule, RoleEditorComponent, ScriptEditorComponent, CollaborationDashboardComponent, RoleLibraryComponent, ScenarioSelectorComponent, WorkflowConfigComponent, WorkflowMonitorComponent, WorkflowAnalyticsComponent],
+  imports: [CommonModule, FormsModule, RoleEditorComponent, ScriptEditorComponent, RoleLibraryComponent, ScenarioSelectorComponent],
   template: `
     <div class="multi-role-center h-full flex flex-col bg-slate-900">
       <!-- 頂部標題欄 -->
@@ -176,7 +172,7 @@ type MultiRoleTab = 'dashboard' | 'library' | 'roles' | 'scenarios' | 'scripts' 
           <div class="flex items-center gap-4">
             <h1 class="text-2xl font-bold text-white flex items-center gap-3">
               <span class="text-2xl">🎭</span>
-              角色資源庫
+              多角色協作
             </h1>
             
             <!-- 活躍群組數 -->
@@ -213,7 +209,7 @@ type MultiRoleTab = 'dashboard' | 'library' | 'roles' | 'scenarios' | 'scripts' 
           </div>
         </div>
         
-        <!-- Tab 導航 -->
+        <!-- Tab 導航 (4 核心 tab) -->
         <div class="flex gap-1 mt-4 bg-slate-800/50 p-1 rounded-xl w-fit">
           @for (tab of tabs; track tab.id) {
             <button (click)="activeTab.set(tab.id)"
@@ -236,9 +232,33 @@ type MultiRoleTab = 'dashboard' | 'library' | 'roles' | 'scenarios' | 'scripts' 
       <!-- Tab 內容區 -->
       <div class="flex-1 overflow-y-auto p-4">
         @switch (activeTab()) {
-          @case ('dashboard') {
-            <!-- 監控儀表板 + AI 策劃入口 -->
-            <div class="space-y-6">
+
+          <!-- ═══════════════════════════════════════════
+               Tab 1: 快速開始 (overview)
+               - AI 策劃入口
+               - 就緒狀態檢查
+               - 近期協作任務
+               - 跳轉到其他功能模組
+          ══════════════════════════════════════════════ -->
+          @case ('overview') {
+            <div class="space-y-5 max-w-4xl mx-auto">
+
+              <!-- 快速統計行 -->
+              <div class="grid grid-cols-3 gap-4">
+                <div class="bg-slate-800/60 rounded-xl border border-slate-700/50 p-4 text-center">
+                  <div class="text-2xl font-bold text-purple-400">{{ multiRoleService.activeGroupCount() }}</div>
+                  <div class="text-xs text-slate-400 mt-1">進行中協作</div>
+                </div>
+                <div class="bg-slate-800/60 rounded-xl border border-slate-700/50 p-4 text-center">
+                  <div class="text-2xl font-bold text-emerald-400">{{ multiRoleService.availableRoles().length }}</div>
+                  <div class="text-xs text-slate-400 mt-1">已就緒角色</div>
+                </div>
+                <div class="bg-slate-800/60 rounded-xl border border-slate-700/50 p-4 text-center">
+                  <div class="text-2xl font-bold text-cyan-400">{{ multiRoleService.scripts().length }}</div>
+                  <div class="text-xs text-slate-400 mt-1">可用劇本</div>
+                </div>
+              </div>
+
               <!-- AI 一鍵策劃卡片 -->
               <div class="bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-cyan-500/20 rounded-2xl border border-purple-500/30 p-6">
                 <div class="flex items-center justify-between">
@@ -246,7 +266,7 @@ type MultiRoleTab = 'dashboard' | 'library' | 'roles' | 'scenarios' | 'scripts' 
                     <h2 class="text-xl font-bold text-white flex items-center gap-3">
                       <span class="text-2xl">🤖</span>
                       AI 智能策劃
-                      <span class="px-2 py-0.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs rounded-full">NEW</span>
+                      <span class="px-2 py-0.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs rounded-full">智能</span>
                     </h2>
                     <p class="text-slate-400 mt-1">告訴 AI 你的目標，自動生成最佳角色組合和執行策略</p>
                   </div>
@@ -256,11 +276,10 @@ type MultiRoleTab = 'dashboard' | 'library' | 'roles' | 'scenarios' | 'scripts' 
                     開始策劃
                   </button>
                 </div>
-                
                 <!-- 快速目標選擇 -->
                 <div class="mt-4 flex flex-wrap gap-2">
                   <span class="text-sm text-slate-500">快速選擇：</span>
-                  <button (click)="quickAIPlan('促進首單成交')" 
+                  <button (click)="quickAIPlan('促進首單成交')"
                           class="px-3 py-1.5 bg-slate-700/50 text-slate-300 text-sm rounded-lg hover:bg-slate-700 transition-colors">
                     💰 促進首單
                   </button>
@@ -278,407 +297,583 @@ type MultiRoleTab = 'dashboard' | 'library' | 'roles' | 'scenarios' | 'scripts' 
                   </button>
                 </div>
               </div>
-              
-              <!-- 原有的監控儀表板 -->
-              <app-collaboration-dashboard></app-collaboration-dashboard>
-            </div>
-          }
-          
-          @case ('library') {
-            <!-- 角色庫 (50個預設角色) -->
-            <app-role-library 
-              (roleAdded)="onPresetRoleAdded($event)"
-              (roleEdit)="onPresetRoleEdit($event)">
-            </app-role-library>
-          }
-          
-          @case ('scenarios') {
-            <!-- 場景模板 (10個預設場景) -->
-            <div class="space-y-6">
-              <div class="flex items-center justify-between">
-                <div>
-                  <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                    <span>🎬</span> 場景模板庫
-                  </h2>
-                  <p class="text-sm text-slate-400 mt-1">10個預設場景，快速啟動多角色協作</p>
+
+              <!-- 就緒狀態檢查 -->
+              <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
+                <h3 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                  <span>✅</span> 協作準備狀態
+                </h3>
+                <div class="space-y-3">
+                  <!-- 角色就緒 -->
+                  <div class="flex items-center justify-between py-2 border-b border-slate-700/30">
+                    <div class="flex items-center gap-3">
+                      @if (multiRoleService.roles().length > 0) {
+                        <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">✓</span>
+                      } @else {
+                        <span class="w-6 h-6 rounded-full bg-slate-600 text-slate-400 flex items-center justify-center text-xs">!</span>
+                      }
+                      <span class="text-sm text-slate-300">已定義角色</span>
+                    </div>
+                    @if (multiRoleService.roles().length > 0) {
+                      <span class="text-xs text-emerald-400">{{ multiRoleService.roles().length }} 個角色</span>
+                    } @else {
+                      <button (click)="activeTab.set('roles'); rolesSubTab.set('mine')"
+                              class="text-xs text-purple-400 hover:text-purple-300">去添加 →</button>
+                    }
+                  </div>
+                  <!-- 帳號綁定 -->
+                  <div class="flex items-center justify-between py-2 border-b border-slate-700/30">
+                    <div class="flex items-center gap-3">
+                      @if (multiRoleService.availableRoles().length > 0) {
+                        <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">✓</span>
+                      } @else {
+                        <span class="w-6 h-6 rounded-full bg-yellow-500/20 text-yellow-400 flex items-center justify-center text-xs">!</span>
+                      }
+                      <span class="text-sm text-slate-300">角色已綁定帳號</span>
+                    </div>
+                    @if (multiRoleService.availableRoles().length > 0) {
+                      <span class="text-xs text-emerald-400">{{ multiRoleService.availableRoles().length }} 個就緒</span>
+                    } @else {
+                      <button (click)="activeTab.set('roles'); rolesSubTab.set('mine')"
+                              class="text-xs text-yellow-400 hover:text-yellow-300">去綁定帳號 →</button>
+                    }
+                  </div>
+                  <!-- 劇本就緒 -->
+                  <div class="flex items-center justify-between py-2">
+                    <div class="flex items-center gap-3">
+                      @if (multiRoleService.scripts().length > 0) {
+                        <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">✓</span>
+                      } @else {
+                        <span class="w-6 h-6 rounded-full bg-slate-600 text-slate-400 flex items-center justify-center text-xs">!</span>
+                      }
+                      <span class="text-sm text-slate-300">已設計劇本</span>
+                    </div>
+                    @if (multiRoleService.scripts().length > 0) {
+                      <span class="text-xs text-emerald-400">{{ multiRoleService.scripts().length }} 個劇本</span>
+                    } @else {
+                      <button (click)="activeTab.set('scripts'); scriptsSubTab.set('mine')"
+                              class="text-xs text-purple-400 hover:text-purple-300">去創建 →</button>
+                    }
+                  </div>
                 </div>
               </div>
-              <app-scenario-selector 
-                (scenarioApplied)="onScenarioApplied($event)">
-              </app-scenario-selector>
-            </div>
-          }
-          
-          @case ('roles') {
-            <!-- 角色管理 -->
-            <div class="max-w-4xl mx-auto space-y-6">
-              <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
-                <div class="flex items-center justify-between mb-6">
-                  <h3 class="font-semibold text-white flex items-center gap-2">
-                    <span>🎭</span> 角色定義
-                  </h3>
-                  <button (click)="showAddRole.set(true)"
-                          class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors">
-                    + 添加角色
+
+              <!-- 快捷跳轉到其他模組 -->
+              <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
+                <h3 class="text-sm font-semibold text-slate-400 mb-3">相關功能模組</h3>
+                <div class="grid grid-cols-2 gap-3">
+                  <button (click)="goTo('trigger-rules')"
+                          class="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors text-left">
+                    <span class="text-xl">🔄</span>
+                    <div>
+                      <div class="text-sm text-white">觸發規則</div>
+                      <div class="text-xs text-slate-500">配置自動觸發條件</div>
+                    </div>
+                    <span class="ml-auto text-slate-500">→</span>
+                  </button>
+                  <button (click)="goTo('monitoring-groups')"
+                          class="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors text-left">
+                    <span class="text-xl">📈</span>
+                    <div>
+                      <div class="text-sm text-white">執行監控</div>
+                      <div class="text-xs text-slate-500">查看群組執行狀態</div>
+                    </div>
+                    <span class="ml-auto text-slate-500">→</span>
+                  </button>
+                  <button (click)="goTo('analytics-center')"
+                          class="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors text-left">
+                    <span class="text-xl">📊</span>
+                    <div>
+                      <div class="text-sm text-white">數據分析</div>
+                      <div class="text-xs text-slate-500">協作效果報告</div>
+                    </div>
+                    <span class="ml-auto text-slate-500">→</span>
+                  </button>
+                  <button (click)="showSettings.set(!showSettings())"
+                          class="flex items-center gap-3 p-3 rounded-lg transition-colors text-left"
+                          [class.bg-purple-500/20]="showSettings()"
+                          [class.border]="showSettings()"
+                          [class.border-purple-500/30]="showSettings()"
+                          [class.bg-slate-700/50]="!showSettings()"
+                          [class.hover:bg-slate-700]="!showSettings()">
+                    <span class="text-xl">⚙️</span>
+                    <div>
+                      <div class="text-sm text-white">協作設置</div>
+                      <div class="text-xs text-slate-500">觸發條件、群名模板</div>
+                    </div>
+                    <span class="ml-auto text-slate-400 text-xs">{{ showSettings() ? '▲' : '▼' }}</span>
                   </button>
                 </div>
-                
-                <div class="space-y-4">
-                  @for (role of multiRoleService.roles(); track role.id) {
-                    <div class="flex items-center justify-between p-4 bg-slate-700/50 rounded-xl hover:bg-slate-700 transition-colors">
-                      <div class="flex items-center gap-4">
-                        <div class="w-14 h-14 rounded-xl flex items-center justify-center text-3xl"
-                             [class.bg-purple-500/20]="role.type === 'expert'"
-                             [class.bg-emerald-500/20]="role.type === 'satisfied_customer'"
-                             [class.bg-cyan-500/20]="role.type === 'support'"
-                             [class.bg-orange-500/20]="role.type === 'manager'"
-                             [class.bg-slate-600]="role.type === 'custom'">
-                          {{ getRoleIcon(role.type) }}
+              </div>
+
+              <!-- 協作設置折疊面板 -->
+              @if (showSettings()) {
+                <div class="bg-slate-800/50 rounded-xl border border-purple-500/20 p-5 space-y-5">
+                  <h3 class="font-semibold text-white flex items-center gap-2">
+                    <span>⚙️</span> 協作設置
+                  </h3>
+
+                  <!-- 自動建群設置 -->
+                  <div class="space-y-4">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">自動建群</div>
+                    <div>
+                      <label class="text-sm text-slate-400 block mb-1.5">群名模板</label>
+                      <input type="text"
+                             [(ngModel)]="autoGroupNameTemplate"
+                             placeholder="VIP專屬服務群 - &#123;客戶名&#125;"
+                             class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm">
+                      <p class="text-xs text-slate-500 mt-1">可用變量: {{ '{' }}客戶名{{ '}' }}</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                      <div>
+                        <label class="text-sm text-slate-400 block mb-1.5">最大同時協作數</label>
+                        <input type="number" [(ngModel)]="maxConcurrent" min="1" max="20"
+                               class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm">
+                      </div>
+                      <div>
+                        <label class="text-sm text-slate-400 block mb-1.5">自動關閉天數</label>
+                        <input type="number" [(ngModel)]="autoCloseDays" min="1" max="30"
+                               class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm">
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 觸發條件 -->
+                  <div class="space-y-4">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">觸發條件</div>
+                    <div class="grid grid-cols-2 gap-4">
+                      <div>
+                        <label class="text-sm text-slate-400 block mb-1.5">意向評分閾值</label>
+                        <div class="flex items-center gap-2">
+                          <input type="range" [(ngModel)]="intentThreshold" min="50" max="100" step="5" class="flex-1">
+                          <span class="text-white text-sm w-10 text-right">{{ intentThreshold }}%</span>
                         </div>
-                        <div>
-                          <div class="font-medium text-white">{{ role.name }}</div>
-                          <div class="text-sm text-slate-400">{{ role.personality.description }}</div>
-                          <div class="flex items-center gap-2 mt-1">
-                            @if (role.boundAccountPhone) {
-                              <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-full">
-                                綁定: {{ role.boundAccountPhone }}
-                              </span>
-                            } @else {
-                              <span class="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded-full">
-                                未綁定帳號
-                              </span>
-                            }
-                            <span class="px-2 py-0.5 bg-slate-600 text-slate-300 text-xs rounded">
-                              {{ getRoleStyleLabel(role.personality.speakingStyle) }}
-                            </span>
+                      </div>
+                      <div>
+                        <label class="text-sm text-slate-400 block mb-1.5">最少對話輪數</label>
+                        <input type="number" [(ngModel)]="minRounds" min="1" max="20"
+                               class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm">
+                      </div>
+                    </div>
+                    <label class="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg cursor-pointer">
+                      <div>
+                        <div class="text-sm text-white">需要詢問過價格</div>
+                        <div class="text-xs text-slate-400">只有詢問過價格的客戶才觸發</div>
+                      </div>
+                      <input type="checkbox" [(ngModel)]="requirePriceInquiry"
+                             class="w-5 h-5 rounded text-purple-500 bg-slate-700 border-slate-600">
+                    </label>
+                  </div>
+
+                  <!-- AI 設置 -->
+                  <div class="space-y-3">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">AI 設置</div>
+                    <label class="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg cursor-pointer">
+                      <div>
+                        <div class="text-sm text-white">使用 AI 中心配置</div>
+                        <div class="text-xs text-slate-400">從智能引擎獲取模型配置</div>
+                      </div>
+                      <input type="checkbox" [(ngModel)]="useAICenter"
+                             class="w-5 h-5 rounded text-purple-500 bg-slate-700 border-slate-600">
+                    </label>
+                    <div>
+                      <label class="text-sm text-slate-400 block mb-1.5">協作模式</label>
+                      <div class="flex gap-2">
+                        <button (click)="coordinationMode = 'sequential'"
+                                class="flex-1 py-2 px-4 rounded-lg text-sm transition-colors"
+                                [class.bg-purple-500]="coordinationMode === 'sequential'"
+                                [class.text-white]="coordinationMode === 'sequential'"
+                                [class.bg-slate-700]="coordinationMode !== 'sequential'"
+                                [class.text-slate-300]="coordinationMode !== 'sequential'">
+                          順序執行
+                        </button>
+                        <button (click)="coordinationMode = 'responsive'"
+                                class="flex-1 py-2 px-4 rounded-lg text-sm transition-colors"
+                                [class.bg-purple-500]="coordinationMode === 'responsive'"
+                                [class.text-white]="coordinationMode === 'responsive'"
+                                [class.bg-slate-700]="coordinationMode !== 'responsive'"
+                                [class.text-slate-300]="coordinationMode !== 'responsive'">
+                          響應式
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button (click)="saveSettings()"
+                          class="w-full py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition-opacity font-medium text-sm">
+                    保存設置
+                  </button>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- ═══════════════════════════════════════════
+               Tab 2: 角色管理 (roles)
+               - 子標籤: 我的角色 / 角色庫(50+)
+          ══════════════════════════════════════════════ -->
+          @case ('roles') {
+            <div class="space-y-4">
+              <!-- 子標籤切換 -->
+              <div class="flex gap-1 bg-slate-800/50 p-1 rounded-xl w-fit">
+                <button (click)="rolesSubTab.set('mine')"
+                        class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                        [class.bg-slate-700]="rolesSubTab() === 'mine'"
+                        [class.text-white]="rolesSubTab() === 'mine'"
+                        [class.text-slate-400]="rolesSubTab() !== 'mine'">
+                  🎭 我的角色
+                  @if (multiRoleService.roles().length > 0) {
+                    <span class="ml-1.5 px-1.5 py-0.5 bg-purple-500/30 text-purple-300 text-xs rounded-full">
+                      {{ multiRoleService.roles().length }}
+                    </span>
+                  }
+                </button>
+                <button (click)="rolesSubTab.set('library')"
+                        class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                        [class.bg-slate-700]="rolesSubTab() === 'library'"
+                        [class.text-white]="rolesSubTab() === 'library'"
+                        [class.text-slate-400]="rolesSubTab() !== 'library'">
+                  📚 角色庫 (50+)
+                </button>
+              </div>
+
+              <!-- 我的角色 -->
+              @if (rolesSubTab() === 'mine') {
+                <div class="max-w-4xl space-y-5">
+                  <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
+                    <div class="flex items-center justify-between mb-6">
+                      <h3 class="font-semibold text-white flex items-center gap-2">
+                        <span>🎭</span> 我的角色定義
+                      </h3>
+                      <div class="flex gap-2">
+                        <button (click)="rolesSubTab.set('library')"
+                                class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600 transition-colors">
+                          從角色庫添加
+                        </button>
+                        <button (click)="showAddRole.set(true)"
+                                class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors">
+                          + 自定義角色
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="space-y-4">
+                      @for (role of multiRoleService.roles(); track role.id) {
+                        <div class="flex items-center justify-between p-4 bg-slate-700/50 rounded-xl hover:bg-slate-700 transition-colors">
+                          <div class="flex items-center gap-4">
+                            <div class="w-14 h-14 rounded-xl flex items-center justify-center text-3xl"
+                                 [class.bg-purple-500/20]="role.type === 'expert'"
+                                 [class.bg-emerald-500/20]="role.type === 'satisfied_customer'"
+                                 [class.bg-cyan-500/20]="role.type === 'support'"
+                                 [class.bg-orange-500/20]="role.type === 'manager'"
+                                 [class.bg-slate-600]="role.type === 'custom'">
+                              {{ getRoleIcon(role.type) }}
+                            </div>
+                            <div>
+                              <div class="font-medium text-white">{{ role.name }}</div>
+                              <div class="text-sm text-slate-400">{{ role.personality.description }}</div>
+                              <div class="flex items-center gap-2 mt-1">
+                                @if (role.boundAccountPhone) {
+                                  <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-full">
+                                    綁定: {{ role.boundAccountPhone }}
+                                  </span>
+                                } @else {
+                                  <span class="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded-full">
+                                    未綁定帳號
+                                  </span>
+                                }
+                                <span class="px-2 py-0.5 bg-slate-600 text-slate-300 text-xs rounded">
+                                  {{ getRoleStyleLabel(role.personality.speakingStyle) }}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="flex items-center gap-3">
+                            <button (click)="editRole(role)"
+                                    class="px-3 py-1.5 bg-slate-600 text-slate-300 rounded-lg text-sm hover:bg-slate-500">
+                              編輯
+                            </button>
+                            <button (click)="deleteRole(role)" class="text-slate-500 hover:text-red-400">
+                              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                              </svg>
+                            </button>
                           </div>
                         </div>
-                      </div>
-                      
-                      <div class="flex items-center gap-3">
-                        <button (click)="editRole(role)"
-                                class="px-3 py-1.5 bg-slate-600 text-slate-300 rounded-lg text-sm hover:bg-slate-500">
-                          編輯
-                        </button>
-                        <button (click)="deleteRole(role)"
-                                class="text-slate-500 hover:text-red-400">
-                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                          </svg>
-                        </button>
-                      </div>
+                      } @empty {
+                        <div class="text-center py-12 text-slate-400">
+                          <div class="text-5xl mb-4">🎭</div>
+                          <p class="text-lg mb-2">尚未定義角色</p>
+                          <p class="text-sm mb-6">從角色庫選擇預設角色，或自定義新角色</p>
+                          <div class="flex gap-3 justify-center">
+                            <button (click)="rolesSubTab.set('library')"
+                                    class="px-5 py-2.5 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors">
+                              📚 瀏覽角色庫
+                            </button>
+                            <button (click)="showAddRole.set(true)"
+                                    class="px-5 py-2.5 bg-purple-500 text-white rounded-lg hover:bg-purple-400 transition-colors">
+                              + 自定義角色
+                            </button>
+                          </div>
+                        </div>
+                      }
                     </div>
-                  } @empty {
-                    <div class="text-center py-12 text-slate-400">
-                      <div class="text-5xl mb-4">🎭</div>
-                      <p class="text-lg mb-2">尚未定義角色</p>
-                      <p class="text-sm mb-4">創建角色來組建多角色協作團隊</p>
-                      <button (click)="showAddRole.set(true)"
-                              class="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-400 transition-colors">
-                        + 創建第一個角色
-                      </button>
+                  </div>
+
+                  <!-- 快速添加預設角色類型 -->
+                  @if (multiRoleService.roles().length > 0) {
+                    <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
+                      <h4 class="text-sm font-medium text-white mb-4">快速添加預設角色類型</h4>
+                      <div class="grid grid-cols-3 gap-3">
+                        @for (type of roleTypes; track type.id) {
+                          <button (click)="quickAddRole(type.id)"
+                                  class="p-4 bg-slate-700/50 rounded-xl text-center hover:bg-slate-700 transition-colors">
+                            <div class="text-3xl mb-2">{{ type.icon }}</div>
+                            <div class="text-sm text-white font-medium">{{ type.label }}</div>
+                            <div class="text-xs text-slate-400 mt-1">{{ type.description }}</div>
+                          </button>
+                        }
+                      </div>
                     </div>
                   }
                 </div>
-              </div>
-              
-              <!-- 快速添加角色 -->
-              <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
-                <h4 class="text-sm font-medium text-white mb-4">快速添加預設角色</h4>
-                <div class="grid grid-cols-3 gap-3">
-                  @for (type of roleTypes; track type.id) {
-                    <button (click)="quickAddRole(type.id)"
-                            class="p-4 bg-slate-700/50 rounded-xl text-center hover:bg-slate-700 transition-colors">
-                      <div class="text-3xl mb-2">{{ type.icon }}</div>
-                      <div class="text-sm text-white font-medium">{{ type.label }}</div>
-                      <div class="text-xs text-slate-400 mt-1">{{ type.description }}</div>
-                    </button>
-                  }
-                </div>
-              </div>
+              }
+
+              <!-- 角色庫 (50+) -->
+              @if (rolesSubTab() === 'library') {
+                <app-role-library
+                  (roleAdded)="onPresetRoleAdded($event)"
+                  (roleEdit)="onPresetRoleEdit($event)">
+                </app-role-library>
+              }
             </div>
           }
-          
+
+          <!-- ═══════════════════════════════════════════
+               Tab 3: 劇本設計 (scripts)
+               - 子標籤: 我的劇本 / 場景模板
+          ══════════════════════════════════════════════ -->
           @case ('scripts') {
-            <!-- 劇本編排 -->
-            <div class="max-w-4xl mx-auto space-y-6">
-              <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
-                <div class="flex items-center justify-between mb-6">
-                  <h3 class="font-semibold text-white flex items-center gap-2">
-                    <span>📜</span> 協作劇本
-                  </h3>
-                  <button (click)="addScript()"
-                          class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors">
-                    + 新建劇本
-                  </button>
-                </div>
-                
-                <div class="space-y-4">
-                  @for (script of multiRoleService.scripts(); track script.id) {
-                    <div class="p-4 bg-slate-700/50 rounded-xl">
-                      <div class="flex items-center justify-between mb-3">
-                        <div>
-                          <div class="font-medium text-white">{{ script.name }}</div>
-                          <div class="text-sm text-slate-400">{{ script.description }}</div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                          <span class="px-2 py-1 bg-slate-600 text-slate-300 text-xs rounded">
-                            {{ script.stages.length }} 個階段
-                          </span>
-                          <button (click)="editScript(script)"
-                                  class="text-purple-400 hover:text-purple-300 text-sm">
-                            編輯
-                          </button>
-                          <button (click)="deleteScript(script)"
-                                  class="text-red-400 hover:text-red-300 text-sm">
-                            刪除
-                          </button>
-                        </div>
+            <div class="space-y-4">
+              <!-- 子標籤切換 -->
+              <div class="flex gap-1 bg-slate-800/50 p-1 rounded-xl w-fit">
+                <button (click)="scriptsSubTab.set('mine')"
+                        class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                        [class.bg-slate-700]="scriptsSubTab() === 'mine'"
+                        [class.text-white]="scriptsSubTab() === 'mine'"
+                        [class.text-slate-400]="scriptsSubTab() !== 'mine'">
+                  📜 我的劇本
+                  @if (multiRoleService.scripts().length > 0) {
+                    <span class="ml-1.5 px-1.5 py-0.5 bg-purple-500/30 text-purple-300 text-xs rounded-full">
+                      {{ multiRoleService.scripts().length }}
+                    </span>
+                  }
+                </button>
+                <button (click)="scriptsSubTab.set('presets')"
+                        class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                        [class.bg-slate-700]="scriptsSubTab() === 'presets'"
+                        [class.text-white]="scriptsSubTab() === 'presets'"
+                        [class.text-slate-400]="scriptsSubTab() !== 'presets'">
+                  🎬 場景模板
+                </button>
+              </div>
+
+              <!-- 我的劇本 -->
+              @if (scriptsSubTab() === 'mine') {
+                <div class="max-w-4xl space-y-5">
+                  <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
+                    <div class="flex items-center justify-between mb-6">
+                      <h3 class="font-semibold text-white flex items-center gap-2">
+                        <span>📜</span> 我的協作劇本
+                      </h3>
+                      <div class="flex gap-2">
+                        <button (click)="scriptsSubTab.set('presets')"
+                                class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600 transition-colors">
+                          從模板創建
+                        </button>
+                        <button (click)="addScript()"
+                                class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors">
+                          + 新建劇本
+                        </button>
                       </div>
-                      
-                      <!-- 劇本階段預覽 -->
-                      @if (script.stages.length > 0) {
-                        <div class="flex items-center gap-2 mt-3">
-                          @for (stage of script.stages; track stage.id; let i = $index) {
+                    </div>
+
+                    <div class="space-y-4">
+                      @for (script of multiRoleService.scripts(); track script.id) {
+                        <div class="p-4 bg-slate-700/50 rounded-xl">
+                          <div class="flex items-center justify-between mb-3">
+                            <div>
+                              <div class="font-medium text-white">{{ script.name }}</div>
+                              <div class="text-sm text-slate-400">{{ script.description }}</div>
+                            </div>
                             <div class="flex items-center gap-2">
-                              <div class="px-3 py-1.5 bg-slate-600/50 rounded-lg text-xs text-slate-300">
-                                {{ stage.name }}
-                              </div>
-                              @if (i < script.stages.length - 1) {
-                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                </svg>
+                              <span class="px-2 py-1 bg-slate-600 text-slate-300 text-xs rounded">
+                                {{ script.stages.length }} 個階段
+                              </span>
+                              <button (click)="editScript(script)" class="text-purple-400 hover:text-purple-300 text-sm">編輯</button>
+                              <button (click)="deleteScript(script)" class="text-red-400 hover:text-red-300 text-sm">刪除</button>
+                            </div>
+                          </div>
+                          @if (script.stages.length > 0) {
+                            <div class="flex items-center gap-2 mt-3 flex-wrap">
+                              @for (stage of script.stages; track stage.id; let i = $index) {
+                                <div class="flex items-center gap-1">
+                                  <div class="px-3 py-1.5 bg-slate-600/50 rounded-lg text-xs text-slate-300">{{ stage.name }}</div>
+                                  @if (i < script.stages.length - 1) {
+                                    <svg class="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                  }
+                                </div>
                               }
                             </div>
                           }
+                          <div class="flex items-center gap-4 mt-3 pt-3 border-t border-slate-600/50 text-xs text-slate-400">
+                            <span>使用 {{ script.stats.useCount }} 次</span>
+                            <span>成功率 {{ (script.stats.conversionRate * 100).toFixed(0) }}%</span>
+                            <span>平均 {{ script.stats.avgDuration }} 分鐘</span>
+                          </div>
+                        </div>
+                      } @empty {
+                        <div class="text-center py-10 text-slate-400">
+                          <div class="text-4xl mb-3">📜</div>
+                          <p class="text-base mb-2">尚未創建劇本</p>
+                          <p class="text-sm mb-5">劇本定義角色如何分步驟協作互動</p>
+                          <div class="flex gap-3 justify-center">
+                            <button (click)="scriptsSubTab.set('presets')"
+                                    class="px-5 py-2.5 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors">
+                              🎬 選場景模板
+                            </button>
+                            <button (click)="addScript()"
+                                    class="px-5 py-2.5 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors">
+                              + 空白創建
+                            </button>
+                          </div>
                         </div>
                       }
-                      
-                      <!-- 統計 -->
-                      <div class="flex items-center gap-4 mt-3 pt-3 border-t border-slate-600/50 text-xs text-slate-400">
-                        <span>使用 {{ script.stats.useCount }} 次</span>
-                        <span>成功率 {{ (script.stats.conversionRate * 100).toFixed(0) }}%</span>
-                        <span>平均 {{ script.stats.avgDuration }} 分鐘</span>
-                      </div>
                     </div>
-                  } @empty {
-                    <div class="text-center py-8 text-slate-400">
-                      <div class="text-4xl mb-2">📜</div>
-                      <p>尚未創建劇本</p>
-                      <button (click)="addScript()"
-                              class="mt-3 px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg">
-                        + 創建劇本
-                      </button>
+                  </div>
+
+                  <!-- 快速使用預設模板 -->
+                  @if (multiRoleService.scripts().length > 0) {
+                    <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
+                      <h4 class="text-sm font-medium text-white mb-4">快速使用預設模板</h4>
+                      <div class="grid grid-cols-2 gap-3">
+                        <button (click)="useTemplate('high_intent')"
+                                class="p-4 bg-slate-700/50 rounded-xl text-left hover:bg-slate-700 transition-colors">
+                          <div class="flex items-center gap-3 mb-1.5">
+                            <span class="text-2xl">🎯</span>
+                            <span class="font-medium text-white text-sm">高意向客戶轉化</span>
+                          </div>
+                          <p class="text-xs text-slate-400">專家介紹 + 老客戶背書 + 客服促單</p>
+                        </button>
+                        <button (click)="useTemplate('product_demo')"
+                                class="p-4 bg-slate-700/50 rounded-xl text-left hover:bg-slate-700 transition-colors">
+                          <div class="flex items-center gap-3 mb-1.5">
+                            <span class="text-2xl">📦</span>
+                            <span class="font-medium text-white text-sm">產品演示推薦</span>
+                          </div>
+                          <p class="text-xs text-slate-400">功能展示 + 使用場景 + 效果分享</p>
+                        </button>
+                      </div>
                     </div>
                   }
                 </div>
-              </div>
-              
-              <!-- 預設劇本模板 -->
-              <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
-                <h4 class="text-sm font-medium text-white mb-4">使用預設模板</h4>
-                <div class="grid grid-cols-2 gap-4">
-                  <button (click)="useTemplate('high_intent')"
-                          class="p-4 bg-slate-700/50 rounded-xl text-left hover:bg-slate-700 transition-colors">
-                    <div class="flex items-center gap-3 mb-2">
-                      <span class="text-2xl">🎯</span>
-                      <span class="font-medium text-white">高意向客戶轉化</span>
+              }
+
+              <!-- 場景模板 -->
+              @if (scriptsSubTab() === 'presets') {
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <span>🎬</span> 場景模板庫
+                      </h2>
+                      <p class="text-sm text-slate-400 mt-1">選擇預設場景，自動配置角色和劇本</p>
                     </div>
-                    <p class="text-sm text-slate-400">專家介紹 + 老客戶背書 + 客服促單</p>
-                  </button>
-                  <button (click)="useTemplate('product_demo')"
-                          class="p-4 bg-slate-700/50 rounded-xl text-left hover:bg-slate-700 transition-colors">
-                    <div class="flex items-center gap-3 mb-2">
-                      <span class="text-2xl">📦</span>
-                      <span class="font-medium text-white">產品演示推薦</span>
-                    </div>
-                    <p class="text-sm text-slate-400">功能展示 + 使用場景 + 效果分享</p>
-                  </button>
+                  </div>
+                  <app-scenario-selector
+                    (scenarioApplied)="onScenarioApplied($event)">
+                  </app-scenario-selector>
                 </div>
-              </div>
+              }
             </div>
           }
-          
-          @case ('groups') {
-            <!-- 協作群組 -->
-            <div class="max-w-4xl mx-auto space-y-6">
-              <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
-                <div class="flex items-center justify-between mb-6">
-                  <h3 class="font-semibold text-white flex items-center gap-2">
-                    <span>🏠</span> 協作群組
-                  </h3>
-                  <button class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors">
-                    + 手動創建
-                  </button>
+
+          <!-- ═══════════════════════════════════════════
+               Tab 4: 協作任務 (tasks)
+               - 進行中 / 已完成協作群組
+               - 啟動新協作的入口
+          ══════════════════════════════════════════════ -->
+          @case ('tasks') {
+            <div class="max-w-4xl mx-auto space-y-5">
+              <!-- 操作列 -->
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-slate-400">協作任務</span>
+                  @if (multiRoleService.activeGroupCount() > 0) {
+                    <span class="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded-full">
+                      {{ multiRoleService.activeGroupCount() }} 個進行中
+                    </span>
+                  }
                 </div>
-                
-                @if (multiRoleService.roles().length === 0) {
-                  <div class="text-center py-12 text-slate-400">
-                    <div class="text-5xl mb-4">🏠</div>
-                    <p class="text-lg mb-2">暫無協作群組</p>
-                    <p class="text-sm mb-4">當觸發多角色協作時，系統會自動建立協作群組</p>
-                    <p class="text-xs text-slate-500">💡 提示：先在「我的角色」中添加角色並綁定帳號</p>
-                  </div>
-                } @else {
-                  <div class="text-center py-12 text-slate-400">
-                    <div class="text-5xl mb-4">🏠</div>
-                    <p class="text-lg mb-2">暫無協作群組</p>
-                    <p class="text-sm mb-4">您已有 {{ multiRoleService.roles().length }} 個角色就緒</p>
-                    <button (click)="showCreateGroupDialog.set(true)"
-                            class="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-400 transition-colors">
-                      + 創建協作群組
-                    </button>
-                  </div>
-                }
+                <button (click)="openAIPlanner()"
+                        class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2">
+                  <span>🤖</span> AI 策劃新協作
+                </button>
               </div>
-            </div>
-          }
-          
-          @case ('workflow') {
-            <!-- 🆕 Phase2: 工作流配置 -->
-            <app-workflow-config></app-workflow-config>
-          }
-          
-          @case ('monitor') {
-            <!-- 🆕 Phase2: 執行監控 -->
-            <app-workflow-monitor></app-workflow-monitor>
-          }
-          
-          @case ('analytics') {
-            <!-- 🆕 Phase4: 數據分析 -->
-            <app-workflow-analytics></app-workflow-analytics>
-          }
-          
-          @case ('settings') {
-            <!-- 設置 -->
-            <div class="max-w-3xl mx-auto space-y-6">
-              <!-- 自動建群設置 -->
-              <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
-                <h3 class="font-semibold text-white mb-6 flex items-center gap-2">
-                  <span>⚙️</span> 自動建群設置
-                </h3>
-                
-                <div class="space-y-4">
-                  <div>
-                    <label class="text-sm text-slate-400 block mb-2">群名模板</label>
-                    <input type="text" 
-                           [(ngModel)]="autoGroupNameTemplate"
-                           placeholder="VIP專屬服務群 - &#123;客戶名&#125;"
-                           class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500">
-                    <p class="text-xs text-slate-500 mt-1">可用變量: {{ '{' }}客戶名{{ '}' }}</p>
-                  </div>
-                  
-                  <div>
-                    <label class="text-sm text-slate-400 block mb-2">邀請話術</label>
-                    <textarea rows="3"
-                              [(ngModel)]="inviteMessage"
-                              placeholder="為了更好地服務您..."
-                              class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 resize-none">
-                    </textarea>
-                  </div>
-                  
-                  <div class="grid grid-cols-2 gap-4">
-                    <div>
-                      <label class="text-sm text-slate-400 block mb-2">最大同時協作數</label>
-                      <input type="number" 
-                             [(ngModel)]="maxConcurrent"
-                             min="1" max="20"
-                             class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white">
-                    </div>
-                    <div>
-                      <label class="text-sm text-slate-400 block mb-2">自動關閉天數</label>
-                      <input type="number"
-                             [(ngModel)]="autoCloseDays"
-                             min="1" max="30"
-                             class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white">
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- 觸發條件 -->
-              <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
-                <h3 class="font-semibold text-white mb-6 flex items-center gap-2">
-                  <span>🎯</span> 默認觸發條件
-                </h3>
-                
-                <div class="space-y-4">
-                  <div class="grid grid-cols-2 gap-4">
-                    <div>
-                      <label class="text-sm text-slate-400 block mb-2">意向評分閾值</label>
-                      <div class="flex items-center gap-2">
-                        <input type="range" 
-                               [(ngModel)]="intentThreshold"
-                               min="50" max="100" step="5"
-                               class="flex-1">
-                        <span class="text-white w-12 text-right">{{ intentThreshold }}%</span>
+
+              <!-- 就緒檢查（若未配置角色/劇本） -->
+              @if (multiRoleService.roles().length === 0 || multiRoleService.availableRoles().length === 0) {
+                <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-5">
+                  <div class="flex items-start gap-3">
+                    <span class="text-2xl">⚠️</span>
+                    <div class="flex-1">
+                      <div class="font-medium text-yellow-400 mb-1">啟動協作前需完成配置</div>
+                      <div class="text-sm text-slate-400 mb-3">
+                        @if (multiRoleService.roles().length === 0) {
+                          <span>尚未添加任何角色。</span>
+                        } @else {
+                          <span>已有 {{ multiRoleService.roles().length }} 個角色，但沒有綁定帳號的就緒角色。</span>
+                        }
+                      </div>
+                      <div class="flex gap-2">
+                        <button (click)="activeTab.set('roles'); rolesSubTab.set('mine')"
+                                class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg text-sm hover:bg-purple-500/30 transition-colors">
+                          🎭 配置角色
+                        </button>
+                        @if (multiRoleService.roles().length > 0) {
+                          <button (click)="goTo('monitoring-accounts')"
+                                  class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600 transition-colors">
+                            📱 管理帳號綁定
+                          </button>
+                        }
                       </div>
                     </div>
-                    <div>
-                      <label class="text-sm text-slate-400 block mb-2">最少對話輪數</label>
-                      <input type="number"
-                             [(ngModel)]="minRounds"
-                             min="1" max="20"
-                             class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white">
-                    </div>
                   </div>
-                  
-                  <label class="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg cursor-pointer">
-                    <div>
-                      <div class="text-white">需要詢問過價格</div>
-                      <div class="text-xs text-slate-400">只有詢問過價格的客戶才觸發</div>
-                    </div>
-                    <input type="checkbox"
-                           [(ngModel)]="requirePriceInquiry"
-                           class="w-5 h-5 rounded text-purple-500 bg-slate-700 border-slate-600">
-                  </label>
                 </div>
-              </div>
-              
-              <!-- AI 設置 -->
+              }
+
+              <!-- 協作任務列表 -->
               <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
-                <h3 class="font-semibold text-white mb-6 flex items-center gap-2">
-                  <span>🤖</span> AI 設置
-                </h3>
-                
-                <label class="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg cursor-pointer mb-4">
-                  <div>
-                    <div class="text-white">使用 AI 中心配置</div>
-                    <div class="text-xs text-slate-400">從 AI 中心獲取模型和知識庫配置</div>
-                  </div>
-                  <input type="checkbox"
-                         [(ngModel)]="useAICenter"
-                         class="w-5 h-5 rounded text-purple-500 bg-slate-700 border-slate-600">
-                </label>
-                
-                <div>
-                  <label class="text-sm text-slate-400 block mb-2">協作模式</label>
-                  <div class="flex gap-2">
-                    <button (click)="coordinationMode = 'sequential'"
-                            class="flex-1 py-2 px-4 rounded-lg text-sm transition-colors"
-                            [class.bg-purple-500]="coordinationMode === 'sequential'"
-                            [class.text-white]="coordinationMode === 'sequential'"
-                            [class.bg-slate-700]="coordinationMode !== 'sequential'"
-                            [class.text-slate-300]="coordinationMode !== 'sequential'">
-                      順序執行
+                <div class="text-center py-12 text-slate-400">
+                  <div class="text-6xl mb-4">🤝</div>
+                  <p class="text-lg mb-2">暫無進行中的協作任務</p>
+                  <p class="text-sm mb-6 text-slate-500">
+                    @if (multiRoleService.availableRoles().length > 0 && multiRoleService.scripts().length > 0) {
+                      您已就緒！點擊「AI 策劃新協作」開始
+                    } @else {
+                      完成角色和劇本配置後，即可啟動多角色協作
+                    }
+                  </p>
+                  @if (multiRoleService.availableRoles().length > 0) {
+                    <button (click)="openAIPlanner()"
+                            class="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition-opacity">
+                      🤖 AI 智能策劃協作
                     </button>
-                    <button (click)="coordinationMode = 'responsive'"
-                            class="flex-1 py-2 px-4 rounded-lg text-sm transition-colors"
-                            [class.bg-purple-500]="coordinationMode === 'responsive'"
-                            [class.text-white]="coordinationMode === 'responsive'"
-                            [class.bg-slate-700]="coordinationMode !== 'responsive'"
-                            [class.text-slate-300]="coordinationMode !== 'responsive'">
-                      響應式
-                    </button>
-                  </div>
+                  }
                 </div>
               </div>
-              
-              <!-- 保存按鈕 -->
-              <button (click)="saveSettings()"
-                      class="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition-opacity font-medium">
-                保存設置
-              </button>
             </div>
           }
         }
@@ -1818,7 +2013,10 @@ export class MultiRoleCenterComponent implements OnInit, OnDestroy {
   private ipc = inject(ElectronIpcService);
   private ipcCleanup: (() => void)[] = [];
   
-  activeTab = signal<MultiRoleTab>('dashboard');
+  activeTab = signal<MultiRoleTab>('overview');
+  rolesSubTab = signal<'mine' | 'library'>('mine');
+  scriptsSubTab = signal<'mine' | 'presets'>('mine');
+  showSettings = signal(false);
   showAddRole = signal(false);
   showCreateGroupDialog = signal(false);
   
@@ -1864,16 +2062,10 @@ export class MultiRoleCenterComponent implements OnInit, OnDestroy {
   editingScript = signal<ScriptTemplate | null>(null);
   
   tabs = [
-    { id: 'dashboard' as const, icon: '📊', label: '監控中心' },
-    { id: 'library' as const, icon: '📚', label: '角色庫 (50+)' },
-    { id: 'roles' as const, icon: '🎭', label: '我的角色' },
-    { id: 'scenarios' as const, icon: '🎬', label: '場景模板' },
-    { id: 'scripts' as const, icon: '📜', label: '劇本編排' },
-    { id: 'groups' as const, icon: '🏠', label: '協作群組' },
-    { id: 'workflow' as const, icon: '🔄', label: '工作流' },
-    { id: 'monitor' as const, icon: '📈', label: '執行監控' },
-    { id: 'analytics' as const, icon: '📉', label: '數據分析' },
-    { id: 'settings' as const, icon: '⚙️', label: '設置' }
+    { id: 'overview' as const, icon: '🚀', label: '快速開始' },
+    { id: 'roles' as const, icon: '🎭', label: '角色管理' },
+    { id: 'scripts' as const, icon: '📜', label: '劇本設計' },
+    { id: 'tasks' as const, icon: '🤝', label: '協作任務' }
   ];
   
   roleTypes = Object.entries(ROLE_TYPE_META)
@@ -2188,6 +2380,13 @@ export class MultiRoleCenterComponent implements OnInit, OnDestroy {
   }
   
   // 預設角色和場景處理
+  /**
+   * 導航到主平台其他頁面
+   */
+  goTo(view: string): void {
+    window.dispatchEvent(new CustomEvent('changeView', { detail: view }));
+  }
+
   onPresetRoleAdded(role: RoleDefinition) {
     this.multiRoleService.addRole({
       name: role.name,
@@ -2196,8 +2395,9 @@ export class MultiRoleCenterComponent implements OnInit, OnDestroy {
       aiConfig: role.aiConfig,
       responsibilities: role.responsibilities
     });
-    // 切換到我的角色標籤查看
+    // 切換到「我的角色」子標籤查看
     this.activeTab.set('roles');
+    this.rolesSubTab.set('mine');
   }
   
   onPresetRoleEdit(preset: any) {
@@ -2221,7 +2421,6 @@ export class MultiRoleCenterComponent implements OnInit, OnDestroy {
   onScenarioApplied(scenario: PresetScenario) {
     // 1. 添加場景中的所有角色
     scenario.roles.forEach(roleConfig => {
-      // 查找預設角色
       const presetRoles = (window as any).PRESET_ROLES || [];
       const preset = presetRoles.find((r: any) => r.roleType === roleConfig.roleType);
       if (preset) {
@@ -2242,8 +2441,9 @@ export class MultiRoleCenterComponent implements OnInit, OnDestroy {
       scenario: scenario.type as any
     });
     
-    // 3. 切換到劇本編排標籤
+    // 3. 切換到「我的劇本」子標籤查看
     this.activeTab.set('scripts');
+    this.scriptsSubTab.set('mine');
   }
   
   // 群組操作

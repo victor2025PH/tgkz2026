@@ -572,23 +572,52 @@ type MultiRoleTab = 'overview' | 'roles' | 'scripts' | 'tasks';
                             <div>
                               <div class="font-medium text-white">{{ role.name }}</div>
                               <div class="text-sm text-slate-400">{{ role.personality.description }}</div>
-                              <div class="flex items-center gap-2 mt-1">
+                              <div class="flex items-center gap-2 mt-1 flex-wrap">
                                 @if (role.boundAccountPhone) {
-                                  <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-full">
-                                    綁定: {{ role.boundAccountPhone }}
+                                  <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-full flex items-center gap-1">
+                                    ✅ {{ role.boundAccountPhone }}
+                                    <button (click)="$event.stopPropagation(); unbindAccount(role.id)"
+                                            class="ml-0.5 text-emerald-500 hover:text-red-400 text-xs">×</button>
                                   </span>
                                 } @else {
-                                  <span class="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded-full">
-                                    未綁定帳號
-                                  </span>
+                                  <button (click)="$event.stopPropagation(); startBindRole(role.id)"
+                                          class="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded-full hover:bg-yellow-500/30 transition-colors flex items-center gap-1">
+                                    ⚠️ 未綁定帳號
+                                    <span class="text-yellow-300">→ 綁定</span>
+                                  </button>
                                 }
                                 <span class="px-2 py-0.5 bg-slate-600 text-slate-300 text-xs rounded">
                                   {{ getRoleStyleLabel(role.personality.speakingStyle) }}
                                 </span>
                               </div>
+
+                              <!-- 內聯帳號選擇器 -->
+                              @if (bindingRoleId() === role.id) {
+                                <div class="mt-2 p-3 bg-slate-600/50 rounded-lg border border-purple-500/30" (click)="$event.stopPropagation()">
+                                  <div class="text-xs text-slate-400 mb-2">選擇要綁定的帳號（僅顯示在線帳號）：</div>
+                                  @if (availableOnlineAccounts().length === 0) {
+                                    <div class="text-xs text-slate-500 py-2">無在線帳號可用。請先在帳號管理中登錄帳號。</div>
+                                  } @else {
+                                    <div class="space-y-1">
+                                      @for (acc of availableOnlineAccounts(); track acc.id) {
+                                        <button (click)="bindAccountToRole(role.id, acc.id, acc.phone || acc.username || String(acc.id))"
+                                                class="w-full flex items-center gap-2 px-3 py-2 bg-slate-700 rounded-lg text-left hover:bg-slate-600 transition-colors">
+                                          <span class="w-2 h-2 bg-emerald-400 rounded-full"></span>
+                                          <span class="text-sm text-white">{{ acc.phone || acc.username || acc.name }}</span>
+                                          <span class="text-xs text-slate-400 ml-auto">{{ acc.name || '' }}</span>
+                                        </button>
+                                      }
+                                    </div>
+                                  }
+                                  <button (click)="bindingRoleId.set(null)"
+                                          class="mt-2 w-full py-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors">
+                                    取消
+                                  </button>
+                                </div>
+                              }
                             </div>
                           </div>
-                          <div class="flex items-center gap-3">
+                          <div class="flex items-center gap-3 self-start">
                             <button (click)="editRole(role)"
                                     class="px-3 py-1.5 bg-slate-600 text-slate-300 rounded-lg text-sm hover:bg-slate-500">
                               編輯
@@ -807,24 +836,43 @@ type MultiRoleTab = 'overview' | 'roles' | 'scripts' | 'tasks';
           ══════════════════════════════════════════════ -->
           @case ('tasks') {
             <div class="max-w-4xl mx-auto space-y-5">
-              <!-- 操作列 -->
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm text-slate-400">協作任務</span>
-                  @if (multiRoleService.activeGroupCount() > 0) {
-                    <span class="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded-full">
-                      {{ multiRoleService.activeGroupCount() }} 個進行中
-                    </span>
+              <!-- 操作列 + 過濾器 -->
+              <div class="flex items-center justify-between flex-wrap gap-3">
+                <!-- 過濾標籤 -->
+                <div class="flex gap-1 bg-slate-800/50 p-1 rounded-xl">
+                  @for (f of [
+                    {id:'all',label:'全部'},
+                    {id:'active',label:'進行中'},
+                    {id:'completed',label:'已完成'},
+                    {id:'failed',label:'失敗/暫停'}
+                  ]; track f.id) {
+                    <button (click)="taskFilter.set(f.id)"
+                            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                            [class.bg-slate-700]="taskFilter() === f.id"
+                            [class.text-white]="taskFilter() === f.id"
+                            [class.text-slate-400]="taskFilter() !== f.id">
+                      {{ f.label }}
+                      @if (f.id === 'active' && multiRoleService.activeGroupCount() > 0) {
+                        <span class="ml-1 px-1.5 py-0.5 bg-emerald-500/30 text-emerald-300 text-xs rounded-full">{{ multiRoleService.activeGroupCount() }}</span>
+                      }
+                    </button>
                   }
                 </div>
-                <button (click)="openAIPlanner()"
-                        class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2">
-                  <span>🤖</span> AI 策劃新協作
-                </button>
+                <div class="flex items-center gap-2">
+                  <button (click)="multiRoleService.loadGroupsFromBackend()"
+                          class="px-3 py-2 bg-slate-700 text-slate-400 rounded-lg text-xs hover:bg-slate-600 transition-colors"
+                          [class.opacity-50]="multiRoleService.isLoadingGroups()">
+                    @if (multiRoleService.isLoadingGroups()) { ⟳ 加載中 } @else { ↻ 刷新 }
+                  </button>
+                  <button (click)="openAIPlanner()"
+                          class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2">
+                    <span>🤖</span> AI 策劃新協作
+                  </button>
+                </div>
               </div>
 
-              <!-- 就緒檢查（若未配置角色/劇本） -->
-              @if (multiRoleService.roles().length === 0 || multiRoleService.availableRoles().length === 0) {
+              <!-- 就緒警告（若未配置角色） -->
+              @if (multiRoleService.availableRoles().length === 0 && multiRoleService.allGroups().length === 0) {
                 <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-5">
                   <div class="flex items-start gap-3">
                     <span class="text-2xl">⚠️</span>
@@ -832,9 +880,9 @@ type MultiRoleTab = 'overview' | 'roles' | 'scripts' | 'tasks';
                       <div class="font-medium text-yellow-400 mb-1">啟動協作前需完成配置</div>
                       <div class="text-sm text-slate-400 mb-3">
                         @if (multiRoleService.roles().length === 0) {
-                          <span>尚未添加任何角色。</span>
+                          尚未添加任何角色，請先到「角色管理」配置角色並綁定帳號。
                         } @else {
-                          <span>已有 {{ multiRoleService.roles().length }} 個角色，但沒有綁定帳號的就緒角色。</span>
+                          已有 {{ multiRoleService.roles().length }} 個角色，但沒有綁定帳號的就緒角色。
                         }
                       </div>
                       <div class="flex gap-2">
@@ -842,38 +890,118 @@ type MultiRoleTab = 'overview' | 'roles' | 'scripts' | 'tasks';
                                 class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg text-sm hover:bg-purple-500/30 transition-colors">
                           🎭 配置角色
                         </button>
-                        @if (multiRoleService.roles().length > 0) {
-                          <button (click)="goTo('monitoring-accounts')"
-                                  class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600 transition-colors">
-                            📱 管理帳號綁定
-                          </button>
-                        }
                       </div>
                     </div>
                   </div>
                 </div>
               }
 
-              <!-- 協作任務列表 -->
-              <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
-                <div class="text-center py-12 text-slate-400">
-                  <div class="text-6xl mb-4">🤝</div>
-                  <p class="text-lg mb-2">暫無進行中的協作任務</p>
-                  <p class="text-sm mb-6 text-slate-500">
-                    @if (multiRoleService.availableRoles().length > 0 && multiRoleService.scripts().length > 0) {
-                      您已就緒！點擊「AI 策劃新協作」開始
-                    } @else {
-                      完成角色和劇本配置後，即可啟動多角色協作
-                    }
-                  </p>
-                  @if (multiRoleService.availableRoles().length > 0) {
-                    <button (click)="openAIPlanner()"
-                            class="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition-opacity">
-                      🤖 AI 智能策劃協作
-                    </button>
+              <!-- 任務列表 -->
+              @if (filteredTasks().length > 0) {
+                <div class="space-y-3">
+                  @for (task of filteredTasks(); track task.id) {
+                    <div class="bg-slate-800/60 rounded-xl border border-slate-700/50 p-4 hover:border-slate-600 transition-colors">
+                      <div class="flex items-start justify-between gap-3">
+                        <!-- 任務信息 -->
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-center gap-2 mb-2">
+                            <span class="text-base font-medium text-white truncate">{{ task.groupTitle }}</span>
+                            <span class="shrink-0 px-2 py-0.5 rounded-full text-xs font-medium"
+                                  [class]="getTaskStatusColor(task.status)">
+                              {{ getTaskStatusLabel(task.status) }}
+                            </span>
+                            @if (task.outcome) {
+                              <span class="shrink-0 text-xs text-slate-400">{{ getOutcomeLabel(task.outcome) }}</span>
+                            }
+                          </div>
+
+                          <!-- 目標客戶 + 劇本 -->
+                          <div class="flex flex-wrap items-center gap-3 text-xs text-slate-400 mb-2">
+                            @if (task.targetCustomer.firstName || task.targetCustomer.username) {
+                              <span class="flex items-center gap-1">
+                                👤 {{ task.targetCustomer.firstName || '@' + task.targetCustomer.username }}
+                                @if (task.targetCustomer.intentScore > 0) {
+                                  <span class="text-purple-400">(意向 {{ task.targetCustomer.intentScore }}%)</span>
+                                }
+                              </span>
+                            }
+                            <span>📜 {{ task.scriptName }}</span>
+                            @if (task.currentStageOrder !== undefined) {
+                              <span>第 {{ (task.currentStageOrder || 0) + 1 }} 階段</span>
+                            }
+                          </div>
+
+                          <!-- 參與角色 -->
+                          @if (task.participants.length > 0) {
+                            <div class="flex items-center gap-1.5 mb-2 flex-wrap">
+                              @for (p of task.participants.slice(0, 4); track p.roleId) {
+                                <span class="px-2 py-0.5 bg-slate-700 text-slate-300 text-xs rounded-full">
+                                  {{ p.roleName }}
+                                </span>
+                              }
+                              @if (task.participants.length > 4) {
+                                <span class="text-xs text-slate-500">+{{ task.participants.length - 4 }}</span>
+                              }
+                            </div>
+                          }
+
+                          <!-- 消息統計 + 時間 -->
+                          <div class="flex items-center gap-4 text-xs text-slate-500">
+                            <span>📤 發送 {{ task.messagesSent }}</span>
+                            <span>💬 客戶 {{ task.customerMessages }}</span>
+                            <span>🕐 {{ formatRelativeTime(task.createdAt) }}</span>
+                          </div>
+                        </div>
+
+                        <!-- 操作按鈕 -->
+                        <div class="flex flex-col gap-1.5 shrink-0">
+                          @if (task.status === 'running' || task.status === 'inviting') {
+                            <button (click)="togglePauseTask(task)"
+                                    class="px-3 py-1.5 bg-yellow-500/20 text-yellow-400 rounded-lg text-xs hover:bg-yellow-500/30 transition-colors">
+                              ⏸ 暫停
+                            </button>
+                          }
+                          @if (task.status === 'paused') {
+                            <button (click)="togglePauseTask(task)"
+                                    class="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-xs hover:bg-emerald-500/30 transition-colors">
+                              ▶ 繼續
+                            </button>
+                          }
+                          @if (task.status !== 'completed' && task.status !== 'failed') {
+                            <button (click)="stopTask(task.id)"
+                                    class="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-xs hover:bg-red-500/30 transition-colors">
+                              ■ 停止
+                            </button>
+                          }
+                        </div>
+                      </div>
+                    </div>
                   }
                 </div>
-              </div>
+              } @else {
+                <!-- 空狀態 -->
+                <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-10 text-center">
+                  <div class="text-5xl mb-4">🤝</div>
+                  @if (taskFilter() === 'all') {
+                    <p class="text-base text-slate-300 mb-2">尚無協作任務</p>
+                    <p class="text-sm text-slate-500 mb-6">
+                      @if (multiRoleService.availableRoles().length > 0) {
+                        角色已就緒！點擊「AI 策劃新協作」開始
+                      } @else {
+                        先在「角色管理」配置角色並綁定帳號
+                      }
+                    </p>
+                    @if (multiRoleService.availableRoles().length > 0) {
+                      <button (click)="openAIPlanner()"
+                              class="px-6 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition-opacity text-sm">
+                        🤖 AI 智能策劃協作
+                      </button>
+                    }
+                  } @else {
+                    <p class="text-sm text-slate-500">此分類暫無任務</p>
+                  }
+                </div>
+              }
             </div>
           }
         }
@@ -2019,6 +2147,25 @@ export class MultiRoleCenterComponent implements OnInit, OnDestroy {
   showSettings = signal(false);
   showAddRole = signal(false);
   showCreateGroupDialog = signal(false);
+
+  // 協作任務過濾
+  taskFilter = signal<'all' | 'active' | 'completed' | 'failed'>('all');
+  filteredTasks = computed(() => {
+    const groups = this.multiRoleService.allGroups();
+    const filter = this.taskFilter();
+    if (filter === 'active') return groups.filter(g => g.status === 'creating' || g.status === 'inviting' || g.status === 'running');
+    if (filter === 'completed') return groups.filter(g => g.status === 'completed');
+    if (filter === 'failed') return groups.filter(g => g.status === 'failed' || g.status === 'paused');
+    return groups;
+  });
+
+  // 角色帳號綁定（inline）
+  bindingRoleId = signal<string | null>(null);
+  availableOnlineAccounts = computed(() =>
+    this.accountService.accounts().filter((a: any) =>
+      String(a.status).toLowerCase() === 'online' || String(a.status).toLowerCase() === 'active'
+    )
+  );
   
   // 🆕 目標用戶選擇
   showTargetUserSelector = signal(false);
@@ -2219,6 +2366,9 @@ export class MultiRoleCenterComponent implements OnInit, OnDestroy {
     // 檢查是否有從發送控制台傳來的目標用戶
     this.checkIncomingTargetUsers();
     
+    // 從後端加載協作任務列表
+    this.multiRoleService.loadGroupsFromBackend();
+
     // 監聽 IPC 事件
     this.ipcCleanup.push(
       this.ipc.on('multi-role:open-ai-planner', (data: { targetUsers: TargetUser[] }) => {
@@ -2230,10 +2380,87 @@ export class MultiRoleCenterComponent implements OnInit, OnDestroy {
         }
       })
     );
+
+    // 監聽後端任務狀態更新
+    this.ipcCleanup.push(...this.multiRoleService.setupGroupIpcListeners());
   }
   
   ngOnDestroy(): void {
     this.ipcCleanup.forEach(cleanup => cleanup());
+  }
+
+  /**
+   * 角色帳號快速綁定
+   */
+  startBindRole(roleId: string): void {
+    this.bindingRoleId.set(roleId === this.bindingRoleId() ? null : roleId);
+  }
+
+  bindAccountToRole(roleId: string, accountId: number, accountPhone: string): void {
+    this.multiRoleService.bindAccountToRole(roleId, accountId, accountPhone);
+    this.bindingRoleId.set(null);
+    this.toast.success(`✅ 帳號 ${accountPhone} 已綁定到角色`);
+  }
+
+  unbindAccount(roleId: string): void {
+    this.multiRoleService.unbindAccountFromRole(roleId);
+    this.toast.info('已解除帳號綁定');
+  }
+
+  /** 任務狀態顯示文字 */
+  getTaskStatusLabel(status: string): string {
+    const map: Record<string, string> = {
+      creating: '建群中', inviting: '邀請中', running: '進行中',
+      paused: '已暫停', completed: '已完成', failed: '失敗'
+    };
+    return map[status] || status;
+  }
+
+  /** 任務狀態顏色 */
+  getTaskStatusColor(status: string): string {
+    const map: Record<string, string> = {
+      creating: 'text-blue-400 bg-blue-500/20',
+      inviting: 'text-cyan-400 bg-cyan-500/20',
+      running: 'text-emerald-400 bg-emerald-500/20',
+      paused: 'text-yellow-400 bg-yellow-500/20',
+      completed: 'text-slate-400 bg-slate-600',
+      failed: 'text-red-400 bg-red-500/20'
+    };
+    return map[status] || 'text-slate-400 bg-slate-600';
+  }
+
+  /** 結果標籤 */
+  getOutcomeLabel(outcome?: string): string {
+    const map: Record<string, string> = {
+      converted: '✅ 已轉化', no_response: '😶 無回應',
+      rejected: '❌ 拒絕', pending: '⏳ 待定'
+    };
+    return outcome ? (map[outcome] || outcome) : '';
+  }
+
+  /** 格式化相對時間（幾分鐘前） */
+  formatRelativeTime(isoTime: string): string {
+    const diff = Date.now() - new Date(isoTime).getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return '剛剛';
+    if (minutes < 60) return `${minutes} 分鐘前`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} 小時前`;
+    return `${Math.floor(hours / 24)} 天前`;
+  }
+
+  /** 停止協作任務 */
+  stopTask(groupId: string): void {
+    if (confirm('確定要停止這個協作任務嗎？')) {
+      this.multiRoleService.updateGroupStatus(groupId, 'failed');
+      this.toast.info('協作任務已停止');
+    }
+  }
+
+  /** 暫停/恢復任務 */
+  togglePauseTask(group: any): void {
+    const newStatus = group.status === 'paused' ? 'running' : 'paused';
+    this.multiRoleService.updateGroupStatus(group.id, newStatus);
   }
   
   /**
@@ -3540,9 +3767,31 @@ ${goal}
       }
     });
     
-    // 4. 關閉對話框並切換到監控中心
+    // 4. 持久化任務記錄並切換到「協作任務」tab
+    const accounts = this.accountMatchResults();
+    const targetUsers = this.selectedTargetUsers();
+    if (result && (accounts.length > 0 || targetUsers.length > 0)) {
+      this.multiRoleService.addTaskRecord({
+        goal: this.aiPlannerGoal,
+        rolesUsed: accounts.map(a => ({
+          roleId: a.roleId,
+          roleName: a.roleName,
+          roleIcon: a.roleIcon,
+          accountId: a.accountId,
+          accountPhone: a.accountPhone
+        })),
+        targetUsers: targetUsers.map(u => ({
+          id: u.telegramId || u.id,
+          username: u.username,
+          firstName: u.firstName,
+          intentScore: u.intentScore
+        })),
+        scriptName: `AI策劃 - ${this.aiPlannerGoal.substring(0, 20)}`
+      });
+    }
+
     this.closeAIPlanner();
-    this.activeTab.set('dashboard');
+    this.activeTab.set('tasks');
     
     // 清空選擇
     this.selectedTargetUsers.set([]);
@@ -3851,10 +4100,34 @@ ${goal}
       
       this.groupCreationStatus.set('ready');
       this.toast.success(`🎉 群聊協作已啟動！群組: ${groupName}`);
+
+      // 持久化任務記錄
+      const groupAccounts = this.accountMatchResults();
+      const groupTargets = this.selectedTargetUsers();
+      const groupResult = this.aiPlanResult();
+      if (groupResult) {
+        this.multiRoleService.addTaskRecord({
+          goal: this.aiPlannerGoal,
+          rolesUsed: groupAccounts.map(a => ({
+            roleId: a.roleId,
+            roleName: a.roleName,
+            roleIcon: a.roleIcon,
+            accountId: a.accountId,
+            accountPhone: a.accountPhone
+          })),
+          targetUsers: groupTargets.map(u => ({
+            id: u.telegramId || u.id,
+            username: u.username,
+            firstName: u.firstName,
+            intentScore: u.intentScore
+          })),
+          scriptName: `群聊 - ${this.aiPlannerGoal.substring(0, 20)}`
+        });
+      }
       
-      // 關閉對話框並切換到監控中心
+      // 關閉對話框並切換到「協作任務」tab
       this.closeAIPlanner();
-      this.activeTab.set('dashboard');
+      this.activeTab.set('tasks');
       
       // 清空選擇
       this.selectedTargetUsers.set([]);

@@ -559,7 +559,13 @@ type MultiRoleTab = 'overview' | 'roles' | 'scripts' | 'tasks';
 
                     <div class="space-y-4">
                       @for (role of multiRoleService.roles(); track role.id) {
-                        <div class="flex items-center justify-between p-4 bg-slate-700/50 rounded-xl hover:bg-slate-700 transition-colors">
+                        <div class="flex items-center justify-between p-4 rounded-xl transition-colors"
+                             [class.bg-slate-700/50]="role.boundAccountPhone"
+                             [class.hover:bg-slate-700]="role.boundAccountPhone"
+                             [class.border-l-4]="!role.boundAccountPhone"
+                             [class.border-yellow-500/50]="!role.boundAccountPhone"
+                             [class.bg-yellow-500/5]="!role.boundAccountPhone"
+                             [class.hover:bg-yellow-500/10]="!role.boundAccountPhone">
                           <div class="flex items-center gap-4">
                             <div class="w-14 h-14 rounded-xl flex items-center justify-center text-3xl"
                                  [class.bg-purple-500/20]="role.type === 'expert'"
@@ -580,11 +586,14 @@ type MultiRoleTab = 'overview' | 'roles' | 'scripts' | 'tasks';
                                             class="ml-0.5 text-emerald-500 hover:text-red-400 text-xs">×</button>
                                   </span>
                                 } @else {
-                                  <button (click)="$event.stopPropagation(); startBindRole(role.id)"
-                                          class="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded-full hover:bg-yellow-500/30 transition-colors flex items-center gap-1">
-                                    ⚠️ 未綁定帳號
-                                    <span class="text-yellow-300">→ 綁定</span>
-                                  </button>
+                                  <div class="flex flex-col gap-1">
+                                    <button (click)="$event.stopPropagation(); startBindRole(role.id)"
+                                            class="w-fit px-3 py-1.5 bg-yellow-500/20 text-yellow-400 text-sm rounded-lg hover:bg-yellow-500/30 transition-colors flex items-center gap-2 border border-yellow-500/30">
+                                      <span>🔗</span>
+                                      <span>點擊綁定帳號</span>
+                                    </button>
+                                    <span class="text-xs text-slate-500">綁定 Telegram 帳號後此角色方可參與協作</span>
+                                  </div>
                                 }
                                 <span class="px-2 py-0.5 bg-slate-600 text-slate-300 text-xs rounded">
                                   {{ getRoleStyleLabel(role.personality.speakingStyle) }}
@@ -2461,6 +2470,11 @@ export class MultiRoleCenterComponent implements OnInit, OnDestroy {
   togglePauseTask(group: any): void {
     const newStatus = group.status === 'paused' ? 'running' : 'paused';
     this.multiRoleService.updateGroupStatus(group.id, newStatus);
+    if (newStatus === 'paused') {
+      this.toast.info('已暫停該協作任務');
+    } else {
+      this.toast.success('已繼續該協作任務');
+    }
   }
   
   /**

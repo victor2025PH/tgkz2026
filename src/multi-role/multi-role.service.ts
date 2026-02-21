@@ -406,10 +406,11 @@ export class MultiRoleService {
   }
   
   updateGroupStatus(groupId: string, status: CollaborationGroup['status']) {
-    this._allGroups.update(groups => 
-      groups.map(g => g.id === groupId ? { ...g, status } : g)
+    const updatedAt = new Date().toISOString();
+    this._allGroups.update(groups =>
+      groups.map(g => g.id === groupId ? { ...g, status, ...(status === 'completed' || status === 'failed' ? { completedAt: updatedAt } : {}) } : g)
     );
-    this.ipc.send('collab-task-updated', { id: groupId, status });
+    this.ipc.send('collab-task-updated', { id: groupId, status, updatedAt });
   }
   
   completeGroup(groupId: string, outcome: CollaborationGroup['outcome']) {

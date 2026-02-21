@@ -783,12 +783,19 @@ async def _batch_send_worker(self, payload: Dict[str, Any]):
             'user_not_found': '用戶不存在',
             'user_blocked': '被封鎖',
             'invalid_id': '無效 ID',
+            'no_account': '無可用帳號',
             'cancelled': '已取消',
             'other': '其他錯誤'
         }
         for reason, count in failure_reasons.items():
             label = reason_labels.get(reason, reason)
-            reason_summary.append(f"{label}: {count}")
+            part = f"{label}: {count}"
+            # 對「其他錯誤」附上第一條具體錯誤，便於排查
+            if reason == 'other' and failed_targets:
+                first_err = next((t.get('error') for t in failed_targets if t.get('reason') == 'other'), None)
+                if first_err:
+                    part += f" — {str(first_err)[:120]}"
+            reason_summary.append(part)
         
         # 🔧 P0：區分確認送達 vs 不確定送達
         confirmed_count = success_count - uncertain_count

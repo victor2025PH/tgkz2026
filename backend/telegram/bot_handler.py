@@ -135,8 +135,9 @@ class TelegramBotHandler:
         self.bot_token = bot_token or os.environ.get('TELEGRAM_BOT_TOKEN', '')
         self.api_base = f"https://api.telegram.org/bot{self.bot_token}"
         
-        # 內部 API 地址（用於確認登入）
+        # 內部 API 地址（用於確認登入）。必須與生成 login token 的後端為同一實例/同一 DB，見 .cursorrules「登錄 Token 與掃碼後端統一規範」
         self.internal_api = os.environ.get('INTERNAL_API_URL', 'http://localhost:8000')
+        logger.info("[Bot] INTERNAL_API_URL=%s (login token 須由此後端生成)", self.internal_api)
         
         if not self.bot_token:
             logger.warning("TELEGRAM_BOT_TOKEN not configured")

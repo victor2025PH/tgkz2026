@@ -15,6 +15,7 @@ Phase 3 優化：
 1. 多語言支持（根據用戶語言設置）
 """
 
+import json
 import os
 import asyncio
 import logging
@@ -22,6 +23,9 @@ import aiohttp
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
+
+# 後端返回 HTML（如 502/504 錯誤頁）時向用戶顯示的錯誤文案
+SERVER_ERROR_USER_MESSAGE = '服务器内部错误'
 
 
 # ==================== 🆕 Phase 3: 多語言消息模板 ====================
@@ -36,9 +40,11 @@ BOT_MESSAGES = {
         'login_confirm_warning': '⚠️ 如果這不是您的操作，請忽略此消息',
         'login_confirm_btn': '✅ 確認登入',
         'login_cancel_btn': '❌ 取消',
-        'login_success': '✅ 登入成功！\n\n您已成功登入 TG-Matrix 後台。\n瀏覽器頁面將自動跳轉。',
+        'login_success': '✅ 登入成功！\n\n您已成功登入 TG-Matrix 後台，瀏覽器頁面將自動跳轉。\n\n👋 歡迎使用 TG 智控王！您可以使用：\n• 群組管理 — 多群統一管理與監控\n• AI 營銷 — 智能生成與投放內容\n• 任務自動化 — 定時與觸發規則',
         'login_failed': '❌ 登入失敗\n\n{error}\n\n請重新嘗試或聯繫客服。',
         'login_expired': '⏰ 登入請求已過期\n\n請返回網頁重新發起登入。',
+        'login_already_done': '您已登入，無需重複操作。',
+        'login_error_generic': '登錄請求無效或已使用，請返回網頁重新嘗試。',
         'login_cancelled': '❌ 已取消登入',
         'help_title': '📖 幫助信息',
         'help_commands': '🔹 /start - 開始使用\n🔹 /login - 獲取登入連結\n🔹 /help - 查看幫助',
@@ -53,9 +59,11 @@ BOT_MESSAGES = {
         'login_confirm_warning': '⚠️ 如果这不是您的操作，请忽略此消息',
         'login_confirm_btn': '✅ 确认登录',
         'login_cancel_btn': '❌ 取消',
-        'login_success': '✅ 登录成功！\n\n您已成功登录 TG-Matrix 后台。\n浏览器页面将自动跳转。',
+        'login_success': '✅ 登录成功！\n\n您已成功登录 TG-Matrix 后台，浏览器页面将自动跳转。\n\n👋 欢迎使用 TG 智控王！您可以使用：\n• 群组管理 — 多群统一管理与监控\n• AI 营销 — 智能生成与投放内容\n• 任务自动化 — 定时与触发规则',
         'login_failed': '❌ 登录失败\n\n{error}\n\n请重新尝试或联系客服。',
         'login_expired': '⏰ 登录请求已过期\n\n请返回网页重新发起登录。',
+        'login_already_done': '您已登录，无需重复操作。',
+        'login_error_generic': '登录请求无效或已使用，请返回网页重新尝试。',
         'login_cancelled': '❌ 已取消登录',
         'help_title': '📖 帮助信息',
         'help_commands': '🔹 /start - 开始使用\n🔹 /login - 获取登录链接\n🔹 /help - 查看帮助',
@@ -70,9 +78,11 @@ BOT_MESSAGES = {
         'login_confirm_warning': '⚠️ If this wasn\'t you, please ignore this message',
         'login_confirm_btn': '✅ Confirm Login',
         'login_cancel_btn': '❌ Cancel',
-        'login_success': '✅ Login Successful!\n\nYou have logged in to TG-Matrix dashboard.\nThe browser page will redirect automatically.',
+        'login_success': '✅ Login successful!\n\nYou have logged in to TG-Matrix. The browser page will redirect automatically.\n\n👋 Welcome to TG Smart Controller! You can use:\n• Group management — multi-group control and monitoring\n• AI marketing — smart content generation and delivery\n• Task automation — scheduling and trigger rules',
         'login_failed': '❌ Login Failed\n\n{error}\n\nPlease try again or contact support.',
         'login_expired': '⏰ Login Request Expired\n\nPlease go back to the website and try again.',
+        'login_already_done': 'You are already logged in. No need to try again.',
+        'login_error_generic': 'Login request invalid or already used. Please try again from the website.',
         'login_cancelled': '❌ Login Cancelled',
         'help_title': '📖 Help',
         'help_commands': '🔹 /start - Get started\n🔹 /login - Get login link\n🔹 /help - View help',
@@ -121,6 +131,23 @@ def get_message(key: str, user: Dict[str, Any] = None, **kwargs) -> str:
         return template.format(**kwargs)
     except (KeyError, ValueError):
         return template
+
+
+def _user_friendly_login_error(error: Optional[str], user: Dict[str, Any]) -> str:
+    """
+    將後端錯誤轉為用戶可理解的短句，不暴露技術用語。
+    方案：掃碼登錄後 Bot 提示詞優化
+    """
+    if not error or not error.strip():
+        return SERVER_ERROR_USER_MESSAGE
+    err = error.strip()
+    # 已確認 / 狀態無效: confirmed 等 → 已登入無需重複
+    if 'confirmed' in err.lower() and ('無效' in err or '无效' in err or 'invalid' in err.lower()):
+        return get_message('login_already_done', user)
+    # Token 狀態 / 技術錯誤 → 通用指引
+    if 'Token 狀態' in err or 'Token 状态' in err or ('token' in err.lower() and 'invalid' in err.lower()):
+        return get_message('login_error_generic', user)
+    return err
 
 
 class TelegramBotHandler:
@@ -216,15 +243,15 @@ class TelegramBotHandler:
         result = await self._confirm_login(token, user)
         
         if result['success']:
-            # 發送成功消息
+            # 發送成功消息（含歡迎與功能簡介）
             success_msg = get_message('login_success', user)
             await self._send_message(chat_id, success_msg)
             return "自動登入成功"
         else:
-            # 發送錯誤消息
-            error_msg = get_message('login_failed', user, error=result['message'])
+            friendly_error = _user_friendly_login_error(result.get('message', ''), user)
+            error_msg = get_message('login_failed', user, error=friendly_error)
             await self._send_message(chat_id, error_msg)
-            return f"自動登入失敗: {result['message']}"
+            return f"自動登入失敗: {friendly_error}"
     
     async def _check_and_auto_confirm(self, chat_id: int, user: Dict[str, Any]) -> Optional[str]:
         """
@@ -298,12 +325,11 @@ class TelegramBotHandler:
             await self._answer_callback(callback_id, result['message'])
             
             if result['success']:
-                # 🆕 多語言成功消息
                 success_msg = get_message('login_success', user)
                 await self._send_message(chat_id, success_msg)
             else:
-                # 🆕 多語言錯誤消息
-                error_msg = get_message('login_failed', user, error=result['message'])
+                friendly_error = _user_friendly_login_error(result.get('message', ''), user)
+                error_msg = get_message('login_failed', user, error=friendly_error)
                 await self._send_message(chat_id, error_msg)
             
             return result['message']
@@ -346,28 +372,44 @@ class TelegramBotHandler:
                     f"{self.internal_api}/api/v1/auth/login-token/{token}",
                     timeout=aiohttp.ClientTimeout(total=5)
                 ) as resp:
-                    result = await resp.json()
-                    
+                    text = await resp.text()
+                    try:
+                        result = json.loads(text) if text.strip() else {}
+                    except Exception as e:
+                        logger.error(
+                            "[Bot] GET login-token returned non-JSON, status=%s, body_prefix=%s",
+                            resp.status, (text[:150] + '...') if len(text) > 150 else text
+                        )
+                        error_msg = get_message('login_failed', user, error=SERVER_ERROR_USER_MESSAGE)
+                        await self._send_message(chat_id, error_msg)
+                        return "服務器內部錯誤"
+                    if resp.status >= 400:
+                        err = result.get('error', SERVER_ERROR_USER_MESSAGE)
+                        friendly_err = _user_friendly_login_error(err, user)
+                        error_msg = get_message('login_failed', user, error=friendly_err)
+                        await self._send_message(chat_id, error_msg)
+                        return friendly_err
                     if not result.get('success'):
                         logger.warning(f"[Bot] Token not found: {token[:8]}...")
                         error_msg = get_message('login_expired', user)
                         await self._send_message(chat_id, error_msg)
                         return "Token 不存在"
-                    
                     token_status = result.get('data', {}).get('status', '')
-                    
                     if token_status == 'expired':
                         logger.warning(f"[Bot] Token expired: {token[:8]}...")
                         error_msg = get_message('login_expired', user)
                         await self._send_message(chat_id, error_msg)
                         return "Token 已過期"
-                    
                     if token_status == 'confirmed':
                         logger.info(f"[Bot] Token already confirmed: {token[:8]}...")
                         success_msg = get_message('login_success', user)
                         await self._send_message(chat_id, success_msg)
                         return "已確認登入"
-                        
+        except asyncio.TimeoutError:
+            logger.error("[Bot] GET login-token timeout: %s", self.internal_api)
+            error_msg = get_message('login_failed', user, error=SERVER_ERROR_USER_MESSAGE)
+            await self._send_message(chat_id, error_msg)
+            return "服務器內部錯誤"
         except Exception as e:
             logger.error(f"[Bot] Token verification failed: {e}")
             # 驗證失敗不阻止流程，繼續顯示確認按鈕
@@ -448,22 +490,33 @@ class TelegramBotHandler:
                     },
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as resp:
-                    result = await resp.json()
+                    text = await resp.text()
+                    try:
+                        result = json.loads(text) if text.strip() else {}
+                    except Exception as e:
+                        logger.error(
+                            "[Bot] Confirm API returned non-JSON, status=%s, body_prefix=%s",
+                            resp.status, (text[:150] + '...') if len(text) > 150 else text
+                        )
+                        return {'success': False, 'message': SERVER_ERROR_USER_MESSAGE}
                     logger.info(f"[Bot] Confirm API response: {result}")
-                    
+                    if resp.status >= 400:
+                        err = result.get('error', SERVER_ERROR_USER_MESSAGE)
+                        return {'success': False, 'message': err}
                     if result.get('success'):
                         logger.info(f"[Bot] Login confirmed successfully for TG user {user.get('id')}")
                         return {'success': True, 'message': '登入成功！'}
-                    else:
-                        error_msg = result.get('error', '確認失敗')
-                        logger.warning(f"[Bot] Confirm failed: {error_msg}")
-                        return {'success': False, 'message': error_msg}
-        
+                    error_msg = result.get('error', '確認失敗')
+                    logger.warning(f"[Bot] Confirm failed: {error_msg}")
+                    return {'success': False, 'message': error_msg}
+        except asyncio.TimeoutError:
+            logger.error("[Bot] Confirm API timeout: %s", confirm_url)
+            return {'success': False, 'message': SERVER_ERROR_USER_MESSAGE}
         except Exception as e:
             logger.error(f"[Bot] Confirm login error: {e}")
             import traceback
             traceback.print_exc()
-            return {'success': False, 'message': f'系統錯誤: {str(e)}'}
+            return {'success': False, 'message': SERVER_ERROR_USER_MESSAGE}
     
     async def _send_welcome(self, chat_id: int, user: Dict[str, Any]) -> str:
         """發送歡迎消息"""

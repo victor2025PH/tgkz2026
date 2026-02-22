@@ -275,6 +275,36 @@ search_history.db
 
 ---
 
+## 🔴 登錄 Token 與掃碼後端統一規範（嚴格遵守）
+
+### 原則：只應有一個「生成並驗證 login token」的後端
+
+掃碼登錄流程：**網頁/客戶端** 請求 `POST /api/v1/auth/login-token` 在**該後端**生成 token 並寫入**該後端**的數據庫 → 用戶在 Telegram 掃碼 → **Bot** 調用 `INTERNAL_API_URL` 對應的後端查詢/確認 token。若 Bot 調用的後端與生成 token 的後端**不是同一個**（或不是同一份數據庫），會出現「Token 不存在」登錄失敗。
+
+### 三端與後端對齊規則
+
+| 端 | 建議行為 | 說明 |
+|----|----------|------|
+| **網頁端**（如 https://tgw.usdt2026.cc） | 不設置 api_server，用同源 | 登錄頁請求同源 API，token 寫在該服務器 DB；Bot 必須與該 API 同機同庫。 |
+| **本地開發**（npm run start + 掃碼） | 若需掃碼成功，將「使用服務器登錄」設為**生產地址**（如 https://tgw.usdt2026.cc）並保存 | 否則 token 在本地 8000 的 DB，服務器上的 Bot 查不到。 |
+| **安裝版（Electron）** | 同上，掃碼登錄時 api_server 應指向**與 Bot 同一後端**（通常為生產地址） | 與管理後台、網頁版共用同一套數據與 token 庫。 |
+
+### 後端與 Bot 部署要求
+
+1. **只部署一個對外提供登錄頁 + login-token API 的後端實例**（同一 `DATABASE_PATH`），避免多實例、多庫導致 token 不一致。
+2. **Telegram Bot 的 `INTERNAL_API_URL`** 必須指向**該同一後端**（或同機同庫的 API）：
+   - 生產：Bot 與 API 同機時設 `INTERNAL_API_URL=http://127.0.0.1:8000`（或該 API 的內網地址），且該 8000 進程即對外提供登錄的後端。
+   - 禁止：Bot 指向 A 機、登錄頁請求 B 機，或 Bot 與 API 使用不同 `DATABASE_PATH`。
+3. **環境變量**：該後端須配置 `TELEGRAM_BOT_USERNAME`、`TELEGRAM_BOT_TOKEN`（與 Bot 一致），以便生成正確的二維碼連結。
+
+### 代碼與配置要點
+
+- 前端：登錄/掃碼時 API 基地址由 `localStorage['api_server']` 或同源決定（`getApiBaseForFetch()`）。
+- 後端：Bot 在 `backend/telegram/bot_handler.py` 使用 `os.environ.get('INTERNAL_API_URL', 'http://localhost:8000')`；部署時必須在運行 Bot 的環境中設置 `INTERNAL_API_URL` 為上述「唯一後端」的地址。
+- 新增或修改登錄/掃碼相關邏輯時，不得引入「多個後端生成 token、Bot 只問其中一個」的配置，必須保持「一個後端 + 一個 DB + Bot 指向該後端」。
+
+---
+
 ## 測試建議
 修改功能後，簡述如何手動測試：
 1. 正常流程

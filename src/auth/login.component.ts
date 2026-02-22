@@ -299,6 +299,7 @@ import { getStoredApiServer, setStoredApiServer } from '../core/api-server';
             />
             <button type="button" class="api-server-save" (click)="saveApiServer()">保存</button>
             <p class="api-server-hint">設置後，登錄與會員數據將與該服務器同步，管理後台可統一管理會員等級。</p>
+            <p class="api-server-hint api-server-scan-hint">掃碼登錄時，此地址須與 Telegram Bot 使用的後端一致，否則會提示「Token 不存在」；本地開發/安裝版建議填生產地址（如 https://tgw.usdt2026.cc）。</p>
           </div>
         }
       </div>
@@ -737,6 +738,10 @@ import { getStoredApiServer, setStoredApiServer } from '../core/api-server';
       width: 100%;
       margin: 0.5rem 0 0;
       font-size: 0.75rem;
+      color: var(--text-secondary, #888);
+    }
+    .api-server-scan-hint {
+      margin-top: 0.25rem;
       color: var(--text-secondary, #888);
     }
     

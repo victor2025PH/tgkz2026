@@ -1412,20 +1412,63 @@ class BackendService(InitStartupMixin, SendQueueMixin, AiServiceMixin, ConfigExe
     
     _active_group_collabs: Dict[str, Dict[str, Any]] = {}
     
+    async def _run_until_shutdown(self):
+        """桌面版：stdin 關閉後保持進程運行，僅依賴 HTTP，直到 self.running 為 False（如 graceful-shutdown）。"""
+        print("[Backend] stdin closed, keeping process alive for HTTP API (desktop)", file=sys.stderr)
+        while self.running:
+            await asyncio.sleep(1)
+    
     async def run(self):
-        """Main event loop - read commands from stdin"""
+        """Main event loop - read commands from stdin. 桌面版同時啟動 HTTP API（與網頁版同一套流程）"""
         await self.initialize()
+        
+        # 桌面版：啟動與網頁版相同的 HTTP API（127.0.0.1:8000），登入/OAuth/性能等走同一套
+        try:
+            from api.http_server import HttpApiServer
+            _port = int(os.environ.get('PORT', 8000))
+            _http = HttpApiServer(backend_service=self, host='127.0.0.1', port=_port)
+            await _http.start()
+            self._http_server = _http
+            print(f"[Backend] HTTP API (desktop) running on http://127.0.0.1:{_port}", file=sys.stderr)
+            # 僅在 HTTP 就緒後發送「後端初始化完成」，Electron 據此顯示視窗，避免登入頁請求 8000 時 connection refused
+            self.send_log(f"✓ 後端初始化完成 (HTTP API 已就緒 :{_port})", "success")
+            # 本地開發：啟動 Telegram Bot getUpdates 輪詢，使掃碼登入無需公網 webhook
+            try:
+                from telegram.bot_handler import start_telegram_bot_polling_for_dev
+                start_telegram_bot_polling_for_dev()
+            except Exception as _e:
+                print(f"[Backend] Bot polling start skipped: {_e}", file=sys.stderr)
+        except Exception as e:
+            err_msg = str(e)
+            print(f"[Backend] HTTP API start skipped (desktop stdin-only): {err_msg}", file=sys.stderr)
+            if "aiohttp_cors" in err_msg or "No module named 'aiohttp_cors'" in err_msg:
+                print("[Backend] 請在後端目錄執行: pip install aiohttp-cors", file=sys.stderr)
+            self.send_log("✓ 後端初始化完成 (僅 stdin，HTTP 未啟動)", "success")
         
         try:
             while self.running:
                 # Read line from stdin (non-blocking)
-                line = await asyncio.get_event_loop().run_in_executor(
-                    None, sys.stdin.readline
-                )
+                try:
+                    line = await asyncio.get_event_loop().run_in_executor(
+                        None, sys.stdin.readline
+                    )
+                except (ValueError, OSError):
+                    # stdin closed or invalid (e.g. Electron spawn); exit loop unless HTTP is serving
+                    if not getattr(self, '_http_server', None):
+                        break
+                    # 桌面版：HTTP 已就緒時不因 stdin 關閉而退出，保持 8000 服務
+                    await self._run_until_shutdown()
+                    await self.shutdown()
+                    return
                 
                 if not line:
                     # EOF - stdin closed
-                    break
+                    if not getattr(self, '_http_server', None):
+                        break
+                    # 桌面版：HTTP 已就緒時保持進程運行，僅靠 HTTP 對外服務
+                    await self._run_until_shutdown()
+                    await self.shutdown()
+                    return
                 
                 line = line.strip()
                 if not line:
@@ -1438,8 +1481,10 @@ class BackendService(InitStartupMixin, SendQueueMixin, AiServiceMixin, ConfigExe
                     payload = command_data.get('payload', {})
                     request_id = command_data.get('request_id')  # Optional request ID for acknowledgment
                     
-                    # Handle command
-                    await self.handle_command(command, payload, request_id)
+                    # Handle command and send result back for invoke-style calls (e.g. auth-login)
+                    result = await self.handle_command(command, payload, request_id)
+                    if request_id is not None and result is not None:
+                        self.send_event("command-response", {"request_id": request_id, "result": result})
                 
                 except json.JSONDecodeError as e:
                     self.send_log(f"Invalid JSON received: {str(e)}", "error")

@@ -909,7 +909,8 @@ class InitStartupMixin:
 
         total_init_time = time.time() - init_start_time
         print(f"[Backend] ========== Initialization complete in {total_init_time:.3f}s ==========", file=sys.stderr)
-        self.send_log(f"✓ 後端初始化完成 ({total_init_time:.2f}s)", "success")
+        # 僅發送「核心初始化完成」；「後端初始化完成」改由 main.run() 在 HTTP API 啟動後發送，確保桌面版 8000 已就緒再顯示視窗
+        self.send_log(f"✓ 核心初始化完成 ({total_init_time:.2f}s)", "success")
         
         # 🆕 發送數據路徑信息到前端（便於調試）
         try:

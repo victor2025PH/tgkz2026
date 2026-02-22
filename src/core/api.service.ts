@@ -13,6 +13,7 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, Subject, BehaviorSubject, from, of, throwError } from 'rxjs';
 import { map, catchError, retry, shareReplay, tap, timeout } from 'rxjs/operators';
+import { getStoredApiServer, getWsUrlFromApiServer } from './api-server';
 
 // 環境配置
 export interface ApiConfig {
@@ -98,10 +99,19 @@ export class ApiService {
   }
   
   private getDefaultConfig(): ApiConfig {
-    // 優先從環境變量獲取
+    const stored = getStoredApiServer();
     const envMode = (window as any).__API_MODE__ || 'auto';
     const envBaseUrl = (window as any).__API_BASE_URL__;
-    
+    // 優先使用存儲的 API 服務器（與管理後台同一套數據）
+    if (stored) {
+      return {
+        mode: 'http',
+        baseUrl: stored.startsWith('http') ? stored : `https://${stored}`,
+        wsUrl: getWsUrlFromApiServer(stored) || this.detectWsUrl(),
+        timeout: 30000,
+        retries: 2
+      };
+    }
     if (envMode === 'http' || envBaseUrl) {
       return {
         mode: 'http',
@@ -111,7 +121,6 @@ export class ApiService {
         retries: 2
       };
     }
-    
     if (this.detectElectron()) {
       return {
         mode: 'ipc',
@@ -119,8 +128,6 @@ export class ApiService {
         retries: 2
       };
     }
-    
-    // Web 環境默認使用 HTTP
     return {
       mode: 'http',
       baseUrl: this.detectApiUrl(),
@@ -131,19 +138,24 @@ export class ApiService {
   }
   
   private detectApiUrl(): string {
-    // 開發環境
+    const stored = getStoredApiServer();
+    if (stored) return stored.startsWith('http') ? stored : `https://${stored}`;
     if (window.location.hostname === 'localhost' && window.location.port === '4200') {
       return 'http://localhost:8000';
     }
-    // 生產環境 - 同源
     return `${window.location.protocol}//${window.location.host}`;
   }
   
   private detectWsUrl(): string {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const stored = getStoredApiServer();
+    if (stored) {
+      const ws = getWsUrlFromApiServer(stored);
+      if (ws) return ws;
+    }
     if (window.location.hostname === 'localhost' && window.location.port === '4200') {
       return 'ws://localhost:8000/ws';
     }
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${protocol}//${window.location.host}/ws`;
   }
   

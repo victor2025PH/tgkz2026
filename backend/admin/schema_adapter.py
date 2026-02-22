@@ -76,19 +76,24 @@ class UserSchemaAdapter:
         return cls._instance
     
     def get_db_path(self) -> str:
-        """獲取數據庫路徑"""
+        """獲取數據庫路徑（與 auth 使用同一 DB，確保掃碼登錄用戶在後台可見）"""
+        # 優先使用與 auth/service 相同的 config.DATABASE_PATH
+        try:
+            from config import DATABASE_PATH
+            path = str(DATABASE_PATH)
+            if path and os.path.exists(path):
+                return path
+        except Exception:
+            pass
         possible_paths = [
             os.environ.get('DATABASE_PATH', ''),
             '/app/data/tgmatrix.db',
             './data/tgmatrix.db',
             '../data/tgmatrix.db',
         ]
-        
         for path in possible_paths:
             if path and os.path.exists(path):
                 return path
-        
-        # 默認路徑
         default = '/app/data/tgmatrix.db' if os.path.exists('/app/data') else './data/tgmatrix.db'
         os.makedirs(os.path.dirname(default), exist_ok=True)
         return default

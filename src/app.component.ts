@@ -2,7 +2,7 @@
 import { ChangeDetectionStrategy, Component, signal, WritableSignal, computed, inject, OnDestroy, effect, OnInit, ChangeDetectorRef, NgZone, HostListener, ViewChild } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { NavigationEnd, Router, RouterOutlet, RouterLink } from '@angular/router';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { VIEW_ROUTE_MAP } from './app.routes';
 import { filter } from 'rxjs/operators';
 // 路由動畫改用 CSS 過渡效果，不再使用 Angular animations
@@ -140,7 +140,7 @@ interface SuccessOverlayConfig {
   standalone: true,
   imports: [
     // 核心模組
-    CommonModule, FormsModule, RouterOutlet, RouterLink,
+    CommonModule, FormsModule, RouterOutlet,
     // 🔧 Phase7-1: 視圖組件已移除 — 全部透過 Router lazy-load
     // 通用組件（模板中使用）
     ToastComponent, GlobalConfirmDialogComponent, GlobalInputDialogComponent, ProgressDialogComponent,
@@ -2563,7 +2563,7 @@ export class AppComponent implements OnDestroy, OnInit {
     // Load saved AI settings from localStorage
     this.loadAiSettings();
     
-    // 🔧 P8-3: 初始化移動端偵測
+    // 🔧 P8-3: 初始化移動端偵測（Electron 下強制桌面布局以顯示側邊欄）
     this.initMobileDetection();
     
     // 🆕 加載保存的側邊欄分組狀態

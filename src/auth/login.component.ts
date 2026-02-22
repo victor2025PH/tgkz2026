@@ -17,6 +17,7 @@ import { AuthService } from '../core/auth.service';
 import { I18nService } from '../i18n.service';
 import { FrontendSecurityService } from '../services/security.service';
 import { ElectronIpcService } from '../electron-ipc.service';
+import { getStoredApiServer, setStoredApiServer } from '../core/api-server';
 
 @Component({
   selector: 'app-login',
@@ -173,7 +174,7 @@ import { ElectronIpcService } from '../electron-ipc.service';
           </button>
         </div>
         
-        <!-- QR Code 登入（默認） -->
+        <!-- QR Code 登入（默認）；桌面版與網頁版同一套流程，均走 HTTP API -->
         @if (loginMethod() === 'qrcode') {
           <div class="qr-login-panel">
             @if (qrCodeLoading()) {
@@ -203,6 +204,14 @@ import { ElectronIpcService } from '../electron-ipc.service';
                   <div class="verify-code-section">
                     <p class="verify-hint">掃碼無效？在 Bot 中輸入驗證碼：</p>
                     <div class="verify-code">{{ verifyCode() }}</div>
+                  </div>
+                }
+                <!-- 🆕 Bot 未配置或不存在時提示（掃碼會出現「該用戶似乎不存在」） -->
+                @if (qrBotError()) {
+                  <div class="qr-bot-warning">
+                    <span class="qr-bot-warning-icon">⚠️</span>
+                    <p class="qr-bot-warning-text">{{ qrBotError() }}</p>
+                    <p class="qr-bot-warning-hint">請在後端設置 <code>TELEGRAM_BOT_USERNAME</code> 與 <code>TELEGRAM_BOT_TOKEN</code>，並確保該 Bot 已在 Telegram 創建；或使用上方驗證碼在已打開的 Bot 中輸入登入。</p>
                   </div>
                 }
                 @if (!qrCodeExpired()) {
@@ -271,6 +280,25 @@ import { ElectronIpcService } from '../electron-ipc.service';
               }
             </button>
             <p class="widget-hint">{{ t('auth.widgetHint') }}</p>
+          </div>
+        }
+      </div>
+      
+      <!-- 使用服務器登錄（與管理後台同一套數據） -->
+      <div class="api-server-section">
+        <button type="button" class="api-server-toggle" (click)="showApiServer.set(!showApiServer())">
+          {{ showApiServer() ? '▼' : '▶' }} 使用服務器登錄（與管理後台同一套數據）
+        </button>
+        @if (showApiServer()) {
+          <div class="api-server-form">
+            <input
+              type="text"
+              [(ngModel)]="apiServerInput"
+              placeholder="https://tgw.usdt2026.cc"
+              class="api-server-input"
+            />
+            <button type="button" class="api-server-save" (click)="saveApiServer()">保存</button>
+            <p class="api-server-hint">設置後，登錄與會員數據將與該服務器同步，管理後台可統一管理會員等級。</p>
           </div>
         }
       </div>
@@ -663,6 +691,55 @@ import { ElectronIpcService } from '../electron-ipc.service';
       text-decoration: underline;
     }
     
+    .api-server-section {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border-color, #333);
+    }
+    .api-server-toggle {
+      background: none;
+      border: none;
+      color: var(--text-secondary, #888);
+      font-size: 0.8rem;
+      cursor: pointer;
+      padding: 0.25rem 0;
+    }
+    .api-server-toggle:hover {
+      color: var(--primary, #3b82f6);
+    }
+    .api-server-form {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .api-server-input {
+      flex: 1;
+      min-width: 180px;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border-color, #333);
+      border-radius: 6px;
+      background: var(--bg-secondary, #1a1a1a);
+      color: var(--text-primary, #fff);
+      font-size: 0.875rem;
+    }
+    .api-server-save {
+      padding: 0.5rem 1rem;
+      background: linear-gradient(135deg, #0088cc, #0066aa);
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .api-server-hint {
+      width: 100%;
+      margin: 0.5rem 0 0;
+      font-size: 0.75rem;
+      color: var(--text-secondary, #888);
+    }
+    
     /* 🆕 Phase 2: 登入方式選擇器 */
     .telegram-login-section {
       margin-top: 0.5rem;
@@ -716,6 +793,15 @@ import { ElectronIpcService } from '../electron-ipc.service';
       background: var(--bg-secondary, #1a1a1a);
       border-radius: 12px;
       border: 1px solid var(--border-color, #333);
+    }
+    
+    .desktop-login-hint {
+      margin: 0;
+      padding: 1rem 1.5rem;
+      color: var(--text-secondary, #888);
+      font-size: 0.9rem;
+      text-align: center;
+      max-width: 320px;
     }
     
     .qr-loading {
@@ -836,6 +922,19 @@ import { ElectronIpcService } from '../electron-ipc.service';
       font-size: 0.75rem;
       font-weight: 600;
     }
+
+    .qr-bot-warning {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: rgba(234, 179, 8, 0.15);
+      border: 1px solid rgba(234, 179, 8, 0.4);
+      border-radius: 8px;
+      text-align: left;
+    }
+    .qr-bot-warning-icon { margin-right: 0.5rem; }
+    .qr-bot-warning-text { font-size: 0.85rem; color: var(--text-muted, #eab308); margin: 0 0 0.5rem 0; }
+    .qr-bot-warning-hint { font-size: 0.75rem; color: var(--text-muted, #888); margin: 0; }
+    .qr-bot-warning code { font-size: 0.7em; background: rgba(0,0,0,0.2); padding: 0.1em 0.3em; border-radius: 4px; }
     
     .qr-countdown {
       display: flex;
@@ -1041,6 +1140,8 @@ export class LoginComponent implements OnInit, OnDestroy {
   qrCountdown = signal(300);
   wsConnected = signal(false);
   verifyCode = signal<string | null>(null);  // 🆕 6 位驗證碼
+  /** 後端校驗登入 Bot 失敗時的提示（掃碼會出現「該用戶似乎不存在」） */
+  qrBotError = signal<string | null>(null);
   private qrToken = '';
   private qrWebSocket: WebSocket | null = null;
   private qrCountdownInterval: any = null;
@@ -1049,6 +1150,8 @@ export class LoginComponent implements OnInit, OnDestroy {
   // 🆕 Phase 3: 登入成功動畫
   loginSuccess = signal(false);
   successUserName = signal('');
+  showApiServer = signal(false);
+  apiServerInput = '';
   
   // P1.5: 安全增強 - 登入限制
   isLocked = computed(() => this.security.isLocked());
@@ -1059,26 +1162,59 @@ export class LoginComponent implements OnInit, OnDestroy {
   private telegramBotUsername = '';
   private telegramBotId = '';  // 🆕 數字格式的 Bot ID
   private lockoutCleanup: (() => void) | null = null;
+  private qrAutoGenTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 桌面版：訂閱後端就緒，就緒後自動生成二維碼並清除連接錯誤 */
+  private unsubBackendStatus: (() => void) | null = null;
+  /** 生成二維碼時連接失敗的重試次數（僅 Electron，避免無限重試） */
+  private qrFetchRetryCount = 0;
+  
+  /** 是否為開發者模式：Electron + 從 localhost:4200 加載（後端 HTTP 會稍後就緒） */
+  private isDevMode(): boolean {
+    return this.isElectronEnv() && window.location.port === '4200' && window.location.hostname === 'localhost';
+  }
   
   ngOnInit() {
-    // 檢查登入限制狀態
+    this.apiServerInput = getStoredApiServer();
     this.checkLoginLimit();
-    
-    // 🆕 Phase 3: 優先使用保存的偏好
     const savedPreference = this.loadLoginPreference();
     
+    // 桌面版：訂閱後端就緒，收到 running: true 時清除連接錯誤並觸發一次二維碼生成
+    if (this.isElectronEnv()) {
+      this.unsubBackendStatus = this.ipcService.on('backend-status', (data: { running?: boolean; error?: string }) => {
+        if (data.running) {
+          if (this.error() && (this.error()!.includes('無法連接到後端') || this.error()!.includes('localhost:8000'))) {
+            this.error.set(null);
+          }
+          if (this.loginMethod() === 'qrcode' && !this.qrCodeUrl() && !this.qrCodeLoading()) {
+            if (this.qrAutoGenTimer) {
+              clearTimeout(this.qrAutoGenTimer);
+              this.qrAutoGenTimer = null;
+            }
+            this.generateQRCode();
+          }
+        }
+      });
+    }
+    
     if (savedPreference) {
-      // 使用用戶之前的選擇
       this.loginMethod.set(savedPreference);
       if (savedPreference === 'qrcode') {
-        this.generateQRCode();
+        if (!this.isElectronEnv()) {
+          this.generateQRCode();
+        } else if (this.isDevMode()) {
+          // 開發者模式：延遲 2.5 秒自動生成二維碼（等後端 HTTP 8000 就緒）；若先收到 backend-status 則會提前觸發
+          this.qrAutoGenTimer = setTimeout(() => this.generateQRCode(), 2500);
+        }
       }
     } else if (this.isMobileDevice()) {
-      // 移動端默認使用 Deep Link
       this.loginMethod.set('deeplink');
     } else {
-      // 桌面端自動生成 QR Code
-      this.generateQRCode();
+      this.loginMethod.set('qrcode');
+      if (!this.isElectronEnv()) {
+        this.generateQRCode();
+      } else if (this.isDevMode()) {
+        this.qrAutoGenTimer = setTimeout(() => this.generateQRCode(), 2500);
+      }
     }
   }
   
@@ -1090,11 +1226,14 @@ export class LoginComponent implements OnInit, OnDestroy {
   }
   
   ngOnDestroy() {
-    // 清理倒計時
+    if (this.qrAutoGenTimer) {
+      clearTimeout(this.qrAutoGenTimer);
+      this.qrAutoGenTimer = null;
+    }
+    this.unsubBackendStatus?.();
+    this.unsubBackendStatus = null;
     this.lockoutCleanup?.();
-    // 清理 Deep Link 輪詢
     this.cancelDeepLink();
-    // 清理 QR Code WebSocket
     this.cleanupQRCode();
   }
   
@@ -1313,9 +1452,9 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.deepLinkLoading.set(true);
     this.telegramLoading.set(true);
     
+    const apiBase = this.getApiBaseForFetch();
     try {
-      // 1. 調用 API 生成登入 Token
-      const response = await fetch('/api/v1/auth/login-token', {
+      const response = await fetch(`${apiBase}/api/v1/auth/login-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'deep_link' })
@@ -1374,9 +1513,8 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.deepLinkWebSocket.close();
     }
     
-    // 構建 WebSocket URL
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
+    const host = this.getWsHost();
     const wsUrl = `${protocol}//${host}/ws/login-token/${token}`;
     
     console.log('[DeepLink WS] Connecting to:', wsUrl);
@@ -1454,7 +1592,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       
       try {
         console.log('[DeepLink Poll] Checking status...');
-        const response = await fetch(`/api/v1/auth/login-token/${this.deepLinkToken}`);
+        const response = await fetch(`${this.getApiBaseForFetch()}/api/v1/auth/login-token/${this.deepLinkToken}`);
         const result = await this.parseJsonResponse(response);
         
         console.log('[DeepLink Poll] Response:', result);
@@ -1521,6 +1659,45 @@ export class LoginComponent implements OnInit, OnDestroy {
     }
   }
   
+  private isElectronEnv(): boolean {
+    try {
+      return !!(window as any).electronAPI || !!(window as any).electron ||
+        !!((window as any).require && (window as any).require('electron')?.ipcRenderer);
+    } catch { return false; }
+  }
+
+  /** 與管理後台同一套數據：優先 api_server，否則桌面/開發 8000，否則同源 */
+  private getApiBaseForFetch(): string {
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('api_server') : null;
+    if (stored) {
+      const url = stored.replace(/\/+$/, '');
+      return url.startsWith('http') ? url : `https://${url}`;
+    }
+    if (this.isElectronEnv()) return 'http://localhost:8000';
+    if (window.location.hostname === 'localhost' && window.location.port === '4200') return 'http://localhost:8000';
+    return '';
+  }
+
+  /** WebSocket host（與 getApiBaseForFetch 一致） */
+  private getWsHost(): string {
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('api_server') : null;
+    if (stored) {
+      try {
+        const u = new URL(stored.startsWith('http') ? stored : `https://${stored}`);
+        return u.host;
+      } catch { /* fallback */ }
+    }
+    if (this.isElectronEnv() || (window.location.hostname === 'localhost' && window.location.port === '4200')) return 'localhost:8000';
+    return window.location.host;
+  }
+
+  /** 保存 API 服務器地址（與管理後台同一套數據） */
+  saveApiServer(): void {
+    const url = setStoredApiServer(this.apiServerInput.trim());
+    this.apiServerInput = url;
+    this.showApiServer.set(false);
+  }
+
   /**
    * 生成 QR Code
    */
@@ -1528,10 +1705,11 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.qrCodeLoading.set(true);
     this.qrCodeExpired.set(false);
     this.error.set(null);
-    
+    this.qrBotError.set(null);
+    const apiBase = this.getApiBaseForFetch();
     try {
-      // 1. 調用 API 生成登入 Token
-      const response = await fetch('/api/v1/auth/login-token', {
+      // 1. 調用 API 生成登入 Token（桌面版與網頁版同一套，均走 HTTP 8000）
+      const response = await fetch(`${apiBase}/api/v1/auth/login-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'qr_code' })
@@ -1544,8 +1722,14 @@ export class LoginComponent implements OnInit, OnDestroy {
         return;
       }
       
-      const data = result.data as { token?: string; deep_link_url?: string; expires_in?: number; qr_image?: string; qr_fallback_url?: string; verify_code?: string };
-      const { token, deep_link_url, expires_in, qr_image, qr_fallback_url, verify_code } = data;
+      this.qrFetchRetryCount = 0; // 成功後重置重試計數
+      const data = result.data as {
+        token?: string; deep_link_url?: string; expires_in?: number;
+        qr_image?: string; qr_fallback_url?: string; verify_code?: string;
+        bot_valid?: boolean; bot_error?: string;
+      };
+      const { token, deep_link_url, expires_in, qr_image, qr_fallback_url, verify_code, bot_valid, bot_error } = data;
+      this.qrBotError.set(bot_valid === false && bot_error ? bot_error : null);
       this.qrToken = token || '';
       this.qrCountdown.set(expires_in ?? 300);
       
@@ -1567,7 +1751,21 @@ export class LoginComponent implements OnInit, OnDestroy {
       
     } catch (e: any) {
       console.error('[QRCode] Error:', e);
-      this.setErrorFromException(e, '生成二維碼失敗');
+      const msg = String((e?.message ?? e) ?? '');
+      const isConnectionRefused = /CONNECTION_REFUSED|Failed to fetch|network/i.test(msg);
+      if (isConnectionRefused && this.isElectronEnv() && this.qrFetchRetryCount < 1) {
+        this.qrFetchRetryCount++;
+        this.qrCodeLoading.set(false);
+        setTimeout(() => this.generateQRCode(), 1500);
+        return;
+      }
+      if (isConnectionRefused && this.isElectronEnv()) {
+        this.error.set(
+          '無法連接到後端 (localhost:8000)。請用 npm run start:dev 啟動開發模式，等待啟動畫面顯示「後端服務已就緒」後再點「生成二維碼」；若仍失敗請查看終端是否出現「HTTP API running on 127.0.0.1:8000」或報錯。也可先用上方帳號密碼登入。'
+        );
+      } else {
+        this.setErrorFromException(e, '生成二維碼失敗');
+      }
     } finally {
       this.qrCodeLoading.set(false);
     }
@@ -1631,7 +1829,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (this.qrPollInterval) {
       clearInterval(this.qrPollInterval);
     }
-    const base = window.location.origin;
+    const base = this.getApiBaseForFetch() || window.location.origin;
     const poll = async () => {
       if (this.qrCodeExpired()) return;
       try {
@@ -1694,9 +1892,8 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.qrWebSocket.close();
     }
     
-    // 構建 WebSocket URL
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
+    const host = this.getWsHost();
     const wsUrl = `${protocol}//${host}/ws/login-token/${token}`;
     
     console.log('[WebSocket] Connecting to:', wsUrl);

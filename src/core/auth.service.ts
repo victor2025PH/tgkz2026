@@ -13,6 +13,7 @@ import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ApiService } from './api.service';
 import { AuthEventsService, AUTH_STORAGE_KEYS } from './auth-events.service';
+import { environment } from '../environments/environment';
 
 // 用戶模型
 export interface User {
@@ -122,7 +123,8 @@ export class AuthService implements OnDestroy {
   
   // 公開的計算屬性
   readonly user = computed(() => this._user());
-  // 🔧 修復：只需要 Token 存在即可認為已認證（user 可以延遲加載）
+  // 🔧 修復：只需要 Token 存在即可認為已認證（user 可延遲加載）
+  // 安裝版（Electron）也需會員登入驗證，有 Token 才視為已認證
   readonly isAuthenticated = computed(() => !!this._accessToken());
   readonly isLoading = computed(() => this._isLoading());
   readonly accessToken = computed(() => this._accessToken());
@@ -244,36 +246,55 @@ export class AuthService implements OnDestroy {
   
   /**
    * 用戶登入
+   * 安裝版（Electron）走 IPC auth-login，與後端本地 auth 服務一致；Web 版走 HTTP API
    */
   async login(request: LoginRequest): Promise<{ success: boolean; error?: string }> {
     this._isLoading.set(true);
     
     try {
-      // 調用 HTTP API
-      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: request.email,
-          password: request.password,
-          device_name: request.device_name || this.getDeviceName(),
-          remember: request.remember || false // 🆕 傳遞記住登入選項
-        })
-      });
+      let result: { success?: boolean; data?: any; error?: string } | null = null;
+      const baseUrl = this.getApiBaseUrl();
+      const payload = {
+        email: request.email,
+        password: request.password,
+        device_name: request.device_name || this.getDeviceName(),
+        remember: request.remember ?? false
+      };
+
+      // 桌面版與網頁版同一套：優先走 HTTP API（localhost:8000），失敗時桌面版回退 IPC
+      try {
+        const response = await fetch(`${baseUrl}/api/v1/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        result = await this.parseJsonResponse(response);
+      } catch (httpErr: any) {
+        if (this.isElectronEnv()) {
+          const invoke = this.getIpcInvoke();
+          if (invoke) {
+            result = await invoke('auth-login', {
+              email: payload.email,
+              password: payload.password,
+              device_name: payload.device_name
+            });
+          }
+        }
+        if (!result) {
+          return { success: false, error: baseUrl ? '網絡錯誤，請稍後重試' : '無法連接後端，請確認應用已正常啟動' };
+        }
+      }
       
-      const result = await this.parseJsonResponse(response);
       if (!result) {
         return { success: false, error: '網絡錯誤，請稍後重試' };
       }
       
       if (result.success && result.data) {
-        // 🆕 保存記住狀態
         if (request.remember) {
           localStorage.setItem('tgm_remember_me', 'true');
         } else {
           localStorage.removeItem('tgm_remember_me');
         }
-        
         this.setAuthState(result.data);
         this.scheduleTokenRefresh();
         return { success: true };
@@ -291,6 +312,7 @@ export class AuthService implements OnDestroy {
   
   /**
    * 獲取 Telegram OAuth 配置
+   * 桌面版與網頁版同一套：均請求 getApiBaseUrl()（桌面版為 http://127.0.0.1:8000）
    */
   async getTelegramConfig(): Promise<{ enabled: boolean; bot_username?: string; bot_id?: string }> {
     try {
@@ -1302,13 +1324,39 @@ export class AuthService implements OnDestroy {
     }
   }
 
+  /** 與 ElectronIpcService 一致：安裝版通過 window.require('electron').ipcRenderer 判斷 */
+  private isElectronEnv(): boolean {
+    try {
+      return !!(window as any).electronAPI || !!(window as any).electron ||
+        !!((window as any).require && (window as any).require('electron')?.ipcRenderer);
+    } catch {
+      return false;
+    }
+  }
+
+  /** 安裝版 IPC invoke，用於 auth-login 等需返回值的調用 */
+  private getIpcInvoke(): ((channel: string, ...args: any[]) => Promise<any>) | null {
+    try {
+      const w = window as any;
+      if (w.electron?.ipcRenderer?.invoke) return w.electron.ipcRenderer.invoke.bind(w.electron.ipcRenderer);
+      if (w.require?.('electron')?.ipcRenderer?.invoke) return w.require('electron').ipcRenderer.invoke.bind(w.require('electron').ipcRenderer);
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   private getApiBaseUrl(): string {
-    // 開發環境
+    const stored = typeof localStorage !== 'undefined' && localStorage.getItem('api_server');
+    if (stored) {
+      const url = stored.replace(/\/+$/, '');
+      return url.startsWith('http') ? url : `https://${url}`;
+    }
+    if (this.isElectronEnv()) return 'http://localhost:8000';
     if (window.location.hostname === 'localhost' && window.location.port === '4200') {
       return 'http://localhost:8000';
     }
-    // 生產環境
-    return '';
+    return environment?.apiBaseUrl ?? '';
   }
   
   private getDeviceName(): string {

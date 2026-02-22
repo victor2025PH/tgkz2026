@@ -96,9 +96,22 @@ export interface PaginatedResult<T> {
 
 // ==================== 服務實現 ====================
 
+function getAdminApiBase(): string {
+  try {
+    const v = localStorage.getItem('api_server');
+    if (v) {
+      const u = v.replace(/\/+$/, '');
+      return u.startsWith('http') ? u : `https://${u}`;
+    }
+  } catch {}
+  return environment.apiBaseUrl || '';
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminService {
-  private apiUrl = environment.apiBaseUrl || '';
+  private get apiUrl(): string {
+    return getAdminApiBase();
+  }
   
   // 狀態
   private _dashboardStats = signal<DashboardStats | null>(null);

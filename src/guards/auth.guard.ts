@@ -137,11 +137,14 @@ export const membershipGuard: CanActivateFn = (
   const toastService = inject(ToastService);
   const router = inject(Router);
   const authService = inject(AuthService);
+  const authEvents = inject(AuthEventsService);
 
-  // 🔧 FIX: 先檢查認證狀態 —— 使用 JWT 過期檢測（不僅僅是長度檢查）
-  const isElectron = !!(window as any).electronAPI || !!(window as any).electron;
+  // 🔧 FIX: 先檢查認證狀態；Electron 與 core/auth.guard 一致（require('electron').ipcRenderer）
+  let isElectron = !!(window as any).electronAPI || !!(window as any).electron;
+  try {
+    if (!isElectron && (window as any).require) isElectron = !!(window as any).require('electron')?.ipcRenderer;
+  } catch {}
   if (!(environment.apiMode === 'ipc' && isElectron)) {
-    const authEvents = inject(AuthEventsService);
     const token = authService.accessToken();
     const localToken = localStorage.getItem('tgm_access_token');
     const refreshToken = localStorage.getItem('tgm_refresh_token');

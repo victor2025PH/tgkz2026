@@ -16,6 +16,7 @@ Phase 3 優化：
 """
 
 import os
+import asyncio
 import logging
 import aiohttp
 from typing import Optional, Dict, Any
@@ -613,3 +614,85 @@ def get_bot_handler() -> TelegramBotHandler:
     if _bot_handler is None:
         _bot_handler = TelegramBotHandler()
     return _bot_handler
+
+
+# ==================== 本地開發：getUpdates 輪詢（無公網 webhook 時收掃碼） ====================
+
+_bot_polling_task: Optional[asyncio.Task] = None
+
+
+async def _telegram_bot_polling_loop() -> None:
+    """
+    本地開發時輪詢 Telegram getUpdates，使掃碼登入無需公網 webhook。
+    Telegram 只會把更新發到 setWebhook 的 URL，本機 127.0.0.1 無法被訪問，故用輪詢接收。
+    """
+    token = os.environ.get('TELEGRAM_BOT_TOKEN', '').strip()
+    if not token:
+        logger.warning("[Bot Polling] TELEGRAM_BOT_TOKEN 未設置，跳過輪詢")
+        return
+    base = f"https://api.telegram.org/bot{token}"
+    offset = 0
+    handler = get_bot_handler()
+    async with aiohttp.ClientSession() as session:
+        # 取消 webhook，使更新改走 getUpdates
+        try:
+            async with session.get(f"{base}/deleteWebhook") as resp:
+                data = await resp.json()
+                if data.get('ok'):
+                    logger.info("[Bot Polling] deleteWebhook 成功，開始 getUpdates 輪詢")
+                else:
+                    logger.warning("[Bot Polling] deleteWebhook 未成功: %s", data)
+        except Exception as e:
+            logger.warning("[Bot Polling] deleteWebhook 請求失敗: %s", e)
+        while True:
+            try:
+                async with session.get(
+                    f"{base}/getUpdates",
+                    params={"offset": offset, "timeout": 30},
+                    timeout=aiohttp.ClientTimeout(total=60),
+                ) as resp:
+                    if resp.status != 200:
+                        await asyncio.sleep(5)
+                        continue
+                    data = await resp.json()
+                if not data.get("ok"):
+                    logger.warning("[Bot Polling] getUpdates 錯誤: %s", data)
+                    await asyncio.sleep(5)
+                    continue
+                for upd in data.get("result", []):
+                    offset = upd.get("update_id", offset) + 1
+                    try:
+                        result = await handler.handle_update(upd)
+                        if result:
+                            logger.info("[Bot Polling] 處理 update %s -> %s", upd.get("update_id"), result[:80] if isinstance(result, str) else result)
+                    except Exception as e:
+                        logger.exception("[Bot Polling] handle_update 異常: %s", e)
+            except asyncio.CancelledError:
+                logger.info("[Bot Polling] 輪詢已取消")
+                break
+            except Exception as e:
+                logger.warning("[Bot Polling] 輪詢異常: %s", e)
+                await asyncio.sleep(5)
+    return None
+
+
+def start_telegram_bot_polling_for_dev() -> Optional[asyncio.Task]:
+    """
+    在開發模式下啟動 Telegram Bot getUpdates 輪詢，使本地掃碼登入可收到確認。
+    僅在 TG_DEV_MODE 或環境為開發時調用；若未配置 TELEGRAM_BOT_TOKEN 則不啟動。
+    """
+    global _bot_polling_task
+    if _bot_polling_task is not None and not _bot_polling_task.done():
+        return _bot_polling_task
+    if not os.environ.get('TELEGRAM_BOT_TOKEN', '').strip():
+        return None
+    try:
+        dev = os.environ.get('TG_DEV_MODE', '').lower() == 'true'
+        if not dev:
+            return None
+    except Exception:
+        return None
+    loop = asyncio.get_event_loop()
+    _bot_polling_task = loop.create_task(_telegram_bot_polling_loop())
+    logger.info("[Bot Polling] 已啟動 getUpdates 輪詢（開發模式）")
+    return _bot_polling_task

@@ -37,6 +37,7 @@ from domain.automation.handlers import register_automation_handlers
 from domain.ai.handlers import register_ai_handlers
 from domain.contacts.handlers import register_contacts_handlers
 from api.handlers.system_handlers import register_system_handlers
+from api.handlers.auth_handlers import register_auth_handlers
 
 # 導入舊處理器代理
 try:
@@ -89,6 +90,12 @@ def setup_command_router(backend_service) -> CommandRouter:
         logger.info("✓ System handlers registered")
     except Exception as e:
         logger.error(f"Failed to register system handlers: {e}")
+    
+    try:
+        register_auth_handlers(backend_service)
+        logger.info("✓ Auth handlers registered")
+    except Exception as e:
+        logger.error(f"Failed to register auth handlers: {e}")
     
     try:
         register_account_handlers(backend_service)

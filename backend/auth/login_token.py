@@ -100,8 +100,8 @@ class LoginTokenService:
     # Token 有效期（秒）
     TOKEN_EXPIRY_SECONDS = 300  # 5 分鐘
     
-    # Token 長度
-    TOKEN_LENGTH = 32  # 生成 64 字符的 hex 字符串
+    # Token 長度（須滿足 Telegram Deep Link start 參數 ≤64 字符：前綴 "login_" 佔 6 字符，故 token 最多 58 字符）
+    TOKEN_LENGTH = 29  # 生成 58 字符的 hex 字符串，使 "login_" + token = 64 字符
     
     def __init__(self, db_path: Optional[str] = None):
         """初始化服務"""

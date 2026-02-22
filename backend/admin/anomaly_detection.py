@@ -325,9 +325,9 @@ class AnomalyDetectionManager:
             return
         
         self._initialized = True
-        self._init_db()
         self._detectors: Dict[str, StatisticalDetector] = {}
         self._anomaly_handlers: List = []
+        self._init_db()
     
     def _init_db(self):
         """初始化數據庫"""

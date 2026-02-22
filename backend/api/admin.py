@@ -47,12 +47,37 @@ class AdminService:
     """管理員服務"""
     
     def __init__(self, db_path: str = None):
-        self.db_path = db_path or os.environ.get(
-            'DATABASE_PATH',
-            os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
-        )
+        if db_path:
+            self.db_path = db_path
+        else:
+            try:
+                from config import DATABASE_PATH
+                self.db_path = str(DATABASE_PATH)
+            except Exception:
+                self.db_path = os.environ.get(
+                    'DATABASE_PATH',
+                    os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
+                )
     
     # ==================== 用戶管理 ====================
+    
+    def _row_to_user_dict(self, row: dict) -> dict:
+        """將 users 表的一行轉為管理後台需要的格式（與 auth 同表，掃碼登錄用戶可見）"""
+        uid = row.get('user_id') or row.get('id', '')
+        return {
+            'user_id': uid,
+            'id': uid,
+            'email': row.get('email') or '',
+            'username': row.get('username') or row.get('telegram_username') or '',
+            'display_name': row.get('display_name') or row.get('telegram_first_name') or '',
+            'subscription_tier': row.get('subscription_tier') or 'free',
+            'subscription_expires': row.get('subscription_expires') or '',
+            'created_at': row.get('created_at') or '',
+            'status': 'active' if row.get('is_active', 1) else 'inactive',
+            'auth_provider': row.get('auth_provider') or 'local',
+            'telegram_id': row.get('telegram_id') or '',
+            'telegram_username': row.get('telegram_username') or '',
+        }
     
     async def get_users(
         self,
@@ -62,99 +87,95 @@ class AdminService:
         status: str = None,
         tier: str = None
     ) -> Dict[str, Any]:
-        """獲取用戶列表"""
+        """獲取用戶列表（從 users 表讀取，與 auth 一致，掃碼登錄用戶會出現在後台）"""
         try:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
+            # 確保查詢 users 表（掃碼登錄寫入此表）
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+            if not cursor.fetchone():
+                conn.close()
+                return {'users': [], 'total': 0, 'page': page, 'page_size': page_size, 'total_pages': 0}
             
-            # 構建查詢
-            query = 'SELECT * FROM user_profiles WHERE 1=1'
-            count_query = 'SELECT COUNT(*) FROM user_profiles WHERE 1=1'
+            query = 'SELECT * FROM users WHERE 1=1'
+            count_query = 'SELECT COUNT(*) FROM users WHERE 1=1'
             params = []
-            
             if search:
-                query += ' AND (email LIKE ? OR username LIKE ?)'
-                count_query += ' AND (email LIKE ? OR username LIKE ?)'
+                query += ' AND (email LIKE ? OR username LIKE ? OR display_name LIKE ? OR telegram_username LIKE ?)'
+                count_query += ' AND (email LIKE ? OR username LIKE ? OR display_name LIKE ? OR telegram_username LIKE ?)'
                 search_term = f'%{search}%'
-                params.extend([search_term, search_term])
-            
+                params.extend([search_term, search_term, search_term, search_term])
             if status:
-                query += ' AND status = ?'
-                count_query += ' AND status = ?'
-                params.append(status)
-            
+                if status == 'active':
+                    query += ' AND COALESCE(is_active, 1) = 1'
+                    count_query += ' AND COALESCE(is_active, 1) = 1'
+                else:
+                    query += ' AND COALESCE(is_active, 1) = 0'
+                    count_query += ' AND COALESCE(is_active, 1) = 0'
             if tier:
                 query += ' AND subscription_tier = ?'
                 count_query += ' AND subscription_tier = ?'
                 params.append(tier)
             
-            # 獲取總數
             cursor.execute(count_query, params)
             total = cursor.fetchone()[0]
-            
-            # 分頁
             offset = (page - 1) * page_size
-            query += f' ORDER BY created_at DESC LIMIT {page_size} OFFSET {offset}'
-            
-            cursor.execute(query, params)
-            
-            users = []
-            for row in cursor.fetchall():
-                user = dict(row)
-                # 移除敏感字段
-                user.pop('password_hash', None)
-                users.append(user)
-            
+            query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+            cursor.execute(query, params + [page_size, offset])
+            users = [self._row_to_user_dict(dict(row)) for row in cursor.fetchall()]
             conn.close()
-            
             return {
                 'users': users,
                 'total': total,
                 'page': page,
                 'page_size': page_size,
-                'total_pages': (total + page_size - 1) // page_size
+                'total_pages': (total + page_size - 1) // page_size if page_size else 0
             }
         except Exception as e:
             logger.error(f"Get users error: {e}")
-            return {'users': [], 'total': 0, 'page': page, 'page_size': page_size}
+            return {'users': [], 'total': 0, 'page': page, 'page_size': page_size, 'total_pages': 0}
     
     async def get_user_detail(self, user_id: str) -> Optional[Dict]:
-        """獲取用戶詳情"""
+        """獲取用戶詳情（先 user_profiles，再 fallback 到 users，掃碼用戶可見）"""
         try:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            
-            # 用戶基本信息
-            cursor.execute('SELECT * FROM user_profiles WHERE user_id = ?', (user_id,))
-            row = cursor.fetchone()
-            
+            row = None
+            cursor.execute('SELECT name FROM sqlite_master WHERE type="table" AND name="user_profiles"')
+            if cursor.fetchone():
+                cursor.execute('SELECT * FROM user_profiles WHERE user_id = ?', (user_id,))
+                row = cursor.fetchone()
+            if not row:
+                cursor.execute('SELECT * FROM users WHERE id = ? OR user_id = ?', (user_id, user_id))
+                row = cursor.fetchone()
             if not row:
                 conn.close()
                 return None
-            
             user = dict(row)
             user.pop('password_hash', None)
-            
-            # 訂閱信息
-            cursor.execute('SELECT * FROM subscriptions WHERE user_id = ?', (user_id,))
-            sub_row = cursor.fetchone()
-            if sub_row:
-                user['subscription'] = dict(sub_row)
-            
-            # 帳號數量
-            cursor.execute('SELECT COUNT(*) FROM accounts WHERE user_id = ?', (user_id,))
-            user['accounts_count'] = cursor.fetchone()[0]
-            
-            # 最近登入
-            cursor.execute('''
-                SELECT * FROM login_history 
-                WHERE user_id = ? AND success = 1 
-                ORDER BY created_at DESC LIMIT 5
-            ''', (user_id,))
-            user['recent_logins'] = [dict(r) for r in cursor.fetchall()]
-            
+            if 'id' in user and 'user_id' not in user:
+                user['user_id'] = user['id']
+            # 訂閱信息（若有 subscriptions 表）
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='subscriptions'")
+            if cursor.fetchone():
+                cursor.execute('SELECT * FROM subscriptions WHERE user_id = ?', (user_id,))
+                sub_row = cursor.fetchone()
+                if sub_row:
+                    user['subscription'] = dict(sub_row)
+            user.setdefault('accounts_count', 0)
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='accounts'")
+            if cursor.fetchone():
+                cursor.execute('SELECT COUNT(*) FROM accounts WHERE user_id = ?', (user_id,))
+                user['accounts_count'] = cursor.fetchone()[0]
+            user.setdefault('recent_logins', [])
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='login_history'")
+            if cursor.fetchone():
+                cursor.execute('''
+                    SELECT * FROM login_history WHERE user_id = ? AND success = 1 ORDER BY created_at DESC LIMIT 5
+                ''', (user_id,))
+                user['recent_logins'] = [dict(r) for r in cursor.fetchall()]
             conn.close()
             return user
         except Exception as e:

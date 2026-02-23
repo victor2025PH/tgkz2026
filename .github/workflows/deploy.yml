@@ -179,6 +179,7 @@ jobs:
         run: |
           ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 deploy-server << 'ENDSSH'
             cd /opt/tg-matrix
+            export INTERNAL_API_URL="https://tgw.usdt2026.cc"
             
             # 🔧 清理孤儿容器防止名称冲突（无容器时 docker rm 可能返回 1，忽略）
             sudo docker compose down --remove-orphans 2>/dev/null || true
@@ -187,9 +188,9 @@ jobs:
             # 重新創建 nginx 容器（確保新的 volume 掛載生效）
             sudo docker compose up -d web
             
-            # 重建並重啟 API 服務（後端代碼更新時需要；Bot 在 API 進程內，會讀取 INTERNAL_API_URL）
+            # 重建並重啟 API（--force-recreate 確保讀取最新 .env；Bot 須有 INTERNAL_API_URL 才能掃碼成功）
             sudo docker compose build --no-cache api
-            sudo docker compose up -d api
+            sudo -E docker compose up -d --force-recreate api
             
             # 等待服務啟動
             sleep 15

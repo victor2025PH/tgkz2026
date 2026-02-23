@@ -107,6 +107,8 @@ jobs:
               echo "INTERNAL_API_URL=$URL" > "$ENV_FILE"
               echo "Created $ENV_FILE with INTERNAL_API_URL=$URL"
             fi
+            echo "Current .env INTERNAL_API_URL:"
+            grep '^INTERNAL_API_URL=' "$ENV_FILE" 2>/dev/null || echo "(not found)"
           ENDSSH
       
       - name: Build and deploy container
@@ -114,19 +116,20 @@ jobs:
           ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 deploy-server << 'ENDSSH'
           set -x
           cd /opt/tg-matrix
+          export INTERNAL_API_URL="https://tgw.usdt2026.cc"
 
           # 重建 API 容器（确保使用新代码；Bot 会读取 INTERNAL_API_URL）
           echo "🔨 Building API container..."
           sudo docker compose build --no-cache api
 
-          # 停止旧容器
+          # 停止并删除旧容器，确保用新 env 创建
           echo "🔄 Stopping old container..."
           sudo docker compose down --remove-orphans api 2>/dev/null || true
           sudo docker rm -f $(sudo docker ps -aq --filter "name=tg-matrix-api") 2>/dev/null || true
 
-          # 启动新容器
-          echo "🚀 Starting new container..."
-          sudo docker compose up -d api
+          # 启动新容器（--force-recreate 确保读取最新 .env；-E 传递 INTERNAL_API_URL）
+          echo "🚀 Starting new container with INTERNAL_API_URL=$INTERNAL_API_URL..."
+          sudo -E docker compose up -d --force-recreate api
 
           # 等待启动
           sleep 15
@@ -139,6 +142,17 @@ jobs:
           sudo docker compose logs --tail=30 api 2>&1 || true
           echo "✅ Backend deployment completed at $(date)"
           ENDSSH
+      
+      - name: Verify INTERNAL_API_URL in container (掃碼登錄須與前端同源)
+        run: |
+          echo "🔍 Checking INTERNAL_API_URL inside api container..."
+          INTERNAL=$(ssh -o ConnectTimeout=30 deploy-server "cd ${{ env.DEPLOY_PATH }} && sudo docker compose exec -T api env 2>/dev/null | grep INTERNAL_API_URL" || true)
+          echo "$INTERNAL"
+          if echo "$INTERNAL" | grep -q "tgw.usdt2026.cc"; then
+            echo "✅ INTERNAL_API_URL is set correctly in container"
+          else
+            echo "⚠️ WARNING: INTERNAL_API_URL not found or wrong in container — scan login may show Token 不存在"
+          fi
       
       - name: Verify deployed code (login-token idempotent fix)
         run: |

@@ -183,6 +183,29 @@ def _should_skip_duplicate_login_failed(chat_id: int, token: str) -> bool:
     return False
 
 
+def _reserve_login_failed_send(chat_id: int, token: str) -> bool:
+    """
+    在處理開始時預佔「發送登錄失敗」的權利，避免並發多個 webhook 導致連發多條。
+    返回 True 表示本請求獲得權利（應繼續執行 _confirm_login 並在失敗時發送一條）；
+    返回 False 表示已有其他請求佔用，本請求應直接跳過不發送。
+    """
+    now = time.time()
+    to_del_chat = [c for c, t in _LOGIN_FAILED_CHAT_SENT.items() if now - t > _LOGIN_FAILED_DEDUPE_SEC]
+    for c in to_del_chat:
+        _LOGIN_FAILED_CHAT_SENT.pop(c, None)
+    if chat_id in _LOGIN_FAILED_CHAT_SENT:
+        return False
+    key = (chat_id, (token[:16] if token else ''))
+    to_del = [k for k, t in _LOGIN_FAILED_SENT.items() if now - t > _LOGIN_FAILED_DEDUPE_SEC]
+    for k in to_del:
+        _LOGIN_FAILED_SENT.pop(k, None)
+    if key in _LOGIN_FAILED_SENT:
+        return False
+    _LOGIN_FAILED_SENT[key] = now
+    _LOGIN_FAILED_CHAT_SENT[chat_id] = now
+    return True
+
+
 class TelegramBotHandler:
     """
     Telegram Bot 處理器
@@ -270,20 +293,19 @@ class TelegramBotHandler:
         3. Bot 自動確認登入
         4. 網頁自動跳轉
         """
+        # 先預佔發送權，避免並發多個 webhook 導致連發 4～6 條失敗提示（在 await 前完成，無競態）
+        if not _reserve_login_failed_send(chat_id, token):
+            logger.info("[Bot] Skip duplicate login attempt (reserved) chat_id=%s token=%s...", chat_id, token[:8])
+            return "已略過重複"
         logger.info(f"[Bot] Auto confirming login for token: {token[:8]}... user: {user.get('id')}")
         
-        # 直接確認登入
         result = await self._confirm_login(token, user)
         
         if result['success']:
-            # 發送成功消息（含歡迎與功能簡介）
             success_msg = get_message('login_success', user)
             await self._send_message(chat_id, success_msg)
             return "自動登入成功"
         else:
-            if _should_skip_duplicate_login_failed(chat_id, token):
-                logger.info("[Bot] Skip duplicate login-failed for chat_id=%s token=%s...", chat_id, token[:8])
-                return "自動登入失敗(已略過重複)"
             friendly_error = _user_friendly_login_error(result.get('message', ''), user)
             error_msg = get_message('login_failed', user, error=friendly_error)
             await self._send_message(chat_id, error_msg)

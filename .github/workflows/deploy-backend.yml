@@ -89,13 +89,33 @@ jobs:
             docker-compose.yml nginx.conf \
             deploy-server:${{ env.DEPLOY_PATH }}/
       
+      - name: Ensure INTERNAL_API_URL on server (掃碼登錄 Bot 與 API 同源)
+        run: |
+          ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 deploy-server << 'ENDSSH'
+            cd /opt/tg-matrix
+            ENV_FILE=".env"
+            URL="https://tgw.usdt2026.cc"
+            if [ -f "$ENV_FILE" ]; then
+              if grep -q '^INTERNAL_API_URL=' "$ENV_FILE" 2>/dev/null; then
+                sed -i.bak "s|^INTERNAL_API_URL=.*|INTERNAL_API_URL=$URL|" "$ENV_FILE"
+                echo "Updated INTERNAL_API_URL=$URL in $ENV_FILE"
+              else
+                echo "INTERNAL_API_URL=$URL" >> "$ENV_FILE"
+                echo "Appended INTERNAL_API_URL=$URL to $ENV_FILE"
+              fi
+            else
+              echo "INTERNAL_API_URL=$URL" > "$ENV_FILE"
+              echo "Created $ENV_FILE with INTERNAL_API_URL=$URL"
+            fi
+          ENDSSH
+      
       - name: Build and deploy container
         run: |
           ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 deploy-server << 'ENDSSH'
           set -x
           cd /opt/tg-matrix
 
-          # 重建 API 容器（确保使用新代码）
+          # 重建 API 容器（确保使用新代码；Bot 会读取 INTERNAL_API_URL）
           echo "🔨 Building API container..."
           sudo docker compose build --no-cache api
 
@@ -119,6 +139,15 @@ jobs:
           sudo docker compose logs --tail=30 api 2>&1 || true
           echo "✅ Backend deployment completed at $(date)"
           ENDSSH
+      
+      - name: Verify deployed code (login-token idempotent fix)
+        run: |
+          echo "🔍 Verifying bot/login-token fix is in container..."
+          if ssh -o ConnectTimeout=30 deploy-server "sudo docker compose -f ${{ env.DEPLOY_PATH }}/docker-compose.yml exec -T api grep -q 'already confirmed (idempotent)' /app/auth/login_token.py 2>/dev/null"; then
+            echo "✅ Container has login-token idempotent fix"
+          else
+            echo "⚠️ WARNING: /app/auth/login_token.py in container may not contain idempotent fix — deploy may be stale"
+          fi
       
       - name: Health check with migration verification
         run: |

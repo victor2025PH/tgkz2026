@@ -18,6 +18,9 @@ import { I18nService } from '../i18n.service';
 import { FrontendSecurityService } from '../services/security.service';
 import { ElectronIpcService } from '../electron-ipc.service';
 import { getStoredApiServer, setStoredApiServer } from '../core/api-server';
+import { getEffectiveApiBaseUrl } from '../core/get-effective-api-base';
+import { ToastService } from '../toast.service';
+import { environment } from '../environments/environment';
 
 @Component({
   selector: 'app-login',
@@ -1110,6 +1113,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   private i18n = inject(I18nService);
   private security = inject(FrontendSecurityService);
   private ipcService = inject(ElectronIpcService);
+  private toast = inject(ToastService);
   
   // 表單數據
   email = '';
@@ -1170,6 +1174,8 @@ export class LoginComponent implements OnInit, OnDestroy {
   private qrAutoGenTimer: ReturnType<typeof setTimeout> | null = null;
   /** 桌面版：訂閱後端就緒，就緒後自動生成二維碼並清除連接錯誤 */
   private unsubBackendStatus: (() => void) | null = null;
+  /** 桌面版：後端從 stderr 解析出端口時立即收到，早於 health check，便於首屏 QR 用對端口 */
+  private unsubApiPort: (() => void) | null = null;
   /** 生成二維碼時連接失敗的重試次數（僅 Electron，避免無限重試） */
   private qrFetchRetryCount = 0;
   
@@ -1185,9 +1191,12 @@ export class LoginComponent implements OnInit, OnDestroy {
     
     // 桌面版：訂閱後端就緒，收到 running: true 時清除連接錯誤並觸發一次二維碼生成
     if (this.isElectronEnv()) {
-      this.unsubBackendStatus = this.ipcService.on('backend-status', (data: { running?: boolean; error?: string }) => {
+      this.unsubBackendStatus = this.ipcService.on('backend-status', (data: { running?: boolean; error?: string; apiPort?: number }) => {
+        if (data.apiPort != null && typeof localStorage !== 'undefined') {
+          localStorage.setItem('api_port', String(data.apiPort));
+        }
         if (data.running) {
-          if (this.error() && (this.error()!.includes('無法連接到後端') || this.error()!.includes('localhost:8000'))) {
+          if (this.error() && (this.error()!.includes('無法連接到後端') || this.error()!.includes('localhost:8000') || this.error()!.includes('localhost:8005'))) {
             this.error.set(null);
           }
           if (this.loginMethod() === 'qrcode' && !this.qrCodeUrl() && !this.qrCodeLoading()) {
@@ -1197,6 +1206,11 @@ export class LoginComponent implements OnInit, OnDestroy {
             }
             this.generateQRCode();
           }
+        }
+      });
+      this.unsubApiPort = this.ipcService.on('api-port', (data: { port?: number }) => {
+        if (data.port != null && typeof localStorage !== 'undefined') {
+          localStorage.setItem('api_port', String(data.port));
         }
       });
     }
@@ -1237,6 +1251,8 @@ export class LoginComponent implements OnInit, OnDestroy {
     }
     this.unsubBackendStatus?.();
     this.unsubBackendStatus = null;
+    this.unsubApiPort?.();
+    this.unsubApiPort = null;
     this.lockoutCleanup?.();
     this.cancelDeepLink();
     this.cleanupQRCode();
@@ -1518,7 +1534,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.deepLinkWebSocket.close();
     }
     
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const protocol = this.getWsProtocol();
     const host = this.getWsHost();
     const wsUrl = `${protocol}//${host}/ws/login-token/${token}`;
     
@@ -1671,29 +1687,36 @@ export class LoginComponent implements OnInit, OnDestroy {
     } catch { return false; }
   }
 
-  /** 與管理後台同一套數據：優先 api_server，否則桌面/開發 8000，否則同源 */
+  /** 與管理後台、Auth、訂閱、用量同一套：有效 API 基址（get-effective-api-base） */
   private getApiBaseForFetch(): string {
-    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('api_server') : null;
-    if (stored) {
-      const url = stored.replace(/\/+$/, '');
-      return url.startsWith('http') ? url : `https://${url}`;
-    }
-    if (this.isElectronEnv()) return 'http://localhost:8000';
-    if (window.location.hostname === 'localhost' && window.location.port === '4200') return 'http://localhost:8000';
-    return '';
+    return getEffectiveApiBaseUrl();
   }
 
   /** WebSocket host（與 getApiBaseForFetch 一致） */
   private getWsHost(): string {
-    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('api_server') : null;
-    if (stored) {
+    const base = this.getApiBaseForFetch();
+    if (base) {
       try {
-        const u = new URL(stored.startsWith('http') ? stored : `https://${stored}`);
+        const u = new URL(base.startsWith('http') ? base : `https://${base}`);
         return u.host;
       } catch { /* fallback */ }
     }
-    if (this.isElectronEnv() || (window.location.hostname === 'localhost' && window.location.port === '4200')) return 'localhost:8000';
+    if (this.isElectronEnv()) {
+      const port = typeof localStorage !== 'undefined' ? localStorage.getItem('api_port') : null;
+      return `localhost:${port && /^\d+$/.test(port) ? port : '8000'}`;
+    }
+    if (window.location.hostname === 'localhost' && (window.location.port === '4200' || window.location.port === '4201')) return 'localhost:8000';
     return window.location.host;
+  }
+
+  /** WebSocket 協議：有 base 時依 base，否則依當前頁協議（同源時避免 301） */
+  private getWsProtocol(): string {
+    const base = this.getApiBaseForFetch();
+    if (base) {
+      const url = (base.startsWith('http') ? base : `https://${base}`).toLowerCase();
+      return url.startsWith('https') ? 'wss:' : 'ws:';
+    }
+    return typeof window !== 'undefined' && window.location?.protocol === 'https:' ? 'wss:' : 'ws:';
   }
 
   /** 保存 API 服務器地址（與管理後台同一套數據） */
@@ -1701,17 +1724,21 @@ export class LoginComponent implements OnInit, OnDestroy {
     const url = setStoredApiServer(this.apiServerInput.trim());
     this.apiServerInput = url;
     this.showApiServer.set(false);
+    if (url) {
+      this.toast.success('已保存，掃碼登錄將使用服務器地址，Bot 與後台可正常顯示。');
+    }
   }
 
   /**
    * 生成 QR Code
+   * 本地/安裝版直接使用當前 API 基址（默認本地後端）生成二維碼，無需彈窗；需與服務器數據對齊時可在登錄頁展開「使用服務器登錄」並保存後再生成。
    */
   async generateQRCode() {
+    const apiBase = this.getApiBaseForFetch();
     this.qrCodeLoading.set(true);
     this.qrCodeExpired.set(false);
     this.error.set(null);
     this.qrBotError.set(null);
-    const apiBase = this.getApiBaseForFetch();
     try {
       // 1. 調用 API 生成登入 Token（桌面版與網頁版同一套，均走 HTTP 8000）
       const response = await fetch(`${apiBase}/api/v1/auth/login-token`, {
@@ -1765,8 +1792,10 @@ export class LoginComponent implements OnInit, OnDestroy {
         return;
       }
       if (isConnectionRefused && this.isElectronEnv()) {
+        const port = typeof localStorage !== 'undefined' ? localStorage.getItem('api_port') : null;
+        const portHint = port && /^\d+$/.test(port) ? port : '8000 或 8005';
         this.error.set(
-          '無法連接到後端 (localhost:8000)。請用 npm run start:dev 啟動開發模式，等待啟動畫面顯示「後端服務已就緒」後再點「生成二維碼」；若仍失敗請查看終端是否出現「HTTP API running on 127.0.0.1:8000」或報錯。也可先用上方帳號密碼登入。'
+          `無法連接到後端 (localhost:${portHint})。請用 npm run start:dev 啟動開發模式，等待啟動畫面顯示「後端服務已就緒」後再點「生成二維碼」；若仍失敗請查看終端是否出現「HTTP API running on 127.0.0.1:...」或報錯。也可先用上方帳號密碼登入。`
         );
       } else {
         this.setErrorFromException(e, '生成二維碼失敗');
@@ -1897,7 +1926,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.qrWebSocket.close();
     }
     
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const protocol = this.getWsProtocol();
     const host = this.getWsHost();
     const wsUrl = `${protocol}//${host}/ws/login-token/${token}`;
     

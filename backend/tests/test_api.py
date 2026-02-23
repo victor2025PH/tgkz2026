@@ -60,8 +60,9 @@ class TestAuthService:
         )
         
         assert result['success'] is True
-        assert 'user' in result
-        assert result['user']['email'] == 'test@example.com'
+        user = result.get('user') or (result.get('data') or {}).get('user')
+        assert user is not None
+        assert user.get('email') == 'test@example.com'
     
     @pytest.mark.asyncio
     async def test_register_duplicate_email(self, auth_service):
@@ -96,9 +97,10 @@ class TestAuthService:
         )
         
         assert result['success'] is True
-        assert 'access_token' in result
-        assert 'refresh_token' in result
-    
+        data = result.get('data') or result
+        assert data.get('access_token') is not None
+        assert data.get('refresh_token') is not None
+
     @pytest.mark.asyncio
     async def test_login_wrong_password(self, auth_service):
         """測試錯誤密碼登入"""
@@ -128,12 +130,13 @@ class TestAuthService:
             email='refresh@example.com',
             password='TestPass123!'
         )
-        
-        refresh_token = login_result['refresh_token']
+        login_data = login_result.get('data') or login_result
+        refresh_token = login_data.get('refresh_token')
+        assert refresh_token is not None
         result = await auth_service.refresh_token(refresh_token)
-        
         assert result['success'] is True
-        assert 'access_token' in result
+        out_data = result.get('data') or result
+        assert out_data.get('access_token') is not None
 
 
 # ==================== 安全服務測試 ====================

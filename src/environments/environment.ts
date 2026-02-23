@@ -11,6 +11,8 @@ export const environment = {
   // HTTP API 配置（僅 http 模式使用）
   apiBaseUrl: 'http://localhost:8000',
   wsUrl: 'ws://localhost:8000/ws',
+  /** 掃碼登錄默認後端（與 Bot 一致）。Electron/本地開發未填「使用服務器登錄」時使用，一鍵掃碼進前端。 */
+  defaultLoginApiUrl: 'https://tgw.usdt2026.cc',
   
   // 功能開關
   features: {

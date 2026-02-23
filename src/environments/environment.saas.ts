@@ -10,6 +10,8 @@ export const environment = {
   // HTTP 配置 - 同源
   apiBaseUrl: '',  // 空字符串表示同源
   wsUrl: '',       // 自動檢測
+  /** 掃碼登錄默認後端；SaaS 同源可為空 */
+  defaultLoginApiUrl: '' as string,
   
   // 功能開關 - 根據用戶訂閱級別動態調整
   features: {

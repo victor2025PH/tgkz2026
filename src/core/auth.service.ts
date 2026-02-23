@@ -13,7 +13,9 @@ import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ApiService } from './api.service';
 import { AuthEventsService, AUTH_STORAGE_KEYS } from './auth-events.service';
+import { ToastService } from '../toast.service';
 import { environment } from '../environments/environment';
+import { getEffectiveApiBaseUrl } from './get-effective-api-base';
 
 // 用戶模型
 export interface User {
@@ -101,6 +103,7 @@ export class AuthService implements OnDestroy {
   private api = inject(ApiService);
   private router = inject(Router);
   private authEvents = inject(AuthEventsService);
+  private toast = inject(ToastService);
   
   // 事件訂閱
   private eventSubscription: Subscription | null = null;
@@ -384,12 +387,13 @@ export class AuthService implements OnDestroy {
     } catch (e) {
       console.error('Logout error:', e);
     } finally {
-      // 🆕 廣播登出事件，通知所有訂閱者
-      this.authEvents.emitLogout();
-      // 清除本服務狀態
-      this.clearAuthStateInternal();
-      // 🔧 修復：使用正確的登入頁面路徑
-      this.router.navigate(['/auth/login']);
+      // 先顯示 Toast，再延遲跳轉以便用戶看到反饋
+      this.toast.success('已退出登錄');
+      setTimeout(() => {
+        this.authEvents.emitLogout();
+        this.clearAuthStateInternal();
+        this.router.navigate(['/auth/login']);
+      }, 400);
     }
   }
   
@@ -761,6 +765,71 @@ export class AuthService implements OnDestroy {
       return result.success ? (result.revoked_count || 0) : 0;
     } catch (e) {
       return 0;
+    }
+  }
+  
+  /**
+   * API 密鑰：列出當前用戶的 API 密鑰
+   */
+  async getApiKeys(): Promise<{ id: string; name: string; prefix: string; last_used_at?: string }[]> {
+    const token = this._accessToken();
+    if (!token) return [];
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/api-keys`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (!result.success || !Array.isArray(result.data)) return [];
+      return result.data.map((k: any) => ({
+        id: k.id,
+        name: k.name || 'Unnamed',
+        prefix: k.key_prefix || k.prefix || '',
+        last_used_at: k.last_used || k.last_used_at
+      }));
+    } catch (e) {
+      return [];
+    }
+  }
+  
+  /**
+   * API 密鑰：創建新密鑰（返回 { success, key?, api_key?, error? }，key 為完整密鑰僅返回一次）
+   */
+  async createApiKey(name: string = 'Unnamed Key'): Promise<{ success: boolean; key?: string; api_key?: any; error?: string }> {
+    const token = this._accessToken();
+    if (!token) return { success: false, error: '未登入' };
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/api-keys`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name, scopes: ['read'] })
+      });
+      const result = await response.json();
+      if (result.success) {
+        const rawKey = result.key ?? result.data?.key;
+        const keyInfo = result.api_key ?? result.data?.api_key;
+        return { success: true, key: rawKey, api_key: keyInfo };
+      }
+      return { success: false, error: result.error || '創建失敗' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || '網絡錯誤' };
+    }
+  }
+  
+  /**
+   * API 密鑰：刪除指定密鑰
+   */
+  async deleteApiKey(keyId: string): Promise<boolean> {
+    const token = this._accessToken();
+    if (!token) return false;
+    try {
+      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/api-keys/${keyId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+      return result.success === true;
+    } catch (e) {
+      return false;
     }
   }
   
@@ -1347,16 +1416,7 @@ export class AuthService implements OnDestroy {
   }
 
   private getApiBaseUrl(): string {
-    const stored = typeof localStorage !== 'undefined' && localStorage.getItem('api_server');
-    if (stored) {
-      const url = stored.replace(/\/+$/, '');
-      return url.startsWith('http') ? url : `https://${url}`;
-    }
-    if (this.isElectronEnv()) return 'http://localhost:8000';
-    if (window.location.hostname === 'localhost' && window.location.port === '4200') {
-      return 'http://localhost:8000';
-    }
-    return environment?.apiBaseUrl ?? '';
+    return getEffectiveApiBaseUrl();
   }
   
   private getDeviceName(): string {

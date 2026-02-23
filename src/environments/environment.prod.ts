@@ -10,6 +10,8 @@ export const environment = {
   // HTTP 配置（備用）
   apiBaseUrl: 'http://localhost:8000',
   wsUrl: 'ws://localhost:8000/ws',
+  /** 掃碼登錄默認後端（與 Bot 一致）。安裝版未填「使用服務器登錄」時使用，一鍵掃碼進前端。 */
+  defaultLoginApiUrl: 'https://tgw.usdt2026.cc',
   
   // 功能開關 - 本地版
   features: {

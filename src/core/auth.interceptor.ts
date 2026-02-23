@@ -12,16 +12,7 @@ import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, from, switchMap, throwError } from 'rxjs';
 import { AuthEventsService, AUTH_STORAGE_KEYS } from './auth-events.service';
-import { environment } from '../environments/environment';
-
-function isElectronEnv(): boolean {
-  try {
-    return !!(window as any).electronAPI || !!(window as any).electron ||
-      !!((window as any).require && (window as any).require('electron')?.ipcRenderer);
-  } catch {
-    return false;
-  }
-}
+import { getEffectiveApiBaseUrl } from './get-effective-api-base';
 
 // 正在刷新 Token 的標記（避免重複刷新）
 let isRefreshing = false;
@@ -39,15 +30,9 @@ async function refreshToken(): Promise<boolean> {
   }
   
   try {
-    let baseUrl = '';
-    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('api_server') : null;
-    if (stored) {
-      const u = stored.replace(/\/+$/, '');
-      baseUrl = u.startsWith('http') ? u : `https://${u}`;
-    } else if (window.location.hostname === 'localhost') {
-      baseUrl = 'http://localhost:8000';
-    }
-    const response = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
+    const baseUrl = getEffectiveApiBaseUrl();
+    const refreshUrl = baseUrl ? `${baseUrl}/api/v1/auth/refresh` : '/api/v1/auth/refresh';
+    const response = await fetch(refreshUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshTokenValue })

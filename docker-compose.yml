@@ -37,9 +37,11 @@ services:
       - DEBUG=${DEBUG:-false}
       - ELECTRON_MODE=false
       
-      # 🆕 Telegram OAuth（P2.2）
+      # 🆕 Telegram OAuth（P2.2）與掃碼登錄
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME:-}
+      # Bot 確認登入時調用的 API，須與生成二維碼的後端一致（否則「Token 不存在」）
+      - INTERNAL_API_URL=${INTERNAL_API_URL:-https://tgw.usdt2026.cc}
       
       # 郵件配置
       - EMAIL_PROVIDER=${EMAIL_PROVIDER:-smtp}

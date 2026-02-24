@@ -147,18 +147,9 @@ import { environment } from '../environments/environment';
         <span>{{ t('auth.or') }}</span>
       </div>
       
-      <!-- 🆕 Phase 2: 多種 Telegram 登入方式（含 QR Code） -->
+      <!-- Telegram 登入方式（已去除掃碼登錄） -->
       <div class="telegram-login-section">
-        <!-- 登入方式選擇器 -->
         <div class="login-method-tabs">
-          <button 
-            class="method-tab" 
-            [class.active]="loginMethod() === 'qrcode'"
-            (click)="switchLoginMethod('qrcode')"
-          >
-            <span class="tab-icon">📷</span>
-            <span>{{ t('auth.qrCodeLogin') }}</span>
-          </button>
           <button 
             class="method-tab" 
             [class.active]="loginMethod() === 'deeplink'"
@@ -176,64 +167,6 @@ import { environment } from '../environments/environment';
             <span>{{ t('auth.webLogin') }}</span>
           </button>
         </div>
-        
-        <!-- QR Code 登入（默認）；桌面版與網頁版同一套流程，均走 HTTP API -->
-        @if (loginMethod() === 'qrcode') {
-          <div class="qr-login-panel">
-            @if (qrCodeLoading()) {
-              <div class="qr-loading">
-                <span class="loading-spinner"></span>
-                <span>{{ t('auth.generatingQR') }}</span>
-              </div>
-            } @else if (qrCodeUrl()) {
-              <div class="qr-container">
-                <div class="qr-code-wrapper">
-                  <img [src]="qrCodeUrl()" [alt]="t('auth.telegramLoginQR')" class="qr-code-img" />
-                  @if (qrCodeExpired()) {
-                    <div class="qr-expired-overlay">
-                      <span class="expired-text">{{ t('auth.qrExpired') }}</span>
-                      <button class="refresh-btn" (click)="refreshQRCode()">{{ t('auth.clickToRefresh') }}</button>
-                    </div>
-                  }
-                </div>
-                <div class="qr-instructions">
-                  <p class="step"><span class="step-num">1</span> {{ t('auth.openTelegram') }}</p>
-                  <p class="step"><span class="step-num">2</span> {{ t('auth.scanQRCode') }}</p>
-                  <p class="step"><span class="step-num">3</span> {{ t('auth.confirmLogin') }}</p>
-                </div>
-                
-                <!-- 🆕 驗證碼（老用戶備用） -->
-                @if (verifyCode()) {
-                  <div class="verify-code-section">
-                    <p class="verify-hint">掃碼無效？在 Bot 中輸入驗證碼：</p>
-                    <div class="verify-code">{{ verifyCode() }}</div>
-                  </div>
-                }
-                <!-- 🆕 Bot 未配置或不存在時提示（掃碼會出現「該用戶似乎不存在」） -->
-                @if (qrBotError()) {
-                  <div class="qr-bot-warning">
-                    <span class="qr-bot-warning-icon">⚠️</span>
-                    <p class="qr-bot-warning-text">{{ qrBotError() }}</p>
-                    <p class="qr-bot-warning-hint">請在後端設置 <code>TELEGRAM_BOT_USERNAME</code> 與 <code>TELEGRAM_BOT_TOKEN</code>，並確保該 Bot 已在 Telegram 創建；或使用上方驗證碼在已打開的 Bot 中輸入登入。</p>
-                  </div>
-                }
-                @if (!qrCodeExpired()) {
-                  <div class="qr-countdown">
-                    <span class="ws-status" [class.connected]="wsConnected()">
-                      {{ wsConnected() ? ('🟢 ' + t('auth.realtimeConnected')) : ('🔴 ' + t('auth.reconnecting')) }}
-                    </span>
-                    <span class="countdown-text">{{ qrCountdown() }}s</span>
-                  </div>
-                }
-              </div>
-            } @else {
-              <button class="generate-qr-btn" (click)="generateQRCode()">
-                <span class="btn-icon">📷</span>
-                <span>{{ t('auth.generateQRCode') }}</span>
-              </button>
-            }
-          </div>
-        }
         
         <!-- Deep Link 登入 -->
         @if (loginMethod() === 'deeplink') {
@@ -1142,7 +1075,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   private deepLinkCountdownInterval: any = null;
   
   // 🆕 Phase 2: QR Code + WebSocket 登入狀態
-  loginMethod = signal<'qrcode' | 'deeplink' | 'widget'>('qrcode');  // 默認 QR Code
+  loginMethod = signal<'deeplink' | 'widget'>('deeplink');  // 默認 QR Code
   qrCodeLoading = signal(false);
   qrCodeUrl = signal<string | null>(null);
   qrCodeExpired = signal(false);
@@ -1189,23 +1122,14 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.checkLoginLimit();
     const savedPreference = this.loadLoginPreference();
     
-    // 桌面版：訂閱後端就緒，收到 running: true 時清除連接錯誤並觸發一次二維碼生成
+    // 桌面版：訂閱後端就緒時清除連接錯誤
     if (this.isElectronEnv()) {
       this.unsubBackendStatus = this.ipcService.on('backend-status', (data: { running?: boolean; error?: string; apiPort?: number }) => {
         if (data.apiPort != null && typeof localStorage !== 'undefined') {
           localStorage.setItem('api_port', String(data.apiPort));
         }
-        if (data.running) {
-          if (this.error() && (this.error()!.includes('無法連接到後端') || this.error()!.includes('localhost:8000') || this.error()!.includes('localhost:8005'))) {
-            this.error.set(null);
-          }
-          if (this.loginMethod() === 'qrcode' && !this.qrCodeUrl() && !this.qrCodeLoading()) {
-            if (this.qrAutoGenTimer) {
-              clearTimeout(this.qrAutoGenTimer);
-              this.qrAutoGenTimer = null;
-            }
-            this.generateQRCode();
-          }
+        if (data.running && this.error() && (this.error()!.includes('無法連接到後端') || this.error()!.includes('localhost:8000') || this.error()!.includes('localhost:8005'))) {
+          this.error.set(null);
         }
       });
       this.unsubApiPort = this.ipcService.on('api-port', (data: { port?: number }) => {
@@ -1217,23 +1141,10 @@ export class LoginComponent implements OnInit, OnDestroy {
     
     if (savedPreference) {
       this.loginMethod.set(savedPreference);
-      if (savedPreference === 'qrcode') {
-        if (!this.isElectronEnv()) {
-          this.generateQRCode();
-        } else if (this.isDevMode()) {
-          // 開發者模式：延遲 2.5 秒自動生成二維碼（等後端 HTTP 8000 就緒）；若先收到 backend-status 則會提前觸發
-          this.qrAutoGenTimer = setTimeout(() => this.generateQRCode(), 2500);
-        }
-      }
     } else if (this.isMobileDevice()) {
       this.loginMethod.set('deeplink');
     } else {
-      this.loginMethod.set('qrcode');
-      if (!this.isElectronEnv()) {
-        this.generateQRCode();
-      } else if (this.isDevMode()) {
-        this.qrAutoGenTimer = setTimeout(() => this.generateQRCode(), 2500);
-      }
+      this.loginMethod.set('deeplink');
     }
   }
   
@@ -1662,22 +1573,12 @@ export class LoginComponent implements OnInit, OnDestroy {
   /**
    * 切換登入方式
    */
-  switchLoginMethod(method: 'qrcode' | 'deeplink' | 'widget') {
-    // 清理當前方式的資源
-    if (this.loginMethod() === 'qrcode' && method !== 'qrcode') {
-      this.cleanupQRCode();
-    }
+  switchLoginMethod(method: 'deeplink' | 'widget') {
     if (this.loginMethod() === 'deeplink' && method !== 'deeplink') {
       this.cancelDeepLink();
     }
-    
     this.loginMethod.set(method);
     this.error.set(null);
-    
-    // 如果切換到 QR Code，自動生成
-    if (method === 'qrcode' && !this.qrCodeUrl()) {
-      this.generateQRCode();
-    }
   }
   
   private isElectronEnv(): boolean {
@@ -1870,6 +1771,17 @@ export class LoginComponent implements OnInit, OnDestroy {
         const res = await fetch(`${base}/api/v1/auth/login-token/${token}`);
         const result = await res.json().catch(() => ({}));
         if (!res.ok) {
+          if (res.status === 404) {
+            // Token 不在本服務器（多實例或 Bot 與生成二維碼的後端不一致）
+            if (this.qrPollInterval) {
+              clearInterval(this.qrPollInterval);
+              this.qrPollInterval = null;
+            }
+            this.error.set(
+              result?.error || '此二維碼不是由當前服務器識別。請在登錄頁選擇「使用服務器登錄」並填寫本服務器地址（如 ' + (base || window.location.origin) + '）後重新生成二維碼。'
+            );
+            return;
+          }
           if (res.status >= 500 && !this.error()) {
             this.error.set(result?.error || '服務暫時不可用，請稍後重試');
           }
@@ -2066,10 +1978,10 @@ export class LoginComponent implements OnInit, OnDestroy {
   /**
    * 🆕 Phase 3: 讀取登入方式偏好
    */
-  private loadLoginPreference(): 'qrcode' | 'deeplink' | 'widget' | null {
+  private loadLoginPreference(): 'deeplink' | 'widget' | null {
     try {
       const saved = localStorage.getItem('tgm_login_method');
-      if (saved === 'qrcode' || saved === 'deeplink' || saved === 'widget') {
+      if (saved === 'deeplink' || saved === 'widget') {
         return saved;
       }
     } catch (e) {

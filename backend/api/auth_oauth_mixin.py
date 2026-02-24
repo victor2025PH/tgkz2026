@@ -166,7 +166,7 @@ class AuthOAuthMixin:
     async def oauth_telegram_config(self, request):
         """獲取 Telegram OAuth 配置（用於前端 Widget）"""
         import os
-        bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', '')
+        bot_username = os.environ.get('TELEGRAM_BOT_USERNAME') or 'tgzkw_bot'
         bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
         
         # 從 Bot Token 中提取 Bot ID（格式：bot_id:secret）
@@ -297,7 +297,9 @@ class AuthOAuthMixin:
             if status == 'not_found':
                 return self._json_response({
                     'success': False,
-                    'error': 'Token 不存在'
+                    'error': 'Token 不存在',
+                    'code': 'TOKEN_NOT_FOUND',
+                    'hint': '請確認 Bot 的 INTERNAL_API_URL 與生成二維碼的後端一致（同一實例或共享數據庫）'
                 }, 404)
             
             if status == 'expired':
@@ -326,6 +328,9 @@ class AuthOAuthMixin:
                         'success': False,
                         'error': '無法創建用戶'
                     }, 500)
+                
+                # 更新最後登錄時間（後台「用戶管理」可顯示最後登錄）
+                auth_service.update_user_last_login(user.id)
                 
                 # 生成 JWT Token
                 role_str = user.role.value if hasattr(user.role, 'value') else user.role
@@ -396,7 +401,16 @@ class AuthOAuthMixin:
             token = request.match_info['token']
             
             # 驗證 Bot 密鑰（安全檢查）
-            body = await request.json()
+            try:
+                body = await request.json()
+            except Exception as e:
+                logger.warning(f"confirm_login_token: invalid JSON body: {e}")
+                return self._json_response({
+                    'success': False,
+                    'error': '請求體無效，需要 JSON'
+                }, 400)
+            if not isinstance(body, dict):
+                body = {}
             bot_secret = body.get('bot_secret', '')
             expected_secret = os.environ.get('TELEGRAM_BOT_TOKEN', '').split(':')[-1][:16]
             
@@ -631,7 +645,7 @@ class AuthOAuthMixin:
         provider = request.query.get('provider', 'telegram')
         
         # 獲取 Bot 配置
-        bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', '')
+        bot_username = os.environ.get('TELEGRAM_BOT_USERNAME') or 'tgzkw_bot'
         
         if not bot_username:
             return self._json_response({

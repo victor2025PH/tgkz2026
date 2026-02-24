@@ -784,6 +784,7 @@
     "openTelegramApp": "Open Telegram App to Login",
     "clickConfirmInTelegram": "Please click \"Confirm Login\" in Telegram",
     "remainingTime": "Remaining: {{seconds}}s",
+    "orEnterCode": "Or enter code",
     "cancel": "Cancel",
     "useTelegramWidget": "Use Telegram Widget to Login",
     "widgetHint": "For users already logged into Telegram in browser"
@@ -849,12 +850,24 @@
     "displayName": "Display Name",
     "avatarUrl": "Avatar URL",
     "updateProfile": "Update Profile",
+    "saveProfileError": "Save failed, please try again",
     "revokeSession": "Revoke",
     "revokeAllSessions": "Revoke All Other Sessions",
     "createApiKey": "Create API Key",
     "deleteApiKey": "Delete",
     "lastUsed": "Last Used",
-    "neverUsed": "Never Used"
+    "neverUsed": "Never Used",
+    "logoutSectionTitle": "Sign Out",
+    "logoutSectionDesc": "After signing out you will be redirected to the login page. You will need to sign in again to continue. This only signs out the current device.",
+    "logoutConfirmText": "Are you sure you want to sign out? You will need to sign in again to continue.",
+    "logoutConfirmButton": "Sign Out",
+    "loadingApiKeys": "Loading...",
+    "apiKeyCreatedOnce": "API key created. Please save it securely. It will only be shown once.",
+    "apiKeyNamePrompt": "Enter a name for this key (for identification)",
+    "apiKeyNamePlaceholder": "Unnamed Key",
+    "copyKey": "Copy",
+    "deleteApiKeyConfirm": "Delete this API key? This cannot be undone.",
+    "logoutUnsavedHint": "You have unsaved profile changes. Sign out anyway?"
   },
   "notification": {
     "center": "Notification Center",

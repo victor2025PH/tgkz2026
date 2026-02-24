@@ -406,7 +406,7 @@ export class NotificationCenterService {
     try {
       const desktopNotif = new Notification(notification.title, {
         body: notification.message,
-        icon: '/assets/icons/icon-192.png',
+        icon: '/assets/icon-192.png',
         tag: notification.id,
         requireInteraction: notification.priority === 'urgent'
       });

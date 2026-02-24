@@ -784,6 +784,7 @@
     "openTelegramApp": "打開 Telegram App 登入",
     "clickConfirmInTelegram": "請在 Telegram 中點擊「確認登入」按鈕",
     "remainingTime": "剩餘時間: {{seconds}}s",
+    "orEnterCode": "或輸入驗證碼",
     "cancel": "取消",
     "useTelegramWidget": "使用 Telegram Widget 登入",
     "widgetHint": "適用於已在瀏覽器登入 Telegram 的用戶"
@@ -849,12 +850,24 @@
     "displayName": "顯示名稱",
     "avatarUrl": "頭像 URL",
     "updateProfile": "更新資料",
+    "saveProfileError": "保存失敗，請重試",
     "revokeSession": "撤銷",
     "revokeAllSessions": "撤銷所有其他設備",
     "createApiKey": "建立 API 金鑰",
     "deleteApiKey": "刪除",
     "lastUsed": "最後使用",
-    "neverUsed": "從未使用"
+    "neverUsed": "從未使用",
+    "logoutSectionTitle": "帳號退出",
+    "logoutSectionDesc": "退出後將返回登錄頁，您需要重新登錄才能繼續使用。此操作僅登出當前設備。",
+    "logoutConfirmText": "確定要退出登錄嗎？您需要重新登錄才能再次使用。",
+    "logoutConfirmButton": "確定退出",
+    "loadingApiKeys": "載入中...",
+    "apiKeyCreatedOnce": "密鑰已建立，請妥善保存。此密鑰僅顯示一次。",
+    "apiKeyNamePrompt": "請輸入密鑰名稱（用於識別）",
+    "apiKeyNamePlaceholder": "Unnamed Key",
+    "copyKey": "複製",
+    "deleteApiKeyConfirm": "確定要刪除此 API 密鑰嗎？刪除後無法恢復。",
+    "logoutUnsavedHint": "您有未保存的個人資料修改，是否仍要退出？"
   },
   "admin": {
     "dashboard": "管理員儀表板",

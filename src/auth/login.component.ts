@@ -147,9 +147,17 @@ import { environment } from '../environments/environment';
         <span>{{ t('auth.or') }}</span>
       </div>
       
-      <!-- Telegram 登入方式（已去除掃碼登錄） -->
+      <!-- Telegram 登入方式（含掃碼登錄） -->
       <div class="telegram-login-section">
         <div class="login-method-tabs">
+          <button 
+            class="method-tab" 
+            [class.active]="loginMethod() === 'qr'"
+            (click)="switchLoginMethod('qr')"
+          >
+            <span class="tab-icon">📷</span>
+            <span>{{ t('auth.qrCodeLogin') }}</span>
+          </button>
           <button 
             class="method-tab" 
             [class.active]="loginMethod() === 'deeplink'"
@@ -168,7 +176,46 @@ import { environment } from '../environments/environment';
           </button>
         </div>
         
-        <!-- Deep Link 登入 -->
+        <!-- 掃碼登錄 -->
+        @if (loginMethod() === 'qr') {
+          <div class="qr-panel">
+            @if (!qrCodeUrl()) {
+              <button 
+                class="social-btn telegram full-width primary-telegram" 
+                (click)="generateQRCode()"
+                [disabled]="qrCodeLoading()"
+              >
+                @if (qrCodeLoading()) {
+                  <span class="loading-spinner small"></span>
+                  <span>{{ t('auth.generatingQR') }}</span>
+                } @else {
+                  <span class="social-icon">📷</span>
+                  <span>{{ t('auth.generateQRCode') }}</span>
+                }
+              </button>
+              @if (qrBotError()) {
+                <p class="qr-bot-error">{{ qrBotError() }}</p>
+              }
+            } @else {
+              @if (qrCodeExpired()) {
+                <p class="qr-expired-hint">{{ t('auth.qrExpired') }}</p>
+                <button class="refresh-qr-btn" (click)="refreshQRCode()">{{ t('auth.clickToRefresh') }}</button>
+              } @else {
+                <div class="qr-display">
+                  <img [src]="qrCodeUrl()!" alt="QR Code" class="qr-image" />
+                  <p class="qr-hint">{{ t('auth.scanQRCode') }}</p>
+                  <p class="qr-countdown">{{ t('auth.remainingTime', {seconds: qrCountdown()}) }}</p>
+                  @if (verifyCode()) {
+                    <p class="qr-verify-hint">{{ t('auth.orEnterCode') }}: <strong>{{ verifyCode() }}</strong></p>
+                  }
+                  <button type="button" class="cancel-btn" (click)="cleanupQRCode()">{{ t('auth.cancel') }}</button>
+                </div>
+              }
+            }
+          </div>
+        }
+        
+        <!-- App 登入（Deep Link） -->
         @if (loginMethod() === 'deeplink') {
           <div class="deeplink-panel">
             <button 
@@ -926,10 +973,45 @@ import { environment } from '../environments/environment';
     }
     
     /* Deep Link 面板 */
-    .deeplink-panel, .widget-panel {
+    .deeplink-panel, .widget-panel, .qr-panel {
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
+    }
+    
+    .qr-display {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .qr-image {
+      width: 180px;
+      height: 180px;
+      border-radius: 8px;
+    }
+    .qr-hint, .qr-countdown, .qr-verify-hint {
+      font-size: 0.875rem;
+      color: var(--text-secondary, #aaa);
+      margin: 0;
+    }
+    .qr-expired-hint {
+      font-size: 0.875rem;
+      color: var(--text-secondary, #aaa);
+      margin: 0;
+    }
+    .refresh-qr-btn {
+      padding: 0.5rem 1rem;
+      background: var(--bg-secondary, #1a1a1a);
+      border: 1px solid var(--border-color, #333);
+      border-radius: 8px;
+      color: var(--text-primary, #fff);
+      cursor: pointer;
+    }
+    .qr-bot-error {
+      font-size: 0.8rem;
+      color: #f87171;
+      margin: 0;
     }
     
     .widget-hint {
@@ -1075,7 +1157,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   private deepLinkCountdownInterval: any = null;
   
   // 🆕 Phase 2: QR Code + WebSocket 登入狀態
-  loginMethod = signal<'deeplink' | 'widget'>('deeplink');  // 默認 QR Code
+  loginMethod = signal<'deeplink' | 'widget' | 'qr'>('qr');  // 默認顯示掃碼登錄
   qrCodeLoading = signal(false);
   qrCodeUrl = signal<string | null>(null);
   qrCodeExpired = signal(false);
@@ -1144,7 +1226,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     } else if (this.isMobileDevice()) {
       this.loginMethod.set('deeplink');
     } else {
-      this.loginMethod.set('deeplink');
+      this.loginMethod.set('qr');
     }
   }
   
@@ -1573,9 +1655,12 @@ export class LoginComponent implements OnInit, OnDestroy {
   /**
    * 切換登入方式
    */
-  switchLoginMethod(method: 'deeplink' | 'widget') {
+  switchLoginMethod(method: 'deeplink' | 'widget' | 'qr') {
     if (this.loginMethod() === 'deeplink' && method !== 'deeplink') {
       this.cancelDeepLink();
+    }
+    if (this.loginMethod() === 'qr' && method !== 'qr') {
+      this.cleanupQRCode();
     }
     this.loginMethod.set(method);
     this.error.set(null);
@@ -1978,10 +2063,10 @@ export class LoginComponent implements OnInit, OnDestroy {
   /**
    * 🆕 Phase 3: 讀取登入方式偏好
    */
-  private loadLoginPreference(): 'deeplink' | 'widget' | null {
+  private loadLoginPreference(): 'deeplink' | 'widget' | 'qr' | null {
     try {
       const saved = localStorage.getItem('tgm_login_method');
-      if (saved === 'deeplink' || saved === 'widget') {
+      if (saved === 'deeplink' || saved === 'widget' || saved === 'qr') {
         return saved;
       }
     } catch (e) {

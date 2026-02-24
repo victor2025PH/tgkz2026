@@ -25,11 +25,11 @@ from typing import Optional, Dict, Any, Tuple
 
 logger = logging.getLogger(__name__)
 
-# 同一 (chat_id, token_prefix) 在 60s 內只發送一次「登錄失敗」，避免 Telegram 重複推送導致連刷多條
+# 同一 (chat_id, token_prefix) 在時間窗內只發送一次「登錄失敗」，避免 Telegram 重複推送導致連刷多條
 _LOGIN_FAILED_SENT: Dict[Tuple[int, str], float] = {}
-# 同一 chat_id 在 60s 內只允許發送一條登錄失敗（不論 token），避免 6 條連發
+# 同一 chat_id 在時間窗內只允許發送一條登錄失敗（不論 token），避免一次掃碼觸發多條
 _LOGIN_FAILED_CHAT_SENT: Dict[int, float] = {}
-_LOGIN_FAILED_DEDUPE_SEC = 60
+_LOGIN_FAILED_DEDUPE_SEC = 120  # 2 分鐘內同一對話只發一條登錄失敗
 
 # 後端返回 HTML（如 502/504 錯誤頁）時向用戶顯示的錯誤文案
 SERVER_ERROR_USER_MESSAGE = '服务器内部错误'
@@ -221,6 +221,8 @@ class TelegramBotHandler:
         # 內部 API 地址（用於確認登入）。必須與生成 login token 的後端為同一實例/同一 DB，見 .cursorrules「登錄 Token 與掃碼後端統一規範」
         self.internal_api = os.environ.get('INTERNAL_API_URL', 'http://localhost:8000')
         logger.info("[Bot] INTERNAL_API_URL=%s (login token 須由此後端生成)", self.internal_api)
+        # 對外官網/登錄頁（Bot 消息中的鏈接，可選）
+        self.public_url = os.environ.get('PUBLIC_URL', 'https://tgw.usdt2026.cc').rstrip('/')
         
         if not self.bot_token:
             logger.warning("TELEGRAM_BOT_TOKEN not configured")
@@ -239,7 +241,18 @@ class TelegramBotHandler:
         callback_query = update.get('callback_query')
         
         if message:
-            return await self._handle_message(message)
+            try:
+                return await self._handle_message(message)
+            except Exception as e:
+                logger.exception("[Bot] _handle_message error: %s", e)
+                try:
+                    await self._send_message(
+                        message.get('chat', {}).get('id'),
+                        "⚠️ 服務暫時不可用，請稍後再試。若持續發生請聯繫客服。"
+                    )
+                except Exception:
+                    pass
+                return "已回覆錯誤"
         elif callback_query:
             return await self._handle_callback(callback_query)
         
@@ -374,9 +387,10 @@ class TelegramBotHandler:
         user = callback.get('from', {})
         callback_id = callback.get('id')
         
-        # 確認登入按鈕
+        # 確認登入按鈕（與 _auto_confirm_login 共用限流：僅取得 reserve 時才發送失敗，避免一次掃碼觸發多條）
         if data.startswith('confirm_login_'):
             token = data[14:]  # 移除 "confirm_login_" 前綴
+            got_reserve = _reserve_login_failed_send(chat_id, token)
             result = await self._confirm_login(token, user)
             
             # 回應回調
@@ -386,7 +400,7 @@ class TelegramBotHandler:
                 success_msg = get_message('login_success', user)
                 await self._send_message(chat_id, success_msg)
             else:
-                if not _should_skip_duplicate_login_failed(chat_id, token):
+                if got_reserve:
                     friendly_error = _user_friendly_login_error(result.get('message', ''), user)
                     error_msg = get_message('login_failed', user, error=friendly_error)
                     await self._send_message(chat_id, error_msg)
@@ -614,10 +628,11 @@ class TelegramBotHandler:
     
     async def _send_login_info(self, chat_id: int, user: Dict[str, Any]) -> str:
         """發送登入信息"""
-        message = """
+        url = getattr(self, 'public_url', None) or os.environ.get('PUBLIC_URL', 'https://tgw.usdt2026.cc')
+        message = f"""
 🔐 *如何登入 TG-AI智控王*
 
-1️⃣ 打開網頁 https://tgw.usdt2026.cc
+1️⃣ 打開網頁 {url}
 2️⃣ 點擊「打開 Telegram 登入」按鈕
 3️⃣ 會自動跳轉到這裡
 4️⃣ 點擊「確認登入」按鈕
@@ -630,7 +645,8 @@ class TelegramBotHandler:
     
     async def _send_help(self, chat_id: int) -> str:
         """發送幫助信息"""
-        message = """
+        url = getattr(self, 'public_url', None) or os.environ.get('PUBLIC_URL', 'https://tgw.usdt2026.cc')
+        message = f"""
 📖 *幫助中心*
 
 *可用命令：*
@@ -641,7 +657,7 @@ class TelegramBotHandler:
 *關於 TG-AI智控王*
 智能 Telegram 營銷自動化平台
 
-🌐 官網: https://tgw.usdt2026.cc
+🌐 官網: {url}
 📧 支持: support@usdt2026.cc
 """
         

@@ -396,6 +396,65 @@
         }
       </div>
       
+      <!-- 🎯 精簡獲客模式：僅渲染 6 個核心獲客入口，不渲染下方完整側欄
+           （AppComponent 本身仍會實例化並執行 ngOnInit 的 IPC/初始狀態邏輯，
+           此處只是模板層切換顯示內容，不影響任何視圖的數據初始化） -->
+      @if (leanMode) {
+        <nav class="flex-1 overflow-y-auto overflow-x-hidden sidebar-nav mt-2 px-2 pb-2">
+          @let leanView = currentView();
+          <a (click)="changeView('dashboard')"
+             class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1"
+             [class.active]="leanView === 'dashboard'"
+             [style.background-color]="leanView === 'dashboard' ? 'var(--sidebar-item-active)' : 'transparent'"
+             [style.color]="leanView === 'dashboard' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
+            <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <span>{{ t('dashboard') }}</span>
+          </a>
+          <a (click)="changeView('accounts')"
+             class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1"
+             [class.active]="leanView === 'accounts' || leanView === 'add-account' || leanView === 'api-credentials'"
+             [style.background-color]="(leanView === 'accounts' || leanView === 'add-account' || leanView === 'api-credentials') ? 'var(--sidebar-item-active)' : 'transparent'"
+             [style.color]="(leanView === 'accounts' || leanView === 'add-account' || leanView === 'api-credentials') ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
+            <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <span>帳號管理</span>
+          </a>
+          <a (click)="changeView('search-discovery')"
+             class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1"
+             [class.active]="leanView === 'search-discovery' || leanView === 'resource-discovery'"
+             [style.background-color]="(leanView === 'search-discovery' || leanView === 'resource-discovery') ? 'var(--sidebar-item-active)' : 'transparent'"
+             [style.color]="(leanView === 'search-discovery' || leanView === 'resource-discovery') ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
+            <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <span>搜索發現</span>
+          </a>
+          <a (click)="changeView('automation')"
+             class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1"
+             [class.active]="leanView === 'automation' || leanView === 'monitoring-accounts' || leanView === 'monitoring-groups' || leanView === 'keyword-sets' || leanView === 'trigger-rules'"
+             [style.background-color]="(leanView === 'automation' || leanView === 'monitoring-accounts' || leanView === 'monitoring-groups' || leanView === 'keyword-sets' || leanView === 'trigger-rules') ? 'var(--sidebar-item-active)' : 'transparent'"
+             [style.color]="(leanView === 'automation' || leanView === 'monitoring-accounts' || leanView === 'monitoring-groups' || leanView === 'keyword-sets' || leanView === 'trigger-rules') ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
+            <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            <span>監控中心</span>
+          </a>
+          <a (click)="changeView('leads')"
+             class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1"
+             [class.active]="leanView === 'leads'"
+             [style.background-color]="leanView === 'leads' ? 'var(--sidebar-item-active)' : 'transparent'"
+             [style.color]="leanView === 'leads' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
+            <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+            <span>潛在客戶</span>
+          </a>
+          <a (click)="changeView('settings')"
+             class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1"
+             [class.active]="leanView === 'settings'"
+             [style.background-color]="leanView === 'settings' ? 'var(--sidebar-item-active)' : 'transparent'"
+             [style.color]="leanView === 'settings' ? 'var(--sidebar-text-active)' : 'var(--sidebar-text)'">
+            <svg class="h-5 w-5 sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <span>{{ t('settings') }}</span>
+          </a>
+          <div class="mt-3 px-3 py-2 text-[11px] leading-tight" style="color: var(--text-muted);">
+            ⚡ 精簡獲客模式 · 僅顯示核心功能
+          </div>
+        </nav>
+      } @else {
       <!-- 可滾動的導航區域 -->
       <nav class="flex-1 overflow-y-auto overflow-x-hidden sidebar-nav mt-2 px-2 pb-2">
         @let view = currentView();
@@ -829,6 +888,7 @@
           }
         </div>
       </nav>
+      }
 
     <!-- 🔧 側欄瘦身：幫助、語言、外觀已移入「設置」頁，底部不再固定區塊，主菜單可顯示更多 -->
   </aside>

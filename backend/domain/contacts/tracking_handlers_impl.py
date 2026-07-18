@@ -19,6 +19,15 @@ from service_locator import (
     get_user_tracker,
     vector_memory
 )
+
+# 🎯 精簡獲客模式：ENABLE_AI=False 時，本文件中依賴 auto_funnel/vector_memory
+# 的 handler 需要在返回結果中標記 ai_disabled，避免前端把「AI 關閉導致的空數據」
+# 誤判為「真的沒有數據」。import 失敗時保守默認 True（不改變現有行為）。
+try:
+    from config import ENABLE_AI
+except Exception:
+    ENABLE_AI = True
+
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -33,10 +42,14 @@ async def handle_analyze_user_message(self, payload: Dict[str, Any]):
         
         result = await auto_funnel.analyze_message(user_id, message, is_from_user)
         
-        self.send_event("message-analyzed", {
+        event_data = {
             "success": True,
             **result
-        })
+        }
+        if not ENABLE_AI:
+            # AI 關閉時 auto_funnel 為安全空對象，result 不含真實分析數據
+            event_data['ai_disabled'] = True
+        self.send_event("message-analyzed", event_data)
     except Exception as e:
         self.send_event("message-analyzed", {
             "success": False,
@@ -49,11 +62,15 @@ async def handle_get_user_journey(self, payload: Dict[str, Any]):
         user_id = payload.get('userId', '')
         journey = await auto_funnel.get_user_journey(user_id)
         
-        self.send_event("user-journey", {
+        event_data = {
             "success": True,
             "userId": user_id,
             "journey": journey
-        })
+        }
+        if not ENABLE_AI:
+            # AI 關閉時 auto_funnel 為安全空對象，journey 不含真實旅程數據
+            event_data['ai_disabled'] = True
+        self.send_event("user-journey", event_data)
     except Exception as e:
         self.send_event("user-journey", {
             "success": False,
@@ -91,7 +108,7 @@ async def handle_get_user_profile_full(self, payload: Dict[str, Any]):
         # Get memory stats
         stats = await vector_memory.get_user_memory_stats(user_id)
         
-        self.send_event("user-profile-full", {
+        event_data = {
             "success": True,
             "userId": user_id,
             "profile": profile,
@@ -99,7 +116,12 @@ async def handle_get_user_profile_full(self, payload: Dict[str, Any]):
             "tags": tags_list,
             "funnelHistory": history,
             "memoryStats": stats
-        })
+        }
+        if not ENABLE_AI:
+            # profile/crm/tags/funnelHistory 為純資料庫讀取，不受 AI 開關影響；
+            # 僅 memoryStats 來自 AI 向量記憶，AI 關閉時為空，標記 ai_disabled 供前端判斷
+            event_data['ai_disabled'] = True
+        self.send_event("user-profile-full", event_data)
     except Exception as e:
         self.send_event("user-profile-full", {
             "success": False,

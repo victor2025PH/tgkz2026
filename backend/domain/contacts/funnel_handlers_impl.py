@@ -14,6 +14,15 @@ from service_context import get_service_context
 from database import db
 
 from service_locator import auto_funnel, get_batch_ops, get_multi_channel_stats
+
+# 🎯 精簡獲客模式：ENABLE_AI=False 時，本文件中依賴 auto_funnel 的 handler 需要
+# 在返回結果中標記 ai_disabled，避免前端把「AI 關閉導致的空數據」誤判為「真的
+# 沒有數據」。import 失敗時保守默認 True（不改變現有行為）。
+try:
+    from config import ENABLE_AI
+except Exception:
+    ENABLE_AI = True
+
 # All handlers receive (self, payload) where self is BackendService instance.
 # They are called via: await handler_impl(self, payload)
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
@@ -26,10 +35,14 @@ async def handle_get_funnel_overview(self):
     """獲取漏斗總覽"""
     try:
         overview = await auto_funnel.get_funnel_overview()
-        self.send_event("funnel-overview", {
+        event_data = {
             "success": True,
             **overview
-        })
+        }
+        if not ENABLE_AI:
+            # AI 關閉時 auto_funnel 為安全空對象，overview 不含真實漏斗數據
+            event_data['ai_disabled'] = True
+        self.send_event("funnel-overview", event_data)
     except Exception as e:
         self.send_event("funnel-overview", {
             "success": False,
@@ -43,6 +56,15 @@ async def handle_transition_funnel_stage(self, payload: Dict[str, Any]):
         user_id = payload.get('userId', '')
         new_stage = payload.get('stage', '')
         reason = payload.get('reason', '手動設置')
+        
+        if not ENABLE_AI:
+            # AI 關閉時 auto_funnel 為安全空對象（非真正 dict），無法真實執行階段
+            # 轉換，也不能直接對其注入鍵；改為回傳明確標記的結果，避免誤報成功
+            self.send_event("stage-transitioned", {
+                "success": False,
+                "ai_disabled": True
+            })
+            return
         
         result = await auto_funnel.transition_stage(user_id, new_stage, reason)
         
@@ -60,6 +82,15 @@ async def handle_batch_update_stages(self, payload: Dict[str, Any]):
         user_ids = payload.get('userIds', [])
         new_stage = payload.get('stage', '')
         reason = payload.get('reason', '批量更新')
+        
+        if not ENABLE_AI:
+            # AI 關閉時 auto_funnel 為安全空對象，不會真正執行批量階段更新；
+            # 明確標記 ai_disabled，避免誤報成功
+            self.send_event("batch-stages-updated", {
+                "success": False,
+                "ai_disabled": True
+            })
+            return
         
         result = await auto_funnel.batch_update_stages(user_ids, new_stage, reason)
         

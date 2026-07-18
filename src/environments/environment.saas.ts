@@ -17,7 +17,9 @@ export const environment = {
     aiEnabled: true,
     teamFeatures: false,    // 付費功能
     apiAccess: false,       // 付費功能
-    debug: false
+    debug: false,
+    // 🎯 精簡獲客模式：true 時隱藏 AI 增值入口（策略規劃/自動執行/多角色/智能引擎/客戶培育）
+    leanMode: false
   },
   
   // 訂閱級別功能配置

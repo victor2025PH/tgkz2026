@@ -26,3 +26,6 @@ export { AnalyticsViewComponent } from './analytics-view.component';
 
 // 系統視圖
 export { MonitoringViewComponent } from './monitoring-view.component';
+
+// 🆕 精簡獲客模式（Stage 2C）
+export { LeanShellComponent } from './lean-shell.component';

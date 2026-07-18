@@ -30,6 +30,14 @@ def _get_MessagePriority():
 
 
 def _get_ai_auto_chat():
+    # 🎯 精簡獲客模式：關閉 AI 時直接返回 None，一處攔截所有 Lead 動作的 AI 調用
+    # （問候與觸發規則會自動回退到模板/固定文案，且不會懶加載 AI 模塊）
+    try:
+        from config import ENABLE_AI
+        if not ENABLE_AI:
+            return None
+    except Exception:
+        pass
     try:
         from service_locator import ai_auto_chat
         return ai_auto_chat
@@ -188,7 +196,15 @@ class LeadActionsMixin:
                     _lead_rule_cooldown.pop(k, None)
 
             try:
-                response_type = rule.get('responseType', rule.get('response_type', 'ai_chat'))
+                # 🎯 精簡獲客模式：規則未指定回覆方式時，默認走模板而非 AI 聊天
+                _default_response_type = 'ai_chat'
+                try:
+                    from config import ENABLE_AI as _EN_AI
+                    if not _EN_AI:
+                        _default_response_type = 'template'
+                except Exception:
+                    pass
+                response_type = rule.get('responseType', rule.get('response_type', _default_response_type))
                 response_config = rule.get('responseConfig', rule.get('response_config')) or {}
                 if isinstance(response_config, str):
                     try:

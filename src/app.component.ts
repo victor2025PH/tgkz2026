@@ -38,6 +38,7 @@ import { SwManagerService } from './services/sw-manager.service';
 import { OnboardingComponent } from './onboarding.component';
 // BackupService 從 ./services 統一導入
 import { I18nService } from './i18n.service';
+import { environment } from './environments/environment';
 // 新增：用戶認證相關 - 使用統一的 JWT 認證服務
 import { AuthService } from './core/auth.service';
 // 🔧 P4-1: Legacy LoginComponent 已移除，統一使用 /auth/login 路由（Core LoginComponent）
@@ -497,6 +498,17 @@ export class AppComponent implements OnDestroy, OnInit {
   // 檢查分組是否展開
   isSidebarGroupExpanded(group: string): boolean {
     return this.sidebarGroups()[group] ?? true;
+  }
+
+  // 🎯 精簡獲客模式開關：隱藏 AI 增值菜單（策略規劃/自動執行/多角色/智能引擎/客戶培育）
+  // 優先讀 localStorage（便於運行時切換演示），否則回退到構建期 environment 開關
+  get leanMode(): boolean {
+    try {
+      const ls = localStorage.getItem('tg_lean_mode');
+      if (ls === 'true') return true;
+      if (ls === 'false') return false;
+    } catch { /* ignore */ }
+    return !!(environment as any)?.features?.leanMode;
   }
   
   // 從本地存儲加載側邊欄分組狀態

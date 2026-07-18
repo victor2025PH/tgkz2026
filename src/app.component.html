@@ -598,7 +598,8 @@
           }
         </div>
         
-        <!-- 分組：AI 智能營銷（可折疊） -->
+        <!-- 分組：AI 智能營銷（可折疊）— 🎯 精簡獲客模式隱藏 -->
+        @if (!leanMode) {
         <div class="sidebar-group">
           <button (click)="toggleSidebarGroup('marketing')" 
                   class="w-full flex items-center justify-between px-3 py-2 mt-2 rounded-md hover:bg-white/5 transition-colors cursor-pointer group">
@@ -700,6 +701,7 @@
             </div>
           }
         </div>
+        }
         
         <!-- 分組：📊 數據分析（可折疊） -->
         <div class="sidebar-group">
@@ -728,6 +730,8 @@
                  <span>分析中心</span>
               </a>
               
+              <!-- 客戶培育 + 多角色（AI 增值）— 🎯 精簡獲客模式隱藏 -->
+              @if (!leanMode) {
               <!-- 客戶培育 (保留 AI 跟進功能) -->
               <a (click)="changeView('lead-nurturing')"
                  class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 cursor-pointer mb-1"
@@ -754,11 +758,13 @@
                    <span class="ml-auto text-xs opacity-60">💎</span>
                  }
               </a>
+              }
             </div>
           }
         </div>
         
-        <!-- 分組：AI 智能（可折疊） -->
+        <!-- 分組：AI 智能（可折疊）— 🎯 精簡獲客模式隱藏 -->
+        @if (!leanMode) {
         <div class="sidebar-group">
           <button (click)="toggleSidebarGroup('ai')" 
                   class="w-full flex items-center justify-between px-3 py-2 mt-2 rounded-md hover:bg-white/5 transition-colors cursor-pointer group">
@@ -791,6 +797,7 @@
             </div>
           }
         </div>
+        }
         
         <!-- 分組：系統監控（可折疊） -->
         <div class="sidebar-group">

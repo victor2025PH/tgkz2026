@@ -28,6 +28,16 @@ from service_locator import (
 # Inside, use self.db, self.send_event(), self.telegram_manager, etc.
 # This is a transitional pattern - later, replace self.xxx with ctx.xxx
 
+
+def _get_lean_mode_flag() -> bool:
+    """🎯 精簡獲客模式旗標（供狀態/診斷面板展示，導入失敗時默認 False 保持原樣顯示）。"""
+    try:
+        from config import LEAN_MODE
+        return LEAN_MODE
+    except Exception:
+        return False
+
+
 async def handle_start_monitoring(self):
     """Handle start-monitoring command with Pyrogram"""
     import sys  # 在函數開頭導入，避免 UnboundLocalError
@@ -890,6 +900,15 @@ async def handle_one_click_start(self, payload: Dict[str, Any] = None):
             ai_settings = await db.get_ai_settings()
             ai_enabled = ai_settings.get('auto_chat_enabled', 0) == 1 if ai_settings else False
             ai_mode = ai_settings.get('auto_chat_mode', 'semi') if ai_settings else 'semi'
+            # 🎯 精簡獲客模式：AI 全局關閉時，即使 DB 裡 auto_chat_enabled 殘留舊值為
+            # 1，AI 聊天實際上也不可能觸發回覆，這裡強制視為未啟用，避免「響應配置有效
+            # 性」判斷誤把不會執行的 AI 聊天當作有效響應來源。
+            try:
+                from config import ENABLE_AI as _RESP_ENABLE_AI
+                if not _RESP_ENABLE_AI:
+                    ai_enabled = False
+            except Exception:
+                pass
             results['response_config']['ai_chat'] = {
                 'enabled': ai_enabled,
                 'mode': ai_mode
@@ -946,37 +965,51 @@ async def handle_one_click_start(self, payload: Dict[str, Any] = None):
             "progress": 50
         })
         
+        # 🎯 精簡獲客模式：AI 全局關閉時，一鍵啟動不應該反向把 DB 的
+        # auto_chat_enabled/auto_chat_mode 強制改回開啟——否則會靜默違背
+        # Lean 模式的設計意圖。這裡視為「AI 步驟不適用」而非「失敗」，
+        # 避免拖累下方 overall_success / 診斷分數的判斷。
         try:
-            # 更新為啟用狀態和全自動模式
-            await db.update_ai_settings({
-                'auto_chat_enabled': 1,
-                'auto_chat_mode': 'full',
-                'auto_greeting': 1
-            })
-            
-            # 重新載入 AI 設置到內存
-            await ai_auto_chat.initialize()
-            
-            # 檢查 AI 端點是否已配置
-            ai_endpoint = ai_auto_chat.local_ai_endpoint
-            if ai_endpoint:
-                self.send_log(f"✓ AI 端點: {ai_endpoint}", "success")
-            else:
-                self.send_log("⚠ AI 端點未配置，將使用備用回覆", "warning")
-            
+            from config import ENABLE_AI
+        except Exception:
+            ENABLE_AI = True
+
+        if not ENABLE_AI:
             results['ai']['success'] = True
-            results['ai']['message'] = f"AI 全自動模式已啟用" + (f" (端點: {ai_endpoint[:30]}...)" if ai_endpoint else " (備用回覆)")
-            self.send_log("✓ AI 自動聊天已啟用 (全自動模式)", "success")
-            
-            # 發送 AI 設置更新事件
-            self.send_event("ai-settings-updated", {
-                'auto_chat_enabled': True,
-                'auto_chat_mode': 'full',
-                'auto_greeting': True
-            })
-        except Exception as ai_err:
-            results['ai']['message'] = str(ai_err)
-            self.send_log(f"✗ AI 啟用錯誤: {ai_err}", "error")
+            results['ai']['message'] = "🎯 精簡獲客模式：AI 自動聊天已停用（設計如此，非錯誤）"
+            self.send_log("🎯 精簡獲客模式：跳過 AI 自動聊天啟用", "info")
+        else:
+            try:
+                # 更新為啟用狀態和全自動模式
+                await db.update_ai_settings({
+                    'auto_chat_enabled': 1,
+                    'auto_chat_mode': 'full',
+                    'auto_greeting': 1
+                })
+                
+                # 重新載入 AI 設置到內存
+                await ai_auto_chat.initialize()
+                
+                # 檢查 AI 端點是否已配置
+                ai_endpoint = ai_auto_chat.local_ai_endpoint
+                if ai_endpoint:
+                    self.send_log(f"✓ AI 端點: {ai_endpoint}", "success")
+                else:
+                    self.send_log("⚠ AI 端點未配置，將使用備用回覆", "warning")
+                
+                results['ai']['success'] = True
+                results['ai']['message'] = f"AI 全自動模式已啟用" + (f" (端點: {ai_endpoint[:30]}...)" if ai_endpoint else " (備用回覆)")
+                self.send_log("✓ AI 自動聊天已啟用 (全自動模式)", "success")
+                
+                # 發送 AI 設置更新事件
+                self.send_event("ai-settings-updated", {
+                    'auto_chat_enabled': True,
+                    'auto_chat_mode': 'full',
+                    'auto_greeting': True
+                })
+            except Exception as ai_err:
+                results['ai']['message'] = str(ai_err)
+                self.send_log(f"✗ AI 啟用錯誤: {ai_err}", "error")
         
         self.send_event("one-click-start-progress", {
             "step": "ai_done",
@@ -1071,41 +1104,54 @@ async def handle_one_click_start(self, payload: Dict[str, Any] = None):
             'message': ''
         }
         
+        # 🎯 精簡獲客模式：自動漏斗屬於 AI 增值功能（config.py 中已明確歸類），
+        # AI 全局關閉時不啟動，避免與「精簡獲客模式關閉自動漏斗」的設計意圖矛盾，
+        # 也避免误报「漏斗自動流轉已啟用」這種與實際狀態不符的訊息。
         try:
-            # 設置漏斗管理器回調
-            async def funnel_send_callback(target_user_id: str, message: str, **kwargs):
-                """漏斗自動跟進發送回調"""
-                # 獲取任一在線帳號
-                for acc in results['accounts']['details']:
-                    if acc.get('success'):
-                        phone = acc.get('phone')
-                        client = self.telegram_manager.get_client(phone)
-                        if client and client.is_connected:
-                            try:
-                                await client.send_message(int(target_user_id), message)
-                                self.send_log(f"[AutoFunnel] 已發送跟進消息給 {target_user_id}", "info")
-                                return True
-                            except Exception as send_err:
-                                self.send_log(f"[AutoFunnel] 發送失敗: {send_err}", "warning")
-                return False
-            
-            auto_funnel.set_callbacks(
-                send_callback=funnel_send_callback,
-                log_callback=self.send_log,
-                event_callback=self.send_event
-            )
-            
-            # 確保漏斗管理器已啟動
-            if not auto_funnel.is_running:
-                await auto_funnel.start()
-            
+            from config import ENABLE_AI
+        except Exception:
+            ENABLE_AI = True
+
+        if not ENABLE_AI:
             results['funnel']['success'] = True
-            results['funnel']['message'] = "漏斗自動流轉已啟用"
-            self.send_log("✓ 漏斗自動流轉已啟動（每30分鐘檢查跟進）", "success")
-            
-        except Exception as funnel_err:
-            results['funnel']['message'] = str(funnel_err)
-            self.send_log(f"⚠ 漏斗管理器啟動錯誤: {funnel_err}", "warning")
+            results['funnel']['message'] = "🎯 精簡獲客模式：自動漏斗已停用（設計如此，非錯誤）"
+            self.send_log("🎯 精簡獲客模式：跳過漏斗自動流轉啟動", "info")
+        else:
+            try:
+                # 設置漏斗管理器回調
+                async def funnel_send_callback(target_user_id: str, message: str, **kwargs):
+                    """漏斗自動跟進發送回調"""
+                    # 獲取任一在線帳號
+                    for acc in results['accounts']['details']:
+                        if acc.get('success'):
+                            phone = acc.get('phone')
+                            client = self.telegram_manager.get_client(phone)
+                            if client and client.is_connected:
+                                try:
+                                    await client.send_message(int(target_user_id), message)
+                                    self.send_log(f"[AutoFunnel] 已發送跟進消息給 {target_user_id}", "info")
+                                    return True
+                                except Exception as send_err:
+                                    self.send_log(f"[AutoFunnel] 發送失敗: {send_err}", "warning")
+                    return False
+                
+                auto_funnel.set_callbacks(
+                    send_callback=funnel_send_callback,
+                    log_callback=self.send_log,
+                    event_callback=self.send_event
+                )
+                
+                # 確保漏斗管理器已啟動
+                if not auto_funnel.is_running:
+                    await auto_funnel.start()
+                
+                results['funnel']['success'] = True
+                results['funnel']['message'] = "漏斗自動流轉已啟用"
+                self.send_log("✓ 漏斗自動流轉已啟動（每30分鐘檢查跟進）", "success")
+                
+            except Exception as funnel_err:
+                results['funnel']['message'] = str(funnel_err)
+                self.send_log(f"⚠ 漏斗管理器啟動錯誤: {funnel_err}", "warning")
         
         # === 步驟 7: 生成診斷報告 ===
         self.send_event("one-click-start-progress", {
@@ -1324,6 +1370,15 @@ async def handle_get_system_status(self):
         ai_settings = await db.get_ai_settings()
         ai_enabled = ai_settings.get('auto_chat_enabled', 0) == 1 if ai_settings else False
         ai_mode = ai_settings.get('auto_chat_mode', 'semi') if ai_settings else 'semi'
+        # 🎯 精簡獲客模式：AI 全局關閉時，狀態面板不應顯示可能誤導的舊 DB 數據
+        # （例如切換到 Lean 模式前殘留的 auto_chat_enabled=1）——AI 實際上不可能
+        # 運作，這裡強制回報為未啟用。
+        try:
+            from config import ENABLE_AI
+            if not ENABLE_AI:
+                ai_enabled = False
+        except Exception:
+            pass
         
         # 是否具備可用 AI 回覆能力（日常對話有已連接模型或默認模型已連接）
         ai_can_reply = False
@@ -1372,7 +1427,9 @@ async def handle_get_system_status(self):
                 'enabled': ai_enabled,
                 'mode': ai_mode,
                 'canReply': ai_can_reply,
-                'endpoint': ai_settings.get('local_ai_endpoint', '') if ai_settings else ''
+                'endpoint': ai_settings.get('local_ai_endpoint', '') if ai_settings else '',
+                # 🎯 精簡獲客模式標記，方便前端明確展示「AI 已停用」而非顯示舊數據
+                'leanMode': _get_lean_mode_flag()
             },
             'keywords': {
                 'sets': len(keyword_sets),
@@ -1619,11 +1676,20 @@ async def handle_check_monitoring_health(self):
                 if phone not in self.telegram_manager.message_handlers:
                     handler_issues.append(f"監控帳號 {phone} 未註冊群組消息處理器")
         
-        for account in online_senders:
-            phone = account.get('phone')
-            if hasattr(private_message_handler, 'private_handlers'):
-                if phone not in private_message_handler.private_handlers:
-                    handler_issues.append(f"發送帳號 {phone} 未註冊私信處理器")
+        # 🎯 精簡獲客模式：AI 全局關閉時，telegram_client.register_private_message_handler
+        # 設計上就會跳過私信處理器註冊（不是故障），這裡不應該把「預期中的未註冊」
+        # 誤報為健康檢查問題。
+        try:
+            from config import ENABLE_AI as _HEALTH_ENABLE_AI
+        except Exception:
+            _HEALTH_ENABLE_AI = True
+
+        if _HEALTH_ENABLE_AI:
+            for account in online_senders:
+                phone = account.get('phone')
+                if hasattr(private_message_handler, 'private_handlers'):
+                    if phone not in private_message_handler.private_handlers:
+                        handler_issues.append(f"發送帳號 {phone} 未註冊私信處理器")
         
         if handler_issues:
             issues.extend(handler_issues)

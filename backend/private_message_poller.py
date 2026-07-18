@@ -10,8 +10,11 @@ from datetime import datetime, timedelta
 from pyrogram import Client
 from pyrogram.enums import ChatType
 from database import db
-from ai_auto_chat import ai_auto_chat
-from auto_funnel_manager import auto_funnel
+# 🎯 精簡獲客模式：AI 依賴改為透過 service_locator 懶加載（原本是頂層 `from
+# ai_auto_chat import ai_auto_chat` / `from auto_funnel_manager import auto_funnel`，
+# 會在本模塊被 import 時就無條件真實加載重量級 AI 模塊，繞過 ENABLE_AI 開關）。
+# ENABLE_AI=True 時 service_locator 代理的行為與原直接 import 完全一致。
+from service_locator import ai_auto_chat, auto_funnel
 
 
 class PrivateMessagePoller:
@@ -264,6 +267,15 @@ class PrivateMessagePoller:
             else:
                 self.log(f"⚠️ event_callback 未設置，無法發送事件", "warning")
             
+            # 🎯 精簡獲客模式：AI 全局關閉時直接跳過（不論 DB 中 auto_chat_enabled 設置為何）
+            try:
+                from config import ENABLE_AI
+            except Exception:
+                ENABLE_AI = True
+            if not ENABLE_AI:
+                self.log("精簡獲客模式：跳過 AI 自動回覆（漏斗分析/AI回覆均不執行）", "debug")
+                return
+
             # 檢查 AI 自動回覆設置
             ai_settings = await db.get_ai_settings()
             auto_chat_enabled = ai_settings.get('auto_chat_enabled', 0) == 1
@@ -343,6 +355,16 @@ class PrivateMessagePoller:
             user_message: 用戶消息
             chat_id: 聊天 ID
         """
+        # 🎯 精簡獲客模式：AI 關閉時跳過私信 AI 自動回覆生成（纵深防御；
+        # service_locator 的空對象即使被繞過也不會拋異常，這裡只是提前短路並打日誌）。
+        try:
+            from config import ENABLE_AI
+        except Exception:
+            ENABLE_AI = True
+        if not ENABLE_AI:
+            self.log("精簡獲客模式：跳過 AI 自動回覆", "debug")
+            return
+
         try:
             user_id = str(user.id)
             username = user.username or user.first_name or f"User_{user_id}"
@@ -450,6 +472,15 @@ class PrivateMessagePoller:
             user: 用戶對象
             user_message: 用戶消息
         """
+        # 🎯 精簡獲客模式：AI 關閉時跳過私信 AI 建議回覆生成
+        try:
+            from config import ENABLE_AI
+        except Exception:
+            ENABLE_AI = True
+        if not ENABLE_AI:
+            self.log("精簡獲客模式：跳過 AI 建議回覆", "debug")
+            return
+
         try:
             user_id = str(user.id)
             username = user.username or user.first_name or f"User_{user_id}"

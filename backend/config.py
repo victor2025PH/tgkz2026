@@ -213,6 +213,79 @@ print(f"[Config] 最大並發客戶端: {SandboxConfig.MAX_CONCURRENT_CLIENTS}",
 print(f"[Config] ====================================", file=sys.stderr)
 
 
+# ========== 🎯 產品功能開關（精簡獲客模式 Lean Acquisition） ==========
+class FeatureConfig:
+    """
+    產品功能開關 — 支持「精簡獲客模式」(Lean Acquisition Mode)。
+
+    LEAN_MODE=true 時關閉 AI 全自動聊天 / RAG / 向量記憶 / 自動漏斗 / 多角色
+    等增值模塊，只保留核心獲客能力：登入、帳號管理、搜索發現、入群、
+    成員提取、關鍵詞監控、批量群發、統一聯繫人。
+
+    設計原則：
+    - 默認保持兼容：未設置任何開關時 ENABLE_AI=True，現有部署行為不變。
+    - 完全可逆：純開關控制，不刪除任何代碼；一套代碼兩種形態。
+    - 可精細覆蓋：TG_ENABLE_AI 可獨立於 TG_LEAN_MODE 強制開/關 AI。
+    """
+
+    # 精簡模式總開關（開啟後默認關閉所有 AI 增值功能）
+    LEAN_MODE = os.environ.get('TG_LEAN_MODE', '').lower() in ('true', '1', 'yes')
+
+    # AI 能力總開關：顯式設置 TG_ENABLE_AI 優先；否則由 LEAN_MODE 推導
+    _ai_env = os.environ.get('TG_ENABLE_AI', '').lower()
+    if _ai_env in ('true', '1', 'yes'):
+        ENABLE_AI = True
+    elif _ai_env in ('false', '0', 'no'):
+        ENABLE_AI = False
+    else:
+        ENABLE_AI = not LEAN_MODE
+
+    @classmethod
+    def status(cls) -> Dict[str, Any]:
+        return {
+            'lean_mode': cls.LEAN_MODE,
+            'enable_ai': cls.ENABLE_AI,
+        }
+
+
+# 模塊級便捷導出（供 `from config import ENABLE_AI, LEAN_MODE` 使用）
+ENABLE_AI = FeatureConfig.ENABLE_AI
+LEAN_MODE = FeatureConfig.LEAN_MODE
+
+print(f"[Config] ========== 產品功能開關 ==========", file=sys.stderr)
+print(f"[Config] 精簡獲客模式 (LEAN_MODE): {'啟用' if LEAN_MODE else '關閉'}", file=sys.stderr)
+print(f"[Config] AI 能力 (ENABLE_AI): {'啟用' if ENABLE_AI else '關閉'}", file=sys.stderr)
+print(f"[Config] ====================================", file=sys.stderr)
+
+
+# ========== 🛡️ 防封基礎設施默認值（Stage 3 起步：QR 登入接入 API 池） ==========
+class AntiBanDefaults:
+    """
+    精簡獲客模式下的防封相關默認值。
+
+    背景：手機驗證碼登入（handle_add_account）已支持 usePlatformApi 時自動從
+    平台 API 池分配專屬憑據；但 QR 登入（handle_qr_login_create）目前只有
+    「用戶自帶專屬 API」或「回退到公共 Telegram Desktop/iOS/Android API」兩條路，
+    沒有 API 池這條中間路徑，是防封鏈路上明確的一個缺口。
+
+    QR_USE_API_POOL 開啟後，QR 登入在用戶未提供專屬 API 時，會先嘗試向平台
+    API 池申請一個專屬憑據，申請成功才使用；池為空或分配失敗時，行為與現在
+    完全一致（回退公共 API + 警告日誌），不會造成任何功能倒退。
+
+    🔒 默認關閉（保守選擇）：因為 QR 登入是掃碼觸發、登入前拿不到手機號，
+    只能用臨時 key 佔用池資源，目前僅在「創建成功/失敗/取消」三個時機做了
+    佔用與釋放，但用戶「掃碼未完成即關閉 App」等邊界情況仍可能造成池資源
+    暫時未釋放（需等會話自然過期）。建議先在小流量環境觀察 API 池用量後
+    再開啟；池用量與健康狀態可在管理後台「API 對接池」頁面查看。
+    """
+
+    QR_USE_API_POOL = os.environ.get('TG_QR_USE_API_POOL', '').lower() in ('true', '1', 'yes')
+
+
+QR_USE_API_POOL = AntiBanDefaults.QR_USE_API_POOL
+print(f"[Config] QR 登入接入 API 池 (QR_USE_API_POOL): {'啟用' if QR_USE_API_POOL else '關閉（默認，回退公共 API）'}", file=sys.stderr)
+
+
 # ========== 🔧 Phase 3 優化：內存優化配置 ==========
 class MemoryOptConfig:
     """內存優化配置"""

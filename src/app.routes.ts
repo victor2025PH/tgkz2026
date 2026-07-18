@@ -41,6 +41,50 @@ export const routes: Routes = [
     redirectTo: 'dashboard',
     pathMatch: 'full'
   },
+  // ============ 🆕 精簡獲客模式 Shell（Stage 2C） ============
+  // 獨立輕量導航外殼，僅承載 6 個核心獲客功能，不依賴巨型 AppComponent 側邊欄
+  // 子路由導航皆停留在 /lean/* 之下，重用既有的懶加載視圖組件，不重複實現業務邏輯
+  {
+    path: 'lean',
+    canActivate: [authGuard],
+    loadComponent: () => import('./views/lean-shell.component').then(m => m.LeanShellComponent),
+    children: [
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./views/dashboard-view.component').then(m => m.DashboardViewComponent),
+        title: '儀表板'
+      },
+      {
+        path: 'accounts',
+        loadComponent: () => import('./views/accounts-view.component').then(m => m.AccountsViewComponent),
+        title: '帳號管理'
+      },
+      {
+        path: 'search-discovery',
+        loadComponent: () => import('./views/resource-discovery-view.component').then(m => m.ResourceDiscoveryViewComponent),
+        data: { discoveryMode: 'search-discovery' },
+        title: '搜索發現',
+        canActivate: [membershipGuard]
+      },
+      {
+        path: 'monitoring',
+        loadComponent: () => import('./views/monitoring-view.component').then(m => m.MonitoringViewComponent),
+        title: '監控中心'
+      },
+      {
+        path: 'leads',
+        loadComponent: () => import('./views/leads-view.component').then(m => m.LeadsViewComponent),
+        title: '潛在客戶',
+        canActivate: [membershipGuard]
+      },
+      {
+        path: 'settings',
+        loadComponent: () => import('./views/settings-view.component').then(m => m.SettingsViewComponent),
+        title: '設定'
+      }
+    ]
+  },
   // 核心功能 - SaaS 模式需要登入
   {
     path: 'dashboard',

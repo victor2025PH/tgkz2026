@@ -15,6 +15,10 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from functools import wraps
 
+# 🔧 改用合法連接模塊 core.db_utils（見 .cursorrules 合法連接模塊清單），
+# 不再直接 sqlite3.connect(self.db_path)，統一走集中式路徑解析 + WAL/PRAGMA 標準化。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
 
@@ -47,10 +51,10 @@ class AdminService:
     """管理員服務"""
     
     def __init__(self, db_path: str = None):
-        self.db_path = db_path or os.environ.get(
-            'DATABASE_PATH',
-            os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
-        )
+        # 🔧 統一經由 core.db_utils.resolve_db_path() 解析（DATABASE_PATH env → DB_PATH env
+        # → config.DATABASE_PATH → 預設路徑），取代原本手寫的硬編碼 fallback 路徑，
+        # 同時修正 Electron 封裝模式下未讀取 TG_DATA_DIR 導致的持久化路徑不一致問題。
+        self.db_path = db_path or resolve_db_path()
     
     # ==================== 用戶管理 ====================
     
@@ -64,7 +68,7 @@ class AdminService:
     ) -> Dict[str, Any]:
         """獲取用戶列表"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -122,7 +126,7 @@ class AdminService:
     async def get_user_detail(self, user_id: str) -> Optional[Dict]:
         """獲取用戶詳情"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -164,7 +168,7 @@ class AdminService:
     async def update_user(self, user_id: str, data: Dict) -> Dict[str, Any]:
         """更新用戶信息"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             cursor = conn.cursor()
             
             # 允許更新的字段
@@ -207,7 +211,7 @@ class AdminService:
     async def suspend_user(self, user_id: str, reason: str = '') -> Dict[str, Any]:
         """暫停用戶"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -239,7 +243,7 @@ class AdminService:
     async def get_dashboard_stats(self) -> Dict[str, Any]:
         """獲取儀表板統計"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             cursor = conn.cursor()
             
             stats = {}
@@ -307,7 +311,7 @@ class AdminService:
     async def get_usage_trends(self, days: int = 30) -> List[Dict]:
         """獲取使用趨勢"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             cursor = conn.cursor()
             
             start_date = (datetime.utcnow() - timedelta(days=days)).date().isoformat()
@@ -340,7 +344,7 @@ class AdminService:
     async def get_security_overview(self) -> Dict[str, Any]:
         """獲取安全概覽"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             cursor = conn.cursor()
             
             overview = {}
@@ -392,7 +396,7 @@ class AdminService:
         """獲取審計日誌"""
         try:
             # 確保表存在
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -528,7 +532,7 @@ class AdminService:
     async def get_user_quota_usage(self, user_id: str) -> Dict[str, Any]:
         """獲取用戶配額使用情況"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -633,7 +637,7 @@ class AdminService:
     ) -> Dict[str, Any]:
         """調整用戶配額（管理員操作）"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             cursor = conn.cursor()
             
             # 確保 custom_quotas 表存在
@@ -689,7 +693,7 @@ class AdminService:
     async def get_quota_overview(self) -> Dict[str, Any]:
         """獲取配額使用總覽"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -810,7 +814,7 @@ class AdminService:
     ) -> Dict[str, Any]:
         """獲取配額使用排行"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -882,7 +886,7 @@ class AdminService:
     ) -> Dict[str, Any]:
         """獲取所有用戶的配額告警（管理員）"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -1003,7 +1007,7 @@ class AdminService:
     ) -> Dict[str, Any]:
         """導出配額使用報表"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -1139,7 +1143,7 @@ class AdminService:
             result = service.reset_daily_quotas()
             
             # 記錄操作日誌
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO admin_logs (id, admin_id, action, target_type, details, created_at)
@@ -1170,7 +1174,7 @@ class AdminService:
     async def get_billing_overview(self) -> Dict[str, Any]:
         """獲取計費總覽"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -1258,7 +1262,7 @@ class AdminService:
     ) -> Dict[str, Any]:
         """獲取所有賬單"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -1320,7 +1324,7 @@ class AdminService:
     ) -> Dict[str, Any]:
         """處理退款"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -1354,7 +1358,7 @@ class AdminService:
             
             # 記錄管理員操作
             if result.get('success') and admin_id:
-                conn = sqlite3.connect(self.db_path)
+                conn = create_connection(self.db_path)
                 cursor = conn.cursor()
                 cursor.execute('''
                     INSERT INTO admin_logs (id, admin_id, action, target_type, target_id, details, created_at)
@@ -1394,7 +1398,7 @@ class AdminService:
             )
             
             if success and admin_id:
-                conn = sqlite3.connect(self.db_path)
+                conn = create_connection(self.db_path)
                 cursor = conn.cursor()
                 cursor.execute('''
                     INSERT INTO admin_logs (id, admin_id, action, target_type, target_id, details, created_at)
@@ -1426,7 +1430,7 @@ class AdminService:
             success = billing.unfreeze_quota(user_id)
             
             if success and admin_id:
-                conn = sqlite3.connect(self.db_path)
+                conn = create_connection(self.db_path)
                 cursor = conn.cursor()
                 cursor.execute('''
                     INSERT INTO admin_logs (id, admin_id, action, target_type, target_id, details, created_at)
@@ -1452,7 +1456,7 @@ class AdminService:
     async def get_frozen_users(self) -> Dict[str, Any]:
         """獲取被凍結的用戶列表"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             

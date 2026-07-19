@@ -18,9 +18,8 @@ export const environment = {
     teamFeatures: false,    // 本地版不支持團隊
     apiAccess: false,       // 本地版不開放 API
     debug: false,
-    // 🎯 精簡獲客模式相關開關，預設關閉。詳見 environment.ts 同名欄位註釋。
-    leanMode: false,
-    leanBootstrapRoot: false
+    // 🎯 精簡獲客模式開關，預設關閉。詳見 environment.ts 同名欄位註釋。
+    leanMode: false
   },
   
   // 版本信息

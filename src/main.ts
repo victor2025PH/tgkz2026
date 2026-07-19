@@ -3,12 +3,35 @@
  * 應用程式入口點 - Angular 17+ Standalone
  * 
  * 🆕 Phase 20: 配置 Angular Router 和應用啟動
+ *
+ * 🎯 精簡獲客模式的 bundle 拆分機制說明：
+ * bootstrap 根組件永遠是極簡的 AppRootComponent（僅 `<router-outlet>`），
+ * 不做任何條件切換。真正的「精簡模式不載入巨型 AppComponent」是透過
+ * `app.routes.ts` 裡的路由懶加載邊界達成的（AppComponent 現在是一個透過
+ * `loadComponent` 掛載的「應用殼」路由組件，只包裝非 /lean/* 的路由）。
+ *
+ * ✅ 已用真實 `ng build` + esbuild metafile 分析驗證確認生效：
+ * Initial（首屏必載）總體積從 1.76MB 降到 461.62KB（-74%），app-component
+ * chunk（888.98KB）現在正確列在 Lazy chunk files（只有導航到需要它的路由
+ * 才會下載），/lean/* 路由完全不會載入它。
+ *
+ * 🔍 這個方案能生效的關鍵前提（追查過程中發現並修復的根因問題）：
+ * `angular.json` 的 `browser` 入口原本錯誤指向專案根目錄一個叫 `index.tsx`
+ * 的遺留檔案（早期與其他模板合併時留下的重複 bootstrap 入口），裡面直接
+ * `import { AppComponent } from './src/app.component'` 做靜態導入，且用了
+ * 一套跟 `app.config.ts` 不同、更精簡的 provider 清單（缺少認證/離線攔截器、
+ * 全局錯誤處理器、智能預加載策略）。這個檔案讓 esbuild 永遠把 AppComponent
+ * 靜態打進主 chunk，不管 `app.routes.ts` 裡怎麼寫 `loadComponent` 都沒用 ——
+ * 這也是為什麼先前嘗試在 main.ts 手動切換根組件時，主包體積量測不到變化。
+ * 已修正 `angular.json` 的 `browser` 指向這個檔案（`src/main.ts`），並刪除
+ * `index.tsx`（連同 `tsconfig.json`/`package.json`/`electron-builder.yml`
+ * 裡對它的引用一併清理），現在整個應用只有這一個真正生效的入口。
  */
 
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideAnimations } from '@angular/platform-browser/animations';
+import { AppRootComponent } from './app-root.component';
 import { appConfig } from './app.config';
-import { environment } from './environments/environment';
 
 /**
  * 啟動 Angular 應用
@@ -22,65 +45,7 @@ const mergedConfig = {
   ]
 };
 
-/**
- * 🎯 精簡獲客模式 - 獨立 Bootstrap 根組件開關
- *
- * 預設（未設置任何開關）沿用既有的 AppComponent 作為根組件，行為與改動前
- * 完全一致。僅當 environment.features.leanBootstrapRoot 為 true，或
- * localStorage 裡的 tg_lean_mode 明確為 'true'（與 leanMode 判斷邏輯一致，
- * 見 src/utils/lean-mode.util.ts）時，才會改用輕量的 LeanRootComponent。
- *
- * 之所以在 main.ts 這裡直接讀取判斷（而非 import isLeanModeActive()），是
- * 因為要在最早的啟動時機同步判斷、且避免引入額外模組解析成本；判斷條件已
- * 刻意與 isLeanModeActive() 保持邏輯一致。
- *
- * ⚠️⚠️ 重要且誠實的已知限制（已用真實構建驗證確認，非推測）：
- * 下面兩個分支都改成 `import()` 動態載入，原意是希望 esbuild 能把
- * AppComponent 和 LeanRootComponent 分別拆成獨立的 lazy chunk，讓精簡模式
- * 啟動時真正不下載/不執行 AppComponent 的程式碼。但實測 `ng build` 後檢查
- * 產物發現：AppComponent 專屬的字串（如 localStorage 鍵名 `sidebar_groups`）
- * 仍然出現在 `main-*.js`（eager 主 chunk）裡，主 chunk 體積幾乎沒有縮小
- * （985KB → 983KB）。也就是說，Angular 現行的 esbuild 應用建構器**不會**對
- * main.ts 裡手動寫的 `import()` 做真正的懶加載拆分，它似乎只對 Angular
- * Router 的 `loadComponent`/`loadChildren`（即路由懶加載邊界）才有這種
- * 拆分優化 —— 這一點在 `app.routes.ts` 裡每個 `loadComponent: () => import(...)`
- * 都確實產生了獨立命名的 lazy chunk（如 dashboard-view-component.js），
- * 形成了鮮明對比。
- *
- * 因此，本次改動雖然實現了「執行到哪一支就用哪個根組件」的正確運行時邏輯，
- * 且已通過編譯驗證，但**尚未達成真正的主包體積縮減**這個原始目標。真正的
- * 修復方式應該是：把 AppComponent 的完整殼（側欄/選單）改造成一個透過
- * Router `loadComponent` 掛載的「包裝路由組件」（例如把現有非精簡路由都
- * 巢狀在一個 `AppShellComponent` 之下），讓 bootstrap 根組件永遠是一個
- * 極小的殼（只有 `<router-outlet>`），這樣才能真正借助 Router 既有的懶加載
- * 拆分機制。這是一次會動到整個 `app.routes.ts` 路由巢狀結構的改動，範圍
- * 比本次大，留給下一階段規劃。
- */
-function shouldUseLeanBootstrapRoot(): boolean {
-  try {
-    const ls = localStorage.getItem('tg_lean_mode');
-    if (ls === 'true') { return true; }
-    if (ls === 'false') { return false; }
-  } catch { /* ignore */ }
-  return !!(environment as any)?.features?.leanBootstrapRoot;
-}
-
-const useLeanRoot = shouldUseLeanBootstrapRoot();
-
-// 🔧 關鍵：兩個分支都必須是動態 import()，否則打包器會把 AppComponent 和
-// LeanRootComponent 兩個都塞進同一個 eager 的 main chunk，即使只有其中一個
-// 真正會在瀏覽器裡被載入執行 —— 那樣「換根」就只是換了個殼，主包體積完全
-// 不會變小，失去這個功能的意義。動態 import() 讓它們各自成為獨立的 lazy
-// chunk，執行到哪一支才真正下載那一支，另一支永遠不會被拉取。
-const rootComponent = useLeanRoot
-  ? () => import('./lean-root.component').then(m => m.LeanRootComponent)
-  : () => import('./app.component').then(m => m.AppComponent);
-
-if (useLeanRoot) {
-  console.log('[TG-AI智控王] 🎯 精簡獲客模式：使用獨立輕量根組件 (LeanRootComponent)');
-}
-
-rootComponent().then(RootComponent => bootstrapApplication(RootComponent, mergedConfig))
+bootstrapApplication(AppRootComponent, mergedConfig)
   .then(() => {
     console.log('[TG-AI智控王] Application started successfully');
     

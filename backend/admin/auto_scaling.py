@@ -18,10 +18,15 @@ from typing import Optional, Dict, Any, List, Callable, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'scaling.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 scaling.db 不變，與其他模塊各自獨立的資料庫檔案區隔）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'scaling.db')
 
 
 class ScalingAction(str, Enum):
@@ -139,7 +144,7 @@ class AutoScalingManager:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 擴縮容策略表
@@ -204,7 +209,7 @@ class AutoScalingManager:
     def create_policy(self, policy: ScalingPolicy) -> bool:
         """創建擴縮容策略"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -238,7 +243,7 @@ class AutoScalingManager:
     def update_policy(self, policy_id: str, updates: Dict[str, Any]) -> bool:
         """更新策略"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             # 展開嵌套的 scale_up/scale_down 配置
@@ -288,7 +293,7 @@ class AutoScalingManager:
             return False
         
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             cursor.execute('DELETE FROM scaling_policies WHERE id = ?', (policy_id,))
             conn.commit()
@@ -300,7 +305,7 @@ class AutoScalingManager:
     
     def get_policy(self, policy_id: str) -> Optional[ScalingPolicy]:
         """獲取策略"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM scaling_policies WHERE id = ?', (policy_id,))
         row = cursor.fetchone()
@@ -312,7 +317,7 @@ class AutoScalingManager:
     
     def list_policies(self, active_only: bool = False) -> List[Dict[str, Any]]:
         """列出所有策略"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         if active_only:
@@ -532,7 +537,7 @@ class AutoScalingManager:
     
     def _save_event(self, event: ScalingEvent):
         """保存擴縮容事件"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -554,7 +559,7 @@ class AutoScalingManager:
     
     def get_scaling_history(self, limit: int = 100, policy_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """獲取擴縮容歷史"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         if policy_id:
@@ -588,7 +593,7 @@ class AutoScalingManager:
     
     def get_scaling_stats(self) -> Dict[str, Any]:
         """獲取擴縮容統計"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 統計各類操作

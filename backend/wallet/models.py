@@ -15,8 +15,21 @@ import uuid
 
 # ==================== 枚舉定義 ====================
 
-class WalletStatus(Enum):
-    """錢包狀態"""
+class WalletStatus(str, Enum):
+    """
+    錢包狀態
+
+    🔧 修復：原為純 Enum（不繼承 str），但 wallet_service.py 的
+    _row_to_wallet() 會把資料庫讀出的字串包成 WalletStatus 實例
+    （例如 WalletStatus.ACTIVE），add_balance()/consume() 卻用
+    `wallet.status != WalletStatus.ACTIVE.value`（enum 實例 vs 純字串）
+    判斷是否可操作——純 Enum 的成員不等於同值的字串，這個比較恆為 True，
+    導致任何「已存在的錢包」（即第一次 get_or_create_wallet() 之後的
+    所有情況）呼叫 add_balance()/consume() 一律被誤判「錢包狀態異常」
+    而拒絕操作。改為 str, Enum 混入後，WalletStatus.ACTIVE == "active"
+    會正確回傳 True，且完全不影響現有 `.value` 存取方式，也不需要改動
+    wallet_service.py 裡任何一處比較的程式碼。
+    """
     ACTIVE = "active"        # 正常
     FROZEN = "frozen"        # 凍結
     CLOSED = "closed"        # 已關閉

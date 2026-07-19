@@ -22,10 +22,15 @@ from enum import Enum
 import csv
 import io
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'audit_compliance.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 audit_compliance.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'audit_compliance.db')
 
 
 class AuditCategory(str, Enum):
@@ -115,7 +120,7 @@ class AuditComplianceManager:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 審計日誌表
@@ -222,7 +227,7 @@ class AuditComplianceManager:
         entry.checksum = self._generate_checksum(entry)
         
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -262,7 +267,7 @@ class AuditComplianceManager:
         offset: int = 0
     ) -> Tuple[List[Dict], int]:
         """查詢審計日誌"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM audit_logs WHERE 1=1'
@@ -355,7 +360,7 @@ class AuditComplianceManager:
     
     def verify_integrity(self, log_id: str) -> Tuple[bool, str]:
         """驗證日誌完整性"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM audit_logs WHERE id = ?', (log_id,))
         row = cursor.fetchone()
@@ -497,7 +502,7 @@ class AuditComplianceManager:
     
     def _save_report(self, report: ComplianceReport):
         """保存報告"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -518,7 +523,7 @@ class AuditComplianceManager:
     
     def list_reports(self, limit: int = 50) -> List[Dict]:
         """列出報告"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT id, report_type, period_start, period_end, generated_at, 
@@ -542,7 +547,7 @@ class AuditComplianceManager:
     
     def get_report(self, report_id: str) -> Optional[Dict]:
         """獲取報告詳情"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM compliance_reports WHERE id = ?', (report_id,))
         row = cursor.fetchone()
@@ -627,7 +632,7 @@ class AuditComplianceManager:
     
     def apply_retention_policy(self) -> Dict[str, int]:
         """應用數據保留策略"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         deleted_counts = {}
@@ -652,7 +657,7 @@ class AuditComplianceManager:
     
     def get_storage_stats(self) -> Dict[str, Any]:
         """獲取存儲統計"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 總記錄數

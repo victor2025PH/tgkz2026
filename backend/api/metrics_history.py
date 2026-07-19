@@ -17,6 +17,11 @@ import threading
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 
+# 🔧 改用合法連接模塊 core.db_utils（見 .cursorrules 合法連接模塊清單），
+# 不再直接 sqlite3.connect()。metrics_history.db 是獨立於三大主庫的專用檔案，
+# 仍沿用本檔案自訂的 _resolve_db_path() 決定路徑，只是連線建立改走 create_connection()。
+from core.db_utils import create_connection
+
 logger = logging.getLogger(__name__)
 
 # 采样间隔和保留策略
@@ -72,7 +77,7 @@ class MetricsHistory:
             return
         try:
             os.makedirs(os.path.dirname(self._db_path), exist_ok=True)
-            conn = sqlite3.connect(self._db_path)
+            conn = create_connection(self._db_path)
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS metrics_samples (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -201,7 +206,7 @@ class MetricsHistory:
         if not self._db_path:
             return
         try:
-            conn = sqlite3.connect(self._db_path, timeout=5)
+            conn = create_connection(self._db_path)
             conn.execute('''
                 INSERT INTO metrics_samples
                 (ts, epoch, rpm, error_rate, p95_ms, avg_ms,
@@ -236,7 +241,7 @@ class MetricsHistory:
             return {'points': [], 'period': period, 'count': 0}
 
         try:
-            conn = sqlite3.connect(self._db_path, timeout=5)
+            conn = create_connection(self._db_path)
             conn.row_factory = sqlite3.Row
 
             # 降采样策略：> 6h 按 5 分钟聚合，> 24h 按 15 分钟聚合
@@ -309,7 +314,7 @@ class MetricsHistory:
             return 0
         try:
             cutoff = int(time.time()) - RETENTION_DAYS * 86400
-            conn = sqlite3.connect(self._db_path, timeout=5)
+            conn = create_connection(self._db_path)
             cursor = conn.execute(
                 'DELETE FROM metrics_samples WHERE epoch < ?', (cutoff,)
             )
@@ -350,8 +355,15 @@ class MetricsHistory:
     # ==================== 辅助 ====================
 
     def _resolve_db_path(self) -> Optional[str]:
-        """解析数据库路径 — 使用独立 DB 文件避免影响主数据库"""
-        data_dir = os.environ.get('DATA_DIR', '')
+        """解析数据库路径 — 使用独立 DB 文件避免影响主数据库
+
+        🔧 修正既有缺陷：原本讀取的環境變量是 'DATA_DIR'，但全專案（config.py /
+        electron.js）實際使用的變量名是 'TG_DATA_DIR'，'DATA_DIR' 從未被設置過，
+        導致此判斷在 Electron 封裝模式下恒為 False，metrics_history.db 一律落在
+        安裝目錄而非使用者持久化目錄（與 quota_routes_mixin.py 的 DB_PATH 屬同一類
+        「環境變量名稱不一致」問題，詳見報告）。
+        """
+        data_dir = os.environ.get('TG_DATA_DIR', '')
         if data_dir:
             return os.path.join(data_dir, 'metrics_history.db')
         default = os.path.join(os.path.dirname(__file__), '..', 'data', 'metrics_history.db')

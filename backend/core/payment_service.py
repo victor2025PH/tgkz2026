@@ -12,7 +12,6 @@ import os
 import json
 import hmac
 import hashlib
-import sqlite3
 import asyncio
 import logging
 from abc import ABC, abstractmethod
@@ -20,6 +19,12 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from enum import Enum
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+# row_factory=False：本檔案原本從未設置 row_factory，全部用位置索引
+# (row[0]、row[1]...)存取欄位，保留原本的 tuple 回傳行為不變。
+from core.db_utils import create_connection
 
 logger = logging.getLogger(__name__)
 
@@ -379,7 +384,7 @@ class PaymentService:
         try:
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
             
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path, row_factory=False)
             cursor = conn.cursor()
             
             # 交易記錄表
@@ -495,7 +500,7 @@ class PaymentService:
     async def get_subscription(self, user_id: str) -> Optional[Subscription]:
         """獲取用戶訂閱"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path, row_factory=False)
             cursor = conn.cursor()
             
             cursor.execute(
@@ -541,7 +546,7 @@ class PaymentService:
         
         # 更新本地記錄
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path, row_factory=False)
             cursor = conn.cursor()
             
             now = datetime.utcnow().isoformat()
@@ -590,7 +595,7 @@ class PaymentService:
         )
         
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path, row_factory=False)
             cursor = conn.cursor()
             
             # 使用 REPLACE 更新或插入
@@ -649,7 +654,7 @@ class PaymentService:
         )
         
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path, row_factory=False)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -678,7 +683,7 @@ class PaymentService:
     ) -> List[Transaction]:
         """獲取交易記錄"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path, row_factory=False)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -721,7 +726,7 @@ class PaymentService:
         features = plan.get('features', {})
         
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = create_connection(self.db_path, row_factory=False)
             cursor = conn.cursor()
             
             cursor.execute('''

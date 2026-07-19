@@ -408,6 +408,8 @@ def _register_wallet_routes(app):
         app.router.add_get('/api/membership/plans', purchase_handlers.list_membership_plans)
         app.router.add_get('/api/quota/packs', purchase_handlers.list_quota_packs)
         app.router.add_get('/api/proxy/packages', purchase_handlers.list_proxy_packages)
+        # 當前用戶購買訂單（對賬/歷史，需登入）
+        app.router.add_get('/api/purchase/orders', purchase_handlers.list_my_orders)
 
     # Phase 4: 提現
     if withdraw_handlers:

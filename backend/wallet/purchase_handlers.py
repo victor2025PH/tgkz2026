@@ -132,7 +132,8 @@ class PurchaseHandlers:
                 price=plan['price'],
                 tier=plan['tier'],
                 duration_days=plan['duration_days'],
-                ip_address=self._get_client_ip(request)
+                ip_address=self._get_client_ip(request),
+                idempotency_key=data.get('idempotency_key')
             )
             
             if result.success:
@@ -398,6 +399,24 @@ class PurchaseHandlers:
         except Exception as e:
             logger.error(f"List proxy packages error: {e}")
             return self._error_response(str(e), "LIST_ERROR", 500)
+    
+    async def list_my_orders(self, request: web.Request) -> web.Response:
+        """GET /api/purchase/orders — 當前用戶的購買訂單（對賬/歷史，需登入）"""
+        try:
+            user = self._require_auth(request)
+            user_id = user.get('user_id') or user.get('sub') or user.get('id')
+            if not user_id:
+                return self._error_response("無法識別用戶", "INVALID_USER")
+            from .purchase_orders import get_purchase_order_store
+            limit = min(int(request.query.get('limit', 50)), 200)
+            offset = int(request.query.get('offset', 0))
+            orders = get_purchase_order_store().list_by_user(user_id, limit, offset)
+            return self._success_response(orders)
+        except web.HTTPUnauthorized:
+            raise
+        except Exception as e:
+            logger.error(f"List my purchase orders error: {e}")
+            return self._error_response(str(e), "LIST_ERROR", 500)
 
 
 # ==================== 路由設置 ====================
@@ -414,6 +433,8 @@ def setup_purchase_routes(app: web.Application):
     app.router.add_get('/api/membership/plans', handlers.list_membership_plans)
     app.router.add_get('/api/quota/packs', handlers.list_quota_packs)
     app.router.add_get('/api/proxy/packages', handlers.list_proxy_packages)
+    # 購買訂單（需登入）
+    app.router.add_get('/api/purchase/orders', handlers.list_my_orders)
     
     logger.info("✅ Purchase API routes registered")
 

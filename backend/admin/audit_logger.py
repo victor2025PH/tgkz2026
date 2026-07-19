@@ -21,6 +21,11 @@ from datetime import datetime
 from dataclasses import dataclass, asdict
 from functools import wraps
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+# 注意：_get_db_path() 的 Docker fallback 判斷邏輯保持不變，僅「開連接」動作改用合法模塊。
+from core.db_utils import create_connection
+
 logger = logging.getLogger(__name__)
 
 
@@ -159,7 +164,7 @@ class AuditLogger:
     
     def _get_connection(self) -> sqlite3.Connection:
         """獲取數據庫連接"""
-        conn = sqlite3.connect(self._get_db_path())
+        conn = create_connection(self._get_db_path())
         conn.row_factory = sqlite3.Row
         return conn
     

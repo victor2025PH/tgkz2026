@@ -19,10 +19,15 @@ from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 from enum import Enum
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'dashboard.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 dashboard.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'dashboard.db')
 
 
 class ServiceStatus(str, Enum):
@@ -104,7 +109,7 @@ class ServiceDashboardManager:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 服務組件表
@@ -189,7 +194,7 @@ class ServiceDashboardManager:
     
     def _init_default_components(self):
         """初始化默認服務組件"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('SELECT COUNT(*) FROM service_components')
@@ -242,7 +247,7 @@ class ServiceDashboardManager:
     ) -> bool:
         """註冊服務組件"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -272,7 +277,7 @@ class ServiceDashboardManager:
     ) -> bool:
         """更新組件狀態"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             now = datetime.now().isoformat()
@@ -321,7 +326,7 @@ class ServiceDashboardManager:
     
     def get_component(self, component_id: str) -> Optional[Dict]:
         """獲取組件信息"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM service_components WHERE id = ?', (component_id,))
         row = cursor.fetchone()
@@ -345,7 +350,7 @@ class ServiceDashboardManager:
     
     def list_components(self, category: ComponentCategory = None) -> List[Dict]:
         """列出所有組件"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM service_components'
@@ -386,7 +391,7 @@ class ServiceDashboardManager:
     ) -> bool:
         """設置 SLA 目標"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -404,7 +409,7 @@ class ServiceDashboardManager:
     
     def update_sla_value(self, sla_id: str, current_value: float) -> Dict:
         """更新 SLA 當前值"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('SELECT target_value, metric FROM sla_targets WHERE id = ?', (sla_id,))
@@ -459,7 +464,7 @@ class ServiceDashboardManager:
     
     def get_sla_status(self) -> List[Dict]:
         """獲取所有 SLA 狀態"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM sla_targets')
         rows = cursor.fetchall()
@@ -488,7 +493,7 @@ class ServiceDashboardManager:
         """創建狀態更新"""
         update_id = str(uuid.uuid4())
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -515,7 +520,7 @@ class ServiceDashboardManager:
     def resolve_status_update(self, update_id: str) -> bool:
         """解決狀態更新"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             # 獲取受影響組件
@@ -544,7 +549,7 @@ class ServiceDashboardManager:
     
     def list_status_updates(self, include_resolved: bool = False, limit: int = 20) -> List[Dict]:
         """列出狀態更新"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM status_updates'
@@ -579,7 +584,7 @@ class ServiceDashboardManager:
         """計劃維護"""
         maintenance_id = str(uuid.uuid4())
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -599,7 +604,7 @@ class ServiceDashboardManager:
     def start_maintenance(self, maintenance_id: str) -> bool:
         """開始維護"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             now = datetime.now().isoformat()
@@ -631,7 +636,7 @@ class ServiceDashboardManager:
     def complete_maintenance(self, maintenance_id: str) -> bool:
         """完成維護"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             now = datetime.now().isoformat()
@@ -662,7 +667,7 @@ class ServiceDashboardManager:
     
     def list_maintenance_windows(self, status: str = None) -> List[Dict]:
         """列出維護窗口"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM maintenance_windows'
@@ -757,7 +762,7 @@ class ServiceDashboardManager:
         hours: int = 24
     ) -> List[Dict]:
         """獲取組件歷史"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()

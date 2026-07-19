@@ -306,42 +306,43 @@ export class PurchaseService {
     this._loading.set(true);
     
     try {
-      // 1. 檢查餘額
+      // 1. 預檢餘額（僅友好提示；真正的扣款+履約由後端原子完成）
       const balanceCheck = await this.walletService.checkBalance(item.amount);
       
       if (!balanceCheck.sufficient) {
-        // 餘額不足，返回需要充值的信息
         return {
           success: false,
           message: `餘額不足，還需 $${(balanceCheck.shortfall / 100).toFixed(2)}`
         };
       }
       
-      // 2. 執行消費
-      const consumeResult = await this.walletService.consume({
-        amount: item.amount,
-        category: item.category,
-        description: item.name,
-        referenceId: item.id,
-        referenceType: item.category
-      });
+      // 2. 🔴 一步原子購買：後端在同一流程內「扣款 → 業務激活 → 失敗自動退款」。
+      //    舊實作是前端「先 consume 扣款，再調 /api/membership/activate」兩步——
+      //    但該 activate 端點根本不存在（404），導致「扣了款、會員沒開通、也不退款」
+      //    的收錢不發貨漏洞；且前端兩步繞過了後端 purchase() 的原子退款保護。
+      //    現統一改調後端 /api/purchase/* 單端點（見 wallet/purchase_handlers.py）。
+      const built = this.buildPurchaseRequest(item);
+      if (!built) {
+        return { success: false, message: '未知的購買類型' };
+      }
       
-      if (!consumeResult.success) {
+      const response = await this.api.post<any>(built.endpoint, built.payload);
+      
+      if (response?.success) {
+        await this.walletService.loadWallet();
         return {
-          success: false,
-          message: consumeResult.error || '支付失敗'
+          success: true,
+          message: response.message || '購買成功',
+          orderId: response.data?.order_id,
+          transactionId: response.data?.transaction_id
         };
       }
       
-      // 3. 調用業務 API 完成購買
-      const businessResult = await this.completeBusinessPurchase(item, consumeResult.transaction?.id);
-      
-      if (!businessResult.success) {
-        // 業務失敗，需要退款（由後端處理）
-        console.error('Business purchase failed, refund needed:', businessResult.message);
-      }
-      
-      return businessResult;
+      // 後端已保證：失敗即未扣款或已自動退款，前端無需再處理退款
+      return {
+        success: false,
+        message: response?.error || response?.message || '購買失敗'
+      };
       
     } catch (error) {
       console.error('Purchase error:', error);
@@ -355,64 +356,56 @@ export class PurchaseService {
   }
   
   /**
-   * 完成業務購買
+   * 組裝後端原子購買請求（端點 + 完整參數）
+   *
+   * 對齊 backend/wallet/purchase_handlers.py 三個端點的入參要求。
+   * 從 item.metadata 取回原始方案對象，補齊 tier/duration_days 等後端必需字段。
    */
-  private async completeBusinessPurchase(
-    item: PurchaseItem,
-    transactionId?: string
-  ): Promise<PurchaseResult> {
-    try {
-      let endpoint = '';
-      let payload: any = {
-        item_id: item.id,
-        transaction_id: transactionId
-      };
-      
-      switch (item.category) {
-        case 'membership':
-          endpoint = '/api/membership/activate';
-          payload.plan_id = item.id;
-          break;
-          
-        case 'ip_proxy':
-          endpoint = '/api/proxy/assign';
-          payload.package_id = item.id;
-          break;
-          
-        case 'quota_pack':
-          endpoint = '/api/quota/add';
-          payload.pack_id = item.id;
-          break;
-          
-        default:
-          return { success: false, message: '未知的購買類型' };
-      }
-      
-      const response = await this.api.post<any>(endpoint, payload);
-      
-      if (response?.success) {
-        // 刷新錢包
-        await this.walletService.loadWallet();
-        
+  private buildPurchaseRequest(item: PurchaseItem): { endpoint: string; payload: any } | null {
+    const meta = item.metadata || {};
+    switch (item.category) {
+      case 'membership': {
+        const plan: Partial<MembershipPlan> = meta.plan || {};
         return {
-          success: true,
-          message: '購買成功',
-          orderId: response.data?.order_id,
-          transactionId
+          endpoint: '/api/purchase/membership',
+          payload: {
+            plan_id: plan.id || item.id,
+            plan_name: plan.name || item.name,
+            price: plan.price ?? item.amount,
+            tier: plan.tier || 'basic',
+            duration_days: plan.duration_days ?? 30
+          }
         };
       }
-      
-      return {
-        success: false,
-        message: response?.error || '購買失敗'
-      };
-      
-    } catch (error) {
-      console.error('Complete business purchase error:', error);
-      return {
-        success: false,
-        message: String(error)
-      };
+      case 'ip_proxy': {
+        const pkg: Partial<ProxyPackage> = meta.proxy || {};
+        return {
+          endpoint: '/api/purchase/proxy',
+          payload: {
+            package_id: pkg.id || item.id,
+            package_name: pkg.name || item.name,
+            price: pkg.price ?? item.amount,
+            region: pkg.region || 'US',
+            type: pkg.type || 'static',
+            duration_days: pkg.duration_days ?? 30
+          }
+        };
+      }
+      case 'quota_pack': {
+        const pack: Partial<QuotaPack> = meta.pack || {};
+        return {
+          endpoint: '/api/purchase/quota',
+          payload: {
+            pack_id: pack.id || item.id,
+            pack_name: pack.name || item.name,
+            price: pack.price ?? item.amount,
+            quota_amount: pack.quota_amount ?? 0,
+            bonus_amount: pack.bonus_amount ?? 0
+          }
+        };
+      }
+      default:
+        return null;
     }
   }
   

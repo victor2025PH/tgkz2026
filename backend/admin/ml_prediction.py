@@ -22,10 +22,15 @@ from dataclasses import dataclass, field
 from enum import Enum
 from collections import defaultdict
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'ml_prediction.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 ml_prediction.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'ml_prediction.db')
 
 
 class PredictionType(str, Enum):
@@ -357,7 +362,7 @@ class MLPredictionEngine:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 預測歷史表
@@ -426,7 +431,7 @@ class MLPredictionEngine:
         labels: List[str] = None
     ):
         """添加訓練數據"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -450,7 +455,7 @@ class MLPredictionEngine:
         hours: int = 168  # 默認 7 天
     ) -> TimeSeriesData:
         """獲取訓練數據"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()
@@ -663,7 +668,7 @@ class MLPredictionEngine:
         actual_values: List[float]
     ) -> Dict[str, Any]:
         """評估預測準確性"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('SELECT predicted_values FROM prediction_history WHERE id = ?', (prediction_id,))
@@ -713,7 +718,7 @@ class MLPredictionEngine:
     
     def get_model_performance(self, metric_name: str = None) -> Dict[str, Any]:
         """獲取模型性能統計"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = '''
@@ -751,7 +756,7 @@ class MLPredictionEngine:
     
     def _save_prediction(self, metric_name: str, result: PredictionResult):
         """保存預測結果"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -769,7 +774,7 @@ class MLPredictionEngine:
     
     def _save_pattern(self, metric_name: str, pattern: Dict):
         """保存模式"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         for pattern_type in ['hourly_pattern', 'weekly_pattern', 'trend']:
@@ -788,7 +793,7 @@ class MLPredictionEngine:
     
     def get_saved_patterns(self, metric_name: str) -> List[Dict]:
         """獲取保存的模式"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT pattern_type, pattern_data, detected_at FROM pattern_records

@@ -22,10 +22,15 @@ from enum import Enum
 import csv
 import io
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'reports.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 reports.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'reports.db')
 
 
 class ReportType(str, Enum):
@@ -257,7 +262,7 @@ class ReportGenerator:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 報告表
@@ -317,7 +322,7 @@ class ReportGenerator:
     
     def _init_default_templates(self):
         """初始化默認模板"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('SELECT COUNT(*) FROM report_templates')
@@ -736,7 +741,7 @@ class ReportGenerator:
         """保存報告"""
         report_id = str(uuid.uuid4())
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -756,7 +761,7 @@ class ReportGenerator:
     
     def get_report(self, report_id: str) -> Optional[Dict]:
         """獲取報告"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM reports WHERE id = ?', (report_id,))
         row = cursor.fetchone()
@@ -785,7 +790,7 @@ class ReportGenerator:
         limit: int = 50
     ) -> List[Dict]:
         """列出報告"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT id, title, report_type, period_start, period_end, summary, generated_at FROM reports WHERE 1=1'
@@ -928,7 +933,7 @@ class ReportGenerator:
     
     def list_templates(self) -> List[Dict]:
         """列出報告模板"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM report_templates')
         rows = cursor.fetchall()
@@ -946,7 +951,7 @@ class ReportGenerator:
     
     def get_report_stats(self) -> Dict[str, Any]:
         """獲取報告統計"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('SELECT report_type, COUNT(*) FROM reports GROUP BY report_type')

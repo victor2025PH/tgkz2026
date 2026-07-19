@@ -23,10 +23,15 @@ from enum import Enum
 from collections import defaultdict
 from contextlib import contextmanager
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'observability.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 observability.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'observability.db')
 
 
 class MetricType(str, Enum):
@@ -282,7 +287,7 @@ class ObservabilityManager:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 指標歷史表
@@ -362,7 +367,7 @@ class ObservabilityManager:
         """刷新指標到數據庫"""
         metrics = self.metrics.get_all_metrics()
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         timestamp = datetime.now().isoformat()
@@ -391,7 +396,7 @@ class ObservabilityManager:
         limit: int = 1000
     ) -> List[Dict]:
         """查詢歷史指標"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM metrics_history WHERE name = ?'
@@ -428,7 +433,7 @@ class ObservabilityManager:
         interval: str = "hour"
     ) -> List[Dict]:
         """獲取指標聚合"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()
@@ -467,7 +472,7 @@ class ObservabilityManager:
     
     def save_span(self, span: Span):
         """保存跨度"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -487,7 +492,7 @@ class ObservabilityManager:
     
     def get_trace(self, trace_id: str) -> List[Dict]:
         """獲取追蹤"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT * FROM traces WHERE trace_id = ? ORDER BY start_time
@@ -520,7 +525,7 @@ class ObservabilityManager:
         limit: int = 100
     ) -> List[Dict]:
         """搜索追蹤"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = time.time() - hours * 3600
@@ -571,7 +576,7 @@ class ObservabilityManager:
         """創建儀表盤"""
         dashboard_id = str(uuid.uuid4())
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         now = datetime.now().isoformat()
@@ -588,7 +593,7 @@ class ObservabilityManager:
     def update_dashboard(self, dashboard_id: str, updates: Dict) -> bool:
         """更新儀表盤"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             updates['updated_at'] = datetime.now().isoformat()
@@ -616,7 +621,7 @@ class ObservabilityManager:
     
     def list_dashboards(self) -> List[Dict]:
         """列出儀表盤"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT id, name, description, created_at, updated_at FROM dashboards')
         rows = cursor.fetchall()
@@ -632,7 +637,7 @@ class ObservabilityManager:
     
     def get_dashboard(self, dashboard_id: str) -> Optional[Dict]:
         """獲取儀表盤"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM dashboards WHERE id = ?', (dashboard_id,))
         row = cursor.fetchone()
@@ -693,7 +698,7 @@ class ObservabilityManager:
             metrics_by_name[m['name']] = m
         
         # 最近追蹤統計
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         hour_ago = time.time() - 3600

@@ -632,45 +632,15 @@ class AlipayHandler(PaymentHandler):
         success_url: str,
         cancel_url: str
     ) -> Tuple[bool, str, Dict[str, Any]]:
+        # 🔴 fail-closed：未配置 app_id 不得返回假的支付寶網關連結（用戶點了也付不了）。
         if not self.config.alipay_app_id:
-            # 返回模擬數據
-            return True, 'success', {
-                'pay_url': f"https://openapi.alipay.com/gateway.do?intent={intent.id}",
-                'qr_code': f"https://qr.alipay.com/{intent.id}"
-            }
+            return False, '支付寶未配置（缺少 alipay_app_id）', {}
         
-        try:
-            params = {
-                'app_id': self.config.alipay_app_id,
-                'method': 'alipay.trade.precreate',
-                'charset': 'utf-8',
-                'sign_type': 'RSA2',
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'version': '1.0',
-                'notify_url': f"{self.config.notify_base_url}/webhooks/alipay",
-                'biz_content': json.dumps({
-                    'out_trade_no': intent.id,
-                    'total_amount': f"{intent.amount / 100:.2f}",
-                    'subject': intent.description or 'TG-Matrix',
-                })
-            }
-            
-            # TODO: 實際 RSA2 簽名
-            params['sign'] = self._sign(params)
-            
-            # TODO: 調用支付寶 API
-            # async with aiohttp.ClientSession() as session:
-            #     async with session.post(self.config.alipay_gateway, data=params) as resp:
-            #         ...
-            
-            return True, 'success', {
-                'pay_url': f"{self.config.alipay_gateway}?intent={intent.id}",
-                'qr_code': ''
-            }
-            
-        except Exception as e:
-            logger.error(f"Alipay create payment error: {e}")
-            return False, str(e), {}
+        # 🔴 fail-closed：即便配置了 app_id，真實 RSA2 簽名與 alipay.trade.precreate
+        # API 調用仍為 TODO。舊代碼在此僅用 MD5 假簽名並拼一個 gateway?intent= 連結就
+        # return success——這不是有效的支付寶下單，掃碼無法支付。接通真實 API 前一律拒絕。
+        logger.warning("[AlipayHandler] 真實下單接口未接通（RSA2 簽名 + trade.precreate 為 TODO）")
+        return False, '支付寶尚未接通真實下單接口', {}
     
     async def verify_payment(self, intent: PaymentIntent) -> Tuple[bool, PaymentState]:
         # TODO: 查詢支付寶訂單狀態
@@ -722,14 +692,14 @@ class WechatPayHandler(PaymentHandler):
         success_url: str,
         cancel_url: str
     ) -> Tuple[bool, str, Dict[str, Any]]:
+        # 🔴 fail-closed：未配置商戶號時不得返回「成功」+ 假 pay_url，
+        # 否則前端會顯示一個永遠無法完成支付的二維碼，用戶掃了也付不了。
         if not self.config.wechat_mch_id:
-            return True, 'success', {
-                'pay_url': f"weixin://wxpay/bizpayurl?intent={intent.id}",
-                'qr_code': f"weixin://wxpay/bizpayurl?intent={intent.id}"
-            }
+            return False, '微信支付未配置（缺少商戶號 wechat_mch_id）', {}
         
-        # TODO: 實際微信支付實現
-        return True, 'success', {'pay_url': '', 'qr_code': ''}
+        # TODO: 實際微信支付實現。未接通前一律 fail-closed，
+        # 不能返回成功 + 空 pay_url（前端拿到空 URL 只會靜默失敗）。
+        return False, '微信支付尚未接通真實下單接口', {}
     
     async def verify_payment(self, intent: PaymentIntent) -> Tuple[bool, PaymentState]:
         return False, intent.state

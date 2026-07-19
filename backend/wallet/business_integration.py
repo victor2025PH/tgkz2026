@@ -33,6 +33,25 @@ class BusinessType(Enum):
     QUOTA_PACK = "quota_pack"
 
 
+# 🔴 履約能力註冊表（fail-closed 核心）
+# 只有在此標記 True 的業務類型才允許扣款購買。
+#
+# 背景：三個 _activate_* 方法原本是「TODO 模擬」——不呼叫任何真實服務、
+# 直接 return success=True（假 IP / 假到期 / 假配額），但 purchase() 已經真實
+# 扣了用戶錢包餘額，形成「收錢不發貨」資金漏洞。
+#
+# fail-closed 原則：未接通真實履約的業務，一律在「扣款之前」就拒絕，
+# 絕不允許先扣款再假激活。這比「扣款後退款」更優：用戶不會經歷扣了又退的
+# 困惑，也不承擔退款失敗（退款鏈失敗目前只打 log）的資金敞口。
+#
+# 接通某業務的真實履約後，把對應項改為 True，並在 _activate_* 實作真實邏輯。
+_FULFILLMENT_ENABLED = {
+    BusinessType.MEMBERSHIP.value: False,  # 有 users 表寫入口徑，但無現成服務，待接通
+    BusinessType.IP_PROXY.value: False,    # 無面向用戶售賣的代理履約服務
+    BusinessType.QUOTA_PACK.value: False,  # QuotaService 無 add；purchase_pack 與限額檢查脫節
+}
+
+
 @dataclass
 class PurchaseRequest:
     """購買請求"""
@@ -74,6 +93,19 @@ class BusinessIntegrationService:
         """
         # 生成訂單號
         order_id = self._generate_order_id(request.business_type)
+        
+        # 🔴 fail-closed：扣款前先檢查該業務是否已接通真實履約。
+        # 未接通就拒絕，絕不「先扣款再假激活」（收錢不發貨）。
+        if not _FULFILLMENT_ENABLED.get(request.business_type, False):
+            logger.warning(
+                f"Purchase rejected (fulfillment not enabled): "
+                f"user={request.user_id}, type={request.business_type}, item={request.item_id}"
+            )
+            return PurchaseResult(
+                success=False,
+                message="該業務暫未開放購買（履約服務尚未接通），未扣款",
+                order_id=order_id
+            )
         
         # 1. 執行消費扣款
         consume_req = ConsumeRequest(
@@ -172,124 +204,51 @@ class BusinessIntegrationService:
         request: PurchaseRequest, 
         order_id: str
     ) -> Dict[str, Any]:
-        """激活會員"""
-        try:
-            # 解析會員方案
-            metadata = request.metadata or {}
-            plan_id = request.item_id
-            duration_days = metadata.get('duration_days', 30)
-            tier = metadata.get('tier', 'basic')
-            
-            # TODO: 調用會員服務激活
-            # 這裡模擬激活邏輯，實際應調用 MembershipService
-            
-            logger.info(
-                f"Activating membership: user={request.user_id}, "
-                f"plan={plan_id}, tier={tier}, days={duration_days}"
-            )
-            
-            # 計算到期時間
-            expires_at = (
-                datetime.now() + timedelta(days=duration_days)
-            ).isoformat()
-            
-            return {
-                'success': True,
-                'membership': {
-                    'plan_id': plan_id,
-                    'tier': tier,
-                    'duration_days': duration_days,
-                    'expires_at': expires_at,
-                    'order_id': order_id
-                }
-            }
-            
-        except Exception as e:
-            logger.error(f"Activate membership error: {e}")
-            return {'success': False, 'error': str(e)}
+        """激活會員（fail-closed：真實履約尚未接通）"""
+        # 🔴 fail-closed：舊代碼在此僅 log + 回傳假到期時間，不寫任何持久化。
+        # 正確接通路徑（待實作）：扣款成功後更新 users 表會員等級與到期，
+        # 對齊 admin/handlers.extend_user 使用的 schema_adapter.get_update_level_query /
+        # get_update_expires_query（同步 membership_level/subscription_tier 與
+        # expires_at/subscription_expires），使 GET /api/v1/auth/me 能讀到。
+        # 未接通前一律返回失敗，由 purchase() 觸發自動退款（雙重保險，
+        # 正常情況下 purchase 入口的 _FULFILLMENT_ENABLED 守衛已先攔下）。
+        logger.warning(
+            f"_activate_membership called but fulfillment not implemented: "
+            f"user={request.user_id}, plan={request.item_id}, order={order_id}"
+        )
+        return {'success': False, 'error': '會員履約服務尚未接通'}
     
     async def _activate_ip_proxy(
         self, 
         request: PurchaseRequest, 
         order_id: str
     ) -> Dict[str, Any]:
-        """分配 IP 代理"""
-        try:
-            metadata = request.metadata or {}
-            package_id = request.item_id
-            region = metadata.get('region', 'US')
-            proxy_type = metadata.get('type', 'static')
-            duration_days = metadata.get('duration_days', 30)
-            
-            # TODO: 調用代理服務分配 IP
-            # 這裡模擬分配邏輯，實際應調用 ProxyService
-            
-            logger.info(
-                f"Allocating IP proxy: user={request.user_id}, "
-                f"package={package_id}, region={region}, days={duration_days}"
-            )
-            
-            # 模擬分配 IP
-            assigned_ip = f"192.168.{hash(request.user_id) % 255}.{hash(order_id) % 255}"
-            expires_at = (
-                datetime.now() + timedelta(days=duration_days)
-            ).isoformat()
-            
-            return {
-                'success': True,
-                'proxy': {
-                    'package_id': package_id,
-                    'ip_address': assigned_ip,
-                    'region': region,
-                    'type': proxy_type,
-                    'port': 1080,
-                    'username': f"user_{request.user_id[:8]}",
-                    'password': order_id[-8:],
-                    'expires_at': expires_at,
-                    'order_id': order_id
-                }
-            }
-            
-        except Exception as e:
-            logger.error(f"Activate IP proxy error: {e}")
-            return {'success': False, 'error': str(e)}
+        """分配 IP 代理（fail-closed：無面向用戶的代理售賣履約服務）"""
+        # 🔴 fail-closed：舊代碼用 hash 拼一個假 IP（192.168.x.x，內網段，根本不可用）
+        # 就回傳成功。現有 ProxyPoolManager.assign_proxy_to_account 是「給 Telegram
+        # 帳號分配連線代理」的運維能力，需要 account_id/phone，與「賣 IP 套餐給用戶並
+        # 發放獨立憑證/到期」不是同一產品域，硬接會錯域。無合適服務前一律拒絕。
+        logger.warning(
+            f"_activate_ip_proxy called but no user-facing proxy fulfillment: "
+            f"user={request.user_id}, package={request.item_id}, order={order_id}"
+        )
+        return {'success': False, 'error': 'IP 代理履約服務尚未接通'}
     
     async def _activate_quota_pack(
         self, 
         request: PurchaseRequest, 
         order_id: str
     ) -> Dict[str, Any]:
-        """添加配額"""
-        try:
-            metadata = request.metadata or {}
-            pack_id = request.item_id
-            quota_amount = metadata.get('quota_amount', 1000)
-            bonus_amount = metadata.get('bonus_amount', 0)
-            
-            # TODO: 調用配額服務添加配額
-            # 這裡模擬添加邏輯，實際應調用 QuotaService
-            
-            total_quota = quota_amount + bonus_amount
-            
-            logger.info(
-                f"Adding quota: user={request.user_id}, "
-                f"pack={pack_id}, amount={total_quota}"
-            )
-            
-            return {
-                'success': True,
-                'quota': {
-                    'pack_id': pack_id,
-                    'added_amount': quota_amount,
-                    'bonus_amount': bonus_amount,
-                    'total_added': total_quota,
-                    'order_id': order_id
-                }
-            }
-            
-        except Exception as e:
-            logger.error(f"Activate quota pack error: {e}")
-            return {'success': False, 'error': str(e)}
+        """添加配額（fail-closed：加包與限額檢查尚未打通）"""
+        # 🔴 fail-closed：舊代碼只回傳假的 total_added，不寫任何庫。
+        # QuotaService 沒有 add_quota/grant；BillingService.purchase_pack 雖會寫
+        # user_quota_packages，但 QuotaService._get_quota_limit 不讀該表，
+        # 「買了包也不會抬高可用上限」。在「配額包 → 限額」打通前一律拒絕。
+        logger.warning(
+            f"_activate_quota_pack called but pack→limit not wired: "
+            f"user={request.user_id}, pack={request.item_id}, order={order_id}"
+        )
+        return {'success': False, 'error': '配額包履約服務尚未接通'}
     
     async def _refund_purchase(
         self, 

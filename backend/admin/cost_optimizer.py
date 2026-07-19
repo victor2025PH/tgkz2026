@@ -21,10 +21,15 @@ from dataclasses import dataclass, field
 from enum import Enum
 from collections import defaultdict
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'cost_optimizer.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 cost_optimizer.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'cost_optimizer.db')
 
 
 class ResourceType(str, Enum):
@@ -122,7 +127,7 @@ class CostOptimizer:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 成本記錄表
@@ -213,7 +218,7 @@ class CostOptimizer:
     
     def _init_default_pricing(self):
         """初始化默認定價"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('SELECT COUNT(*) FROM pricing_config')
@@ -256,7 +261,7 @@ class CostOptimizer:
             unit_price = self._get_unit_price(resource_type)
             cost = quantity * unit_price
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -279,7 +284,7 @@ class CostOptimizer:
     
     def _get_unit_price(self, resource_type: ResourceType) -> float:
         """獲取單價"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT unit_price FROM pricing_config 
@@ -292,7 +297,7 @@ class CostOptimizer:
     
     def _get_unit(self, resource_type: ResourceType) -> str:
         """獲取計量單位"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT unit FROM pricing_config WHERE resource_type = ?', (resource_type.value,))
         row = cursor.fetchone()
@@ -304,7 +309,7 @@ class CostOptimizer:
         if not tenant_id:
             return
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         now = datetime.now().isoformat()
@@ -325,7 +330,7 @@ class CostOptimizer:
         days: int = 30
     ) -> Dict[str, Any]:
         """獲取成本摘要"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(days=days)).isoformat()
@@ -394,7 +399,7 @@ class CostOptimizer:
         days: int = 30
     ) -> Dict[str, Any]:
         """獲取成本分解"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(days=days)).isoformat()
@@ -515,7 +520,7 @@ class CostOptimizer:
             start_date = now.replace(month=1, day=1)
             end_date = now.replace(month=12, day=31)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -535,7 +540,7 @@ class CostOptimizer:
     
     def get_budget_status(self, budget_id: str = None, tenant_id: str = None) -> List[Dict]:
         """獲取預算狀態"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM budgets WHERE 1=1'
@@ -613,7 +618,7 @@ class CostOptimizer:
         """查找閒置資源"""
         recommendations = []
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 過去 7 天沒有使用的資源
@@ -657,7 +662,7 @@ class CostOptimizer:
         """分析使用效率"""
         recommendations = []
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 查找高成本低效率的資源
@@ -727,7 +732,7 @@ class CostOptimizer:
     
     def _save_recommendation(self, rec: Dict):
         """保存優化建議"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -751,7 +756,7 @@ class CostOptimizer:
         min_savings: float = None
     ) -> List[Dict]:
         """列出優化建議"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM optimization_recommendations WHERE status = ?'
@@ -790,7 +795,7 @@ class CostOptimizer:
     ) -> bool:
         """更新建議狀態"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             if status == "implemented":
@@ -817,7 +822,7 @@ class CostOptimizer:
         period: str = "monthly"
     ) -> Dict[str, Any]:
         """按租戶分配成本"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 確定時間範圍

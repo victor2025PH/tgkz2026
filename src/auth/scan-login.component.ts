@@ -16,6 +16,8 @@ import { Component, OnInit, OnDestroy, inject, signal, computed, AfterViewInit }
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { I18nService } from '../i18n.service';
+// 🔧 修復 Electron app:// 協議下相對路徑 fetch 失效問題：統一用共用工具解析 API 基址
+import { resolveApiBaseUrl } from '../utils/api-base-url.util';
 
 // 全局 Telegram Widget 回調聲明
 declare global {
@@ -691,7 +693,7 @@ export class ScanLoginComponent implements OnInit, OnDestroy, AfterViewInit {
    */
   async sendConfirmationToUser(user: TelegramUser) {
     try {
-      const response = await fetch(`/api/v1/auth/login-token/${this.token}/send-confirmation`, {
+      const response = await fetch(`${resolveApiBaseUrl()}/api/v1/auth/login-token/${this.token}/send-confirmation`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -813,7 +815,7 @@ export class ScanLoginComponent implements OnInit, OnDestroy, AfterViewInit {
 
   async verifyToken() {
     try {
-      const response = await fetch(`/api/v1/auth/login-token/${this.token}`);
+      const response = await fetch(`${resolveApiBaseUrl()}/api/v1/auth/login-token/${this.token}`);
       const result = await response.json();
 
       if (!result.success) {
@@ -887,7 +889,7 @@ export class ScanLoginComponent implements OnInit, OnDestroy, AfterViewInit {
     // 每 2 秒輪詢一次 Token 狀態
     this.pollInterval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/v1/auth/login-token/${this.token}`);
+        const response = await fetch(`${resolveApiBaseUrl()}/api/v1/auth/login-token/${this.token}`);
         const result = await response.json();
 
         if (result.success && result.data) {

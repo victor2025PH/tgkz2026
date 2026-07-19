@@ -17,6 +17,7 @@ import { ToastService } from '../toast.service';
 import { AuthService } from '../core/auth.service';
 import { AuthEventsService } from '../core/auth-events.service';
 import { environment } from '../environments/environment';
+import { isElectronRuntime } from '../utils/runtime-env.util';
 
 /**
  * 🔧 輔助函數：本地解析 JWT Payload，檢查是否已過期
@@ -139,7 +140,7 @@ export const membershipGuard: CanActivateFn = (
   const authService = inject(AuthService);
 
   // 🔧 FIX: 先檢查認證狀態 —— 使用 JWT 過期檢測（不僅僅是長度檢查）
-  const isElectron = !!(window as any).electronAPI || !!(window as any).electron;
+  const isElectron = isElectronRuntime();
   if (!(environment.apiMode === 'ipc' && isElectron)) {
     const authEvents = inject(AuthEventsService);
     const token = authService.accessToken();

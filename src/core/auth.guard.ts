@@ -13,6 +13,7 @@ import { Router, CanActivateFn, ActivatedRouteSnapshot, RouterStateSnapshot } fr
 import { AuthService } from './auth.service';
 import { AuthEventsService } from './auth-events.service';
 import { environment } from '../environments/environment';
+import { isElectronRuntime } from '../utils/runtime-env.util';
 
 /**
  * 🔧 輔助函數：本地解析 JWT Payload，檢查是否已過期
@@ -61,7 +62,9 @@ export const authGuard: CanActivateFn = (
   const router = inject(Router);
   
   // 本地版（Electron）不需要認證
-  const isElectron = !!(window as any).electronAPI || !!(window as any).electron;
+  // 🔧 用統一偵測（含 window.require）：本專案 renderer 靠 window.require 取 ipcRenderer，
+  // 舊條件漏判導致桌面版免登入例外失效、被踹回登入頁。
+  const isElectron = isElectronRuntime();
   if (environment.apiMode === 'ipc' && isElectron) {
     return true;
   }

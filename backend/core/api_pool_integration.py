@@ -429,4 +429,9 @@ async def get_pool_status() -> Dict[str, Any]:
         status['qr_allocations_since_startup'] = get_qr_pool_allocation_count()
     except Exception:
         pass
+    try:
+        from config import QR_USE_API_POOL, QR_POOL_ROLLOUT_PERCENT
+        status['qr_pool_rollout_percent'] = 100 if QR_USE_API_POOL else QR_POOL_ROLLOUT_PERCENT
+    except Exception:
+        pass
     return status

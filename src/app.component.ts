@@ -630,28 +630,8 @@ export class AppComponent implements OnDestroy, OnInit {
   settingsTab = signal<'backup' | 'migration' | 'scheduler' | 'appearance'>('backup');
   
   // --- Vector Memory State ---
-  vectorMemoryStats = signal<{
-    totalMemories: number;
-    byType: {[key: string]: number};
-    totalUsers: number;
-    avgImportance: number;
-  }>({ totalMemories: 0, byType: {}, totalUsers: 0, avgImportance: 0 });
   vectorMemorySearchQuery = '';
-  vectorMemorySearchResults = signal<Array<{
-    id: number;
-    userId: string;
-    content: string;
-    memoryType: string;
-    importance: number;
-    similarity: number;
-    createdAt: string;
-  }>>([]);
-  isSearchingMemory = signal(false);
-  isAddingMemory = signal(false);
-  showAddMemoryDialog = signal(false);
-  newMemory = { userId: '', content: '', type: 'conversation', importance: 0.5 };
   selectedMemoryUserId = signal('');
-  memoryUserList = signal<string[]>([]);
   
   // --- Voice Clone State (Enhanced) ---
   showVoiceRecordingDialog = signal(false);
@@ -767,32 +747,9 @@ export class AppComponent implements OnDestroy, OnInit {
   newQaPair = signal({question: '', answer: '', category: 'general', keywords: ''});
   
   // --- Telegram RAG System State ---
-  ragSystemInitialized = signal(false);
-  isInitializingRag = signal(false);
-  isRagLearning = signal(false);
-  isReindexing = signal(false);
-  isCleaningRag = signal(false);
-  isSearchingRag = signal(false);
   ragSearchQuery = '';
-  ragSearchResults = signal<Array<{id: number; type: string; question: string; answer: string; successScore: number; similarity: number; useCount: number; source: string}>>([]);
-  ragStats = signal<{
-    total_knowledge: number;
-    qa_count: number;
-    scripts_count: number;
-    total_uses: number;
-    avg_score: number;
-    chromadb_enabled: boolean;
-    neural_embedding: boolean;
-    by_type: {[key: string]: {count: number; avg_score: number; uses: number}};
-  }>({
-    total_knowledge: 0, qa_count: 0, scripts_count: 0, total_uses: 0, avg_score: 0,
-    chromadb_enabled: false, neural_embedding: false, by_type: {}
-  });
   showAddRagKnowledgeDialog = signal(false);
   newRagKnowledge = {type: 'qa', question: '', answer: '', context: ''};
-  
-  // Computed for RAG type keys
-  ragTypeKeys = computed(() => Object.keys(this.ragStats().by_type));
   
   // --- Resource Discovery State ---
   resourceDiscoveryInitialized = signal(false);
@@ -1148,53 +1105,10 @@ export class AppComponent implements OnDestroy, OnInit {
   availableMembersForInvite = signal<Array<{id: string; name?: string; username?: string}>>([]);
   
   // --- Discussion Watcher State ---
-  discussionWatcherInitialized = signal(false);
-  channelDiscussions = signal<Array<{
-    id: number;
-    channel_id: string;
-    channel_title: string;
-    discussion_id: string;
-    discussion_title: string;
-    is_monitoring: number;
-    message_count: number;
-    lead_count: number;
-    last_message_at: string;
-  }>>([]);
-  discussionMessages = signal<Array<{
-    id: number;
-    discussion_id: string;
-    message_id: number;
-    user_id: string;
-    username: string;
-    first_name: string;
-    message_text: string;
-    is_matched: number;
-    matched_keywords: string[];
-    is_replied: number;
-    created_at: string;
-  }>>([]);
-  discussionStats = signal<{
-    total_discussions: number;
-    monitoring_count: number;
-    total_messages: number;
-    matched_messages: number;
-    leads_from_discussions: number;
-    today_messages: number;
-    today_leads: number;
-  }>({
-    total_discussions: 0,
-    monitoring_count: 0,
-    total_messages: 0,
-    matched_messages: 0,
-    leads_from_discussions: 0,
-    today_messages: 0,
-    today_leads: 0
-  });
   selectedDiscussionId = signal<string>('');
   discoverChannelId = '';
   resourcesTab = signal<'resources' | 'discussions'>('resources');
   resourceCenterTab = signal<'manage' | 'stats'>('manage');  // 資源中心 Tab（移除了搜索發現，獨立頁面）
-  isLoadingDiscussionMessages = signal(false);
   discussionReplyText = signal('');
   
   // --- Voice Clone Configuration ---
@@ -1305,10 +1219,8 @@ export class AppComponent implements OnDestroy, OnInit {
   isSelectAllLeads = signal(false);
   showBatchOperationMenu = signal(false);
   showFloatingMoreMenu = signal(false); // 浮動欄更多操作下拉菜單
-  batchOperationInProgress = signal(false);
   batchOperationHistory: WritableSignal<any[]> = signal([]);
   showBatchOperationHistory = signal(false);
-  allTags: WritableSignal<{id: number, name: string, color: string, usageCount: number}[]> = signal([]);
   newTagName = signal('');
   newTagColor = signal('#3B82F6');
   showAddTagDialog = signal(false);
@@ -1334,10 +1246,6 @@ export class AppComponent implements OnDestroy, OnInit {
   hasSelectedLeads = computed(() => this.selectedLeadIds().size > 0);
   
   // Ad System State (廣告發送系統)
-  adTemplates: WritableSignal<any[]> = signal([]);
-  adSchedules: WritableSignal<any[]> = signal([]);
-  adSendLogs: WritableSignal<any[]> = signal([]);
-  adOverviewStats: WritableSignal<any> = signal(null);
   showAdTemplateForm = signal(false);
   showAdScheduleForm = signal(false);
   editingAdTemplate: WritableSignal<any> = signal(null);
@@ -1355,19 +1263,13 @@ export class AppComponent implements OnDestroy, OnInit {
     accountStrategy: 'rotate' as const,
     assignedAccounts: [] as string[]
   });
-  spintaxPreview: WritableSignal<string[]> = signal([]);
   isPreviewingSpintax = signal(false);
   adSystemTab = signal<'templates' | 'schedules' | 'logs' | 'analytics'>('templates');
   
   // User Tracking State (用戶追蹤系統)
-  trackedUsers: WritableSignal<any[]> = signal([]);
-  userGroups: WritableSignal<any[]> = signal([]);
-  highValueGroups: WritableSignal<any[]> = signal([]);
-  trackingStats: WritableSignal<any> = signal(null);
   showAddUserForm = signal(false);
   newTrackedUser = signal({ userId: '', username: '', notes: '' });
   selectedTrackedUser: WritableSignal<any> = signal(null);
-  isTrackingUser = signal(false);
   userTrackingTab = signal<'users' | 'groups' | 'analytics'>('users');
   userValueFilter = signal<string>('');
   
@@ -1388,12 +1290,7 @@ export class AppComponent implements OnDestroy, OnInit {
   });
   
   // Multi-Role Collaboration State (多角色協作)
-  roleTemplates: WritableSignal<Record<string, any>> = signal({});
-  allRoles: WritableSignal<any[]> = signal([]);
-  scriptTemplates: WritableSignal<any[]> = signal([]);
   collabGroups: WritableSignal<any[]> = signal([]);
-  collabStats: WritableSignal<any> = signal(null);
-  roleStats: WritableSignal<any> = signal(null);
   showRoleAssignForm = signal(false);
   multiRoleTab = signal<'roles' | 'scripts' | 'collab' | 'stats'>('roles');
   newRoleAssign = signal({
@@ -5306,10 +5203,6 @@ export class AppComponent implements OnDestroy, OnInit {
     this.newRoleAssign.update(r => ({...r, roleName: value}));
   }
   
-  getRolesOfType(roleType: string): any[] {
-    return this.allRoles().filter(r => r.roleType === roleType);
-  }
-
   addTemplate() {
     const form = this.newTemplate();
     if (form.name.trim() && form.prompt.trim()) {

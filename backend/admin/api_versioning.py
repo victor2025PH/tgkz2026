@@ -20,10 +20,15 @@ from dataclasses import dataclass, field
 from enum import Enum
 import random
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'api_versioning.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 api_versioning.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'api_versioning.db')
 
 
 class VersionStatus(str, Enum):
@@ -143,7 +148,7 @@ class ApiVersioningManager:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # API 版本表
@@ -224,7 +229,7 @@ class ApiVersioningManager:
     def create_version(self, version: ApiVersion) -> bool:
         """創建版本"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             now = datetime.now().isoformat()
@@ -251,7 +256,7 @@ class ApiVersioningManager:
     def update_version(self, version_id: str, updates: Dict[str, Any]) -> bool:
         """更新版本"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             updates['updated_at'] = datetime.now().isoformat()
@@ -281,7 +286,7 @@ class ApiVersioningManager:
     
     def get_version(self, version_id: str) -> Optional[ApiVersion]:
         """獲取版本"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM api_versions WHERE id = ?', (version_id,))
         row = cursor.fetchone()
@@ -297,7 +302,7 @@ class ApiVersioningManager:
         status: Optional[str] = None
     ) -> List[Dict]:
         """列出版本"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM api_versions WHERE 1=1'
@@ -321,7 +326,7 @@ class ApiVersioningManager:
     
     def get_stable_version(self, api_id: str) -> Optional[ApiVersion]:
         """獲取穩定版本"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT * FROM api_versions 
@@ -356,7 +361,7 @@ class ApiVersioningManager:
     def create_rollout(self, plan: RolloutPlan) -> bool:
         """創建發布計劃"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -391,7 +396,7 @@ class ApiVersioningManager:
             return False, f"當前狀態 {plan['status']} 不允許啟動"
         
         # 更新狀態
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE rollout_plans 
@@ -442,7 +447,7 @@ class ApiVersioningManager:
         if not plan:
             return False, "發布計劃不存在"
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE rollout_plans SET status = 'paused' WHERE id = ?
@@ -458,7 +463,7 @@ class ApiVersioningManager:
         if not plan:
             return False, "發布計劃不存在"
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 更新計劃狀態
@@ -493,7 +498,7 @@ class ApiVersioningManager:
         if not plan:
             return False, "發布計劃不存在"
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 更新計劃狀態
@@ -525,7 +530,7 @@ class ApiVersioningManager:
     
     def _update_traffic(self, plan_id: str, percentage: int):
         """更新流量百分比"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE rollout_plans SET current_percentage = ? WHERE id = ?
@@ -535,7 +540,7 @@ class ApiVersioningManager:
     
     def _get_rollout(self, plan_id: str) -> Optional[Dict]:
         """獲取發布計劃"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM rollout_plans WHERE id = ?', (plan_id,))
         row = cursor.fetchone()
@@ -564,7 +569,7 @@ class ApiVersioningManager:
     
     def list_rollouts(self, status: Optional[str] = None) -> List[Dict]:
         """列出發布計劃"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         if status:
@@ -598,7 +603,7 @@ class ApiVersioningManager:
             return self.get_version(self._user_version_cache[cache_key])
         
         # 檢查是否有固定分配
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT version_id FROM user_version_assignments WHERE user_id = ?
@@ -657,7 +662,7 @@ class ApiVersioningManager:
     def assign_version_to_user(self, user_id: str, version_id: str, reason: str = "") -> bool:
         """為用戶分配固定版本"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -692,7 +697,7 @@ class ApiVersioningManager:
         """記錄版本指標"""
         import uuid
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         error_rate = failures / (successes + failures) * 100 if (successes + failures) > 0 else 0
@@ -711,7 +716,7 @@ class ApiVersioningManager:
     
     def get_version_metrics(self, version_id: str, hours: int = 24) -> Dict[str, Any]:
         """獲取版本指標"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()

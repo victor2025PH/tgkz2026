@@ -824,12 +824,11 @@ class InitStartupMixin:
             except Exception as e:
                 print(f"[Backend] Background consistency check error: {e}", file=sys.stderr)
             
-            # 🆕 P2: 數據庫健康守護
+            # 🆕 P2: 數據庫健康守護（必須用 config.DATABASE_DIR，勿讀錯誤的 DATA_DIR）
             try:
-                import os as _os
+                from config import DATABASE_DIR
                 from services.db_health_guard import get_db_health_guard
-                data_dir = _os.environ.get('DATA_DIR', '/app/data')
-                self._db_health_guard = get_db_health_guard(data_dir)
+                self._db_health_guard = get_db_health_guard(str(DATABASE_DIR))
                 await self._db_health_guard.start()
             except Exception as e:
                 print(f"[Backend] DB Health Guard start error: {e}", file=sys.stderr)

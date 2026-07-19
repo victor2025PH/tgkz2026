@@ -21,10 +21,15 @@ from typing import Optional, Dict, Any, List, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'webhooks.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 webhooks.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'webhooks.db')
 
 
 class EventType(str, Enum):
@@ -117,7 +122,7 @@ class WebhookEventSystem:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 訂閱者表
@@ -166,7 +171,7 @@ class WebhookEventSystem:
     def add_subscriber(self, subscriber: WebhookSubscriber) -> bool:
         """添加訂閱者"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -197,7 +202,7 @@ class WebhookEventSystem:
     def update_subscriber(self, subscriber_id: str, updates: Dict[str, Any]) -> bool:
         """更新訂閱者"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             set_clauses = []
@@ -229,7 +234,7 @@ class WebhookEventSystem:
     def remove_subscriber(self, subscriber_id: str) -> bool:
         """刪除訂閱者"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             cursor.execute('DELETE FROM webhook_subscribers WHERE id = ?', (subscriber_id,))
             conn.commit()
@@ -242,7 +247,7 @@ class WebhookEventSystem:
     
     def get_subscriber(self, subscriber_id: str) -> Optional[WebhookSubscriber]:
         """獲取訂閱者"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM webhook_subscribers WHERE id = ?', (subscriber_id,))
         row = cursor.fetchone()
@@ -254,7 +259,7 @@ class WebhookEventSystem:
     
     def list_subscribers(self, active_only: bool = False) -> List[Dict[str, Any]]:
         """列出所有訂閱者"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         if active_only:
@@ -341,7 +346,7 @@ class WebhookEventSystem:
     
     def _get_subscribers_for_event(self, event_type: str) -> List[WebhookSubscriber]:
         """獲取訂閱特定事件的訂閱者"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM webhook_subscribers WHERE is_active = 1')
         rows = cursor.fetchall()
@@ -440,7 +445,7 @@ class WebhookEventSystem:
     
     def _save_event(self, event: WebhookEvent):
         """保存事件"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO webhook_events 
@@ -466,7 +471,7 @@ class WebhookEventSystem:
         response_body: Optional[str]
     ):
         """更新事件推送狀態"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE webhook_events 
@@ -499,7 +504,7 @@ class WebhookEventSystem:
         limit: int = 100
     ) -> List[Dict[str, Any]]:
         """獲取事件歷史"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM webhook_events WHERE 1=1'
@@ -539,7 +544,7 @@ class WebhookEventSystem:
     
     def get_delivery_stats(self) -> Dict[str, Any]:
         """獲取推送統計"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 按狀態統計
@@ -600,7 +605,7 @@ class WebhookEventSystem:
     
     async def retry_failed_events(self, max_age_hours: int = 24):
         """重試失敗的事件"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cutoff = (datetime.now() - timedelta(hours=max_age_hours)).isoformat()

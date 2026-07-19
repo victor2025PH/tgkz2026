@@ -18,6 +18,11 @@ from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+# 注意：_get_db_path() 的 Docker fallback 判斷邏輯保持不變，僅「開連接」動作改用合法模塊。
+from core.db_utils import create_connection
+
 logger = logging.getLogger(__name__)
 
 
@@ -229,7 +234,7 @@ class PasswordHistoryManager:
         return possible_paths[1] if os.path.exists('/app/data') else possible_paths[2]
     
     def _get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
+        conn = create_connection(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
     

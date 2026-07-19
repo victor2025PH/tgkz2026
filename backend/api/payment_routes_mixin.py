@@ -262,19 +262,18 @@ class PaymentRoutesMixin:
             limit = int(request.query.get('limit', 50))
             
             from core.unified_payment import get_unified_payment_service
-            import sqlite3
+            # 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+            # 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+            from core.db_utils import get_connection
             
             service = get_unified_payment_service()
-            db = sqlite3.connect(service.db_path)
-            db.row_factory = sqlite3.Row
-            
-            rows = db.execute('''
-                SELECT * FROM payment_intents 
-                WHERE user_id = ? 
-                ORDER BY created_at DESC 
-                LIMIT ?
-            ''', (tenant.user_id, limit)).fetchall()
-            db.close()
+            with get_connection(service.db_path) as db:
+                rows = db.execute('''
+                    SELECT * FROM payment_intents 
+                    WHERE user_id = ? 
+                    ORDER BY created_at DESC 
+                    LIMIT ?
+                ''', (tenant.user_id, limit)).fetchall()
             
             payments = []
             for row in rows:
@@ -403,17 +402,16 @@ class PaymentRoutesMixin:
             invoice_id = request.match_info.get('invoice_id')
             
             from core.unified_payment import get_unified_payment_service
-            import sqlite3
+            # 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+            # 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+            from core.db_utils import get_connection
             
             service = get_unified_payment_service()
-            db = sqlite3.connect(service.db_path)
-            db.row_factory = sqlite3.Row
-            
-            row = db.execute(
-                'SELECT * FROM invoices WHERE id = ? AND user_id = ?',
-                (invoice_id, tenant.user_id)
-            ).fetchone()
-            db.close()
+            with get_connection(service.db_path) as db:
+                row = db.execute(
+                    'SELECT * FROM invoices WHERE id = ? AND user_id = ?',
+                    (invoice_id, tenant.user_id)
+                ).fetchone()
             
             if not row:
                 return self._json_response({'success': False, 'error': '發票不存在'}, 404)

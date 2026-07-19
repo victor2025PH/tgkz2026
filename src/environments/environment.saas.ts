@@ -19,10 +19,7 @@ export const environment = {
     apiAccess: false,       // 付費功能
     debug: false,
     // 🎯 精簡獲客模式：true 時隱藏 AI 增值入口（策略規劃/自動執行/多角色/智能引擎/客戶培育）
-    leanMode: false,
-    // 🎯 精簡獲客模式 - 獨立 Bootstrap 根組件（真正的 bundle 體積優化），預設關閉。
-    // 詳見 environment.ts 同名欄位註釋。
-    leanBootstrapRoot: false
+    leanMode: false
   },
   
   // 訂閱級別功能配置

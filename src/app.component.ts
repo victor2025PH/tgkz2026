@@ -133,7 +133,12 @@ interface SuccessOverlayConfig {
 }
 
 @Component({
-  selector: 'app-root',
+  // 🔧 選擇器改為 'app-shell'：AppComponent 現在是透過路由 loadComponent 懶加載
+  // 掛載的「應用殼」組件，不再是 bootstrap 根組件（見 main.ts / app-root.component.ts），
+  // selector 對路由懶加載組件本身沒有實際作用（Router 直接實例化類別、插入
+  // <router-outlet> 位置，不依賴標籤匹配），改名只是避免與新的 app-root 選擇器
+  // 混淆，不影響任何既有邏輯或模板。
+  selector: 'app-shell',
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,

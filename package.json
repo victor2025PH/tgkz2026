@@ -100,7 +100,6 @@
       "electron.js",
       "preload.js",
       "index.html",
-      "index.tsx",
       "metadata.json",
       "dist/**/*",
       "default-config/**/*",

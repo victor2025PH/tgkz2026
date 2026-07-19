@@ -15,7 +15,6 @@ files:
   - electron.js
   - preload.js
   - index.html
-  - index.tsx
   - metadata.json
   - security-electron.js
   - auto-ai-setup.js

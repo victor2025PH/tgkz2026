@@ -122,3 +122,82 @@ def resolve_proxy_package(package_id: str) -> Optional[Dict[str, Any]]:
     （購買被拒）。待建立權威 PROXY_PACKAGES 表並接通履約後再實作。
     """
     return None
+
+
+# ==================== 方案列表（供前端展示；價格權威、展示元數據集中）====================
+
+# 會員展示元數據（中文名/賣點/是否主推）。價格一律取自 SUBSCRIPTION_PLANS（權威），
+# 這裡只放「展示」相關，避免前端硬編碼價格導致多處漂移。
+_MEMBERSHIP_DISPLAY = {
+    'basic': {
+        'name': '基礎版',
+        'features': ['5 個帳號', '基礎功能', 'AI 功能', 'Email 支持'],
+        'is_popular': False,
+    },
+    'pro': {
+        'name': '專業版',
+        'features': ['20 個帳號', '進階功能', 'AI + 監控', '優先支持', 'API 訪問'],
+        'is_popular': True,
+    },
+    'enterprise': {
+        'name': '企業版',
+        'features': ['無限帳號', '全部功能', '專屬客服', '定制開發'],
+        'is_popular': False,
+    },
+}
+
+# 展示順序（低到高）
+_MEMBERSHIP_ORDER = ['basic', 'pro', 'enterprise']
+
+
+def list_membership_plans(cycle: str = 'monthly') -> list:
+    """列出可售會員方案（前端 MembershipPlan 結構）。價格取自權威源。"""
+    plans = []
+    for tier in _MEMBERSHIP_ORDER:
+        plan_id = f'{tier}_{cycle}'
+        resolved = resolve_membership_plan(plan_id)
+        if not resolved:
+            continue
+        disp = _MEMBERSHIP_DISPLAY.get(tier, {})
+        plans.append({
+            'id': plan_id,
+            'name': disp.get('name', resolved['name']),
+            'tier': tier,
+            'duration_days': resolved['duration_days'],
+            'price': resolved['price'],
+            'features': disp.get('features', []),
+            'is_popular': disp.get('is_popular', False),
+        })
+    return plans
+
+
+def list_quota_packs() -> list:
+    """列出可售配額包（前端 QuotaPack 結構）。價格取自 QUOTA_PACKS 權威。"""
+    try:
+        from core.billing_service import QUOTA_PACKS
+    except Exception as e:
+        logger.error(f"[plan_catalog] 無法載入 QUOTA_PACKS: {e}")
+        return []
+
+    packs = []
+    for pack_id, pack in QUOTA_PACKS.items():
+        price = int(getattr(pack, 'price', 0) or 0)
+        if price <= 0:
+            continue
+        quotas = getattr(pack, 'quotas', {}) or {}
+        quota_amount = int(sum(v for v in quotas.values() if isinstance(v, int) and v > 0))
+        packs.append({
+            'id': pack_id,
+            'name': getattr(pack, 'name', pack_id),
+            'quota_amount': quota_amount,
+            'price': price,
+            'bonus_amount': 0,
+            'is_popular': bool(getattr(pack, 'featured', False)),
+            'description': getattr(pack, 'description', ''),
+        })
+    return packs
+
+
+def list_proxy_packages() -> list:
+    """列出可售代理套餐。目前無權威表且履約關閉，返回空列表（前端不顯示可購買代理）。"""
+    return []

@@ -404,6 +404,10 @@ def _register_wallet_routes(app):
         app.router.add_post('/api/purchase/membership', purchase_handlers.purchase_membership)
         app.router.add_post('/api/purchase/proxy', purchase_handlers.purchase_ip_proxy)
         app.router.add_post('/api/purchase/quota', purchase_handlers.purchase_quota_pack)
+        # 方案列表（公開，價格來自服務端權威源 wallet/plan_catalog）
+        app.router.add_get('/api/membership/plans', purchase_handlers.list_membership_plans)
+        app.router.add_get('/api/quota/packs', purchase_handlers.list_quota_packs)
+        app.router.add_get('/api/proxy/packages', purchase_handlers.list_proxy_packages)
 
     # Phase 4: 提現
     if withdraw_handlers:

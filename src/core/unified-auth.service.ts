@@ -11,6 +11,7 @@
 import { Injectable, inject, signal, computed, effect } from '@angular/core';
 import { Router } from '@angular/router';
 import { environment } from '../environments/environment';
+import { isElectronRuntime } from '../utils/runtime-env.util';
 
 // ==================== 統一模型定義 ====================
 
@@ -173,7 +174,8 @@ export class UnifiedAuthService {
    * 檢測是否在 Electron 環境
    */
   isElectronMode(): boolean {
-    return !!(window as any).electronAPI || !!(window as any).electron;
+    // 🔧 用統一偵測（含 window.require），與 Guard/ApiService 判斷一致
+    return isElectronRuntime();
   }
   
   /**

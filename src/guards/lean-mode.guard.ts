@@ -19,29 +19,7 @@ import {
   RouterStateSnapshot
 } from '@angular/router';
 import { ToastService } from '../toast.service';
-import { environment } from '../environments/environment';
-
-/**
- * 判斷是否處於精簡獲客模式
- *
- * 🔧 判斷邏輯必須與 `app.component.ts` 的 `leanMode` getter 保持一致：
- * 優先讀 localStorage（供運行時切換/演示覆蓋），否則回退到構建期 environment 開關。
- *
- * ⚠️ 此處為刻意保留的重複邏輯（未提煉為共用函數）：`app.component.ts` 當前由另一
- * 位協作者處理中，本次改動避免碰觸該檔案。建議未來將此判斷提煉為共用工具函數
- * （例如 `src/utils/lean-mode.util.ts` 匯出 `isLeanModeActive()`），並讓
- * `app.component.ts` 的 `leanMode` getter 與本守衛都改為呼叫同一處，避免兩處判斷
- * 邏輯日後漂移不一致。（此重複模式在專案中已有先例：`isTokenAlive()` 目前也同時
- * 存在於 `src/core/auth.guard.ts` 與 `src/guards/auth.guard.ts` 兩處。）
- */
-function isLeanModeActive(): boolean {
-  try {
-    const ls = localStorage.getItem('tg_lean_mode');
-    if (ls === 'true') { return true; }
-    if (ls === 'false') { return false; }
-  } catch { /* ignore */ }
-  return !!(environment as any)?.features?.leanMode;
-}
+import { isLeanModeActive } from '../utils/lean-mode.util';
 
 /**
  * AI 專屬功能守衛

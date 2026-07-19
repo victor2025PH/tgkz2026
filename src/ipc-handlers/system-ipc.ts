@@ -248,7 +248,6 @@ export function setupSystemIpcHandlers(this: any): void {
             this.toastService.success(`已更新 ${data.count} 個用戶`);
             this.selectedUserIds.set([]);
             this.loadUsersWithProfiles();
-            this.loadFunnelStats();
         } else {
             this.toastService.error(`更新失敗: ${data.error}`);
         }

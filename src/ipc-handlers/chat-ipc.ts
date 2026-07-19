@@ -1,6 +1,18 @@
 /**
  * Phase 9-1a: Ollama, local AI, first run, discussion watcher, chat history
  * Extracted from AppComponent.setupIpcListeners()
+ *
+ * 🔧 精簡獲客模式重構（Stage 2D）：
+ * 原本的 'backend-status' / 'monitoring-status' / 'monitoring-health' 三個監聽器
+ * 已搬移至 core-ipc.ts（它們服務的是全局後端狀態橫幅與監控狀態，屬於精簡模式也需要的
+ * 核心/通用功能，不可與本檔案一起被精簡模式跳過註冊）。
+ *
+ * 本檔案剩餘的監聽器經逐條追蹤讀取端（signal 的所有讀取位置）後確認：
+ * 除了下面列出的少數例外，其餘全部沒有任何存活的 UI 讀取者（無論精簡模式與否），
+ * 屬於過往重構留下的孤兒代碼（例如 Discussion Watcher 全鏈路、chat-list、
+ * Ollama/首次運行向導等）。因此本檔案整體可以安全地交由 setupAllIpcHandlers
+ * 依 isLeanModeActive() 條件跳過註冊；即使在非精簡模式下，這些監聽器目前也不會
+ * 影響任何可見功能，維持原行為不變。詳見任務分類表（未隨代碼提交）。
  */
 import { LogEntry, TelegramAccount, CapturedLead, KeywordConfig, QueueStatus, QueueMessage, Alert } from '../models';
 import { TimeSeriesData } from '../analytics-charts.component';
@@ -40,17 +52,6 @@ export function setupChatIpcHandlers(this: any): void {
         // this.showWelcomeDialog.set(true);
         // 後台靜默檢測 Ollama
         setTimeout(() => this.detectOllama(), 1000);
-      }
-    });
-    
-    // 後端狀態監聽
-    this.ipcService.on('backend-status', (data: { running: boolean, error?: string, suggestion?: string }) => {
-      console.log('[App] Backend status:', data);
-      this.backendRunning.set(data.running);
-      if (!data.running && data.error) {
-        this.backendError.set(data.error);
-        this.showBackendErrorDialog.set(true);
-        this.toastService.error('❌ Python 後端未運行，部分功能無法使用');
       }
     });
     
@@ -243,23 +244,6 @@ export function setupChatIpcHandlers(this: any): void {
       // AI 回復生成後，更新聊天記錄
       if (this.selectedChatUserId() === data.userId) {
         this.loadChatHistory(data.userId);
-      }
-    });
-    
-    this.ipcService.on('monitoring-status', (data: { success: boolean, isMonitoring?: boolean, listenerAccounts?: any[], senderAccounts?: any[] }) => {
-      if (data.success) {
-        console.log('[Frontend] Monitoring status:', data);
-      }
-    });
-    
-    this.ipcService.on('monitoring-health', (data: { success: boolean, isHealthy?: boolean, issues?: string[], warnings?: string[] }) => {
-      if (data.success) {
-        if (data.issues && data.issues.length > 0) {
-          console.warn('[Frontend] Monitoring issues:', data.issues);
-        }
-        if (data.warnings && data.warnings.length > 0) {
-          console.warn('[Frontend] Monitoring warnings:', data.warnings);
-        }
       }
     });
     

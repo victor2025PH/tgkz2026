@@ -38,7 +38,7 @@ import { SwManagerService } from './services/sw-manager.service';
 import { OnboardingComponent } from './onboarding.component';
 // BackupService 從 ./services 統一導入
 import { I18nService } from './i18n.service';
-import { environment } from './environments/environment';
+import { isLeanModeActive } from './utils/lean-mode.util';
 // 新增：用戶認證相關 - 使用統一的 JWT 認證服務
 import { AuthService } from './core/auth.service';
 // 🔧 P4-1: Legacy LoginComponent 已移除，統一使用 /auth/login 路由（Core LoginComponent）
@@ -501,14 +501,9 @@ export class AppComponent implements OnDestroy, OnInit {
   }
 
   // 🎯 精簡獲客模式開關：隱藏 AI 增值菜單（策略規劃/自動執行/多角色/智能引擎/客戶培育）
-  // 優先讀 localStorage（便於運行時切換演示），否則回退到構建期 environment 開關
+  // 判斷邏輯統一提煉至 utils/lean-mode.util.ts，與 aiFeatureGuard 共用同一實現
   get leanMode(): boolean {
-    try {
-      const ls = localStorage.getItem('tg_lean_mode');
-      if (ls === 'true') return true;
-      if (ls === 'false') return false;
-    } catch { /* ignore */ }
-    return !!(environment as any)?.features?.leanMode;
+    return isLeanModeActive();
   }
   
   // 從本地存儲加載側邊欄分組狀態
@@ -2006,20 +2001,7 @@ export class AppComponent implements OnDestroy, OnInit {
     };
   });
 
-  // --- Funnel Stats & User Management ---
-  funnelStats = signal<{
-    stages: {[key: string]: {count: number, avg_interest: number, avg_sentiment: number}},
-    tags: [string, number][],
-    interest_distribution: {[key: number]: number},
-    today_new: number,
-    week_converted: number
-  }>({
-    stages: {},
-    tags: [],
-    interest_distribution: {},
-    today_new: 0,
-    week_converted: 0
-  });
+  // --- User Management ---
   
   // --- Marketing Campaign (Phase 4) ---
   marketingCampaigns = signal<Array<{
@@ -2079,22 +2061,6 @@ export class AppComponent implements OnDestroy, OnInit {
   userFilterTags = signal<string>('');
   userFilterSearch = signal<string>('');
   selectedUserIds = signal<string[]>([]);
-  
-  // 漏斗階段定義
-  funnelStages = [
-    {key: 'new', name: '新客戶', color: 'bg-blue-500'},
-    {key: 'contacted', name: '已聯繫', color: 'bg-cyan-500'},
-    {key: 'replied', name: '已回復', color: 'bg-green-500'},
-    {key: 'interested', name: '有興趣', color: 'bg-yellow-500'},
-    {key: 'negotiating', name: '洽談中', color: 'bg-orange-500'},
-    {key: 'follow_up', name: '需跟進', color: 'bg-purple-500'},
-    {key: 'converted', name: '已成交', color: 'bg-emerald-500'},
-    {key: 'churned', name: '已流失', color: 'bg-red-500'}
-  ];
-  
-  loadFunnelStats() {
-    this.ipcService.send('get-funnel-stats', {});
-  }
   
   // ==================== Marketing Campaign Methods (Phase 4) ====================
   
@@ -2330,16 +2296,6 @@ export class AppComponent implements OnDestroy, OnInit {
     this.ipcService.send('bulk-update-user-stage', {userIds, stage});
   }
   
-  getStageName(stage: string): string {
-    const found = this.funnelStages.find(s => s.key === stage);
-    return found ? found.name : stage;
-  }
-  
-  getStageColor(stage: string): string {
-    const found = this.funnelStages.find(s => s.key === stage);
-    return found ? found.color : 'bg-gray-500';
-  }
-
   // --- Analytics & Dashboard State ---
   dashboardStats = computed(() => {
     const accounts = this.accounts();
@@ -2744,8 +2700,7 @@ export class AppComponent implements OnDestroy, OnInit {
         lastView = currentView;
         
         if (currentView === 'leads') {
-          // 加載漏斗統計和用戶列表
-          this.loadFunnelStats();
+          // 加載用戶列表
           this.loadUsersWithProfiles();
         } else if (currentView === 'resources') {
           // 加載資源發現數據
@@ -2954,7 +2909,6 @@ export class AppComponent implements OnDestroy, OnInit {
     this.ipcService.cleanup('templates-updated');
     this.ipcService.cleanup('campaigns-updated');
     this.ipcService.cleanup('leads-updated');
-    this.ipcService.cleanup('funnel-stats');
     this.ipcService.cleanup('users-with-profiles');
     this.ipcService.cleanup('bulk-update-complete');
     this.ipcService.cleanup('login-requires-code');
@@ -3894,49 +3848,6 @@ export class AppComponent implements OnDestroy, OnInit {
   messagesChartData(): TimeSeriesData | null {
     // Use sending stats data if available
     return this.sendingStatsData();
-  }
-  
-  funnelChartData(): TimeSeriesData | null {
-    const funnel = this.funnelStats();
-    if (!funnel || !funnel.stages || Object.keys(funnel.stages).length === 0) {
-      return null;
-    }
-    
-    const stages = this.funnelStages;
-    const labels = stages.map(s => s.name);
-    const data = stages.map(s => {
-      const stageData = funnel.stages[s.key];
-      return stageData ? stageData.count : 0;
-    });
-    
-    return {
-      labels,
-      datasets: [{
-        label: '漏斗数据',
-        data,
-        backgroundColor: [
-          'rgba(59, 130, 246, 0.8)',
-          'rgba(34, 197, 94, 0.8)',
-          'rgba(168, 85, 247, 0.8)',
-          'rgba(239, 68, 68, 0.8)',
-          'rgba(245, 158, 11, 0.8)',
-          'rgba(236, 72, 153, 0.8)',
-          'rgba(16, 185, 129, 0.8)',
-          'rgba(239, 68, 68, 0.8)'
-        ],
-        borderColor: [
-          'rgb(59, 130, 246)',
-          'rgb(34, 197, 94)',
-          'rgb(168, 85, 247)',
-          'rgb(239, 68, 68)',
-          'rgb(245, 158, 11)',
-          'rgb(236, 72, 153)',
-          'rgb(16, 185, 129)',
-          'rgb(239, 68, 68)'
-        ],
-        borderWidth: 1
-      }]
-    };
   }
   
   // Alert management state

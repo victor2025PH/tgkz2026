@@ -629,14 +629,6 @@ export function setupDataSyncIpcHandlers(this: any): void {
         }
     });
     
-    // 漏斗統計事件
-    this.ipcService.on('funnel-stats', (data: any) => {
-        console.log('[Frontend] Received funnel-stats:', data);
-        if (!data.error) {
-            this.funnelStats.set(data);
-        }
-    });
-    
     // Marketing Stats 事件 (Phase 4)
     this.ipcService.on('marketing-stats', (data: any) => {
       this.isLoadingMarketing.set(false);

@@ -9,7 +9,6 @@
 """
 
 import os
-import sqlite3
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
@@ -18,6 +17,10 @@ from enum import Enum
 import threading
 import secrets
 import string
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -150,82 +153,80 @@ class ReferralService:
         """初始化數據庫表"""
         try:
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # 邀請碼表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS referral_codes (
-                    code TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL UNIQUE,
-                    uses_count INTEGER DEFAULT 0,
-                    max_uses INTEGER DEFAULT -1,
-                    created_at TEXT
-                )
-            ''')
-            
-            # 推薦記錄表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS referrals (
-                    id TEXT PRIMARY KEY,
-                    referrer_id TEXT NOT NULL,
-                    referee_id TEXT NOT NULL UNIQUE,
-                    referral_code TEXT,
-                    status TEXT DEFAULT 'pending',
-                    referrer_reward_given INTEGER DEFAULT 0,
-                    referee_reward_given INTEGER DEFAULT 0,
-                    referrer_reward_amount INTEGER DEFAULT 0,
-                    referee_reward_amount INTEGER DEFAULT 0,
-                    total_commission INTEGER DEFAULT 0,
-                    created_at TEXT,
-                    qualified_at TEXT,
-                    rewarded_at TEXT
-                )
-            ''')
-            
-            # 返佣記錄表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS commissions (
-                    id TEXT PRIMARY KEY,
-                    referral_id TEXT NOT NULL,
-                    referrer_id TEXT NOT NULL,
-                    referee_id TEXT NOT NULL,
-                    order_id TEXT,
-                    order_amount INTEGER,
-                    commission_rate INTEGER,
-                    commission_amount INTEGER,
-                    status TEXT DEFAULT 'pending',
-                    created_at TEXT,
-                    paid_at TEXT
-                )
-            ''')
-            
-            # 用戶獎勵餘額表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS user_rewards (
-                    user_id TEXT PRIMARY KEY,
-                    balance INTEGER DEFAULT 0,
-                    total_earned INTEGER DEFAULT 0,
-                    total_withdrawn INTEGER DEFAULT 0,
-                    updated_at TEXT
-                )
-            ''')
-            
-            # 索引
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_referrals_referee ON referrals(referee_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_commissions_referrer ON commissions(referrer_id)')
-            
-            conn.commit()
-            conn.close()
-            
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                # 邀請碼表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS referral_codes (
+                        code TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL UNIQUE,
+                        uses_count INTEGER DEFAULT 0,
+                        max_uses INTEGER DEFAULT -1,
+                        created_at TEXT
+                    )
+                ''')
+
+                # 推薦記錄表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS referrals (
+                        id TEXT PRIMARY KEY,
+                        referrer_id TEXT NOT NULL,
+                        referee_id TEXT NOT NULL UNIQUE,
+                        referral_code TEXT,
+                        status TEXT DEFAULT 'pending',
+                        referrer_reward_given INTEGER DEFAULT 0,
+                        referee_reward_given INTEGER DEFAULT 0,
+                        referrer_reward_amount INTEGER DEFAULT 0,
+                        referee_reward_amount INTEGER DEFAULT 0,
+                        total_commission INTEGER DEFAULT 0,
+                        created_at TEXT,
+                        qualified_at TEXT,
+                        rewarded_at TEXT
+                    )
+                ''')
+
+                # 返佣記錄表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS commissions (
+                        id TEXT PRIMARY KEY,
+                        referral_id TEXT NOT NULL,
+                        referrer_id TEXT NOT NULL,
+                        referee_id TEXT NOT NULL,
+                        order_id TEXT,
+                        order_amount INTEGER,
+                        commission_rate INTEGER,
+                        commission_amount INTEGER,
+                        status TEXT DEFAULT 'pending',
+                        created_at TEXT,
+                        paid_at TEXT
+                    )
+                ''')
+
+                # 用戶獎勵餘額表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS user_rewards (
+                        user_id TEXT PRIMARY KEY,
+                        balance INTEGER DEFAULT 0,
+                        total_earned INTEGER DEFAULT 0,
+                        total_withdrawn INTEGER DEFAULT 0,
+                        updated_at TEXT
+                    )
+                ''')
+
+                # 索引
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_referrals_referee ON referrals(referee_id)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_commissions_referrer ON commissions(referrer_id)')
+
+                conn.commit()
+
         except Exception as e:
             logger.error(f"Init referral DB error: {e}")
-    
+
     def _get_db(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        """獲取數據庫連接（統一經由 core.db_utils.create_connection，調用方負責關閉）"""
+        return create_connection(self.db_path)
     
     def _generate_code(self, length: int = 6) -> str:
         """生成邀請碼"""

@@ -592,6 +592,23 @@ export class AdminService {
     }
   }
 
+  /** GET /api/v1/admin/purchase-orders — 購買訂單對賬（JWT admin） */
+  async getPurchaseOrders(
+    status: string = '',
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      let url = `${this.apiUrl}/api/v1/admin/purchase-orders?limit=${limit}&offset=${offset}`;
+      if (status) url += `&status=${status}`;
+      const res = await this.http.get<any>(url).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Get purchase orders error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
   async processRefund(billId: string, refundAmount: number, reason: string): Promise<any> {
     try {
       const res = await this.http.post<any>(

@@ -490,3 +490,24 @@ async def http_api_pool_forecast(request):
     except Exception as e:
         print(f"[api_stats_routes] api-pool/forecast 失敗: {e}", file=sys.stderr)
         return web.json_response({'success': False, 'error': str(e)}, status=500)
+
+
+async def http_admin_purchase_orders(request):
+    """GET /api/v1/admin/purchase-orders — 購買訂單對賬（JWT admin）
+
+    支持 ?status=completed|refunded|... &limit=&offset= 篩選分頁；
+    複用 wallet.purchase_orders.PurchaseOrderStore.list_all。
+    """
+    denied = _require_admin(request)
+    if denied is not None:
+        return denied
+    try:
+        from wallet.purchase_orders import get_purchase_order_store
+        status = request.query.get('status') or None
+        limit = min(int(request.query.get('limit', '100')), 500)
+        offset = int(request.query.get('offset', '0'))
+        orders = get_purchase_order_store().list_all(status=status, limit=limit, offset=offset)
+        return web.json_response({'success': True, 'data': orders})
+    except Exception as e:
+        print(f"[api_stats_routes] admin/purchase-orders 失敗: {e}", file=sys.stderr)
+        return web.json_response({'success': False, 'error': str(e)}, status=500)

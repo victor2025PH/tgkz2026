@@ -56,6 +56,9 @@ def _register_saas_api_stats_capacity_routes(app):
     app.router.add_get('/api/v1/admin/api-pool/alerts', stats.http_api_pool_alerts)
     app.router.add_get('/api/v1/admin/api-pool/forecast', stats.http_api_pool_forecast)
 
+    # 購買訂單對賬（JWT admin）
+    app.router.add_get('/api/v1/admin/purchase-orders', stats.http_admin_purchase_orders)
+
     logger.info("✅ SaaS api-stats / capacity routes registered under /api/v1/admin/")
 
 

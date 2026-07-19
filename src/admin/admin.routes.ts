@@ -77,6 +77,13 @@ export const ADMIN_ROUTES: Routes = [
           .then(m => m.CapacityChartComponent),
         title: '容量规划'
       },
+      // 🆕 購買訂單對賬（會員/配額/代理購買，供客服對賬與退款追溯）
+      {
+        path: 'purchase-orders',
+        loadComponent: () => import('./purchase-orders.component')
+          .then(m => m.PurchaseOrdersComponent),
+        title: '购买订单'
+      },
       // 🆕 运维中心
       {
         path: 'ops',

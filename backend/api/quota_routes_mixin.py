@@ -10,6 +10,9 @@ Usage: HttpApiServer(..., QuotaRoutesMixin, ...) inheritance
 """
 import logging
 
+# 🔧 改用合法連接模塊 core.db_utils（見 .cursorrules 合法連接模塊清單）。
+from core.db_utils import create_connection
+
 logger = logging.getLogger(__name__)
 
 
@@ -228,12 +231,17 @@ class QuotaRoutesMixin:
             
             days = 7 if period == '7d' else 30 if period == '30d' else 90
             
+            # 🔧 改用合法連接模塊 core.db_utils（見 .cursorrules 合法連接模塊清單）。
+            # 舊寫法有兩個既有缺陷：① 本檔案從未 import os，os.environ.get(...) 執行到這裡
+            # 必定拋出 NameError，此端點過去每次呼叫都直接被外層 except 攔截、回傳 500；
+            # ② 就算修了 import os，DB_PATH 這個環境變量本服務也從未設置過（它是
+            # deploy/docker-compose.yml 中另一個獨立 license-server 服務專用的變量），
+            # 錯誤預設值 'tg_matrix.db'（拼寫也與正式的 tgmatrix.db 不同）會在當前工作目錄
+            # 生成一個全新的空 db 檔案，與 core/scheduler.py 上一輪修復的潛伏 bug 屬同一模式。
             import sqlite3
             from datetime import datetime, timedelta
-            
-            db_path = os.environ.get('DB_PATH', 'tg_matrix.db')
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
+
+            conn = create_connection()
             cursor = conn.cursor()
             
             # 生成日期範圍
@@ -317,11 +325,11 @@ class QuotaRoutesMixin:
             offset = int(request.query.get('offset', 0))
             quota_type = request.query.get('type')  # 可選過濾
             
+            # 🔧 改用合法連接模塊 core.db_utils，理由與 get_quota_trend() 相同
+            # （見上方註解：缺少 import os 導致 NameError + DB_PATH 潛伏 bug）。
             import sqlite3
             
-            db_path = os.environ.get('DB_PATH', 'tg_matrix.db')
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
+            conn = create_connection()
             cursor = conn.cursor()
             
             history = []

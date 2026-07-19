@@ -6,10 +6,13 @@ import asyncio
 import os
 import sys
 import shutil
-import sqlite3
 import glob
 from datetime import datetime
 from typing import Optional
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import get_connection
 
 
 class DatabaseHealthGuard:
@@ -98,9 +101,10 @@ class DatabaseHealthGuard:
             if ".broken" in name or ".backup" in name or ".corrupt" in name:
                 continue
             try:
-                conn = sqlite3.connect(db_path, timeout=10)
-                result = conn.execute("PRAGMA integrity_check(1)").fetchone()
-                conn.close()
+                # 全項目強制 WAL（見「數據庫持久化防護規範」）；已是 WAL 的庫這裡只是
+                # 無鎖 no-op pragma，不影響 integrity_check 的損壞判定結果。
+                with get_connection(db_path) as conn:
+                    result = conn.execute("PRAGMA integrity_check(1)").fetchone()
                 status = result[0] if result else "unknown"
                 if status == "ok":
                     report["ok"].append(name)
@@ -126,11 +130,10 @@ class DatabaseHealthGuard:
             if ".broken" in db_path or ".backup" in db_path:
                 continue
             try:
-                conn = sqlite3.connect(db_path, timeout=10)
-                mode = conn.execute("PRAGMA journal_mode").fetchone()
-                if mode and mode[0] == "wal":
-                    conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
-                conn.close()
+                with get_connection(db_path) as conn:
+                    mode = conn.execute("PRAGMA journal_mode").fetchone()
+                    if mode and mode[0] == "wal":
+                        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
             except Exception:
                 pass
 
@@ -151,9 +154,8 @@ class DatabaseHealthGuard:
 
         # 備份（先 checkpoint）
         try:
-            conn = sqlite3.connect(main_db, timeout=10)
-            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            conn.close()
+            with get_connection(main_db) as conn:
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         except Exception:
             pass
 

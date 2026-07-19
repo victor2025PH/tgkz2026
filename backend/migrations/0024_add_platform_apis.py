@@ -137,10 +137,19 @@ def rollback(conn: sqlite3.Connection) -> bool:
 
 
 if __name__ == "__main__":
-    # 測試遷移
+    # 測試遷移（本區塊僅供手動自測，migrate()/rollback() 實際上由呼叫方傳入 conn，
+    # 不在此處建立連接；本身也未被 migration_manager.py 自動載入執行）
     import os
-    
-    db_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'system.db')
+    from pathlib import Path as _Path
+
+    _backend_dir = _Path(__file__).resolve().parent.parent
+    if str(_backend_dir) not in sys.path:
+        sys.path.insert(0, str(_backend_dir))
+    try:
+        from config import DATABASE_DIR
+        db_path = str(DATABASE_DIR / "system.db")
+    except ImportError:
+        db_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'system.db')
     
     if os.path.exists(db_path):
         conn = sqlite3.connect(db_path)

@@ -17,13 +17,31 @@ class Migration0008_AddAccountExtendedFields(Migration):
     
     async def up(self, db) -> None:
         """Apply migration (upgrade) - Add new columns to accounts table"""
-        # Note: This migration runs on tgai_server.db, but accounts table is in tgmatrix.db
-        # We need to connect to the correct database
+        # 📌 架構說明（2026-07 查證，詳見資料庫連接規範修復任務報告）：
+        # 早期架構下 accounts 表在 tgmatrix.db，而本遷移掛在 tgai_server.db 的遷移
+        # 流程下執行，兩者曾是不同檔案，因此才需要用 db.db_path 所在目錄動態算出
+        # 「兄弟檔案」tgmatrix.db 的路徑，另開一條獨立連接來改 accounts 表。
+        #
+        # 現況：database.py 已將 tgai_server.db 合併進 tgmatrix.db（見 database.py
+        # 頂部註解「原 tgai_server.db 已合併到 tgmatrix.db」），全局唯一的 Database()
+        # 實例只綁定一個 db_path（= config.DATABASE_PATH）。也就是說，目前
+        # db.db_path 與下面算出的 accounts_db_path 實際上是同一個檔案，這條額外連接
+        # 現在是「安全但多餘」（SQLite 允許同一檔案被多條連接同時開啟）。
+        #
+        # 🚫 刻意不簡化為直接重用 db._connection、也不改成直接 import
+        # config.DATABASE_PATH：tests/conftest.py 的 temp_db fixture 會用「臨時檔
+        # 路徑」構造 Database() 並跑 migrations，若這裡改成硬編碼引用
+        # config.DATABASE_PATH，測試時會誤指到開發機上真實的 backend/data/tgmatrix.db，
+        # 等於單測意外寫入/污染真實數據——這風險比「多開一條連接」更嚴重，因此保留
+        # 現有「取 db.db_path 同目錄下的兄弟檔案」這個環境無關的動態推導寫法。
+        # 未來若要徹底解決此類「同一份數據到底在哪個檔案」的歧義，建議 database.py
+        # 提供明確的 get_accounts_db_path()（或等價的顯式介面），讓所有遷移/模塊
+        # 都能查詢「accounts 表現在實際在哪個檔案」，不需要各自猜測與重複這段邏輯。
         import aiosqlite
         from pathlib import Path
         
         try:
-            # Determine the accounts database path
+            # Determine the accounts database path（兄弟檔案，見上方架構說明）
             data_dir = Path(db.db_path).parent
             accounts_db_path = data_dir / 'tgmatrix.db'
             

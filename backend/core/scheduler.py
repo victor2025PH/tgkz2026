@@ -318,26 +318,27 @@ class TaskScheduler:
     async def _cleanup_expired_data(self):
         """清理過期數據"""
         try:
-            import os
-            import sqlite3
-            
-            db_path = os.environ.get('DB_PATH', 'tg_matrix.db')
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            
-            # 刪除 90 天前的配額日誌
-            cutoff = (datetime.now() - timedelta(days=90)).isoformat()
-            cursor.execute('DELETE FROM quota_logs WHERE created_at < ?', (cutoff,))
-            
-            # 刪除 30 天前已確認的告警
-            alert_cutoff = (datetime.now() - timedelta(days=30)).isoformat()
-            cursor.execute('''
-                DELETE FROM quota_alerts_v2 
-                WHERE acknowledged = 1 AND created_at < ?
-            ''', (alert_cutoff,))
-            
-            conn.commit()
-            conn.close()
+            # 🔧 改用合法連接模塊 core.db_utils（見 .cursorrules 合法連接模塊清單），
+            # 不再直接 sqlite3.connect(DB_PATH)：舊寫法的 DB_PATH 環境變量實際只給
+            # 獨立的 license-server 用（見 deploy/docker-compose.yml），本服務從未設置，
+            # 過去一直落到錯誤的預設值 'tg_matrix.db'（拼寫也與正式的 tgmatrix.db 不同）。
+            from .db_utils import get_connection
+
+            with get_connection() as conn:
+                cursor = conn.cursor()
+
+                # 刪除 90 天前的配額日誌
+                cutoff = (datetime.now() - timedelta(days=90)).isoformat()
+                cursor.execute('DELETE FROM quota_logs WHERE created_at < ?', (cutoff,))
+
+                # 刪除 30 天前已確認的告警
+                alert_cutoff = (datetime.now() - timedelta(days=30)).isoformat()
+                cursor.execute('''
+                    DELETE FROM quota_alerts_v2 
+                    WHERE acknowledged = 1 AND created_at < ?
+                ''', (alert_cutoff,))
+
+                conn.commit()
             
             logger.info("Cleanup expired data completed")
         except Exception as e:
@@ -346,80 +347,75 @@ class TaskScheduler:
     async def _check_quota_alerts(self):
         """檢查配額告警"""
         try:
-            import os
-            import sqlite3
-            
-            db_path = os.environ.get('DB_PATH', 'tg_matrix.db')
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
+            from .db_utils import get_connection
             from .level_config import get_level_config_service
             level_service = get_level_config_service()
-            
-            # 獲取所有活躍用戶
-            cursor.execute('''
-                SELECT DISTINCT u.id, u.subscription_tier
-                FROM users u
-                JOIN quota_usage q ON u.id = q.user_id
-                WHERE q.date = date('now')
-            ''')
-            
-            users = cursor.fetchall()
-            alerts_created = 0
-            
-            for user in users:
-                user_id = user['id']
-                tier = user['subscription_tier'] or 'bronze'
-                
-                # 檢查每種每日配額
-                for quota_type in ['daily_messages', 'ai_calls']:
-                    limit = level_service.get_quota_limit(tier, quota_type)
-                    if limit == -1:
-                        continue
-                    
-                    # 獲取當前使用量
-                    cursor.execute('''
-                        SELECT used FROM quota_usage 
-                        WHERE user_id = ? AND quota_type = ? AND date = date('now')
-                    ''', (user_id, quota_type))
-                    row = cursor.fetchone()
-                    used = row['used'] if row else 0
-                    
-                    percentage = (used / limit) * 100 if limit > 0 else 0
-                    
-                    # 檢查是否需要告警
-                    alert_type = None
-                    if percentage >= 100:
-                        alert_type = 'exceeded'
-                    elif percentage >= 95:
-                        alert_type = 'critical'
-                    elif percentage >= 80:
-                        alert_type = 'warning'
-                    
-                    if alert_type:
-                        # 檢查是否已有相同告警（1小時內）
+
+            with get_connection() as conn:
+                cursor = conn.cursor()
+
+                # 獲取所有活躍用戶
+                cursor.execute('''
+                    SELECT DISTINCT u.id, u.subscription_tier
+                    FROM users u
+                    JOIN quota_usage q ON u.id = q.user_id
+                    WHERE q.date = date('now')
+                ''')
+
+                users = cursor.fetchall()
+                alerts_created = 0
+
+                for user in users:
+                    user_id = user['id']
+                    tier = user['subscription_tier'] or 'bronze'
+
+                    # 檢查每種每日配額
+                    for quota_type in ['daily_messages', 'ai_calls']:
+                        limit = level_service.get_quota_limit(tier, quota_type)
+                        if limit == -1:
+                            continue
+
+                        # 獲取當前使用量
                         cursor.execute('''
-                            SELECT id FROM quota_alerts_v2 
-                            WHERE user_id = ? AND quota_type = ? AND alert_type = ?
-                            AND created_at > datetime('now', '-1 hour')
-                        ''', (user_id, quota_type, alert_type))
-                        
-                        if not cursor.fetchone():
+                            SELECT used FROM quota_usage 
+                            WHERE user_id = ? AND quota_type = ? AND date = date('now')
+                        ''', (user_id, quota_type))
+                        row = cursor.fetchone()
+                        used = row['used'] if row else 0
+
+                        percentage = (used / limit) * 100 if limit > 0 else 0
+
+                        # 檢查是否需要告警
+                        alert_type = None
+                        if percentage >= 100:
+                            alert_type = 'exceeded'
+                        elif percentage >= 95:
+                            alert_type = 'critical'
+                        elif percentage >= 80:
+                            alert_type = 'warning'
+
+                        if alert_type:
+                            # 檢查是否已有相同告警（1小時內）
                             cursor.execute('''
-                                INSERT INTO quota_alerts_v2 
-                                (user_id, quota_type, alert_type, message, percentage, acknowledged, created_at)
-                                VALUES (?, ?, ?, ?, ?, 0, datetime('now'))
-                            ''', (
-                                user_id, quota_type, alert_type,
-                                f'{quota_type} 使用率達 {percentage:.1f}%',
-                                percentage
-                            ))
-                            alerts_created += 1
-            
-            conn.commit()
-            conn.close()
-            
+                                SELECT id FROM quota_alerts_v2 
+                                WHERE user_id = ? AND quota_type = ? AND alert_type = ?
+                                AND created_at > datetime('now', '-1 hour')
+                            ''', (user_id, quota_type, alert_type))
+
+                            if not cursor.fetchone():
+                                cursor.execute('''
+                                    INSERT INTO quota_alerts_v2 
+                                    (user_id, quota_type, alert_type, message, percentage, acknowledged, created_at)
+                                    VALUES (?, ?, ?, ?, ?, 0, datetime('now'))
+                                ''', (
+                                    user_id, quota_type, alert_type,
+                                    f'{quota_type} 使用率達 {percentage:.1f}%',
+                                    percentage
+                                ))
+                                alerts_created += 1
+
+                conn.commit()
+
             if alerts_created > 0:
                 logger.info(f"Created {alerts_created} quota alerts")
                 
@@ -429,26 +425,22 @@ class TaskScheduler:
     async def _daily_overage_billing(self):
         """每日超額賬單生成"""
         try:
-            import os
-            import sqlite3
             from datetime import datetime, timedelta
-            
-            db_path = os.environ.get('DB_PATH', 'tg_matrix.db')
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            # 獲取昨天的日期
-            yesterday = (datetime.utcnow() - timedelta(days=1)).strftime('%Y-%m-%d')
-            
-            # 查找有超額記錄的用戶
-            cursor.execute('''
-                SELECT DISTINCT user_id FROM overage_usage
-                WHERE date = ? AND billed = 0 AND overage_amount > 0
-            ''', (yesterday,))
-            
-            users = cursor.fetchall()
-            conn.close()
+            from .db_utils import get_connection
+
+            with get_connection() as conn:
+                cursor = conn.cursor()
+
+                # 獲取昨天的日期
+                yesterday = (datetime.utcnow() - timedelta(days=1)).strftime('%Y-%m-%d')
+
+                # 查找有超額記錄的用戶
+                cursor.execute('''
+                    SELECT DISTINCT user_id FROM overage_usage
+                    WHERE date = ? AND billed = 0 AND overage_amount > 0
+                ''', (yesterday,))
+
+                users = cursor.fetchall()
             
             from .billing_service import get_billing_service
             billing = get_billing_service()
@@ -472,28 +464,24 @@ class TaskScheduler:
     async def _subscription_expiry_reminder(self):
         """訂閱到期提醒"""
         try:
-            import os
-            import sqlite3
             from datetime import datetime, timedelta
-            
-            db_path = os.environ.get('DB_PATH', 'tg_matrix.db')
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            # 查找 7 天內到期的訂閱
-            expiry_date = (datetime.utcnow() + timedelta(days=7)).isoformat()
-            
-            cursor.execute('''
-                SELECT user_id, plan_id, current_period_end
-                FROM subscriptions
-                WHERE status = 'active'
-                  AND current_period_end <= ?
-                  AND cancel_at_period_end = 0
-            ''', (expiry_date,))
-            
-            subscriptions = cursor.fetchall()
-            conn.close()
+            from .db_utils import get_connection
+
+            with get_connection() as conn:
+                cursor = conn.cursor()
+
+                # 查找 7 天內到期的訂閱
+                expiry_date = (datetime.utcnow() + timedelta(days=7)).isoformat()
+
+                cursor.execute('''
+                    SELECT user_id, plan_id, current_period_end
+                    FROM subscriptions
+                    WHERE status = 'active'
+                      AND current_period_end <= ?
+                      AND cancel_at_period_end = 0
+                ''', (expiry_date,))
+
+                subscriptions = cursor.fetchall()
             
             from .billing_service import get_billing_service
             billing = get_billing_service()
@@ -516,26 +504,23 @@ class TaskScheduler:
     async def _check_expired_packages(self):
         """檢查過期的配額包"""
         try:
-            import os
-            import sqlite3
             from datetime import datetime
-            
-            db_path = os.environ.get('DB_PATH', 'tg_matrix.db')
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            
-            now = datetime.utcnow().isoformat()
-            
-            # 標記過期的配額包為非活躍
-            cursor.execute('''
-                UPDATE user_quota_packages
-                SET is_active = 0
-                WHERE is_active = 1 AND expires_at < ?
-            ''', (now,))
-            
-            expired_count = cursor.rowcount
-            conn.commit()
-            conn.close()
+            from .db_utils import get_connection
+
+            with get_connection() as conn:
+                cursor = conn.cursor()
+
+                now = datetime.utcnow().isoformat()
+
+                # 標記過期的配額包為非活躍
+                cursor.execute('''
+                    UPDATE user_quota_packages
+                    SET is_active = 0
+                    WHERE is_active = 1 AND expires_at < ?
+                ''', (now,))
+
+                expired_count = cursor.rowcount
+                conn.commit()
             
             if expired_count > 0:
                 logger.info(f"Marked {expired_count} quota packages as expired")

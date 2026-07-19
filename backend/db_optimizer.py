@@ -90,7 +90,14 @@ class DatabaseOptimizer:
         'search_history': 7,     # 搜索歷史保留 7 天
     }
     
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: Optional[str] = None):
+        # 🔧 路徑統一回落到 core.db_utils.resolve_db_path()（見 .cursorrules 合法連接
+        # 模塊清單：DATABASE_PATH env → DB_PATH env → config.DATABASE_PATH → 預設路徑）。
+        # 目前唯一呼叫端 service/init_startup_mixin.py 已顯式傳入 config.DATABASE_PATH，
+        # 這裡的回落只是防禦性兜底，避免未來呼叫端遺漏路徑時憑空產生硬編碼相對路徑。
+        if not db_path:
+            from core.db_utils import resolve_db_path
+            db_path = resolve_db_path()
         self.db_path = db_path
         self._connection = None
         self._stats = {
@@ -101,7 +108,18 @@ class DatabaseOptimizer:
         }
     
     async def connect(self):
-        """建立連接"""
+        """
+        建立連接
+
+        🔧 刻意直連 aiosqlite，不走 db_connection_pool.py 的共享連接池：
+        VACUUM 需要對整個資料庫取得獨佔寫鎖，期間會讓其他連接的讀寫全部
+        SQLITE_BUSY（已查證 SQLite 官方文檔 sqlite.org/lang_vacuum.html 及官方論壇：
+        "VACUUM is a write operation... will prevent other write transactions
+        (and eventually read transactions) from starting"）。若改用共享連接池，
+        VACUUM 會與池中其他並發查詢互相阻塞，可能拖慢甚至卡住線上其他請求；
+        DatabaseOptimizer 本身生命週期內只用一條專屬連接（self._connection），
+        與連接池「多連接復用」的設計目標本就不同，維持直連才安全。
+        """
         if not HAS_AIOSQLITE:
             raise ImportError("aiosqlite is required")
         if self._connection is None:
@@ -367,7 +385,7 @@ def get_db_optimizer() -> Optional[DatabaseOptimizer]:
     return _optimizer
 
 
-async def init_db_optimizer(db_path: str) -> DatabaseOptimizer:
+async def init_db_optimizer(db_path: Optional[str] = None) -> DatabaseOptimizer:
     """初始化數據庫優化器"""
     global _optimizer
     if _optimizer is None:

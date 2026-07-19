@@ -278,10 +278,14 @@ class TenantMigrationService:
         """獲取舊數據庫連接"""
         if not db_path.exists():
             return None
-        
-        conn = sqlite3.connect(str(db_path), timeout=30.0)
-        conn.row_factory = sqlite3.Row
-        return conn
+
+        # 🔧 改用合法連接模塊 core.db_utils.create_connection()（見 .cursorrules
+        # 合法連接模塊清單）。此方法回傳的連接由呼叫端在各流程中手動管理生命週期
+        # （視情況才 close()，非固定的 with 區塊），故採用同樣合法、但不綁定
+        # context manager 的 create_connection()，行為等同原本的
+        # sqlite3.connect(..., timeout=30.0) + row_factory=sqlite3.Row。
+        from .db_utils import create_connection
+        return create_connection(str(db_path))
     
     def scan_users(self) -> Set[str]:
         """

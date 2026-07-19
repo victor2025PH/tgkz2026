@@ -3,18 +3,28 @@
 直接在 tgmatrix.db 中創建表（因為 FTS 表已經在那裡）
 """
 
-import sqlite3
 import sys
 from pathlib import Path
 
-# tgmatrix.db 路徑（FTS 表所在的數據庫）
-ACCOUNTS_DB_PATH = Path(__file__).parent.parent / "data" / "tgmatrix.db"
+# 🔧 確保可從任意 cwd 導入 config / core.db_utils
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_DIR))
+
+# tgmatrix.db 路徑（FTS 表所在的數據庫）— 改由 config.py 統一解析，不再硬編碼
+try:
+    from config import DATABASE_PATH
+    ACCOUNTS_DB_PATH = DATABASE_PATH
+except ImportError:
+    ACCOUNTS_DB_PATH = Path(__file__).parent.parent / "data" / "tgmatrix.db"
 
 def create_chat_history_table():
     """創建 chat_history 表"""
     print(f"連接到數據庫: {ACCOUNTS_DB_PATH}")
     
-    conn = sqlite3.connect(ACCOUNTS_DB_PATH)
+    # 🔧 改用合法連接模塊 core.db_utils，取代直接 sqlite3.connect()
+    from core.db_utils import create_connection
+    conn = create_connection(str(ACCOUNTS_DB_PATH))
     cursor = conn.cursor()
     
     try:

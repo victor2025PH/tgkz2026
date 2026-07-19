@@ -21,7 +21,12 @@ class DatabaseIntegrityTest:
     
     def __init__(self, db_path: str = None):
         if db_path is None:
-            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'tg_bot.db')
+            # 🔧 改由 config.py 統一解析（原硬編碼的 'tg_bot.db' 檔名已不存在，是歷史殘留錯誤路徑）
+            try:
+                from config import DATABASE_PATH
+                db_path = str(DATABASE_PATH)
+            except ImportError:
+                db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'tgmatrix.db')
         self.db_path = db_path
         self.results: Dict[str, Any] = {
             'test_time': datetime.now().isoformat(),
@@ -35,7 +40,9 @@ class DatabaseIntegrityTest:
         """連接數據庫"""
         if not os.path.exists(self.db_path):
             raise FileNotFoundError(f"數據庫文件不存在: {self.db_path}")
-        return sqlite3.connect(self.db_path)
+        # 🔧 改用合法連接模塊 core.db_utils，取代直接 sqlite3.connect()
+        from core.db_utils import create_connection
+        return create_connection(self.db_path)
     
     def get_all_tables(self, conn: sqlite3.Connection) -> List[str]:
         """獲取所有表名"""

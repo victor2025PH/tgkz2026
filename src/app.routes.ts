@@ -23,7 +23,7 @@
  */
 import { Routes } from '@angular/router';
 import { membershipGuard, aiFeatureGuard } from './guards';
-import { authGuard } from './core/auth.guard';
+import { authGuard, adminGuard } from './core/auth.guard';
 // Resolvers 暫時禁用 - 事件不匹配問題待修復
 // import { 
 //   dashboardResolver, 
@@ -307,6 +307,16 @@ export const routes: Routes = [
         loadComponent: () => import('./views/analytics-view.component').then(m => m.AnalyticsViewComponent),
         title: '數據分析',
         canActivate: [membershipGuard]
+      },
+      // 🆕 管理員後台（技術運維向：API 池管理/容量規劃/智能運維/審計日誌/安全中心等）
+      // 與根目錄獨立的 admin-panel/ 靜態站台（商業運維向：用戶/卡密/訂單/收入）
+      // 是兩套並行的後台，各自對接不同的後端模組，互不影響。
+      // adminGuard 檢查 user.role === 'admin'（與 src/core/auth.guard.ts 既有定義一致），
+      // 疊加 authGuard 確保未登入者先被導去登入頁而不是直接看到「無權限」跳轉。
+      {
+        path: 'admin',
+        canActivate: [authGuard, adminGuard],
+        loadChildren: () => import('./admin/admin.routes').then(m => m.ADMIN_ROUTES)
       },
       // 系統功能 - 無權限限制
       {

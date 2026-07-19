@@ -21,11 +21,14 @@ import io
 import base64
 import secrets
 import logging
-import sqlite3
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass
 from enum import Enum
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import get_connection, resolve_db_path
 
 # QR Code 生成庫
 try:
@@ -105,57 +108,50 @@ class LoginTokenService:
     
     def __init__(self, db_path: Optional[str] = None):
         """初始化服務"""
-        self.db_path = db_path or os.environ.get(
-            'DATABASE_PATH',
-            os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
-        )
+        self.db_path = db_path or resolve_db_path()
         self._init_db()
     
-    def _get_db(self) -> sqlite3.Connection:
-        """獲取數據庫連接"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+    def _get_db(self):
+        """獲取數據庫連接（context manager，統一經由 core.db_utils.get_connection）"""
+        return get_connection(self.db_path)
     
     def _init_db(self):
         """初始化數據庫表"""
-        db = self._get_db()
-        try:
-            db.execute('''
-                CREATE TABLE IF NOT EXISTS login_tokens (
-                    id TEXT PRIMARY KEY,
-                    token TEXT UNIQUE NOT NULL,
-                    type TEXT NOT NULL DEFAULT 'deep_link',
-                    status TEXT NOT NULL DEFAULT 'pending',
-                    user_id TEXT,
-                    telegram_id TEXT,
-                    telegram_username TEXT,
-                    telegram_first_name TEXT,
-                    ip_address TEXT,
-                    user_agent TEXT,
-                    verify_code TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    expires_at TIMESTAMP NOT NULL,
-                    confirmed_at TIMESTAMP
-                )
-            ''')
-            
-            # 🆕 添加 verify_code 欄位（如果不存在）
+        with self._get_db() as db:
             try:
-                db.execute('ALTER TABLE login_tokens ADD COLUMN verify_code TEXT')
-            except:
-                pass  # 欄位已存在
-            
-            # 創建索引
-            db.execute('CREATE INDEX IF NOT EXISTS idx_login_tokens_token ON login_tokens(token)')
-            db.execute('CREATE INDEX IF NOT EXISTS idx_login_tokens_status_expires ON login_tokens(status, expires_at)')
-            
-            db.commit()
-            logger.info("Login tokens table initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize login_tokens table: {e}")
-        finally:
-            db.close()
+                db.execute('''
+                    CREATE TABLE IF NOT EXISTS login_tokens (
+                        id TEXT PRIMARY KEY,
+                        token TEXT UNIQUE NOT NULL,
+                        type TEXT NOT NULL DEFAULT 'deep_link',
+                        status TEXT NOT NULL DEFAULT 'pending',
+                        user_id TEXT,
+                        telegram_id TEXT,
+                        telegram_username TEXT,
+                        telegram_first_name TEXT,
+                        ip_address TEXT,
+                        user_agent TEXT,
+                        verify_code TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        expires_at TIMESTAMP NOT NULL,
+                        confirmed_at TIMESTAMP
+                    )
+                ''')
+                
+                # 🆕 添加 verify_code 欄位（如果不存在）
+                try:
+                    db.execute('ALTER TABLE login_tokens ADD COLUMN verify_code TEXT')
+                except:
+                    pass  # 欄位已存在
+                
+                # 創建索引
+                db.execute('CREATE INDEX IF NOT EXISTS idx_login_tokens_token ON login_tokens(token)')
+                db.execute('CREATE INDEX IF NOT EXISTS idx_login_tokens_status_expires ON login_tokens(status, expires_at)')
+                
+                db.commit()
+                logger.info("Login tokens table initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize login_tokens table: {e}")
     
     def generate_token(
         self,
@@ -192,8 +188,7 @@ class LoginTokenService:
             expires_at=expires_at
         )
         
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             db.execute('''
                 INSERT INTO login_tokens 
                 (id, token, type, status, ip_address, user_agent, created_at, expires_at)
@@ -210,8 +205,6 @@ class LoginTokenService:
             ))
             db.commit()
             logger.info(f"Generated login token: {token[:8]}... (type={token_type.value})")
-        finally:
-            db.close()
         
         return login_token
     
@@ -225,8 +218,7 @@ class LoginTokenService:
         Returns:
             LoginToken 對象，不存在返回 None
         """
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             row = db.execute(
                 'SELECT * FROM login_tokens WHERE token = ?',
                 (token,)
@@ -236,13 +228,10 @@ class LoginTokenService:
                 return None
             
             return self._row_to_token(row)
-        finally:
-            db.close()
     
     def get_token_by_id(self, token_id: str) -> Optional[LoginToken]:
         """通過 ID 獲取 Token"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             row = db.execute(
                 'SELECT * FROM login_tokens WHERE id = ?',
                 (token_id,)
@@ -252,8 +241,6 @@ class LoginTokenService:
                 return None
             
             return self._row_to_token(row)
-        finally:
-            db.close()
     
     def confirm_token(
         self,
@@ -289,34 +276,32 @@ class LoginTokenService:
             return False, "Token 已過期，請重新獲取"
         
         # 更新 Token 狀態
-        db = self._get_db()
         try:
-            db.execute('''
-                UPDATE login_tokens 
-                SET status = ?, 
-                    telegram_id = ?, 
-                    telegram_username = ?,
-                    telegram_first_name = ?,
-                    user_id = ?,
-                    confirmed_at = ?
-                WHERE token = ?
-            ''', (
-                LoginTokenStatus.CONFIRMED.value,
-                telegram_id,
-                telegram_username,
-                telegram_first_name,
-                user_id,
-                datetime.utcnow().isoformat(),
-                token
-            ))
-            db.commit()
-            logger.info(f"Login token confirmed: {token[:8]}... by TG user {telegram_id}")
-            return True, None
+            with self._get_db() as db:
+                db.execute('''
+                    UPDATE login_tokens 
+                    SET status = ?, 
+                        telegram_id = ?, 
+                        telegram_username = ?,
+                        telegram_first_name = ?,
+                        user_id = ?,
+                        confirmed_at = ?
+                    WHERE token = ?
+                ''', (
+                    LoginTokenStatus.CONFIRMED.value,
+                    telegram_id,
+                    telegram_username,
+                    telegram_first_name,
+                    user_id,
+                    datetime.utcnow().isoformat(),
+                    token
+                ))
+                db.commit()
+                logger.info(f"Login token confirmed: {token[:8]}... by TG user {telegram_id}")
+                return True, None
         except Exception as e:
             logger.error(f"Failed to confirm token: {e}")
             return False, str(e)
-        finally:
-            db.close()
     
     def check_token_status(self, token: str) -> Tuple[str, Optional[Dict[str, Any]]]:
         """
@@ -348,15 +333,12 @@ class LoginTokenService:
     
     def _update_status(self, token: str, status: LoginTokenStatus):
         """更新 Token 狀態"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             db.execute(
                 'UPDATE login_tokens SET status = ? WHERE token = ?',
                 (status.value, token)
             )
             db.commit()
-        finally:
-            db.close()
     
     def update_token_status(self, token: str, status: str, telegram_id: Optional[str] = None):
         """
@@ -364,8 +346,7 @@ class LoginTokenService:
         
         用於中轉頁面發送確認消息後更新狀態
         """
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             if telegram_id:
                 db.execute(
                     'UPDATE login_tokens SET status = ?, telegram_id = ? WHERE token = ?',
@@ -377,8 +358,6 @@ class LoginTokenService:
                     (status, token)
                 )
             db.commit()
-        finally:
-            db.close()
     
     def update_verify_code(self, token: str, verify_code: str):
         """
@@ -386,15 +365,12 @@ class LoginTokenService:
         
         用於老用戶手動輸入驗證碼登入
         """
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             db.execute(
                 'UPDATE login_tokens SET verify_code = ? WHERE token = ?',
                 (verify_code, token)
             )
             db.commit()
-        finally:
-            db.close()
     
     def get_token_by_verify_code(self, verify_code: str) -> Optional['LoginToken']:
         """
@@ -402,8 +378,7 @@ class LoginTokenService:
         
         用於老用戶在 Bot 中輸入驗證碼
         """
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             cursor = db.execute(
                 '''SELECT * FROM login_tokens 
                    WHERE verify_code = ? 
@@ -416,8 +391,6 @@ class LoginTokenService:
             if row:
                 return self._row_to_token(row)
             return None
-        finally:
-            db.close()
     
     def get_pending_token_for_telegram_user(self, telegram_id: str) -> Optional['LoginToken']:
         """
@@ -426,8 +399,7 @@ class LoginTokenService:
         當用戶發送 /start 時，查找最近 60 秒內創建的待處理 Token
         如果只有一個，自動確認（假設是這個用戶的請求）
         """
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             # 查找最近 60 秒內創建的待處理 Token
             cursor = db.execute(
                 '''SELECT * FROM login_tokens 
@@ -440,8 +412,6 @@ class LoginTokenService:
             if row:
                 return self._row_to_token(row)
             return None
-        finally:
-            db.close()
     
     def _row_to_token(self, row) -> 'LoginToken':
         """將數據庫行轉換為 LoginToken 對象"""
@@ -481,8 +451,7 @@ class LoginTokenService:
     
     def cleanup_expired(self):
         """清理過期的 Token"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             result = db.execute('''
                 DELETE FROM login_tokens 
                 WHERE expires_at < ? AND status IN (?, ?)
@@ -495,8 +464,6 @@ class LoginTokenService:
             deleted = result.rowcount
             if deleted > 0:
                 logger.info(f"Cleaned up {deleted} expired login tokens")
-        finally:
-            db.close()
     
     # ==================== 🆕 Phase 3: QR Code 生成 ====================
     
@@ -694,45 +661,43 @@ class LoginTokenService:
         1. 記錄所有登入嘗試（成功和失敗）
         2. 用於異常檢測和審計
         """
-        db = self._get_db()
         try:
-            # 確保審計表存在
-            db.execute('''
-                CREATE TABLE IF NOT EXISTS login_audit (
-                    id TEXT PRIMARY KEY,
-                    token TEXT,
-                    telegram_id TEXT,
-                    success INTEGER,
-                    ip_address TEXT,
-                    user_agent TEXT,
-                    additional_info TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            import uuid
-            import json
-            
-            db.execute('''
-                INSERT INTO login_audit 
-                (id, token, telegram_id, success, ip_address, user_agent, additional_info, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                str(uuid.uuid4()),
-                token[:16] if token else None,  # 只記錄部分 Token
-                telegram_id,
-                1 if success else 0,
-                ip_address,
-                user_agent[:200] if user_agent else None,  # 限制長度
-                json.dumps(additional_info) if additional_info else None,
-                datetime.utcnow().isoformat()
-            ))
-            db.commit()
+            with self._get_db() as db:
+                # 確保審計表存在
+                db.execute('''
+                    CREATE TABLE IF NOT EXISTS login_audit (
+                        id TEXT PRIMARY KEY,
+                        token TEXT,
+                        telegram_id TEXT,
+                        success INTEGER,
+                        ip_address TEXT,
+                        user_agent TEXT,
+                        additional_info TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                
+                import uuid
+                import json
+                
+                db.execute('''
+                    INSERT INTO login_audit 
+                    (id, token, telegram_id, success, ip_address, user_agent, additional_info, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    str(uuid.uuid4()),
+                    token[:16] if token else None,  # 只記錄部分 Token
+                    telegram_id,
+                    1 if success else 0,
+                    ip_address,
+                    user_agent[:200] if user_agent else None,  # 限制長度
+                    json.dumps(additional_info) if additional_info else None,
+                    datetime.utcnow().isoformat()
+                ))
+                db.commit()
             
         except Exception as e:
             logger.warning(f"Failed to record login audit: {e}")
-        finally:
-            db.close()
     
     def check_suspicious_activity(self, telegram_id: str, ip_address: str = None) -> Dict[str, Any]:
         """
@@ -751,7 +716,6 @@ class LoginTokenService:
                 'recent_attempts': int
             }
         """
-        db = self._get_db()
         result = {
             'is_suspicious': False,
             'risk_level': 'low',
@@ -759,45 +723,44 @@ class LoginTokenService:
             'recent_attempts': 0
         }
         
-        try:
-            # 檢查過去 5 分鐘的登入嘗試次數
-            five_minutes_ago = (datetime.utcnow() - timedelta(minutes=5)).isoformat()
-            
-            cursor = db.execute('''
-                SELECT COUNT(*) as count FROM login_audit
-                WHERE telegram_id = ? AND created_at > ?
-            ''', (telegram_id, five_minutes_ago))
-            
-            row = cursor.fetchone()
-            recent_attempts = row['count'] if row else 0
-            result['recent_attempts'] = recent_attempts
-            
-            # 規則 1: 5 分鐘內超過 5 次嘗試
-            if recent_attempts > 5:
-                result['is_suspicious'] = True
-                result['reasons'].append('頻繁登入嘗試')
-                result['risk_level'] = 'high' if recent_attempts > 10 else 'medium'
-            
-            # 規則 2: 檢查不同 IP 的登入
-            if ip_address:
+        with self._get_db() as db:
+            try:
+                # 檢查過去 5 分鐘的登入嘗試次數
+                five_minutes_ago = (datetime.utcnow() - timedelta(minutes=5)).isoformat()
+                
                 cursor = db.execute('''
-                    SELECT COUNT(DISTINCT ip_address) as ip_count 
-                    FROM login_audit
+                    SELECT COUNT(*) as count FROM login_audit
                     WHERE telegram_id = ? AND created_at > ?
                 ''', (telegram_id, five_minutes_ago))
                 
                 row = cursor.fetchone()
-                ip_count = row['ip_count'] if row else 0
+                recent_attempts = row['count'] if row else 0
+                result['recent_attempts'] = recent_attempts
                 
-                if ip_count > 3:
+                # 規則 1: 5 分鐘內超過 5 次嘗試
+                if recent_attempts > 5:
                     result['is_suspicious'] = True
-                    result['reasons'].append('多個 IP 地址登入')
-                    result['risk_level'] = 'high'
-            
-        except Exception as e:
-            logger.warning(f"Failed to check suspicious activity: {e}")
-        finally:
-            db.close()
+                    result['reasons'].append('頻繁登入嘗試')
+                    result['risk_level'] = 'high' if recent_attempts > 10 else 'medium'
+                
+                # 規則 2: 檢查不同 IP 的登入
+                if ip_address:
+                    cursor = db.execute('''
+                        SELECT COUNT(DISTINCT ip_address) as ip_count 
+                        FROM login_audit
+                        WHERE telegram_id = ? AND created_at > ?
+                    ''', (telegram_id, five_minutes_ago))
+                    
+                    row = cursor.fetchone()
+                    ip_count = row['ip_count'] if row else 0
+                    
+                    if ip_count > 3:
+                        result['is_suspicious'] = True
+                        result['reasons'].append('多個 IP 地址登入')
+                        result['risk_level'] = 'high'
+                
+            except Exception as e:
+                logger.warning(f"Failed to check suspicious activity: {e}")
         
         return result
     
@@ -807,30 +770,28 @@ class LoginTokenService:
         
         用於用戶查看自己的登入記錄
         """
-        db = self._get_db()
         history = []
         
-        try:
-            cursor = db.execute('''
-                SELECT success, ip_address, user_agent, created_at
-                FROM login_audit
-                WHERE telegram_id = ?
-                ORDER BY created_at DESC
-                LIMIT ?
-            ''', (telegram_id, limit))
-            
-            for row in cursor.fetchall():
-                history.append({
-                    'success': bool(row['success']),
-                    'ip_address': row['ip_address'],
-                    'user_agent': row['user_agent'][:50] if row['user_agent'] else None,
-                    'time': row['created_at']
-                })
+        with self._get_db() as db:
+            try:
+                cursor = db.execute('''
+                    SELECT success, ip_address, user_agent, created_at
+                    FROM login_audit
+                    WHERE telegram_id = ?
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                ''', (telegram_id, limit))
                 
-        except Exception as e:
-            logger.warning(f"Failed to get login history: {e}")
-        finally:
-            db.close()
+                for row in cursor.fetchall():
+                    history.append({
+                        'success': bool(row['success']),
+                        'ip_address': row['ip_address'],
+                        'user_agent': row['user_agent'][:50] if row['user_agent'] else None,
+                        'time': row['created_at']
+                    })
+                    
+            except Exception as e:
+                logger.warning(f"Failed to get login history: {e}")
         
         return history
 

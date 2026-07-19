@@ -37,12 +37,19 @@ class FullSystemTest:
         
         import platform
         
+        # 🔧 改由 config.py 統一解析（原硬編碼的 'tg_bot.db' 檔名已不存在，是歷史殘留錯誤路徑）
+        try:
+            from config import DATABASE_PATH
+            database_path = str(DATABASE_PATH)
+        except ImportError:
+            database_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'tgmatrix.db')
+
         self.results['system_info'] = {
             'platform': platform.system(),
             'platform_version': platform.version(),
             'python_version': platform.python_version(),
             'working_directory': os.getcwd(),
-            'database_path': os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'tg_bot.db')
+            'database_path': database_path
         }
         
         # 檢查數據庫文件
@@ -256,9 +263,10 @@ class FullSystemTest:
         # 檢查數據庫表是否存在
         try:
             from database import db
-            import sqlite3
+            # 🔧 改用合法連接模塊 core.db_utils，取代直接 sqlite3.connect()
+            from core.db_utils import create_connection
             
-            conn = sqlite3.connect(db.db_path)
+            conn = create_connection(db.db_path)
             cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
             existing_tables = [row[0] for row in cursor.fetchall()]
             conn.close()

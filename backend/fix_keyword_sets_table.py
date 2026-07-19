@@ -2,7 +2,12 @@
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "data" / "tgai_server.db"
+# 🔧 路徑改由 config.py 統一解析（不再硬編碼），與其他環境（開發/Electron/生產）保持一致
+try:
+    from config import DATABASE_DIR
+    DB_PATH = DATABASE_DIR / "tgai_server.db"
+except ImportError:
+    DB_PATH = Path(__file__).parent / "data" / "tgai_server.db"
 
 def fix_table():
     conn = sqlite3.connect(str(DB_PATH))

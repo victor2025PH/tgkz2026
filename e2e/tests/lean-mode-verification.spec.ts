@@ -182,3 +182,34 @@ test.describe('精簡獲客模式 - Bootstrap 與路由重構驗證', () => {
     await page.evaluate(() => localStorage.removeItem('tg_lean_mode'));
   });
 });
+
+test.describe('管理員路由守衛驗證（本輪新掛載的 /admin）', () => {
+  test('未登入時訪問 /admin 應被導向登入頁，不應該看到管理頁面內容', async ({ page }) => {
+    const consoleErrors: string[] = [];
+    page.on('pageerror', (err) => consoleErrors.push(err.message));
+
+    await page.goto('/admin', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+
+    const url = page.url();
+    console.log('=== 未登入訪問 /admin 後的 URL ===', url);
+
+    // authGuard 應該先擋下未登入訪問（adminGuard 在它之後才執行）
+    expect(url).not.toContain('/admin');
+    expect(consoleErrors, `頁面錯誤: ${JSON.stringify(consoleErrors)}`).toHaveLength(0);
+  });
+
+  test('已登入但非 admin 角色時訪問 /admin 應被 adminGuard 導回首頁', async ({ page }) => {
+    // DEFAULT_TEST_USER 的 membershipLevel 是 'gold'，非 'admin'
+    await mockAuthenticatedUser(page, DEFAULT_TEST_USER);
+    await page.goto('/admin', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+
+    const url = page.url();
+    console.log('=== [已登入，非admin角色] 訪問 /admin 後的 URL ===', url);
+
+    // 無論是 authGuard（mock token 未通過驗證）或 adminGuard（role !== 'admin'）
+    // 擋下，都不應該真的停留在 /admin 頁面上
+    expect(url).not.toContain('/admin');
+  });
+});

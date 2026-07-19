@@ -23,9 +23,19 @@ try:
 except ImportError:
     HAS_HTTPX = False
 
-# 數據庫路徑
-ACCOUNTS_DB_PATH = Path(__file__).parent.parent / "data" / "tgmatrix.db"
-SERVER_DB_PATH = Path(__file__).parent.parent / "data" / "tgai_server.db"
+# 🔧 確保可從任意 cwd 導入 config
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_DIR))
+
+# 數據庫路徑 — 改由 config.py 統一解析，不再硬編碼（連接方式維持原樣未變）
+try:
+    from config import DATABASE_PATH, DATABASE_DIR
+    ACCOUNTS_DB_PATH = DATABASE_PATH
+    SERVER_DB_PATH = DATABASE_DIR / "tgai_server.db"
+except ImportError:
+    ACCOUNTS_DB_PATH = Path(__file__).parent.parent / "data" / "tgmatrix.db"
+    SERVER_DB_PATH = Path(__file__).parent.parent / "data" / "tgai_server.db"
 
 # 遠程服務器 URL（從截圖中獲取）
 REMOTE_API_URL = "https://tgkz.usdt2026.cc"

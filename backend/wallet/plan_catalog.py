@@ -152,6 +152,11 @@ _MEMBERSHIP_ORDER = ['basic', 'pro', 'enterprise']
 
 def list_membership_plans(cycle: str = 'monthly') -> list:
     """列出可售會員方案（前端 MembershipPlan 結構）。價格取自權威源。"""
+    try:
+        from core.payment_service import SUBSCRIPTION_PLANS
+    except Exception:
+        SUBSCRIPTION_PLANS = {}
+
     plans = []
     for tier in _MEMBERSHIP_ORDER:
         plan_id = f'{tier}_{cycle}'
@@ -159,12 +164,20 @@ def list_membership_plans(cycle: str = 'monthly') -> list:
         if not resolved:
             continue
         disp = _MEMBERSHIP_DISPLAY.get(tier, {})
+        # max_accounts 供前端展示「最多 N 個帳號」（-1 表示無限）
+        features_dict = (SUBSCRIPTION_PLANS.get(tier) or {}).get('features') or {}
+        max_accounts = features_dict.get('max_accounts', 0)
+        # 年付價（供前端切換展示；購買時用 {tier}_yearly，後端仍以權威價扣款）
+        resolved_yearly = resolve_membership_plan(f'{tier}_yearly')
+        price_yearly = resolved_yearly['price'] if resolved_yearly else 0
         plans.append({
             'id': plan_id,
             'name': disp.get('name', resolved['name']),
             'tier': tier,
             'duration_days': resolved['duration_days'],
             'price': resolved['price'],
+            'price_yearly': price_yearly,
+            'max_accounts': max_accounts,
             'features': disp.get('features', []),
             'is_popular': disp.get('is_popular', False),
         })

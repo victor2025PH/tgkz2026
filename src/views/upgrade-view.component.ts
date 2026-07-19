@@ -14,18 +14,25 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { I18nService } from '../i18n.service';
 import { QuotaService, MembershipLevel } from '../services/quota.service';
+import { PurchaseService, MembershipPlan } from '../services/purchase.service';
+import { ToastService } from '../toast.service';
 
 interface PricingPlan {
-  id: string;
+  id: string;                 // 用於「當前方案」高亮比較（= tier，如 basic/pro/enterprise）
   name: string;
-  price: number;
-  yearlyPrice: number;
+  price: number;              // 展示用（元/月）
+  yearlyPrice: number;        // 展示用（元/月，年付月均）
   features: string[];
   maxAccounts: number;
   highlighted: boolean;
   badge?: string;
   icon?: string;
   quotas?: Record<string, number>;
+  // 🔧 購買所需（後端權威）
+  tier?: string;              // basic/pro/enterprise
+  priceCents?: number;        // 月價（分），購買展示；實際扣款以後端權威為準
+  durationDays?: number;
+  isAuthoritative?: boolean;  // true=來自後端權威方案（可真實購買）
 }
 
 @Component({
@@ -539,6 +546,11 @@ export class UpgradeViewComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private i18n = inject(I18nService);
   private quotaService = inject(QuotaService);
+  private purchaseService = inject(PurchaseService);
+  private toast = inject(ToastService);
+
+  // 後端權威方案（用於購買；與展示用 PricingPlan 分離）
+  private rawPlans = signal<MembershipPlan[]>([]);
   
   // 狀態
   billingCycle = signal<'monthly' | 'yearly'>('monthly');
@@ -669,9 +681,36 @@ export class UpgradeViewComponent implements OnInit {
   private async loadMembershipLevels() {
     this.isLoading.set(true);
     try {
+      // 🔧 優先用後端權威方案（可真實購買，價格單位分）。
+      // 這些方案走 /api/membership/plans → wallet/plan_catalog（權威源）。
+      const authPlans = await this.purchaseService.loadMembershipPlans();
+      if (authPlans && authPlans.length > 0) {
+        this.rawPlans.set(authPlans);
+        const icons: Record<string, string> = { basic: '🥈', pro: '🥇', enterprise: '👑' };
+        const plans: PricingPlan[] = authPlans.map((p: any) => ({
+          id: p.tier,                                  // 高亮比較用 tier
+          tier: p.tier,
+          name: p.name,
+          price: Math.round((p.price || 0) / 100),      // 分→元（月）
+          yearlyPrice: p.price_yearly
+            ? Math.round(p.price_yearly / 12 / 100)      // 年付月均（元）
+            : Math.round((p.price || 0) / 100),
+          maxAccounts: p.max_accounts === -1 ? 999 : (p.max_accounts || 0),
+          icon: icons[p.tier] || '⭐',
+          features: p.features || [],
+          highlighted: !!p.is_popular,
+          badge: p.is_popular ? '最受歡迎' : undefined,
+          priceCents: p.price,
+          durationDays: p.duration_days,
+          isAuthoritative: true,
+        }));
+        this._plans.set(plans);
+        return;
+      }
+
+      // 後備：舊的六級展示（僅展示，不可購買）
       await this.quotaService.loadMembershipLevels();
       const levels = this.quotaService.levels();
-      
       if (levels.length > 0) {
         const plans: PricingPlan[] = levels.map((level, index) => ({
           id: level.level,
@@ -683,9 +722,9 @@ export class UpgradeViewComponent implements OnInit {
           features: this.generateFeatures(level),
           highlighted: level.level === 'gold',
           badge: level.level === 'gold' ? '最受歡迎' : undefined,
-          quotas: level.quotas
+          quotas: level.quotas,
+          isAuthoritative: false,
         }));
-        
         this._plans.set(plans);
       }
     } catch (error) {
@@ -767,27 +806,63 @@ export class UpgradeViewComponent implements OnInit {
     return this.i18n.t(key);
   }
   
-  selectPlan(plan: PricingPlan) {
-    if (plan.price === -1) {
-      // 企業版 - 聯繫銷售
-      window.open('mailto:sales@tg-matrix.com?subject=Enterprise Plan Inquiry', '_blank');
+  async selectPlan(plan: PricingPlan) {
+    // 非權威方案（舊六級後備展示）尚不可直接購買 → 引導聯繫/說明
+    if (!plan.isAuthoritative || !plan.tier) {
+      if (plan.price === -1) {
+        window.open('mailto:sales@tg-matrix.com?subject=Enterprise Plan Inquiry', '_blank');
+      } else if (plan.price === 0) {
+        this.router.navigate(['/dashboard']);
+      } else {
+        this.toast.info('該方案暫不支持在線購買，請聯繫客服');
+      }
       return;
     }
-    
-    if (plan.price === 0) {
-      // 免費版 - 直接開始
-      this.router.navigate(['/dashboard']);
+
+    // 已是當前方案
+    if (this.currentTier() === plan.id) {
       return;
     }
-    
-    // 付費方案 - 跳轉到支付頁面
+
+    // 🔴 真實購買：用錢包餘額經後端原子端點（扣款+履約+失敗退款）。
+    // plan_id 依計費週期組合為 {tier}_{monthly|yearly}；價格/時長以後端權威為準，
+    // 前端傳值僅供展示，即使被改也不影響實際扣款（見上一階段權威定價）。
+    const cycle = this.billingCycle() === 'yearly' ? 'yearly' : 'monthly';
+    const planId = `${plan.tier}_${cycle}`;
+    const membershipPlan: MembershipPlan = {
+      id: planId,
+      name: plan.name,
+      tier: plan.tier,
+      duration_days: plan.durationDays || (cycle === 'yearly' ? 365 : 30),
+      price: plan.priceCents || 0,
+      features: plan.features || [],
+    };
+
     this.selectedPlan.set(plan.id);
     this.isUpgrading.set(true);
-    
-    // TODO: 實現支付流程
-    setTimeout(() => {
+    try {
+      const result = await this.purchaseService.purchaseMembership(membershipPlan);
+
+      if (result.success) {
+        this.toast.success(`已開通${plan.name}，正在刷新會員狀態…`);
+        // 刷新用戶會員等級顯示（MembershipService 會經 user_update 同步）
+        await this.authService.fetchCurrentUser();
+      } else {
+        const msg = result.message || '購買失敗';
+        // 餘額不足 → 引導去充值（帶回跳與所需金額）
+        if (msg.includes('餘額不足') || msg.includes('余额不足')) {
+          this.toast.warning(msg);
+          this.router.navigate(['/wallet/recharge'], {
+            queryParams: { returnUrl: '/upgrade', amount: plan.priceCents || 0 }
+          });
+        } else {
+          this.toast.error(msg);
+        }
+      }
+    } catch (e: any) {
+      this.toast.error(e?.message || '購買失敗，請稍後重試');
+    } finally {
       this.isUpgrading.set(false);
-      alert('支付功能即將推出！');
-    }, 1500);
+    }
   }
 }

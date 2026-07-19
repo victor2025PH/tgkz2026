@@ -470,6 +470,11 @@ COMMAND_ALIAS_REGISTRY: Dict[str, tuple] = {
     'check-group-monitoring-status':('domain.automation.monitoring_handlers_impl', 'handle_get_group_monitoring_status'),
     'group-get-info':               ('domain.automation.monitoring_handlers_impl', 'handle_analyze_group_link'),
     
+    # === API 統計 / 容量規劃（SaaS 管理後台）===
+    'api-stats:command':           ('api.api_stats_routes', 'handle_api_stats_alias'),
+    'capacity:status':             ('api.api_stats_routes', 'handle_capacity_status_alias'),
+    'capacity:history':            ('api.api_stats_routes', 'handle_capacity_history_alias'),
+
     # === 預留擴展點 (新增別名只需在此添加一行) ===
 }
 

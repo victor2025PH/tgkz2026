@@ -51,10 +51,8 @@ export const ADMIN_ROUTES: Routes = [
       //   /api/v1/admin/audit/logs，後端真實可用，但欄位只有
       //   {id, action, category, user_id, details, timestamp}；異常偵測後端
       //   無對應 API，UI 已改為「功能開發中」提示，見組件內註釋）。
-      // - api-stats / capacity：對應的後端命令 api-stats:command /
-      //   capacity:status / capacity:history 在後端從未被註冊實現（純前端遺留
-      //   呼叫），確認後端目前完全沒有可用端點，故 UI 改為「功能開發中」
-      //   優雅降級提示（不影響編譯，也不會呼叫任何不存在的 API）。
+      // - api-stats：GET /api/v1/admin/api-stats/dashboard（JWT admin）
+      // - capacity：GET /api/v1/admin/capacity/status|history（JWT admin）
       {
         path: 'api-stats',
         loadComponent: () => import('./api-stats-dashboard.component')

@@ -12,6 +12,7 @@
 import { Component, signal, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ToastService } from '../toast.service';
+import { AdminService } from './admin.service';
 
 interface DailyStats {
   date: string;
@@ -87,19 +88,6 @@ interface DashboardData {
           </button>
         </div>
       </div>
-
-      @if (backendUnavailable) {
-        <div class="dev-notice">
-          <div class="dev-notice-icon">🚧</div>
-          <div class="dev-notice-content">
-            <strong>API 统计仪表板功能开发中</strong>
-            <p>此页面原本使用的 Electron IPC 命令 <code>api-stats:command</code> 在后端从未被
-              注册为真实可调用的命令（<code>backend/api/api_stats_routes.py</code> 是未被任何路由
-              引用的孤立模块），因此没有对应的 REST API 可供串接。目前显示为预览版面，
-              待后端补上 <code>/api/v1/admin/api-stats/*</code> 一类端点后即可启用真实数据。</p>
-          </div>
-        </div>
-      } @else {
 
       @if (error()) {
         <div class="error-banner">
@@ -262,7 +250,6 @@ interface DashboardData {
           }
         </div>
       </div>
-      }
     </div>
   `,
   styles: [`
@@ -272,7 +259,6 @@ interface DashboardData {
       margin: 0 auto;
     }
 
-    /* 🚧 功能开发中提示 */
     .dev-notice {
       display: flex;
       gap: 1rem;
@@ -741,23 +727,14 @@ interface DashboardData {
 })
 export class ApiStatsDashboardComponent implements OnInit, OnDestroy {
   private toast = inject(ToastService);
+  private adminService = inject(AdminService);
 
-  /**
-   * 🔧 此页面需要的登录尝试统计（按 API 池 api_id 排名/每日每小时趋势/告警）
-   * 唯一对应的后端逻辑是 backend/core/api_stats.py，但暴露它的
-   * backend/api/api_stats_routes.py 从未被任何路由或命令注册引用
-   * （既不在 backend/main.py 的 COMMAND_ALIAS_REGISTRY，也没有对应的
-   * /api/v1/* REST 路由），是一个孤立、从未被真正接上的模块。
-   * 因此这里做优雅降级，不假造资料，保留完整版面结构供未来串接。
-   */
-  readonly backendUnavailable = true;
-
-  // 状态
+  // 狀態
   isLoading = signal(false);
   error = signal('');
   lastUpdated = signal<number | null>(null);
 
-  // 数据
+  // 數據
   dashboardData = signal<DashboardData | null>(null);
   totalStats = signal<OverallStats['total'] | null>(null);
   dailyStats = signal<DailyStats[]>([]);
@@ -766,13 +743,10 @@ export class ApiStatsDashboardComponent implements OnInit, OnDestroy {
   alerts = signal<Alert[]>([]);
   realtimeData = signal<Record<string, Record<string, number>>>({});
 
-  // 刷新定时器
+  // 刷新定時器
   private refreshInterval: any;
 
   ngOnInit(): void {
-    if (this.backendUnavailable) {
-      return;
-    }
     this.loadDashboard();
     // 🔧 Phase2: 30s→60s 降低輪詢頻率
     this.refreshInterval = setInterval(() => this.loadDashboard(), 60000);
@@ -785,17 +759,16 @@ export class ApiStatsDashboardComponent implements OnInit, OnDestroy {
   }
 
   async loadDashboard(): Promise<void> {
-    if (this.isLoading() || this.backendUnavailable) return;
+    if (this.isLoading()) return;
 
     this.isLoading.set(true);
     this.error.set('');
 
     try {
-      // 目前无真实后端端点可用，保留方法签名供未来串接使用
-      const result: { success?: boolean; data?: DashboardData; error?: string } = { success: false, error: '后端尚未提供此功能' };
+      const result = await this.adminService.getApiStatsDashboard();
 
       if (result?.success && result.data) {
-        const data = result.data;
+        const data = result.data as DashboardData;
         this.dashboardData.set(data);
         this.totalStats.set(data.overall?.total || null);
         this.dailyStats.set(data.overall?.daily || []);
@@ -805,22 +778,27 @@ export class ApiStatsDashboardComponent implements OnInit, OnDestroy {
         this.realtimeData.set(data.overall?.realtime || {});
         this.lastUpdated.set(data.last_updated);
       } else {
-        this.error.set(result?.error || '加载失败');
+        this.error.set(result?.error || '載入失敗');
       }
     } catch (e: any) {
-      this.error.set(e.message || '网络错误');
+      this.error.set(e.message || '網絡錯誤');
     } finally {
       this.isLoading.set(false);
     }
   }
 
   async clearAlerts(): Promise<void> {
-    if (this.backendUnavailable) {
-      this.toast.info('此功能开发中，暂无法清除告警');
-      return;
+    try {
+      const result = await this.adminService.clearApiStatsAlerts();
+      if (result?.success) {
+        this.alerts.set([]);
+        this.toast.success('告警已清除');
+      } else {
+        this.toast.error(result?.error || '清除告警失敗');
+      }
+    } catch (e: any) {
+      this.toast.error(e?.message || '清除告警失敗');
     }
-    this.alerts.set([]);
-    this.toast.success('告警已清除');
   }
 
   // 辅助方法

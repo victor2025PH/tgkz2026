@@ -7,6 +7,7 @@
  */
 import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { AdminService } from './admin.service';
 import { ToastService } from '../toast.service';
 
@@ -29,7 +30,7 @@ interface PurchaseOrder {
 @Component({
   selector: 'app-purchase-orders',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="po-page">
@@ -71,6 +72,7 @@ interface PurchaseOrder {
               <th>狀態</th>
               <th>建立時間</th>
               <th>完成時間</th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -89,10 +91,16 @@ interface PurchaseOrder {
                 </td>
                 <td class="time">{{ formatTime(o.created_at) }}</td>
                 <td class="time">{{ formatTime(o.completed_at) }}</td>
+                <td class="ops">
+                  <button class="op-btn" (click)="viewDetail(o)">詳情</button>
+                  @if (o.status === 'completed') {
+                    <button class="op-btn danger" (click)="openRefund(o)">退款</button>
+                  }
+                </td>
               </tr>
             }
             @if (!isLoading() && orders().length === 0) {
-              <tr><td colspan="9" class="empty">暫無購買訂單</td></tr>
+              <tr><td colspan="10" class="empty">暫無購買訂單</td></tr>
             }
           </tbody>
         </table>
@@ -101,9 +109,62 @@ interface PurchaseOrder {
       <!-- 分頁 -->
       <div class="pagination">
         <button (click)="prevPage()" [disabled]="offset() === 0 || isLoading()">上一頁</button>
-        <span>第 {{ (offset() / pageSize) + 1 }} 頁</span>
+        <span>第 {{ (offset() / pageSize) + 1 }} 頁 / 共 {{ total() }} 筆</span>
         <button (click)="nextPage()" [disabled]="!hasMore() || isLoading()">下一頁</button>
       </div>
+
+      <!-- 訂單詳情彈窗 -->
+      @if (detailOrder()) {
+        <div class="modal-overlay" (click)="detailOrder.set(null)">
+          <div class="modal-content" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h3>訂單詳情</h3>
+              <button class="close-btn" (click)="detailOrder.set(null)">×</button>
+            </div>
+            <div class="detail-grid">
+              <div class="dl">訂單 ID</div><div class="dv mono">{{ detailOrder()!.order_id }}</div>
+              <div class="dl">用戶 ID</div><div class="dv mono">{{ detailOrder()!.user_id }}</div>
+              <div class="dl">業務類型</div><div class="dv">{{ businessTypeLabel(detailOrder()!.business_type) }}</div>
+              <div class="dl">商品</div><div class="dv">{{ detailOrder()!.item_name || detailOrder()!.item_id || '-' }}</div>
+              <div class="dl">金額</div><div class="dv amount">{{ formatPrice(detailOrder()!.amount) }}</div>
+              <div class="dl">等級</div><div class="dv">{{ detailOrder()!.tier || '-' }}</div>
+              <div class="dl">時長(天)</div><div class="dv">{{ detailOrder()!.duration_days || '-' }}</div>
+              <div class="dl">狀態</div><div class="dv"><span class="status-badge" [style.background]="statusColor(detailOrder()!.status)">{{ statusLabel(detailOrder()!.status) }}</span></div>
+              <div class="dl">流水號</div><div class="dv mono">{{ detailOrder()!.transaction_id || '-' }}</div>
+              <div class="dl">建立時間</div><div class="dv">{{ formatTime(detailOrder()!.created_at) }}</div>
+              <div class="dl">完成時間</div><div class="dv">{{ formatTime(detailOrder()!.completed_at) }}</div>
+              @if (detailOrder()!.error_message) {
+                <div class="dl">錯誤/備註</div><div class="dv err">{{ detailOrder()!.error_message }}</div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- 退款對話框 -->
+      @if (refundOrder()) {
+        <div class="modal-overlay" (click)="closeRefund()">
+          <div class="modal-content" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h3>確認退款</h3>
+              <button class="close-btn" (click)="closeRefund()">×</button>
+            </div>
+            <p class="refund-info">
+              將退回 <strong class="amount">{{ formatPrice(refundOrder()!.amount) }}</strong>
+              至用戶錢包（訂單 {{ shortId(refundOrder()!.order_id) }}）。
+            </p>
+            <p class="refund-warn">⚠️ 會員/配額權益不會自動撤銷，如需撤銷請另行在用戶管理處理。</p>
+            <label class="refund-label">退款原因</label>
+            <input class="refund-input" [(ngModel)]="refundReason" placeholder="請輸入退款原因" />
+            <div class="modal-actions">
+              <button class="btn-cancel" (click)="closeRefund()" [disabled]="refunding()">取消</button>
+              <button class="btn-confirm" (click)="confirmRefund()" [disabled]="refunding()">
+                {{ refunding() ? '處理中…' : '確認退款' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -129,6 +190,26 @@ interface PurchaseOrder {
     .pagination { display: flex; align-items: center; gap: 16px; justify-content: center; margin-top: 16px; }
     .pagination button { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; padding: 6px 16px; border-radius: 8px; cursor: pointer; }
     .pagination button:disabled { opacity: .5; cursor: default; }
+    .ops { display: flex; gap: 6px; }
+    .op-btn { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .op-btn.danger { background: #7f1d1d; color: #fecaca; border-color: #991b1b; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .modal-content { background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 20px; width: min(560px, 92vw); max-height: 86vh; overflow-y: auto; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .modal-header h3 { margin: 0; font-size: 18px; }
+    .close-btn { background: none; border: none; color: #94a3b8; font-size: 22px; cursor: pointer; line-height: 1; }
+    .detail-grid { display: grid; grid-template-columns: 96px 1fr; gap: 8px 12px; font-size: 13px; }
+    .dl { color: #94a3b8; }
+    .dv { color: #e2e8f0; word-break: break-all; }
+    .dv.err { color: #fca5a5; }
+    .refund-info { font-size: 14px; margin: 4px 0 8px; }
+    .refund-warn { font-size: 12px; color: #fbbf24; background: #422006; padding: 8px 10px; border-radius: 8px; margin: 8px 0; }
+    .refund-label { display: block; font-size: 13px; color: #94a3b8; margin: 8px 0 4px; }
+    .refund-input { width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 8px 10px; border-radius: 8px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+    .btn-cancel { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
+    .btn-confirm { background: #dc2626; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
+    .btn-confirm:disabled, .btn-cancel:disabled { opacity: .6; cursor: default; }
   `]
 })
 export class PurchaseOrdersComponent implements OnInit {
@@ -140,9 +221,16 @@ export class PurchaseOrdersComponent implements OnInit {
   error = signal('');
   statusFilter = signal('');
   offset = signal(0);
+  total = signal(0);
   readonly pageSize = 50;
-  // list_all 無 total：滿頁即認為可能還有下一頁
-  hasMore = computed(() => this.orders().length >= this.pageSize);
+  // 用後端返回的 total 精確判斷是否還有下一頁
+  hasMore = computed(() => this.offset() + this.orders().length < this.total());
+
+  // 詳情 / 退款
+  detailOrder = signal<PurchaseOrder | null>(null);
+  refundOrder = signal<PurchaseOrder | null>(null);
+  refundReason = '';
+  refunding = signal(false);
 
   statusFilters = [
     { value: '', label: '全部' },
@@ -165,9 +253,11 @@ export class PurchaseOrdersComponent implements OnInit {
       const res = await this.admin.getPurchaseOrders(this.statusFilter(), this.pageSize, this.offset());
       if (res?.success && Array.isArray(res.data)) {
         this.orders.set(res.data as PurchaseOrder[]);
+        this.total.set(typeof res.total === 'number' ? res.total : res.data.length);
       } else {
         this.error.set(res?.error || '載入失敗');
         this.orders.set([]);
+        this.total.set(0);
       }
     } catch (e: any) {
       this.error.set(e?.message || '網絡錯誤');
@@ -198,6 +288,40 @@ export class PurchaseOrdersComponent implements OnInit {
     if (this.offset() === 0) return;
     this.offset.set(Math.max(0, this.offset() - this.pageSize));
     this.load();
+  }
+
+  viewDetail(o: PurchaseOrder): void {
+    this.detailOrder.set(o);
+  }
+
+  openRefund(o: PurchaseOrder): void {
+    this.refundReason = '';
+    this.refundOrder.set(o);
+  }
+
+  closeRefund(): void {
+    if (this.refunding()) return;
+    this.refundOrder.set(null);
+  }
+
+  async confirmRefund(): Promise<void> {
+    const o = this.refundOrder();
+    if (!o || this.refunding()) return;
+    this.refunding.set(true);
+    try {
+      const res = await this.admin.refundPurchaseOrder(o.order_id, this.refundReason || '客服後台退款');
+      if (res?.success) {
+        this.toast.success(res.message || '退款成功');
+        this.refundOrder.set(null);
+        await this.load();
+      } else {
+        this.toast.error(res?.error || '退款失敗');
+      }
+    } catch (e: any) {
+      this.toast.error(e?.message || '退款失敗');
+    } finally {
+      this.refunding.set(false);
+    }
   }
 
   formatPrice(cents: number): string {

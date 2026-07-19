@@ -597,7 +597,7 @@ export class AdminService {
     status: string = '',
     limit: number = 50,
     offset: number = 0
-  ): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  ): Promise<{ success: boolean; data?: any[]; total?: number; error?: string }> {
     try {
       let url = `${this.apiUrl}/api/v1/admin/purchase-orders?limit=${limit}&offset=${offset}`;
       if (status) url += `&status=${status}`;
@@ -605,6 +605,20 @@ export class AdminService {
       return res || { success: false, error: '空回應' };
     } catch (e) {
       console.error('Get purchase orders error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  /** POST /api/v1/admin/purchase-orders/{orderId}/refund — 客服退款（JWT admin） */
+  async refundPurchaseOrder(orderId: string, reason: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await this.http.post<any>(
+        `${this.apiUrl}/api/v1/admin/purchase-orders/${orderId}/refund`,
+        { reason }
+      ).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Refund purchase order error:', e);
       return { success: false, error: String(e) };
     }
   }

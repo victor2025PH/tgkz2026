@@ -11,6 +11,10 @@ import time
 from datetime import datetime, timedelta
 from aiohttp import web
 
+# 🔧 改用合法連接模塊 core.db_utils（見 .cursorrules 合法連接模塊清單），
+# 不再直接 sqlite3.connect()。
+from core.db_utils import create_connection
+
 logger = logging.getLogger(__name__)
 
 
@@ -704,10 +708,9 @@ class SystemRoutesMixin:
             
             # 存入數據庫（持久化，方便查詢）
             try:
-                import sqlite3
-                db_path = os.environ.get('DATABASE_PATH', 
-                    os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db'))
-                conn = sqlite3.connect(db_path)
+                # 🔧 改用合法連接模塊 core.db_utils，取代硬編碼 fallback 路徑
+                # （原寫法在 Electron 封裝模式下不會考慮 TG_DATA_DIR 持久化路徑）。
+                conn = create_connection()
                 conn.execute('''
                     CREATE TABLE IF NOT EXISTS frontend_errors (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -796,10 +799,8 @@ class SystemRoutesMixin:
             
             # 持久化到數據庫
             try:
-                import sqlite3
-                db_path = os.environ.get('DATABASE_PATH',
-                    os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db'))
-                conn = sqlite3.connect(db_path)
+                # 🔧 改用合法連接模塊 core.db_utils，理由與 receive_frontend_error() 相同。
+                conn = create_connection()
                 
                 # 創建表（如果不存在）
                 conn.execute('''
@@ -1133,10 +1134,12 @@ class SystemRoutesMixin:
         
         # 4. 直接查詢數據庫
         try:
-            import sqlite3 as _sqlite3
+            # 🔧 改用合法連接模塊 core.db_utils（見 .cursorrules 合法連接模塊清單），
+            # 不再直接 _sqlite3.connect()；路徑仍沿用 config.DATABASE_PATH（本診斷端點
+            # 目的就是要驗證這條路徑本身，維持原樣以確保診斷語義不變）。
             from config import DATABASE_PATH as _db_path
             if _db_path.exists():
-                conn = _sqlite3.connect(str(_db_path))
+                conn = create_connection(str(_db_path))
                 cursor = conn.cursor()
                 
                 # 檢查 accounts 表是否存在

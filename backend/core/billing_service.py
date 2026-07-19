@@ -852,15 +852,51 @@ class BillingService:
                 db.close()
                 return {'success': False, 'error': '賬單已支付'}
             
-            # TODO: 實際支付邏輯
+            user_id = row['user_id']
+            amount = int(row['amount'] or 0)
             
+            # 🔴 fail-closed：舊代碼直接 UPDATE status=PAID，完全跳過真實扣款——
+            # 帳單標記已付但用戶一分未付。現要求真實扣款成功後才標記已付。
+            if payment_method == 'balance':
+                # 用錢包餘額支付：真實扣款。以 bill_id 作 order_id，天然冪等
+                # （錢包層對重複 order_id 會拒絕，防止同一帳單重複扣款）。
+                if amount <= 0:
+                    db.close()
+                    return {'success': False, 'error': '帳單金額無效，無法支付'}
+                try:
+                    from wallet.wallet_service import get_wallet_service
+                    wallet_svc = get_wallet_service()
+                    ok, msg, _tx = wallet_svc.consume(
+                        user_id=user_id,
+                        amount=amount,
+                        category='billing',
+                        description=row['description'] or f'支付帳單 {bill_id}',
+                        order_id=f'BILL_{bill_id}',
+                        reference_id=bill_id,
+                        reference_type='billing_item',
+                    )
+                except Exception as pay_err:
+                    db.close()
+                    logger.error(f"Pay bill wallet consume error: {pay_err}")
+                    return {'success': False, 'error': f'扣款失敗: {pay_err}'}
+                
+                if not ok:
+                    db.close()
+                    logger.warning(f"Bill {bill_id} pay failed (insufficient/other): {msg}")
+                    return {'success': False, 'error': msg or '餘額不足或扣款失敗'}
+            else:
+                # 第三方支付渠道尚未接通真實扣款；拒絕而非假標記已付
+                db.close()
+                logger.warning(f"Bill {bill_id} pay rejected: payment_method={payment_method} not implemented")
+                return {'success': False, 'error': f'支付方式 {payment_method} 尚未支持，請使用餘額支付'}
+            
+            # 扣款成功，標記帳單已付
             db.execute('''
                 UPDATE billing_items SET status = ?, paid_at = ?
                 WHERE id = ?
             ''', (BillStatus.PAID.value, datetime.utcnow().isoformat(), bill_id))
             
             # 解凍配額（如果之前因欠費凍結）
-            user_id = row['user_id']
             freeze_info = self.is_quota_frozen(user_id)
             if freeze_info.get('frozen') and freeze_info.get('freeze_type') == 'payment_failed':
                 self.unfreeze_quota(user_id)
@@ -868,8 +904,8 @@ class BillingService:
             db.commit()
             db.close()
             
-            logger.info(f"Bill {bill_id} paid")
-            return {'success': True, 'bill_id': bill_id}
+            logger.info(f"Bill {bill_id} paid via {payment_method}, amount={amount}")
+            return {'success': True, 'bill_id': bill_id, 'amount': amount, 'payment_method': payment_method}
             
         except Exception as e:
             logger.error(f"Pay bill error: {e}")

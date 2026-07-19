@@ -843,18 +843,26 @@ class WalletHandlers:
         try:
             provider = request.match_info.get('provider', '')
             
-            if provider in ['alipay', 'wechat', 'epay']:
-                # 處理第三方支付回調
-                data = await request.post() if request.content_type == 'application/x-www-form-urlencoded' else await request.json()
-                
-                # TODO: 驗證簽名
-                # TODO: 處理回調邏輯
-                
-                logger.info(f"Payment callback from {provider}: {data}")
-                
-                return web.Response(text="success")
+            if provider not in ['alipay', 'wechat', 'epay']:
+                return web.Response(text="unknown provider", status=400)
             
-            return web.Response(text="unknown provider", status=400)
+            # 讀取回調內容僅用於審計日誌（不據此入賬）
+            try:
+                data = await request.post() if request.content_type == 'application/x-www-form-urlencoded' else await request.json()
+            except Exception:
+                data = {}
+            
+            # 🔴 fail-closed：簽名驗證與入賬邏輯尚未實作。
+            # 舊代碼在此無條件 return "success"——這是嚴重資金漏洞：此為公開無認證端點，
+            # 任何人 POST 都會得到成功響應，且真實訂單狀態/餘額從未更新（偽造回調風險 +
+            # 真實回調也不入賬）。在驗簽與入賬接通前，一律拒絕，絕不返回成功語義。
+            # 正確接通所需：①各 provider 的 verify_sign（目前 unified_payment/payment_gateway
+            # 皆為 TODO）②根據 out_trade_no 查本地充值訂單並冪等入賬（複用 mark_recharge_paid 邏輯）。
+            logger.warning(
+                f"[payment_callback] 驗簽/入賬未實作，拒絕回調 provider={provider} "
+                f"keys={list(data.keys()) if isinstance(data, dict) else 'n/a'}"
+            )
+            return web.Response(text="callback handler not implemented", status=501)
             
         except Exception as e:
             logger.error(f"Payment callback error: {e}")

@@ -4,3 +4,4 @@
  */
 
 export * from './auth.guard';
+export * from './lean-mode.guard';

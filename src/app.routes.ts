@@ -6,7 +6,7 @@
  * 🆕 P2: 添加認證路由和 SaaS 守衛
  */
 import { Routes } from '@angular/router';
-import { membershipGuard } from './guards';
+import { membershipGuard, aiFeatureGuard } from './guards';
 import { authGuard } from './core/auth.guard';
 // Resolvers 暫時禁用 - 事件不匹配問題待修復
 // import { 
@@ -213,7 +213,7 @@ export const routes: Routes = [
     loadComponent: () => import('./views/smart-marketing-view.component').then(m => m.SmartMarketingViewComponent),
     title: '策略規劃',
     data: { hubMode: 'strategy' },
-    canActivate: [membershipGuard]
+    canActivate: [membershipGuard, aiFeatureGuard]
   },
   // 營銷任務中心 - 自動執行（任務列表）
   {
@@ -221,14 +221,14 @@ export const routes: Routes = [
     loadComponent: () => import('./views/smart-marketing-view.component').then(m => m.SmartMarketingViewComponent),
     title: '自動執行',
     data: { hubMode: 'execution' },
-    canActivate: [membershipGuard]
+    canActivate: [membershipGuard, aiFeatureGuard]
   },
   // 角色資源庫（原多角色協作的資產部分）
   {
     path: 'role-library',
     loadComponent: () => import('./views/multi-role-view.component').then(m => m.MultiRoleViewComponent),
     title: '角色資源庫',
-    canActivate: [membershipGuard]
+    canActivate: [membershipGuard, aiFeatureGuard]
   },
   // 智能引擎（原 AI 中心的配置部分）
   {
@@ -236,7 +236,7 @@ export const routes: Routes = [
     loadComponent: () => import('./views/ai-center-view.component').then(m => m.AiCenterViewComponent),
     title: '智能引擎',
     data: { enginePanel: 'default' },
-    canActivate: [membershipGuard]
+    canActivate: [membershipGuard, aiFeatureGuard]
   },
   // 知识大脑 - 总览 / 知识管理 / 知识缺口（独立 URL 以正确高亮与切 Tab）
   {
@@ -244,21 +244,21 @@ export const routes: Routes = [
     loadComponent: () => import('./views/ai-center-view.component').then(m => m.AiCenterViewComponent),
     title: '知识大脑总览',
     data: { enginePanel: 'overview' },
-    canActivate: [membershipGuard]
+    canActivate: [membershipGuard, aiFeatureGuard]
   },
   {
     path: 'ai-engine/knowledge',
     loadComponent: () => import('./views/ai-center-view.component').then(m => m.AiCenterViewComponent),
     title: '知识管理',
     data: { enginePanel: 'knowledge' },
-    canActivate: [membershipGuard]
+    canActivate: [membershipGuard, aiFeatureGuard]
   },
   {
     path: 'ai-engine/gaps',
     loadComponent: () => import('./views/ai-center-view.component').then(m => m.AiCenterViewComponent),
     title: '知识缺口',
     data: { enginePanel: 'gaps' },
-    canActivate: [membershipGuard]
+    canActivate: [membershipGuard, aiFeatureGuard]
   },
   
   // ============ 舊路由（保持兼容，重定向到新模塊） ============

@@ -93,6 +93,11 @@ async def handle_qr_login_create(self, payload: Dict[str, Any]):
                         custom_api_id = pool_api_id
                         custom_api_hash = pool_api_hash
                         print(f"[Backend] QR 登入從平台 API 池分配到專屬憑據 (api_id={pool_api_id}, source={pool_source})", file=sys.stderr)
+                        try:
+                            from core.api_pool_integration import record_qr_pool_allocation
+                            record_qr_pool_allocation()
+                        except Exception:
+                            pass
                     else:
                         # 池為空/回退：不佔用任何資源，temp_key 置空，走原有公共 API 邏輯
                         _qr_pool_temp_key = None

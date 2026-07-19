@@ -27,6 +27,10 @@ from typing import Optional, Dict, Any, List, Tuple
 from dataclasses import dataclass
 from enum import Enum
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection
+
 logger = logging.getLogger(__name__)
 
 
@@ -175,7 +179,6 @@ class CouponService:
         if hasattr(self, '_initialized') and self._initialized:
             return
         
-        import sqlite3
         self.db_path = db_path or os.path.join(
             os.path.dirname(__file__), '..', 'data', 'wallet.db'
         )
@@ -184,11 +187,9 @@ class CouponService:
         logger.info("CouponService initialized")
     
     def _get_connection(self):
-        import sqlite3
+        """獲取數據庫連接（統一經由 core.db_utils.create_connection，調用方負責關閉）"""
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        return create_connection(self.db_path)
     
     def _init_database(self):
         """初始化數據庫表"""

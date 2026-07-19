@@ -98,12 +98,52 @@ class ApiKeyService:
                     )
                 ''')
                 
+                # 🔧 Bug 修復：舊資料庫可能已被 auth/service.py 的舊版 schema
+                # （欄位為 prefix/last_used_at，且無 usage_count）搶先建表——
+                # CREATE TABLE IF NOT EXISTS 對已存在的表是 no-op，所以這裡自我修復欄位名稱，
+                # 確保無論哪個模塊先初始化，最終欄位都與本檔案的 CRUD 邏輯一致。
+                self._migrate_legacy_columns(conn, cursor)
+                
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_apikeys_user ON api_keys(user_id)')
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_apikeys_prefix ON api_keys(key_prefix)')
                 
                 conn.commit()
         except Exception as e:
             logger.error(f"API Key DB init error: {e}")
+
+    def _migrate_legacy_columns(self, conn, cursor):
+        """
+        遷移舊版 api_keys 表結構
+
+        既有 bug：auth/service.py 曾用不同欄位名稱建立同一張表
+        （prefix 對應本檔案的 key_prefix；last_used_at 對應 last_used；
+        且缺少 usage_count），若該版本先初始化，本檔案的 create()/verify()
+        會因欄位不存在而報錯。這裡用 ALTER TABLE ... RENAME COLUMN
+        （SQLite 3.25+）就地遷移，不重建表、不影響既有資料，且冪等可重複執行。
+        """
+        try:
+            cursor.execute("PRAGMA table_info(api_keys)")
+            columns = {row[1] for row in cursor.fetchall()}
+            
+            if 'prefix' in columns and 'key_prefix' not in columns:
+                cursor.execute('ALTER TABLE api_keys RENAME COLUMN prefix TO key_prefix')
+                logger.info("API Key DB 遷移：prefix -> key_prefix")
+                columns.discard('prefix')
+                columns.add('key_prefix')
+            
+            if 'last_used_at' in columns and 'last_used' not in columns:
+                cursor.execute('ALTER TABLE api_keys RENAME COLUMN last_used_at TO last_used')
+                logger.info("API Key DB 遷移：last_used_at -> last_used")
+                columns.discard('last_used_at')
+                columns.add('last_used')
+            
+            if 'usage_count' not in columns:
+                cursor.execute('ALTER TABLE api_keys ADD COLUMN usage_count INTEGER DEFAULT 0')
+                logger.info("API Key DB 遷移：新增 usage_count 欄位")
+            
+            conn.commit()
+        except Exception as e:
+            logger.error(f"API Key DB legacy column migration error: {e}")
     
     # ==================== 密鑰生成 ====================
     

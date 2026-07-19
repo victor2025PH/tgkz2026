@@ -182,10 +182,15 @@ class AuthCoreMixin:
                         getattr(user, 'id', ''), getattr(user, 'username', ''), getattr(user, 'display_name', ''),
                         getattr(user, 'telegram_id', ''), data.get('subscription_expires'))
             try:
-                db_path = str(getattr(auth_service, 'db_path', '') or os.environ.get('DATABASE_PATH', ''))
-                if db_path:
-                    conn = sqlite3.connect(db_path)
-                    conn.row_factory = sqlite3.Row
+                # 🔧 改用合法連接模塊 core.db_utils（見 .cursorrules 合法連接模塊清單）。
+                # 舊寫法直接 sqlite3.connect() + os.environ.get('DATABASE_PATH')，但本檔案從未
+                # import os / sqlite3，執行到這裡必定拋出 NameError（被下方 except Exception as ex
+                # 吞掉）——也就是說以下 is_lifetime / subscription_tier 同步邏輯過去從未真正執行過。
+                # 本次修復除了改用合法連接模塊，也順帶修正此既有缺陷（詳見報告）。
+                from core.db_utils import create_connection
+                db_path = str(getattr(auth_service, 'db_path', '') or '')
+                conn = create_connection(db_path or None)
+                if conn:
                     try:
                         # 優先 id/user_id，再嘗試 username/nickname/telegram_id/email
                         params = [user.id, user.id]

@@ -2021,33 +2021,6 @@ export class AppComponent implements OnDestroy, OnInit {
     week_converted: 0
   });
   
-  // --- Funnel Visualization (Phase 4) ---
-  funnelOverview = signal<{
-    stages: Array<{stage: string; name: string; count: number; color: string}>;
-    totalLeads: number;
-    convertedLeads: number;
-    averageConversionDays: number;
-    conversionRate: number;
-  }>({
-    stages: [],
-    totalLeads: 0,
-    convertedLeads: 0,
-    averageConversionDays: 0,
-    conversionRate: 0
-  });
-  showFunnelVisualization = signal(false);
-  isLoadingFunnel = signal(false);
-  selectedJourneyUserId = signal('');
-  userJourneyData = signal<{
-    userId: string;
-    stages: Array<{stage: string; timestamp: string; reason: string}>;
-    currentStage: string;
-    totalDays: number;
-    isConverted: boolean;
-  } | null>(null);
-  isLoadingJourney = signal(false);
-  leadsTab = signal<'kanban' | 'funnel' | 'journey'>('kanban');
-  
   // --- Marketing Campaign (Phase 4) ---
   marketingCampaigns = signal<Array<{
     id: number;
@@ -2121,28 +2094,6 @@ export class AppComponent implements OnDestroy, OnInit {
   
   loadFunnelStats() {
     this.ipcService.send('get-funnel-stats', {});
-  }
-  
-  // ==================== Funnel Visualization Methods (Phase 4) ====================
-  
-  loadFunnelOverview() {
-    this.isLoadingFunnel.set(true);
-    this.ipcService.send('get-funnel-overview', {});
-  }
-  
-  loadUserJourney(userId: string) {
-    if (!userId) return;
-    this.isLoadingJourney.set(true);
-    this.selectedJourneyUserId.set(userId);
-    this.ipcService.send('get-user-journey', { userId });
-  }
-  
-  transitionFunnelStage(userId: string, newStage: string, reason?: string) {
-    this.ipcService.send('transition-funnel-stage', {
-      userId,
-      stage: newStage,
-      reason: reason || '手動轉換'
-    });
   }
   
   // ==================== Marketing Campaign Methods (Phase 4) ====================

@@ -11,7 +11,6 @@
 
 import { Component, signal, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ElectronIpcService } from '../electron-ipc.service';
 import { ToastService } from '../toast.service';
 
 interface DailyStats {
@@ -88,6 +87,19 @@ interface DashboardData {
           </button>
         </div>
       </div>
+
+      @if (backendUnavailable) {
+        <div class="dev-notice">
+          <div class="dev-notice-icon">🚧</div>
+          <div class="dev-notice-content">
+            <strong>API 统计仪表板功能开发中</strong>
+            <p>此页面原本使用的 Electron IPC 命令 <code>api-stats:command</code> 在后端从未被
+              注册为真实可调用的命令（<code>backend/api/api_stats_routes.py</code> 是未被任何路由
+              引用的孤立模块），因此没有对应的 REST API 可供串接。目前显示为预览版面，
+              待后端补上 <code>/api/v1/admin/api-stats/*</code> 一类端点后即可启用真实数据。</p>
+          </div>
+        </div>
+      } @else {
 
       @if (error()) {
         <div class="error-banner">
@@ -250,6 +262,7 @@ interface DashboardData {
           }
         </div>
       </div>
+      }
     </div>
   `,
   styles: [`
@@ -257,6 +270,39 @@ interface DashboardData {
       padding: 1.5rem;
       max-width: 1400px;
       margin: 0 auto;
+    }
+
+    /* 🚧 功能开发中提示 */
+    .dev-notice {
+      display: flex;
+      gap: 1rem;
+      padding: 1.25rem;
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: 0.75rem;
+    }
+
+    .dev-notice-icon {
+      font-size: 1.75rem;
+    }
+
+    .dev-notice-content strong {
+      color: #93c5fd;
+      font-size: 1rem;
+    }
+
+    .dev-notice-content p {
+      margin: 0.5rem 0 0 0;
+      font-size: 0.8rem;
+      color: #9ca3af;
+      line-height: 1.6;
+    }
+
+    .dev-notice-content code {
+      font-size: 0.75rem;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 0.1rem 0.3rem;
+      border-radius: 0.25rem;
     }
 
     .dashboard-header {
@@ -694,8 +740,17 @@ interface DashboardData {
   `]
 })
 export class ApiStatsDashboardComponent implements OnInit, OnDestroy {
-  private ipcService = inject(ElectronIpcService);
   private toast = inject(ToastService);
+
+  /**
+   * 🔧 此页面需要的登录尝试统计（按 API 池 api_id 排名/每日每小时趋势/告警）
+   * 唯一对应的后端逻辑是 backend/core/api_stats.py，但暴露它的
+   * backend/api/api_stats_routes.py 从未被任何路由或命令注册引用
+   * （既不在 backend/main.py 的 COMMAND_ALIAS_REGISTRY，也没有对应的
+   * /api/v1/* REST 路由），是一个孤立、从未被真正接上的模块。
+   * 因此这里做优雅降级，不假造资料，保留完整版面结构供未来串接。
+   */
+  readonly backendUnavailable = true;
 
   // 状态
   isLoading = signal(false);
@@ -715,6 +770,9 @@ export class ApiStatsDashboardComponent implements OnInit, OnDestroy {
   private refreshInterval: any;
 
   ngOnInit(): void {
+    if (this.backendUnavailable) {
+      return;
+    }
     this.loadDashboard();
     // 🔧 Phase2: 30s→60s 降低輪詢頻率
     this.refreshInterval = setInterval(() => this.loadDashboard(), 60000);
@@ -727,18 +785,17 @@ export class ApiStatsDashboardComponent implements OnInit, OnDestroy {
   }
 
   async loadDashboard(): Promise<void> {
-    if (this.isLoading()) return;
+    if (this.isLoading() || this.backendUnavailable) return;
 
     this.isLoading.set(true);
     this.error.set('');
 
     try {
-      const result = await this.ipcService.send('api-stats:command', {
-        command: 'dashboard'
-      });
+      // 目前无真实后端端点可用，保留方法签名供未来串接使用
+      const result: { success?: boolean; data?: DashboardData; error?: string } = { success: false, error: '后端尚未提供此功能' };
 
       if (result?.success && result.data) {
-        const data = result.data as DashboardData;
+        const data = result.data;
         this.dashboardData.set(data);
         this.totalStats.set(data.overall?.total || null);
         this.dailyStats.set(data.overall?.daily || []);
@@ -758,18 +815,12 @@ export class ApiStatsDashboardComponent implements OnInit, OnDestroy {
   }
 
   async clearAlerts(): Promise<void> {
-    try {
-      const result = await this.ipcService.send('api-stats:command', {
-        command: 'clear_alerts'
-      });
-
-      if (result?.success) {
-        this.alerts.set([]);
-        this.toast.show({ message: '告警已清除', type: 'success' });
-      }
-    } catch (e) {
-      console.error('Clear alerts failed:', e);
+    if (this.backendUnavailable) {
+      this.toast.info('此功能开发中，暂无法清除告警');
+      return;
     }
+    this.alerts.set([]);
+    this.toast.success('告警已清除');
   }
 
   // 辅助方法

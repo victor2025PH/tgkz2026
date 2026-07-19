@@ -94,6 +94,21 @@ export interface PaginatedResult<T> {
   total_pages: number;
 }
 
+/**
+ * 🆕 操作審計日誌（對應 backend/core/audit_service.py）
+ * 注意：與 AuditLog（管理員操作日誌，/api/v1/admin/audit-logs）是不同的數據源，
+ * 這裡對接的是 /api/v1/admin/audit/logs，記錄 API 池/帳號/告警/系統等操作事件。
+ * 後端目前只回傳 {id, action, category, user_id, details, timestamp} 這幾個欄位。
+ */
+export interface OperationAuditLog {
+  id: string;
+  action: string;
+  category: string;
+  user_id: string;
+  details: string;
+  timestamp: number;
+}
+
 // ==================== 服務實現 ====================
 
 @Injectable({ providedIn: 'root' })
@@ -352,7 +367,62 @@ export class AdminService {
       return { items: [], total: 0, page, page_size: 50, total_pages: 1 };
     }
   }
-  
+
+  /**
+   * 🆕 操作審計日誌（core.audit_service，/api/v1/admin/audit/logs）
+   * ⚠️ 已知後端限制：
+   * 1. 該端點的 action / category 篩選參數目前未被後端實際套用（傳了也不會過濾）
+   * 2. start_time / end_time 若傳入會因後端型別比較錯誤觸發 500，因此這裡刻意不傳
+   * 3. /api/v1/admin/audit/stats 目前後端缺少 get_stats() 實作，會直接報錯，因此不呼叫
+   * 故僅使用真正可用的 limit / offset，其餘篩選改由前端在拿到資料後自行處理。
+   */
+  async getOperationAuditLogs(limit: number = 100, offset: number = 0): Promise<{ success: boolean; data: OperationAuditLog[]; error?: string }> {
+    try {
+      const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/audit/logs?${params}`
+      ).toPromise();
+      return { success: res?.success !== false, data: res?.data || [], error: res?.error };
+    } catch (e) {
+      console.error('Get operation audit logs error:', e);
+      return { success: false, data: [], error: String(e) };
+    }
+  }
+
+  // ==================== 系統告警（真實命令通道）====================
+  // 🔧 說明：後端尚未提供 /api/v1/admin/alerts 這類 RESTful 端點，
+  // 但通用命令通道 POST /api/command 已註冊 alerts:get / alerts:resolve / alerts:clear
+  // （見 backend/main.py COMMAND_ALIAS_REGISTRY → api/handlers/analytics_handlers_impl.py），
+  // 直接讀寫 system_alerts 表，是目前唯一真實可用的系統告警數據源。
+
+  async getSystemAlerts(): Promise<any> {
+    return this.sendCommand('alerts:get', {});
+  }
+
+  async resolveSystemAlert(alertId: string): Promise<any> {
+    return this.sendCommand('alerts:resolve', { id: alertId });
+  }
+
+  async clearAllSystemAlerts(): Promise<any> {
+    return this.sendCommand('alerts:clear', {});
+  }
+
+  /**
+   * 通用命令通道 — 對應後端 POST /api/command（{command, payload} → backend_service.handle_command）
+   */
+  private async sendCommand(command: string, payload: any): Promise<any> {
+    try {
+      const res = await this.http.post<any>(
+        `${this.apiUrl}/api/command`,
+        { command, payload }
+      ).toPromise();
+      return res;
+    } catch (e) {
+      console.error(`Command '${command}' error:`, e);
+      return { success: false, error: String(e) };
+    }
+  }
+
   // ==================== 緩存統計 ====================
   
   async getCacheStats(): Promise<any> {

@@ -12,10 +12,17 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ElectronIpcService } from '../electron-ipc.service';
+import { AdminService, OperationAuditLog } from './admin.service';
 import { ToastService } from '../toast.service';
 import { I18nService } from '../i18n.service';
 
+/**
+ * 🔧 對接後端 core/audit_service.py（/api/v1/admin/audit/logs）後的真實欄位。
+ * 後端只回傳 {id, action, category, user_id, details, timestamp}，
+ * 以下 resource_id / user_name / ip_address / old_value / new_value / success / error
+ * 目前後端不提供，保留欄位是為了盡量不更動既有模板結構，
+ * 載入時一律填入安全預設值，且模板已移除會誤導的狀態顯示（見 loadData/mapLogs 註釋）。
+ */
 interface AuditLog {
   id: string;
   action: string;
@@ -32,24 +39,14 @@ interface AuditLog {
   timestamp: number;
 }
 
+/** 🔧 後端 /api/v1/admin/audit/stats 缺少 get_stats() 實作（呼叫必錯），
+ * 這裡改為前端依實際載入的日誌批次自行統計，欄位也對應調整 */
 interface AuditSummary {
-  period_hours: number;
   total_entries: number;
-  success_count: number;
-  failure_count: number;
-  success_rate: number;
-  by_action: Record<string, number>;
-  by_resource: Record<string, number>;
   active_users: number;
-  top_actions: Array<[string, number]>;
-}
-
-interface Anomaly {
-  type: string;
-  message: string;
-  severity: string;
-  count?: number;
-  user_id?: string;
+  category_count: number;
+  top_action: string;
+  top_action_count: number;
 }
 
 @Component({
@@ -77,34 +74,28 @@ interface Anomaly {
             <div class="card-value">{{ summary()?.total_entries || 0 }}</div>
             <div class="card-label">总操作数</div>
           </div>
-          <div class="summary-card success">
-            <div class="card-value">{{ summary()?.success_count || 0 }}</div>
-            <div class="card-label">成功操作</div>
-          </div>
-          <div class="summary-card danger">
-            <div class="card-value">{{ summary()?.failure_count || 0 }}</div>
-            <div class="card-label">失败操作</div>
-          </div>
           <div class="summary-card">
             <div class="card-value">{{ summary()?.active_users || 0 }}</div>
             <div class="card-label">活跃用户</div>
           </div>
+          <div class="summary-card">
+            <div class="card-value">{{ summary()?.category_count || 0 }}</div>
+            <div class="card-label">涉及分类数</div>
+          </div>
+          <div class="summary-card">
+            <div class="card-value">{{ summary()?.top_action_count || 0 }}</div>
+            <div class="card-label">{{ summary()?.top_action ? formatAction(summary()!.top_action) : '最常见操作' }}</div>
+          </div>
         </div>
 
-        <!-- 异常检测 -->
-        @if (anomalies().length > 0) {
-          <div class="anomalies-banner">
-            <div class="anomaly-icon">⚠️</div>
-            <div class="anomaly-content">
-              <strong>检测到异常操作模式</strong>
-              <ul>
-                @for (anomaly of anomalies(); track anomaly.type) {
-                  <li [class]="anomaly.severity">{{ anomaly.message }}</li>
-                }
-              </ul>
-            </div>
+        <!-- 异常检测：后端暂未提供异常操作侦测的 REST API，先做优雅降级提示 -->
+        <div class="anomalies-banner dev-notice">
+          <div class="anomaly-icon">🚧</div>
+          <div class="anomaly-content">
+            <strong>异常操作侦测功能开发中</strong>
+            <p class="dev-notice-desc">后端尚未提供对应的异常侦测 API，此区块将于后端支援后启用。</p>
           </div>
-        }
+        </div>
       </div>
 
       <!-- 筛选器 -->
@@ -149,15 +140,6 @@ interface Anomaly {
           </div>
 
           <div class="filter-group">
-            <label>状态</label>
-            <select [(ngModel)]="filterStatus" (change)="applyFilter()">
-              <option value="">全部</option>
-              <option value="success">成功</option>
-              <option value="failure">失败</option>
-            </select>
-          </div>
-
-          <div class="filter-group">
             <label>时间范围</label>
             <select [(ngModel)]="filterTime" (change)="applyFilter()">
               <option value="1h">最近1小时</option>
@@ -195,14 +177,12 @@ interface Anomaly {
                   <th class="col-action">操作</th>
                   <th class="col-resource">资源</th>
                   <th class="col-user">操作者</th>
-                  <th class="col-ip">IP 地址</th>
-                  <th class="col-status">状态</th>
                   <th class="col-details">详情</th>
                 </tr>
               </thead>
               <tbody>
                 @for (log of filteredLogs(); track log.id) {
-                  <tr [class.failure]="!log.success">
+                  <tr>
                     <td class="col-time">{{ formatTime(log.timestamp) }}</td>
                     <td class="col-action">
                       <span class="action-badge" [class]="getActionClass(log.action)">
@@ -217,16 +197,6 @@ interface Anomaly {
                     </td>
                     <td class="col-user">
                       {{ log.user_name || log.user_id || 'System' }}
-                    </td>
-                    <td class="col-ip">
-                      <code>{{ log.ip_address || '-' }}</code>
-                    </td>
-                    <td class="col-status">
-                      @if (log.success) {
-                        <span class="status-badge success">✓ 成功</span>
-                      } @else {
-                        <span class="status-badge failure">✗ 失败</span>
-                      }
                     </td>
                     <td class="col-details">
                       <button class="btn-details" (click)="showDetails(log)">
@@ -280,16 +250,6 @@ interface Anomaly {
               <div class="detail-row">
                 <label>操作者</label>
                 <span>{{ selectedLog()!.user_name || selectedLog()!.user_id || 'System' }}</span>
-              </div>
-              <div class="detail-row">
-                <label>IP 地址</label>
-                <code>{{ selectedLog()!.ip_address || '-' }}</code>
-              </div>
-              <div class="detail-row">
-                <label>状态</label>
-                <span [class]="selectedLog()!.success ? 'success' : 'failure'">
-                  {{ selectedLog()!.success ? '成功' : '失败' }}
-                </span>
               </div>
               @if (selectedLog()!.error) {
                 <div class="detail-row">
@@ -444,6 +404,22 @@ interface Anomaly {
 
     .anomaly-content li.critical {
       color: #f87171;
+    }
+
+    /* 🚧 功能开发中提示（异常侦测暂无后端支援） */
+    .anomalies-banner.dev-notice {
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+    }
+
+    .anomalies-banner.dev-notice .anomaly-content strong {
+      color: #93c5fd;
+    }
+
+    .dev-notice-desc {
+      margin: 0.375rem 0 0 0;
+      font-size: 0.8rem;
+      color: #9ca3af;
     }
 
     /* 筛选器 */
@@ -786,7 +762,7 @@ interface Anomaly {
   `]
 })
 export class AuditLogsComponent implements OnInit {
-  private ipcService = inject(ElectronIpcService);
+  private adminService = inject(AdminService);
   private toast = inject(ToastService);
   private i18n = inject(I18nService);
 
@@ -795,19 +771,18 @@ export class AuditLogsComponent implements OnInit {
   logs = signal<AuditLog[]>([]);
   filteredLogs = signal<AuditLog[]>([]);
   summary = signal<AuditSummary | null>(null);
-  anomalies = signal<Anomaly[]>([]);
   selectedLog = signal<AuditLog | null>(null);
   hasMore = signal(true);
 
-  // 筛选
+  // 筛选（操作类型/资源分类/时间范围/搜索皆由前端在拿到日志批次后处理，
+  // 因为后端 /api/v1/admin/audit/logs 目前不支援这些筛选参数）
   filterAction = '';
   filterResource = '';
-  filterStatus = '';
   filterTime = '24h';
   searchQuery = '';
 
-  // 分页
-  private pageSize = 50;
+  // 分页（后端 offset/limit 参数可正常使用）
+  private pageSize = 100;
   private currentOffset = 0;
 
   ngOnInit(): void {
@@ -825,21 +800,16 @@ export class AuditLogsComponent implements OnInit {
     this.currentOffset = 0;
 
     try {
-      const result = await this.ipcService.send('audit:get', {
-        action: this.filterAction || undefined,
-        resource_type: this.filterResource || undefined,
-        success: this.filterStatus === 'success' ? true : 
-                 this.filterStatus === 'failure' ? false : undefined,
-        time_range: this.filterTime,
-        limit: this.pageSize
-      });
+      const result = await this.adminService.getOperationAuditLogs(this.pageSize, 0);
 
-      if (result?.success) {
-        this.logs.set(result.data?.logs || []);
-        this.summary.set(result.data?.summary || null);
-        this.anomalies.set(result.data?.anomalies || []);
+      if (result.success) {
+        const mapped = this.mapLogs(result.data);
+        this.logs.set(mapped);
+        this.summary.set(this.computeSummary(mapped));
         this.applyFilter();
-        this.hasMore.set((result.data?.logs?.length || 0) >= this.pageSize);
+        this.hasMore.set(mapped.length >= this.pageSize);
+      } else if (result.error) {
+        console.error('Load audit logs failed:', result.error);
       }
     } catch (e) {
       console.error('Load audit logs failed:', e);
@@ -852,17 +822,13 @@ export class AuditLogsComponent implements OnInit {
     this.currentOffset += this.pageSize;
 
     try {
-      const result = await this.ipcService.send('audit:get', {
-        action: this.filterAction || undefined,
-        resource_type: this.filterResource || undefined,
-        time_range: this.filterTime,
-        limit: this.pageSize,
-        offset: this.currentOffset
-      });
+      const result = await this.adminService.getOperationAuditLogs(this.pageSize, this.currentOffset);
 
-      if (result?.success && result.data?.logs) {
-        const newLogs = result.data.logs;
-        this.logs.set([...this.logs(), ...newLogs]);
+      if (result.success) {
+        const newLogs = this.mapLogs(result.data);
+        const combined = [...this.logs(), ...newLogs];
+        this.logs.set(combined);
+        this.summary.set(this.computeSummary(combined));
         this.applyFilter();
         this.hasMore.set(newLogs.length >= this.pageSize);
       }
@@ -871,21 +837,96 @@ export class AuditLogsComponent implements OnInit {
     }
   }
 
+  /**
+   * 将后端 core.audit_service 回传的原始记录（{id, action, category, user_id,
+   * details, timestamp}）映射成组件用的 AuditLog；resource_id/user_name/
+   * ip_address/old_value/new_value/error 后端未提供，填入安全预设值，
+   * success 固定为 true（模板已移除会误导的成功/失败显示，不受此值影响）。
+   */
+  private mapLogs(raw: OperationAuditLog[] | any[]): AuditLog[] {
+    const arr = Array.isArray(raw) ? raw : [];
+    return arr.map((r: any) => ({
+      id: String(r?.id ?? ''),
+      action: r?.action || '',
+      resource_type: r?.category || '',
+      resource_id: '',
+      user_id: r?.user_id || '',
+      user_name: r?.user_id || '',
+      ip_address: '',
+      old_value: null,
+      new_value: null,
+      details: r?.details || '',
+      success: true,
+      error: '',
+      timestamp: this.normalizeTimestamp(r?.timestamp)
+    }));
+  }
+
+  private normalizeTimestamp(value: any): number {
+    const parsed = Number(value);
+    return isNaN(parsed) || parsed <= 0 ? Date.now() / 1000 : parsed;
+  }
+
+  /** 前端依当前已载入的日志批次统计摘要（后端 /audit/stats 端点无法使用，见文件顶部注释） */
+  private computeSummary(logs: AuditLog[]): AuditSummary {
+    const categories = new Set<string>();
+    const users = new Set<string>();
+    const actionCounts: Record<string, number> = {};
+
+    for (const log of logs) {
+      if (log.resource_type) categories.add(log.resource_type);
+      if (log.user_id) users.add(log.user_id);
+      actionCounts[log.action] = (actionCounts[log.action] || 0) + 1;
+    }
+
+    const top = Object.entries(actionCounts).sort((a, b) => b[1] - a[1])[0];
+
+    return {
+      total_entries: logs.length,
+      active_users: users.size,
+      category_count: categories.size,
+      top_action: top ? top[0] : '',
+      top_action_count: top ? top[1] : 0
+    };
+  }
+
   applyFilter(): void {
     let filtered = this.logs();
+
+    if (this.filterAction) {
+      filtered = filtered.filter(log => log.action === this.filterAction);
+    }
+
+    if (this.filterResource) {
+      filtered = filtered.filter(log => log.resource_type === this.filterResource);
+    }
+
+    const cutoff = this.getTimeCutoff(this.filterTime);
+    if (cutoff !== null) {
+      filtered = filtered.filter(log => log.timestamp >= cutoff);
+    }
 
     // 搜索
     if (this.searchQuery) {
       const query = this.searchQuery.toLowerCase();
       filtered = filtered.filter(log =>
-        log.resource_id?.toLowerCase().includes(query) ||
         log.user_id?.toLowerCase().includes(query) ||
-        log.user_name?.toLowerCase().includes(query) ||
         log.details?.toLowerCase().includes(query)
       );
     }
 
     this.filteredLogs.set(filtered);
+  }
+
+  private getTimeCutoff(range: string): number | null {
+    const now = Date.now() / 1000;
+    switch (range) {
+      case '1h': return now - 3600;
+      case '24h': return now - 86400;
+      case '7d': return now - 7 * 86400;
+      case '30d': return now - 30 * 86400;
+      default: return null;
+    }
   }
 
   onSearch(): void {
@@ -905,10 +946,8 @@ export class AuditLogsComponent implements OnInit {
       const data = this.filteredLogs().map(log => ({
         time: new Date(log.timestamp * 1000).toISOString(),
         action: log.action,
-        resource: `${log.resource_type}/${log.resource_id}`,
+        category: log.resource_type,
         user: log.user_name || log.user_id,
-        ip: log.ip_address,
-        status: log.success ? 'Success' : 'Failed',
         details: log.details
       }));
 
@@ -922,10 +961,10 @@ export class AuditLogsComponent implements OnInit {
       a.click();
       
       URL.revokeObjectURL(url);
-      this.toast.show({ message: '导出成功', type: 'success' });
+      this.toast.success('导出成功');
     } catch (e) {
       console.error('Export failed:', e);
-      this.toast.show({ message: '导出失败', type: 'error' });
+      this.toast.error('导出失败');
     }
   }
 

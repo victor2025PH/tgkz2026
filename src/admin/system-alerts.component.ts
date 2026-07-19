@@ -11,7 +11,7 @@
 import { Component, signal, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ElectronIpcService } from '../electron-ipc.service';
+import { AdminService } from './admin.service';
 import { ToastService } from '../toast.service';
 
 interface Alert {
@@ -499,7 +499,7 @@ interface AlertSummary {
   `]
 })
 export class SystemAlertsComponent implements OnInit, OnDestroy {
-  private ipcService = inject(ElectronIpcService);
+  private adminService = inject(AdminService);
   private toast = inject(ToastService);
 
   // 状态
@@ -535,19 +535,42 @@ export class SystemAlertsComponent implements OnInit, OnDestroy {
     this.isLoading.set(true);
 
     try {
-      const result = await this.ipcService.invoke('alerts:get', {}) as { success?: boolean; data?: { summary?: any; active?: any[]; recent?: any[] } } | undefined;
+      const result = await this.adminService.getSystemAlerts() as { success?: boolean; data?: { summary?: any; active?: any[]; recent?: any[] }; error?: string } | undefined;
 
       if (result?.success) {
-        this.summary.set(result.data?.summary || null);
-        // 🔧 Fix: 映射 DB 原始字段，確保 timestamp 正確解析
-        const mapAlert = (a: any) => ({
-          ...a,
-          timestamp: this.parseTimestamp(a.created_at || a.timestamp),
-          type: a.alert_type || a.type || 'system',
+        // 🔧 Fix: 映射 DB 原始字段，確保 timestamp 正確解析；system_alerts 表沒有
+        // title/api_id 欄位，用 alert_type 反推一個可讀標題顯示
+        const mapAlert = (a: any) => {
+          const type = a.alert_type || a.type || 'system';
+          return {
+            ...a,
+            timestamp: this.parseTimestamp(a.created_at || a.timestamp),
+            type,
+            title: a.title || this.formatType(type),
+          };
+        };
+        // 🔧 已用真實後端驗證證實：backend/api/handlers/analytics_handlers_impl.py 的
+        // handle_get_alerts 在計算 active 時比對不存在的 'status' 欄位（實際欄位是
+        // 'resolved'），導致 active 恆等於全部告警（即使已解決也會出現在 active 裡）。
+        // 這是後端既有邏輯問題（不在本次可修改檔案範圍內），這裡改由前端依真實的
+        // resolved 欄位重新過濾，避免「已解決」的告警誤顯示在活躍列表中。
+        const active = (result.data?.active || []).map(mapAlert).filter((a: Alert) => !a.resolved);
+        const recent = (result.data?.recent || []).map(mapAlert);
+
+        this.activeAlerts.set(active);
+        this.historyAlerts.set(recent);
+        // 後端回傳的 summary 同樣受上述問題影響，改由前端依過濾後的 active 陣列重新統計
+        this.summary.set({
+          total_active: active.length,
+          urgent: active.filter((a: Alert) => a.level === 'urgent').length,
+          critical: active.filter((a: Alert) => a.level === 'critical').length,
+          warning: active.filter((a: Alert) => a.level === 'warning').length,
+          info: active.filter((a: Alert) => a.level === 'info').length,
+          total_history: recent.length
         });
-        this.activeAlerts.set((result.data?.active || []).map(mapAlert));
-        this.historyAlerts.set((result.data?.recent || []).map(mapAlert));
         this.applyFilter();
+      } else if (result?.error) {
+        console.error('Load alerts failed:', result.error);
       }
     } catch (e) {
       console.error('Load alerts failed:', e);
@@ -575,27 +598,33 @@ export class SystemAlertsComponent implements OnInit, OnDestroy {
 
   async resolveAlert(alert: Alert): Promise<void> {
     try {
-      const result = await this.ipcService.send('alerts:resolve', { id: alert.id });
+      const result = await this.adminService.resolveSystemAlert(alert.id);
 
       if (result?.success) {
-        this.toast.show({ message: '告警已解决', type: 'success' });
+        this.toast.success('告警已解决');
         await this.loadAlerts();
+      } else {
+        this.toast.error(result?.error || '解决告警失败');
       }
     } catch (e) {
       console.error('Resolve alert failed:', e);
+      this.toast.error('解决告警失败');
     }
   }
 
   async clearAllAlerts(): Promise<void> {
     try {
-      const result = await this.ipcService.send('alerts:clear', {});
+      const result = await this.adminService.clearAllSystemAlerts();
 
       if (result?.success) {
-        this.toast.show({ message: '所有告警已清除', type: 'success' });
+        this.toast.success('所有告警已清除');
         await this.loadAlerts();
+      } else {
+        this.toast.error(result?.error || '清除告警失败');
       }
     } catch (e) {
       console.error('Clear alerts failed:', e);
+      this.toast.error('清除告警失败');
     }
   }
 

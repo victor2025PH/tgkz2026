@@ -10,12 +10,15 @@ P17-2: API 安全审计 — 限流日志分析 + 异常访问模式检测
 """
 
 import os
-import sqlite3
 import logging
 import threading
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from collections import defaultdict
+
+# 🔧 改用合法連接模塊 core.db_utils（見 .cursorrules 合法連接模塊清單），
+# 不再直接 sqlite3.connect()，路徑解析也統一交由 resolve_db_path() 處理。
+from core.db_utils import create_connection, resolve_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +61,7 @@ class SecurityAuditor:
         db_path = self._resolve_db_path()
         if db_path and os.path.exists(db_path):
             try:
-                conn = sqlite3.connect(db_path, timeout=5)
-                conn.row_factory = sqlite3.Row
+                conn = create_connection(db_path)
                 hour_ago = (datetime.utcnow() - timedelta(hours=1)).isoformat()
 
                 # Top blocked IPs (最近 1 小时)
@@ -163,11 +165,12 @@ class SecurityAuditor:
         return report
 
     def _resolve_db_path(self) -> Optional[str]:
-        """解析 rate_limiter 的 DB 路径"""
-        db_path = os.environ.get('DB_PATH')
-        if db_path:
-            return db_path
-        default = os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
-        if os.path.exists(default):
-            return default
-        return None
+        """解析 rate_limiter 的 DB 路径
+
+        🔧 改用 core.db_utils.resolve_db_path()（見 .cursorrules 合法連接模塊清單），
+        原因與 db_health.py 相同：DB_PATH 環境變量本服務從未設置，舊寫法未讀取
+        config.DATABASE_PATH，在 Electron 封裝模式下不會考慮 TG_DATA_DIR。
+        呼叫端 generate_report() 會再自行 os.path.exists() 檢查一次，故此處
+        即使解析出的路徑不存在也不影響既有行為。
+        """
+        return resolve_db_path()

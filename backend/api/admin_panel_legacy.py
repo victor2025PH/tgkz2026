@@ -12,10 +12,15 @@
 
 import logging
 import os
-import sqlite3
 from typing import Optional
 
 from aiohttp import web
+
+# 🔧 改用合法連接模塊 core.db_utils（見 .cursorrules 合法連接模塊清單）。
+# 舊寫法用一組硬編碼候選路徑（./data、../data、/app/data...）逐一嘗試 os.path.exists()，
+# 且完全不考慮 Electron 封裝模式下的 TG_DATA_DIR 持久化路徑；統一改用
+# resolve_db_path()（DATABASE_PATH env → DB_PATH env → config.DATABASE_PATH → 預設路徑）。
+from core.db_utils import create_connection, resolve_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -27,29 +32,9 @@ class AdminPanelLegacy:
         """获取管理员数据库连接"""
         import hashlib
 
-        # 尝试多个可能的数据库路径
-        possible_paths = [
-            os.environ.get('DATABASE_PATH', ''),
-            '/app/data/tgmatrix.db',  # Docker 容器路径
-            './data/tgmatrix.db',
-            '../data/tgmatrix.db',
-            os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
-        ]
-
-        db_path = None
-        for path in possible_paths:
-            if path and os.path.exists(path):
-                db_path = path
-                break
-
-        if not db_path:
-            # 如果没有找到数据库，创建一个
-            db_path = '/app/data/tgmatrix.db' if os.path.exists('/app/data') else './data/tgmatrix.db'
-            os.makedirs(os.path.dirname(db_path), exist_ok=True)
-
+        db_path = resolve_db_path()
         logger.info(f"Using database path: {db_path}")
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
+        conn = create_connection(db_path)
 
         # 确保 admins 表存在
         cursor = conn.cursor()

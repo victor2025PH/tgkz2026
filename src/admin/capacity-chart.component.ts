@@ -8,8 +8,9 @@
  * 4. 历史数据对比
  */
 
-import { Component, signal, OnInit, OnDestroy, Input } from '@angular/core';
+import { Component, signal, OnInit, OnDestroy, Input, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { AdminService } from './admin.service';
 
 interface CapacitySnapshot {
   timestamp: number;
@@ -52,19 +53,7 @@ interface CapacityStatus {
   imports: [CommonModule],
   template: `
     <div class="capacity-chart-container">
-      @if (backendUnavailable) {
-        <div class="dev-notice">
-          <div class="dev-notice-icon">🚧</div>
-          <div class="dev-notice-content">
-            <strong>容量规划图表功能开发中</strong>
-            <p>API 池容量预测所需的资料（容量状态快照、24 小时历史趋势、扩容建议）目前只存在于
-              另一套独立的管理系统（/api/admin/api-pool/*，使用与本 SaaS 后台不同的登入机制），
-              尚未对接到 Angular 管理后台使用的 JWT 认证体系，因此暂无法显示真实数据，
-              待后端补上对应的 /api/v1/admin/* REST 端点后即可启用。</p>
-          </div>
-        </div>
-      } @else {
-      <!-- 当前状态卡片 -->
+      <!-- 當前狀態卡片 -->
       <div class="status-section">
         <div class="status-card main">
           <div class="gauge-container">
@@ -233,7 +222,6 @@ interface CapacityStatus {
           <div class="tooltip-time">{{ tooltip()!.time }}</div>
           <div class="tooltip-value">{{ tooltip()!.value.toFixed(1) }}%</div>
         </div>
-      }
       }
     </div>
   `,
@@ -602,31 +590,20 @@ interface CapacityStatus {
   `]
 })
 export class CapacityChartComponent implements OnInit, OnDestroy {
-  @Input() refreshInterval = 60000; // 刷新间隔
+  @Input() refreshInterval = 60000; // 刷新間隔
 
-  /**
-   * 🔧 容量规划所需的 API 池容量/预测数据目前只存在于 backend/admin/handlers.py
-   * 的 get_api_pool_alerts / get_api_pool_forecast（路径 /api/admin/api-pool/*），
-   * 该模块使用独立的 _verify_token() 管理员登入机制，与本 SaaS 后台的 JWT 租户
-   * 认证（AuthGuard + Bearer token）不是同一套体系，目前无法从这里直接调用。
-   * 前端 IPC 命令 capacity:status / capacity:history 在后端也从未被注册实现。
-   * 因此先做优雅降级，保留完整图表结构，待后端补上对应 REST 端点后再串接。
-   */
-  readonly backendUnavailable = true;
+  private adminService = inject(AdminService);
 
-  // 状态
+  // 狀態
   status = signal<CapacityStatus | null>(null);
   history = signal<CapacitySnapshot[]>([]);
   chartPoints = signal<Array<{ x: number; y: number; value: number; time: string }>>([]);
   tooltip = signal<{ x: number; y: number; time: string; value: number } | null>(null);
 
-  // 刷新定时器
+  // 刷新定時器
   private refreshTimer: any;
 
   ngOnInit(): void {
-    if (this.backendUnavailable) {
-      return;
-    }
     this.loadData();
     this.refreshTimer = setInterval(() => this.loadData(), this.refreshInterval);
   }
@@ -639,17 +616,17 @@ export class CapacityChartComponent implements OnInit, OnDestroy {
 
   async loadData(): Promise<void> {
     try {
-      // 目前无真实后端端点可用，保留方法签名供未来串接使用
-      const result: { success?: boolean; data?: any } = { success: false };
+      const [result, historyResult] = await Promise.all([
+        this.adminService.getCapacityStatus(),
+        this.adminService.getCapacityHistory(24),
+      ]);
 
       if (result?.success && result.data) {
-        this.status.set(result.data);
+        this.status.set(result.data as CapacityStatus);
       }
 
-      const historyResult: { success?: boolean; data?: any } = { success: false };
-
-      if (historyResult?.success && historyResult.data) {
-        this.history.set(historyResult.data);
+      if (historyResult?.success && Array.isArray(historyResult.data)) {
+        this.history.set(historyResult.data as CapacitySnapshot[]);
         this.calculateChartPoints();
       }
     } catch (e) {

@@ -642,4 +642,87 @@ export class AdminService {
       return { success: false, error: String(e) };
     }
   }
+
+  // ==================== API 統計儀表板 ====================
+
+  /** GET /api/v1/admin/api-stats/dashboard */
+  async getApiStatsDashboard(): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/api-stats/dashboard`
+      ).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Get API stats dashboard error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  /** POST /api/v1/admin/api-stats/clear-alerts */
+  async clearApiStatsAlerts(): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await this.http.post<any>(
+        `${this.apiUrl}/api/v1/admin/api-stats/clear-alerts`,
+        {}
+      ).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Clear API stats alerts error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  // ==================== 容量規劃 ====================
+
+  /** GET /api/v1/admin/capacity/status — 前端 CapacityStatus 形狀 */
+  async getCapacityStatus(): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/capacity/status`
+      ).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Get capacity status error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  /** GET /api/v1/admin/capacity/history?hours=24 */
+  async getCapacityHistory(hours: number = 24): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/capacity/history?hours=${hours}`
+      ).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Get capacity history error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  /** GET /api/v1/admin/api-pool/alerts */
+  async getApiPoolAlerts(): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/api-pool/alerts`
+      ).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Get API pool alerts error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  /** GET /api/v1/admin/api-pool/forecast?days=7 */
+  async getApiPoolForecast(days: number = 7): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/api-pool/forecast?days=${days}`
+      ).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Get API pool forecast error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
 }

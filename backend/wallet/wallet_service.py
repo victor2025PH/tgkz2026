@@ -72,7 +72,22 @@ class WalletService:
                 db_path = str(data_dir / "wallet.db")
         
         self.db_path = db_path
-        self._use_legacy_table = 'wallet.db' in db_path  # 是否使用舊表結構
+        # 🔧 修復：原邏輯依檔名字串判斷 self._use_legacy_table，這個 db_path 幾乎
+        # 總是指向 tgmatrix.db（上面優先選擇的分支），導致此旗標恆為 False，
+        # 使 _wallet_table/_balance_column 指向從未被 _init_database() 建立過的
+        # 「wallets」表（get_or_create_wallet() 對它 INSERT 會直接拋
+        # OperationalError: no such table）。更嚴重的是，add_balance()/consume()
+        # 這兩個實際搬動金額的方法完全沒有走 _wallet_table 動態判斷，是直接
+        # 硬編碼 SQL 查詢/更新「user_wallets」表——也就是說，即使補上 wallets
+        # 表，充值/消費仍會去錯的表找資料，回報「錢包版本衝突」。
+        # user_wallets 表是全服務唯一被 _init_database() 實際建立、且被
+        # add_balance()/consume() 兩個核心方法一致使用的表（wallet_transactions
+        # 的外鍵也指向 user_wallets(id)），故不論底層檔案是否叫 wallet.db，
+        # 統一固定使用這套表結構，讓 get_wallet/get_or_create_wallet/
+        # admin_adjust_balance 這三個仍會依旗標動態判斷表名的方法，與
+        # add_balance/consume 保持一致，而不是新增一個大部分方法都用不到、
+        # 半成品的「wallets」表。
+        self._use_legacy_table = True
         self._init_database()
         self._initialized = True
         logger.info(f"WalletService initialized with db: {db_path}, legacy: {self._use_legacy_table}")

@@ -641,12 +641,12 @@ class AdminRoutesMixin:
             limit = int(request.query.get('limit', '50'))
             error_type = request.query.get('type', '')
             severity = request.query.get('severity', '')
-            
-            import sqlite3
-            db_path = os.environ.get('DATABASE_PATH',
-                os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db'))
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
+
+            # 🔧 改用合法連接模塊 core.db_utils（見 .cursorrules 合法連接模塊清單）。
+            # 舊寫法 os.environ.get('DATABASE_PATH', ...) 依賴的 os 模塊在本檔案從未 import，
+            # 一旦執行到這裡必定拋出 NameError（被外層 try/except 吞掉，此端點過去每次呼叫都會 500）。
+            from core.db_utils import create_connection
+            conn = create_connection()
             
             query = 'SELECT * FROM frontend_errors WHERE 1=1'
             params = []

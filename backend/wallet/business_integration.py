@@ -81,6 +81,7 @@ class PurchaseRequest:
     item_description: str = ""
     metadata: Optional[Dict] = None
     ip_address: str = ""
+    idempotency_key: Optional[str] = None  # 客戶端冪等鍵（可選）：相同 key 重試不重複扣款
 
 
 @dataclass
@@ -99,18 +100,45 @@ class BusinessIntegrationService:
     def __init__(self):
         self.consume_service = get_consume_service()
     
+    def _safe_order(self, method: str, *args, **kwargs) -> None:
+        """審計旁路：呼叫 PurchaseOrderStore，任何異常只記日誌，絕不阻斷購買主流程。"""
+        try:
+            from .purchase_orders import get_purchase_order_store
+            getattr(get_purchase_order_store(), method)(*args, **kwargs)
+        except Exception as e:
+            logger.warning(f"[purchase_orders] audit '{method}' failed (non-blocking): {e}")
+    
     async def purchase(self, request: PurchaseRequest) -> PurchaseResult:
         """
         統一購買接口
         
         流程：
-        1. 檢查餘額
-        2. 執行扣款
-        3. 調用業務激活
-        4. 失敗則退款
+        1. 冪等檢查（若客戶端傳 idempotency_key）
+        2. fail-closed 履約檢查
+        3. 執行扣款
+        4. 調用業務激活
+        5. 失敗則退款
+        全程旁路寫 purchase_orders 審計（不阻斷主流程）。
         """
         # 生成訂單號
         order_id = self._generate_order_id(request.business_type)
+        
+        # 🔒 冪等：若客戶端傳入 idempotency_key 且已有 completed 訂單，直接返回原結果，
+        # 避免重試重複扣款。查詢異常時 fail-open（照常購買），不因審計層問題阻斷交易。
+        if request.idempotency_key:
+            try:
+                from .purchase_orders import get_purchase_order_store
+                existing = get_purchase_order_store().find_completed_by_idempotency_key(request.idempotency_key)
+                if existing:
+                    logger.info(f"Purchase idempotent hit: key={request.idempotency_key}, order={existing['order_id']}")
+                    return PurchaseResult(
+                        success=True,
+                        message="購買成功（冪等返回，未重複扣款）",
+                        order_id=existing['order_id'],
+                        transaction_id=existing.get('transaction_id') or '',
+                    )
+            except Exception as e:
+                logger.warning(f"[purchase_orders] idempotency check failed (fail-open): {e}")
         
         # 🔴 fail-closed：扣款前先檢查該業務是否已接通真實履約。
         # 未接通就拒絕，絕不「先扣款再假激活」（收錢不發貨）。
@@ -119,11 +147,22 @@ class BusinessIntegrationService:
                 f"Purchase rejected (fulfillment not enabled): "
                 f"user={request.user_id}, type={request.business_type}, item={request.item_id}"
             )
+            self._safe_order('create_pending', order_id, request.user_id, request.business_type,
+                             item_id=request.item_id, item_name=request.item_name, amount=request.amount,
+                             idempotency_key=request.idempotency_key, ip_address=request.ip_address)
+            self._safe_order('mark_rejected', order_id, '履約服務尚未接通')
             return PurchaseResult(
                 success=False,
                 message="該業務暫未開放購買（履約服務尚未接通），未扣款",
                 order_id=order_id
             )
+        
+        # 建立 pending 訂單（審計旁路）
+        _meta = request.metadata or {}
+        self._safe_order('create_pending', order_id, request.user_id, request.business_type,
+                         item_id=request.item_id, item_name=request.item_name, amount=request.amount,
+                         tier=_meta.get('tier', ''), duration_days=_meta.get('duration_days', 0),
+                         idempotency_key=request.idempotency_key, ip_address=request.ip_address)
         
         # 1. 執行消費扣款
         consume_req = ConsumeRequest(
@@ -141,6 +180,7 @@ class BusinessIntegrationService:
         consume_result = self.consume_service.consume(consume_req)
         
         if not consume_result.success:
+            self._safe_order('mark_failed', order_id, consume_result.message)
             return PurchaseResult(
                 success=False,
                 message=consume_result.message,
@@ -157,6 +197,9 @@ class BusinessIntegrationService:
                     f"type={request.business_type}, item={request.item_id}, "
                     f"order={order_id}"
                 )
+                self._safe_order('mark_completed', order_id,
+                                 transaction_id=consume_result.transaction_id,
+                                 activation_result=business_result)
                 
                 return PurchaseResult(
                     success=True,
@@ -173,6 +216,7 @@ class BusinessIntegrationService:
                     order_id, 
                     f"業務激活失敗: {error_msg}"
                 )
+                self._safe_order('mark_refunded', order_id, f"業務激活失敗: {error_msg}")
                 
                 return PurchaseResult(
                     success=False,
@@ -188,6 +232,7 @@ class BusinessIntegrationService:
                 order_id,
                 f"系統異常: {str(e)}"
             )
+            self._safe_order('mark_refunded', order_id, f"系統異常: {str(e)}")
             
             return PurchaseResult(
                 success=False,
@@ -401,7 +446,8 @@ class BusinessIntegrationService:
         price: int,
         tier: str,
         duration_days: int,
-        ip_address: str = ""
+        ip_address: str = "",
+        idempotency_key: Optional[str] = None
     ) -> PurchaseResult:
         """購買會員"""
         return await self.purchase(PurchaseRequest(
@@ -414,7 +460,8 @@ class BusinessIntegrationService:
                 'tier': tier,
                 'duration_days': duration_days
             },
-            ip_address=ip_address
+            ip_address=ip_address,
+            idempotency_key=idempotency_key
         ))
     
     async def purchase_ip_proxy(

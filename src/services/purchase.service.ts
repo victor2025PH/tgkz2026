@@ -325,7 +325,12 @@ export class PurchaseService {
       if (!built) {
         return { success: false, message: '未知的購買類型' };
       }
-      
+
+      // 🔒 冪等鍵：每次購買嘗試生成一個唯一 key，隨請求一併發送。
+      // 若因網絡抖動/用戶重複點擊導致同一次購買被重試，後端據此返回原結果、
+      // 不重複扣款（見 business_integration.purchase 的冪等處理）。
+      built.payload.idempotency_key = this.genIdempotencyKey();
+
       const response = await this.api.post<any>(built.endpoint, built.payload);
       
       if (response?.success) {
@@ -355,6 +360,16 @@ export class PurchaseService {
     }
   }
   
+  /** 生成購買冪等鍵（每次購買嘗試唯一）。 */
+  private genIdempotencyKey(): string {
+    try {
+      if (typeof crypto !== 'undefined' && (crypto as any).randomUUID) {
+        return `pur_${(crypto as any).randomUUID()}`;
+      }
+    } catch { /* ignore */ }
+    return `pur_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  }
+
   /**
    * 組裝後端原子購買請求（端點 + 完整參數）
    *

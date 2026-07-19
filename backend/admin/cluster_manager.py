@@ -20,10 +20,15 @@ from typing import Optional, Dict, Any, List, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'clusters.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 clusters.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'clusters.db')
 
 
 class ClusterStatus(str, Enum):
@@ -143,7 +148,7 @@ class ClusterManager:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 集群節點表
@@ -209,7 +214,7 @@ class ClusterManager:
     def register_cluster(self, node: ClusterNode) -> bool:
         """註冊集群節點"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             now = datetime.now().isoformat()
@@ -238,7 +243,7 @@ class ClusterManager:
     def update_cluster(self, cluster_id: str, updates: Dict[str, Any]) -> bool:
         """更新集群"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             updates['updated_at'] = datetime.now().isoformat()
@@ -269,7 +274,7 @@ class ClusterManager:
     def remove_cluster(self, cluster_id: str) -> bool:
         """移除集群"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             cursor.execute('DELETE FROM cluster_nodes WHERE id = ?', (cluster_id,))
             conn.commit()
@@ -282,7 +287,7 @@ class ClusterManager:
     
     def get_cluster(self, cluster_id: str) -> Optional[ClusterNode]:
         """獲取集群"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM cluster_nodes WHERE id = ?', (cluster_id,))
         row = cursor.fetchone()
@@ -294,7 +299,7 @@ class ClusterManager:
     
     def list_clusters(self, region: Optional[str] = None, status: Optional[str] = None) -> List[Dict]:
         """列出集群"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM cluster_nodes WHERE 1=1'
@@ -574,7 +579,7 @@ class ClusterManager:
         
         # 記錄故障轉移
         failover_id = str(uuid.uuid4())
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -596,7 +601,7 @@ class ClusterManager:
     
     def get_failover_history(self, limit: int = 50) -> List[Dict]:
         """獲取故障轉移歷史"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT * FROM failover_history ORDER BY initiated_at DESC LIMIT ?

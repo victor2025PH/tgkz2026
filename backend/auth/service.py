@@ -139,19 +139,24 @@ class AuthService:
                 );
                 
                 -- API 密鑰表
+                -- 🔧 Bug 修復：欄位命名需與 auth/api_key.py（ApiKeyService，唯一實際做 CRUD 的一方）一致。
+                -- 舊版本此處用 prefix/last_used_at，與 api_key.py 的 key_prefix/last_used/usage_count 不符；
+                -- 因為 CREATE TABLE IF NOT EXISTS 是 no-op，兩邊誰先初始化就決定實際 schema，
+                -- 造成 ApiKeyService.create() 報 "no column named key_prefix"。現統一以 api_key.py 為準。
                 CREATE TABLE IF NOT EXISTS api_keys (
                     id TEXT PRIMARY KEY,
                     user_id TEXT NOT NULL,
                     name TEXT,
                     key_hash TEXT UNIQUE,
-                    prefix TEXT,
+                    key_prefix TEXT,
                     scopes TEXT,
                     rate_limit INTEGER DEFAULT 100,
                     allowed_ips TEXT,
                     is_active BOOLEAN DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     expires_at TIMESTAMP,
-                    last_used_at TIMESTAMP,
+                    last_used TIMESTAMP,
+                    usage_count INTEGER DEFAULT 0,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 );
                 

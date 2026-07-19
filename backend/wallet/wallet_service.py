@@ -25,6 +25,9 @@ from .models import (
     Wallet, Transaction, WalletStatus, TransactionType, TransactionStatus,
     ConsumeCategory, RechargePackage, DEFAULT_RECHARGE_PACKAGES
 )
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection
 
 logger = logging.getLogger(__name__)
 
@@ -75,10 +78,8 @@ class WalletService:
         logger.info(f"WalletService initialized with db: {db_path}, legacy: {self._use_legacy_table}")
     
     def _get_connection(self) -> sqlite3.Connection:
-        """獲取數據庫連接"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        """獲取數據庫連接（統一經由 core.db_utils.create_connection，調用方負責關閉）"""
+        return create_connection(self.db_path)
     
     @property
     def _wallet_table(self) -> str:

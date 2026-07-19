@@ -13,6 +13,7 @@ import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ApiService } from './api.service';
 import { AuthEventsService, AUTH_STORAGE_KEYS } from './auth-events.service';
+import { resolveApiBaseUrl } from '../utils/api-base-url.util';
 
 // 用戶模型
 export interface User {
@@ -1303,12 +1304,8 @@ export class AuthService implements OnDestroy {
   }
 
   private getApiBaseUrl(): string {
-    // 開發環境
-    if (window.location.hostname === 'localhost' && window.location.port === '4200') {
-      return 'http://localhost:8000';
-    }
-    // 生產環境
-    return '';
+    // 統一改用共用工具解析（兼容 Electron app:// 協議 / ng serve 開發 / SaaS 同源部署）
+    return resolveApiBaseUrl();
   }
   
   private getDeviceName(): string {

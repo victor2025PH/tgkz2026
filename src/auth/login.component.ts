@@ -17,6 +17,8 @@ import { AuthService } from '../core/auth.service';
 import { I18nService } from '../i18n.service';
 import { FrontendSecurityService } from '../services/security.service';
 import { ElectronIpcService } from '../electron-ipc.service';
+// 🔧 修復 Electron app:// 協議下相對路徑 fetch 失效問題：統一用共用工具解析 API/WS 基址
+import { resolveApiBaseUrl, resolveWsBaseUrl } from '../utils/api-base-url.util';
 
 @Component({
   selector: 'app-login',
@@ -1201,8 +1203,8 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.error.set(null);
     
     try {
-      // 1. 獲取 Google 配置
-      const response = await fetch('/api/v1/oauth/google/config');
+      // 1. 獲取 Google 配置（經共用工具解析基址，兼容 Electron app:// 協議）
+      const response = await fetch(`${resolveApiBaseUrl()}/api/v1/oauth/google/config`);
       const config = await this.parseJsonResponse(response);
       if (!config?.success || !(config?.data as any)?.enabled) {
         this.error.set(this.t('auth.googleNotAvailable'));
@@ -1314,8 +1316,8 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.telegramLoading.set(true);
     
     try {
-      // 1. 調用 API 生成登入 Token
-      const response = await fetch('/api/v1/auth/login-token', {
+      // 1. 調用 API 生成登入 Token（經共用工具解析基址，兼容 Electron app:// 協議）
+      const response = await fetch(`${resolveApiBaseUrl()}/api/v1/auth/login-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'deep_link' })
@@ -1374,10 +1376,8 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.deepLinkWebSocket.close();
     }
     
-    // 構建 WebSocket URL
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws/login-token/${token}`;
+    // 構建 WebSocket URL（經共用工具解析基址，兼容 Electron app:// 協議）
+    const wsUrl = `${resolveWsBaseUrl()}/ws/login-token/${token}`;
     
     console.log('[DeepLink WS] Connecting to:', wsUrl);
     
@@ -1454,7 +1454,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       
       try {
         console.log('[DeepLink Poll] Checking status...');
-        const response = await fetch(`/api/v1/auth/login-token/${this.deepLinkToken}`);
+        const response = await fetch(`${resolveApiBaseUrl()}/api/v1/auth/login-token/${this.deepLinkToken}`);
         const result = await this.parseJsonResponse(response);
         
         console.log('[DeepLink Poll] Response:', result);
@@ -1530,8 +1530,8 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.error.set(null);
     
     try {
-      // 1. 調用 API 生成登入 Token
-      const response = await fetch('/api/v1/auth/login-token', {
+      // 1. 調用 API 生成登入 Token（經共用工具解析基址，兼容 Electron app:// 協議）
+      const response = await fetch(`${resolveApiBaseUrl()}/api/v1/auth/login-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'qr_code' })
@@ -1631,7 +1631,8 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (this.qrPollInterval) {
       clearInterval(this.qrPollInterval);
     }
-    const base = window.location.origin;
+    // 🔧 原用 window.location.origin，在 Electron app:// 協議下會拼出 app://... 導致請求失敗
+    const base = resolveApiBaseUrl();
     const poll = async () => {
       if (this.qrCodeExpired()) return;
       try {
@@ -1694,10 +1695,8 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.qrWebSocket.close();
     }
     
-    // 構建 WebSocket URL
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws/login-token/${token}`;
+    // 構建 WebSocket URL（經共用工具解析基址，兼容 Electron app:// 協議）
+    const wsUrl = `${resolveWsBaseUrl()}/ws/login-token/${token}`;
     
     console.log('[WebSocket] Connecting to:', wsUrl);
     

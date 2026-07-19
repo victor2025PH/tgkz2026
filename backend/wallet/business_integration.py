@@ -46,10 +46,28 @@ class BusinessType(Enum):
 #
 # 接通某業務的真實履約後，把對應項改為 True，並在 _activate_* 實作真實邏輯。
 _FULFILLMENT_ENABLED = {
-    BusinessType.MEMBERSHIP.value: False,  # 有 users 表寫入口徑，但無現成服務，待接通
+    BusinessType.MEMBERSHIP.value: True,   # ✅ 已接通：扣款成功後寫 users 會員等級+到期（見 _activate_membership）
     BusinessType.IP_PROXY.value: False,    # 無面向用戶售賣的代理履約服務
     BusinessType.QUOTA_PACK.value: False,  # QuotaService 無 add；purchase_pack 與限額檢查脫節
 }
+
+
+def _normalize_membership_level(tier: str) -> str:
+    """把購買傳入的 tier（可能是 free/basic/pro/enterprise 或六級名）正規化為
+    users.membership_level 的六級值域（bronze/silver/gold/diamond/star/king）。
+
+    背景：前端購買方案傳 SaaS 風格 tier（basic/pro/enterprise），但 users 表
+    與卡密/extend 路徑都用六級。若不正規化直接寫入，auth/me 顯示與配額會錯亂。
+    """
+    try:
+        from core.level_config import MembershipLevel
+        return MembershipLevel.from_string(tier or 'free').value
+    except Exception:
+        fallback = {'free': 'bronze', 'basic': 'silver', 'pro': 'gold', 'enterprise': 'king'}
+        t = (tier or '').strip().lower()
+        if t in ('bronze', 'silver', 'gold', 'diamond', 'star', 'king'):
+            return t
+        return fallback.get(t, 'bronze')
 
 
 @dataclass
@@ -204,19 +222,101 @@ class BusinessIntegrationService:
         request: PurchaseRequest, 
         order_id: str
     ) -> Dict[str, Any]:
-        """激活會員（fail-closed：真實履約尚未接通）"""
-        # 🔴 fail-closed：舊代碼在此僅 log + 回傳假到期時間，不寫任何持久化。
-        # 正確接通路徑（待實作）：扣款成功後更新 users 表會員等級與到期，
-        # 對齊 admin/handlers.extend_user 使用的 schema_adapter.get_update_level_query /
-        # get_update_expires_query（同步 membership_level/subscription_tier 與
-        # expires_at/subscription_expires），使 GET /api/v1/auth/me 能讀到。
-        # 未接通前一律返回失敗，由 purchase() 觸發自動退款（雙重保險，
-        # 正常情況下 purchase 入口的 _FULFILLMENT_ENABLED 守衛已先攔下）。
-        logger.warning(
-            f"_activate_membership called but fulfillment not implemented: "
-            f"user={request.user_id}, plan={request.item_id}, order={order_id}"
-        )
-        return {'success': False, 'error': '會員履約服務尚未接通'}
+        """激活會員：扣款成功後真實寫入 users 表會員等級與到期時間。
+
+        設計要點：
+        - 值域正規化：tier → 六級（_normalize_membership_level），兩欄同寫同一值
+        - 雙欄同步：membership_level/subscription_tier + expires_at/subscription_expires
+          （對齊 auth/me 的讀取與 extend_user 的寫入口徑）
+        - 到期延長：在「現有到期或現在」較晚者基礎上 +duration_days（續費不吃虧）
+        - 事務性：單條 UPDATE + commit；失敗回傳 False 由 purchase() 自動退款
+        - 定位：users 表 id 與 user_id 皆為同一 UUID，用 (id=? OR user_id=?) 兼容兩套 schema
+        """
+        try:
+            metadata = request.metadata or {}
+            duration_days = int(metadata.get('duration_days', 30) or 30)
+            raw_tier = metadata.get('tier') or request.item_id or 'basic'
+            level = _normalize_membership_level(raw_tier)
+
+            from core.db_utils import create_connection
+            conn = create_connection()
+            try:
+                cursor = conn.cursor()
+                # 確認用戶存在（付費用戶必然已登入，理論上一定存在）
+                urow = cursor.execute(
+                    "SELECT id, user_id, expires_at, subscription_expires FROM users "
+                    "WHERE id = ? OR user_id = ? LIMIT 1",
+                    (request.user_id, request.user_id)
+                ).fetchone()
+                if not urow:
+                    return {'success': False, 'error': f'用戶不存在: {request.user_id}'}
+
+                # 動態偵測存在的欄位（兼容 LICENSE / SAAS / both）
+                cols = {c[1] for c in cursor.execute("PRAGMA table_info(users)").fetchall()}
+                has_sub_tier = 'subscription_tier' in cols
+                has_sub_exp = 'subscription_expires' in cols
+                has_expires = 'expires_at' in cols
+
+                # 計算新到期：max(現有到期, now) + duration_days
+                now = datetime.now()
+                base = now
+                cur_exp = None
+                try:
+                    cur_val = (urow['expires_at'] if has_expires else None) or \
+                              (urow['subscription_expires'] if has_sub_exp else None)
+                    if cur_val:
+                        cur_exp = datetime.fromisoformat(str(cur_val))
+                except Exception:
+                    cur_exp = None
+                if cur_exp and cur_exp > now:
+                    base = cur_exp
+                new_expires = (base + timedelta(days=duration_days)).isoformat()
+
+                # 組裝 UPDATE：只更新存在的欄位
+                set_parts = ['membership_level = ?']
+                params = [level]
+                if has_sub_tier:
+                    set_parts.append('subscription_tier = ?')
+                    params.append(level)
+                if has_expires:
+                    set_parts.append('expires_at = ?')
+                    params.append(new_expires)
+                if has_sub_exp:
+                    set_parts.append('subscription_expires = ?')
+                    params.append(new_expires)
+                if 'updated_at' in cols:
+                    set_parts.append('updated_at = ?')
+                    params.append(now.isoformat())
+                params.extend([request.user_id, request.user_id])
+
+                cursor.execute(
+                    f"UPDATE users SET {', '.join(set_parts)} WHERE id = ? OR user_id = ?",
+                    params
+                )
+                if cursor.rowcount == 0:
+                    conn.rollback()
+                    return {'success': False, 'error': '會員更新失敗（未命中用戶）'}
+                conn.commit()
+            finally:
+                conn.close()
+
+            logger.info(
+                f"Membership activated: user={request.user_id}, level={level}, "
+                f"days={duration_days}, expires={new_expires}, order={order_id}"
+            )
+            return {
+                'success': True,
+                'membership': {
+                    'level': level,
+                    'tier': level,
+                    'duration_days': duration_days,
+                    'expires_at': new_expires,
+                    'order_id': order_id
+                }
+            }
+        except Exception as e:
+            logger.error(f"Activate membership error: {e}")
+            return {'success': False, 'error': str(e)}
     
     async def _activate_ip_proxy(
         self, 

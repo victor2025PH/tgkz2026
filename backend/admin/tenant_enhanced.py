@@ -20,10 +20,18 @@ from dataclasses import dataclass, field
 from enum import Enum
 from decimal import Decimal
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+# 注意：本檔案的 tenant_enhanced.db（配額/報表/成本分攤）與
+# core/tenant_database.py（多租戶 SaaS 每租戶獨立 db）是完全獨立的兩套機制，
+# 僅共用 core.db_utils 的路徑解析工具，不共用資料庫檔案或表結構。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'tenant_enhanced.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 tenant_enhanced.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'tenant_enhanced.db')
 
 
 class QuotaType(str, Enum):
@@ -105,7 +113,7 @@ class TenantEnhancedManager:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 租戶配置表
@@ -205,7 +213,7 @@ class TenantEnhancedManager:
     
     def _init_default_costs(self):
         """初始化默認成本配置"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('SELECT COUNT(*) FROM cost_allocation')
@@ -238,7 +246,7 @@ class TenantEnhancedManager:
     ) -> bool:
         """註冊租戶"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             now = datetime.now().isoformat()
@@ -272,7 +280,7 @@ class TenantEnhancedManager:
     
     def get_tenant(self, tenant_id: str) -> Optional[Dict]:
         """獲取租戶信息"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM tenant_configs WHERE tenant_id = ?', (tenant_id,))
         row = cursor.fetchone()
@@ -292,7 +300,7 @@ class TenantEnhancedManager:
     
     def list_tenants(self, active_only: bool = True) -> List[Dict]:
         """列出所有租戶"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM tenant_configs'
@@ -326,7 +334,7 @@ class TenantEnhancedManager:
     ) -> bool:
         """設置配額"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             now = datetime.now().isoformat()
@@ -352,7 +360,7 @@ class TenantEnhancedManager:
     
     def get_quotas(self, tenant_id: str) -> List[Dict]:
         """獲取租戶配額"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM resource_quotas WHERE tenant_id = ?', (tenant_id,))
         rows = cursor.fetchall()
@@ -388,7 +396,7 @@ class TenantEnhancedManager:
         amount: float
     ) -> Dict[str, Any]:
         """使用配額"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         quota_type_str = quota_type.value if isinstance(quota_type, QuotaType) else quota_type
@@ -502,7 +510,7 @@ class TenantEnhancedManager:
         unacknowledged_only: bool = True
     ) -> List[Dict]:
         """獲取配額預警"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM quota_alerts WHERE 1=1'
@@ -535,7 +543,7 @@ class TenantEnhancedManager:
     def acknowledge_alert(self, alert_id: str) -> bool:
         """確認預警"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             cursor.execute('UPDATE quota_alerts SET acknowledged = 1 WHERE id = ?', (alert_id,))
             conn.commit()
@@ -546,7 +554,7 @@ class TenantEnhancedManager:
     
     def reset_quota(self, tenant_id: str, quota_type: QuotaType = None):
         """重置配額使用量"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         now = datetime.now().isoformat()
@@ -595,7 +603,7 @@ class TenantEnhancedManager:
         quotas = self.get_quotas(tenant_id)
         
         # 獲取使用歷史
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -646,7 +654,7 @@ class TenantEnhancedManager:
         }
         
         # 保存報表
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO tenant_reports 
@@ -668,7 +676,7 @@ class TenantEnhancedManager:
         limit: int = 50
     ) -> List[Dict]:
         """列出報表"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT id, tenant_id, report_type, period_start, period_end, total_cost, generated_at FROM tenant_reports WHERE 1=1'
@@ -701,7 +709,7 @@ class TenantEnhancedManager:
     
     def get_report(self, report_id: str) -> Optional[Dict]:
         """獲取報表詳情"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM tenant_reports WHERE id = ?', (report_id,))
         row = cursor.fetchone()

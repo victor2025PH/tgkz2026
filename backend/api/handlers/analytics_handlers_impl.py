@@ -155,8 +155,11 @@ async def handle_get_alerts(self, payload: Dict[str, Any]):
         else:
             alerts = await db.get_recent_alerts(limit, level)
         
-        # 計算摘要
-        active_alerts = [a for a in alerts if isinstance(a, dict) and a.get('status') != 'resolved'] if alerts else []
+        # 計算摘要（表欄位為 resolved INTEGER，非 status 字串）
+        active_alerts = [
+            a for a in alerts
+            if isinstance(a, dict) and not a.get('resolved')
+        ] if alerts else []
         summary = {
             'total': len(alerts) if alerts else 0,
             'active': len(active_alerts),

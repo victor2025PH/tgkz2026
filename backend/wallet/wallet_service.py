@@ -16,6 +16,7 @@ import os
 import sqlite3
 import logging
 import threading
+import uuid
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any, Tuple, List
@@ -464,7 +465,7 @@ class WalletService:
             transaction = Transaction(
                 wallet_id=wallet.id,
                 user_id=user_id,
-                order_id=order_id or f"ADD{int(datetime.now().timestamp())}{wallet.id[:8]}",
+                order_id=order_id or f"ADD_{uuid.uuid4().hex[:16]}",
                 type=TransactionType.RECHARGE.value,
                 amount=amount,
                 bonus_amount=bonus_amount,
@@ -637,7 +638,7 @@ class WalletService:
             transaction = Transaction(
                 wallet_id=wallet.id,
                 user_id=user_id,
-                order_id=order_id or f"CSM{int(datetime.now().timestamp())}{wallet.id[:8]}",
+                order_id=order_id or f"CSM_{uuid.uuid4().hex[:16]}",
                 type=TransactionType.CONSUME.value,
                 amount=-amount,  # 消費為負數
                 bonus_amount=-bonus_deduct if bonus_deduct > 0 else 0,
@@ -731,8 +732,8 @@ class WalletService:
         try:
             cursor.execute('BEGIN IMMEDIATE')
             
-            # 生成唯一訂單號
-            order_id = f"ADJ_{datetime.now().strftime('%Y%m%d%H%M%S')}_{user_id[:8]}"
+            # 生成唯一訂單號（uuid，避免同秒併發碰撞）
+            order_id = f"ADJ_{uuid.uuid4().hex[:16]}"
             
             # 獲取當前錢包狀態（使用正確的表名和 ID 欄位）
             table_name = self._wallet_table

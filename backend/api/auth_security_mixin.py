@@ -31,11 +31,12 @@ class AuthSecurityMixin:
         try:
             from auth.geo_security import get_geo_security
             
-            user = request.get('user')
-            if not user:
+            # 中介層寫入 request['auth']（AuthContext），非 request['user']
+            auth_ctx = request.get('auth')
+            if not auth_ctx or not auth_ctx.is_authenticated or not auth_ctx.user:
                 return self._json_response({'success': False, 'error': '未認證'}, 401)
             
-            user_id = user.get('user_id') or user.get('id')
+            user_id = auth_ctx.user.id
             unacknowledged_only = request.query.get('unacknowledged', 'false').lower() == 'true'
             
             service = get_geo_security()
@@ -61,11 +62,12 @@ class AuthSecurityMixin:
         try:
             from auth.geo_security import get_geo_security
             
-            user = request.get('user')
-            if not user:
+            # 中介層寫入 request['auth']（AuthContext），非 request['user']
+            auth_ctx = request.get('auth')
+            if not auth_ctx or not auth_ctx.is_authenticated or not auth_ctx.user:
                 return self._json_response({'success': False, 'error': '未認證'}, 401)
             
-            user_id = user.get('user_id') or user.get('id')
+            user_id = auth_ctx.user.id
             event_id = int(request.match_info['event_id'])
             
             service = get_geo_security()

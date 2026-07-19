@@ -368,6 +368,36 @@ class PurchaseHandlers:
         except Exception as e:
             logger.error(f"Unified purchase error: {e}")
             return self._error_response(str(e), "PURCHASE_ERROR", 500)
+    
+    # ==================== 方案列表（公開，供前端展示）====================
+    
+    async def list_membership_plans(self, request: web.Request) -> web.Response:
+        """GET /api/membership/plans — 返回權威會員方案（價格來自服務端）"""
+        try:
+            from .plan_catalog import list_membership_plans
+            cycle = request.query.get('cycle', 'monthly')
+            return self._success_response(list_membership_plans(cycle))
+        except Exception as e:
+            logger.error(f"List membership plans error: {e}")
+            return self._error_response(str(e), "LIST_ERROR", 500)
+    
+    async def list_quota_packs(self, request: web.Request) -> web.Response:
+        """GET /api/quota/packs — 返回權威配額包"""
+        try:
+            from .plan_catalog import list_quota_packs
+            return self._success_response(list_quota_packs())
+        except Exception as e:
+            logger.error(f"List quota packs error: {e}")
+            return self._error_response(str(e), "LIST_ERROR", 500)
+    
+    async def list_proxy_packages(self, request: web.Request) -> web.Response:
+        """GET /api/proxy/packages — 返回權威代理套餐（目前為空，履約未開通）"""
+        try:
+            from .plan_catalog import list_proxy_packages
+            return self._success_response(list_proxy_packages())
+        except Exception as e:
+            logger.error(f"List proxy packages error: {e}")
+            return self._error_response(str(e), "LIST_ERROR", 500)
 
 
 # ==================== 路由設置 ====================
@@ -380,6 +410,10 @@ def setup_purchase_routes(app: web.Application):
     app.router.add_post('/api/purchase/membership', handlers.purchase_membership)
     app.router.add_post('/api/purchase/proxy', handlers.purchase_ip_proxy)
     app.router.add_post('/api/purchase/quota', handlers.purchase_quota_pack)
+    # 方案列表（公開）
+    app.router.add_get('/api/membership/plans', handlers.list_membership_plans)
+    app.router.add_get('/api/quota/packs', handlers.list_quota_packs)
+    app.router.add_get('/api/proxy/packages', handlers.list_proxy_packages)
     
     logger.info("✅ Purchase API routes registered")
 

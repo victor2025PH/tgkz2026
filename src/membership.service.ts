@@ -563,7 +563,7 @@ export class MembershipService {
       'free': 'bronze',
       'basic': 'silver',
       'pro': 'gold',
-      'enterprise': 'diamond',
+      'enterprise': 'king',  // 🔧 对齐后端 level_config.from_string(enterprise)→king
       'bronze': 'bronze',
       'silver': 'silver',
       'gold': 'gold',

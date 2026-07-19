@@ -7,12 +7,22 @@ import os
 import io
 
 # 🔧 P0: 強制設置 stdin/stdout/stderr 為 UTF-8 編碼（解決 Windows GBK 問題）
+# 🔧 根因修復：舊寫法 `sys.stdin = io.TextIOWrapper(sys.stdin.buffer, ...)` 會讓
+# 原本的 TextIOWrapper 失去引用；它被 GC 回收時會關閉底層 buffer，導致新 wrapper
+# 在之後某個不確定時刻（取決於 GC）readline()/print() 拋出
+# "ValueError: I/O operation on closed file"，整個後端崩潰（Electron IPC 斷線的元兇）。
+# 改用 reconfigure() 原地變更編碼（Python 3.7+，倉庫其他入口一致用法），不產生孤兒 wrapper。
 if sys.platform == 'win32':
-    # 🆕 設置 stdin 為 UTF-8（關鍵：接收來自 Electron 的中文關鍵詞）
-    sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8', errors='replace')
-    # 設置 stdout 為 UTF-8，並忽略編碼錯誤
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+    for _stream, _kwargs in (
+        (sys.stdin, {'encoding': 'utf-8', 'errors': 'replace'}),
+        (sys.stdout, {'encoding': 'utf-8', 'errors': 'replace', 'line_buffering': True}),
+        (sys.stderr, {'encoding': 'utf-8', 'errors': 'replace', 'line_buffering': True}),
+    ):
+        try:
+            if _stream is not None and hasattr(_stream, 'reconfigure'):
+                _stream.reconfigure(**_kwargs)
+        except (ValueError, OSError):
+            pass  # 流已關閉或不支持（如 pythonw），保持原樣
 
 # 🔧 立即輸出啟動信號（用於診斷）
 print('{"event":"backend-starting","payload":{"status":"initializing"}}', flush=True)
@@ -1423,12 +1433,19 @@ class BackendService(InitStartupMixin, SendQueueMixin, AiServiceMixin, ConfigExe
         try:
             while self.running:
                 # Read line from stdin (non-blocking)
-                line = await asyncio.get_event_loop().run_in_executor(
-                    None, sys.stdin.readline
-                )
+                try:
+                    line = await asyncio.get_event_loop().run_in_executor(
+                        None, sys.stdin.readline
+                    )
+                except ValueError:
+                    # 🔧 stdin 底層檔案已被關閉（父進程死亡/管道斷開/句柄轉發失效）。
+                    # 舊代碼在此直接拋 Traceback 崩潰；語義上等同 EOF，走優雅關閉。
+                    print("[Backend] stdin closed (ValueError), shutting down gracefully", file=sys.stderr)
+                    break
                 
                 if not line:
                     # EOF - stdin closed
+                    print("[Backend] stdin EOF received, shutting down gracefully", file=sys.stderr)
                     break
                 
                 line = line.strip()

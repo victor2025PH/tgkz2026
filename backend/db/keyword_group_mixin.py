@@ -120,12 +120,17 @@ class KeywordGroupMixin:
                 )
             ''')
             
-            # 🔧 P0: 遷移 — 給已有表補 user_id 列（SQLite ALTER TABLE 安全，列已存在時忽略）
+            # 🔧 P0: 遷移 — 給已有表補 user_id 列
+            # 先查 PRAGMA 確認缺列才 ALTER，避免每次啟動都觸發
+            # "duplicate column name" 被 execute 記成 ERROR 日誌（噪音誤導排查）
             for tbl in ('ai_models', 'ai_settings'):
                 try:
-                    await self.execute(f"ALTER TABLE {tbl} ADD COLUMN user_id TEXT DEFAULT ''")
+                    cols = await self.fetch_all(f"PRAGMA table_info({tbl})")
+                    col_names = {c['name'] if isinstance(c, dict) else c[1] for c in (cols or [])}
+                    if 'user_id' not in col_names:
+                        await self.execute(f"ALTER TABLE {tbl} ADD COLUMN user_id TEXT DEFAULT ''")
                 except Exception:
-                    pass  # 列已存在
+                    pass  # 表不存在等边缘情况，建表语句已在上方处理
             
             # 關鍵詞表
             await self.execute('''

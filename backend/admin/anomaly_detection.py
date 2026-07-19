@@ -329,10 +329,13 @@ class AnomalyDetectionManager:
         if self._initialized:
             return
         
-        self._initialized = True
-        self._init_db()
+        # 🔧 修復：_init_db() 內部會呼叫 _load_detectors()（向 self._detectors 寫入），
+        # 因此容器必須在 _init_db() 之前就緒，否則每次啟動都 AttributeError；
+        # 且 _initialized 必須在全部成功後才設 True，失敗時允許下次重試。
         self._detectors: Dict[str, StatisticalDetector] = {}
         self._anomaly_handlers: List = []
+        self._init_db()
+        self._initialized = True
     
     def _init_db(self):
         """初始化數據庫"""

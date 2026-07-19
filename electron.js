@@ -300,6 +300,10 @@ let logFilePath = null;
 // 🆕 P0: 後端準備狀態
 let backendReadyForUI = false;
 
+// 🔧 後端崩潰自動重啟的計數與上限（就緒成功後歸零）
+let backendRestartCount = 0;
+const MAX_BACKEND_RESTARTS = 5;
+
 // 🆕 P0: 寫入日誌文件
 function writeLog(message, level = 'INFO') {
   const timestamp = new Date().toISOString();
@@ -841,63 +845,60 @@ app.on('quit', () => {
 // --- Python Backend Management ---
 
 function findPythonExecutable() {
-    // In packaged app, try to find Python in common locations
-    if (app.isPackaged) {
-        const possiblePaths = [];
+    // 🔧 修復：一律優先解析「絕對路徑」的真實 python.exe（不再僅限打包模式）。
+    // 原因：裸字串 'python' 交給 PATH 解析時，可能命中 Windows Store 的
+    // AppExecutionAlias shim（WindowsApps\python.exe）——shim 會另起真正的
+    // python 進程，導致進程樹斷裂（kill 殺不到）且 stdin 管道句柄傳遞不可靠
+    // （實測出現 "ValueError: I/O operation on closed file"）。
+    const possiblePaths = [];
+    
+    if (process.platform === 'win32') {
+        // Windows: Check common Python installation paths
+        const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+        const localAppData = process.env['LOCALAPPDATA'] || path.join(process.env['USERPROFILE'] || '', 'AppData', 'Local');
         
-        if (process.platform === 'win32') {
-            // Windows: Check common Python installation paths
-            const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
-            const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
-            const localAppData = process.env['LOCALAPPDATA'] || path.join(process.env['USERPROFILE'] || '', 'AppData', 'Local');
-            
-            possiblePaths.push(
-                path.join(programFiles, 'Python313', 'python.exe'),
-                path.join(programFiles, 'Python312', 'python.exe'),
-                path.join(programFiles, 'Python311', 'python.exe'),
-                path.join(programFiles, 'Python310', 'python.exe'),
-                path.join(localAppData, 'Programs', 'Python', 'Python313', 'python.exe'),
-                path.join(localAppData, 'Programs', 'Python', 'Python312', 'python.exe'),
-                path.join(localAppData, 'Programs', 'Python', 'Python311', 'python.exe'),
-                path.join(localAppData, 'Programs', 'Python', 'Python310', 'python.exe')
-            );
-        } else {
-            // Linux/macOS: Check common paths
-            possiblePaths.push(
-                '/usr/bin/python3',
-                '/usr/local/bin/python3',
-                '/opt/homebrew/bin/python3',
-                path.join(process.env['HOME'] || '', '.local', 'bin', 'python3')
-            );
-        }
-        
-        // Try to find Python in PATH first
-        const pythonInPath = process.platform === 'win32' ? 'python' : 'python3';
-        
-        // Check if Python is in PATH
+        possiblePaths.push(
+            path.join(localAppData, 'Programs', 'Python', 'Python313', 'python.exe'),
+            path.join(localAppData, 'Programs', 'Python', 'Python312', 'python.exe'),
+            path.join(localAppData, 'Programs', 'Python', 'Python311', 'python.exe'),
+            path.join(localAppData, 'Programs', 'Python', 'Python310', 'python.exe'),
+            path.join(programFiles, 'Python313', 'python.exe'),
+            path.join(programFiles, 'Python312', 'python.exe'),
+            path.join(programFiles, 'Python311', 'python.exe'),
+            path.join(programFiles, 'Python310', 'python.exe')
+        );
+    } else {
+        // Linux/macOS: Check common paths
+        possiblePaths.push(
+            '/usr/bin/python3',
+            '/usr/local/bin/python3',
+            '/opt/homebrew/bin/python3',
+            path.join(process.env['HOME'] || '', '.local', 'bin', 'python3')
+        );
+    }
+    
+    for (const pythonPath of possiblePaths) {
         try {
-            require('child_process').execSync(`${pythonInPath} --version`, { stdio: 'ignore' });
-            return pythonInPath;
-        } catch (e) {
-            // Python not in PATH, try possible paths
-            for (const pythonPath of possiblePaths) {
-                try {
-                    if (fs.existsSync(pythonPath)) {
-                        require('child_process').execSync(`"${pythonPath}" --version`, { stdio: 'ignore' });
-                        return pythonPath;
-                    }
-                } catch (e) {
-                    // Continue to next path
-                }
+            if (fs.existsSync(pythonPath)) {
+                require('child_process').execSync(`"${pythonPath}" --version`, { stdio: 'ignore' });
+                return pythonPath;
             }
+        } catch (e) {
+            // Continue to next path
         }
     }
     
-    // Fallback to default
+    // Fallback: PATH 裡的 python（僅當找不到任何絕對路徑安裝時）
     return process.platform === 'win32' ? 'python' : 'python3';
 }
 
 function startPythonBackend() {
+    // 🔧 單實例守護：已有存活後端時不得重複 spawn。
+    // 實測曾出現雙後端同時運行：互搶 SQLite、stdin 管道混亂、殭屍進程。
+    if (pythonProcess && !pythonProcess.killed) {
+        writeLog('startPythonBackend skipped: backend already running (PID: ' + pythonProcess.pid + ')', 'WARN');
+        return;
+    }
     writeLog('========== Starting Python Backend ==========');
     updateSplashStatus('正在啟動後端服務...', 70);
     
@@ -1025,7 +1026,12 @@ function startPythonBackend() {
         pythonProcess = spawn(backendPath, backendArgs, {
             cwd: workingDir,
             stdio: ['pipe', 'pipe', 'pipe'],
-            shell: !useExe,  // exe 不需要 shell
+            // 🔧 修復：一律不經 shell。舊代碼開發模式 shell:true 讓 Node 追蹤的是
+            // cmd.exe 包裝進程而非 python 本體：cmd 一退出就誤觸發 on('exit') 重啟，
+            // 真正的 python 淪為殭屍（taskkill 樹殺也打不到），stdin 句柄經多層
+            // 轉發後不可靠。findPythonExecutable() 已回傳絕對路徑，無需 shell 解析。
+            shell: false,
+            windowsHide: true,
             env: {
                 ...process.env,
                 PYTHONUNBUFFERED: '1',
@@ -1097,8 +1103,12 @@ function startPythonBackend() {
         }
         
         // 🆕 P1: 當收到初始化完成的標誌時，才標記為 UI 可用
-        if (!backendReadyForUI && (rawData.includes('後端初始化完成') || rawData.includes('Initialization complete') || rawData.includes('"event"'))) {
+        // 🔧 修復：舊條件含 rawData.includes('"event"')——後端第一條輸出
+        // {"event":"backend-starting"}（初始化「開始」信號）就會誤判為就緒，
+        // 比真實就緒早數十秒。現只認顯式 backend-ready 事件與完成文案。
+        if (!backendReadyForUI && (rawData.includes('"backend-ready"') || rawData.includes('後端初始化完成') || rawData.includes('Initialization complete'))) {
             backendReadyForUI = true;
+            backendRestartCount = 0;  // 成功就緒後重置重啟計數
             clearTimeout(healthCheckTimeout);
             writeLog('Backend fully initialized, ready for UI');
             updateSplashStatus('後端服務已就緒，正在載入界面...', 95);
@@ -1212,17 +1222,38 @@ function startPythonBackend() {
     pythonProcess.on('exit', (code, signal) => {
         writeLog(`Backend process exited with code ${code}, signal ${signal}`);
         pythonProcess = null;
+        const wasReady = backendReadyForUI;
+        backendReadyForUI = false;  // 🔧 進程已死，就緒狀態同步復位（舊代碼遺漏，導致重啟後判斷失真）
         
         // 🆕 P0: 如果後端還沒準備好就退出了，顯示錯誤
-        if (!backendReadyForUI) {
+        if (!wasReady) {
             const errorMsg = `後端進程異常退出 (code: ${code})`;
             writeLog(errorMsg, 'ERROR');
             updateSplashStatus(null, null, errorMsg + '，請查看日誌');
         }
         
+        // 通知前端後端已離線
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('backend-status', {
+                running: false,
+                error: code === 0 ? null : `後端進程退出 (code: ${code})`
+            });
+        }
+        
         // Restart if not intentionally closed and not shutting down
+        // 🔧 加重啟上限：崩潰循環時最多重試 MAX_BACKEND_RESTARTS 次，避免無限重生
         if (!isShuttingDown && code !== 0 && mainWindow && !mainWindow.isDestroyed()) {
-            writeLog('Restarting Python backend in 2 seconds...');
+            if (backendRestartCount >= MAX_BACKEND_RESTARTS) {
+                writeLog(`Backend restart limit reached (${MAX_BACKEND_RESTARTS}), giving up`, 'ERROR');
+                mainWindow.webContents.send('backend-status', {
+                    running: false,
+                    error: '後端連續崩潰，已停止自動重啟',
+                    suggestion: '請查看日誌後手動重啟應用'
+                });
+                return;
+            }
+            backendRestartCount++;
+            writeLog(`Restarting Python backend in 2 seconds... (attempt ${backendRestartCount}/${MAX_BACKEND_RESTARTS})`);
             setTimeout(() => startPythonBackend(), 2000);
         }
     });

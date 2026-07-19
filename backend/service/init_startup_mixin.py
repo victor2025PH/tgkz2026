@@ -907,6 +907,8 @@ class InitStartupMixin:
         total_init_time = time.time() - init_start_time
         print(f"[Backend] ========== Initialization complete in {total_init_time:.3f}s ==========", file=sys.stderr)
         self.send_log(f"✓ 後端初始化完成 ({total_init_time:.2f}s)", "success")
+        # 🔧 顯式就緒事件：Electron 據此（而非第一條 stdout）判定後端真正可用
+        self.send_event("backend-ready", {"status": "ready", "init_seconds": round(total_init_time, 2)})
         
         # 🆕 發送數據路徑信息到前端（便於調試）
         try:

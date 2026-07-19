@@ -58,6 +58,7 @@ def _register_saas_api_stats_capacity_routes(app):
 
     # 購買訂單對賬（JWT admin）
     app.router.add_get('/api/v1/admin/purchase-orders', stats.http_admin_purchase_orders)
+    app.router.add_post('/api/v1/admin/purchase-orders/{order_id}/refund', stats.http_admin_refund_purchase_order)
 
     logger.info("✅ SaaS api-stats / capacity routes registered under /api/v1/admin/")
 

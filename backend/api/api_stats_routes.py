@@ -496,18 +496,88 @@ async def http_admin_purchase_orders(request):
     """GET /api/v1/admin/purchase-orders — 購買訂單對賬（JWT admin）
 
     支持 ?status=completed|refunded|... &limit=&offset= 篩選分頁；
-    複用 wallet.purchase_orders.PurchaseOrderStore.list_all。
+    回傳 {items, total}（total 供前端精確分頁）。
     """
     denied = _require_admin(request)
     if denied is not None:
         return denied
     try:
         from wallet.purchase_orders import get_purchase_order_store
+        store = get_purchase_order_store()
         status = request.query.get('status') or None
         limit = min(int(request.query.get('limit', '100')), 500)
         offset = int(request.query.get('offset', '0'))
-        orders = get_purchase_order_store().list_all(status=status, limit=limit, offset=offset)
-        return web.json_response({'success': True, 'data': orders})
+        orders = store.list_all(status=status, limit=limit, offset=offset)
+        total = store.count(status=status)
+        # 兼容舊前端：data 仍為陣列；另附 total
+        return web.json_response({'success': True, 'data': orders, 'total': total})
     except Exception as e:
         print(f"[api_stats_routes] admin/purchase-orders 失敗: {e}", file=sys.stderr)
+        return web.json_response({'success': False, 'error': str(e)}, status=500)
+
+
+def _admin_id(request) -> str:
+    """從已通過 _require_admin 的請求取管理員 user_id（審計用）。"""
+    tenant = request.get('tenant')
+    uid = getattr(tenant, 'user_id', None) if tenant else None
+    if not uid:
+        auth_ctx = request.get('auth')
+        user = getattr(auth_ctx, 'user', None) if auth_ctx else None
+        uid = getattr(user, 'id', None) if user else None
+    return str(uid or 'admin')
+
+
+async def http_admin_refund_purchase_order(request):
+    """POST /api/v1/admin/purchase-orders/{order_id}/refund — 客服退款（JWT admin）
+
+    只允許退「已完成(completed)」訂單；全額退回錢包餘額（金額以原扣款為權威，
+    不接受前端金額）；退款成功後標記 purchase_order 為 refunded。冪等：非 completed
+    直接拒絕；錢包層 order_id 亦有「已退款」二道防線。
+    ⚠️ 會員/配額等權益不自動撤銷（避免覆蓋購買後的其他變更），如需撤銷由客服另行處理。
+    """
+    denied = _require_admin(request)
+    if denied is not None:
+        return denied
+    order_id = request.match_info.get('order_id', '')
+    try:
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        reason = (body.get('reason') or '客服後台退款').strip()
+
+        from wallet.purchase_orders import get_purchase_order_store, PurchaseOrderStatus
+        store = get_purchase_order_store()
+        order = store.get(order_id)
+        if not order:
+            return web.json_response({'success': False, 'error': '訂單不存在'}, status=404)
+        if order.get('status') != PurchaseOrderStatus.COMPLETED:
+            return web.json_response(
+                {'success': False, 'error': f"只能退款已完成訂單（當前狀態：{order.get('status')}）"},
+                status=400
+            )
+
+        from wallet.wallet_service import get_wallet_service
+        ok, msg, tx = get_wallet_service().refund(
+            user_id=order['user_id'],
+            original_order_id=order_id,
+            amount=None,  # 全額（= 原扣款權威金額）
+            reason=reason,
+            operator_id=_admin_id(request),
+        )
+        if ok:
+            store.mark_refunded(order_id, reason)
+            return web.json_response({
+                'success': True,
+                'message': '退款成功',
+                'data': {'order_id': order_id, 'refund_transaction_id': getattr(tx, 'id', None),
+                         'note': '會員/配額權益未自動撤銷，如需撤銷請另行處理'}
+            })
+        # 錢包層已退但 purchase_order 未同步 → 修正狀態一致性
+        if msg and ('已退款' in msg):
+            store.mark_refunded(order_id, reason)
+            return web.json_response({'success': False, 'error': '該訂單已退款（已同步狀態）'}, status=409)
+        return web.json_response({'success': False, 'error': msg or '退款失敗'}, status=400)
+    except Exception as e:
+        print(f"[api_stats_routes] admin/refund 失敗: {e}", file=sys.stderr)
         return web.json_response({'success': False, 'error': str(e)}, status=500)

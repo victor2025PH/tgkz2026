@@ -208,6 +208,18 @@ class PurchaseOrderStore:
         finally:
             conn.close()
 
+    def count(self, status: str = None) -> int:
+        """管理端對賬用：訂單總數（可按狀態）。"""
+        conn = self._conn()
+        try:
+            if status:
+                row = conn.execute('SELECT COUNT(*) AS c FROM purchase_orders WHERE status = ?', (status,)).fetchone()
+            else:
+                row = conn.execute('SELECT COUNT(*) AS c FROM purchase_orders').fetchone()
+            return int(row['c'] if row else 0)
+        finally:
+            conn.close()
+
 
 _store: Optional[PurchaseOrderStore] = None
 

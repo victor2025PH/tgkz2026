@@ -2086,12 +2086,10 @@ ipcMain.on('export-leads-to-excel', async (event, leads) => {
 });
 
 
-// This will be used in the next step to create a dummy preload file
-// to avoid an error on startup.
-const preloadContent = `
-// This file is intentionally left blank for now.
-// In a production app, it would be used to securely expose
-// specific 'ipcRenderer' functions to the frontend,
-// rather than enabling full nodeIntegration.
-`;
-fs.writeFileSync(path.join(__dirname, 'preload.js'), preloadContent);
+// 🔧 排查修復：這裡曾有一段「每次啟動都用空白佔位內容覆寫 preload.js」的
+// 遺留腳手架代碼（註釋原文是「這將用於下一步驟建立一個虛設的 preload 檔案」），
+// 但「下一步」從未真正發生——preload.js 早已作為真實檔案存在於版本控制中，
+// 這段代碼只是每次啟動時把它覆寫回空白內容，是一個潛在地雷：未來一旦有人往
+// preload.js 寫入真正的 contextBridge 安全邏輯（webPreferences 註釋裡提到的
+// "未來優化方向"），會被這裡靜默清空，且不會有任何錯誤提示。目前
+// preload.js 的內容本來就是這段佔位文字，故移除此覆寫不影響現有行為。

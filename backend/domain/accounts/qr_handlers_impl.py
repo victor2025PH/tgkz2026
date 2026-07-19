@@ -77,10 +77,26 @@ async def handle_qr_login_create(self, payload: Dict[str, Any]):
         _qr_pool_temp_key: Optional[str] = None
         if not (custom_api_id and custom_api_hash):
             try:
-                from config import QR_USE_API_POOL
+                from config import QR_USE_API_POOL, QR_POOL_ROLLOUT_PERCENT
             except Exception:
                 QR_USE_API_POOL = False
+                QR_POOL_ROLLOUT_PERCENT = 0
+
+            # 🎯 灰度放量判定：全開（QR_USE_API_POOL）視為 100%；否則按百分比
+            # 用隨機數決定「這一次」是否走池，讓運維可以先用小比例安全積累
+            # 真實數據。百分比為 0（默認值）時等同於原本的行為，完全不變。
+            _use_pool_this_time = False
+            _trigger_reason = "off"
             if QR_USE_API_POOL:
+                _use_pool_this_time = True
+                _trigger_reason = "forced_on"
+            elif QR_POOL_ROLLOUT_PERCENT > 0:
+                import random
+                if random.random() * 100 < QR_POOL_ROLLOUT_PERCENT:
+                    _use_pool_this_time = True
+                    _trigger_reason = f"canary_{QR_POOL_ROLLOUT_PERCENT}pct"
+
+            if _use_pool_this_time:
                 try:
                     import uuid
                     from core.api_pool_integration import get_api_for_login
@@ -92,7 +108,7 @@ async def handle_qr_login_create(self, payload: Dict[str, Any]):
                     if pool_source in ("platform", "platform_sqlite") and pool_api_id and pool_api_hash:
                         custom_api_id = pool_api_id
                         custom_api_hash = pool_api_hash
-                        print(f"[Backend] QR 登入從平台 API 池分配到專屬憑據 (api_id={pool_api_id}, source={pool_source})", file=sys.stderr)
+                        print(f"[Backend] QR 登入從平台 API 池分配到專屬憑據 (api_id={pool_api_id}, source={pool_source}, trigger={_trigger_reason})", file=sys.stderr)
                         try:
                             from core.api_pool_integration import record_qr_pool_allocation
                             record_qr_pool_allocation()
@@ -102,7 +118,7 @@ async def handle_qr_login_create(self, payload: Dict[str, Any]):
                         # 池為空/回退：不佔用任何資源，temp_key 置空，走原有公共 API 邏輯
                         _qr_pool_temp_key = None
                 except Exception as pool_err:
-                    print(f"[Backend] QR 登入 API 池分配失敗（不影響登入，回退公共 API）: {pool_err}", file=sys.stderr)
+                    print(f"[Backend] QR 登入 API 池分配失敗（不影響登入，回退公共 API，trigger={_trigger_reason}): {pool_err}", file=sys.stderr)
                     _qr_pool_temp_key = None
 
         if custom_api_id and custom_api_hash:

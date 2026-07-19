@@ -281,9 +281,29 @@ class AntiBanDefaults:
 
     QR_USE_API_POOL = os.environ.get('TG_QR_USE_API_POOL', '').lower() in ('true', '1', 'yes')
 
+    # 🎯 灰度放量百分比（0-100，默認 0 = 完全不變）。
+    #
+    # 背景：QR_USE_API_POOL 是「全開/全關」的二元開關，在拿到真實使用數據前
+    # 一直保持關閉，等於永遠拿不到數據去支持「該不該開」的判斷——這是一個
+    # 死鎖。灰度放量把決策從「開 or 不開」換成「開多大比例」，讓運維可以先用
+    # 5%、10% 這種小比例安全地開始積累真實池分配數據（成功率、池耗盡頻率、
+    # 未釋放佔用比例），再逐步調大到 100%，而不必一次性承擔全量風險。
+    #
+    # 優先級：QR_USE_API_POOL=true 時視為 100%（強制全開，行為不變）；
+    # 否則讀取 TG_QR_POOL_ROLLOUT_PERCENT，超出 0-100 範圍會被夾緊。
+    # 默認值 0 與之前的行為完全一致（不會有任何請求走池）。
+    try:
+        QR_POOL_ROLLOUT_PERCENT = int(os.environ.get('TG_QR_POOL_ROLLOUT_PERCENT', '0'))
+    except ValueError:
+        QR_POOL_ROLLOUT_PERCENT = 0
+    QR_POOL_ROLLOUT_PERCENT = max(0, min(100, QR_POOL_ROLLOUT_PERCENT))
+
 
 QR_USE_API_POOL = AntiBanDefaults.QR_USE_API_POOL
+QR_POOL_ROLLOUT_PERCENT = 100 if QR_USE_API_POOL else AntiBanDefaults.QR_POOL_ROLLOUT_PERCENT
 print(f"[Config] QR 登入接入 API 池 (QR_USE_API_POOL): {'啟用' if QR_USE_API_POOL else '關閉（默認，回退公共 API）'}", file=sys.stderr)
+if not QR_USE_API_POOL and QR_POOL_ROLLOUT_PERCENT > 0:
+    print(f"[Config]   └─ 灰度放量中: {QR_POOL_ROLLOUT_PERCENT}% 的 QR 登入請求會嘗試使用 API 池（觀測數據用）", file=sys.stderr)
 
 
 # ========== 🔧 Phase 3 優化：內存優化配置 ==========

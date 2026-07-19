@@ -21,10 +21,15 @@ from enum import Enum
 from collections import defaultdict
 import statistics
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'rca.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 rca.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'rca.db')
 
 
 class IncidentSeverity(str, Enum):
@@ -283,7 +288,7 @@ class RootCauseAnalyzer:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 事件表
@@ -395,7 +400,7 @@ class RootCauseAnalyzer:
         
         now = datetime.now().isoformat()
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -428,7 +433,7 @@ class RootCauseAnalyzer:
     
     def get_incident(self, incident_id: str) -> Optional[Dict]:
         """獲取事件"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM incidents WHERE id = ?', (incident_id,))
         row = cursor.fetchone()
@@ -470,7 +475,7 @@ class RootCauseAnalyzer:
         limit: int = 50
     ) -> List[Dict]:
         """列出事件"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT id, title, severity, status, affected_components, root_cause, created_at FROM incidents WHERE 1=1'
@@ -510,7 +515,7 @@ class RootCauseAnalyzer:
     ) -> bool:
         """更新事件狀態"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             updates = ["status = ?", "updated_at = ?"]
@@ -626,7 +631,7 @@ class RootCauseAnalyzer:
     
     def _match_symptom_patterns(self, symptoms: List[Dict]) -> List[Dict]:
         """匹配症狀模式"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM root_cause_knowledge ORDER BY confidence DESC, occurrence_count DESC')
         rows = cursor.fetchall()
@@ -722,7 +727,7 @@ class RootCauseAnalyzer:
         pattern = sorted([s.get('name', '') for s in symptoms])
         pattern_json = json.dumps(pattern)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 檢查是否已有類似模式
@@ -797,7 +802,7 @@ class RootCauseAnalyzer:
     
     def get_rca_stats(self) -> Dict[str, Any]:
         """獲取根因分析統計"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 事件統計

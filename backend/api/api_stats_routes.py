@@ -337,19 +337,43 @@ async def handle_capacity_history_alias(backend_service, payload=None) -> Dict[s
 # ==================== aiohttp REST handlers（JWT + tenant.role==admin）====================
 
 def _require_admin(request) -> Optional[Any]:
-    """檢查 SaaS JWT admin；失敗回傳 web.Response，成功回傳 None。"""
+    """
+    檢查 SaaS JWT admin；失敗回傳 web.Response，成功回傳 None。
+
+    同時相容：
+    - request['tenant'].role（tenant_middleware / auth_middleware）
+    - request['auth'].user.role（AuthContext，可能為 UserRole 枚舉）
+    """
     if web is None:
+        # 無 aiohttp 時不應走到 HTTP handler
         return None
+
+    role = None
     tenant = request.get('tenant')
-    if not tenant or getattr(tenant, 'role', None) != 'admin':
+    if tenant is not None:
+        role = getattr(tenant, 'role', None)
+
+    if role is None:
+        auth_ctx = request.get('auth')
+        user = getattr(auth_ctx, 'user', None) if auth_ctx else None
+        if user is not None:
+            role = getattr(user, 'role', None)
+
+    # UserRole 枚舉 → 字串
+    if role is not None and hasattr(role, 'value'):
+        role = role.value
+    role = str(role or '').lower().strip()
+
+    if role != 'admin':
         return web.json_response({'success': False, 'error': '需要管理員權限'}, status=403)
     return None
 
 
 async def http_api_stats_dashboard(request):
     """GET /api/v1/admin/api-stats/dashboard"""
+    # 注意：aiohttp Response 的 bool() 恆為 False，必須用 `is not None`
     denied = _require_admin(request)
-    if denied:
+    if denied is not None:
         return denied
     result = await get_dashboard_data()
     status = 200 if result.get('success') else 500
@@ -359,7 +383,7 @@ async def http_api_stats_dashboard(request):
 async def http_api_stats_clear_alerts(request):
     """POST /api/v1/admin/api-stats/clear-alerts"""
     denied = _require_admin(request)
-    if denied:
+    if denied is not None:
         return denied
     result = await clear_alerts()
     status = 200 if result.get('success') else 500
@@ -369,7 +393,7 @@ async def http_api_stats_clear_alerts(request):
 async def http_api_stats_overall(request):
     """GET /api/v1/admin/api-stats/overall?days=7"""
     denied = _require_admin(request)
-    if denied:
+    if denied is not None:
         return denied
     days = int(request.query.get('days', '7'))
     result = await get_overall_stats(days=days)
@@ -380,7 +404,7 @@ async def http_api_stats_overall(request):
 async def http_api_stats_hourly(request):
     """GET /api/v1/admin/api-stats/hourly?hours=24"""
     denied = _require_admin(request)
-    if denied:
+    if denied is not None:
         return denied
     hours = int(request.query.get('hours', '24'))
     result = await get_hourly_stats(hours=hours)
@@ -391,7 +415,7 @@ async def http_api_stats_hourly(request):
 async def http_api_stats_ranking(request):
     """GET /api/v1/admin/api-stats/ranking?top_n=10"""
     denied = _require_admin(request)
-    if denied:
+    if denied is not None:
         return denied
     top_n = int(request.query.get('top_n', '10'))
     result = await get_api_ranking(top_n=top_n)
@@ -402,7 +426,7 @@ async def http_api_stats_ranking(request):
 async def http_api_stats_alerts(request):
     """GET /api/v1/admin/api-stats/alerts?limit=20"""
     denied = _require_admin(request)
-    if denied:
+    if denied is not None:
         return denied
     limit = int(request.query.get('limit', '20'))
     result = await get_alerts(limit=limit)
@@ -413,7 +437,7 @@ async def http_api_stats_alerts(request):
 async def http_capacity_status(request):
     """GET /api/v1/admin/capacity/status"""
     denied = _require_admin(request)
-    if denied:
+    if denied is not None:
         return denied
     try:
         data = build_capacity_status()
@@ -426,7 +450,7 @@ async def http_capacity_status(request):
 async def http_capacity_history(request):
     """GET /api/v1/admin/capacity/history?hours=24"""
     denied = _require_admin(request)
-    if denied:
+    if denied is not None:
         return denied
     try:
         hours = int(request.query.get('hours', '24'))
@@ -440,7 +464,7 @@ async def http_capacity_history(request):
 async def http_api_pool_alerts(request):
     """GET /api/v1/admin/api-pool/alerts — JWT 版，複用 admin.api_pool 業務邏輯"""
     denied = _require_admin(request)
-    if denied:
+    if denied is not None:
         return denied
     try:
         thresholds = {}
@@ -457,7 +481,7 @@ async def http_api_pool_alerts(request):
 async def http_api_pool_forecast(request):
     """GET /api/v1/admin/api-pool/forecast — JWT 版，複用 admin.api_pool 業務邏輯"""
     denied = _require_admin(request)
-    if denied:
+    if denied is not None:
         return denied
     try:
         days = int(request.query.get('days', '7'))

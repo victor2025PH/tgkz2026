@@ -26,6 +26,10 @@ from .proxy_providers.base_provider import (
 from .proxy_providers.provider_factory import create_provider
 from .proxy_pool import ProxyStatus
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,8 +60,9 @@ class ProxySyncService:
         if db_path:
             self._db_path = db_path
         else:
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            self._db_path = os.path.join(base_dir, 'data', 'tgmatrix.db')
+            # 默認數據庫路徑（與主庫 tgmatrix.db 共用，改由 resolve_db_path() 統一解析，
+            # 尊重 DATABASE_PATH/DB_PATH 環境變量與 config.py 的路徑判斷，行為與 database.py 一致）
+            self._db_path = resolve_db_path()
 
         self._init_tables()
         self._auto_sync_task: Optional[asyncio.Task] = None
@@ -65,7 +70,7 @@ class ProxySyncService:
         self._initialized = True
 
     def _get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self._db_path)
+        conn = create_connection(self._db_path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")

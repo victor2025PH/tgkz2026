@@ -14,6 +14,7 @@ import { ElectronIpcService } from '../electron-ipc.service';
 import { ToastService } from '../toast.service';
 import { AccountManagementService, DialogService } from '../services';
 import { MonitoringStateService } from '../monitoring/monitoring-state.service';
+import { OnboardingService } from '../services/onboarding.service';
 
 // 子組件導入
 import { MonitoringGroupsComponent } from '../monitoring/monitoring-groups.component';
@@ -67,6 +68,7 @@ const TAB_TO_VIEW: Record<string, string> = {
           @for (tab of tabs; track tab.id) {
             <button (click)="switchTab(tab.id)"
                     class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                    [attr.data-tour]="'monitoring-tab-' + tab.id"
                     [class.bg-gradient-to-r]="activeTab() === tab.id"
                     [class.from-cyan-500]="activeTab() === tab.id"
                     [class.to-blue-500]="activeTab() === tab.id"
@@ -115,6 +117,7 @@ export class MonitoringViewComponent implements OnInit, OnDestroy {
   public membershipService = inject(MembershipService);
   public accountService = inject(AccountManagementService);
   public monitoringState = inject(MonitoringStateService);
+  private onboarding = inject(OnboardingService);
   
   // 標籤頁配置
   tabs = [
@@ -138,6 +141,21 @@ export class MonitoringViewComponent implements OnInit, OnDestroy {
     if (targetTab && targetTab !== this.activeTab()) {
       console.log(`[MonitoringView] 視圖切換: ${currentView} → Tab: ${targetTab}`);
       this.activeTab.set(targetTab);
+    }
+  });
+  
+  // 🆕 首訪 spotlight：等數據載入完成後，僅在「完全未配置」時觸發一次導覽
+  // （已配置的老用戶不打擾；已完成/跳過的進度持久化在 localStorage）
+  private tourChecked = false;
+  private firstVisitTourEffect = effect(() => {
+    if (this.tourChecked || !this.monitoringState.lastUpdated()) return;
+    this.tourChecked = true;
+    const unconfigured = this.monitoringState.groups().length === 0
+      && this.monitoringState.keywordSets().length === 0
+      && this.monitoringState.triggerRules().length === 0;
+    console.log('[MonitoringView] 首訪導覽檢查: unconfigured =', unconfigured);
+    if (unconfigured) {
+      setTimeout(() => this.onboarding.startTourIfFirstVisit('monitoring-flow'), 600);
     }
   });
   

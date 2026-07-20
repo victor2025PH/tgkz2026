@@ -36,6 +36,7 @@ import { OfflineCacheService } from './services/offline-cache.service';
 import { SwManagerService } from './services/sw-manager.service';
 // LoadingOverlayComponent removed - using non-blocking connection indicator instead
 import { OnboardingComponent } from './onboarding.component';
+import { OnboardingOverlayComponent } from './components/onboarding-overlay.component';
 // BackupService 從 ./services 統一導入
 import { I18nService } from './i18n.service';
 import { isLeanModeActive } from './utils/lean-mode.util';
@@ -159,6 +160,8 @@ interface SuccessOverlayConfig {
     MembershipDialogComponent, UpgradePromptComponent, PaymentComponent,
     // 導航和佈局（模板中使用）
     OnboardingComponent,
+    // 🆕 關鍵頁首訪 spotlight 導覽（OnboardingService 驅動）
+    OnboardingOverlayComponent,
     // 帳號管理（模板中使用）
     QrLoginComponent,
     // 對話框（模板中使用）
@@ -2582,7 +2585,7 @@ export class AppComponent implements OnDestroy, OnInit {
     this.ipcService.send('save-first-run-settings', settings);
     this.showWelcomeDialog.set(false);
     this.isFirstRun.set(false);
-    this.toastService.success('🎉 設置完成！歡迎使用 TG-Matrix');
+    this.toastService.success('🎉 設置完成！歡迎使用 智控 MatrixX');
   }
   
   // 跳過首次設置

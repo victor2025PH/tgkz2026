@@ -8,7 +8,7 @@
  * 3. 更好的 UI/UX 體驗
  */
 
-import { Component, signal, computed, inject, OnInit, OnDestroy, output, input, effect } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, OnDestroy, output, input, effect, viewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ToastService } from '../toast.service';
@@ -18,6 +18,7 @@ import { DialogService } from '../services/dialog.service';
 import { OperationHistoryService } from '../services/operation-history.service';
 import { NavBridgeService } from '../services/nav-bridge.service';
 import { SavedResourcesService } from '../services/saved-resources.service';
+import { EmptyStateComponent } from '../components/empty-state.component';
 
 // 資源類型定義
 export interface DiscoveredResource {
@@ -72,83 +73,28 @@ export interface Account {
 @Component({
   selector: 'app-search-discovery',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, EmptyStateComponent],
   template: `
     <div class="h-full flex flex-col bg-slate-900 text-white overflow-hidden">
-      <!-- 頂部標題欄 - 精簡設計 -->
-      <div class="flex-shrink-0 px-6 py-4 border-b border-slate-700/50 bg-slate-900/95 backdrop-blur-sm">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-4">
-            <h1 class="text-2xl font-bold text-white flex items-center gap-3">
-              <span class="text-2xl">{{ initialView() === 'resource-center' ? '📦' : '🔍' }}</span>
-              {{ initialView() === 'resource-center' ? '資源中心' : '搜索發現' }}
-            </h1>
-            <!-- 快速統計：資源中心強調已收藏 + 添加資源入口 -->
-            <div class="flex items-center gap-2 text-sm">
+      <!-- 頂部：標題 + 帳號（精簡） -->
+      <div class="flex-shrink-0 px-6 pt-4 pb-2 border-b border-slate-700/50 bg-slate-900/95 backdrop-blur-sm">
+        <div class="flex items-center justify-between mb-4">
+          <h1 class="text-2xl font-bold text-white flex items-center gap-3">
+            <span class="flex items-center justify-center w-10 h-10 rounded-xl"
+                  style="background: var(--primary-bg); color: var(--primary-light);">
               @if (initialView() === 'resource-center') {
-                <span class="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-lg">
-                  {{ savedCount() }} 已收藏
-                </span>
-                <span class="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-lg">
-                  {{ mergedResources().length }} 項
-                </span>
-                <button (click)="goToSearchDiscovery()"
-                        class="px-3 py-1.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-400 hover:from-cyan-500/30 hover:to-blue-500/30 rounded-lg border border-cyan-500/50 transition-all flex items-center gap-1">
-                  ➕ 添加資源
-                </button>
-                @if (mergedResources().length > 0) {
-                  <button (click)="exportResults()"
-                          class="px-3 py-1.5 bg-green-500/20 text-green-400 hover:bg-green-500/30 rounded-lg text-sm transition-all flex items-center gap-1">
-                    📤 導出
-                  </button>
-                  <button (click)="checkResourcesHealth()"
-                          [disabled]="healthCheckRunning()"
-                          class="px-3 py-1.5 bg-teal-500/20 text-teal-400 hover:bg-teal-500/30 rounded-lg text-sm transition-all flex items-center gap-1 disabled:opacity-40 disabled:cursor-wait"
-                          title="驗證收藏資源的可達性">
-                    {{ healthCheckRunning() ? '⏳ 檢查中...' : '🏥 健康檢查' }}
-                  </button>
-                  <button (click)="batchUnsaveAll()"
-                          class="px-3 py-1.5 bg-red-500/10 text-red-400/60 hover:bg-red-500/20 hover:text-red-400 rounded-lg text-sm transition-all flex items-center gap-1">
-                    🗑️ 清空收藏
-                  </button>
-                }
-                <!-- 🔧 Phase3: 標籤篩選 -->
-                @if (allTags().length > 0) {
-                  <div class="flex items-center gap-1 ml-2 pl-2 border-l border-slate-700/50">
-                    <span class="text-xs text-slate-500">標籤:</span>
-                    <button (click)="filterByTag.set('')"
-                            class="px-2 py-0.5 rounded text-xs transition-all"
-                            [ngClass]="{'bg-cyan-500/20 text-cyan-400': !filterByTag(), 'bg-slate-700/30 text-slate-500 hover:text-slate-300': filterByTag()}">
-                      全部
-                    </button>
-                    @for (tag of allTags(); track tag) {
-                      <button (click)="filterByTag.set(filterByTag() === tag ? '' : tag)"
-                              class="px-2 py-0.5 rounded text-xs transition-all"
-                              [ngClass]="{'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/30': filterByTag() === tag, 'bg-slate-700/30 text-slate-400 hover:text-slate-200': filterByTag() !== tag}">
-                        🏷️ {{ tag }}
-                      </button>
-                    }
-                  </div>
-                }
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M16.5 9.4l-9-5.19"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+                </svg>
               } @else {
-                <span class="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-lg">
-                  {{ mergedResources().length }} 結果
-                </span>
-                <span class="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-lg">
-                  {{ savedCount() }} 已收藏
-                </span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                </svg>
               }
-              <!-- Phase3: 操作歷史快捷按鈕 -->
-              <button (click)="showOperationHistory.set(!showOperationHistory())"
-                      class="px-3 py-1 rounded-lg text-sm transition-all"
-                      [class]="showOperationHistory() ? 'bg-purple-500/30 text-purple-300 ring-1 ring-purple-500/50' : 'bg-slate-700/30 text-slate-400 hover:bg-slate-600/30'">
-                📋 {{ opHistory.todayRecords().length }} 操作
-              </button>
-            </div>
-          </div>
-          
-          <!-- 帳號選擇 -->
-          <div class="flex items-center gap-4">
+            </span>
+            {{ initialView() === 'resource-center' ? '資源中心' : '搜索發現' }}
+          </h1>
+          <div class="flex items-center gap-3">
             <div class="flex items-center gap-2 text-sm">
               <span class="text-slate-400">使用帳號:</span>
               @if (mergedSelectedAccount(); as account) {
@@ -174,21 +120,157 @@ export interface Account {
                   }
                 </div>
               } @else {
-                <span class="text-red-400 text-sm px-3 py-1.5 bg-red-500/10 rounded-lg">⚠️ 無可用帳號</span>
+                <button (click)="goToAddAccount()"
+                        class="text-red-400 text-sm px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-all">
+                  無可用帳號 · 去添加
+                </button>
               }
             </div>
-            
-            <!-- 系統狀態 -->
             @if (mergedSearching()) {
-              <span class="px-3 py-1.5 rounded-lg text-sm bg-blue-500/20 text-blue-400 animate-pulse">
-                🔄 搜索中...
-              </span>
+              <span class="px-3 py-1.5 rounded-lg text-sm bg-blue-500/20 text-blue-400 animate-pulse">搜索中...</span>
             } @else {
-              <span class="px-3 py-1.5 rounded-lg text-sm bg-green-500/20 text-green-400">
-                ✅ 就緒
-              </span>
+              <span class="px-3 py-1.5 rounded-lg text-sm bg-green-500/20 text-green-400">就緒</span>
             }
           </div>
+        </div>
+
+        <!-- 一級：情境英雄區（無帳號閘道 / 資源中心主CTA / 搜索引導） -->
+        @if (!mergedSelectedAccount()) {
+          <div class="rounded-2xl p-5 mb-4 flex flex-col sm:flex-row items-center justify-between gap-4"
+               style="background: linear-gradient(135deg, var(--primary-bg), rgba(6, 182, 212, 0.08)); border: 1px solid var(--border-default);">
+            <div class="flex items-center gap-4 min-w-0">
+              <span class="flex items-center justify-center w-12 h-12 rounded-xl shrink-0"
+                    style="background: var(--primary-bg); color: var(--primary-light);">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </span>
+              <div class="min-w-0">
+                <h3 class="text-lg font-bold" style="color: var(--text-primary);">先添加帳號，才能搜索與加入群組</h3>
+                <p class="text-sm" style="color: var(--text-muted);">這是獲客鏈路的起點：帳號 → 搜索發現 → 加入監控</p>
+              </div>
+            </div>
+            <button (click)="goToAddAccount()"
+                    class="inline-flex items-center gap-2 font-bold py-2.5 px-6 rounded-xl transition-all shadow-lg hover:brightness-110 shrink-0"
+                    style="background: linear-gradient(90deg, var(--primary), var(--accent)); color: #fff;">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              添加帳號
+            </button>
+          </div>
+        } @else if (initialView() === 'resource-center') {
+          <div class="rounded-2xl p-5 mb-4 flex flex-col sm:flex-row items-center justify-between gap-4"
+               style="background: linear-gradient(135deg, var(--primary-bg), rgba(6, 182, 212, 0.08)); border: 1px solid var(--border-default);">
+            <div class="min-w-0">
+              <h3 class="text-lg font-bold" style="color: var(--text-primary);">
+                {{ savedCount() }} 個已收藏資源
+              </h3>
+              <p class="text-sm" style="color: var(--text-muted);">
+                @if (savedCount() === 0) { 去搜索發現收藏群組，再回來批量管理 }
+                @else { 可批量監控、提取成員或導出 }
+              </p>
+            </div>
+            <button (click)="goToSearchDiscovery()"
+                    class="inline-flex items-center gap-2 font-bold py-2.5 px-6 rounded-xl transition-all shadow-lg hover:brightness-110 shrink-0"
+                    style="background: linear-gradient(90deg, var(--primary), var(--accent)); color: #fff;">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              去搜索發現
+            </button>
+          </div>
+        } @else {
+          <div class="rounded-2xl p-5 mb-4 flex flex-col sm:flex-row items-center justify-between gap-4"
+               style="background: linear-gradient(135deg, var(--primary-bg), rgba(6, 182, 212, 0.08)); border: 1px solid var(--border-default);">
+            <div class="min-w-0">
+              <h3 class="text-lg font-bold" style="color: var(--text-primary);">
+                @if (mergedResources().length > 0) { 已發現 {{ mergedResources().length }} 個結果 }
+                @else { 輸入關鍵詞，發現群組與頻道 }
+              </h3>
+              <p class="text-sm" style="color: var(--text-muted);">
+                搜索 → 加入 → 加入監控，打通獲客鏈路
+              </p>
+            </div>
+            <button (click)="focusSearchInput()"
+                    class="inline-flex items-center gap-2 font-bold py-2.5 px-6 rounded-xl transition-all shadow-lg hover:brightness-110 shrink-0"
+                    style="background: linear-gradient(90deg, var(--primary), var(--accent)); color: #fff;">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              {{ mergedResources().length > 0 ? '繼續搜索' : '開始搜索' }}
+            </button>
+          </div>
+        }
+
+        <!-- 二級：可點數據卡 -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+          <button type="button" (click)="onStatCardClick('results')"
+                  class="rounded-xl p-3 text-left transition-colors"
+                  style="background-color: var(--bg-card); border: 1px solid var(--border-default);">
+            <div class="text-xs mb-1" style="color: var(--text-muted);">{{ initialView() === 'resource-center' ? '資源' : '結果' }}</div>
+            <div class="text-xl font-bold" style="color: var(--text-primary);">{{ mergedResources().length }}</div>
+          </button>
+          <button type="button" (click)="onStatCardClick('saved')"
+                  class="rounded-xl p-3 text-left transition-colors"
+                  style="background-color: var(--bg-card); border: 1px solid var(--border-default);">
+            <div class="text-xs mb-1" style="color: var(--text-muted);">已收藏</div>
+            <div class="text-xl font-bold" style="color: var(--warning);">{{ savedCount() }}</div>
+          </button>
+          <button type="button" (click)="onStatCardClick('ops')"
+                  class="rounded-xl p-3 text-left transition-colors col-span-2 sm:col-span-1"
+                  style="background-color: var(--bg-card); border: 1px solid var(--border-default);">
+            <div class="text-xs mb-1" style="color: var(--text-muted);">今日操作</div>
+            <div class="text-xl font-bold" style="color: var(--primary-light);">{{ opHistory.todayRecords().length }}</div>
+          </button>
+        </div>
+
+        <!-- 三級：更多操作（默認折疊） -->
+        <div class="mb-3">
+          <button type="button" (click)="showMore.set(!showMore())"
+                  class="w-full flex items-center justify-center gap-2 py-2 rounded-xl transition-colors"
+                  style="background-color: var(--bg-card); border: 1px solid var(--border-default); color: var(--text-secondary);">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <span class="text-sm font-medium">更多操作</span>
+            <svg class="w-4 h-4 transition-transform" [class.rotate-180]="showMore()" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          @if (showMore()) {
+            <div class="mt-2 flex flex-wrap items-center gap-2 p-3 rounded-xl"
+                 style="background-color: var(--bg-card); border: 1px solid var(--border-default);">
+              <button type="button" (click)="showOperationHistory.set(!showOperationHistory())"
+                      class="px-3 py-1.5 rounded-lg text-sm transition-all"
+                      [class]="showOperationHistory() ? 'bg-purple-500/30 text-purple-300 ring-1 ring-purple-500/50' : 'bg-slate-700/30 text-slate-400 hover:bg-slate-600/30'">
+                操作記錄 ({{ opHistory.todayRecords().length }})
+              </button>
+              @if (initialView() === 'resource-center') {
+                @if (mergedResources().length > 0) {
+                  <button type="button" (click)="exportResults()"
+                          class="px-3 py-1.5 bg-green-500/20 text-green-400 hover:bg-green-500/30 rounded-lg text-sm transition-all">導出</button>
+                  <button type="button" (click)="checkResourcesHealth()" [disabled]="healthCheckRunning()"
+                          class="px-3 py-1.5 bg-teal-500/20 text-teal-400 hover:bg-teal-500/30 rounded-lg text-sm transition-all disabled:opacity-40">
+                    {{ healthCheckRunning() ? '檢查中...' : '健康檢查' }}
+                  </button>
+                  <button type="button" (click)="batchUnsaveAll()"
+                          class="px-3 py-1.5 bg-red-500/10 text-red-400/70 hover:bg-red-500/20 hover:text-red-400 rounded-lg text-sm transition-all">清空收藏</button>
+                }
+                @if (allTags().length > 0) {
+                  <div class="flex items-center gap-1 flex-wrap w-full mt-1 pt-2 border-t border-slate-700/40">
+                    <span class="text-xs text-slate-500">標籤:</span>
+                    <button type="button" (click)="filterByTag.set('')"
+                            class="px-2 py-0.5 rounded text-xs transition-all"
+                            [ngClass]="{'bg-cyan-500/20 text-cyan-400': !filterByTag(), 'bg-slate-700/30 text-slate-500 hover:text-slate-300': filterByTag()}">全部</button>
+                    @for (tag of allTags(); track tag) {
+                      <button type="button" (click)="filterByTag.set(filterByTag() === tag ? '' : tag)"
+                              class="px-2 py-0.5 rounded text-xs transition-all"
+                              [ngClass]="{'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/30': filterByTag() === tag, 'bg-slate-700/30 text-slate-400 hover:text-slate-200': filterByTag() !== tag}">{{ tag }}</button>
+                    }
+                  </div>
+                }
+              } @else {
+                <button type="button" (click)="forceRefreshSearch()"
+                        class="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-lg text-sm transition-all">強制刷新</button>
+                <button type="button" (click)="clearResults()"
+                        class="px-3 py-1.5 bg-slate-600/50 hover:bg-slate-600 text-slate-400 rounded-lg text-sm transition-all">清空結果</button>
+                <button type="button" (click)="showAdvancedFilter.set(!showAdvancedFilter())"
+                        class="px-3 py-1.5 rounded-lg text-sm transition-all"
+                        [class]="showAdvancedFilter() || activeFilterCount() > 0 ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-700/50 text-slate-300'">
+                  高級篩選@if (activeFilterCount() > 0) { ({{ activeFilterCount() }}) }
+                </button>
+              }
+            </div>
+          }
         </div>
       </div>
       
@@ -238,7 +320,7 @@ export interface Account {
         <!-- 搜索輸入 -->
         <div class="flex gap-3 mb-4">
           <div class="flex-1 relative">
-            <input type="text" 
+            <input #searchInput type="text"
                    [(ngModel)]="searchQuery"
                    (keyup.enter)="doSearch(); showSuggestions.set(false)"
                    (input)="onSearchInputChange($any($event.target).value)"
@@ -246,7 +328,9 @@ export interface Account {
                    (blur)="hideSuggestions()"
                    placeholder="輸入關鍵詞搜索群組和頻道..."
                    class="w-full bg-slate-700/50 border border-slate-600 rounded-xl py-3 px-4 pl-12 text-white text-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all">
-            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">🔍</span>
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            </span>
             
             <!-- 🔧 Phase3: 智能搜索建議下拉 -->
             @if (showSuggestions() && !mergedSearching()) {
@@ -343,15 +427,6 @@ export interface Account {
             <button (click)="selectedSources.set(['telegram', 'jiso'])"
                     class="text-xs px-2 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded transition-all">
               推薦組合
-            </button>
-            <button (click)="forceRefreshSearch()"
-                    class="text-xs px-2 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded transition-all"
-                    title="忽略緩存重新搜索">
-              🔄 強制刷新
-            </button>
-            <button (click)="clearResults()"
-                    class="text-xs px-2 py-1 bg-slate-600/50 hover:bg-slate-600 text-slate-400 rounded transition-all">
-              清空結果
             </button>
           </div>
         </div>
@@ -611,73 +686,70 @@ export interface Account {
             }
           </div>
         } @else if (filteredResources().length === 0) {
-          <!-- 空狀態：資源中心專用 vs 搜索發現 -->
-          <div class="flex flex-col items-center justify-center h-full text-center">
+          <!-- 空狀態：統一 EmptyState + 頁面特有引導插槽 -->
+          <div class="flex flex-col items-center justify-center h-full">
             @if (initialView() === 'resource-center') {
-              <div class="max-w-lg">
-                <div class="text-6xl mb-4">📦</div>
-                <p class="text-slate-300 text-xl mb-2">歡迎來到資源中心</p>
-                <p class="text-slate-500 mb-6">這裡是你的群組與頻道資產庫。收藏的資源可在此統一管理、批量操作。</p>
-                
-                <!-- 🔧 3 步引導流程 -->
-                <div class="grid grid-cols-3 gap-4 mb-6 text-sm">
-                  <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                    <div class="text-3xl mb-2">🔍</div>
-                    <div class="text-cyan-400 font-medium mb-1">第一步</div>
-                    <div class="text-slate-400">去搜索發現搜索群組</div>
+              <app-empty-state iconKind="package"
+                               title="歡迎來到資源中心"
+                               description="這裡是你的群組與頻道資產庫。收藏後可統一管理、批量操作。"
+                               ctaLabel="去搜索發現添加資源"
+                               (cta)="goToSearchDiscovery()">
+                <div class="grid grid-cols-3 gap-3 mb-4 text-sm max-w-lg w-full">
+                  <div class="rounded-xl p-3 border border-slate-700/50 bg-slate-800/50">
+                    <div class="text-cyan-400 font-medium mb-1">1. 搜索</div>
+                    <div class="text-slate-400 text-xs">去搜索發現找群組</div>
                   </div>
-                  <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                    <div class="text-3xl mb-2">⭐</div>
-                    <div class="text-yellow-400 font-medium mb-1">第二步</div>
-                    <div class="text-slate-400">點擊收藏感興趣的群組</div>
+                  <div class="rounded-xl p-3 border border-slate-700/50 bg-slate-800/50">
+                    <div class="text-yellow-400 font-medium mb-1">2. 收藏</div>
+                    <div class="text-slate-400 text-xs">點星號收藏感興趣的</div>
                   </div>
-                  <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                    <div class="text-3xl mb-2">📦</div>
-                    <div class="text-green-400 font-medium mb-1">第三步</div>
-                    <div class="text-slate-400">回到這裡統一管理</div>
+                  <div class="rounded-xl p-3 border border-slate-700/50 bg-slate-800/50">
+                    <div class="text-green-400 font-medium mb-1">3. 管理</div>
+                    <div class="text-slate-400 text-xs">回到這裡批量操作</div>
                   </div>
                 </div>
-                
-                <button (click)="goToSearchDiscovery()"
-                        class="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl font-medium transition-all shadow-lg shadow-cyan-500/25">
-                  🔍 去搜索發現添加資源
-                </button>
-                
-                <!-- 🔧 快捷搜索提示 -->
                 @if (mergedHistoryKeywords().length > 0) {
-                  <div class="mt-4 text-sm">
+                  <div class="mb-3 text-sm">
                     <span class="text-slate-500">最近搜索過：</span>
                     @for (kw of mergedHistoryKeywords().slice(0, 3); track kw) {
-                      <button (click)="goToSearchDiscovery()"
+                      <button type="button" (click)="goToSearchDiscovery()"
                               class="ml-2 px-3 py-1 bg-slate-700/50 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-400 rounded-full text-xs transition-all">
                         {{ kw }}
                       </button>
                     }
                   </div>
                 }
-              </div>
+              </app-empty-state>
             } @else if (mergedSearchError().hasError) {
-              <div class="max-w-md">
-                <div class="text-6xl mb-4">⚠️</div>
-                <p class="text-red-400 text-xl mb-2">搜索失敗</p>
-                <p class="text-slate-400 mb-4">{{ mergedSearchError().message }}</p>
-                <button (click)="doSearch()" class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg">
-                  🔄 重試
-                </button>
-              </div>
+              <app-empty-state iconKind="alert"
+                               title="搜索失敗"
+                               [description]="mergedSearchError().message"
+                               ctaLabel="重試"
+                               (cta)="doSearch()">
+              </app-empty-state>
+            } @else if (!mergedSelectedAccount()) {
+              <app-empty-state iconKind="user"
+                               title="還沒有可用帳號"
+                               description="添加並登錄 Telegram 帳號後，即可搜索與加入群組"
+                               ctaLabel="添加帳號"
+                               (cta)="goToAddAccount()">
+              </app-empty-state>
             } @else {
-              <div class="text-6xl mb-4">🔍</div>
-              <p class="text-slate-300 text-xl mb-2">開始搜索發現群組</p>
-              <p class="text-slate-500 mb-6">輸入關鍵詞搜索 Telegram 群組和頻道</p>
-              <div class="flex flex-wrap justify-center gap-2 max-w-lg">
-                <span class="text-slate-500 text-sm">試試：</span>
-                @for (kw of hotKeywords.slice(0, 5); track kw) {
-                  <button (click)="quickSearch(kw)" 
-                          class="px-3 py-1.5 bg-slate-700/50 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-400 rounded-full text-sm transition-all">
-                    {{ kw }}
-                  </button>
-                }
-              </div>
+              <app-empty-state iconKind="search"
+                               title="開始搜索發現群組"
+                               description="輸入關鍵詞搜索 Telegram 群組和頻道"
+                               ctaLabel="開始搜索"
+                               (cta)="focusSearchInput()">
+                <div class="flex flex-wrap justify-center gap-2 max-w-lg mb-4">
+                  <span class="text-slate-500 text-sm self-center">試試：</span>
+                  @for (kw of hotKeywords.slice(0, 5); track kw) {
+                    <button type="button" (click)="quickSearch(kw)"
+                            class="px-3 py-1.5 bg-slate-700/50 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-400 rounded-full text-sm transition-all">
+                      {{ kw }}
+                    </button>
+                  }
+                </div>
+              </app-empty-state>
             }
           </div>
         } @else {
@@ -1551,6 +1623,10 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   
   // 🆕 Phase3: 操作歷史面板開關
   showOperationHistory = signal(false);
+  /** 更多操作折疊（與儀表板/帳號/監控一致） */
+  showMore = signal(false);
+  /** 搜索框焦點（英雄區「開始搜索」） */
+  private searchInputRef = viewChild<ElementRef<HTMLInputElement>>('searchInput');
   
   // 🔧 P0: 注入群組管理服務用於打開加入對話框
   private groupService: any = null;  // 延遲注入避免循環依賴
@@ -2570,6 +2646,36 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   /** 資源中心：跳轉到搜索發現頁添加資源 */
   goToSearchDiscovery(): void {
     this.navigateTo.emit('search-discovery');
+  }
+
+  goToAddAccount(): void {
+    this.navigateTo.emit('add-account');
+  }
+
+  focusSearchInput(): void {
+    const el = this.searchInputRef()?.nativeElement;
+    if (el) {
+      el.focus();
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  /** 二級數據卡點擊：收藏→資源中心；操作→展開歷史；結果→聚焦搜索 */
+  onStatCardClick(kind: 'results' | 'saved' | 'ops'): void {
+    if (kind === 'saved') {
+      if (this.initialView() !== 'resource-center') {
+        this.navigateTo.emit('resource-center');
+      }
+      return;
+    }
+    if (kind === 'ops') {
+      this.showMore.set(true);
+      this.showOperationHistory.set(true);
+      return;
+    }
+    if (this.initialView() !== 'resource-center') {
+      this.focusSearchInput();
+    }
   }
 
   // 🆕 鍵盤事件處理

@@ -412,6 +412,9 @@ export class MonitoringViewComponent implements OnInit, OnDestroy {
         break;
       case 'add-template':
         break;
+      case 'goto-search-discovery':
+        this.nav.navigateTo('search-discovery');
+        break;
       default:
         break;
     }

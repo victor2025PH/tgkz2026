@@ -14,8 +14,9 @@
  *                  ctaLabel="前往搜索發現" (cta)="go()">
  * </app-empty-state>
  */
-import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { I18nService } from '../i18n.service';
 
 /** 內建線性圖標種類（與側邊欄 SVG 風格一致，不引新依賴） */
 export type EmptyStateIconKind =
@@ -91,20 +92,20 @@ export type EmptyStateIconKind =
       <h3 class="font-medium mb-2"
           [class.text-lg]="!compact()"
           [class.text-base]="compact()"
-          style="color: var(--text-primary);">{{ title() }}</h3>
+          style="color: var(--text-primary);">{{ resolvedTitle() }}</h3>
 
-      @if (description()) {
+      @if (resolvedDescription()) {
         <p class="text-sm max-w-md whitespace-pre-line leading-relaxed"
            [class.mb-6]="!compact()"
            [class.mb-4]="compact()"
-           style="color: var(--text-muted);">{{ description() }}</p>
+           style="color: var(--text-muted);">{{ resolvedDescription() }}</p>
       }
 
       <ng-content></ng-content>
 
-      @if (ctaLabel() || secondaryLabel()) {
+      @if (resolvedCtaLabel() || resolvedSecondaryLabel()) {
         <div class="flex items-center justify-center gap-3 flex-wrap mt-2">
-          @if (ctaLabel()) {
+          @if (resolvedCtaLabel()) {
             <button (click)="cta.emit()"
                     class="font-medium rounded-xl transition-all shadow-lg hover:brightness-110"
                     [class.px-6]="!compact()"
@@ -113,10 +114,10 @@ export type EmptyStateIconKind =
                     [class.py-2]="compact()"
                     [class.text-sm]="compact()"
                     style="background: linear-gradient(90deg, var(--primary), var(--accent)); color: #fff;">
-              {{ ctaLabel() }}
+              {{ resolvedCtaLabel() }}
             </button>
           }
-          @if (secondaryLabel()) {
+          @if (resolvedSecondaryLabel()) {
             <button (click)="secondaryCta.emit()"
                     class="rounded-xl transition-colors"
                     [class.px-5]="!compact()"
@@ -125,7 +126,7 @@ export type EmptyStateIconKind =
                     [class.py-2]="compact()"
                     [class.text-sm]="compact()"
                     style="background-color: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border-default);">
-              {{ secondaryLabel() }}
+              {{ resolvedSecondaryLabel() }}
             </button>
           }
         </div>
@@ -134,10 +135,18 @@ export type EmptyStateIconKind =
   `
 })
 export class EmptyStateComponent {
+  private i18n = inject(I18nService);
+
   /** 線性圖標種類；指定後優先於 icon emoji */
   iconKind = input<EmptyStateIconKind | ''>('');
   /** 圖標（emoji），未指定 iconKind 時使用；兼容舊用法 */
   icon = input<string>('📭');
+  /**
+   * title/description/ctaLabel/secondaryLabel 均支持兩種傳法：
+   * - i18n 鍵（形如 emptyStates.xxx.title 的點分 ASCII 字串）→ 組件內解析翻譯，
+   *   調用方無需注入 I18nService，切語言即時生效
+   * - 普通文案（含動態錯誤消息）→ 原樣顯示
+   */
   title = input.required<string>();
   description = input<string>('');
   ctaLabel = input<string>('');
@@ -146,4 +155,15 @@ export class EmptyStateComponent {
 
   cta = output<void>();
   secondaryCta = output<void>();
+
+  resolvedTitle = computed(() => this.resolve(this.title()));
+  resolvedDescription = computed(() => this.resolve(this.description()));
+  resolvedCtaLabel = computed(() => this.resolve(this.ctaLabel()));
+  resolvedSecondaryLabel = computed(() => this.resolve(this.secondaryLabel()));
+
+  /** 像 i18n 鍵就翻譯；翻譯不到（t 返回鍵本身）或不像鍵則原樣返回 */
+  private resolve(text: string): string {
+    if (!text || !/^[a-zA-Z][\w-]*(\.[\w-]+)+$/.test(text)) return text;
+    return this.i18n.t(text);
+  }
 }

@@ -334,10 +334,10 @@ import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, Collectio
               } @empty {
                 <div class="col-span-full">
                   <app-empty-state iconKind="radar"
-                                   title="還沒有監控群組"
-                                   description="監控群組可以自動監聽關鍵詞、提取成員、收集潛在客戶"
-                                   ctaLabel="前往搜索發現"
-                                   secondaryLabel="+ 手動添加 URL"
+                                   title="emptyStates.monitoringGroups.title"
+                                   description="emptyStates.monitoringGroups.description"
+                                   ctaLabel="emptyStates.monitoringGroups.cta"
+                                   secondaryLabel="emptyStates.monitoringGroups.secondary"
                                    (cta)="navigateToResourceCenter()"
                                    (secondaryCta)="showQuickAddDialog.set(true)">
                     <!-- 步驟引導（頁面特有內容，經插槽注入） -->

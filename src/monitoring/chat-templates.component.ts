@@ -91,8 +91,8 @@ const TEMPLATE_TYPES = {
         <div class="flex-1 overflow-y-auto p-2">
           @if (filteredTemplates().length === 0) {
             <app-empty-state iconKind="chat" [compact]="true"
-                             [title]="searchQuery || filterType !== 'all' ? '沒有符合的模板' : '還沒有模板'"
-                             ctaLabel="創建第一個模板"
+                             [title]="searchQuery || filterType !== 'all' ? 'emptyStates.templates.titleFiltered' : 'emptyStates.templates.title'"
+                             ctaLabel="emptyStates.templates.cta"
                              (cta)="createNewTemplate()">
             </app-empty-state>
           } @else {
@@ -136,9 +136,9 @@ const TEMPLATE_TYPES = {
         @if (!selectedTemplate() && !isCreating()) {
           <div class="flex-1 flex items-center justify-center">
             <app-empty-state iconKind="chat"
-                             title="選擇或創建聊天模板"
-                             description="從左側選擇一個模板查看詳情，或創建新模板"
-                             ctaLabel="創建新模板"
+                             title="emptyStates.templateSelect.title"
+                             description="emptyStates.templateSelect.description"
+                             ctaLabel="emptyStates.templateSelect.cta"
                              (cta)="createNewTemplate()">
             </app-empty-state>
           </div>

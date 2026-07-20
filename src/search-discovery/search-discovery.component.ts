@@ -651,9 +651,9 @@ export interface Account {
           <div class="flex flex-col items-center justify-center h-full">
             @if (initialView() === 'resource-center') {
               <app-empty-state iconKind="package"
-                               title="歡迎來到資源中心"
-                               description="這裡是你的群組與頻道資產庫。收藏後可統一管理、批量操作。"
-                               ctaLabel="去搜索發現添加資源"
+                               title="emptyStates.resourceCenter.title"
+                               description="emptyStates.resourceCenter.description"
+                               ctaLabel="emptyStates.resourceCenter.cta"
                                (cta)="goToSearchDiscovery()">
                 <div class="grid grid-cols-3 gap-3 mb-4 text-sm max-w-lg w-full">
                   <div class="rounded-xl p-3 border border-slate-700/50 bg-slate-800/50">
@@ -683,23 +683,23 @@ export interface Account {
               </app-empty-state>
             } @else if (mergedSearchError().hasError) {
               <app-empty-state iconKind="alert"
-                               title="搜索失敗"
+                               title="emptyStates.searchFailed.title"
                                [description]="mergedSearchError().message"
-                               ctaLabel="重試"
+                               ctaLabel="emptyStates.searchFailed.cta"
                                (cta)="doSearch()">
               </app-empty-state>
             } @else if (!mergedSelectedAccount()) {
               <app-empty-state iconKind="user"
-                               title="還沒有可用帳號"
-                               description="添加並登錄 Telegram 帳號後，即可搜索與加入群組"
-                               ctaLabel="添加帳號"
+                               title="emptyStates.noAccount.title"
+                               description="emptyStates.noAccount.description"
+                               ctaLabel="emptyStates.noAccount.cta"
                                (cta)="goToAddAccount()">
               </app-empty-state>
             } @else {
               <app-empty-state iconKind="search"
-                               title="開始搜索發現群組"
-                               description="輸入關鍵詞搜索 Telegram 群組和頻道"
-                               ctaLabel="開始搜索"
+                               title="emptyStates.searchStart.title"
+                               description="emptyStates.searchStart.description"
+                               ctaLabel="emptyStates.searchStart.cta"
                                (cta)="focusSearchInput()">
                 <div class="flex flex-wrap justify-center gap-2 max-w-lg mb-4">
                   <span class="text-slate-500 text-sm self-center">試試：</span>

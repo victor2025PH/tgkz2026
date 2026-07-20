@@ -229,8 +229,8 @@ interface CollectedUsersStats {
             </div>
           } @else if (filteredUsers().length === 0) {
             <app-empty-state iconKind="inbox" [compact]="true"
-                             title="暫無收集的用戶"
-                             description="開啟群組監控後，系統會自動收集發言者">
+                             title="emptyStates.collectedUsers.title"
+                             description="emptyStates.collectedUsers.description">
             </app-empty-state>
           } @else {
             <div class="grid gap-2">

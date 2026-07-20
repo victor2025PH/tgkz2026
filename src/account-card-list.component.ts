@@ -744,8 +744,8 @@ export const PROXY_TYPES = [
 
       @if (filteredAccounts.length === 0 && accounts.length > 0) {
         <app-empty-state iconKind="search"
-                         title="沒有找到匹配的帳戶"
-                         description="請嘗試調整搜索條件或篩選器">
+                         title="emptyStates.accountsFiltered.title"
+                         description="emptyStates.accountsFiltered.description">
         </app-empty-state>
       }
     </div>

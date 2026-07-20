@@ -145,9 +145,9 @@ import { EmptyStateComponent } from '../components/empty-state.component';
           <div class="flex-1 overflow-y-auto p-4">
             @if (stateService.keywordSets().length === 0) {
               <app-empty-state iconKind="key"
-                               title="還沒有關鍵詞集"
-                               description="關鍵詞集定義了系統要在監控群組中捕捉的觸發詞。&#10;當群組消息命中關鍵詞時，會自動生成潛在客戶線索。"
-                               ctaLabel="創建第一個關鍵詞集"
+                               title="emptyStates.keywordSets.title"
+                               description="emptyStates.keywordSets.description"
+                               ctaLabel="emptyStates.keywordSets.cta"
                                (cta)="createNewSet()">
               </app-empty-state>
             } @else {

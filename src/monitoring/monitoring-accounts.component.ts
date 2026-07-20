@@ -158,9 +158,9 @@ import { EmptyStateComponent } from '../components/empty-state.component';
               </div>
             } @empty {
               <app-empty-state iconKind="user"
-                               title="暫無監控帳號"
-                               description="請在帳戶管理中添加帳號並設為監聽角色"
-                               ctaLabel="添加帳號"
+                               title="emptyStates.monitoringAccounts.title"
+                               description="emptyStates.monitoringAccounts.description"
+                               ctaLabel="emptyStates.monitoringAccounts.cta"
                                (cta)="navigateToAccountManagement()">
               </app-empty-state>
             }

@@ -514,9 +514,9 @@ interface TriggerRule {
             } @else {
               <div class="h-full flex items-center justify-center">
                 <app-empty-state iconKind="bolt"
-                                 title="還沒有觸發規則"
-                                 description="觸發規則讓 AI 在偵測到特定關鍵詞時自動採取行動——回覆消息、發送模板、或開始私聊培育"
-                                 ctaLabel="創建第一個規則"
+                                 title="emptyStates.triggerRules.title"
+                                 description="emptyStates.triggerRules.description"
+                                 ctaLabel="emptyStates.triggerRules.cta"
                                  (cta)="openCreateWizard()">
                   @if (aiChatEnabled()) {
                     <div class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm mb-4"

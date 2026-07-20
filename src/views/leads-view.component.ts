@@ -261,9 +261,9 @@ import { EmptyStateComponent } from '../components/empty-state.component';
       <div class="rounded-xl overflow-hidden" style="background-color: var(--bg-card); border: 1px solid var(--border-color);">
         @if (filteredContacts().length === 0) {
           <app-empty-state iconKind="inbox"
-                           title="發送列表還是空的"
-                           description="您需要先將客戶加入發送列表，才能批量發送消息"
-                           ctaLabel="前往資源中心"
+                           title="emptyStates.leads.title"
+                           description="emptyStates.leads.description"
+                           ctaLabel="emptyStates.leads.cta"
                            (cta)="goToResourceCenter()">
             <!-- 數據來源引導（main 側內容，統一 token 呈現） -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-xl mx-auto mb-4">

@@ -1107,5 +1107,70 @@
     "subtitle": "群組（聽哪裡）→ 關鍵詞（聽什麼）→ 規則（聽到後做什麼）",
     "progressLabel": "配置進度",
     "next": "下一步"
+  },
+  "emptyStates": {
+    "resourceCenter": {
+      "title": "歡迎來到資源中心",
+      "description": "這裡是你的群組與頻道資產庫。收藏後可統一管理、批量操作。",
+      "cta": "去搜索發現添加資源"
+    },
+    "searchFailed": {
+      "title": "搜索失敗",
+      "cta": "重試"
+    },
+    "noAccount": {
+      "title": "還沒有可用帳號",
+      "description": "添加並登錄 Telegram 帳號後，即可搜索與加入群組",
+      "cta": "添加帳號"
+    },
+    "searchStart": {
+      "title": "開始搜索發現群組",
+      "description": "輸入關鍵詞搜索 Telegram 群組和頻道",
+      "cta": "開始搜索"
+    },
+    "triggerRules": {
+      "title": "還沒有觸發規則",
+      "description": "觸發規則讓 AI 在偵測到特定關鍵詞時自動採取行動——回覆消息、發送模板、或開始私聊培育",
+      "cta": "創建第一個規則"
+    },
+    "templates": {
+      "title": "還沒有模板",
+      "titleFiltered": "沒有符合的模板",
+      "cta": "創建第一個模板"
+    },
+    "templateSelect": {
+      "title": "選擇或創建聊天模板",
+      "description": "從左側選擇一個模板查看詳情，或創建新模板",
+      "cta": "創建新模板"
+    },
+    "monitoringAccounts": {
+      "title": "暫無監控帳號",
+      "description": "請在帳戶管理中添加帳號並設為監聽角色",
+      "cta": "添加帳號"
+    },
+    "monitoringGroups": {
+      "title": "還沒有監控群組",
+      "description": "監控群組可以自動監聽關鍵詞、提取成員、收集潛在客戶",
+      "cta": "前往搜索發現",
+      "secondary": "+ 手動添加 URL"
+    },
+    "leads": {
+      "title": "發送列表還是空的",
+      "description": "您需要先將客戶加入發送列表，才能批量發送消息",
+      "cta": "前往資源中心"
+    },
+    "keywordSets": {
+      "title": "還沒有關鍵詞集",
+      "description": "關鍵詞集定義了系統要在監控群組中捕捉的觸發詞。\n當群組消息命中關鍵詞時，會自動生成潛在客戶線索。",
+      "cta": "創建第一個關鍵詞集"
+    },
+    "accountsFiltered": {
+      "title": "沒有找到匹配的帳戶",
+      "description": "請嘗試調整搜索條件或篩選器"
+    },
+    "collectedUsers": {
+      "title": "暫無收集的用戶",
+      "description": "開啟群組監控後，系統會自動收集發言者"
+    }
   }
 }

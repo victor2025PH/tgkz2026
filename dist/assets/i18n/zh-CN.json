@@ -42,7 +42,9 @@
     "myWallet": "我的钱包",
     "manualOperations": "手动操作",
     "searchDiscovery": "搜索发现",
+    "searchDiscoveryHint": "发现群组与频道",
     "resourceCenter": "资源中心",
+    "resourceCenterHint": "我的收藏与资源管理",
     "sendConsole": "发送控制台",
     "automationOverview": "自动化总览",
     "configAndStatus": "配置与监控状态",
@@ -166,10 +168,12 @@
     "allStatus": "全部状态",
     "allGroups": "全部分组",
     "tags": "标签",
+    "selectTags": "选择标签",
+    "manageTags": "管理标签",
     "manageGroups": "管理分组",
     "online": "在线",
     "offline": "离线",
-    "banned": "封禁",
+    "banned": "已封禁",
     "total": "总计",
     "selectAll": "全选",
     "gridView": "卡片视图",
@@ -200,6 +204,9 @@
     "allAccounts": "所有账号",
     "phone": "电话",
     "manageAccounts": "管理账号",
+    "apiCredentialsPool": "API 凭据池",
+    "scanLogin": "扫码登入",
+    "importing": "导入中...",
     "addNewAccount": "添加新账号",
     "username": "用户名",
     "lastActive": "最后活跃",
@@ -208,7 +215,6 @@
     "disconnected": "已断开",
     "connecting": "连接中...",
     "loginRequired": "需要登录",
-    "banned": "已封禁",
     "limited": "受限",
     "sessionFile": "Session 文件",
     "connectionTest": "测试连接",
@@ -355,6 +361,17 @@
   },
   "settings": {
     "title": "设置",
+    "tabs": {
+      "appearance": "外观设置",
+      "notifications": "通知与提醒",
+      "help": "使用帮助",
+      "backup": "备份管理",
+      "scheduler": "任务调度",
+      "about": "关于"
+    },
+    "notificationsDesc": "在此查看系统通知与提醒，点击铃铛展开列表。",
+    "helpDesc": "新手引导与常见问题。",
+    "openOnboarding": "打开新手引导",
     "appearance": "外观",
     "language": "语言",
     "theme": "主题",
@@ -380,7 +397,43 @@
     "help": "帮助",
     "settingsTitle": "设置",
     "settingsAutoSaveHint": "设置会自动保存",
-    "localAiConfiguration": "本地 AI 配置"
+    "localAiConfiguration": "本地 AI 配置",
+    "themeSettings": "主题设置",
+    "darkTheme": "深色主题",
+    "lightTheme": "浅色主题",
+    "followSystem": "跟随系统",
+    "languageSettings": "语言设置",
+    "backupManagement": "备份管理",
+    "creating": "创建中...",
+    "refresh": "刷新",
+    "backupName": "备份名称",
+    "createdAt": "创建时间",
+    "size": "大小",
+    "action": "操作",
+    "restore": "恢复",
+    "noBackups": "暂无备份",
+    "taskScheduler": "任务调度",
+    "stop": "停止",
+    "start": "启动",
+    "status": "状态",
+    "running": "运行中",
+    "stopped": "已停止",
+    "uptime": "运行时间",
+    "totalTasks": "总任务",
+    "activeTasks": "活跃任务",
+    "taskName": "任务名称",
+    "interval": "间隔",
+    "lastRun": "上次执行",
+    "execute": "执行",
+    "never": "从未",
+    "noScheduledTasks": "暂无调度任务",
+    "membershipInfo": "会员信息",
+    "versionInfo": "版本信息",
+    "buildDate": "构建日期",
+    "techStack": "技术栈",
+    "animationMode": "动画模式",
+    "validUntil": "有效期至",
+    "permanent": "永久有效"
   },
   "monitoring": {
     "title": "监控",
@@ -439,6 +492,7 @@
     "expiresOn": "到期时间",
     "daysRemaining": "剩余 {{days}} 天",
     "accountQuota": "账号配额",
+    "upgradeUnlock": "升级解锁更多",
     "dailyMessages": "每日消息",
     "dailyAiCalls": "每日 AI 调用",
     "features": "功能",
@@ -729,6 +783,7 @@
     "openTelegramApp": "打开 Telegram App 登录",
     "clickConfirmInTelegram": "请在 Telegram 中点击「确认登录」按钮",
     "remainingTime": "剩余时间: {{seconds}}s",
+    "orEnterCode": "或输入验证码",
     "cancel": "取消",
     "useTelegramWidget": "使用 Telegram Widget 登录",
     "widgetHint": "适用于已在浏览器登录 Telegram 的用户"
@@ -794,12 +849,24 @@
     "displayName": "显示名称",
     "avatarUrl": "头像 URL",
     "updateProfile": "更新资料",
+    "saveProfileError": "保存失败，请重试",
     "revokeSession": "撤销",
     "revokeAllSessions": "撤销所有其他设备",
     "createApiKey": "创建 API 密钥",
     "deleteApiKey": "删除",
     "lastUsed": "最后使用",
-    "neverUsed": "从未使用"
+    "neverUsed": "从未使用",
+    "logoutSectionTitle": "账号退出",
+    "logoutSectionDesc": "退出后将返回登录页，您需要重新登录才能继续使用。此操作仅登出当前设备。",
+    "logoutConfirmText": "确定要退出登录吗？您需要重新登录才能再次使用。",
+    "logoutConfirmButton": "确定退出",
+    "loadingApiKeys": "載入中...",
+    "apiKeyCreatedOnce": "密鑰已創建，請妥善保存。此密鑰僅顯示一次。",
+    "apiKeyNamePrompt": "請輸入密鑰名稱（用於識別）",
+    "apiKeyNamePlaceholder": "Unnamed Key",
+    "copyKey": "複製",
+    "deleteApiKeyConfirm": "確定要刪除此 API 密鑰嗎？刪除後無法恢復。",
+    "logoutUnsavedHint": "您有未保存的個人資料修改，是否仍要退出？"
   },
   "notification": {
     "center": "通知中心",
@@ -908,24 +975,6 @@
   },
   "p15": {
     "queueRecovery": "队列恢复",
-    "recoveredMessages": "已恢复待处理消息",
-    "abTestSelect": "选择 A/B 测试（可选）",
-    "abTestNone": "不使用",
-    "abTestAutoSelect": "后端将自动选择模板变体并记录效果",
-    "notifications": "通知",
-    "noNotifications": "暂无通知",
-    "markAllRead": "全部标记已读",
-    "deadLetterAlert": "消息送达失败",
-    "enteredDeadLetter": "已进入死信队列",
-    "contacts": "联系人",
-    "contactsTotal": "联系人总数",
-    "recentAdded": "近期新增",
-    "byStatus": "按状态",
-    "bySource": "按来源",
-    "httpFallback": "HTTP API 模式已启用"
-  },
-  "p15": {
-    "queueRecovery": "队列恢复",
     "queueRecoveryDesc": "重启后恢复待处理消息",
     "contactsApi": "联系人 API",
     "contactsApiDesc": "HTTP 模式下通过 REST 加载联系人",
@@ -933,5 +982,104 @@
     "abTestInBatchDesc": "选择进行中的测试由后端自动选变体",
     "businessNotify": "业务通知",
     "businessNotifyDesc": "评分、去重、A/B 结果会出现在通知中心"
+  },
+  "dashboardSetup": {
+    "title": "跑通你的第一条获客链路",
+    "subtitle": "完成 5 个上手步骤，系统将自动监控关键词、AI 策划培育并沉淀潜在客户",
+    "progressLabel": "上手进度",
+    "next": "下一步",
+    "steps": {
+      "account": {
+        "label": "添加帐号",
+        "desc": "连接你的 Telegram 帐号"
+      },
+      "groups": {
+        "label": "添加监控群组",
+        "desc": "选择要监听的目标群组"
+      },
+      "keywords": {
+        "label": "设置关键词",
+        "desc": "定义触发线索的关键词"
+      },
+      "rules": {
+        "label": "配置触发规则",
+        "desc": "设定命中后的自动动作"
+      },
+      "monitor": {
+        "label": "启动监控",
+        "desc": "一键启动，开始自动获客"
+      }
+    }
+  },
+  "monitoringSetup": {
+    "title": "完成监控配置",
+    "subtitle": "群组（听哪里）→ 关键词（听什么）→ 规则（听到后做什么）",
+    "progressLabel": "配置进度",
+    "next": "下一步"
+  },
+  "emptyStates": {
+    "resourceCenter": {
+      "title": "欢迎来到资源中心",
+      "description": "这里是你的群组与频道资产库。收藏后可统一管理、批量操作。",
+      "cta": "去搜索发现添加资源"
+    },
+    "searchFailed": {
+      "title": "搜索失败",
+      "cta": "重试"
+    },
+    "noAccount": {
+      "title": "还没有可用帐号",
+      "description": "添加并登录 Telegram 帐号后，即可搜索与加入群组",
+      "cta": "添加帐号"
+    },
+    "searchStart": {
+      "title": "开始搜索发现群组",
+      "description": "输入关键词搜索 Telegram 群组和频道",
+      "cta": "开始搜索"
+    },
+    "triggerRules": {
+      "title": "还没有触发规则",
+      "description": "触发规则让 AI 在侦测到特定关键词时自动采取行动——回复消息、发送模板、或开始私聊培育",
+      "cta": "创建第一个规则"
+    },
+    "templates": {
+      "title": "还没有模板",
+      "titleFiltered": "没有符合的模板",
+      "cta": "创建第一个模板"
+    },
+    "templateSelect": {
+      "title": "选择或创建聊天模板",
+      "description": "从左侧选择一个模板查看详情，或创建新模板",
+      "cta": "创建新模板"
+    },
+    "monitoringAccounts": {
+      "title": "暂无监控帐号",
+      "description": "请在帐户管理中添加帐号并设为监听角色",
+      "cta": "添加帐号"
+    },
+    "monitoringGroups": {
+      "title": "还没有监控群组",
+      "description": "监控群组可以自动监听关键词、提取成员、收集潜在客户",
+      "cta": "前往搜索发现",
+      "secondary": "+ 手动添加 URL"
+    },
+    "leads": {
+      "title": "发送列表还是空的",
+      "description": "您需要先将客户加入发送列表，才能批量发送消息",
+      "cta": "前往资源中心"
+    },
+    "keywordSets": {
+      "title": "还没有关键词集",
+      "description": "关键词集定义了系统要在监控群组中捕捉的触发词。\n当群组消息命中关键词时，会自动生成潜在客户线索。",
+      "cta": "创建第一个关键词集"
+    },
+    "accountsFiltered": {
+      "title": "没有找到匹配的帐户",
+      "description": "请尝试调整搜索条件或筛选器"
+    },
+    "collectedUsers": {
+      "title": "暂无收集的用户",
+      "description": "开启群组监控后，系统会自动收集发言者"
+    }
   }
 }

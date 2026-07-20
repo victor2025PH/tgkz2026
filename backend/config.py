@@ -54,7 +54,7 @@ else:
         print(f"[Config] Using local sessions dir (fallback): {SESSIONS_DIR}", file=sys.stderr)
 
 # Database configuration
-DATABASE_PATH = DATABASE_DIR / "tgmatrix.db"
+DATABASE_PATH = DATABASE_DIR / "matrixx.db"
 
 # 🆕 啟動時診斷信息
 print(f"[Config] ========== 數據路徑配置 ==========", file=sys.stderr)
@@ -240,21 +240,44 @@ class FeatureConfig:
     else:
         ENABLE_AI = not LEAN_MODE
 
+    # AI 決策後端（無界融合期新增，2026-07）：local=現有本地 ai_auto_chat（默認，行為不變）
+    # chengjie=改問 platform/replybus 決策回執總線、bus 不可達時自動回落 local（總線可選鐵律）
+    # off=兩邊都不調（配合 ENABLE_AI=False 更徹底關閉 AI 路徑）。
+    # 🔒 重要：ENABLE_AI=False 時 telegram_client 根本不註冊私信 handler（見 L3408 附近），
+    # AI_BACKEND 此時形同虛設——兩個開關的優先級由調用處自行判斷，這裡只做純配置讀取。
+    _ai_backend_env = os.environ.get('TG_AI_BACKEND', 'local').strip().lower()
+    AI_BACKEND = _ai_backend_env if _ai_backend_env in ('local', 'chengjie', 'off') else 'local'
+
+    # 影子模式（第四階段新增，2026-07，S3.5 灰度前置）：默認關閉。開啟後，即使
+    # AI_BACKEND 仍是 'local'（真實回覆不變、零風險），也會在背景額外問一次
+    # chengjie 的決策，只寫本地 JSONL 對比日誌（不參與真實回覆），供業務方在真的
+    # 切換 AI_BACKEND=chengjie 前，用真實流量預覽草稿質量。與 AI_BACKEND 完全正交：
+    # 開影子模式不會讓任何真實回覆改用 chengjie；AI_BACKEND=chengjie 時開影子模式
+    # 也沒有意義（已經在用真決策，無需再對比），此時 _shadow_log_task 只是多打一次
+    # 重複請求，不算錯但沒必要——留給運營自行判斷是否同時開。
+    REPLYBUS_SHADOW = os.environ.get('TG_REPLYBUS_SHADOW', '').lower() in ('true', '1', 'yes')
+
     @classmethod
     def status(cls) -> Dict[str, Any]:
         return {
             'lean_mode': cls.LEAN_MODE,
             'enable_ai': cls.ENABLE_AI,
+            'ai_backend': cls.AI_BACKEND,
+            'replybus_shadow': cls.REPLYBUS_SHADOW,
         }
 
 
-# 模塊級便捷導出（供 `from config import ENABLE_AI, LEAN_MODE` 使用）
+# 模塊級便捷導出（供 `from config import ENABLE_AI, LEAN_MODE, AI_BACKEND` 使用）
 ENABLE_AI = FeatureConfig.ENABLE_AI
 LEAN_MODE = FeatureConfig.LEAN_MODE
+AI_BACKEND = FeatureConfig.AI_BACKEND
+REPLYBUS_SHADOW = FeatureConfig.REPLYBUS_SHADOW
 
 print(f"[Config] ========== 產品功能開關 ==========", file=sys.stderr)
 print(f"[Config] 精簡獲客模式 (LEAN_MODE): {'啟用' if LEAN_MODE else '關閉'}", file=sys.stderr)
 print(f"[Config] AI 能力 (ENABLE_AI): {'啟用' if ENABLE_AI else '關閉'}", file=sys.stderr)
+print(f"[Config] Replybus 影子模式 (REPLYBUS_SHADOW): {'啟用' if REPLYBUS_SHADOW else '關閉'}", file=sys.stderr)
+print(f"[Config] AI 決策後端 (AI_BACKEND): {AI_BACKEND}", file=sys.stderr)
 print(f"[Config] ====================================", file=sys.stderr)
 
 

@@ -294,9 +294,9 @@ export class AuthService implements OnDestroy {
       
       if (result.success && result.data) {
         if (request.remember) {
-          localStorage.setItem('tgm_remember_me', 'true');
+          localStorage.setItem('mtx_remember_me', 'true');
         } else {
-          localStorage.removeItem('tgm_remember_me');
+          localStorage.removeItem('mtx_remember_me');
         }
         this.setAuthState(result.data);
         this.scheduleTokenRefresh();
@@ -750,7 +750,7 @@ export class AuthService implements OnDestroy {
     
     try {
       // 獲取當前會話 ID（如果有保存的話）
-      const currentSessionId = localStorage.getItem('tgm_session_id') || '';
+      const currentSessionId = localStorage.getItem('mtx_session_id') || '';
       
       const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/devices/revoke-all`, {
         method: 'POST',
@@ -854,7 +854,7 @@ export class AuthService implements OnDestroy {
    * 🔧 修復：同時檢查 Signal 和 localStorage，確保 Token 總能被讀取
    */
   getAuthHeaders(): Record<string, string> {
-    const token = this._accessToken() || localStorage.getItem('tgm_access_token');
+    const token = this._accessToken() || localStorage.getItem('mtx_access_token');
     if (token) {
       return { 'Authorization': `Bearer ${token}` };
     }
@@ -1368,7 +1368,7 @@ export class AuthService implements OnDestroy {
     }
     
     // 🆕 根據"記住我"狀態調整刷新間隔
-    const rememberMe = localStorage.getItem('tgm_remember_me') === 'true';
+    const rememberMe = localStorage.getItem('mtx_remember_me') === 'true';
     // 普通：55 分鐘刷新，記住我：23 小時刷新（假設後端 Token 有效期 1 小時/24 小時）
     const refreshIn = rememberMe ? 23 * 60 * 60 * 1000 : 55 * 60 * 1000;
     

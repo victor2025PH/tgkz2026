@@ -1,5 +1,5 @@
 
-const { app, BrowserWindow, ipcMain, dialog, shell, protocol } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, protocol, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 // 🆕 載入 .env（TELEGRAM_BOT_USERNAME / TELEGRAM_BOT_TOKEN 等），供後端進程繼承
@@ -937,8 +937,8 @@ function startPythonBackend() {
     const resourcesPath = process.resourcesPath || path.dirname(appPath);
     
     // 🔧 修復：打包後優先使用 resourcesPath 中的 exe
-    const backendExeResources = path.join(resourcesPath, 'backend-exe', 'tg-matrix-backend.exe');
-    const backendExe = path.join(appPath, 'backend-exe', 'tg-matrix-backend.exe');
+    const backendExeResources = path.join(resourcesPath, 'backend-exe', 'matrixx-backend.exe');
+    const backendExe = path.join(appPath, 'backend-exe', 'matrixx-backend.exe');
     const pythonScript = path.join(appPath, 'backend', 'main.py');
     
     let useExe = false;
@@ -1999,6 +1999,50 @@ ipcMain.handle('ai-execution:get-active', async (event, payload = {}) => {
 
 // ==================== 文件選擇 API ====================
 // 用於選擇要發送的附件文件，直接傳遞文件路徑而非 base64
+
+// 🔧 2026-07-20 第八阶段新增：本機安全存儲（LICENSE_CONTRACT.md §6④ 續 /
+// security-client.service.ts 會話級請求簽名密鑰的存儲加固）。
+//
+// 背景：token + 會話級請求簽名密鑰目前明文存在 localStorage——若攻擊者能整份拷走
+// 本機用戶數據目錄（不需要反編譯，只需要文件系統訪問權限），就能直接讀到兩者。
+// `safeStorage` 用操作系統級密鑰加密（Windows 為 DPAPI，綁定當前系統用戶賬戶），
+// 加密後的內容拷到另一台機器或另一個系統用戶下**解不開**——收窄"整份拷走本機
+// 存儲"這一類攻擊的效果。注意這**不是**萬能解法：與當前用戶同權限運行的惡意
+// 程序仍可調用同一份 safeStorage API 自行解密（操作系統級限制，任何應用層方案
+// 都繞不開），這一點如實記錄，不誇大修復效果。
+//
+// 只加固「請求簽名密鑰」和「license token」這兩項渲染進程會寫入 localStorage 的
+// 敏感值；不改動其它已有 localStorage 用法，範圍精確收斂。
+ipcMain.handle('secure-storage-encrypt', async (event, payload = {}) => {
+    try {
+        const text = String(payload && payload.text || '');
+        if (!text) return { success: false, error: 'empty_text' };
+        if (!safeStorage || !safeStorage.isEncryptionAvailable()) {
+            return { success: false, error: 'encryption_unavailable' };
+        }
+        const buf = safeStorage.encryptString(text);
+        return { success: true, cipher: buf.toString('base64') };
+    } catch (e) {
+        return { success: false, error: String(e && e.message || e) };
+    }
+});
+
+ipcMain.handle('secure-storage-decrypt', async (event, payload = {}) => {
+    try {
+        const cipher = String(payload && payload.cipher || '');
+        if (!cipher) return { success: false, error: 'empty_cipher' };
+        if (!safeStorage || !safeStorage.isEncryptionAvailable()) {
+            return { success: false, error: 'encryption_unavailable' };
+        }
+        const buf = Buffer.from(cipher, 'base64');
+        const text = safeStorage.decryptString(buf);
+        return { success: true, text };
+    } catch (e) {
+        // 常見於：密文是舊機器/其它系統用戶加密的，本機解不開——調用方應把它當
+        // "這條記錄讀不回了"處理（比如重新走一次心跳/激活拿新值），不是崩潰信號。
+        return { success: false, error: String(e && e.message || e) };
+    }
+});
 
 ipcMain.handle('select-file-for-attachment', async (event, options = {}) => {
     console.log('[IPC] Received: select-file-for-attachment');

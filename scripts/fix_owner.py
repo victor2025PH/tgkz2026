@@ -3,7 +3,7 @@
 import sqlite3
 import sys
 
-DB_PATH = sys.argv[1] if len(sys.argv) > 1 else '/opt/tg-matrix/data/tgmatrix.db'
+DB_PATH = sys.argv[1] if len(sys.argv) > 1 else '/opt/matrixx/data/matrixx.db'
 TENANT_ID = '037affdb-d948-41fe-8f76-10f1c2d8207e'
 
 conn = sqlite3.connect(DB_PATH)

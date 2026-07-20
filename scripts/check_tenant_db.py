@@ -7,7 +7,7 @@ import glob
 DATA_DIR = '/app/data'
 
 # Check main DB
-main_db = os.path.join(DATA_DIR, 'tgmatrix.db')
+main_db = os.path.join(DATA_DIR, 'matrixx.db')
 conn = sqlite3.connect(main_db)
 rows = conn.execute("SELECT phone, owner_user_id, status FROM accounts").fetchall()
 print(f"Main DB ({main_db}): {len(rows)} accounts")

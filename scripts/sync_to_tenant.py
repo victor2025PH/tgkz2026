@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Sync accounts from main tgmatrix.db to tenant database."""
+"""Sync accounts from main matrixx.db to tenant database."""
 import sqlite3
 import sys
 
-MAIN_DB = '/opt/tg-matrix/data/tgmatrix.db'
-TENANT_DB = '/opt/tg-matrix/data/tenants/tenant_037affdbd94841fe8f7610f1c2d8207e.db'
+MAIN_DB = '/opt/matrixx/data/matrixx.db'
+TENANT_DB = '/opt/matrixx/data/tenants/tenant_037affdbd94841fe8f7610f1c2d8207e.db'
 
 main_conn = sqlite3.connect(MAIN_DB)
 main_conn.row_factory = sqlite3.Row

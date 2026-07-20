@@ -19,7 +19,7 @@
 
 | 數據庫 | 路徑 | 用途 | 管理模塊 |
 |--------|------|------|----------|
-| `tgmatrix.db` | `backend/data/` | 帳號管理 | `database.py` |
+| `matrixx.db` | `backend/data/` | 帳號管理 | `database.py` |
 | `tgai_server.db` | `backend/data/` | 業務數據 | `database.py` |
 | `search_history.db` | `backend/data/` | 搜索歷史 | `search_history_service.py` |
 
@@ -39,7 +39,7 @@
 
 | 模塊 | 定位 | 適用場景 |
 |------|------|----------|
-| `database.py` | 主庫（`tgmatrix.db`/`tgai_server.db`）唯一 async 連接來源 | 業務邏輯主流程 |
+| `database.py` | 主庫（`matrixx.db`/`tgai_server.db`）唯一 async 連接來源 | 業務邏輯主流程 |
 | `search_history_service.py` | `search_history.db` 唯一連接來源 | 搜索歷史相關 |
 | `core/tenant_database.py` | 多租戶 SaaS 模式下每租戶獨立 db 的連接來源 | 租戶隔離場景 |
 | `core/db_utils.py` | 同步輔助查詢的唯一合法來源（`get_connection()`/`create_connection()`） | 非 async 上下文的簡單讀寫 |
@@ -53,7 +53,7 @@
 
 ### 表歸屬映射（唯一來源）
 
-#### tgmatrix.db（帳號專用）
+#### matrixx.db（帳號專用）
 | 表名 | 定義位置 | 說明 |
 |------|----------|------|
 | `accounts` | `database.py:_init_db()` | Telegram 帳號 |
@@ -154,7 +154,7 @@ db_path = "D:/tgkz2026/backend/data/tgai_server.db"
 ## 核心表關係圖
 
 ```
-tgmatrix.db                    tgai_server.db
+matrixx.db                     tgai_server.db
 ┌─────────────┐               ┌─────────────────┐
 │  accounts   │──────────────►│ monitored_groups │
 │  (3 records)│               │   (關聯帳號)      │
@@ -282,7 +282,7 @@ search_history.db
 ## 🔴 數據庫持久化防護規範
 
 ### 防止數據丟失的檢查清單
-1. **部署後檢查數據庫路徑** — `docker exec` 進容器確認 `/app/data/tgmatrix.db` 存在
+1. **部署後檢查數據庫路徑** — `docker exec` 進容器確認 `/app/data/matrixx.db` 存在
 2. **Docker Volume 必須掛載** — `docker-compose.yml` 中 `./data:/app/data` 不可刪除
 3. **數據庫操作必須用事務** — 多步驟更新使用 `BEGIN/COMMIT`
 4. **WAL 模式保持開啟** — `PRAGMA journal_mode=WAL` 防止並發寫入衝突
@@ -291,9 +291,9 @@ search_history.db
 ### 數據庫路徑解析優先級
 | 環境 | 路徑 | 注意事項 |
 |------|------|----------|
-| 開發 | `backend/data/tgmatrix.db` | 本地直接訪問 |
-| Docker | `/app/data/tgmatrix.db` | 必須掛載 Volume |
-| Electron | `{userData}/backend-data/tgmatrix.db` | 由 Electron 傳遞路徑 |
+| 開發 | `backend/data/matrixx.db` | 本地直接訪問 |
+| Docker | `/app/data/matrixx.db` | 必須掛載 Volume |
+| Electron | `{userData}/backend-data/matrixx.db` | 由 Electron 傳遞路徑 |
 
 ---
 
@@ -346,7 +346,7 @@ search_history.db
 | **主機** | `165.154.210.154` |
 | **用戶名** | `ubuntu` |
 | **域名** | `tgw.usdt2026.cc` |
-| **部署路徑** | `/opt/tg-matrix` |
+| **部署路徑** | `/opt/matrixx` |
 
 ### SSH 連接命令
 ```bash
@@ -356,7 +356,7 @@ ssh ubuntu@165.154.210.154
 ### 常用運維命令
 ```bash
 # 進入項目目錄
-cd /opt/tg-matrix
+cd /opt/matrixx
 
 # 查看運行狀態
 sudo docker compose ps

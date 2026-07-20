@@ -9,6 +9,9 @@ __pycache__/
 # dist/ - Temporarily enabled for SaaS deployment
 build/
 release/
+release2/
+release-verify/
+release*/
 build-python/
 dist-backend/
 *.dmg

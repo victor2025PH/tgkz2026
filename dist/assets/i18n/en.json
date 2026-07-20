@@ -25,8 +25,8 @@
     "settings": "Settings",
     "resourceManagement": "Resource Management",
     "marketingAutomation": "Marketing Automation",
-    "aiIntelligence": "AI & Intelligence",
-    "systemMonitor": "System Monitor",
+    "aiIntelligence": "AI Settings",
+    "systemMonitor": "System Settings",
     "resourceDiscovery": "Resource Discovery",
     "aiCenter": "AI Center",
     "aiEngine": "Smart Engine",
@@ -40,12 +40,14 @@
     "monitoring": "Monitoring",
     "membershipCenter": "Membership Center",
     "myWallet": "My Wallet",
-    "manualOperations": "Manual Operations",
+    "manualOperations": "Management",
     "searchDiscovery": "Search Discovery",
+    "searchDiscoveryHint": "Discover groups and channels",
     "resourceCenter": "Resource Center",
-    "sendConsole": "Send Console",
-    "automationOverview": "Automation Overview",
-    "configAndStatus": "Configuration & Status",
+    "resourceCenterHint": "My saved resources",
+    "sendConsole": "Broadcast Manager",
+    "automationOverview": "Automation Settings",
+    "configAndStatus": "Config & Status",
     "monitorAccounts": "Monitor Accounts",
     "monitorGroups": "Monitor Groups",
     "knowledgeBrain": "Knowledge Brain",
@@ -60,7 +62,7 @@
     "keywordSets": "Keyword Sets",
     "chatTemplates": "Chat Templates",
     "triggerRules": "Trigger Rules",
-    "collectedUsers": "Collected Users",
+    "collectedUsers": "Captured Users",
     "aiMarketing": "AI Marketing",
     "aiAssistant": "AI Assistant",
     "dataBrain": "Data Brain"
@@ -166,6 +168,8 @@
     "allStatus": "All Status",
     "allGroups": "All Groups",
     "tags": "Tags",
+    "selectTags": "Select tags",
+    "manageTags": "Manage tags",
     "manageGroups": "Manage Groups",
     "online": "Online",
     "offline": "Offline",
@@ -200,6 +204,9 @@
     "allAccounts": "All Accounts",
     "phone": "Phone",
     "manageAccounts": "Manage Accounts",
+    "apiCredentialsPool": "API Credential Pool",
+    "scanLogin": "Scan to Login",
+    "importing": "Importing...",
     "addNewAccount": "Add New Account",
     "username": "Username",
     "lastActive": "Last Active",
@@ -208,7 +215,6 @@
     "disconnected": "Disconnected",
     "connecting": "Connecting...",
     "loginRequired": "Login Required",
-    "banned": "Banned",
     "limited": "Limited",
     "sessionFile": "Session File",
     "connectionTest": "Test Connection",
@@ -355,6 +361,17 @@
   },
   "settings": {
     "title": "Settings",
+    "tabs": {
+      "appearance": "Appearance",
+      "notifications": "Notifications",
+      "help": "Help",
+      "backup": "Backup",
+      "scheduler": "Scheduler",
+      "about": "About"
+    },
+    "notificationsDesc": "View system notifications and alerts here. Click the bell to expand the list.",
+    "helpDesc": "Onboarding and frequently asked questions.",
+    "openOnboarding": "Open onboarding guide",
     "appearance": "Appearance",
     "language": "Language",
     "theme": "Theme",
@@ -380,7 +397,43 @@
     "help": "Help",
     "settingsTitle": "Settings",
     "settingsAutoSaveHint": "Settings auto-save on change",
-    "localAiConfiguration": "Local AI Configuration"
+    "localAiConfiguration": "Local AI Configuration",
+    "themeSettings": "Theme",
+    "darkTheme": "Dark theme",
+    "lightTheme": "Light theme",
+    "followSystem": "Follow system",
+    "languageSettings": "Language",
+    "backupManagement": "Backup",
+    "creating": "Creating...",
+    "refresh": "Refresh",
+    "backupName": "Backup name",
+    "createdAt": "Created at",
+    "size": "Size",
+    "action": "Action",
+    "restore": "Restore",
+    "noBackups": "No backups",
+    "taskScheduler": "Task Scheduler",
+    "stop": "Stop",
+    "start": "Start",
+    "status": "Status",
+    "running": "Running",
+    "stopped": "Stopped",
+    "uptime": "Uptime",
+    "totalTasks": "Total tasks",
+    "activeTasks": "Active tasks",
+    "taskName": "Task name",
+    "interval": "Interval",
+    "lastRun": "Last run",
+    "execute": "Run",
+    "never": "Never",
+    "noScheduledTasks": "No scheduled tasks",
+    "membershipInfo": "Membership",
+    "versionInfo": "Version",
+    "buildDate": "Build date",
+    "techStack": "Tech stack",
+    "animationMode": "Animation",
+    "validUntil": "Valid until",
+    "permanent": "Permanent"
   },
   "monitoring": {
     "title": "Monitoring",
@@ -439,6 +492,7 @@
     "expiresOn": "Expires on",
     "daysRemaining": "{{days}} days remaining",
     "accountQuota": "Account Quota",
+    "upgradeUnlock": "Upgrade for more",
     "dailyMessages": "Daily Messages",
     "dailyAiCalls": "Daily AI Calls",
     "features": "Features",
@@ -729,6 +783,7 @@
     "openTelegramApp": "Open Telegram App to Login",
     "clickConfirmInTelegram": "Please click \"Confirm Login\" in Telegram",
     "remainingTime": "Remaining: {{seconds}}s",
+    "orEnterCode": "Or enter code",
     "cancel": "Cancel",
     "useTelegramWidget": "Use Telegram Widget to Login",
     "widgetHint": "For users already logged into Telegram in browser"
@@ -794,12 +849,24 @@
     "displayName": "Display Name",
     "avatarUrl": "Avatar URL",
     "updateProfile": "Update Profile",
+    "saveProfileError": "Save failed, please try again",
     "revokeSession": "Revoke",
     "revokeAllSessions": "Revoke All Other Sessions",
     "createApiKey": "Create API Key",
     "deleteApiKey": "Delete",
     "lastUsed": "Last Used",
-    "neverUsed": "Never Used"
+    "neverUsed": "Never Used",
+    "logoutSectionTitle": "Sign Out",
+    "logoutSectionDesc": "After signing out you will be redirected to the login page. You will need to sign in again to continue. This only signs out the current device.",
+    "logoutConfirmText": "Are you sure you want to sign out? You will need to sign in again to continue.",
+    "logoutConfirmButton": "Sign Out",
+    "loadingApiKeys": "Loading...",
+    "apiKeyCreatedOnce": "API key created. Please save it securely. It will only be shown once.",
+    "apiKeyNamePrompt": "Enter a name for this key (for identification)",
+    "apiKeyNamePlaceholder": "Unnamed Key",
+    "copyKey": "Copy",
+    "deleteApiKeyConfirm": "Delete this API key? This cannot be undone.",
+    "logoutUnsavedHint": "You have unsaved profile changes. Sign out anyway?"
   },
   "notification": {
     "center": "Notification Center",
@@ -908,24 +975,6 @@
   },
   "p15": {
     "queueRecovery": "Queue Recovery",
-    "recoveredMessages": "Recovered pending messages",
-    "abTestSelect": "Select A/B Test (Optional)",
-    "abTestNone": "Don't Use",
-    "abTestAutoSelect": "Backend will auto-select template variant",
-    "notifications": "Notifications",
-    "noNotifications": "No notifications",
-    "markAllRead": "Mark All Read",
-    "deadLetterAlert": "Message delivery failed",
-    "enteredDeadLetter": "entered dead letter queue",
-    "contacts": "Contacts",
-    "contactsTotal": "Total Contacts",
-    "recentAdded": "Added Recently",
-    "byStatus": "By Status",
-    "bySource": "By Source",
-    "httpFallback": "HTTP API mode active"
-  },
-  "p15": {
-    "queueRecovery": "Queue Recovery",
     "queueRecoveryDesc": "Pending messages restored on restart",
     "contactsApi": "Contacts API",
     "contactsApiDesc": "Load contacts via REST in HTTP mode",
@@ -933,5 +982,104 @@
     "abTestInBatchDesc": "Select a running test to auto-pick variant",
     "businessNotify": "Business Notifications",
     "businessNotifyDesc": "Scoring, dedup, A/B results in notification center"
+  },
+  "dashboardSetup": {
+    "title": "Get your first acquisition pipeline running",
+    "subtitle": "Complete 5 setup steps — the system will monitor keywords, nurture leads with AI, and collect prospects automatically",
+    "progressLabel": "Setup progress",
+    "next": "Next",
+    "steps": {
+      "account": {
+        "label": "Add account",
+        "desc": "Connect your Telegram account"
+      },
+      "groups": {
+        "label": "Add monitored groups",
+        "desc": "Choose target groups to listen to"
+      },
+      "keywords": {
+        "label": "Set keywords",
+        "desc": "Define keywords that trigger leads"
+      },
+      "rules": {
+        "label": "Configure trigger rules",
+        "desc": "Set automatic actions on match"
+      },
+      "monitor": {
+        "label": "Start monitoring",
+        "desc": "One click to start acquiring"
+      }
+    }
+  },
+  "monitoringSetup": {
+    "title": "Complete monitoring setup",
+    "subtitle": "Groups (where) → Keywords (what) → Rules (then what)",
+    "progressLabel": "Setup progress",
+    "next": "Next"
+  },
+  "emptyStates": {
+    "resourceCenter": {
+      "title": "Welcome to Resource Center",
+      "description": "Your library of groups and channels. Save resources to manage them in batches here.",
+      "cta": "Find resources in Search & Discover"
+    },
+    "searchFailed": {
+      "title": "Search failed",
+      "cta": "Retry"
+    },
+    "noAccount": {
+      "title": "No account available",
+      "description": "Add and log in a Telegram account to search and join groups",
+      "cta": "Add account"
+    },
+    "searchStart": {
+      "title": "Start discovering groups",
+      "description": "Enter keywords to search Telegram groups and channels",
+      "cta": "Start searching"
+    },
+    "triggerRules": {
+      "title": "No trigger rules yet",
+      "description": "Trigger rules let AI act automatically on keyword matches — reply, send templates, or start nurturing chats",
+      "cta": "Create your first rule"
+    },
+    "templates": {
+      "title": "No templates yet",
+      "titleFiltered": "No matching templates",
+      "cta": "Create your first template"
+    },
+    "templateSelect": {
+      "title": "Select or create a template",
+      "description": "Pick a template on the left to view details, or create a new one",
+      "cta": "Create template"
+    },
+    "monitoringAccounts": {
+      "title": "No monitoring accounts",
+      "description": "Add an account in Account Management and set it as a listener",
+      "cta": "Add account"
+    },
+    "monitoringGroups": {
+      "title": "No monitored groups yet",
+      "description": "Monitored groups listen for keywords, extract members and collect leads automatically",
+      "cta": "Go to Search & Discover",
+      "secondary": "+ Add URL manually"
+    },
+    "leads": {
+      "title": "Send list is empty",
+      "description": "Add customers to the send list before batch messaging",
+      "cta": "Go to Resource Center"
+    },
+    "keywordSets": {
+      "title": "No keyword sets yet",
+      "description": "Keyword sets define trigger words to catch in monitored groups.\nMatched messages automatically become leads.",
+      "cta": "Create your first keyword set"
+    },
+    "accountsFiltered": {
+      "title": "No matching accounts",
+      "description": "Try adjusting your search or filters"
+    },
+    "collectedUsers": {
+      "title": "No collected users yet",
+      "description": "Once group monitoring is on, speakers are collected automatically"
+    }
   }
 }

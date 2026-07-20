@@ -22,12 +22,13 @@ import { ToastService } from '../toast.service';
 import { DialogService, ExportService } from '../services';
 import { UnifiedContactsService, UnifiedContact } from '../services/unified-contacts.service';
 import { LeadScoringPanelComponent } from '../lead-nurturing/lead-scoring-panel.component';
+import { EmptyStateComponent } from '../components/empty-state.component';
 
 @Component({
   selector: 'app-leads-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, LeadScoringPanelComponent],
+  imports: [CommonModule, FormsModule, LeadScoringPanelComponent, EmptyStateComponent],
   template: `
     <div class="page-content">
       <!-- 🔧 頁面標題 + 操作按鈕 -->
@@ -249,15 +250,12 @@ import { LeadScoringPanelComponent } from '../lead-nurturing/lead-scoring-panel.
       <!-- 客戶列表 / 卡片 -->
       <div class="rounded-xl overflow-hidden" style="background-color: var(--bg-card); border: 1px solid var(--border-color);">
         @if (filteredContacts().length === 0) {
-          <div class="p-12 text-center" style="color: var(--text-muted);">
-            <span class="text-5xl mb-4 block">📭</span>
-            <p class="text-lg mb-2">暫無客戶數據</p>
-            <p class="text-sm mb-4">請先到「資源中心」添加客戶，或從監控群組自動收集</p>
-            <button (click)="goToResourceCenter()" 
-                    class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition-colors">
-              前往資源中心 →
-            </button>
-          </div>
+          <app-empty-state iconKind="inbox"
+                           title="暫無客戶數據"
+                           description="請先到「資源中心」添加客戶，或從監控群組自動收集"
+                           ctaLabel="前往資源中心"
+                           (cta)="goToResourceCenter()">
+          </app-empty-state>
         } @else if (viewMode() === 'card') {
           <!-- 卡片視圖 -->
           <div class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

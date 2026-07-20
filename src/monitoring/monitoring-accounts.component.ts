@@ -2,40 +2,42 @@
  * 監控帳號管理頁面
  * 使用 MonitoringStateService 統一管理數據
  */
-import { Component, signal, computed, inject, OnInit, output } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, output, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MonitoringStateService, MonitoringAccount } from './monitoring-state.service';
 import { ConfigProgressComponent } from './config-progress.component';
 import { ElectronIpcService } from '../electron-ipc.service';
 import { ToastService } from '../toast.service';
+import { EmptyStateComponent } from '../components/empty-state.component';
 
 @Component({
   selector: 'app-monitoring-accounts',
   standalone: true,
-  imports: [CommonModule, FormsModule, ConfigProgressComponent],
+  imports: [CommonModule, FormsModule, ConfigProgressComponent, EmptyStateComponent],
   template: `
-    <div class="h-full flex flex-col bg-slate-900 p-6">
-      <!-- 頂部標題 -->
-      <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-3">
-          <div class="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center">
-            <span class="text-2xl">🤖</span>
+    <div class="h-full flex flex-col p-6" [style.background-color]="embedded() ? 'transparent' : 'var(--bg-primary)'">
+      <div class="flex items-center justify-between mb-6" [class.mb-4]="embedded()">
+        @if (!embedded()) {
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center">
+              <span class="text-2xl">🤖</span>
+            </div>
+            <div>
+              <h1 class="text-2xl font-bold" style="color: var(--text-primary);">監控帳號管理</h1>
+              <p class="text-sm" style="color: var(--text-muted);">管理用於監控群組消息的 Telegram 帳號</p>
+            </div>
           </div>
-          <div>
-            <h1 class="text-2xl font-bold text-white">監控帳號管理</h1>
-            <p class="text-sm text-slate-400">管理用於監控群組消息的 Telegram 帳號</p>
-          </div>
-        </div>
+        } @else {
+          <div class="text-sm font-medium" style="color: var(--text-secondary);">帳號列表</div>
+        }
         <div class="flex items-center gap-3">
-          <!-- 配置進度（緊湊模式） -->
-          <app-config-progress 
-            mode="compact" 
-            (action)="handleConfigAction($event)">
-          </app-config-progress>
-          
+          @if (!embedded()) {
+            <app-config-progress mode="compact" (action)="handleConfigAction($event)"></app-config-progress>
+          }
           <button (click)="refreshData()"
-                  class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors flex items-center gap-2">
+                  class="px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                  style="background-color: var(--bg-tertiary); color: var(--text-primary);">
             <span [class.animate-spin]="stateService.isLoading()">🔄</span>
             <span>刷新</span>
           </button>
@@ -155,15 +157,12 @@ import { ToastService } from '../toast.service';
                 </div>
               </div>
             } @empty {
-              <div class="text-center py-12 text-slate-400">
-                <div class="text-5xl mb-4">👤</div>
-                <h3 class="text-lg font-medium text-white mb-2">暫無監控帳號</h3>
-                <p class="text-sm mb-4">請在帳戶管理中添加帳號並設為監聽角色</p>
-                <button (click)="navigateToAccountManagement()"
-                        class="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-colors">
-                  + 添加帳號
-                </button>
-              </div>
+              <app-empty-state iconKind="user"
+                               title="暫無監控帳號"
+                               description="請在帳戶管理中添加帳號並設為監聽角色"
+                               ctaLabel="添加帳號"
+                               (cta)="navigateToAccountManagement()">
+              </app-empty-state>
             }
           </div>
         </div>
@@ -289,6 +288,9 @@ export class MonitoringAccountsComponent implements OnInit {
   stateService = inject(MonitoringStateService);
   private ipcService = inject(ElectronIpcService);
   private toastService = inject(ToastService);
+
+  /** 嵌入監控殼層時隱藏重複標題/進度條 */
+  embedded = input(false);
 
   // 配置動作事件
   configAction = output<string>();

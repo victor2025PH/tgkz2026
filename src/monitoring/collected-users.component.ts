@@ -8,6 +8,7 @@ import { FormsModule } from '@angular/forms';
 import { ElectronIpcService } from '../electron-ipc.service';
 import { ToastService } from '../toast.service';
 import { ConfirmDialogService } from '../confirm-dialog.service';
+import { EmptyStateComponent } from '../components/empty-state.component';
 
 // 收集用戶接口
 interface CollectedUser {
@@ -52,7 +53,7 @@ interface CollectedUsersStats {
 @Component({
   selector: 'app-collected-users',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, EmptyStateComponent],
   template: `
     <div class="h-full flex flex-col bg-slate-900 p-6">
       <!-- 頂部標題 -->
@@ -227,11 +228,10 @@ interface CollectedUsersStats {
               <div class="animate-spin w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full"></div>
             </div>
           } @else if (filteredUsers().length === 0) {
-            <div class="flex flex-col items-center justify-center h-40 text-slate-500">
-              <span class="text-4xl mb-2">📭</span>
-              <p>暫無收集的用戶</p>
-              <p class="text-sm">開啟群組監控後，系統會自動收集發言者</p>
-            </div>
+            <app-empty-state iconKind="inbox" [compact]="true"
+                             title="暫無收集的用戶"
+                             description="開啟群組監控後，系統會自動收集發言者">
+            </app-empty-state>
           } @else {
             <div class="grid gap-2">
               @for (user of filteredUsers(); track user.telegram_id) {

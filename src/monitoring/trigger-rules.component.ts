@@ -2,7 +2,7 @@
  * 觸發規則管理頁面
  * 定義關鍵詞匹配後的響應動作
  */
-import { Component, signal, computed, inject, OnInit, OnDestroy, effect } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, OnDestroy, effect, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MonitoringStateService } from './monitoring-state.service';
@@ -10,6 +10,7 @@ import { ConfigProgressComponent } from './config-progress.component';
 import { ElectronIpcService } from '../electron-ipc.service';
 import { ToastService } from '../toast.service';
 import { ConfirmDialogService } from '../confirm-dialog.service';
+import { EmptyStateComponent } from '../components/empty-state.component';
 
 // 觸發規則接口
 interface TriggerRule {
@@ -52,32 +53,33 @@ interface TriggerRule {
 @Component({
   selector: 'app-trigger-rules',
   standalone: true,
-  imports: [CommonModule, FormsModule, ConfigProgressComponent],
+  imports: [CommonModule, FormsModule, ConfigProgressComponent, EmptyStateComponent],
   template: `
-    <div class="h-full flex flex-col bg-slate-900 p-6">
-      <!-- 頂部標題 -->
-      <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-3">
-          <div class="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center">
-            <span class="text-2xl">⚡</span>
+    <div class="h-full flex flex-col p-6" [style.background-color]="embedded() ? 'transparent' : 'var(--bg-primary)'">
+      <div class="flex items-center justify-between mb-6" [class.mb-4]="embedded()">
+        @if (!embedded()) {
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center">
+              <span class="text-2xl">⚡</span>
+            </div>
+            <div>
+              <h1 class="text-2xl font-bold" style="color: var(--text-primary);">觸發規則</h1>
+              <p class="text-sm" style="color: var(--text-muted);">定義關鍵詞匹配後的響應動作</p>
+            </div>
           </div>
-          <div>
-            <h1 class="text-2xl font-bold text-white">觸發規則</h1>
-            <p class="text-sm text-slate-400">定義關鍵詞匹配後的響應動作</p>
-          </div>
-        </div>
+        } @else {
+          <div class="text-sm font-medium" style="color: var(--text-secondary);">規則列表</div>
+        }
         <div class="flex items-center gap-3">
-          <app-config-progress 
-            mode="compact" 
-            (action)="handleConfigAction($event)">
-          </app-config-progress>
-          
+          @if (!embedded()) {
+            <app-config-progress mode="compact" (action)="handleConfigAction($event)"></app-config-progress>
+          }
           <button (click)="refreshData()"
-                  class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors flex items-center gap-2">
+                  class="px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                  style="background-color: var(--bg-tertiary); color: var(--text-primary);">
             <span [class.animate-spin]="isLoading()">🔄</span>
             <span>刷新</span>
           </button>
-          
           <button (click)="openCreateWizard()"
                   class="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg transition-colors flex items-center gap-2">
             <span>+</span>
@@ -278,25 +280,18 @@ interface TriggerRule {
                 }
               </div>
             } @else {
-              <!-- 空狀態 -->
-              <div class="flex flex-col items-center justify-center h-full text-center py-12">
-                <div class="w-20 h-20 bg-slate-700/50 rounded-full flex items-center justify-center mb-4">
-                  <span class="text-4xl">⚡</span>
-                </div>
-                <h3 class="text-lg font-medium text-white mb-2">還沒有觸發規則</h3>
-                <p class="text-slate-400 mb-6 max-w-md">
-                  觸發規則定義了當關鍵詞匹配後系統的響應方式。<br>
-                  您可以為不同的關鍵詞設置不同的響應動作。
-                </p>
-                @if (aiChatEnabled()) {
-                  <p class="text-emerald-400 text-sm mb-4">
-                    💡 AI 自動聊天已開啟，將作為默認響應方式
-                  </p>
-                }
-                <button (click)="openCreateWizard()"
-                        class="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl transition-colors flex items-center gap-2">
-                  <span>🚀</span> 創建第一個規則
-                </button>
+              <div class="h-full flex items-center justify-center">
+                <app-empty-state iconKind="bolt"
+                                 title="還沒有觸發規則"
+                                 description="觸發規則定義了當關鍵詞匹配後系統的響應方式。&#10;您可以為不同的關鍵詞設置不同的響應動作。"
+                                 ctaLabel="創建第一個規則"
+                                 (cta)="openCreateWizard()">
+                  @if (aiChatEnabled()) {
+                    <p class="text-sm mb-4" style="color: var(--success);">
+                      💡 AI 自動聊天已開啟，將作為默認響應方式
+                    </p>
+                  }
+                </app-empty-state>
               </div>
             }
           </div>
@@ -764,6 +759,8 @@ interface TriggerRule {
   `
 })
 export class TriggerRulesComponent implements OnInit, OnDestroy {
+  /** 嵌入監控殼層時隱藏重複標題/進度條 */
+  embedded = input(false);
   stateService = inject(MonitoringStateService);
   private ipcService = inject(ElectronIpcService);
   private toastService = inject(ToastService);

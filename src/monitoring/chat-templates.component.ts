@@ -10,6 +10,7 @@ import { ElectronIpcService } from '../electron-ipc.service';
 import { ToastService } from '../toast.service';
 import { ConfirmDialogService } from '../confirm-dialog.service';
 import { MonitoringStateService } from './monitoring-state.service';
+import { EmptyStateComponent } from '../components/empty-state.component';
 
 // 模板數據接口
 export interface ChatTemplateData {
@@ -36,7 +37,7 @@ const TEMPLATE_TYPES = {
 @Component({
   selector: 'app-chat-templates',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, EmptyStateComponent],
   template: `
     <div class="h-full flex bg-slate-900">
       <!-- 左側模板列表 -->
@@ -89,12 +90,11 @@ const TEMPLATE_TYPES = {
         <!-- 模板列表 -->
         <div class="flex-1 overflow-y-auto p-2">
           @if (filteredTemplates().length === 0) {
-            <div class="p-4 text-center text-slate-500">
-              <p>{{ searchQuery || filterType !== 'all' ? '沒有符合的模板' : '還沒有模板' }}</p>
-              <button (click)="createNewTemplate()" class="mt-2 text-pink-400 hover:underline text-sm">
-                + 創建第一個模板
-              </button>
-            </div>
+            <app-empty-state iconKind="chat" [compact]="true"
+                             [title]="searchQuery || filterType !== 'all' ? '沒有符合的模板' : '還沒有模板'"
+                             ctaLabel="創建第一個模板"
+                             (cta)="createNewTemplate()">
+            </app-empty-state>
           } @else {
             @for (template of filteredTemplates(); track template.id) {
               <div (click)="selectTemplate(template)"
@@ -134,19 +134,13 @@ const TEMPLATE_TYPES = {
       <!-- 右側詳情/編輯區 -->
       <div class="flex-1 flex flex-col">
         @if (!selectedTemplate() && !isCreating()) {
-          <!-- 空狀態 -->
           <div class="flex-1 flex items-center justify-center">
-            <div class="text-center">
-              <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span class="text-5xl">💬</span>
-              </div>
-              <h3 class="text-lg font-medium text-white mb-2">選擇或創建聊天模板</h3>
-              <p class="text-slate-400 mb-4">從左側選擇一個模板查看詳情，或創建新模板</p>
-              <button (click)="createNewTemplate()"
-                      class="px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg">
-                + 創建新模板
-              </button>
-            </div>
+            <app-empty-state iconKind="chat"
+                             title="選擇或創建聊天模板"
+                             description="從左側選擇一個模板查看詳情，或創建新模板"
+                             ctaLabel="創建新模板"
+                             (cta)="createNewTemplate()">
+            </app-empty-state>
           </div>
         } @else {
           <!-- 編輯區頂部 -->

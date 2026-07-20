@@ -11,12 +11,15 @@ P15-2: 数据库健康监控 — 统一聚合 ConnectionPool + ConnectionStats +
 
 import os
 import time
-import sqlite3
 import logging
 import threading
 from typing import Dict, Any, Optional, List
 from collections import deque
 from datetime import datetime
+
+# 🔧 改用合法連接模塊 core.db_utils（見 .cursorrules 合法連接模塊清單），
+# 不再直接 sqlite3.connect()，路徑解析也統一交由 resolve_db_path() 處理。
+from core.db_utils import create_connection, resolve_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +137,10 @@ class DbHealthMonitor:
             return {'error': 'db_path not found'}
 
         try:
-            conn = sqlite3.connect(db_path, timeout=5)
+            # 🔧 wal=False/row_factory=False：此處是「診斷讀取」，刻意不套用
+            # create_connection() 預設的 WAL/PRAGMA 標準化，避免診斷本身反而
+            # 改寫了 journal_mode/cache_size/synchronous 等正要檢測的數值。
+            conn = create_connection(db_path, wal=False, row_factory=False)
             diag = {}
 
             # WAL 模式
@@ -219,7 +225,7 @@ class DbHealthMonitor:
             wal_mb = diag.get('wal_size_mb', 0)
             if wal_mb > self.WAL_CHECKPOINT_THRESHOLD_MB and (now - self._last_checkpoint_time > self._checkpoint_cooldown):
                 try:
-                    conn = sqlite3.connect(db_path, timeout=10)
+                    conn = create_connection(db_path)
                     result = conn.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()
                     conn.close()
                     self._last_checkpoint_time = now
@@ -241,7 +247,11 @@ class DbHealthMonitor:
             frag = diag.get('fragmentation_pct', 0)
             if frag > self.FRAGMENTATION_VACUUM_THRESHOLD and (now - self._last_vacuum_time > self._vacuum_cooldown):
                 try:
-                    conn = sqlite3.connect(db_path, timeout=60)
+                    conn = create_connection(db_path)
+                    # VACUUM 需要改寫整個檔案，耗時可能較長；沿用舊版 timeout=60 的
+                    # 等待耐心（create_connection() 預設 30s），避免大型資料庫因鎖等待
+                    # 提前被判定為 database is locked。
+                    conn.execute('PRAGMA busy_timeout=60000')
                     conn.execute('VACUUM')
                     conn.close()
                     self._last_vacuum_time = now
@@ -265,15 +275,14 @@ class DbHealthMonitor:
     # ==================== 辅助 ====================
 
     def _resolve_db_path(self) -> Optional[str]:
-        """解析数据库路径"""
+        """解析数据库路径
+
+        🔧 改用 core.db_utils.resolve_db_path()（見 .cursorrules 合法連接模塊清單）。
+        舊寫法只檢查 DB_PATH 環境變量（本服務從未設置，恒為 None）便直接跳到硬編碼
+        相對路徑，且未讀取 config.DATABASE_PATH，在 Electron 封裝模式下不會考慮
+        TG_DATA_DIR 持久化路徑。所有呼叫端都會再自行 os.path.exists() 檢查一次，
+        故此處即使解析出的路徑不存在也不影響既有行為。
+        """
         if self._db_path:
             return self._db_path
-        # 尝试从环境变量获取
-        db_path = os.environ.get('DB_PATH')
-        if db_path:
-            return db_path
-        # 默认路径
-        default = os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
-        if os.path.exists(default):
-            return default
-        return None
+        return resolve_db_path()

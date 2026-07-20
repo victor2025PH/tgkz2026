@@ -9,7 +9,6 @@
 """
 
 import os
-import sqlite3
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
@@ -19,6 +18,10 @@ import threading
 import json
 import secrets
 import string
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -148,76 +151,74 @@ class CouponService:
         """初始化數據庫表"""
         try:
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # 優惠券表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS coupons (
-                    id TEXT PRIMARY KEY,
-                    code TEXT UNIQUE NOT NULL,
-                    name TEXT,
-                    type TEXT NOT NULL,
-                    value INTEGER NOT NULL,
-                    min_purchase INTEGER DEFAULT 0,
-                    max_discount INTEGER DEFAULT 0,
-                    applicable_tiers TEXT,
-                    applicable_products TEXT,
-                    max_uses INTEGER DEFAULT -1,
-                    max_uses_per_user INTEGER DEFAULT 1,
-                    current_uses INTEGER DEFAULT 0,
-                    valid_from TEXT,
-                    valid_until TEXT,
-                    status TEXT DEFAULT 'active',
-                    campaign_id TEXT,
-                    description TEXT,
-                    created_at TEXT
-                )
-            ''')
-            
-            # 優惠券使用記錄表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS coupon_usages (
-                    id TEXT PRIMARY KEY,
-                    coupon_id TEXT NOT NULL,
-                    user_id TEXT NOT NULL,
-                    order_id TEXT,
-                    discount_amount INTEGER,
-                    used_at TEXT
-                )
-            ''')
-            
-            # 促銷活動表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS campaigns (
-                    id TEXT PRIMARY KEY,
-                    name TEXT,
-                    description TEXT,
-                    start_at TEXT,
-                    end_at TEXT,
-                    coupon_ids TEXT,
-                    auto_apply INTEGER DEFAULT 0,
-                    banner_url TEXT,
-                    is_active INTEGER DEFAULT 1,
-                    created_at TEXT
-                )
-            ''')
-            
-            # 索引
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_coupons_code ON coupons(code)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_coupon_usages_user ON coupon_usages(user_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_coupon_usages_coupon ON coupon_usages(coupon_id)')
-            
-            conn.commit()
-            conn.close()
-            
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                # 優惠券表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS coupons (
+                        id TEXT PRIMARY KEY,
+                        code TEXT UNIQUE NOT NULL,
+                        name TEXT,
+                        type TEXT NOT NULL,
+                        value INTEGER NOT NULL,
+                        min_purchase INTEGER DEFAULT 0,
+                        max_discount INTEGER DEFAULT 0,
+                        applicable_tiers TEXT,
+                        applicable_products TEXT,
+                        max_uses INTEGER DEFAULT -1,
+                        max_uses_per_user INTEGER DEFAULT 1,
+                        current_uses INTEGER DEFAULT 0,
+                        valid_from TEXT,
+                        valid_until TEXT,
+                        status TEXT DEFAULT 'active',
+                        campaign_id TEXT,
+                        description TEXT,
+                        created_at TEXT
+                    )
+                ''')
+
+                # 優惠券使用記錄表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS coupon_usages (
+                        id TEXT PRIMARY KEY,
+                        coupon_id TEXT NOT NULL,
+                        user_id TEXT NOT NULL,
+                        order_id TEXT,
+                        discount_amount INTEGER,
+                        used_at TEXT
+                    )
+                ''')
+
+                # 促銷活動表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS campaigns (
+                        id TEXT PRIMARY KEY,
+                        name TEXT,
+                        description TEXT,
+                        start_at TEXT,
+                        end_at TEXT,
+                        coupon_ids TEXT,
+                        auto_apply INTEGER DEFAULT 0,
+                        banner_url TEXT,
+                        is_active INTEGER DEFAULT 1,
+                        created_at TEXT
+                    )
+                ''')
+
+                # 索引
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_coupons_code ON coupons(code)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_coupon_usages_user ON coupon_usages(user_id)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_coupon_usages_coupon ON coupon_usages(coupon_id)')
+
+                conn.commit()
+
         except Exception as e:
             logger.error(f"Init coupon DB error: {e}")
-    
+
     def _get_db(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        """獲取數據庫連接（統一經由 core.db_utils.create_connection，調用方負責關閉）"""
+        return create_connection(self.db_path)
     
     def _generate_code(self, length: int = 8) -> str:
         """生成優惠碼"""

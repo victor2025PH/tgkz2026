@@ -19,10 +19,15 @@ from typing import Optional, Dict, Any, List, Tuple, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'alert_escalation.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 alert_escalation.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'alert_escalation.db')
 
 
 class EscalationLevel(str, Enum):
@@ -164,7 +169,7 @@ class AlertEscalationManager:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 值班表
@@ -257,7 +262,7 @@ class AlertEscalationManager:
     def create_schedule(self, schedule: OnCallSchedule) -> bool:
         """創建值班表"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -280,7 +285,7 @@ class AlertEscalationManager:
     
     def list_schedules(self, level: Optional[str] = None) -> List[Dict]:
         """列出值班表"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         if level:
@@ -354,7 +359,7 @@ class AlertEscalationManager:
     def create_policy(self, policy: EscalationPolicy) -> bool:
         """創建升級策略"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -376,7 +381,7 @@ class AlertEscalationManager:
     
     def list_policies(self) -> List[Dict]:
         """列出升級策略"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM escalation_policies ORDER BY is_default DESC')
         rows = cursor.fetchall()
@@ -394,7 +399,7 @@ class AlertEscalationManager:
     
     def get_policy(self, policy_id: str) -> Optional[Dict]:
         """獲取策略"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM escalation_policies WHERE id = ?', (policy_id,))
         row = cursor.fetchone()
@@ -414,7 +419,7 @@ class AlertEscalationManager:
     
     def get_default_policy(self) -> Optional[Dict]:
         """獲取默認策略"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM escalation_policies WHERE is_default = 1 LIMIT 1')
         row = cursor.fetchone()
@@ -459,7 +464,7 @@ class AlertEscalationManager:
         
         now = datetime.now().isoformat()
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -515,7 +520,7 @@ class AlertEscalationManager:
             "reason": reason
         })
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE escalation_alerts 
@@ -544,7 +549,7 @@ class AlertEscalationManager:
             "user_id": user_id
         })
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE escalation_alerts 
@@ -571,7 +576,7 @@ class AlertEscalationManager:
             "resolution": resolution
         })
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE escalation_alerts 
@@ -585,7 +590,7 @@ class AlertEscalationManager:
     
     def _get_alert(self, alert_id: str) -> Optional[Dict]:
         """獲取告警"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM escalation_alerts WHERE id = ?', (alert_id,))
         row = cursor.fetchone()
@@ -618,7 +623,7 @@ class AlertEscalationManager:
         limit: int = 100
     ) -> List[Dict]:
         """列出告警"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM escalation_alerts WHERE 1=1'
@@ -723,7 +728,7 @@ class AlertEscalationManager:
                 logger.warning(error)
             
             # 記錄通知
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO notification_logs 
@@ -784,7 +789,7 @@ class AlertEscalationManager:
     
     def get_stats(self) -> Dict[str, Any]:
         """獲取統計信息"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 按狀態統計

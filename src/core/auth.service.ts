@@ -154,7 +154,7 @@ export class AuthService implements OnDestroy {
       'free': 'bronze',
       'basic': 'silver',
       'pro': 'gold',
-      'enterprise': 'diamond',
+      'enterprise': 'king',  // 🔧 对齐后端 level_config.from_string(enterprise)→king
       // 🔧 直接映射（數據庫可能直接存儲等級名稱）
       'bronze': 'bronze',
       'silver': 'silver',

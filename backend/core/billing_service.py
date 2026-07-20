@@ -11,7 +11,6 @@
 """
 
 import os
-import sqlite3
 import logging
 from datetime import datetime, timedelta, date
 from typing import Optional, List, Dict, Any
@@ -19,6 +18,10 @@ from dataclasses import dataclass, field, asdict
 from enum import Enum
 import threading
 import json
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -256,91 +259,89 @@ class BillingService:
         """初始化數據庫表"""
         try:
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # 賬單項目表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS billing_items (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    billing_type TEXT NOT NULL,
-                    amount INTEGER NOT NULL,
-                    currency TEXT DEFAULT 'CNY',
-                    description TEXT,
-                    quota_type TEXT,
-                    quantity INTEGER DEFAULT 0,
-                    unit_price INTEGER DEFAULT 0,
-                    period_start TEXT,
-                    period_end TEXT,
-                    status TEXT DEFAULT 'pending',
-                    metadata TEXT,
-                    created_at TEXT,
-                    paid_at TEXT
-                )
-            ''')
-            
-            # 用戶配額包表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS user_quota_packages (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    pack_id TEXT NOT NULL,
-                    pack_name TEXT,
-                    quotas TEXT,
-                    remaining TEXT,
-                    purchased_at TEXT,
-                    expires_at TEXT,
-                    is_active INTEGER DEFAULT 1
-                )
-            ''')
-            
-            # 超額使用記錄表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS overage_usage (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL,
-                    quota_type TEXT NOT NULL,
-                    date TEXT NOT NULL,
-                    base_limit INTEGER,
-                    pack_bonus INTEGER DEFAULT 0,
-                    actual_used INTEGER,
-                    overage_amount INTEGER,
-                    billed INTEGER DEFAULT 0,
-                    bill_id TEXT,
-                    created_at TEXT
-                )
-            ''')
-            
-            # 配額凍結表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS quota_freezes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL UNIQUE,
-                    freeze_type TEXT,
-                    reason TEXT,
-                    frozen_at TEXT,
-                    unfreeze_at TEXT,
-                    is_active INTEGER DEFAULT 1
-                )
-            ''')
-            
-            # 索引
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_billing_user ON billing_items(user_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_billing_status ON billing_items(status)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_packages_user ON user_quota_packages(user_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_overage_user ON overage_usage(user_id, date)')
-            
-            conn.commit()
-            conn.close()
-            
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                # 賬單項目表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS billing_items (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        billing_type TEXT NOT NULL,
+                        amount INTEGER NOT NULL,
+                        currency TEXT DEFAULT 'CNY',
+                        description TEXT,
+                        quota_type TEXT,
+                        quantity INTEGER DEFAULT 0,
+                        unit_price INTEGER DEFAULT 0,
+                        period_start TEXT,
+                        period_end TEXT,
+                        status TEXT DEFAULT 'pending',
+                        metadata TEXT,
+                        created_at TEXT,
+                        paid_at TEXT
+                    )
+                ''')
+
+                # 用戶配額包表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS user_quota_packages (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        pack_id TEXT NOT NULL,
+                        pack_name TEXT,
+                        quotas TEXT,
+                        remaining TEXT,
+                        purchased_at TEXT,
+                        expires_at TEXT,
+                        is_active INTEGER DEFAULT 1
+                    )
+                ''')
+
+                # 超額使用記錄表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS overage_usage (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        quota_type TEXT NOT NULL,
+                        date TEXT NOT NULL,
+                        base_limit INTEGER,
+                        pack_bonus INTEGER DEFAULT 0,
+                        actual_used INTEGER,
+                        overage_amount INTEGER,
+                        billed INTEGER DEFAULT 0,
+                        bill_id TEXT,
+                        created_at TEXT
+                    )
+                ''')
+
+                # 配額凍結表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS quota_freezes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL UNIQUE,
+                        freeze_type TEXT,
+                        reason TEXT,
+                        frozen_at TEXT,
+                        unfreeze_at TEXT,
+                        is_active INTEGER DEFAULT 1
+                    )
+                ''')
+
+                # 索引
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_billing_user ON billing_items(user_id)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_billing_status ON billing_items(status)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_packages_user ON user_quota_packages(user_id)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_overage_user ON overage_usage(user_id, date)')
+
+                conn.commit()
+
         except Exception as e:
             logger.error(f"Init billing DB error: {e}")
-    
+
     def _get_db(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        """獲取數據庫連接（統一經由 core.db_utils.create_connection，調用方負責關閉）"""
+        return create_connection(self.db_path)
     
     # ==================== 超額計費 ====================
     
@@ -851,15 +852,51 @@ class BillingService:
                 db.close()
                 return {'success': False, 'error': '賬單已支付'}
             
-            # TODO: 實際支付邏輯
+            user_id = row['user_id']
+            amount = int(row['amount'] or 0)
             
+            # 🔴 fail-closed：舊代碼直接 UPDATE status=PAID，完全跳過真實扣款——
+            # 帳單標記已付但用戶一分未付。現要求真實扣款成功後才標記已付。
+            if payment_method == 'balance':
+                # 用錢包餘額支付：真實扣款。以 bill_id 作 order_id，天然冪等
+                # （錢包層對重複 order_id 會拒絕，防止同一帳單重複扣款）。
+                if amount <= 0:
+                    db.close()
+                    return {'success': False, 'error': '帳單金額無效，無法支付'}
+                try:
+                    from wallet.wallet_service import get_wallet_service
+                    wallet_svc = get_wallet_service()
+                    ok, msg, _tx = wallet_svc.consume(
+                        user_id=user_id,
+                        amount=amount,
+                        category='billing',
+                        description=row['description'] or f'支付帳單 {bill_id}',
+                        order_id=f'BILL_{bill_id}',
+                        reference_id=bill_id,
+                        reference_type='billing_item',
+                    )
+                except Exception as pay_err:
+                    db.close()
+                    logger.error(f"Pay bill wallet consume error: {pay_err}")
+                    return {'success': False, 'error': f'扣款失敗: {pay_err}'}
+                
+                if not ok:
+                    db.close()
+                    logger.warning(f"Bill {bill_id} pay failed (insufficient/other): {msg}")
+                    return {'success': False, 'error': msg or '餘額不足或扣款失敗'}
+            else:
+                # 第三方支付渠道尚未接通真實扣款；拒絕而非假標記已付
+                db.close()
+                logger.warning(f"Bill {bill_id} pay rejected: payment_method={payment_method} not implemented")
+                return {'success': False, 'error': f'支付方式 {payment_method} 尚未支持，請使用餘額支付'}
+            
+            # 扣款成功，標記帳單已付
             db.execute('''
                 UPDATE billing_items SET status = ?, paid_at = ?
                 WHERE id = ?
             ''', (BillStatus.PAID.value, datetime.utcnow().isoformat(), bill_id))
             
             # 解凍配額（如果之前因欠費凍結）
-            user_id = row['user_id']
             freeze_info = self.is_quota_frozen(user_id)
             if freeze_info.get('frozen') and freeze_info.get('freeze_type') == 'payment_failed':
                 self.unfreeze_quota(user_id)
@@ -867,8 +904,8 @@ class BillingService:
             db.commit()
             db.close()
             
-            logger.info(f"Bill {bill_id} paid")
-            return {'success': True, 'bill_id': bill_id}
+            logger.info(f"Bill {bill_id} paid via {payment_method}, amount={amount}")
+            return {'success': True, 'bill_id': bill_id, 'amount': amount, 'payment_method': payment_method}
             
         except Exception as e:
             logger.error(f"Pay bill error: {e}")

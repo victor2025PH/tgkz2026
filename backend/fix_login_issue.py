@@ -8,8 +8,17 @@ import sqlite3
 import sys
 from pathlib import Path
 
-# 可能的数据库路径
-POSSIBLE_PATHS = [
+# 🔧 優先從 config.py 讀取實際數據目錄（尊重 Electron/生產環境的路徑覆蓋），
+# 若 config 無法導入（例如脫離 backend 環境獨立執行），才退回下方硬編碼候選路徑
+_CONFIG_PATHS = []
+try:
+    from config import DATABASE_DIR
+    _CONFIG_PATHS = [DATABASE_DIR / "tgai_server.db", DATABASE_DIR / "tgmatrix.db"]
+except ImportError:
+    pass
+
+# 可能的数据库路径（保留原硬編碼候選作為手動 SSH 運維時的後備）
+POSSIBLE_PATHS = _CONFIG_PATHS + [
     Path(__file__).parent / "data" / "tgai_server.db",
     Path("/opt/tg-matrix-server/backend/data/tgai_server.db"),
     Path("/opt/tg-matrix-server/backend/data/tgmatrix.db"),

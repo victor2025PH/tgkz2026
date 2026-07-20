@@ -20,10 +20,15 @@ from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, asdict
 from enum import Enum
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'system_config.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 system_config.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'system_config.db')
 
 
 class AlertChannel(str, Enum):
@@ -98,7 +103,7 @@ class AlertService:
         """初始化配置數據庫"""
         os.makedirs(os.path.dirname(self._db_path), exist_ok=True)
         
-        conn = sqlite3.connect(self._db_path)
+        conn = create_connection(self._db_path)
         cursor = conn.cursor()
         
         # 系統配置表
@@ -130,7 +135,7 @@ class AlertService:
     def _load_config_from_db(self):
         """從數據庫加載配置"""
         try:
-            conn = sqlite3.connect(self._db_path)
+            conn = create_connection(self._db_path)
             cursor = conn.cursor()
             
             cursor.execute("SELECT value FROM system_config WHERE key = 'alert_config'")
@@ -165,7 +170,7 @@ class AlertService:
                 "min_level": self._config.min_level.value
             }
             
-            conn = sqlite3.connect(self._db_path)
+            conn = create_connection(self._db_path)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -336,7 +341,7 @@ class AlertService:
     def _save_alert_to_db(self, alert_data: Dict[str, Any], results: Dict[str, Any]):
         """保存告警記錄到數據庫"""
         try:
-            conn = sqlite3.connect(self._db_path)
+            conn = create_connection(self._db_path)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -477,7 +482,7 @@ class AlertService:
             return self._alert_history[-limit:][::-1]
         
         try:
-            conn = sqlite3.connect(self._db_path)
+            conn = create_connection(self._db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             

@@ -9,6 +9,7 @@ import { FormsModule } from '@angular/forms';
 import { ElectronIpcService } from './electron-ipc.service';
 import { ToastService } from './toast.service';
 import { I18nService } from './i18n.service';
+import { EmptyStateComponent } from './components/empty-state.component';
 
 export interface Account {
   id: number;
@@ -384,7 +385,7 @@ export const PROXY_TYPES = [
 @Component({
   selector: 'app-account-card-list',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, EmptyStateComponent],
   template: `
     <div class="account-card-list">
       <!-- 頂部工具欄 -->
@@ -733,22 +734,19 @@ export const PROXY_TYPES = [
 
       <!-- 空状态 -->
       @if (filteredAccounts.length === 0 && accounts.length === 0) {
-        <div class="empty-state">
-          <div class="empty-icon">👥</div>
-          <h3>{{ t('accounts.noAccountsYet') }}</h3>
-          <p>{{ t('accounts.clickToAddFirst') }}</p>
-          <button (click)="addAccount.emit()" class="add-btn large">
-            ➕ {{ t('accounts.addAccount') }}
-          </button>
-        </div>
+        <app-empty-state iconKind="users"
+                         [title]="t('accounts.noAccountsYet')"
+                         [description]="t('accounts.clickToAddFirst')"
+                         [ctaLabel]="t('accounts.addAccount')"
+                         (cta)="addAccount.emit()">
+        </app-empty-state>
       }
 
       @if (filteredAccounts.length === 0 && accounts.length > 0) {
-        <div class="empty-state">
-          <div class="empty-icon">🔍</div>
-          <h3>沒有找到匹配的账户</h3>
-          <p>請嘗試調整搜索條件或篩選器</p>
-        </div>
+        <app-empty-state iconKind="search"
+                         title="沒有找到匹配的帳戶"
+                         description="請嘗試調整搜索條件或篩選器">
+        </app-empty-state>
       }
     </div>
 

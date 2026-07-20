@@ -25,10 +25,16 @@ from enum import Enum
 import threading
 import asyncio
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'disaster_recovery.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 disaster_recovery.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'disaster_recovery.db')
+# 備份檔案存放目錄（非資料庫連接，僅為檔案系統路徑，維持原有解析方式不變）
 BACKUP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'backups')
 
 
@@ -126,7 +132,7 @@ class DisasterRecoveryManager:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 備份任務表
@@ -235,7 +241,7 @@ class DisasterRecoveryManager:
         target_path = os.path.join(BACKUP_DIR, target_filename)
         
         # 創建備份記錄
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -326,7 +332,7 @@ class DisasterRecoveryManager:
         error_message: str = None
     ):
         """更新備份狀態"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         updates = ["status = ?"]
@@ -359,7 +365,7 @@ class DisasterRecoveryManager:
     
     def verify_backup(self, backup_id: str) -> Dict[str, Any]:
         """驗證備份完整性"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT target_path, checksum, size_bytes FROM backup_jobs WHERE id = ?
@@ -405,7 +411,7 @@ class DisasterRecoveryManager:
         limit: int = 50
     ) -> List[Dict]:
         """列出備份"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM backup_jobs WHERE 1=1'
@@ -442,7 +448,7 @@ class DisasterRecoveryManager:
     
     def delete_backup(self, backup_id: str) -> bool:
         """刪除備份"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('SELECT target_path FROM backup_jobs WHERE id = ?', (backup_id,))
@@ -477,7 +483,7 @@ class DisasterRecoveryManager:
         start_time = datetime.now()
         
         # 獲取備份信息
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT target_path, source_path, backup_type FROM backup_jobs WHERE id = ?
@@ -494,7 +500,7 @@ class DisasterRecoveryManager:
             target_path = original_source
         
         # 創建恢復記錄
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO recovery_jobs (id, backup_id, target_path, status, started_at)
@@ -572,7 +578,7 @@ class DisasterRecoveryManager:
         error_message: str = None
     ):
         """更新恢復狀態"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         updates = ["status = ?"]
@@ -612,7 +618,7 @@ class DisasterRecoveryManager:
         """創建備份調度"""
         schedule_id = str(uuid.uuid4())
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 計算下次運行時間（簡化）
@@ -652,7 +658,7 @@ class DisasterRecoveryManager:
     
     def list_schedules(self, active_only: bool = True) -> List[Dict]:
         """列出調度"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM backup_schedules'
@@ -678,7 +684,7 @@ class DisasterRecoveryManager:
     def toggle_schedule(self, schedule_id: str, is_active: bool) -> bool:
         """切換調度狀態"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             cursor.execute('''
                 UPDATE backup_schedules SET is_active = ? WHERE id = ?
@@ -694,7 +700,7 @@ class DisasterRecoveryManager:
     def _record_rpo_metric(self):
         """記錄 RPO 指標"""
         # 獲取最後成功備份時間
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT completed_at FROM backup_jobs 
@@ -720,7 +726,7 @@ class DisasterRecoveryManager:
         """記錄 RTO 指標"""
         status = "met" if rto_seconds <= self._rto_target else "breached"
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO rpo_rto_metrics (id, metric_type, value_seconds, target_seconds, status, recorded_at)
@@ -731,7 +737,7 @@ class DisasterRecoveryManager:
     
     def get_rpo_status(self) -> Dict[str, Any]:
         """獲取 RPO 狀態"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 最後成功備份
@@ -765,7 +771,7 @@ class DisasterRecoveryManager:
     
     def get_rto_stats(self) -> Dict[str, Any]:
         """獲取 RTO 統計"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -804,7 +810,7 @@ class DisasterRecoveryManager:
         """創建恢復計劃"""
         plan_id = str(uuid.uuid4())
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO recovery_plans 
@@ -818,7 +824,7 @@ class DisasterRecoveryManager:
     
     def list_recovery_plans(self) -> List[Dict]:
         """列出恢復計劃"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM recovery_plans WHERE is_active = 1 ORDER BY priority DESC')
         rows = cursor.fetchall()
@@ -838,7 +844,7 @@ class DisasterRecoveryManager:
     
     def test_recovery_plan(self, plan_id: str) -> Dict[str, Any]:
         """測試恢復計劃"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT steps, estimated_rto_seconds FROM recovery_plans WHERE id = ?', (plan_id,))
         row = cursor.fetchone()
@@ -887,7 +893,7 @@ class DisasterRecoveryManager:
     
     def cleanup_old_backups(self, retention_days: int = None) -> int:
         """清理舊備份"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 獲取需要清理的備份
@@ -921,7 +927,7 @@ class DisasterRecoveryManager:
     
     def get_dr_stats(self) -> Dict[str, Any]:
         """獲取災備統計"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 備份統計

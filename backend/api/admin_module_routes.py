@@ -21,6 +21,46 @@ def register_admin_module_routes(app):
     _register_admin_handlers_routes(app)
     _register_wallet_routes(app)
     _register_legacy_admin_routes(app)
+    _register_saas_api_stats_capacity_routes(app)
+
+
+def _register_saas_api_stats_capacity_routes(app):
+    """
+    註冊 SaaS JWT admin 體系下的 API 統計 / 容量規劃路由。
+
+    與舊 /api/admin/*（_verify_token type=admin）分離，統一走
+    /api/v1/admin/* + tenant.role==admin。
+    """
+    try:
+        from api import api_stats_routes as stats
+    except ImportError:
+        try:
+            from backend.api import api_stats_routes as stats
+        except ImportError as e:
+            logger.warning(f"⚠️ api_stats_routes 不可用，跳過 SaaS api-stats/capacity 路由: {e}")
+            return
+
+    # API 統計
+    app.router.add_get('/api/v1/admin/api-stats/dashboard', stats.http_api_stats_dashboard)
+    app.router.add_post('/api/v1/admin/api-stats/clear-alerts', stats.http_api_stats_clear_alerts)
+    app.router.add_get('/api/v1/admin/api-stats/overall', stats.http_api_stats_overall)
+    app.router.add_get('/api/v1/admin/api-stats/hourly', stats.http_api_stats_hourly)
+    app.router.add_get('/api/v1/admin/api-stats/ranking', stats.http_api_stats_ranking)
+    app.router.add_get('/api/v1/admin/api-stats/alerts', stats.http_api_stats_alerts)
+
+    # 容量規劃（前端圖表形狀）
+    app.router.add_get('/api/v1/admin/capacity/status', stats.http_capacity_status)
+    app.router.add_get('/api/v1/admin/capacity/history', stats.http_capacity_history)
+
+    # API 池告警 / 預測（複用 admin.api_pool 業務邏輯，JWT 認證）
+    app.router.add_get('/api/v1/admin/api-pool/alerts', stats.http_api_pool_alerts)
+    app.router.add_get('/api/v1/admin/api-pool/forecast', stats.http_api_pool_forecast)
+
+    # 購買訂單對賬（JWT admin）
+    app.router.add_get('/api/v1/admin/purchase-orders', stats.http_admin_purchase_orders)
+    app.router.add_post('/api/v1/admin/purchase-orders/{order_id}/refund', stats.http_admin_refund_purchase_order)
+
+    logger.info("✅ SaaS api-stats / capacity routes registered under /api/v1/admin/")
 
 
 def _register_admin_handlers_routes(app):
@@ -368,6 +408,12 @@ def _register_wallet_routes(app):
         app.router.add_post('/api/purchase/membership', purchase_handlers.purchase_membership)
         app.router.add_post('/api/purchase/proxy', purchase_handlers.purchase_ip_proxy)
         app.router.add_post('/api/purchase/quota', purchase_handlers.purchase_quota_pack)
+        # 方案列表（公開，價格來自服務端權威源 wallet/plan_catalog）
+        app.router.add_get('/api/membership/plans', purchase_handlers.list_membership_plans)
+        app.router.add_get('/api/quota/packs', purchase_handlers.list_quota_packs)
+        app.router.add_get('/api/proxy/packages', purchase_handlers.list_proxy_packages)
+        # 當前用戶購買訂單（對賬/歷史，需登入）
+        app.router.add_get('/api/purchase/orders', purchase_handlers.list_my_orders)
 
     # Phase 4: 提現
     if withdraw_handlers:

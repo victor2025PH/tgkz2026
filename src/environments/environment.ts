@@ -20,7 +20,9 @@ export const environment = {
     aiEnabled: true,
     teamFeatures: true,
     apiAccess: true,
-    debug: true
+    debug: true,
+    // 🎯 精簡獲客模式：true 時隱藏 AI 增值入口（策略規劃/自動執行/多角色/智能引擎/客戶培育）
+    leanMode: false
   },
   
   // 版本信息

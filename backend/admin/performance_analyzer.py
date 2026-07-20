@@ -23,10 +23,15 @@ from enum import Enum
 from collections import defaultdict
 import statistics
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'performance.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 performance.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'performance.db')
 
 
 class MetricCategory(str, Enum):
@@ -124,7 +129,7 @@ class PerformanceAnalyzer:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 性能指標表
@@ -212,7 +217,7 @@ class PerformanceAnalyzer:
         metric_id = str(uuid.uuid4())
         now = datetime.now().isoformat()
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -291,7 +296,7 @@ class PerformanceAnalyzer:
         hours: int = 1
     ) -> Dict[str, Any]:
         """獲取延遲統計"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()
@@ -337,7 +342,7 @@ class PerformanceAnalyzer:
         hours: int = 1
     ) -> Dict[str, Any]:
         """獲取吞吐量統計"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()
@@ -375,7 +380,7 @@ class PerformanceAnalyzer:
         hours: int = 1
     ) -> Dict[str, Any]:
         """獲取錯誤率統計"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()
@@ -483,7 +488,7 @@ class PerformanceAnalyzer:
         hours: int = 24
     ) -> str:
         """創建性能基線"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()
@@ -539,7 +544,7 @@ class PerformanceAnalyzer:
         endpoint: str = ""
     ) -> Optional[Dict]:
         """獲取基線"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT * FROM performance_baselines 
@@ -616,7 +621,7 @@ class PerformanceAnalyzer:
         deviation: float
     ):
         """記錄性能回歸"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -638,7 +643,7 @@ class PerformanceAnalyzer:
         hours: int = 24
     ) -> List[Dict]:
         """列出性能回歸"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()
@@ -670,7 +675,7 @@ class PerformanceAnalyzer:
         bottlenecks = []
         
         # 獲取各端點性能
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 過去 1 小時的數據
@@ -779,7 +784,7 @@ class PerformanceAnalyzer:
     
     def _save_bottleneck(self, bottleneck: Dict):
         """保存瓶頸"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -803,7 +808,7 @@ class PerformanceAnalyzer:
         hours: int = 24
     ) -> List[Dict]:
         """列出瓶頸"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()
@@ -832,7 +837,7 @@ class PerformanceAnalyzer:
     def resolve_bottleneck(self, bottleneck_id: str) -> bool:
         """標記瓶頸已解決"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             cursor.execute('''
                 UPDATE bottlenecks SET resolved_at = ? WHERE id = ?
@@ -847,7 +852,7 @@ class PerformanceAnalyzer:
     
     def get_performance_summary(self) -> Dict[str, Any]:
         """獲取性能摘要"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         hour_ago = (datetime.now() - timedelta(hours=1)).isoformat()

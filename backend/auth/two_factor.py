@@ -14,11 +14,14 @@ import struct
 import base64
 import hashlib
 import secrets
-import sqlite3
 import logging
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field, asdict
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import get_connection, resolve_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +68,7 @@ class TwoFactorService:
     """2FA 服務"""
     
     def __init__(self, db_path: str = None):
-        self.db_path = db_path or os.environ.get(
-            'DATABASE_PATH',
-            os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
-        )
+        self.db_path = db_path or resolve_db_path()
         self._init_db()
     
     def _init_db(self):
@@ -76,38 +76,37 @@ class TwoFactorService:
         try:
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
             
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # 2FA 配置表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS two_factor_config (
-                    user_id TEXT PRIMARY KEY,
-                    enabled INTEGER DEFAULT 0,
-                    secret TEXT,
-                    backup_codes TEXT,
-                    created_at TEXT,
-                    last_used TEXT
-                )
-            ''')
-            
-            # 受信任設備表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS trusted_devices (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    device_name TEXT,
-                    device_fingerprint TEXT,
-                    created_at TEXT,
-                    last_used TEXT,
-                    expires_at TEXT
-                )
-            ''')
-            
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_devices_user ON trusted_devices(user_id)')
-            
-            conn.commit()
-            conn.close()
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # 2FA 配置表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS two_factor_config (
+                        user_id TEXT PRIMARY KEY,
+                        enabled INTEGER DEFAULT 0,
+                        secret TEXT,
+                        backup_codes TEXT,
+                        created_at TEXT,
+                        last_used TEXT
+                    )
+                ''')
+                
+                # 受信任設備表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS trusted_devices (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        device_name TEXT,
+                        device_fingerprint TEXT,
+                        created_at TEXT,
+                        last_used TEXT,
+                        expires_at TEXT
+                    )
+                ''')
+                
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_devices_user ON trusted_devices(user_id)')
+                
+                conn.commit()
         except Exception as e:
             logger.error(f"2FA DB init error: {e}")
     
@@ -196,15 +195,14 @@ class TwoFactorService:
     def get_config(self, user_id: str) -> Optional[TwoFactorConfig]:
         """獲取 2FA 配置"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute(
-                'SELECT * FROM two_factor_config WHERE user_id = ?',
-                (user_id,)
-            )
-            row = cursor.fetchone()
-            conn.close()
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute(
+                    'SELECT * FROM two_factor_config WHERE user_id = ?',
+                    (user_id,)
+                )
+                row = cursor.fetchone()
             
             if row:
                 import json
@@ -225,24 +223,23 @@ class TwoFactorService:
         """保存 2FA 配置"""
         try:
             import json
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                INSERT OR REPLACE INTO two_factor_config 
-                (user_id, enabled, secret, backup_codes, created_at, last_used)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (
-                config.user_id,
-                1 if config.enabled else 0,
-                config.secret,
-                json.dumps(config.backup_codes),
-                config.created_at,
-                config.last_used
-            ))
-            
-            conn.commit()
-            conn.close()
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    INSERT OR REPLACE INTO two_factor_config 
+                    (user_id, enabled, secret, backup_codes, created_at, last_used)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    config.user_id,
+                    1 if config.enabled else 0,
+                    config.secret,
+                    json.dumps(config.backup_codes),
+                    config.created_at,
+                    config.last_used
+                ))
+                
+                conn.commit()
         except Exception as e:
             logger.error(f"Save 2FA config error: {e}")
     
@@ -405,21 +402,20 @@ class TwoFactorService:
         )
         
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                INSERT INTO trusted_devices 
-                (id, user_id, device_name, device_fingerprint, created_at, last_used, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                device.id, device.user_id, device.device_name,
-                device.device_fingerprint, device.created_at,
-                device.last_used, device.expires_at
-            ))
-            
-            conn.commit()
-            conn.close()
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    INSERT INTO trusted_devices 
+                    (id, user_id, device_name, device_fingerprint, created_at, last_used, expires_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    device.id, device.user_id, device.device_name,
+                    device.device_fingerprint, device.created_at,
+                    device.last_used, device.expires_at
+                ))
+                
+                conn.commit()
             
             return device
         except Exception as e:
@@ -431,25 +427,24 @@ class TwoFactorService:
         try:
             now = datetime.utcnow().isoformat()
             
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    SELECT id FROM trusted_devices 
+                    WHERE user_id = ? AND device_fingerprint = ? AND expires_at > ?
+                ''', (user_id, device_fingerprint, now))
+                
+                row = cursor.fetchone()
+                
+                if row:
+                    # 更新最後使用時間
+                    cursor.execute(
+                        'UPDATE trusted_devices SET last_used = ? WHERE id = ?',
+                        (now, row[0])
+                    )
+                    conn.commit()
             
-            cursor.execute('''
-                SELECT id FROM trusted_devices 
-                WHERE user_id = ? AND device_fingerprint = ? AND expires_at > ?
-            ''', (user_id, device_fingerprint, now))
-            
-            row = cursor.fetchone()
-            
-            if row:
-                # 更新最後使用時間
-                cursor.execute(
-                    'UPDATE trusted_devices SET last_used = ? WHERE id = ?',
-                    (now, row[0])
-                )
-                conn.commit()
-            
-            conn.close()
             return row is not None
         except Exception as e:
             logger.error(f"Check trusted device error: {e}")
@@ -458,19 +453,17 @@ class TwoFactorService:
     async def get_trusted_devices(self, user_id: str) -> List[Dict]:
         """獲取用戶的受信任設備列表"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                SELECT id, device_name, created_at, last_used, expires_at 
-                FROM trusted_devices 
-                WHERE user_id = ? 
-                ORDER BY last_used DESC
-            ''', (user_id,))
-            
-            devices = [dict(row) for row in cursor.fetchall()]
-            conn.close()
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    SELECT id, device_name, created_at, last_used, expires_at 
+                    FROM trusted_devices 
+                    WHERE user_id = ? 
+                    ORDER BY last_used DESC
+                ''', (user_id,))
+                
+                devices = [dict(row) for row in cursor.fetchall()]
             
             return devices
         except Exception as e:
@@ -480,17 +473,16 @@ class TwoFactorService:
     async def remove_trusted_device(self, user_id: str, device_id: str) -> bool:
         """移除受信任設備"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute(
-                'DELETE FROM trusted_devices WHERE id = ? AND user_id = ?',
-                (device_id, user_id)
-            )
-            
-            deleted = cursor.rowcount > 0
-            conn.commit()
-            conn.close()
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute(
+                    'DELETE FROM trusted_devices WHERE id = ? AND user_id = ?',
+                    (device_id, user_id)
+                )
+                
+                deleted = cursor.rowcount > 0
+                conn.commit()
             
             return deleted
         except Exception as e:
@@ -500,16 +492,15 @@ class TwoFactorService:
     async def clear_trusted_devices(self, user_id: str):
         """清除所有受信任設備"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute(
-                'DELETE FROM trusted_devices WHERE user_id = ?',
-                (user_id,)
-            )
-            
-            conn.commit()
-            conn.close()
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute(
+                    'DELETE FROM trusted_devices WHERE user_id = ?',
+                    (user_id,)
+                )
+                
+                conn.commit()
         except Exception as e:
             logger.error(f"Clear trusted devices error: {e}")
 

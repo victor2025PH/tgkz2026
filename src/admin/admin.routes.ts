@@ -31,12 +31,9 @@ export const ADMIN_ROUTES: Routes = [
           .then(m => m.UserManagementComponent),
         title: '用戶管理'
       },
-      {
-        path: 'logs',
-        loadComponent: () => import('./audit-logs.component')
-          .then(m => m.AuditLogsComponent),
-        title: '審計日誌'
-      },
+      // ⚠️ 'logs' 路由原指向 audit-logs.component.ts，與下方 'audit-logs' 是
+      // 同一個組件的重複路由；且該組件目前有真實的 TypeScript 編譯錯誤
+      // （見下方說明），本次掛載路由時一併停用，避免掛出一個編譯不過的頁面。
       // 🆕 API 池管理
       {
         path: 'api-pool',
@@ -44,33 +41,48 @@ export const ADMIN_ROUTES: Routes = [
           .then(m => m.ApiPoolManagerComponent),
         title: 'API 池管理'
       },
-      // 🆕 API 统计仪表板
+      // ✅ 以下 4 個路由已重新啟用（原先因 inject(ElectronIpcService).send(...)
+      // 這種 Electron-only IPC 呼叫模式在 SaaS/瀏覽器模式下編譯不過而被停用）。
+      // 本輪已將資料獲取邏輯改為 AdminService（HTTP）呼叫模式：
+      // - system-alerts：改接 AdminService.getSystemAlerts/resolveSystemAlert/
+      //   clearAllSystemAlerts（POST /api/command 的 alerts:get/resolve/clear，
+      //   後端真實可用，讀寫 system_alerts 表）。
+      // - audit-logs：改接 AdminService.getOperationAuditLogs（GET
+      //   /api/v1/admin/audit/logs，後端真實可用，但欄位只有
+      //   {id, action, category, user_id, details, timestamp}；異常偵測後端
+      //   無對應 API，UI 已改為「功能開發中」提示，見組件內註釋）。
+      // - api-stats：GET /api/v1/admin/api-stats/dashboard（JWT admin）
+      // - capacity：GET /api/v1/admin/capacity/status|history（JWT admin）
       {
         path: 'api-stats',
         loadComponent: () => import('./api-stats-dashboard.component')
           .then(m => m.ApiStatsDashboardComponent),
         title: 'API 统计'
       },
-      // 🆕 系统告警
       {
         path: 'alerts',
         loadComponent: () => import('./system-alerts.component')
           .then(m => m.SystemAlertsComponent),
         title: '系统告警'
       },
-      // 🆕 审计日志（增强版）
       {
         path: 'audit-logs',
         loadComponent: () => import('./audit-logs.component')
           .then(m => m.AuditLogsComponent),
         title: '审计日志'
       },
-      // 🆕 容量规划
       {
         path: 'capacity',
         loadComponent: () => import('./capacity-chart.component')
           .then(m => m.CapacityChartComponent),
         title: '容量规划'
+      },
+      // 🆕 購買訂單對賬（會員/配額/代理購買，供客服對賬與退款追溯）
+      {
+        path: 'purchase-orders',
+        loadComponent: () => import('./purchase-orders.component')
+          .then(m => m.PurchaseOrdersComponent),
+        title: '购买订单'
       },
       // 🆕 运维中心
       {

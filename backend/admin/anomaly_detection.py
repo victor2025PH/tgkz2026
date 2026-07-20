@@ -19,10 +19,15 @@ from dataclasses import dataclass, field
 from enum import Enum
 from collections import deque
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'anomaly_detection.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 anomaly_detection.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'anomaly_detection.db')
 
 
 class AnomalyType(str, Enum):
@@ -324,16 +329,19 @@ class AnomalyDetectionManager:
         if self._initialized:
             return
         
-        self._initialized = True
+        # 🔧 修復：_init_db() 內部會呼叫 _load_detectors()（向 self._detectors 寫入），
+        # 因此容器必須在 _init_db() 之前就緒，否則每次啟動都 AttributeError；
+        # 且 _initialized 必須在全部成功後才設 True，失敗時允許下次重試。
         self._detectors: Dict[str, StatisticalDetector] = {}
         self._anomaly_handlers: List = []
         self._init_db()
+        self._initialized = True
     
     def _init_db(self):
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 檢測器配置表
@@ -401,7 +409,7 @@ class AnomalyDetectionManager:
     
     def _load_detectors(self):
         """加載檢測器"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM detector_configs WHERE is_active = 1')
         rows = cursor.fetchall()
@@ -430,7 +438,7 @@ class AnomalyDetectionManager:
     def create_detector(self, config: DetectorConfig) -> bool:
         """創建檢測器"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -459,7 +467,7 @@ class AnomalyDetectionManager:
     
     def list_detectors(self) -> List[Dict]:
         """列出檢測器"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM detector_configs')
         rows = cursor.fetchall()
@@ -482,7 +490,7 @@ class AnomalyDetectionManager:
     def toggle_detector(self, metric_name: str, active: bool) -> bool:
         """啟用/禁用檢測器"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             cursor.execute('''
                 UPDATE detector_configs SET is_active = ? WHERE metric_name = ?
@@ -536,7 +544,7 @@ class AnomalyDetectionManager:
     
     def _save_anomaly(self, anomaly: Anomaly):
         """保存異常"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -565,7 +573,7 @@ class AnomalyDetectionManager:
         limit: int = 100
     ) -> List[Dict]:
         """列出異常"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()
@@ -610,7 +618,7 @@ class AnomalyDetectionManager:
     def acknowledge_anomaly(self, anomaly_id: str, user_id: str) -> bool:
         """確認異常"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             cursor.execute('''
                 UPDATE anomalies 
@@ -626,7 +634,7 @@ class AnomalyDetectionManager:
     
     def get_anomaly_stats(self, hours: int = 24) -> Dict[str, Any]:
         """獲取異常統計"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()

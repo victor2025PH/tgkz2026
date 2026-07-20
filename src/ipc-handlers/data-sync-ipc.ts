@@ -675,53 +675,6 @@ export function setupDataSyncIpcHandlers(this: any): void {
         }
     });
     
-    // 漏斗統計事件
-    this.ipcService.on('funnel-stats', (data: any) => {
-        console.log('[Frontend] Received funnel-stats:', data);
-        if (!data.error) {
-            this.funnelStats.set(data);
-        }
-    });
-    
-    // Funnel Overview 事件 (Phase 4)
-    this.ipcService.on('funnel-overview', (data: any) => {
-      this.isLoadingFunnel.set(false);
-      if (data.success) {
-        this.funnelOverview.set({
-          stages: data.stages || [],
-          totalLeads: data.total_leads || 0,
-          convertedLeads: data.converted_leads || 0,
-          averageConversionDays: data.average_days || 0,
-          conversionRate: data.conversion_rate || 0
-        });
-      }
-    });
-    
-    // User Journey 事件 (Phase 4)
-    this.ipcService.on('user-journey', (data: any) => {
-      this.isLoadingJourney.set(false);
-      if (data.success && data.journey) {
-        this.userJourneyData.set({
-          userId: data.userId,
-          stages: data.journey.transitions || [],
-          currentStage: data.journey.current_stage || 'new',
-          totalDays: data.journey.total_days || 0,
-          isConverted: data.journey.is_converted || false
-        });
-      }
-    });
-    
-    // Funnel Stage Transitioned 事件 (Phase 4)
-    this.ipcService.on('funnel-stage-transitioned', (data: any) => {
-      if (data.success) {
-        this.toastService.success(`✅ 漏斗階段已更新: ${data.stage}`);
-        this.loadFunnelOverview();
-        this.loadFunnelStats();
-      } else {
-        this.toastService.error(`更新失敗: ${data.error}`);
-      }
-    });
-    
     // Marketing Stats 事件 (Phase 4)
     this.ipcService.on('marketing-stats', (data: any) => {
       this.isLoadingMarketing.set(false);

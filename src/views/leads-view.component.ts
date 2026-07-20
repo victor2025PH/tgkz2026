@@ -22,12 +22,13 @@ import { ToastService } from '../toast.service';
 import { DialogService, ExportService } from '../services';
 import { UnifiedContactsService, UnifiedContact } from '../services/unified-contacts.service';
 import { LeadScoringPanelComponent } from '../lead-nurturing/lead-scoring-panel.component';
+import { EmptyStateComponent } from '../components/empty-state.component';
 
 @Component({
   selector: 'app-leads-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, LeadScoringPanelComponent],
+  imports: [CommonModule, FormsModule, LeadScoringPanelComponent, EmptyStateComponent],
   template: `
     <div class="page-content">
       <!-- 🔧 頁面標題 + 操作按鈕 -->
@@ -259,51 +260,45 @@ import { LeadScoringPanelComponent } from '../lead-nurturing/lead-scoring-panel.
       <!-- 客戶列表 / 卡片 -->
       <div class="rounded-xl overflow-hidden" style="background-color: var(--bg-card); border: 1px solid var(--border-color);">
         @if (filteredContacts().length === 0) {
-          <!-- 🆕 Phase 1: 豐富的空狀態設計 -->
-          <div class="p-10 text-center">
-            <div class="text-6xl mb-4">📭</div>
-            <h3 class="text-xl font-semibold mb-2" style="color: var(--text-primary);">
-              發送列表還是空的
-            </h3>
-            <p class="text-sm mb-8 max-w-sm mx-auto" style="color: var(--text-muted);">
-              您需要先將客戶加入發送列表，才能批量發送消息
-            </p>
-
-            <!-- 數據來源引導 -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-xl mx-auto mb-6">
-              <div class="p-4 rounded-xl border border-slate-700/50 bg-slate-800/40 text-center">
-                <div class="text-2xl mb-2">📡</div>
+          <app-empty-state iconKind="inbox"
+                           title="發送列表還是空的"
+                           description="您需要先將客戶加入發送列表，才能批量發送消息"
+                           ctaLabel="前往資源中心"
+                           (cta)="goToResourceCenter()">
+            <!-- 數據來源引導（main 側內容，統一 token 呈現） -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-xl mx-auto mb-4">
+              <div class="p-4 rounded-xl text-center" style="background: var(--bg-card); border: 1px solid var(--border-default);">
                 <div class="text-sm font-medium mb-1" style="color: var(--text-primary);">監控採集</div>
                 <div class="text-xs mb-3" style="color: var(--text-muted);">從群組自動收集用戶</div>
                 <button (click)="navigateTo('monitoring-groups')"
-                        class="text-xs px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors border border-cyan-500/20">
-                  去設置 →
+                        class="text-xs px-3 py-1.5 rounded-lg transition-colors"
+                        style="background: var(--primary-bg); color: var(--primary-light); border: 1px solid var(--primary);">
+                  去設置
                 </button>
               </div>
-              <div class="p-4 rounded-xl border border-slate-700/50 bg-slate-800/40 text-center">
-                <div class="text-2xl mb-2">📦</div>
+              <div class="p-4 rounded-xl text-center" style="background: var(--bg-card); border: 1px solid var(--border-default);">
                 <div class="text-sm font-medium mb-1" style="color: var(--text-primary);">資源中心</div>
                 <div class="text-xs mb-3" style="color: var(--text-muted);">手動導入聯絡人</div>
                 <button (click)="goToResourceCenter()"
-                        class="text-xs px-3 py-1.5 rounded-lg bg-slate-600/50 text-slate-300 hover:bg-slate-600 transition-colors border border-slate-600/30">
-                  去添加 →
+                        class="text-xs px-3 py-1.5 rounded-lg transition-colors"
+                        style="background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border-default);">
+                  去添加
                 </button>
               </div>
-              <div class="p-4 rounded-xl border border-slate-700/50 bg-slate-800/40 text-center">
-                <div class="text-2xl mb-2">👥</div>
+              <div class="p-4 rounded-xl text-center" style="background: var(--bg-card); border: 1px solid var(--border-default);">
                 <div class="text-sm font-medium mb-1" style="color: var(--text-primary);">廣告識別</div>
                 <div class="text-xs mb-3" style="color: var(--text-muted);">從廣告點擊自動識別</div>
                 <button (click)="navigateTo('collected-users')"
-                        class="text-xs px-3 py-1.5 rounded-lg bg-slate-600/50 text-slate-300 hover:bg-slate-600 transition-colors border border-slate-600/30">
-                  去查看 →
+                        class="text-xs px-3 py-1.5 rounded-lg transition-colors"
+                        style="background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border-default);">
+                  去查看
                 </button>
               </div>
             </div>
-
-            <p class="text-xs" style="color: var(--text-muted);">
-              💡 建議先開啟監控群組，AI 會自動識別並添加感興趣的用戶
+            <p class="text-xs mb-2" style="color: var(--text-muted);">
+              建議先開啟監控群組，AI 會自動識別並添加感興趣的用戶
             </p>
-          </div>
+          </app-empty-state>
         } @else if (viewMode() === 'kanban') {
           <!-- 🆕 Phase 2: 線索旅程看板 -->
           <div class="p-4 overflow-x-auto">

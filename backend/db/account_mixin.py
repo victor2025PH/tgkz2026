@@ -8,6 +8,9 @@ import json
 import sys
 import sqlite3
 
+# 🔧 同步回退分支改用合法連接模塊 core.db_utils（見 .cursorrules 合法連接模塊清單）。
+from core.db_utils import create_connection
+
 # 異步數據庫支持
 try:
     import aiosqlite
@@ -19,6 +22,24 @@ except ImportError:
 # 從 config 導入數據庫路徑（避免與 database.py 循環導入）
 from config import DATABASE_PATH
 ACCOUNTS_DB_PATH = DATABASE_PATH
+
+# 🔍 本檔案同步/異步雙套邏輯查證結論（2026-07 排查，詳見報告）：
+# - 這「不是」兩套服務不同呼叫場景的並行邏輯，而是同一個 async def 方法內部依
+#   HAS_AIOSQLITE 做的防禦性分支：aiosqlite 缺失時（理論上幾乎不會發生，因為
+#   requirements.txt 已鎖定 aiosqlite>=0.19.0）才會落入同步 sqlite3 回退路徑。
+#   此寫法與 database.py（三大庫「唯一合法」async 連接來源）自身採用的
+#   `if not HAS_AIOSQLITE:` 防禦性回退模式完全一致，並非本檔案獨有的技術債。
+# - 同步回退分支：已改用 core.db_utils.create_connection()（僅替換連線建立方式，
+#   呼叫時機/回傳值/資料表結構完全不變）。
+# - 異步主邏輯：評估後維持直連 aiosqlite.connect()，不遷移到 db_connection_pool.py。
+#   原因：① db_connection_pool.init_connection_pool() 在全專案「從未被呼叫過」，
+#   目前是完全休眠、未經生產驗證的全域單例，若在帳號管理主流程首次啟用，風險遠高於
+#   單次任務應承擔的範圍；② 本檔案多個方法（_ensure_accounts_table 的多語句
+#   CREATE+ALTER 序列、get_all_accounts 的查詢失敗後降級重試）依賴同一條連線
+#   跨多個語句的順序性，直連短生命週期連線在语义上更貼近現狀、風險更低。
+# - 路徑解析：ACCOUNTS_DB_PATH 已經是 from config import DATABASE_PATH，等同
+#   core.db_utils.resolve_db_path() 的解析結果（已交叉比對 dev/Docker/Electron
+#   三種環境，結論一致），不屬於「硬編碼路徑」，故不需改動。
 
 
 class AccountMixin:
@@ -47,7 +68,7 @@ class AccountMixin:
             
             if not HAS_AIOSQLITE:
                 # 同步回退
-                conn = sqlite3.connect(str(accounts_db_path))
+                conn = create_connection(str(accounts_db_path))
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 # 嘗試兩種格式（有 + 和沒有 +）
@@ -132,7 +153,7 @@ class AccountMixin:
 
             if not HAS_AIOSQLITE:
                 # 同步回退
-                conn = sqlite3.connect(str(accounts_db_path))
+                conn = create_connection(str(accounts_db_path))
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
 
@@ -236,7 +257,7 @@ class AccountMixin:
             
             if not HAS_AIOSQLITE:
                 # 同步回退
-                conn = sqlite3.connect(str(accounts_db_path))
+                conn = create_connection(str(accounts_db_path))
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 cursor.execute(query, params)
@@ -274,7 +295,7 @@ class AccountMixin:
         """檢查數據庫表中是否存在指定欄位"""
         try:
             if not HAS_AIOSQLITE:
-                conn = sqlite3.connect(str(db_path))
+                conn = create_connection(str(db_path))
                 cursor = conn.cursor()
                 cursor.execute(f"PRAGMA table_info({table})")
                 columns = {row[1] for row in cursor.fetchall()}
@@ -329,7 +350,7 @@ class AccountMixin:
 
             if not HAS_AIOSQLITE:
                 # 同步回退
-                conn = sqlite3.connect(str(accounts_db_path))
+                conn = create_connection(str(accounts_db_path))
                 cursor = conn.cursor()
 
                 set_clause = ','.join([f"{escape_column(k)} = ?" for k in filtered_updates.keys()])
@@ -384,7 +405,7 @@ class AccountMixin:
             values = [status] + account_ids
             
             if not HAS_AIOSQLITE:
-                conn = sqlite3.connect(str(accounts_db_path))
+                conn = create_connection(str(accounts_db_path))
                 cursor = conn.cursor()
                 cursor.execute(f'''
                     UPDATE accounts 
@@ -421,7 +442,7 @@ class AccountMixin:
             
             if not HAS_AIOSQLITE:
                 # 同步回退
-                conn = sqlite3.connect(str(accounts_db_path))
+                conn = create_connection(str(accounts_db_path))
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 cursor.execute('SELECT * FROM accounts WHERE id = ?', (account_id,))
@@ -448,7 +469,7 @@ class AccountMixin:
             
             if not HAS_AIOSQLITE:
                 # 同步回退
-                conn = sqlite3.connect(str(accounts_db_path))
+                conn = create_connection(str(accounts_db_path))
                 cursor = conn.cursor()
                 cursor.execute('DELETE FROM accounts WHERE id = ?', (account_id,))
                 conn.commit()
@@ -545,7 +566,7 @@ class AccountMixin:
             ]
             
             if not HAS_AIOSQLITE:
-                conn = sqlite3.connect(str(db_path))
+                conn = create_connection(str(db_path))
                 cursor = conn.cursor()
                 cursor.execute(create_table_sql)
                 conn.commit()

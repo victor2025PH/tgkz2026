@@ -8,9 +8,9 @@
  * 4. 历史数据对比
  */
 
-import { Component, signal, inject, OnInit, OnDestroy, Input } from '@angular/core';
+import { Component, signal, OnInit, OnDestroy, Input, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ElectronIpcService } from '../electron-ipc.service';
+import { AdminService } from './admin.service';
 
 interface CapacitySnapshot {
   timestamp: number;
@@ -53,7 +53,7 @@ interface CapacityStatus {
   imports: [CommonModule],
   template: `
     <div class="capacity-chart-container">
-      <!-- 当前状态卡片 -->
+      <!-- 當前狀態卡片 -->
       <div class="status-section">
         <div class="status-card main">
           <div class="gauge-container">
@@ -231,6 +231,32 @@ interface CapacityStatus {
       border-radius: 1rem;
       padding: 1.5rem;
       border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* 🚧 功能开发中提示 */
+    .dev-notice {
+      display: flex;
+      gap: 1rem;
+      padding: 1.25rem;
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: 0.75rem;
+    }
+
+    .dev-notice-icon {
+      font-size: 1.75rem;
+    }
+
+    .dev-notice-content strong {
+      color: #93c5fd;
+      font-size: 1rem;
+    }
+
+    .dev-notice-content p {
+      margin: 0.5rem 0 0 0;
+      font-size: 0.8rem;
+      color: #9ca3af;
+      line-height: 1.6;
     }
 
     /* 状态区域 */
@@ -564,17 +590,17 @@ interface CapacityStatus {
   `]
 })
 export class CapacityChartComponent implements OnInit, OnDestroy {
-  private ipcService = inject(ElectronIpcService);
+  @Input() refreshInterval = 60000; // 刷新間隔
 
-  @Input() refreshInterval = 60000; // 刷新间隔
+  private adminService = inject(AdminService);
 
-  // 状态
+  // 狀態
   status = signal<CapacityStatus | null>(null);
   history = signal<CapacitySnapshot[]>([]);
   chartPoints = signal<Array<{ x: number; y: number; value: number; time: string }>>([]);
   tooltip = signal<{ x: number; y: number; time: string; value: number } | null>(null);
 
-  // 刷新定时器
+  // 刷新定時器
   private refreshTimer: any;
 
   ngOnInit(): void {
@@ -590,16 +616,17 @@ export class CapacityChartComponent implements OnInit, OnDestroy {
 
   async loadData(): Promise<void> {
     try {
-      const result = await this.ipcService.send('capacity:status', {});
+      const [result, historyResult] = await Promise.all([
+        this.adminService.getCapacityStatus(),
+        this.adminService.getCapacityHistory(24),
+      ]);
 
       if (result?.success && result.data) {
-        this.status.set(result.data);
+        this.status.set(result.data as CapacityStatus);
       }
 
-      const historyResult = await this.ipcService.send('capacity:history', { hours: 24 });
-
-      if (historyResult?.success && historyResult.data) {
-        this.history.set(historyResult.data);
+      if (historyResult?.success && Array.isArray(historyResult.data)) {
+        this.history.set(historyResult.data as CapacitySnapshot[]);
         this.calculateChartPoints();
       }
     } catch (e) {

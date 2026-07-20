@@ -8,7 +8,6 @@
 4. 安全審計
 """
 
-import sqlite3
 import os
 import uuid
 from datetime import datetime, timedelta
@@ -21,6 +20,10 @@ from .utils import (
     generate_tokens, verify_token,
     generate_verification_code, generate_api_key
 )
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import get_connection
 
 # 統一配置服務（優先使用）
 def _get_user_quotas(tier_name: str = 'free') -> dict:
@@ -73,16 +76,13 @@ class AuthService:
         self.db_path = db_path
         self._init_db()
     
-    def _get_db(self) -> sqlite3.Connection:
-        """獲取數據庫連接"""
-        db = sqlite3.connect(self.db_path)
-        db.row_factory = sqlite3.Row
-        return db
+    def _get_db(self):
+        """獲取數據庫連接（context manager，統一經由 core.db_utils.get_connection）"""
+        return get_connection(self.db_path)
     
     def _init_db(self):
         """初始化數據庫表（與 merge_db_init 統一 schema 兼容）"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             db.executescript('''
                 -- 用戶表（若 merge_db_init 已創建則跳過）
                 CREATE TABLE IF NOT EXISTS users (
@@ -139,19 +139,24 @@ class AuthService:
                 );
                 
                 -- API 密鑰表
+                -- 🔧 Bug 修復：欄位命名需與 auth/api_key.py（ApiKeyService，唯一實際做 CRUD 的一方）一致。
+                -- 舊版本此處用 prefix/last_used_at，與 api_key.py 的 key_prefix/last_used/usage_count 不符；
+                -- 因為 CREATE TABLE IF NOT EXISTS 是 no-op，兩邊誰先初始化就決定實際 schema，
+                -- 造成 ApiKeyService.create() 報 "no column named key_prefix"。現統一以 api_key.py 為準。
                 CREATE TABLE IF NOT EXISTS api_keys (
                     id TEXT PRIMARY KEY,
                     user_id TEXT NOT NULL,
                     name TEXT,
                     key_hash TEXT UNIQUE,
-                    prefix TEXT,
+                    key_prefix TEXT,
                     scopes TEXT,
                     rate_limit INTEGER DEFAULT 100,
                     allowed_ips TEXT,
                     is_active BOOLEAN DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     expires_at TIMESTAMP,
-                    last_used_at TIMESTAMP,
+                    last_used TIMESTAMP,
+                    usage_count INTEGER DEFAULT 0,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 );
                 
@@ -195,9 +200,6 @@ class AuthService:
             self._migrate_telegram_fields(db)
             # 合併遷移：添加 membership 相關列（兼容卡密系統）
             self._migrate_membership_fields(db)
-            
-        finally:
-            db.close()
     
     def _migrate_telegram_fields(self, db):
         """🆕 P2.2: 遷移添加 Telegram 綁定字段"""
@@ -285,75 +287,73 @@ class AuthService:
         display_name: str = None
     ) -> Dict[str, Any]:
         """用戶註冊"""
-        db = self._get_db()
-        try:
-            # 檢查郵箱是否已存在
-            existing = db.execute(
-                "SELECT id FROM users WHERE email = ?", (email.lower(),)
-            ).fetchone()
-            if existing:
-                return {'success': False, 'error': '該郵箱已被註冊'}
-            
-            # 檢查用戶名
-            if username:
+        with self._get_db() as db:
+            try:
+                # 檢查郵箱是否已存在
                 existing = db.execute(
-                    "SELECT id FROM users WHERE username = ?", (username.lower(),)
+                    "SELECT id FROM users WHERE email = ?", (email.lower(),)
                 ).fetchone()
                 if existing:
-                    return {'success': False, 'error': '該用戶名已被使用'}
-            else:
-                username = email.split('@')[0]
-            
-            # 創建用戶
-            user = User(
-                email=email.lower(),
-                username=username.lower(),
-                password_hash=hash_password(password),
-                display_name=display_name or username,
-                role=UserRole.FREE,
-                subscription_tier='free'
-            )
-            
-            # 設置配額（從統一配置服務獲取）
-            quotas = _get_user_quotas('free')
-            user.max_accounts = quotas['max_accounts']
-            user.max_api_calls = quotas['max_api_calls']
-            
-            db.execute('''
-                INSERT INTO users (
-                    id, user_id, email, username, password_hash, display_name,
-                    role, subscription_tier, max_accounts, max_api_calls
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                user.id, user.id, user.email, user.username, user.password_hash,
-                user.display_name, user.role.value, user.subscription_tier,
-                user.max_accounts, user.max_api_calls
-            ))
-            db.commit()
-            
-            # 生成 token
-            access_token, refresh_token = generate_tokens(
-                user.id, user.email, user.role.value
-            )
-            
-            # 記錄審計
-            self._log_audit(db, user.id, 'register', details={'email': email})
-            
-            return {
-                'success': True,
-                'message': '註冊成功',
-                'data': {
-                    'user': user.to_dict(),
-                    'access_token': access_token,
-                    'refresh_token': refresh_token
+                    return {'success': False, 'error': '該郵箱已被註冊'}
+                
+                # 檢查用戶名
+                if username:
+                    existing = db.execute(
+                        "SELECT id FROM users WHERE username = ?", (username.lower(),)
+                    ).fetchone()
+                    if existing:
+                        return {'success': False, 'error': '該用戶名已被使用'}
+                else:
+                    username = email.split('@')[0]
+                
+                # 創建用戶
+                user = User(
+                    email=email.lower(),
+                    username=username.lower(),
+                    password_hash=hash_password(password),
+                    display_name=display_name or username,
+                    role=UserRole.FREE,
+                    subscription_tier='free'
+                )
+                
+                # 設置配額（從統一配置服務獲取）
+                quotas = _get_user_quotas('free')
+                user.max_accounts = quotas['max_accounts']
+                user.max_api_calls = quotas['max_api_calls']
+                
+                db.execute('''
+                    INSERT INTO users (
+                        id, user_id, email, username, password_hash, display_name,
+                        role, subscription_tier, max_accounts, max_api_calls
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    user.id, user.id, user.email, user.username, user.password_hash,
+                    user.display_name, user.role.value, user.subscription_tier,
+                    user.max_accounts, user.max_api_calls
+                ))
+                db.commit()
+                
+                # 生成 token
+                access_token, refresh_token = generate_tokens(
+                    user.id, user.email, user.role.value
+                )
+                
+                # 記錄審計
+                self._log_audit(db, user.id, 'register', details={'email': email})
+                
+                return {
+                    'success': True,
+                    'message': '註冊成功',
+                    'data': {
+                        'user': user.to_dict(),
+                        'access_token': access_token,
+                        'refresh_token': refresh_token
+                    }
                 }
-            }
-            
-        except Exception as e:
-            logger.exception(f"Registration error: {e}")
-            return {'success': False, 'error': str(e)}
-        finally:
-            db.close()
+                
+            except Exception as e:
+                logger.exception(f"Registration error: {e}")
+                return {'success': False, 'error': str(e)}
     
     async def register_oauth(
         self,
@@ -377,93 +377,91 @@ class AuthService:
             display_name: 顯示名稱
             avatar_url: 頭像 URL
         """
-        db = self._get_db()
-        try:
-            # 檢查是否已存在
-            existing = db.execute(
-                "SELECT id FROM users WHERE auth_provider = ? AND oauth_id = ?",
-                (provider, provider_id)
-            ).fetchone()
-            
-            if existing:
+        with self._get_db() as db:
+            try:
+                # 檢查是否已存在
+                existing = db.execute(
+                    "SELECT id FROM users WHERE auth_provider = ? AND oauth_id = ?",
+                    (provider, provider_id)
+                ).fetchone()
+                
+                if existing:
+                    return {
+                        'success': True,
+                        'user_id': existing['id'],
+                        'is_existing': True
+                    }
+                
+                # 檢查用戶名是否可用
+                if username:
+                    existing = db.execute(
+                        "SELECT id FROM users WHERE username = ?", (username.lower(),)
+                    ).fetchone()
+                    if existing:
+                        # 添加數字後綴
+                        base_username = username.lower()
+                        counter = 1
+                        while True:
+                            new_username = f"{base_username}_{counter}"
+                            existing = db.execute(
+                                "SELECT id FROM users WHERE username = ?", (new_username,)
+                            ).fetchone()
+                            if not existing:
+                                username = new_username
+                                break
+                            counter += 1
+                
+                # 創建用戶
+                user = User(
+                    email=email.lower() if email else None,
+                    username=username.lower() if username else f"{provider}_{provider_id}",
+                    password_hash=None,  # OAuth 用戶無密碼
+                    display_name=display_name or username,
+                    avatar_url=avatar_url,
+                    auth_provider=provider,
+                    oauth_id=provider_id,
+                    role=UserRole.FREE,
+                    subscription_tier='free',
+                    is_verified=True  # OAuth 用戶自動驗證
+                )
+                
+                # 設置配額（從統一配置服務獲取）
+                quotas = _get_user_quotas('free')
+                user.max_accounts = quotas['max_accounts']
+                user.max_api_calls = quotas['max_api_calls']
+                
+                db.execute('''
+                    INSERT INTO users (
+                        id, user_id, email, username, password_hash, display_name, avatar_url,
+                        auth_provider, oauth_id, role, subscription_tier, 
+                        max_accounts, max_api_calls, is_verified
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    user.id, user.id, user.email, user.username, user.password_hash,
+                    user.display_name, user.avatar_url,
+                    provider, provider_id,
+                    user.role.value, user.subscription_tier,
+                    user.max_accounts, user.max_api_calls, 1
+                ))
+                db.commit()
+                
+                # 記錄審計
+                self._log_audit(db, user.id, 'oauth_register', details={
+                    'provider': provider, 
+                    'provider_id': provider_id
+                })
+                
+                logger.info(f"OAuth user registered: {user.id} via {provider}")
+                
                 return {
                     'success': True,
-                    'user_id': existing['id'],
-                    'is_existing': True
+                    'user_id': user.id,
+                    'is_existing': False
                 }
-            
-            # 檢查用戶名是否可用
-            if username:
-                existing = db.execute(
-                    "SELECT id FROM users WHERE username = ?", (username.lower(),)
-                ).fetchone()
-                if existing:
-                    # 添加數字後綴
-                    base_username = username.lower()
-                    counter = 1
-                    while True:
-                        new_username = f"{base_username}_{counter}"
-                        existing = db.execute(
-                            "SELECT id FROM users WHERE username = ?", (new_username,)
-                        ).fetchone()
-                        if not existing:
-                            username = new_username
-                            break
-                        counter += 1
-            
-            # 創建用戶
-            user = User(
-                email=email.lower() if email else None,
-                username=username.lower() if username else f"{provider}_{provider_id}",
-                password_hash=None,  # OAuth 用戶無密碼
-                display_name=display_name or username,
-                avatar_url=avatar_url,
-                auth_provider=provider,
-                oauth_id=provider_id,
-                role=UserRole.FREE,
-                subscription_tier='free',
-                is_verified=True  # OAuth 用戶自動驗證
-            )
-            
-            # 設置配額（從統一配置服務獲取）
-            quotas = _get_user_quotas('free')
-            user.max_accounts = quotas['max_accounts']
-            user.max_api_calls = quotas['max_api_calls']
-            
-            db.execute('''
-                INSERT INTO users (
-                    id, user_id, email, username, password_hash, display_name, avatar_url,
-                    auth_provider, oauth_id, role, subscription_tier, 
-                    max_accounts, max_api_calls, is_verified
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                user.id, user.id, user.email, user.username, user.password_hash,
-                user.display_name, user.avatar_url,
-                provider, provider_id,
-                user.role.value, user.subscription_tier,
-                user.max_accounts, user.max_api_calls, 1
-            ))
-            db.commit()
-            
-            # 記錄審計
-            self._log_audit(db, user.id, 'oauth_register', details={
-                'provider': provider, 
-                'provider_id': provider_id
-            })
-            
-            logger.info(f"OAuth user registered: {user.id} via {provider}")
-            
-            return {
-                'success': True,
-                'user_id': user.id,
-                'is_existing': False
-            }
-            
-        except Exception as e:
-            logger.exception(f"OAuth registration error: {e}")
-            return {'success': False, 'error': str(e)}
-        finally:
-            db.close()
+                
+            except Exception as e:
+                logger.exception(f"OAuth registration error: {e}")
+                return {'success': False, 'error': str(e)}
     
     async def get_user_by_telegram_id(self, telegram_id: str) -> Optional[User]:
         """
@@ -477,44 +475,42 @@ class AuthService:
         Returns:
             User 對象，不存在返回 None
         """
-        db = self._get_db()
-        try:
-            # 🆕 首先檢查 telegram_id 字段（新綁定方式）
+        with self._get_db() as db:
             try:
-                row = db.execute(
-                    "SELECT * FROM users WHERE telegram_id = ?",
-                    (telegram_id,)
-                ).fetchone()
-            except Exception as col_err:
-                # 🔧 如果列不存在，先執行遷移
-                if 'no such column' in str(col_err).lower():
-                    logger.warning(f"telegram_id column missing, running migration...")
-                    self._migrate_telegram_fields(db)
-                    # 遷移後重試
+                # 🆕 首先檢查 telegram_id 字段（新綁定方式）
+                try:
                     row = db.execute(
                         "SELECT * FROM users WHERE telegram_id = ?",
                         (telegram_id,)
                     ).fetchone()
-                else:
-                    raise
-            
-            # 🔧 兼容舊的 OAuth 登入方式
-            if not row:
-                row = db.execute(
-                    "SELECT * FROM users WHERE auth_provider = 'telegram' AND oauth_id = ?",
-                    (telegram_id,)
-                ).fetchone()
-            
-            if not row:
+                except Exception as col_err:
+                    # 🔧 如果列不存在，先執行遷移
+                    if 'no such column' in str(col_err).lower():
+                        logger.warning(f"telegram_id column missing, running migration...")
+                        self._migrate_telegram_fields(db)
+                        # 遷移後重試
+                        row = db.execute(
+                            "SELECT * FROM users WHERE telegram_id = ?",
+                            (telegram_id,)
+                        ).fetchone()
+                    else:
+                        raise
+                
+                # 🔧 兼容舊的 OAuth 登入方式
+                if not row:
+                    row = db.execute(
+                        "SELECT * FROM users WHERE auth_provider = 'telegram' AND oauth_id = ?",
+                        (telegram_id,)
+                    ).fetchone()
+                
+                if not row:
+                    return None
+                
+                return User.from_dict(dict(row))
+                
+            except Exception as e:
+                logger.error(f"Error getting user by telegram_id: {e}")
                 return None
-            
-            return User.from_dict(dict(row))
-            
-        except Exception as e:
-            logger.error(f"Error getting user by telegram_id: {e}")
-            return None
-        finally:
-            db.close()
     
     # ==================== 🆕 P2.2: Telegram 綁定方法 ====================
     
@@ -541,39 +537,37 @@ class AuthService:
         Returns:
             操作結果
         """
-        db = self._get_db()
-        try:
-            # 🔧 確保 telegram 相關列存在
-            self._migrate_telegram_fields(db)
-            
-            # 更新用戶的 Telegram 信息
-            db.execute('''
-                UPDATE users SET
-                    telegram_id = ?,
-                    telegram_username = ?,
-                    telegram_first_name = ?,
-                    telegram_photo_url = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ''', (telegram_id, telegram_username, telegram_first_name, telegram_photo_url, user_id))
-            
-            db.commit()
-            
-            # 記錄審計
-            self._log_audit(db, user_id, 'telegram_bound', details={
-                'telegram_id': telegram_id,
-                'telegram_username': telegram_username
-            })
-            
-            logger.info(f"User {user_id} bound Telegram {telegram_id}")
-            
-            return {'success': True}
-            
-        except Exception as e:
-            logger.exception(f"Bind Telegram error: {e}")
-            return {'success': False, 'error': str(e)}
-        finally:
-            db.close()
+        with self._get_db() as db:
+            try:
+                # 🔧 確保 telegram 相關列存在
+                self._migrate_telegram_fields(db)
+                
+                # 更新用戶的 Telegram 信息
+                db.execute('''
+                    UPDATE users SET
+                        telegram_id = ?,
+                        telegram_username = ?,
+                        telegram_first_name = ?,
+                        telegram_photo_url = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (telegram_id, telegram_username, telegram_first_name, telegram_photo_url, user_id))
+                
+                db.commit()
+                
+                # 記錄審計
+                self._log_audit(db, user_id, 'telegram_bound', details={
+                    'telegram_id': telegram_id,
+                    'telegram_username': telegram_username
+                })
+                
+                logger.info(f"User {user_id} bound Telegram {telegram_id}")
+                
+                return {'success': True}
+                
+            except Exception as e:
+                logger.exception(f"Bind Telegram error: {e}")
+                return {'success': False, 'error': str(e)}
     
     async def unbind_telegram(self, user_id: str) -> Dict[str, Any]:
         """
@@ -585,32 +579,30 @@ class AuthService:
         Returns:
             操作結果
         """
-        db = self._get_db()
-        try:
-            db.execute('''
-                UPDATE users SET
-                    telegram_id = NULL,
-                    telegram_username = NULL,
-                    telegram_first_name = NULL,
-                    telegram_photo_url = NULL,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ''', (user_id,))
-            
-            db.commit()
-            
-            # 記錄審計
-            self._log_audit(db, user_id, 'telegram_unbound')
-            
-            logger.info(f"User {user_id} unbound Telegram")
-            
-            return {'success': True}
-            
-        except Exception as e:
-            logger.exception(f"Unbind Telegram error: {e}")
-            return {'success': False, 'error': str(e)}
-        finally:
-            db.close()
+        with self._get_db() as db:
+            try:
+                db.execute('''
+                    UPDATE users SET
+                        telegram_id = NULL,
+                        telegram_username = NULL,
+                        telegram_first_name = NULL,
+                        telegram_photo_url = NULL,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (user_id,))
+                
+                db.commit()
+                
+                # 記錄審計
+                self._log_audit(db, user_id, 'telegram_unbound')
+                
+                logger.info(f"User {user_id} unbound Telegram")
+                
+                return {'success': True}
+                
+            except Exception as e:
+                logger.exception(f"Unbind Telegram error: {e}")
+                return {'success': False, 'error': str(e)}
     
     def create_user_from_telegram(
         self,
@@ -631,99 +623,97 @@ class AuthService:
         Returns:
             User 對象，失敗返回 None
         """
-        db = self._get_db()
-        try:
-            # 確保 Telegram 相關列存在
-            self._migrate_telegram_fields(db)
-            
-            # 檢查是否已存在
-            existing = db.execute(
-                "SELECT * FROM users WHERE telegram_id = ?",
-                (telegram_id,)
-            ).fetchone()
-            
-            if existing:
-                return User.from_dict(dict(existing))
-            
-            # 兼容舊的 OAuth 方式
-            existing = db.execute(
-                "SELECT * FROM users WHERE auth_provider = 'telegram' AND oauth_id = ?",
-                (telegram_id,)
-            ).fetchone()
-            
-            if existing:
-                # 更新 telegram_id 字段
-                db.execute(
-                    "UPDATE users SET telegram_id = ? WHERE id = ?",
-                    (telegram_id, existing['id'])
-                )
-                db.commit()
-                return User.from_dict(dict(existing))
-            
-            # 創建新用戶
-            display_name = first_name or f"TG_{telegram_id[-4:]}"
-            safe_username = (username or f"tg_{telegram_id}").lower().replace('@', '')
-            
-            # 確保用戶名唯一
-            base_username = safe_username
-            counter = 1
-            while True:
+        with self._get_db() as db:
+            try:
+                # 確保 Telegram 相關列存在
+                self._migrate_telegram_fields(db)
+                
+                # 檢查是否已存在
                 existing = db.execute(
-                    "SELECT id FROM users WHERE username = ?", (safe_username,)
+                    "SELECT * FROM users WHERE telegram_id = ?",
+                    (telegram_id,)
                 ).fetchone()
-                if not existing:
-                    break
-                safe_username = f"{base_username}_{counter}"
-                counter += 1
-            
-            user = User(
-                email=None,
-                username=safe_username,
-                password_hash=None,
-                display_name=display_name,
-                avatar_url=photo_url,
-                auth_provider='telegram',
-                oauth_id=telegram_id,
-                role=UserRole.FREE,
-                subscription_tier='free',
-                is_verified=True
-            )
-            
-            # 設置配額
-            quotas = _get_user_quotas('free')
-            user.max_accounts = quotas['max_accounts']
-            user.max_api_calls = quotas['max_api_calls']
-            
-            # 插入用戶
-            db.execute('''
-                INSERT INTO users (
-                    id, user_id, email, username, password_hash, display_name, avatar_url,
-                    auth_provider, oauth_id, telegram_id, telegram_username, telegram_first_name,
-                    role, subscription_tier, max_accounts, max_api_calls, is_verified
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                user.id, user.id, user.email, user.username, user.password_hash,
-                user.display_name, user.avatar_url,
-                'telegram', telegram_id, telegram_id, username, first_name,
-                user.role.value, user.subscription_tier,
-                user.max_accounts, user.max_api_calls, 1
-            ))
-            db.commit()
-            
-            # 記錄審計
-            self._log_audit(db, user.id, 'telegram_register', details={
-                'telegram_id': telegram_id,
-                'telegram_username': username
-            })
-            
-            logger.info(f"Created user from Telegram: {user.id} (TG: {telegram_id})")
-            return user
-            
-        except Exception as e:
-            logger.exception(f"Create user from Telegram error: {e}")
-            return None
-        finally:
-            db.close()
+                
+                if existing:
+                    return User.from_dict(dict(existing))
+                
+                # 兼容舊的 OAuth 方式
+                existing = db.execute(
+                    "SELECT * FROM users WHERE auth_provider = 'telegram' AND oauth_id = ?",
+                    (telegram_id,)
+                ).fetchone()
+                
+                if existing:
+                    # 更新 telegram_id 字段
+                    db.execute(
+                        "UPDATE users SET telegram_id = ? WHERE id = ?",
+                        (telegram_id, existing['id'])
+                    )
+                    db.commit()
+                    return User.from_dict(dict(existing))
+                
+                # 創建新用戶
+                display_name = first_name or f"TG_{telegram_id[-4:]}"
+                safe_username = (username or f"tg_{telegram_id}").lower().replace('@', '')
+                
+                # 確保用戶名唯一
+                base_username = safe_username
+                counter = 1
+                while True:
+                    existing = db.execute(
+                        "SELECT id FROM users WHERE username = ?", (safe_username,)
+                    ).fetchone()
+                    if not existing:
+                        break
+                    safe_username = f"{base_username}_{counter}"
+                    counter += 1
+                
+                user = User(
+                    email=None,
+                    username=safe_username,
+                    password_hash=None,
+                    display_name=display_name,
+                    avatar_url=photo_url,
+                    auth_provider='telegram',
+                    oauth_id=telegram_id,
+                    role=UserRole.FREE,
+                    subscription_tier='free',
+                    is_verified=True
+                )
+                
+                # 設置配額
+                quotas = _get_user_quotas('free')
+                user.max_accounts = quotas['max_accounts']
+                user.max_api_calls = quotas['max_api_calls']
+                
+                # 插入用戶
+                db.execute('''
+                    INSERT INTO users (
+                        id, user_id, email, username, password_hash, display_name, avatar_url,
+                        auth_provider, oauth_id, telegram_id, telegram_username, telegram_first_name,
+                        role, subscription_tier, max_accounts, max_api_calls, is_verified
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    user.id, user.id, user.email, user.username, user.password_hash,
+                    user.display_name, user.avatar_url,
+                    'telegram', telegram_id, telegram_id, username, first_name,
+                    user.role.value, user.subscription_tier,
+                    user.max_accounts, user.max_api_calls, 1
+                ))
+                db.commit()
+                
+                # 記錄審計
+                self._log_audit(db, user.id, 'telegram_register', details={
+                    'telegram_id': telegram_id,
+                    'telegram_username': username
+                })
+                
+                logger.info(f"Created user from Telegram: {user.id} (TG: {telegram_id})")
+                return user
+                
+            except Exception as e:
+                logger.exception(f"Create user from Telegram error: {e}")
+                return None
     
     async def create_session(
         self, 
@@ -740,58 +730,56 @@ class AuthService:
         Returns:
             包含 access_token 和 refresh_token 的字典
         """
-        db = self._get_db()
-        try:
-            # 獲取用戶信息
-            user = await self.get_user(user_id)
-            if not user:
-                return {'error': '用戶不存在'}
-            
-            # 生成 token
-            access_token, refresh_token = generate_tokens(
-                user.id, user.email or '', 
-                user.role.value if hasattr(user.role, 'value') else str(user.role)
-            )
-            
-            # 創建會話
-            session_id = str(uuid.uuid4())
-            expires_at = datetime.now() + timedelta(days=7)
-            
-            device_info = device_info or {}
-            
-            db.execute('''
-                INSERT INTO user_sessions (
-                    id, user_id, access_token, refresh_token,
-                    device_name, device_type, ip_address, user_agent,
-                    expires_at, last_activity_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ''', (
-                session_id, user_id, access_token, refresh_token,
-                device_info.get('device_name', 'Unknown'),
-                device_info.get('device_type', 'web'),
-                device_info.get('ip_address', ''),
-                device_info.get('user_agent', ''),
-                expires_at.isoformat()
-            ))
-            db.commit()
-            
-            # 更新最後登入時間
-            db.execute(
-                "UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (user_id,)
-            )
-            db.commit()
-            
-            return {
-                'access_token': access_token,
-                'refresh_token': refresh_token
-            }
-            
-        except Exception as e:
-            logger.exception(f"Session creation error: {e}")
-            return {'error': str(e)}
-        finally:
-            db.close()
+        with self._get_db() as db:
+            try:
+                # 獲取用戶信息
+                user = await self.get_user(user_id)
+                if not user:
+                    return {'error': '用戶不存在'}
+                
+                # 生成 token
+                access_token, refresh_token = generate_tokens(
+                    user.id, user.email or '', 
+                    user.role.value if hasattr(user.role, 'value') else str(user.role)
+                )
+                
+                # 創建會話
+                session_id = str(uuid.uuid4())
+                expires_at = datetime.now() + timedelta(days=7)
+                
+                device_info = device_info or {}
+                
+                db.execute('''
+                    INSERT INTO user_sessions (
+                        id, user_id, access_token, refresh_token,
+                        device_name, device_type, ip_address, user_agent,
+                        expires_at, last_activity_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (
+                    session_id, user_id, access_token, refresh_token,
+                    device_info.get('device_name', 'Unknown'),
+                    device_info.get('device_type', 'web'),
+                    device_info.get('ip_address', ''),
+                    device_info.get('user_agent', ''),
+                    expires_at.isoformat()
+                ))
+                db.commit()
+                
+                # 更新最後登入時間
+                db.execute(
+                    "UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (user_id,)
+                )
+                db.commit()
+                
+                return {
+                    'access_token': access_token,
+                    'refresh_token': refresh_token
+                }
+                
+            except Exception as e:
+                logger.exception(f"Session creation error: {e}")
+                return {'error': str(e)}
     
     async def login(
         self, 
@@ -800,116 +788,113 @@ class AuthService:
         device_info: Dict[str, str] = None
     ) -> Dict[str, Any]:
         """用戶登入"""
-        db = self._get_db()
-        try:
-            # 查找用戶
-            row = db.execute(
-                "SELECT * FROM users WHERE email = ? OR username = ?",
-                (email.lower(), email.lower())
-            ).fetchone()
-            
-            if not row:
-                return {'success': False, 'error': '用戶不存在'}
-            
-            user = User.from_dict(dict(row))
-            
-            # 檢查是否被鎖定
-            if user.locked_until and user.locked_until > datetime.now():
-                remaining = (user.locked_until - datetime.now()).seconds // 60
-                return {'success': False, 'error': f'帳號已鎖定，請 {remaining} 分鐘後重試'}
-            
-            # 驗證密碼
-            if not verify_password(password, user.password_hash):
-                # 增加失敗次數
-                failed = user.failed_login_attempts + 1
-                locked_until = None
+        with self._get_db() as db:
+            try:
+                # 查找用戶
+                row = db.execute(
+                    "SELECT * FROM users WHERE email = ? OR username = ?",
+                    (email.lower(), email.lower())
+                ).fetchone()
                 
-                if failed >= 5:
-                    locked_until = datetime.now() + timedelta(minutes=15)
+                if not row:
+                    return {'success': False, 'error': '用戶不存在'}
                 
-                db.execute(
-                    "UPDATE users SET failed_login_attempts = ?, locked_until = ? WHERE id = ?",
-                    (failed, locked_until, user.id)
+                user = User.from_dict(dict(row))
+                
+                # 檢查是否被鎖定
+                if user.locked_until and user.locked_until > datetime.now():
+                    remaining = (user.locked_until - datetime.now()).seconds // 60
+                    return {'success': False, 'error': f'帳號已鎖定，請 {remaining} 分鐘後重試'}
+                
+                # 驗證密碼
+                if not verify_password(password, user.password_hash):
+                    # 增加失敗次數
+                    failed = user.failed_login_attempts + 1
+                    locked_until = None
+                    
+                    if failed >= 5:
+                        locked_until = datetime.now() + timedelta(minutes=15)
+                    
+                    db.execute(
+                        "UPDATE users SET failed_login_attempts = ?, locked_until = ? WHERE id = ?",
+                        (failed, locked_until, user.id)
+                    )
+                    db.commit()
+                    
+                    self._log_audit(db, user.id, 'login_failed', 
+                        details={'reason': 'wrong_password', 'attempts': failed})
+                    
+                    return {'success': False, 'error': '密碼錯誤'}
+                
+                # 檢查帳號狀態
+                if not user.is_active:
+                    return {'success': False, 'error': '帳號已被停用'}
+                
+                # 登入成功，重置失敗次數
+                db.execute('''
+                    UPDATE users SET 
+                        failed_login_attempts = 0, 
+                        locked_until = NULL,
+                        last_login_at = ?
+                    WHERE id = ?
+                ''', (datetime.now(), user.id))
+                
+                # 生成 token
+                access_token, refresh_token = generate_tokens(
+                    user.id, user.email, user.role.value
                 )
+                
+                # 創建會話
+                device_info = device_info or {}
+                session = UserSession(
+                    user_id=user.id,
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                    device_name=device_info.get('device_name', 'Unknown'),
+                    device_type=device_info.get('device_type', 'web'),
+                    ip_address=device_info.get('ip_address', ''),
+                    user_agent=device_info.get('user_agent', ''),
+                    expires_at=datetime.now() + timedelta(days=30)
+                )
+                
+                db.execute('''
+                    INSERT INTO user_sessions (
+                        id, user_id, access_token, refresh_token,
+                        device_name, device_type, ip_address, user_agent, expires_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    session.id, session.user_id, session.access_token, session.refresh_token,
+                    session.device_name, session.device_type, session.ip_address,
+                    session.user_agent, session.expires_at
+                ))
                 db.commit()
                 
-                self._log_audit(db, user.id, 'login_failed', 
-                    details={'reason': 'wrong_password', 'attempts': failed})
+                # 記錄審計
+                self._log_audit(db, user.id, 'login', 
+                    ip_address=device_info.get('ip_address'),
+                    details={'device': device_info.get('device_name')})
                 
-                return {'success': False, 'error': '密碼錯誤'}
-            
-            # 檢查帳號狀態
-            if not user.is_active:
-                return {'success': False, 'error': '帳號已被停用'}
-            
-            # 登入成功，重置失敗次數
-            db.execute('''
-                UPDATE users SET 
-                    failed_login_attempts = 0, 
-                    locked_until = NULL,
-                    last_login_at = ?
-                WHERE id = ?
-            ''', (datetime.now(), user.id))
-            
-            # 生成 token
-            access_token, refresh_token = generate_tokens(
-                user.id, user.email, user.role.value
-            )
-            
-            # 創建會話
-            device_info = device_info or {}
-            session = UserSession(
-                user_id=user.id,
-                access_token=access_token,
-                refresh_token=refresh_token,
-                device_name=device_info.get('device_name', 'Unknown'),
-                device_type=device_info.get('device_type', 'web'),
-                ip_address=device_info.get('ip_address', ''),
-                user_agent=device_info.get('user_agent', ''),
-                expires_at=datetime.now() + timedelta(days=30)
-            )
-            
-            db.execute('''
-                INSERT INTO user_sessions (
-                    id, user_id, access_token, refresh_token,
-                    device_name, device_type, ip_address, user_agent, expires_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                session.id, session.user_id, session.access_token, session.refresh_token,
-                session.device_name, session.device_type, session.ip_address,
-                session.user_agent, session.expires_at
-            ))
-            db.commit()
-            
-            # 記錄審計
-            self._log_audit(db, user.id, 'login', 
-                ip_address=device_info.get('ip_address'),
-                details={'device': device_info.get('device_name')})
-            
-            # 更新用戶信息
-            user.last_login_at = datetime.now()
-            
-            return {
-                'success': True,
-                'message': '登入成功',
-                'data': {
-                    'user': user.to_dict(),
-                    'access_token': access_token,
-                    'refresh_token': refresh_token,
-                    'session_id': session.id
+                # 更新用戶信息
+                user.last_login_at = datetime.now()
+                
+                return {
+                    'success': True,
+                    'message': '登入成功',
+                    'data': {
+                        'user': user.to_dict(),
+                        'access_token': access_token,
+                        'refresh_token': refresh_token,
+                        'session_id': session.id
+                    }
                 }
-            }
-            
-        except Exception as e:
-            logger.exception(f"Login error: {e}")
-            return {'success': False, 'error': str(e)}
-        finally:
-            db.close()
+                
+            except Exception as e:
+                logger.exception(f"Login error: {e}")
+                return {'success': False, 'error': str(e)}
     
     async def logout(self, session_id: str = None, token: str = None) -> Dict[str, Any]:
         """登出"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             if session_id:
                 db.execute(
                     "UPDATE user_sessions SET is_active = 0 WHERE id = ?",
@@ -922,8 +907,6 @@ class AuthService:
                 )
             db.commit()
             return {'success': True, 'message': '已登出'}
-        finally:
-            db.close()
     
     async def refresh_token(self, refresh_token: str) -> Dict[str, Any]:
         """刷新 Token"""
@@ -934,8 +917,7 @@ class AuthService:
         
         user_id = payload.get('sub')
         
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             # 獲取用戶
             row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
             if not row:
@@ -963,8 +945,6 @@ class AuthService:
                     'refresh_token': new_refresh_token
                 }
             }
-        finally:
-            db.close()
     
     async def get_user_by_token(self, token: str) -> Optional[User]:
         """通過 Token 獲取用戶"""
@@ -974,32 +954,25 @@ class AuthService:
         
         user_id = payload.get('sub')
         
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
             if row:
                 return User.from_dict(dict(row))
             return None
-        finally:
-            db.close()
     
     async def get_user(self, user_id: str) -> Optional[User]:
         """獲取用戶"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
             if row:
                 return User.from_dict(dict(row))
             return None
-        finally:
-            db.close()
     
     async def update_user(self, user_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
         """更新用戶信息"""
         allowed_fields = ['display_name', 'avatar_url', 'username']
         
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             # 構建更新語句
             set_clauses = []
             values = []
@@ -1022,15 +995,12 @@ class AuthService:
             db.commit()
             
             return {'success': True, 'message': '更新成功'}
-        finally:
-            db.close()
     
     async def change_password(
         self, user_id: str, old_password: str, new_password: str
     ) -> Dict[str, Any]:
         """修改密碼"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             row = db.execute("SELECT password_hash FROM users WHERE id = ?", (user_id,)).fetchone()
             if not row:
                 return {'success': False, 'error': '用戶不存在'}
@@ -1048,380 +1018,359 @@ class AuthService:
             self._log_audit(db, user_id, 'password_changed')
             
             return {'success': True, 'message': '密碼已修改'}
-        finally:
-            db.close()
     
     # ==================== 郵箱驗證 ====================
     
     async def send_verification_email(self, user_id: str) -> Dict[str, Any]:
         """發送郵箱驗證郵件"""
-        db = self._get_db()
-        try:
-            # 獲取用戶
-            row = db.execute(
-                "SELECT id, email, username, is_verified FROM users WHERE id = ?",
-                (user_id,)
-            ).fetchone()
-            
-            if not row:
-                return {'success': False, 'error': '用戶不存在'}
-            
-            if row['is_verified']:
-                return {'success': False, 'error': '郵箱已驗證'}
-            
-            if not row['email']:
-                return {'success': False, 'error': '未設置郵箱'}
-            
-            # 生成驗證 Token
-            from .email_service import get_email_service
-            email_service = get_email_service()
-            
-            token = email_service.generate_verification_token()
-            code = email_service.generate_verification_code()
-            token_hash = email_service.hash_token(token)
-            expires_at = datetime.now() + timedelta(minutes=email_service.VERIFICATION_CODE_EXPIRY)
-            
-            # 保存驗證碼
-            db.execute('''
-                INSERT INTO verification_codes (user_id, email, code, type, expires_at)
-                VALUES (?, ?, ?, 'email_verification', ?)
-            ''', (user_id, row['email'], token_hash, expires_at.isoformat()))
-            db.commit()
-            
-            # 發送郵件
-            success, error = await email_service.send_verification_email(
-                row['email'],
-                row['username'],
-                token,
-                code
-            )
-            
-            if success:
-                self._log_audit(db, user_id, 'verification_email_sent')
-                return {'success': True, 'message': '驗證郵件已發送'}
-            else:
-                return {'success': False, 'error': error or '發送失敗'}
+        with self._get_db() as db:
+            try:
+                # 獲取用戶
+                row = db.execute(
+                    "SELECT id, email, username, is_verified FROM users WHERE id = ?",
+                    (user_id,)
+                ).fetchone()
                 
-        except Exception as e:
-            logger.exception(f"Send verification email error: {e}")
-            return {'success': False, 'error': str(e)}
-        finally:
-            db.close()
+                if not row:
+                    return {'success': False, 'error': '用戶不存在'}
+                
+                if row['is_verified']:
+                    return {'success': False, 'error': '郵箱已驗證'}
+                
+                if not row['email']:
+                    return {'success': False, 'error': '未設置郵箱'}
+                
+                # 生成驗證 Token
+                from .email_service import get_email_service
+                email_service = get_email_service()
+                
+                token = email_service.generate_verification_token()
+                code = email_service.generate_verification_code()
+                token_hash = email_service.hash_token(token)
+                expires_at = datetime.now() + timedelta(minutes=email_service.VERIFICATION_CODE_EXPIRY)
+                
+                # 保存驗證碼
+                db.execute('''
+                    INSERT INTO verification_codes (user_id, email, code, type, expires_at)
+                    VALUES (?, ?, ?, 'email_verification', ?)
+                ''', (user_id, row['email'], token_hash, expires_at.isoformat()))
+                db.commit()
+                
+                # 發送郵件
+                success, error = await email_service.send_verification_email(
+                    row['email'],
+                    row['username'],
+                    token,
+                    code
+                )
+                
+                if success:
+                    self._log_audit(db, user_id, 'verification_email_sent')
+                    return {'success': True, 'message': '驗證郵件已發送'}
+                else:
+                    return {'success': False, 'error': error or '發送失敗'}
+                    
+            except Exception as e:
+                logger.exception(f"Send verification email error: {e}")
+                return {'success': False, 'error': str(e)}
     
     async def verify_email(self, token: str) -> Dict[str, Any]:
         """驗證郵箱"""
-        db = self._get_db()
-        try:
-            from .email_service import get_email_service
-            email_service = get_email_service()
-            
-            token_hash = email_service.hash_token(token)
-            
-            # 查找驗證碼
-            row = db.execute('''
-                SELECT user_id, expires_at, used FROM verification_codes 
-                WHERE code = ? AND type = 'email_verification'
-                ORDER BY created_at DESC LIMIT 1
-            ''', (token_hash,)).fetchone()
-            
-            if not row:
-                return {'success': False, 'error': '無效的驗證鏈接'}
-            
-            if row['used']:
-                return {'success': False, 'error': '此鏈接已使用'}
-            
-            expires_at = datetime.fromisoformat(row['expires_at'])
-            if datetime.now() > expires_at:
-                return {'success': False, 'error': '驗證鏈接已過期'}
-            
-            # 標記為已使用
-            db.execute(
-                "UPDATE verification_codes SET used = 1 WHERE code = ?",
-                (token_hash,)
-            )
-            
-            # 更新用戶狀態
-            db.execute(
-                "UPDATE users SET is_verified = 1, updated_at = ? WHERE id = ?",
-                (datetime.now(), row['user_id'])
-            )
-            db.commit()
-            
-            self._log_audit(db, row['user_id'], 'email_verified')
-            
-            # 發送歡迎郵件
-            user = await self.get_user(row['user_id'])
-            if user and user.email:
-                await email_service.send_welcome_email(user.email, user.username)
-            
-            return {'success': True, 'message': '郵箱驗證成功'}
-            
-        except Exception as e:
-            logger.exception(f"Verify email error: {e}")
-            return {'success': False, 'error': str(e)}
-        finally:
-            db.close()
+        with self._get_db() as db:
+            try:
+                from .email_service import get_email_service
+                email_service = get_email_service()
+                
+                token_hash = email_service.hash_token(token)
+                
+                # 查找驗證碼
+                row = db.execute('''
+                    SELECT user_id, expires_at, used FROM verification_codes 
+                    WHERE code = ? AND type = 'email_verification'
+                    ORDER BY created_at DESC LIMIT 1
+                ''', (token_hash,)).fetchone()
+                
+                if not row:
+                    return {'success': False, 'error': '無效的驗證鏈接'}
+                
+                if row['used']:
+                    return {'success': False, 'error': '此鏈接已使用'}
+                
+                expires_at = datetime.fromisoformat(row['expires_at'])
+                if datetime.now() > expires_at:
+                    return {'success': False, 'error': '驗證鏈接已過期'}
+                
+                # 標記為已使用
+                db.execute(
+                    "UPDATE verification_codes SET used = 1 WHERE code = ?",
+                    (token_hash,)
+                )
+                
+                # 更新用戶狀態
+                db.execute(
+                    "UPDATE users SET is_verified = 1, updated_at = ? WHERE id = ?",
+                    (datetime.now(), row['user_id'])
+                )
+                db.commit()
+                
+                self._log_audit(db, row['user_id'], 'email_verified')
+                
+                # 發送歡迎郵件
+                user = await self.get_user(row['user_id'])
+                if user and user.email:
+                    await email_service.send_welcome_email(user.email, user.username)
+                
+                return {'success': True, 'message': '郵箱驗證成功'}
+                
+            except Exception as e:
+                logger.exception(f"Verify email error: {e}")
+                return {'success': False, 'error': str(e)}
     
     async def verify_email_by_code(self, email: str, code: str) -> Dict[str, Any]:
         """通過驗證碼驗證郵箱"""
-        db = self._get_db()
-        try:
-            # 查找驗證碼
-            row = db.execute('''
-                SELECT vc.user_id, vc.expires_at, vc.used, u.username
-                FROM verification_codes vc
-                JOIN users u ON vc.user_id = u.id
-                WHERE vc.email = ? AND vc.type = 'email_verification' AND vc.used = 0
-                ORDER BY vc.created_at DESC LIMIT 1
-            ''', (email.lower(),)).fetchone()
-            
-            if not row:
-                return {'success': False, 'error': '無效的驗證碼'}
-            
-            expires_at = datetime.fromisoformat(row['expires_at'])
-            if datetime.now() > expires_at:
-                return {'success': False, 'error': '驗證碼已過期'}
-            
-            # 驗證碼使用原始值比較（6位數字）
-            # 注意：這裡需要存儲原始驗證碼，或者改用其他方式
-            # 為簡化，我們信任來自同一郵箱的最新驗證請求
-            
-            # 標記為已使用
-            db.execute('''
-                UPDATE verification_codes SET used = 1 
-                WHERE email = ? AND type = 'email_verification' AND used = 0
-            ''', (email.lower(),))
-            
-            # 更新用戶狀態
-            db.execute(
-                "UPDATE users SET is_verified = 1, updated_at = ? WHERE id = ?",
-                (datetime.now(), row['user_id'])
-            )
-            db.commit()
-            
-            self._log_audit(db, row['user_id'], 'email_verified_by_code')
-            
-            # 發送歡迎郵件
-            from .email_service import get_email_service
-            email_service = get_email_service()
-            await email_service.send_welcome_email(email, row['username'])
-            
-            return {'success': True, 'message': '郵箱驗證成功'}
-            
-        except Exception as e:
-            logger.exception(f"Verify email by code error: {e}")
-            return {'success': False, 'error': str(e)}
-        finally:
-            db.close()
+        with self._get_db() as db:
+            try:
+                # 查找驗證碼
+                row = db.execute('''
+                    SELECT vc.user_id, vc.expires_at, vc.used, u.username
+                    FROM verification_codes vc
+                    JOIN users u ON vc.user_id = u.id
+                    WHERE vc.email = ? AND vc.type = 'email_verification' AND vc.used = 0
+                    ORDER BY vc.created_at DESC LIMIT 1
+                ''', (email.lower(),)).fetchone()
+                
+                if not row:
+                    return {'success': False, 'error': '無效的驗證碼'}
+                
+                expires_at = datetime.fromisoformat(row['expires_at'])
+                if datetime.now() > expires_at:
+                    return {'success': False, 'error': '驗證碼已過期'}
+                
+                # 驗證碼使用原始值比較（6位數字）
+                # 注意：這裡需要存儲原始驗證碼，或者改用其他方式
+                # 為簡化，我們信任來自同一郵箱的最新驗證請求
+                
+                # 標記為已使用
+                db.execute('''
+                    UPDATE verification_codes SET used = 1 
+                    WHERE email = ? AND type = 'email_verification' AND used = 0
+                ''', (email.lower(),))
+                
+                # 更新用戶狀態
+                db.execute(
+                    "UPDATE users SET is_verified = 1, updated_at = ? WHERE id = ?",
+                    (datetime.now(), row['user_id'])
+                )
+                db.commit()
+                
+                self._log_audit(db, row['user_id'], 'email_verified_by_code')
+                
+                # 發送歡迎郵件
+                from .email_service import get_email_service
+                email_service = get_email_service()
+                await email_service.send_welcome_email(email, row['username'])
+                
+                return {'success': True, 'message': '郵箱驗證成功'}
+                
+            except Exception as e:
+                logger.exception(f"Verify email by code error: {e}")
+                return {'success': False, 'error': str(e)}
     
     # ==================== 密碼重置 ====================
     
     async def request_password_reset(self, email: str) -> Dict[str, Any]:
         """請求密碼重置"""
-        db = self._get_db()
-        try:
-            # 查找用戶
-            row = db.execute(
-                "SELECT id, email, username FROM users WHERE email = ?",
-                (email.lower(),)
-            ).fetchone()
-            
-            # 安全考慮：即使用戶不存在也返回成功
-            if not row:
-                logger.info(f"Password reset requested for non-existent email: {email}")
+        with self._get_db() as db:
+            try:
+                # 查找用戶
+                row = db.execute(
+                    "SELECT id, email, username FROM users WHERE email = ?",
+                    (email.lower(),)
+                ).fetchone()
+                
+                # 安全考慮：即使用戶不存在也返回成功
+                if not row:
+                    logger.info(f"Password reset requested for non-existent email: {email}")
+                    return {'success': True, 'message': '如果該郵箱已註冊，您將收到重置郵件'}
+                
+                # 生成重置 Token
+                from .email_service import get_email_service
+                email_service = get_email_service()
+                
+                token = email_service.generate_verification_token()
+                code = email_service.generate_verification_code()
+                token_hash = email_service.hash_token(token)
+                expires_at = datetime.now() + timedelta(minutes=email_service.PASSWORD_RESET_EXPIRY)
+                
+                # 保存重置碼
+                db.execute('''
+                    INSERT INTO verification_codes (user_id, email, code, type, expires_at)
+                    VALUES (?, ?, ?, 'password_reset', ?)
+                ''', (row['id'], row['email'], token_hash, expires_at.isoformat()))
+                db.commit()
+                
+                # 發送郵件
+                success, error = await email_service.send_password_reset_email(
+                    row['email'],
+                    row['username'],
+                    token,
+                    code
+                )
+                
+                if success:
+                    self._log_audit(db, row['id'], 'password_reset_requested')
+                
+                # 無論成功失敗都返回成功（安全考慮）
                 return {'success': True, 'message': '如果該郵箱已註冊，您將收到重置郵件'}
-            
-            # 生成重置 Token
-            from .email_service import get_email_service
-            email_service = get_email_service()
-            
-            token = email_service.generate_verification_token()
-            code = email_service.generate_verification_code()
-            token_hash = email_service.hash_token(token)
-            expires_at = datetime.now() + timedelta(minutes=email_service.PASSWORD_RESET_EXPIRY)
-            
-            # 保存重置碼
-            db.execute('''
-                INSERT INTO verification_codes (user_id, email, code, type, expires_at)
-                VALUES (?, ?, ?, 'password_reset', ?)
-            ''', (row['id'], row['email'], token_hash, expires_at.isoformat()))
-            db.commit()
-            
-            # 發送郵件
-            success, error = await email_service.send_password_reset_email(
-                row['email'],
-                row['username'],
-                token,
-                code
-            )
-            
-            if success:
-                self._log_audit(db, row['id'], 'password_reset_requested')
-            
-            # 無論成功失敗都返回成功（安全考慮）
-            return {'success': True, 'message': '如果該郵箱已註冊，您將收到重置郵件'}
-            
-        except Exception as e:
-            logger.exception(f"Request password reset error: {e}")
-            return {'success': True, 'message': '如果該郵箱已註冊，您將收到重置郵件'}
-        finally:
-            db.close()
+                
+            except Exception as e:
+                logger.exception(f"Request password reset error: {e}")
+                return {'success': True, 'message': '如果該郵箱已註冊，您將收到重置郵件'}
     
     async def reset_password(self, token: str, new_password: str) -> Dict[str, Any]:
         """重置密碼"""
-        db = self._get_db()
-        try:
-            from .email_service import get_email_service
-            email_service = get_email_service()
-            
-            token_hash = email_service.hash_token(token)
-            
-            # 查找重置碼
-            row = db.execute('''
-                SELECT user_id, expires_at, used FROM verification_codes 
-                WHERE code = ? AND type = 'password_reset'
-                ORDER BY created_at DESC LIMIT 1
-            ''', (token_hash,)).fetchone()
-            
-            if not row:
-                return {'success': False, 'error': '無效的重置鏈接'}
-            
-            if row['used']:
-                return {'success': False, 'error': '此鏈接已使用'}
-            
-            expires_at = datetime.fromisoformat(row['expires_at'])
-            if datetime.now() > expires_at:
-                return {'success': False, 'error': '重置鏈接已過期'}
-            
-            # 驗證密碼強度
-            if len(new_password) < 8:
-                return {'success': False, 'error': '密碼至少需要 8 個字符'}
-            
-            # 標記為已使用
-            db.execute(
-                "UPDATE verification_codes SET used = 1 WHERE code = ?",
-                (token_hash,)
-            )
-            
-            # 更新密碼
-            new_hash = hash_password(new_password)
-            db.execute('''
-                UPDATE users SET 
-                    password_hash = ?, 
-                    updated_at = ?,
-                    failed_login_attempts = 0,
-                    locked_until = NULL
-                WHERE id = ?
-            ''', (new_hash, datetime.now(), row['user_id']))
-            db.commit()
-            
-            # 撤銷所有現有會話（強制重新登入）
-            db.execute(
-                "UPDATE user_sessions SET is_active = 0 WHERE user_id = ?",
-                (row['user_id'],)
-            )
-            db.commit()
-            
-            self._log_audit(db, row['user_id'], 'password_reset_completed')
-            
-            return {'success': True, 'message': '密碼重置成功，請使用新密碼登入'}
-            
-        except Exception as e:
-            logger.exception(f"Reset password error: {e}")
-            return {'success': False, 'error': str(e)}
-        finally:
-            db.close()
+        with self._get_db() as db:
+            try:
+                from .email_service import get_email_service
+                email_service = get_email_service()
+                
+                token_hash = email_service.hash_token(token)
+                
+                # 查找重置碼
+                row = db.execute('''
+                    SELECT user_id, expires_at, used FROM verification_codes 
+                    WHERE code = ? AND type = 'password_reset'
+                    ORDER BY created_at DESC LIMIT 1
+                ''', (token_hash,)).fetchone()
+                
+                if not row:
+                    return {'success': False, 'error': '無效的重置鏈接'}
+                
+                if row['used']:
+                    return {'success': False, 'error': '此鏈接已使用'}
+                
+                expires_at = datetime.fromisoformat(row['expires_at'])
+                if datetime.now() > expires_at:
+                    return {'success': False, 'error': '重置鏈接已過期'}
+                
+                # 驗證密碼強度
+                if len(new_password) < 8:
+                    return {'success': False, 'error': '密碼至少需要 8 個字符'}
+                
+                # 標記為已使用
+                db.execute(
+                    "UPDATE verification_codes SET used = 1 WHERE code = ?",
+                    (token_hash,)
+                )
+                
+                # 更新密碼
+                new_hash = hash_password(new_password)
+                db.execute('''
+                    UPDATE users SET 
+                        password_hash = ?, 
+                        updated_at = ?,
+                        failed_login_attempts = 0,
+                        locked_until = NULL
+                    WHERE id = ?
+                ''', (new_hash, datetime.now(), row['user_id']))
+                db.commit()
+                
+                # 撤銷所有現有會話（強制重新登入）
+                db.execute(
+                    "UPDATE user_sessions SET is_active = 0 WHERE user_id = ?",
+                    (row['user_id'],)
+                )
+                db.commit()
+                
+                self._log_audit(db, row['user_id'], 'password_reset_completed')
+                
+                return {'success': True, 'message': '密碼重置成功，請使用新密碼登入'}
+                
+            except Exception as e:
+                logger.exception(f"Reset password error: {e}")
+                return {'success': False, 'error': str(e)}
     
     async def reset_password_by_code(
         self, email: str, code: str, new_password: str
     ) -> Dict[str, Any]:
         """通過驗證碼重置密碼"""
-        db = self._get_db()
-        try:
-            # 查找重置碼
-            row = db.execute('''
-                SELECT user_id, expires_at FROM verification_codes 
-                WHERE email = ? AND type = 'password_reset' AND used = 0
-                ORDER BY created_at DESC LIMIT 1
-            ''', (email.lower(),)).fetchone()
-            
-            if not row:
-                return {'success': False, 'error': '無效的驗證碼'}
-            
-            expires_at = datetime.fromisoformat(row['expires_at'])
-            if datetime.now() > expires_at:
-                return {'success': False, 'error': '驗證碼已過期'}
-            
-            # 驗證密碼強度
-            if len(new_password) < 8:
-                return {'success': False, 'error': '密碼至少需要 8 個字符'}
-            
-            # 標記為已使用
-            db.execute('''
-                UPDATE verification_codes SET used = 1 
-                WHERE email = ? AND type = 'password_reset' AND used = 0
-            ''', (email.lower(),))
-            
-            # 更新密碼
-            new_hash = hash_password(new_password)
-            db.execute('''
-                UPDATE users SET 
-                    password_hash = ?, 
-                    updated_at = ?,
-                    failed_login_attempts = 0,
-                    locked_until = NULL
-                WHERE id = ?
-            ''', (new_hash, datetime.now(), row['user_id']))
-            db.commit()
-            
-            # 撤銷所有現有會話
-            db.execute(
-                "UPDATE user_sessions SET is_active = 0 WHERE user_id = ?",
-                (row['user_id'],)
-            )
-            db.commit()
-            
-            self._log_audit(db, row['user_id'], 'password_reset_by_code')
-            
-            return {'success': True, 'message': '密碼重置成功，請使用新密碼登入'}
-            
-        except Exception as e:
-            logger.exception(f"Reset password by code error: {e}")
-            return {'success': False, 'error': str(e)}
-        finally:
-            db.close()
+        with self._get_db() as db:
+            try:
+                # 查找重置碼
+                row = db.execute('''
+                    SELECT user_id, expires_at FROM verification_codes 
+                    WHERE email = ? AND type = 'password_reset' AND used = 0
+                    ORDER BY created_at DESC LIMIT 1
+                ''', (email.lower(),)).fetchone()
+                
+                if not row:
+                    return {'success': False, 'error': '無效的驗證碼'}
+                
+                expires_at = datetime.fromisoformat(row['expires_at'])
+                if datetime.now() > expires_at:
+                    return {'success': False, 'error': '驗證碼已過期'}
+                
+                # 驗證密碼強度
+                if len(new_password) < 8:
+                    return {'success': False, 'error': '密碼至少需要 8 個字符'}
+                
+                # 標記為已使用
+                db.execute('''
+                    UPDATE verification_codes SET used = 1 
+                    WHERE email = ? AND type = 'password_reset' AND used = 0
+                ''', (email.lower(),))
+                
+                # 更新密碼
+                new_hash = hash_password(new_password)
+                db.execute('''
+                    UPDATE users SET 
+                        password_hash = ?, 
+                        updated_at = ?,
+                        failed_login_attempts = 0,
+                        locked_until = NULL
+                    WHERE id = ?
+                ''', (new_hash, datetime.now(), row['user_id']))
+                db.commit()
+                
+                # 撤銷所有現有會話
+                db.execute(
+                    "UPDATE user_sessions SET is_active = 0 WHERE user_id = ?",
+                    (row['user_id'],)
+                )
+                db.commit()
+                
+                self._log_audit(db, row['user_id'], 'password_reset_by_code')
+                
+                return {'success': True, 'message': '密碼重置成功，請使用新密碼登入'}
+                
+            except Exception as e:
+                logger.exception(f"Reset password by code error: {e}")
+                return {'success': False, 'error': str(e)}
     
     # ==================== 會話管理 ====================
     
     async def get_sessions(self, user_id: str) -> List[Dict]:
         """獲取用戶所有會話"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             rows = db.execute(
                 "SELECT * FROM user_sessions WHERE user_id = ? AND is_active = 1 ORDER BY last_activity_at DESC",
                 (user_id,)
             ).fetchall()
             return [dict(row) for row in rows]
-        finally:
-            db.close()
     
     async def revoke_session(self, user_id: str, session_id: str) -> Dict[str, Any]:
         """撤銷指定會話"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             db.execute(
                 "UPDATE user_sessions SET is_active = 0 WHERE id = ? AND user_id = ?",
                 (session_id, user_id)
             )
             db.commit()
             return {'success': True, 'message': '會話已撤銷'}
-        finally:
-            db.close()
     
     async def revoke_all_sessions(self, user_id: str, except_current: str = None) -> Dict[str, Any]:
         """撤銷所有會話"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             if except_current:
                 db.execute(
                     "UPDATE user_sessions SET is_active = 0 WHERE user_id = ? AND id != ?",
@@ -1434,8 +1383,6 @@ class AuthService:
                 )
             db.commit()
             return {'success': True, 'message': '所有會話已撤銷'}
-        finally:
-            db.close()
     
     # ==================== 審計日誌 ====================
     

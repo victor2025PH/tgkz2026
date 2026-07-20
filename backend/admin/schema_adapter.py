@@ -17,6 +17,10 @@ from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict
 from datetime import datetime
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection
+
 logger = logging.getLogger(__name__)
 
 
@@ -99,10 +103,13 @@ class UserSchemaAdapter:
         return default
     
     def get_connection(self) -> sqlite3.Connection:
-        """獲取數據庫連接"""
-        conn = sqlite3.connect(self.get_db_path())
-        conn.row_factory = sqlite3.Row
-        return conn
+        """獲取數據庫連接
+
+        🔧 本方法對外提供連接供多處共用（呼叫方負責關閉，見 detect_schema/
+        get_user_by_id 的 close_conn 旗標語義），改由 create_connection()
+        建立連接（已內建 WAL + row_factory），而非直接 sqlite3.connect()。
+        """
+        return create_connection(self.get_db_path())
     
     def detect_schema(self, conn: sqlite3.Connection = None) -> SchemaType:
         """檢測表結構類型"""

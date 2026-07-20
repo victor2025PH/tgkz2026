@@ -470,4 +470,39 @@ export function setupCoreIpcHandlers(this: any): void {
         console.error('[Frontend] Session files cleanup error:', data);
     });
 
+    // 🔧 精簡獲客模式重構（Stage 2D）：由 chat-ipc.ts 搬移至此
+    // 原因：這三個事件服務於「後端運行狀態橫幅/錯誤對話框」與「監控狀態」，
+    // 是精簡模式與完整模式都需要的核心/通用功能，不應隨 chat-ipc.ts 一起被
+    // isLeanModeActive() 跳過註冊，故獨立移入 core-ipc.ts 確保任何模式下都會註冊。
+
+    // 後端狀態監聽（驅動 app.component.html 中無條件顯示的後端未運行橫幅/錯誤對話框）
+    this.ipcService.on('backend-status', (data: { running: boolean, error?: string, suggestion?: string }) => {
+      console.log('[App] Backend status:', data);
+      this.backendRunning.set(data.running);
+      if (!data.running && data.error) {
+        this.backendError.set(data.error);
+        this.showBackendErrorDialog.set(true);
+        this.toastService.error('❌ Python 後端未運行，部分功能無法使用');
+      }
+    });
+
+    // 監控狀態/健康度事件（目前僅記錄日誌；實際的 isMonitoring 狀態由
+    // MonitoringManagementService 自身獨立監聽同名事件驅動，兩者互不影響）
+    this.ipcService.on('monitoring-status', (data: { success: boolean, isMonitoring?: boolean, listenerAccounts?: any[], senderAccounts?: any[] }) => {
+      if (data.success) {
+        console.log('[Frontend] Monitoring status:', data);
+      }
+    });
+
+    this.ipcService.on('monitoring-health', (data: { success: boolean, isHealthy?: boolean, issues?: string[], warnings?: string[] }) => {
+      if (data.success) {
+        if (data.issues && data.issues.length > 0) {
+          console.warn('[Frontend] Monitoring issues:', data.issues);
+        }
+        if (data.warnings && data.warnings.length > 0) {
+          console.warn('[Frontend] Monitoring warnings:', data.warnings);
+        }
+      }
+    });
+
 }

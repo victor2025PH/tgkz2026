@@ -18,6 +18,23 @@ from service_context import get_service_context
 # This is a transitional pattern - later, replace self.xxx with ctx.xxx
 
 
+def _release_qr_pool_allocation(temp_key: Optional[str]) -> None:
+    """
+    🛡️ Stage 3：釋放 QR 登入時從平台 API 池臨時佔用的憑據。
+
+    對「未使用池分配」的情況（temp_key 為 None）是安全的 no-op；
+    對「已重新綁定到 sessionId」的情況，傳入 sessionId 一樣可以正確釋放
+    （release_api_for_phone 內部按 key 查表，查不到就什麼都不做）。
+    """
+    if not temp_key:
+        return
+    try:
+        from core.api_pool_integration import release_api_for_phone
+        release_api_for_phone(temp_key)
+    except Exception as e:
+        print(f"[Backend] QR 登入 API 池釋放失敗（不影響流程）: {e}", file=sys.stderr)
+
+
 # ===================== QR Code Login Handlers =====================
 
 async def handle_qr_login_create(self, payload: Dict[str, Any]):
@@ -52,7 +69,58 @@ async def handle_qr_login_create(self, payload: Dict[str, Any]):
         # 獲取自定義 API 憑據（防封推薦）
         custom_api_id = payload.get("customApiId") if isinstance(payload, dict) else None
         custom_api_hash = payload.get("customApiHash") if isinstance(payload, dict) else None
-        
+
+        # 🛡️ Stage 3：用戶未提供專屬 API 時，先嘗試向平台 API 池申請
+        # （與手機驗證碼登入的 process_login_payload 同源機制）；申請成功則
+        # 視同「用戶專屬 API」使用，避免落到公共 Desktop/iOS/Android API。
+        # 池為空、分配失敗或開關關閉時，行為與之前完全一致（回退公共 API）。
+        _qr_pool_temp_key: Optional[str] = None
+        if not (custom_api_id and custom_api_hash):
+            try:
+                from config import QR_USE_API_POOL, QR_POOL_ROLLOUT_PERCENT
+            except Exception:
+                QR_USE_API_POOL = False
+                QR_POOL_ROLLOUT_PERCENT = 0
+
+            # 🎯 灰度放量判定：全開（QR_USE_API_POOL）視為 100%；否則按百分比
+            # 用隨機數決定「這一次」是否走池，讓運維可以先用小比例安全積累
+            # 真實數據。百分比為 0（默認值）時等同於原本的行為，完全不變。
+            _use_pool_this_time = False
+            _trigger_reason = "off"
+            if QR_USE_API_POOL:
+                _use_pool_this_time = True
+                _trigger_reason = "forced_on"
+            elif QR_POOL_ROLLOUT_PERCENT > 0:
+                import random
+                if random.random() * 100 < QR_POOL_ROLLOUT_PERCENT:
+                    _use_pool_this_time = True
+                    _trigger_reason = f"canary_{QR_POOL_ROLLOUT_PERCENT}pct"
+
+            if _use_pool_this_time:
+                try:
+                    import uuid
+                    from core.api_pool_integration import get_api_for_login
+                    _qr_pool_temp_key = f"qr-pending:{uuid.uuid4().hex}"
+                    pool_api_id, pool_api_hash, pool_source = get_api_for_login(
+                        phone=_qr_pool_temp_key,
+                        use_platform_api=True
+                    )
+                    if pool_source in ("platform", "platform_sqlite") and pool_api_id and pool_api_hash:
+                        custom_api_id = pool_api_id
+                        custom_api_hash = pool_api_hash
+                        print(f"[Backend] QR 登入從平台 API 池分配到專屬憑據 (api_id={pool_api_id}, source={pool_source}, trigger={_trigger_reason})", file=sys.stderr)
+                        try:
+                            from core.api_pool_integration import record_qr_pool_allocation
+                            record_qr_pool_allocation()
+                        except Exception:
+                            pass
+                    else:
+                        # 池為空/回退：不佔用任何資源，temp_key 置空，走原有公共 API 邏輯
+                        _qr_pool_temp_key = None
+                except Exception as pool_err:
+                    print(f"[Backend] QR 登入 API 池分配失敗（不影響登入，回退公共 API，trigger={_trigger_reason}): {pool_err}", file=sys.stderr)
+                    _qr_pool_temp_key = None
+
         if custom_api_id and custom_api_hash:
             print(f"[Backend] Using CUSTOM API credentials (api_id={custom_api_id}) - Recommended for anti-ban", file=sys.stderr)
         else:
@@ -75,6 +143,7 @@ async def handle_qr_login_create(self, payload: Dict[str, Any]):
         except asyncio.TimeoutError:
             error_msg = "創建 QR 登入超時（60秒），請檢查網絡連接或代理設置"
             print(f"[Backend] {error_msg}", file=sys.stderr)
+            _release_qr_pool_allocation(_qr_pool_temp_key)
             self.send_event("qr-login-error", {"error": error_msg})
             self.send_log(error_msg, "error")
             return
@@ -82,16 +151,32 @@ async def handle_qr_login_create(self, payload: Dict[str, Any]):
         print(f"[Backend] create_qr_login result: success={result.get('success')}, error={result.get('error', 'None')}", file=sys.stderr)
         
         if result.get("success"):
+            # 🛡️ 將池分配的臨時 key 重新綁定到真正的 sessionId，方便取消/失敗時按 sessionId 釋放
+            if _qr_pool_temp_key:
+                try:
+                    from core.api_pool_integration import bind_phone_to_api, get_api_for_phone
+                    real_api_id = get_api_for_phone(_qr_pool_temp_key)
+                    session_id = result.get('sessionId')
+                    if real_api_id and session_id:
+                        bind_phone_to_api(session_id, real_api_id)
+                except Exception as bind_err:
+                    print(f"[Backend] QR 登入 API 池 key 重綁定失敗（不影響登入）: {bind_err}", file=sys.stderr)
             print(f"[Backend] Sending qr-login-created event with sessionId={result.get('sessionId')}", file=sys.stderr)
             self.send_event("qr-login-created", result)
             self.send_log(f"QR 登入會話已創建，請掃描二維碼", "info")
         else:
+            _release_qr_pool_allocation(_qr_pool_temp_key)
             error_msg = result.get("error", "創建 QR 登入失敗")
             print(f"[Backend] QR login failed: {error_msg}", file=sys.stderr)
             self.send_event("qr-login-error", {"error": error_msg})
             self.send_log(f"創建 QR 登入失敗: {error_msg}", "error")
             
     except Exception as e:
+        # 🛡️ 任何未預期異常也要釋放已佔用的池資源，避免洩漏
+        try:
+            _release_qr_pool_allocation(locals().get('_qr_pool_temp_key'))
+        except Exception:
+            pass
         import sys
         import traceback
         error_msg = f"創建 QR 登入時發生錯誤: {str(e)}"
@@ -189,6 +274,10 @@ async def handle_qr_login_cancel(self, payload: Dict[str, Any]):
         
         session_id = payload.get("sessionId") if isinstance(payload, dict) else payload
         result = await self.qr_auth_manager.cancel_session(session_id)
+
+        # 🛡️ 若此 session 曾從 API 池分配專屬憑據，取消時一併釋放回池
+        # （若未使用池分配，release_api_for_phone 查不到 key，是安全的 no-op）
+        _release_qr_pool_allocation(session_id)
         
         self.send_event("qr-login-cancelled", {
             "sessionId": session_id,

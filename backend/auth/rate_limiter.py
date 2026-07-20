@@ -15,11 +15,14 @@ Phase 5 安全功能：
 
 import os
 import logging
-import sqlite3
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass
 from enum import Enum
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -84,54 +87,50 @@ class RateLimiterService:
         self._init_db()
     
     def _get_db(self):
-        """獲取數據庫連接"""
-        db = sqlite3.connect(self.db_path)
-        db.row_factory = sqlite3.Row
-        return db
+        """獲取數據庫連接（context manager，統一經由 core.db_utils.get_connection）"""
+        return get_connection(self.db_path)
     
     def _init_db(self):
         """初始化數據庫表"""
-        db = self._get_db()
-        try:
-            # 登入嘗試記錄表
-            db.execute('''
-                CREATE TABLE IF NOT EXISTS login_attempts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    identifier TEXT NOT NULL,
-                    identifier_type TEXT NOT NULL,
-                    success INTEGER DEFAULT 0,
-                    ip_address TEXT,
-                    user_agent TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # 鎖定記錄表
-            db.execute('''
-                CREATE TABLE IF NOT EXISTS lockouts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    identifier TEXT NOT NULL,
-                    identifier_type TEXT NOT NULL,
-                    reason TEXT,
-                    locked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    unlock_at TIMESTAMP NOT NULL,
-                    consecutive_lockouts INTEGER DEFAULT 1,
-                    is_active INTEGER DEFAULT 1
-                )
-            ''')
-            
-            # 創建索引
-            db.execute('CREATE INDEX IF NOT EXISTS idx_login_attempts_identifier ON login_attempts(identifier, identifier_type)')
-            db.execute('CREATE INDEX IF NOT EXISTS idx_login_attempts_time ON login_attempts(created_at)')
-            db.execute('CREATE INDEX IF NOT EXISTS idx_lockouts_identifier ON lockouts(identifier, identifier_type)')
-            db.execute('CREATE INDEX IF NOT EXISTS idx_lockouts_active ON lockouts(is_active, unlock_at)')
-            
-            db.commit()
-            logger.info("Rate limiter tables initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize rate limiter tables: {e}")
-        finally:
-            db.close()
+        with self._get_db() as db:
+            try:
+                # 登入嘗試記錄表
+                db.execute('''
+                    CREATE TABLE IF NOT EXISTS login_attempts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        identifier TEXT NOT NULL,
+                        identifier_type TEXT NOT NULL,
+                        success INTEGER DEFAULT 0,
+                        ip_address TEXT,
+                        user_agent TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                
+                # 鎖定記錄表
+                db.execute('''
+                    CREATE TABLE IF NOT EXISTS lockouts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        identifier TEXT NOT NULL,
+                        identifier_type TEXT NOT NULL,
+                        reason TEXT,
+                        locked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        unlock_at TIMESTAMP NOT NULL,
+                        consecutive_lockouts INTEGER DEFAULT 1,
+                        is_active INTEGER DEFAULT 1
+                    )
+                ''')
+                
+                # 創建索引
+                db.execute('CREATE INDEX IF NOT EXISTS idx_login_attempts_identifier ON login_attempts(identifier, identifier_type)')
+                db.execute('CREATE INDEX IF NOT EXISTS idx_login_attempts_time ON login_attempts(created_at)')
+                db.execute('CREATE INDEX IF NOT EXISTS idx_lockouts_identifier ON lockouts(identifier, identifier_type)')
+                db.execute('CREATE INDEX IF NOT EXISTS idx_lockouts_active ON lockouts(is_active, unlock_at)')
+                
+                db.commit()
+                logger.info("Rate limiter tables initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize rate limiter tables: {e}")
     
     def check_rate_limit(
         self,
@@ -148,55 +147,53 @@ class RateLimiterService:
         Returns:
             RateLimitResult 對象
         """
-        db = self._get_db()
         now = datetime.utcnow()
         
         try:
-            # 1. 檢查是否被鎖定
-            cursor = db.execute('''
-                SELECT unlock_at, reason FROM lockouts
-                WHERE identifier = ? AND identifier_type = ? 
-                AND is_active = 1 AND unlock_at > ?
-                ORDER BY unlock_at DESC LIMIT 1
-            ''', (identifier, identifier_type, now.isoformat()))
-            
-            lockout = cursor.fetchone()
-            if lockout:
-                unlock_at = datetime.fromisoformat(lockout['unlock_at'])
+            with self._get_db() as db:
+                # 1. 檢查是否被鎖定
+                cursor = db.execute('''
+                    SELECT unlock_at, reason FROM lockouts
+                    WHERE identifier = ? AND identifier_type = ? 
+                    AND is_active = 1 AND unlock_at > ?
+                    ORDER BY unlock_at DESC LIMIT 1
+                ''', (identifier, identifier_type, now.isoformat()))
+                
+                lockout = cursor.fetchone()
+                if lockout:
+                    unlock_at = datetime.fromisoformat(lockout['unlock_at'])
+                    return RateLimitResult(
+                        allowed=False,
+                        remaining_attempts=0,
+                        lockout_until=unlock_at,
+                        lockout_seconds=int((unlock_at - now).total_seconds()),
+                        reason=lockout['reason'] or '登入嘗試過多'
+                    )
+                
+                # 2. 計算時間窗口內的失敗次數
+                window_start = (now - timedelta(seconds=self.WINDOW_SECONDS)).isoformat()
+                
+                cursor = db.execute('''
+                    SELECT COUNT(*) as count FROM login_attempts
+                    WHERE identifier = ? AND identifier_type = ?
+                    AND success = 0 AND created_at > ?
+                ''', (identifier, identifier_type, window_start))
+                
+                row = cursor.fetchone()
+                failed_attempts = row['count'] if row else 0
+                
+                remaining = max(0, self.MAX_ATTEMPTS - failed_attempts)
+                
                 return RateLimitResult(
-                    allowed=False,
-                    remaining_attempts=0,
-                    lockout_until=unlock_at,
-                    lockout_seconds=int((unlock_at - now).total_seconds()),
-                    reason=lockout['reason'] or '登入嘗試過多'
+                    allowed=remaining > 0,
+                    remaining_attempts=remaining,
+                    reason='超過最大嘗試次數' if remaining == 0 else None
                 )
-            
-            # 2. 計算時間窗口內的失敗次數
-            window_start = (now - timedelta(seconds=self.WINDOW_SECONDS)).isoformat()
-            
-            cursor = db.execute('''
-                SELECT COUNT(*) as count FROM login_attempts
-                WHERE identifier = ? AND identifier_type = ?
-                AND success = 0 AND created_at > ?
-            ''', (identifier, identifier_type, window_start))
-            
-            row = cursor.fetchone()
-            failed_attempts = row['count'] if row else 0
-            
-            remaining = max(0, self.MAX_ATTEMPTS - failed_attempts)
-            
-            return RateLimitResult(
-                allowed=remaining > 0,
-                remaining_attempts=remaining,
-                reason='超過最大嘗試次數' if remaining == 0 else None
-            )
             
         except Exception as e:
             logger.error(f"Rate limit check error: {e}")
             # 出錯時允許通過（fail open）
             return RateLimitResult(allowed=True, remaining_attempts=self.MAX_ATTEMPTS)
-        finally:
-            db.close()
     
     def record_attempt(
         self,
@@ -219,60 +216,58 @@ class RateLimiterService:
         Returns:
             更新後的限制狀態
         """
-        db = self._get_db()
         now = datetime.utcnow()
         
         try:
-            # 記錄嘗試
-            db.execute('''
-                INSERT INTO login_attempts 
-                (identifier, identifier_type, success, ip_address, user_agent, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (
-                identifier, identifier_type, 1 if success else 0,
-                ip_address, user_agent, now.isoformat()
-            ))
-            
-            if success:
-                # 成功登入，清除鎖定
+            with self._get_db() as db:
+                # 記錄嘗試
                 db.execute('''
-                    UPDATE lockouts SET is_active = 0
-                    WHERE identifier = ? AND identifier_type = ? AND is_active = 1
-                ''', (identifier, identifier_type))
+                    INSERT INTO login_attempts 
+                    (identifier, identifier_type, success, ip_address, user_agent, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    identifier, identifier_type, 1 if success else 0,
+                    ip_address, user_agent, now.isoformat()
+                ))
+                
+                if success:
+                    # 成功登入，清除鎖定
+                    db.execute('''
+                        UPDATE lockouts SET is_active = 0
+                        WHERE identifier = ? AND identifier_type = ? AND is_active = 1
+                    ''', (identifier, identifier_type))
+                    db.commit()
+                    return RateLimitResult(allowed=True, remaining_attempts=self.MAX_ATTEMPTS)
+                
+                # 失敗登入，檢查是否需要鎖定
+                window_start = (now - timedelta(seconds=self.WINDOW_SECONDS)).isoformat()
+                
+                cursor = db.execute('''
+                    SELECT COUNT(*) as count FROM login_attempts
+                    WHERE identifier = ? AND identifier_type = ?
+                    AND success = 0 AND created_at > ?
+                ''', (identifier, identifier_type, window_start))
+                
+                row = cursor.fetchone()
+                failed_attempts = row['count'] if row else 0
+                
+                if failed_attempts >= self.MAX_ATTEMPTS:
+                    # 觸發鎖定
+                    lockout_result = self._create_lockout(db, identifier, identifier_type, now)
+                    db.commit()
+                    return lockout_result
+                
                 db.commit()
-                return RateLimitResult(allowed=True, remaining_attempts=self.MAX_ATTEMPTS)
-            
-            # 失敗登入，檢查是否需要鎖定
-            window_start = (now - timedelta(seconds=self.WINDOW_SECONDS)).isoformat()
-            
-            cursor = db.execute('''
-                SELECT COUNT(*) as count FROM login_attempts
-                WHERE identifier = ? AND identifier_type = ?
-                AND success = 0 AND created_at > ?
-            ''', (identifier, identifier_type, window_start))
-            
-            row = cursor.fetchone()
-            failed_attempts = row['count'] if row else 0
-            
-            if failed_attempts >= self.MAX_ATTEMPTS:
-                # 觸發鎖定
-                lockout_result = self._create_lockout(db, identifier, identifier_type, now)
-                db.commit()
-                return lockout_result
-            
-            db.commit()
-            
-            remaining = max(0, self.MAX_ATTEMPTS - failed_attempts)
-            return RateLimitResult(
-                allowed=remaining > 0,
-                remaining_attempts=remaining
-            )
+                
+                remaining = max(0, self.MAX_ATTEMPTS - failed_attempts)
+                return RateLimitResult(
+                    allowed=remaining > 0,
+                    remaining_attempts=remaining
+                )
             
         except Exception as e:
             logger.error(f"Record attempt error: {e}")
             return RateLimitResult(allowed=True, remaining_attempts=self.MAX_ATTEMPTS)
-        finally:
-            db.close()
     
     def _create_lockout(
         self,
@@ -331,8 +326,7 @@ class RateLimiterService:
         Returns:
             是否成功
         """
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             result = db.execute('''
                 UPDATE lockouts SET is_active = 0
                 WHERE identifier = ? AND identifier_type = ? AND is_active = 1
@@ -343,8 +337,6 @@ class RateLimiterService:
                 logger.info(f"Manually unlocked {identifier_type}:{identifier}")
                 return True
             return False
-        finally:
-            db.close()
     
     def get_lockout_status(
         self,
@@ -354,10 +346,9 @@ class RateLimiterService:
         """
         獲取鎖定狀態
         """
-        db = self._get_db()
         now = datetime.utcnow()
         
-        try:
+        with self._get_db() as db:
             cursor = db.execute('''
                 SELECT locked_at, unlock_at, reason, consecutive_lockouts
                 FROM lockouts
@@ -379,9 +370,6 @@ class RateLimiterService:
                 }
             
             return {'is_locked': False}
-            
-        finally:
-            db.close()
     
     def cleanup_old_records(self, days: int = 7) -> int:
         """
@@ -393,10 +381,9 @@ class RateLimiterService:
         Returns:
             清理的記錄數
         """
-        db = self._get_db()
         cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
         
-        try:
+        with self._get_db() as db:
             # 清理舊的嘗試記錄
             result = db.execute('''
                 DELETE FROM login_attempts WHERE created_at < ?
@@ -415,9 +402,6 @@ class RateLimiterService:
             if total > 0:
                 logger.info(f"Cleaned up {total} old rate limit records")
             return total
-            
-        finally:
-            db.close()
 
 
 # 全局服務實例

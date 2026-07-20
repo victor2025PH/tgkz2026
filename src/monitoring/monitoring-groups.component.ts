@@ -2,57 +2,58 @@
  * 監控群組管理頁面
  * 使用 MonitoringStateService 統一管理數據
  */
-import { Component, signal, computed, inject, OnInit, output, effect } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, output, effect, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MonitoringStateService, MonitoringGroup } from './monitoring-state.service';
 import { ConfigProgressComponent } from './config-progress.component';
 import { ElectronIpcService } from '../electron-ipc.service';
 import { ToastService } from '../toast.service';
+import { EmptyStateComponent } from '../components/empty-state.component';
 import { ConfirmDialogService } from '../confirm-dialog.service';
 import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, CollectionResult } from '../dialogs/history-collection-dialog.component';
 
 @Component({
   selector: 'app-monitoring-groups',
   standalone: true,
-  imports: [CommonModule, FormsModule, ConfigProgressComponent, HistoryCollectionDialogComponent],
+  imports: [CommonModule, FormsModule, ConfigProgressComponent, HistoryCollectionDialogComponent, EmptyStateComponent],
   template: `
-    <div class="h-full flex flex-col bg-slate-900 p-6">
-      <!-- 頂部標題 -->
-      <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-3">
-          <div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
-            <span class="text-2xl">👥</span>
+    <div class="h-full flex flex-col p-6" [style.background-color]="embedded() ? 'transparent' : 'var(--bg-primary)'">
+      <!-- 頂部：獨立頁顯示完整標題+進度；embedded 時僅工具按鈕（進度由監控殼層承接） -->
+      <div class="flex items-center justify-between mb-6" [class.mb-4]="embedded()">
+        @if (!embedded()) {
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
+              <span class="text-2xl">👥</span>
+            </div>
+            <div>
+              <h1 class="text-2xl font-bold" style="color: var(--text-primary);">監控群組管理</h1>
+              <p class="text-sm" style="color: var(--text-muted);">管理正在監控的 Telegram 群組</p>
+            </div>
           </div>
-          <div>
-            <h1 class="text-2xl font-bold text-white">監控群組管理</h1>
-            <p class="text-sm text-slate-400">管理正在監控的 Telegram 群組</p>
-          </div>
-        </div>
+        } @else {
+          <div class="text-sm font-medium" style="color: var(--text-secondary);">群組列表</div>
+        }
         <div class="flex items-center gap-3">
-          <!-- 配置進度（緊湊模式） -->
-          <app-config-progress 
-            mode="compact" 
-            (action)="handleConfigAction($event)">
-          </app-config-progress>
-          
-          <!-- 🆕 批量刷新成員數按鈕 -->
+          @if (!embedded()) {
+            <app-config-progress mode="compact" (action)="handleConfigAction($event)"></app-config-progress>
+          }
           <button (click)="refreshAllMemberCounts()"
                   [disabled]="isRefreshingMemberCounts()"
                   class="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition-colors flex items-center gap-2 border border-purple-500/30 disabled:opacity-50">
             <span [class.animate-spin]="isRefreshingMemberCounts()">👥</span>
             <span>{{ isRefreshingMemberCounts() ? '刷新中...' : '刷新成員數' }}</span>
           </button>
-          
           <button (click)="refreshData()"
-                  class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors flex items-center gap-2">
+                  class="px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                  style="background-color: var(--bg-tertiary); color: var(--text-primary);">
             <span [class.animate-spin]="stateService.isLoading()">🔄</span>
             <span>刷新</span>
           </button>
         </div>
       </div>
 
-      <!-- 統計卡片 - 🔧 美化優化 -->
+      <!-- 本頁專屬統計（總成員/今日匹配/綁定狀態，與殼層總覽互補） -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div class="bg-gradient-to-br from-emerald-500/10 to-teal-500/5 rounded-xl border border-emerald-500/20 p-4 hover:border-emerald-500/40 transition-colors">
           <div class="flex items-center gap-3">
@@ -331,51 +332,39 @@ import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, Collectio
                   </div>
                 </div>
               } @empty {
-                <!-- 🔧 Phase4: 增強空狀態引導 -->
-                <div class="col-span-full text-center py-12 text-slate-400">
-                  <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-teal-500/5 border border-emerald-500/20 flex items-center justify-center">
-                    <span class="text-4xl">📡</span>
-                  </div>
-                  <h3 class="text-xl font-semibold text-white mb-2">還沒有監控群組</h3>
-                  <p class="text-sm mb-8 text-slate-500 max-w-md mx-auto">
-                    監控群組可以自動監聽關鍵詞、提取成員、收集潛在客戶
-                  </p>
-                  
-                  <!-- 步驟引導 -->
-                  <div class="max-w-lg mx-auto mb-8">
-                    <div class="flex items-start gap-4 text-left mb-4">
-                      <div class="w-8 h-8 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center flex-shrink-0 text-sm font-bold">1</div>
-                      <div>
-                        <div class="text-sm text-white font-medium">搜索並發現群組</div>
-                        <div class="text-xs text-slate-500">在「搜索發現」中搜索 Telegram 群組或頻道</div>
+                <div class="col-span-full">
+                  <app-empty-state iconKind="radar"
+                                   title="還沒有監控群組"
+                                   description="監控群組可以自動監聽關鍵詞、提取成員、收集潛在客戶"
+                                   ctaLabel="前往搜索發現"
+                                   secondaryLabel="+ 手動添加 URL"
+                                   (cta)="navigateToResourceCenter()"
+                                   (secondaryCta)="showQuickAddDialog.set(true)">
+                    <!-- 步驟引導（頁面特有內容，經插槽注入） -->
+                    <div class="max-w-lg mx-auto mb-6">
+                      <div class="flex items-start gap-4 text-left mb-4">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold" style="background: var(--primary-bg); color: var(--primary-light);">1</div>
+                        <div>
+                          <div class="text-sm font-medium" style="color: var(--text-primary);">搜索並發現群組</div>
+                          <div class="text-xs" style="color: var(--text-muted);">在「搜索發現」中搜索 Telegram 群組或頻道</div>
+                        </div>
+                      </div>
+                      <div class="flex items-start gap-4 text-left mb-4">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold" style="background: var(--success-bg); color: var(--success);">2</div>
+                        <div>
+                          <div class="text-sm font-medium" style="color: var(--text-primary);">點擊「📡 監控」按鈕</div>
+                          <div class="text-xs" style="color: var(--text-muted);">在搜索結果中，點擊群組旁的監控按鈕即可添加</div>
+                        </div>
+                      </div>
+                      <div class="flex items-start gap-4 text-left">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold" style="background: rgba(139, 92, 246, 0.15); color: var(--accent-light);">3</div>
+                        <div>
+                          <div class="text-sm font-medium" style="color: var(--text-primary);">綁定關鍵詞集開始監控</div>
+                          <div class="text-xs" style="color: var(--text-muted);">為群組綁定關鍵詞集，系統自動匹配潛在客戶</div>
+                        </div>
                       </div>
                     </div>
-                    <div class="flex items-start gap-4 text-left mb-4">
-                      <div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0 text-sm font-bold">2</div>
-                      <div>
-                        <div class="text-sm text-white font-medium">點擊「📡 監控」按鈕</div>
-                        <div class="text-xs text-slate-500">在搜索結果中，點擊群組旁的監控按鈕即可添加</div>
-                      </div>
-                    </div>
-                    <div class="flex items-start gap-4 text-left">
-                      <div class="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center flex-shrink-0 text-sm font-bold">3</div>
-                      <div>
-                        <div class="text-sm text-white font-medium">綁定關鍵詞集開始監控</div>
-                        <div class="text-xs text-slate-500">為群組綁定關鍵詞集，系統自動匹配潛在客戶</div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div class="flex items-center justify-center gap-3">
-                    <button (click)="navigateToResourceCenter()"
-                            class="px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-emerald-500 text-white rounded-xl hover:from-cyan-600 hover:to-emerald-600 transition-all shadow-lg shadow-cyan-500/20 font-medium">
-                      🔍 前往搜索發現
-                    </button>
-                    <button (click)="showQuickAddDialog.set(true)"
-                            class="px-5 py-2.5 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600 transition-colors border border-slate-600">
-                      + 手動添加 URL
-                    </button>
-                  </div>
+                  </app-empty-state>
                 </div>
               }
             </div>
@@ -753,6 +742,9 @@ export class MonitoringGroupsComponent implements OnInit {
   private ipcService = inject(ElectronIpcService);
   private toastService = inject(ToastService);
   private confirmDialog = inject(ConfirmDialogService);
+
+  /** 嵌入監控殼層時隱藏重複標題/進度條 */
+  embedded = input(false);
 
   // 配置動作事件
   configAction = output<string>();

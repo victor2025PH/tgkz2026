@@ -28,6 +28,7 @@ import { Injectable, signal, computed, WritableSignal, inject, OnDestroy } from 
 import { Subscription } from 'rxjs';
 import { AuthEventsService } from './core/auth-events.service';
 import { AuthService } from './core/auth.service';
+import { isElectronRuntime } from './utils/runtime-env.util';
 
 // ============ 類型定義 ============
 
@@ -431,7 +432,8 @@ export class MembershipService {
   // ========== 免登錄完整版配置 ==========
   // 與 AuthService 保持一致：免登錄模式下默認為榮耀王者
   // 僅在 Electron/IPC 模式下啟用免登錄
-  private readonly SKIP_LOGIN = !!(window as any).electronAPI || !!(window as any).electron;
+  // 🔧 用統一偵測（含 window.require），與 Guard 判斷一致，避免時鬆時緊
+  private readonly SKIP_LOGIN = isElectronRuntime();
   private readonly DEFAULT_LEVEL: MembershipLevel = 'king';
   // ========================================
   
@@ -561,7 +563,7 @@ export class MembershipService {
       'free': 'bronze',
       'basic': 'silver',
       'pro': 'gold',
-      'enterprise': 'diamond',
+      'enterprise': 'king',  // 🔧 对齐后端 level_config.from_string(enterprise)→king
       'bronze': 'bronze',
       'silver': 'silver',
       'gold': 'gold',

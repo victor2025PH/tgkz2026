@@ -6,7 +6,7 @@
 
 ## 技術棧
 - **前端**: Angular 21 + TypeScript (Standalone Components)
-- **後端**: Python 3.11+ / FastAPI + Pyrogram (Telegram API)
+- **後端**: Python 3.11+ / aiohttp + Pyrofork (Telegram API)
 - **桌面**: Electron 28
 - **資料庫**: SQLite (三數據庫架構)
 - **通訊**: Electron IPC (stdin/stdout JSON)
@@ -28,6 +28,28 @@
 2. **禁止硬編碼數據庫路徑** - 必須從 `config.py` 獲取
 3. **禁止重複定義表結構** - 表定義唯一來源見下方
 4. **禁止跨數據庫查詢** - 每個表只存在於一個數據庫
+
+### 🆕 合法連接模塊清單（2026-07 系統排查後補充）
+
+系統排查發現 `backend/` 下約 109 個檔案直接開 sqlite 連接，繞過上方指定模塊。
+逐一排查後確認：其中 `core/db_utils.py`、`db_connection_pool.py` 雖然技術上
+也直接呼叫 `sqlite3.connect()`/`aiosqlite.connect()`，但屬於**刻意設計的
+集中式工具**（分別提供同步輔助查詢與異步連接池），已被 11+ 處正確採用，
+廢棄它們的成本遠高於承認現狀。故正式列入合法連接模塊：
+
+| 模塊 | 定位 | 適用場景 |
+|------|------|----------|
+| `database.py` | 主庫（`tgmatrix.db`/`tgai_server.db`）唯一 async 連接來源 | 業務邏輯主流程 |
+| `search_history_service.py` | `search_history.db` 唯一連接來源 | 搜索歷史相關 |
+| `core/tenant_database.py` | 多租戶 SaaS 模式下每租戶獨立 db 的連接來源 | 租戶隔離場景 |
+| `core/db_utils.py` | 同步輔助查詢的唯一合法來源（`get_connection()`/`create_connection()`） | 非 async 上下文的簡單讀寫 |
+| `db_connection_pool.py` | 高頻查詢的專用異步連接池 | 效能敏感的重複查詢場景 |
+
+其餘直接 `sqlite3.connect()`/硬編碼路徑的檔案（`admin/*`、`auth/*`、
+`core/payment_service.py` 等約 70 個 D 類高風險檔案）屬於待修復的技術債，
+正在依風險分批遷移到上方合法模塊，詳見對話記錄中的完整盤點報告，
+**修復前必須先確認該檔案是否仍被其他測試/生產代碼引用**（曾發現盤點
+報告誤判「零引用」的案例，實際仍被測試依賴）。
 
 ### 表歸屬映射（唯一來源）
 

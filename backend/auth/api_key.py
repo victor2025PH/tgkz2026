@@ -11,12 +11,15 @@ API 密鑰管理
 import os
 import secrets
 import hashlib
-import sqlite3
 import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field, asdict
 from enum import Enum
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import get_connection, resolve_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -68,43 +71,79 @@ class ApiKeyService:
     KEY_LENGTH = 32
     
     def __init__(self, db_path: str = None):
-        self.db_path = db_path or os.environ.get(
-            'DATABASE_PATH',
-            os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
-        )
+        self.db_path = db_path or resolve_db_path()
         self._init_db()
-    
+
     def _init_db(self):
         """初始化數據庫表"""
         try:
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
             
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS api_keys (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    name TEXT NOT NULL,
-                    key_prefix TEXT NOT NULL,
-                    key_hash TEXT NOT NULL,
-                    scopes TEXT,
-                    last_used TEXT,
-                    usage_count INTEGER DEFAULT 0,
-                    created_at TEXT,
-                    expires_at TEXT,
-                    is_active INTEGER DEFAULT 1
-                )
-            ''')
-            
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_apikeys_user ON api_keys(user_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_apikeys_prefix ON api_keys(key_prefix)')
-            
-            conn.commit()
-            conn.close()
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS api_keys (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        key_prefix TEXT NOT NULL,
+                        key_hash TEXT NOT NULL,
+                        scopes TEXT,
+                        last_used TEXT,
+                        usage_count INTEGER DEFAULT 0,
+                        created_at TEXT,
+                        expires_at TEXT,
+                        is_active INTEGER DEFAULT 1
+                    )
+                ''')
+                
+                # 🔧 Bug 修復：舊資料庫可能已被 auth/service.py 的舊版 schema
+                # （欄位為 prefix/last_used_at，且無 usage_count）搶先建表——
+                # CREATE TABLE IF NOT EXISTS 對已存在的表是 no-op，所以這裡自我修復欄位名稱，
+                # 確保無論哪個模塊先初始化，最終欄位都與本檔案的 CRUD 邏輯一致。
+                self._migrate_legacy_columns(conn, cursor)
+                
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_apikeys_user ON api_keys(user_id)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_apikeys_prefix ON api_keys(key_prefix)')
+                
+                conn.commit()
         except Exception as e:
             logger.error(f"API Key DB init error: {e}")
+
+    def _migrate_legacy_columns(self, conn, cursor):
+        """
+        遷移舊版 api_keys 表結構
+
+        既有 bug：auth/service.py 曾用不同欄位名稱建立同一張表
+        （prefix 對應本檔案的 key_prefix；last_used_at 對應 last_used；
+        且缺少 usage_count），若該版本先初始化，本檔案的 create()/verify()
+        會因欄位不存在而報錯。這裡用 ALTER TABLE ... RENAME COLUMN
+        （SQLite 3.25+）就地遷移，不重建表、不影響既有資料，且冪等可重複執行。
+        """
+        try:
+            cursor.execute("PRAGMA table_info(api_keys)")
+            columns = {row[1] for row in cursor.fetchall()}
+            
+            if 'prefix' in columns and 'key_prefix' not in columns:
+                cursor.execute('ALTER TABLE api_keys RENAME COLUMN prefix TO key_prefix')
+                logger.info("API Key DB 遷移：prefix -> key_prefix")
+                columns.discard('prefix')
+                columns.add('key_prefix')
+            
+            if 'last_used_at' in columns and 'last_used' not in columns:
+                cursor.execute('ALTER TABLE api_keys RENAME COLUMN last_used_at TO last_used')
+                logger.info("API Key DB 遷移：last_used_at -> last_used")
+                columns.discard('last_used_at')
+                columns.add('last_used')
+            
+            if 'usage_count' not in columns:
+                cursor.execute('ALTER TABLE api_keys ADD COLUMN usage_count INTEGER DEFAULT 0')
+                logger.info("API Key DB 遷移：新增 usage_count 欄位")
+            
+            conn.commit()
+        except Exception as e:
+            logger.error(f"API Key DB legacy column migration error: {e}")
     
     # ==================== 密鑰生成 ====================
     
@@ -163,23 +202,22 @@ class ApiKeyService:
         )
         
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                INSERT INTO api_keys 
-                (id, user_id, name, key_prefix, key_hash, scopes, 
-                 usage_count, created_at, expires_at, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                api_key.id, api_key.user_id, api_key.name,
-                api_key.key_prefix, api_key.key_hash,
-                json.dumps(api_key.scopes), 0,
-                api_key.created_at, api_key.expires_at, 1
-            ))
-            
-            conn.commit()
-            conn.close()
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    INSERT INTO api_keys 
+                    (id, user_id, name, key_prefix, key_hash, scopes, 
+                     usage_count, created_at, expires_at, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    api_key.id, api_key.user_id, api_key.name,
+                    api_key.key_prefix, api_key.key_hash,
+                    json.dumps(api_key.scopes), 0,
+                    api_key.created_at, api_key.expires_at, 1
+                ))
+                
+                conn.commit()
             
             # 返回完整密鑰（只這一次）
             return {
@@ -205,51 +243,47 @@ class ApiKeyService:
         
         try:
             import json
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                SELECT id, user_id, name, scopes, expires_at, is_active
-                FROM api_keys 
-                WHERE key_hash = ? AND key_prefix = ?
-            ''', (key_hash, key_prefix))
-            
-            row = cursor.fetchone()
-            
-            if not row:
-                conn.close()
-                return None
-            
-            key_id, user_id, name, scopes_json, expires_at, is_active = row
-            
-            # 檢查是否激活
-            if not is_active:
-                conn.close()
-                return None
-            
-            # 檢查是否過期
-            if expires_at:
-                if datetime.fromisoformat(expires_at) < datetime.utcnow():
-                    conn.close()
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    SELECT id, user_id, name, scopes, expires_at, is_active
+                    FROM api_keys 
+                    WHERE key_hash = ? AND key_prefix = ?
+                ''', (key_hash, key_prefix))
+                
+                row = cursor.fetchone()
+                
+                if not row:
                     return None
-            
-            # 更新使用統計
-            now = datetime.utcnow().isoformat()
-            cursor.execute('''
-                UPDATE api_keys 
-                SET last_used = ?, usage_count = usage_count + 1 
-                WHERE id = ?
-            ''', (now, key_id))
-            
-            conn.commit()
-            conn.close()
-            
-            return {
-                'id': key_id,
-                'user_id': user_id,
-                'name': name,
-                'scopes': json.loads(scopes_json) if scopes_json else []
-            }
+                
+                key_id, user_id, name, scopes_json, expires_at, is_active = row
+                
+                # 檢查是否激活
+                if not is_active:
+                    return None
+                
+                # 檢查是否過期
+                if expires_at:
+                    if datetime.fromisoformat(expires_at) < datetime.utcnow():
+                        return None
+                
+                # 更新使用統計
+                now = datetime.utcnow().isoformat()
+                cursor.execute('''
+                    UPDATE api_keys 
+                    SET last_used = ?, usage_count = usage_count + 1 
+                    WHERE id = ?
+                ''', (now, key_id))
+                
+                conn.commit()
+                
+                return {
+                    'id': key_id,
+                    'user_id': user_id,
+                    'name': name,
+                    'scopes': json.loads(scopes_json) if scopes_json else []
+                }
             
         except Exception as e:
             logger.error(f"Verify API key error: {e}")
@@ -259,34 +293,32 @@ class ApiKeyService:
         """列出用戶的 API 密鑰"""
         try:
             import json
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                SELECT * FROM api_keys 
-                WHERE user_id = ? 
-                ORDER BY created_at DESC
-            ''', (user_id,))
-            
-            keys = []
-            for row in cursor.fetchall():
-                keys.append(ApiKey(
-                    id=row['id'],
-                    user_id=row['user_id'],
-                    name=row['name'],
-                    key_prefix=row['key_prefix'],
-                    key_hash='',  # 不返回哈希
-                    scopes=json.loads(row['scopes']) if row['scopes'] else [],
-                    last_used=row['last_used'] or '',
-                    usage_count=row['usage_count'] or 0,
-                    created_at=row['created_at'] or '',
-                    expires_at=row['expires_at'] or '',
-                    is_active=bool(row['is_active'])
-                ))
-            
-            conn.close()
-            return keys
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    SELECT * FROM api_keys 
+                    WHERE user_id = ? 
+                    ORDER BY created_at DESC
+                ''', (user_id,))
+                
+                keys = []
+                for row in cursor.fetchall():
+                    keys.append(ApiKey(
+                        id=row['id'],
+                        user_id=row['user_id'],
+                        name=row['name'],
+                        key_prefix=row['key_prefix'],
+                        key_hash='',  # 不返回哈希
+                        scopes=json.loads(row['scopes']) if row['scopes'] else [],
+                        last_used=row['last_used'] or '',
+                        usage_count=row['usage_count'] or 0,
+                        created_at=row['created_at'] or '',
+                        expires_at=row['expires_at'] or '',
+                        is_active=bool(row['is_active'])
+                    ))
+                
+                return keys
         except Exception as e:
             logger.error(f"List API keys error: {e}")
             return []
@@ -294,18 +326,17 @@ class ApiKeyService:
     async def revoke(self, user_id: str, key_id: str) -> Dict[str, Any]:
         """撤銷 API 密鑰"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                UPDATE api_keys 
-                SET is_active = 0 
-                WHERE id = ? AND user_id = ?
-            ''', (key_id, user_id))
-            
-            updated = cursor.rowcount > 0
-            conn.commit()
-            conn.close()
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    UPDATE api_keys 
+                    SET is_active = 0 
+                    WHERE id = ? AND user_id = ?
+                ''', (key_id, user_id))
+                
+                updated = cursor.rowcount > 0
+                conn.commit()
             
             if updated:
                 return {'success': True}
@@ -317,17 +348,16 @@ class ApiKeyService:
     async def delete(self, user_id: str, key_id: str) -> Dict[str, Any]:
         """刪除 API 密鑰"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                DELETE FROM api_keys 
-                WHERE id = ? AND user_id = ?
-            ''', (key_id, user_id))
-            
-            deleted = cursor.rowcount > 0
-            conn.commit()
-            conn.close()
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    DELETE FROM api_keys 
+                    WHERE id = ? AND user_id = ?
+                ''', (key_id, user_id))
+                
+                deleted = cursor.rowcount > 0
+                conn.commit()
             
             if deleted:
                 return {'success': True}
@@ -345,18 +375,17 @@ class ApiKeyService:
         """更新密鑰權限範圍"""
         try:
             import json
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                UPDATE api_keys 
-                SET scopes = ? 
-                WHERE id = ? AND user_id = ?
-            ''', (json.dumps(scopes), key_id, user_id))
-            
-            updated = cursor.rowcount > 0
-            conn.commit()
-            conn.close()
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    UPDATE api_keys 
+                    SET scopes = ? 
+                    WHERE id = ? AND user_id = ?
+                ''', (json.dumps(scopes), key_id, user_id))
+                
+                updated = cursor.rowcount > 0
+                conn.commit()
             
             if updated:
                 return {'success': True}

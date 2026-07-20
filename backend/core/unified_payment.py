@@ -13,7 +13,6 @@ import os
 import json
 import hashlib
 import hmac
-import sqlite3
 import logging
 import asyncio
 import threading
@@ -23,6 +22,10 @@ from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 import uuid
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -629,45 +632,15 @@ class AlipayHandler(PaymentHandler):
         success_url: str,
         cancel_url: str
     ) -> Tuple[bool, str, Dict[str, Any]]:
+        # 🔴 fail-closed：未配置 app_id 不得返回假的支付寶網關連結（用戶點了也付不了）。
         if not self.config.alipay_app_id:
-            # 返回模擬數據
-            return True, 'success', {
-                'pay_url': f"https://openapi.alipay.com/gateway.do?intent={intent.id}",
-                'qr_code': f"https://qr.alipay.com/{intent.id}"
-            }
+            return False, '支付寶未配置（缺少 alipay_app_id）', {}
         
-        try:
-            params = {
-                'app_id': self.config.alipay_app_id,
-                'method': 'alipay.trade.precreate',
-                'charset': 'utf-8',
-                'sign_type': 'RSA2',
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'version': '1.0',
-                'notify_url': f"{self.config.notify_base_url}/webhooks/alipay",
-                'biz_content': json.dumps({
-                    'out_trade_no': intent.id,
-                    'total_amount': f"{intent.amount / 100:.2f}",
-                    'subject': intent.description or 'TG-Matrix',
-                })
-            }
-            
-            # TODO: 實際 RSA2 簽名
-            params['sign'] = self._sign(params)
-            
-            # TODO: 調用支付寶 API
-            # async with aiohttp.ClientSession() as session:
-            #     async with session.post(self.config.alipay_gateway, data=params) as resp:
-            #         ...
-            
-            return True, 'success', {
-                'pay_url': f"{self.config.alipay_gateway}?intent={intent.id}",
-                'qr_code': ''
-            }
-            
-        except Exception as e:
-            logger.error(f"Alipay create payment error: {e}")
-            return False, str(e), {}
+        # 🔴 fail-closed：即便配置了 app_id，真實 RSA2 簽名與 alipay.trade.precreate
+        # API 調用仍為 TODO。舊代碼在此僅用 MD5 假簽名並拼一個 gateway?intent= 連結就
+        # return success——這不是有效的支付寶下單，掃碼無法支付。接通真實 API 前一律拒絕。
+        logger.warning("[AlipayHandler] 真實下單接口未接通（RSA2 簽名 + trade.precreate 為 TODO）")
+        return False, '支付寶尚未接通真實下單接口', {}
     
     async def verify_payment(self, intent: PaymentIntent) -> Tuple[bool, PaymentState]:
         # TODO: 查詢支付寶訂單狀態
@@ -719,14 +692,14 @@ class WechatPayHandler(PaymentHandler):
         success_url: str,
         cancel_url: str
     ) -> Tuple[bool, str, Dict[str, Any]]:
+        # 🔴 fail-closed：未配置商戶號時不得返回「成功」+ 假 pay_url，
+        # 否則前端會顯示一個永遠無法完成支付的二維碼，用戶掃了也付不了。
         if not self.config.wechat_mch_id:
-            return True, 'success', {
-                'pay_url': f"weixin://wxpay/bizpayurl?intent={intent.id}",
-                'qr_code': f"weixin://wxpay/bizpayurl?intent={intent.id}"
-            }
+            return False, '微信支付未配置（缺少商戶號 wechat_mch_id）', {}
         
-        # TODO: 實際微信支付實現
-        return True, 'success', {'pay_url': '', 'qr_code': ''}
+        # TODO: 實際微信支付實現。未接通前一律 fail-closed，
+        # 不能返回成功 + 空 pay_url（前端拿到空 URL 只會靜默失敗）。
+        return False, '微信支付尚未接通真實下單接口', {}
     
     async def verify_payment(self, intent: PaymentIntent) -> Tuple[bool, PaymentState]:
         return False, intent.state
@@ -849,91 +822,89 @@ class UnifiedPaymentService:
         """初始化數據庫表"""
         try:
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # 支付意圖表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS payment_intents (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    amount INTEGER NOT NULL,
-                    currency TEXT DEFAULT 'CNY',
-                    provider TEXT,
-                    payment_type TEXT,
-                    state TEXT DEFAULT 'created',
-                    description TEXT,
-                    metadata TEXT,
-                    provider_session_id TEXT,
-                    provider_payment_id TEXT,
-                    pay_url TEXT,
-                    qr_code TEXT,
-                    created_at TEXT,
-                    expires_at TEXT,
-                    completed_at TEXT
-                )
-            ''')
-            
-            # 發票表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS invoices (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    payment_id TEXT,
-                    invoice_number TEXT UNIQUE,
-                    subtotal INTEGER,
-                    tax INTEGER DEFAULT 0,
-                    total INTEGER,
-                    currency TEXT DEFAULT 'CNY',
-                    buyer_name TEXT,
-                    buyer_email TEXT,
-                    buyer_address TEXT,
-                    buyer_tax_id TEXT,
-                    seller_name TEXT DEFAULT 'TG-Matrix',
-                    seller_address TEXT,
-                    seller_tax_id TEXT,
-                    items TEXT,
-                    status TEXT DEFAULT 'draft',
-                    issued_at TEXT,
-                    due_date TEXT,
-                    paid_at TEXT,
-                    pdf_url TEXT
-                )
-            ''')
-            
-            # 財務記錄表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS financial_records (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    date TEXT NOT NULL,
-                    type TEXT NOT NULL,
-                    provider TEXT,
-                    amount INTEGER,
-                    currency TEXT DEFAULT 'CNY',
-                    transaction_count INTEGER DEFAULT 0,
-                    fees INTEGER DEFAULT 0,
-                    net_amount INTEGER DEFAULT 0,
-                    metadata TEXT,
-                    created_at TEXT
-                )
-            ''')
-            
-            # 索引
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_intents_user ON payment_intents(user_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_intents_state ON payment_intents(state)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_invoices_user ON invoices(user_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_financial_date ON financial_records(date)')
-            
-            conn.commit()
-            conn.close()
-            
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                # 支付意圖表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS payment_intents (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        amount INTEGER NOT NULL,
+                        currency TEXT DEFAULT 'CNY',
+                        provider TEXT,
+                        payment_type TEXT,
+                        state TEXT DEFAULT 'created',
+                        description TEXT,
+                        metadata TEXT,
+                        provider_session_id TEXT,
+                        provider_payment_id TEXT,
+                        pay_url TEXT,
+                        qr_code TEXT,
+                        created_at TEXT,
+                        expires_at TEXT,
+                        completed_at TEXT
+                    )
+                ''')
+
+                # 發票表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS invoices (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        payment_id TEXT,
+                        invoice_number TEXT UNIQUE,
+                        subtotal INTEGER,
+                        tax INTEGER DEFAULT 0,
+                        total INTEGER,
+                        currency TEXT DEFAULT 'CNY',
+                        buyer_name TEXT,
+                        buyer_email TEXT,
+                        buyer_address TEXT,
+                        buyer_tax_id TEXT,
+                        seller_name TEXT DEFAULT 'TG-Matrix',
+                        seller_address TEXT,
+                        seller_tax_id TEXT,
+                        items TEXT,
+                        status TEXT DEFAULT 'draft',
+                        issued_at TEXT,
+                        due_date TEXT,
+                        paid_at TEXT,
+                        pdf_url TEXT
+                    )
+                ''')
+
+                # 財務記錄表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS financial_records (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        date TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        provider TEXT,
+                        amount INTEGER,
+                        currency TEXT DEFAULT 'CNY',
+                        transaction_count INTEGER DEFAULT 0,
+                        fees INTEGER DEFAULT 0,
+                        net_amount INTEGER DEFAULT 0,
+                        metadata TEXT,
+                        created_at TEXT
+                    )
+                ''')
+
+                # 索引
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_intents_user ON payment_intents(user_id)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_intents_state ON payment_intents(state)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_invoices_user ON invoices(user_id)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_financial_date ON financial_records(date)')
+
+                conn.commit()
+
         except Exception as e:
             logger.error(f"Init payment DB error: {e}")
-    
+
     def _get_db(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        """獲取數據庫連接（統一經由 core.db_utils.create_connection，調用方負責關閉）"""
+        return create_connection(self.db_path)
     
     def get_handler(self, provider: PaymentProvider) -> Optional[PaymentHandler]:
         """獲取支付處理器"""

@@ -11,8 +11,8 @@
 
 import { Component, signal, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ElectronIpcService } from '../electron-ipc.service';
 import { ToastService } from '../toast.service';
+import { AdminService } from './admin.service';
 
 interface DailyStats {
   date: string;
@@ -257,6 +257,38 @@ interface DashboardData {
       padding: 1.5rem;
       max-width: 1400px;
       margin: 0 auto;
+    }
+
+    .dev-notice {
+      display: flex;
+      gap: 1rem;
+      padding: 1.25rem;
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: 0.75rem;
+    }
+
+    .dev-notice-icon {
+      font-size: 1.75rem;
+    }
+
+    .dev-notice-content strong {
+      color: #93c5fd;
+      font-size: 1rem;
+    }
+
+    .dev-notice-content p {
+      margin: 0.5rem 0 0 0;
+      font-size: 0.8rem;
+      color: #9ca3af;
+      line-height: 1.6;
+    }
+
+    .dev-notice-content code {
+      font-size: 0.75rem;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 0.1rem 0.3rem;
+      border-radius: 0.25rem;
     }
 
     .dashboard-header {
@@ -694,15 +726,15 @@ interface DashboardData {
   `]
 })
 export class ApiStatsDashboardComponent implements OnInit, OnDestroy {
-  private ipcService = inject(ElectronIpcService);
   private toast = inject(ToastService);
+  private adminService = inject(AdminService);
 
-  // 状态
+  // 狀態
   isLoading = signal(false);
   error = signal('');
   lastUpdated = signal<number | null>(null);
 
-  // 数据
+  // 數據
   dashboardData = signal<DashboardData | null>(null);
   totalStats = signal<OverallStats['total'] | null>(null);
   dailyStats = signal<DailyStats[]>([]);
@@ -711,7 +743,7 @@ export class ApiStatsDashboardComponent implements OnInit, OnDestroy {
   alerts = signal<Alert[]>([]);
   realtimeData = signal<Record<string, Record<string, number>>>({});
 
-  // 刷新定时器
+  // 刷新定時器
   private refreshInterval: any;
 
   ngOnInit(): void {
@@ -733,9 +765,7 @@ export class ApiStatsDashboardComponent implements OnInit, OnDestroy {
     this.error.set('');
 
     try {
-      const result = await this.ipcService.send('api-stats:command', {
-        command: 'dashboard'
-      });
+      const result = await this.adminService.getApiStatsDashboard();
 
       if (result?.success && result.data) {
         const data = result.data as DashboardData;
@@ -748,10 +778,10 @@ export class ApiStatsDashboardComponent implements OnInit, OnDestroy {
         this.realtimeData.set(data.overall?.realtime || {});
         this.lastUpdated.set(data.last_updated);
       } else {
-        this.error.set(result?.error || '加载失败');
+        this.error.set(result?.error || '載入失敗');
       }
     } catch (e: any) {
-      this.error.set(e.message || '网络错误');
+      this.error.set(e.message || '網絡錯誤');
     } finally {
       this.isLoading.set(false);
     }
@@ -759,16 +789,15 @@ export class ApiStatsDashboardComponent implements OnInit, OnDestroy {
 
   async clearAlerts(): Promise<void> {
     try {
-      const result = await this.ipcService.send('api-stats:command', {
-        command: 'clear_alerts'
-      });
-
+      const result = await this.adminService.clearApiStatsAlerts();
       if (result?.success) {
         this.alerts.set([]);
-        this.toast.show({ message: '告警已清除', type: 'success' });
+        this.toast.success('告警已清除');
+      } else {
+        this.toast.error(result?.error || '清除告警失敗');
       }
-    } catch (e) {
-      console.error('Clear alerts failed:', e);
+    } catch (e: any) {
+      this.toast.error(e?.message || '清除告警失敗');
     }
   }
 

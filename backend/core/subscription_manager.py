@@ -10,7 +10,6 @@
 """
 
 import os
-import sqlite3
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
@@ -18,6 +17,10 @@ from dataclasses import dataclass, field, asdict
 from enum import Enum
 import threading
 import json
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -123,53 +126,51 @@ class SubscriptionManager:
         """初始化數據庫表"""
         try:
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # 訂閱變更歷史表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS subscription_changes (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    action TEXT NOT NULL,
-                    from_tier TEXT,
-                    to_tier TEXT,
-                    from_period TEXT,
-                    to_period TEXT,
-                    reason TEXT,
-                    prorate_amount INTEGER DEFAULT 0,
-                    effective_at TEXT,
-                    created_at TEXT
-                )
-            ''')
-            
-            # 訂閱暫停記錄表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS subscription_pauses (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL,
-                    paused_at TEXT,
-                    resume_at TEXT,
-                    reason TEXT,
-                    days_remaining INTEGER,
-                    is_active INTEGER DEFAULT 1
-                )
-            ''')
-            
-            # 索引
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_sub_changes_user ON subscription_changes(user_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_sub_pauses_user ON subscription_pauses(user_id)')
-            
-            conn.commit()
-            conn.close()
-            
+            with get_connection(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                # 訂閱變更歷史表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS subscription_changes (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        action TEXT NOT NULL,
+                        from_tier TEXT,
+                        to_tier TEXT,
+                        from_period TEXT,
+                        to_period TEXT,
+                        reason TEXT,
+                        prorate_amount INTEGER DEFAULT 0,
+                        effective_at TEXT,
+                        created_at TEXT
+                    )
+                ''')
+
+                # 訂閱暫停記錄表
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS subscription_pauses (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        paused_at TEXT,
+                        resume_at TEXT,
+                        reason TEXT,
+                        days_remaining INTEGER,
+                        is_active INTEGER DEFAULT 1
+                    )
+                ''')
+
+                # 索引
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_sub_changes_user ON subscription_changes(user_id)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_sub_pauses_user ON subscription_pauses(user_id)')
+
+                conn.commit()
+
         except Exception as e:
             logger.error(f"Init subscription DB error: {e}")
-    
+
     def _get_db(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        """獲取數據庫連接（統一經由 core.db_utils.create_connection，調用方負責關閉）"""
+        return create_connection(self.db_path)
     
     # ==================== 訂閱查詢 ====================
     

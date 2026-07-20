@@ -9,9 +9,19 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime
 
-# 數據庫路徑
-SERVER_DB_PATH = Path(__file__).parent.parent / "data" / "tgai_server.db"
-ACCOUNTS_DB_PATH = Path(__file__).parent.parent / "data" / "tgmatrix.db"
+# 🔧 確保可從任意 cwd 導入 config
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_DIR))
+
+# 數據庫路徑 — 改由 config.py 統一解析，不再硬編碼（連接方式維持原樣未變）
+try:
+    from config import DATABASE_PATH, DATABASE_DIR
+    SERVER_DB_PATH = DATABASE_DIR / "tgai_server.db"
+    ACCOUNTS_DB_PATH = DATABASE_PATH
+except ImportError:
+    SERVER_DB_PATH = Path(__file__).parent.parent / "data" / "tgai_server.db"
+    ACCOUNTS_DB_PATH = Path(__file__).parent.parent / "data" / "tgmatrix.db"
 
 
 class AnalyticsBatchChecker:

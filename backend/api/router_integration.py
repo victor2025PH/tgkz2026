@@ -115,11 +115,19 @@ def setup_command_router(backend_service) -> CommandRouter:
     except Exception as e:
         logger.error(f"Failed to register automation handlers: {e}")
     
+    # 🎯 精簡獲客模式：關閉 AI 時不註冊 AI 命令處理器
     try:
-        register_ai_handlers(backend_service)
-        logger.info("✓ AI handlers registered")
-    except Exception as e:
-        logger.error(f"Failed to register AI handlers: {e}")
+        from config import ENABLE_AI
+    except Exception:
+        ENABLE_AI = True
+    if ENABLE_AI:
+        try:
+            register_ai_handlers(backend_service)
+            logger.info("✓ AI handlers registered")
+        except Exception as e:
+            logger.error(f"Failed to register AI handlers: {e}")
+    else:
+        logger.info("🎯 精簡獲客模式：跳過 AI 命令處理器註冊")
     
     try:
         register_contacts_handlers(backend_service)

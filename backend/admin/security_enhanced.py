@@ -30,10 +30,15 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection, resolve_db_path
+
 logger = logging.getLogger(__name__)
 
-# 數據庫路徑
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'security.db')
+# 數據庫路徑（目錄部分改由 resolve_db_path() 解析的 DATABASE_DIR 取得，
+# 檔名維持獨立的 security.db 不變）
+DB_PATH = os.path.join(os.path.dirname(resolve_db_path()), 'security.db')
 KEY_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', '.security_key')
 
 
@@ -220,7 +225,7 @@ class SecurityManager:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         # 用戶角色表
@@ -312,7 +317,7 @@ class SecurityManager:
     ) -> bool:
         """分配角色"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             now = datetime.now().isoformat()
@@ -337,7 +342,7 @@ class SecurityManager:
     
     def get_user_permissions(self, user_id: str) -> Set[str]:
         """獲取用戶權限"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT roles, custom_permissions, is_active FROM user_roles WHERE user_id = ?', (user_id,))
         row = cursor.fetchone()
@@ -384,7 +389,7 @@ class SecurityManager:
     
     def get_user_roles(self, user_id: str) -> Dict:
         """獲取用戶角色信息"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM user_roles WHERE user_id = ?', (user_id,))
         row = cursor.fetchone()
@@ -418,7 +423,7 @@ class SecurityManager:
         
         expires_at = (datetime.now() + timedelta(days=expires_in_days)).isoformat()
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -441,7 +446,7 @@ class SecurityManager:
         """驗證令牌"""
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -486,7 +491,7 @@ class SecurityManager:
     def revoke_token(self, token_id: str, user_id: str = None) -> bool:
         """撤銷令牌"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             query = 'UPDATE access_tokens SET is_revoked = 1 WHERE id = ?'
@@ -507,7 +512,7 @@ class SecurityManager:
     
     def list_tokens(self, user_id: str) -> List[Dict]:
         """列出用戶令牌"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT id, name, scopes, expires_at, last_used, created_at, is_revoked
@@ -541,7 +546,7 @@ class SecurityManager:
         secret_id = str(uuid.uuid4())
         encrypted = self.encryption.encrypt(secret_value)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -560,7 +565,7 @@ class SecurityManager:
     
     def get_secret(self, secret_id: str, owner_id: str = None) -> Optional[str]:
         """獲取解密後的密鑰"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT encrypted_value, owner_id FROM encrypted_secrets WHERE id = ?'
@@ -588,7 +593,7 @@ class SecurityManager:
         old_key = self.encryption.rotate_key()
         old_fernet = Fernet(old_key)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         query = 'SELECT id, encrypted_value FROM encrypted_secrets'
@@ -671,7 +676,7 @@ class SecurityManager:
     ):
         """記錄安全事件"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -697,7 +702,7 @@ class SecurityManager:
         limit: int = 100
     ) -> List[Dict]:
         """查詢安全事件"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()
@@ -739,7 +744,7 @@ class SecurityManager:
     
     def get_security_summary(self) -> Dict[str, Any]:
         """獲取安全概要"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH)
         cursor = conn.cursor()
         
         hour_ago = (datetime.now() - timedelta(hours=1)).isoformat()

@@ -16,8 +16,9 @@
               "base": "./dist",
               "browser": "."
             },
-            "browser": "index.tsx",
+            "browser": "src/main.ts",
             "tsConfig": "tsconfig.json",
+            "styles": ["src/styles.css"],
             "assets": [
               {
                 "glob": "**/*",

@@ -182,10 +182,15 @@ class AuthCoreMixin:
                         getattr(user, 'id', ''), getattr(user, 'username', ''), getattr(user, 'display_name', ''),
                         getattr(user, 'telegram_id', ''), data.get('subscription_expires'))
             try:
-                db_path = str(getattr(auth_service, 'db_path', '') or os.environ.get('DATABASE_PATH', ''))
-                if db_path:
-                    conn = sqlite3.connect(db_path)
-                    conn.row_factory = sqlite3.Row
+                # 🔧 改用合法連接模塊 core.db_utils（見 .cursorrules 合法連接模塊清單）。
+                # 舊寫法直接 sqlite3.connect() + os.environ.get('DATABASE_PATH')，但本檔案從未
+                # import os / sqlite3，執行到這裡必定拋出 NameError（被下方 except Exception as ex
+                # 吞掉）——也就是說以下 is_lifetime / subscription_tier 同步邏輯過去從未真正執行過。
+                # 本次修復除了改用合法連接模塊，也順帶修正此既有缺陷（詳見報告）。
+                from core.db_utils import create_connection
+                db_path = str(getattr(auth_service, 'db_path', '') or '')
+                conn = create_connection(db_path or None)
+                if conn:
                     try:
                         # 優先 id/user_id，再嘗試 username/nickname/telegram_id/email
                         params = [user.id, user.id]
@@ -633,15 +638,17 @@ class AuthCoreMixin:
         try:
             from auth.device_session import get_device_session_service
             
-            # 獲取當前用戶（從 JWT）
-            user = request.get('user')
-            if not user:
+            # 🔧 Bug 修復：中介層（auth/middleware.py）寫入的是 request['auth']
+            # (AuthContext，.user 為 User 物件)，不是 request['user']（此鍵從未被設置，
+            # 導致即使 JWT 驗證成功這裡也一律誤判未認證並回 401）
+            auth_ctx = request.get('auth')
+            if not auth_ctx or not auth_ctx.is_authenticated or not auth_ctx.user:
                 return self._json_response({
                     'success': False,
                     'error': '未認證'
                 }, 401)
             
-            user_id = user.get('user_id') or user.get('id')
+            user_id = auth_ctx.user.id
             
             # 獲取當前設備 ID（基於請求信息）
             ip_address = request.headers.get('X-Forwarded-For', request.remote)
@@ -681,14 +688,15 @@ class AuthCoreMixin:
         try:
             from auth.device_session import get_device_session_service
             
-            user = request.get('user')
-            if not user:
+            # 🔧 Bug 修復：見 get_user_devices 註釋，中介層寫入 request['auth']，非 request['user']
+            auth_ctx = request.get('auth')
+            if not auth_ctx or not auth_ctx.is_authenticated or not auth_ctx.user:
                 return self._json_response({
                     'success': False,
                     'error': '未認證'
                 }, 401)
             
-            user_id = user.get('user_id') or user.get('id')
+            user_id = auth_ctx.user.id
             session_id = request.match_info['session_id']
             
             service = get_device_session_service()
@@ -722,14 +730,15 @@ class AuthCoreMixin:
         try:
             from auth.device_session import get_device_session_service
             
-            user = request.get('user')
-            if not user:
+            # 🔧 Bug 修復：見 get_user_devices 註釋，中介層寫入 request['auth']，非 request['user']
+            auth_ctx = request.get('auth')
+            if not auth_ctx or not auth_ctx.is_authenticated or not auth_ctx.user:
                 return self._json_response({
                     'success': False,
                     'error': '未認證'
                 }, 401)
             
-            user_id = user.get('user_id') or user.get('id')
+            user_id = auth_ctx.user.id
             
             # 從請求體獲取當前會話 ID
             try:
@@ -762,11 +771,12 @@ class AuthCoreMixin:
         try:
             from auth.geo_security import get_geo_security
             
-            user = request.get('user')
-            if not user:
+            # 🔧 Bug 修復：見 get_user_devices 註釋，中介層寫入 request['auth']，非 request['user']
+            auth_ctx = request.get('auth')
+            if not auth_ctx or not auth_ctx.is_authenticated or not auth_ctx.user:
                 return self._json_response({'success': False, 'error': '未認證'}, 401)
             
-            user_id = user.get('user_id') or user.get('id')
+            user_id = auth_ctx.user.id
             
             service = get_geo_security()
             locations = service.get_user_trusted_locations(user_id)
@@ -791,11 +801,12 @@ class AuthCoreMixin:
         try:
             from auth.geo_security import get_geo_security
             
-            user = request.get('user')
-            if not user:
+            # 🔧 Bug 修復：見 get_user_devices 註釋，中介層寫入 request['auth']，非 request['user']
+            auth_ctx = request.get('auth')
+            if not auth_ctx or not auth_ctx.is_authenticated or not auth_ctx.user:
                 return self._json_response({'success': False, 'error': '未認證'}, 401)
             
-            user_id = user.get('user_id') or user.get('id')
+            user_id = auth_ctx.user.id
             location_id = int(request.match_info['location_id'])
             
             service = get_geo_security()

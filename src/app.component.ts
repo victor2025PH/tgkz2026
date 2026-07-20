@@ -36,8 +36,10 @@ import { OfflineCacheService } from './services/offline-cache.service';
 import { SwManagerService } from './services/sw-manager.service';
 // LoadingOverlayComponent removed - using non-blocking connection indicator instead
 import { OnboardingComponent } from './onboarding.component';
+import { OnboardingOverlayComponent } from './components/onboarding-overlay.component';
 // BackupService 從 ./services 統一導入
 import { I18nService } from './i18n.service';
+import { isLeanModeActive } from './utils/lean-mode.util';
 // 新增：用戶認證相關 - 使用統一的 JWT 認證服務
 import { AuthService } from './core/auth.service';
 // 🔧 P4-1: Legacy LoginComponent 已移除，統一使用 /auth/login 路由（Core LoginComponent）
@@ -134,7 +136,12 @@ interface SuccessOverlayConfig {
 }
 
 @Component({
-  selector: 'app-root',
+  // 🔧 選擇器改為 'app-shell'：AppComponent 現在是透過路由 loadComponent 懶加載
+  // 掛載的「應用殼」組件，不再是 bootstrap 根組件（見 main.ts / app-root.component.ts），
+  // selector 對路由懶加載組件本身沒有實際作用（Router 直接實例化類別、插入
+  // <router-outlet> 位置，不依賴標籤匹配），改名只是避免與新的 app-root 選擇器
+  // 混淆，不影響任何既有邏輯或模板。
+  selector: 'app-shell',
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
@@ -155,6 +162,8 @@ interface SuccessOverlayConfig {
     MembershipDialogComponent, UpgradePromptComponent, PaymentComponent,
     // 導航和佈局（模板中使用）
     OnboardingComponent,
+    // 🆕 關鍵頁首訪 spotlight 導覽（OnboardingService 驅動）
+    OnboardingOverlayComponent,
     // 帳號管理（模板中使用）
     QrLoginComponent,
     // 對話框（模板中使用）
@@ -503,6 +512,12 @@ export class AppComponent implements OnDestroy, OnInit {
   isSidebarGroupExpanded(group: string): boolean {
     return this.sidebarGroups()[group] ?? true;
   }
+
+  // 🎯 精簡獲客模式開關：隱藏 AI 增值菜單（策略規劃/自動執行/多角色/智能引擎/客戶培育）
+  // 判斷邏輯統一提煉至 utils/lean-mode.util.ts，與 aiFeatureGuard 共用同一實現
+  get leanMode(): boolean {
+    return isLeanModeActive();
+  }
   
   // 從本地存儲加載側邊欄分組狀態
   loadSidebarGroupsState(): void {
@@ -623,28 +638,8 @@ export class AppComponent implements OnDestroy, OnInit {
   settingsTab = signal<'backup' | 'migration' | 'scheduler' | 'appearance'>('backup');
   
   // --- Vector Memory State ---
-  vectorMemoryStats = signal<{
-    totalMemories: number;
-    byType: {[key: string]: number};
-    totalUsers: number;
-    avgImportance: number;
-  }>({ totalMemories: 0, byType: {}, totalUsers: 0, avgImportance: 0 });
   vectorMemorySearchQuery = '';
-  vectorMemorySearchResults = signal<Array<{
-    id: number;
-    userId: string;
-    content: string;
-    memoryType: string;
-    importance: number;
-    similarity: number;
-    createdAt: string;
-  }>>([]);
-  isSearchingMemory = signal(false);
-  isAddingMemory = signal(false);
-  showAddMemoryDialog = signal(false);
-  newMemory = { userId: '', content: '', type: 'conversation', importance: 0.5 };
   selectedMemoryUserId = signal('');
-  memoryUserList = signal<string[]>([]);
   
   // --- Voice Clone State (Enhanced) ---
   showVoiceRecordingDialog = signal(false);
@@ -760,32 +755,9 @@ export class AppComponent implements OnDestroy, OnInit {
   newQaPair = signal({question: '', answer: '', category: 'general', keywords: ''});
   
   // --- Telegram RAG System State ---
-  ragSystemInitialized = signal(false);
-  isInitializingRag = signal(false);
-  isRagLearning = signal(false);
-  isReindexing = signal(false);
-  isCleaningRag = signal(false);
-  isSearchingRag = signal(false);
   ragSearchQuery = '';
-  ragSearchResults = signal<Array<{id: number; type: string; question: string; answer: string; successScore: number; similarity: number; useCount: number; source: string}>>([]);
-  ragStats = signal<{
-    total_knowledge: number;
-    qa_count: number;
-    scripts_count: number;
-    total_uses: number;
-    avg_score: number;
-    chromadb_enabled: boolean;
-    neural_embedding: boolean;
-    by_type: {[key: string]: {count: number; avg_score: number; uses: number}};
-  }>({
-    total_knowledge: 0, qa_count: 0, scripts_count: 0, total_uses: 0, avg_score: 0,
-    chromadb_enabled: false, neural_embedding: false, by_type: {}
-  });
   showAddRagKnowledgeDialog = signal(false);
   newRagKnowledge = {type: 'qa', question: '', answer: '', context: ''};
-  
-  // Computed for RAG type keys
-  ragTypeKeys = computed(() => Object.keys(this.ragStats().by_type));
   
   // --- Resource Discovery State ---
   resourceDiscoveryInitialized = signal(false);
@@ -1141,53 +1113,10 @@ export class AppComponent implements OnDestroy, OnInit {
   availableMembersForInvite = signal<Array<{id: string; name?: string; username?: string}>>([]);
   
   // --- Discussion Watcher State ---
-  discussionWatcherInitialized = signal(false);
-  channelDiscussions = signal<Array<{
-    id: number;
-    channel_id: string;
-    channel_title: string;
-    discussion_id: string;
-    discussion_title: string;
-    is_monitoring: number;
-    message_count: number;
-    lead_count: number;
-    last_message_at: string;
-  }>>([]);
-  discussionMessages = signal<Array<{
-    id: number;
-    discussion_id: string;
-    message_id: number;
-    user_id: string;
-    username: string;
-    first_name: string;
-    message_text: string;
-    is_matched: number;
-    matched_keywords: string[];
-    is_replied: number;
-    created_at: string;
-  }>>([]);
-  discussionStats = signal<{
-    total_discussions: number;
-    monitoring_count: number;
-    total_messages: number;
-    matched_messages: number;
-    leads_from_discussions: number;
-    today_messages: number;
-    today_leads: number;
-  }>({
-    total_discussions: 0,
-    monitoring_count: 0,
-    total_messages: 0,
-    matched_messages: 0,
-    leads_from_discussions: 0,
-    today_messages: 0,
-    today_leads: 0
-  });
   selectedDiscussionId = signal<string>('');
   discoverChannelId = '';
   resourcesTab = signal<'resources' | 'discussions'>('resources');
   resourceCenterTab = signal<'manage' | 'stats'>('manage');  // 資源中心 Tab（移除了搜索發現，獨立頁面）
-  isLoadingDiscussionMessages = signal(false);
   discussionReplyText = signal('');
   
   // --- Voice Clone Configuration ---
@@ -1298,10 +1227,8 @@ export class AppComponent implements OnDestroy, OnInit {
   isSelectAllLeads = signal(false);
   showBatchOperationMenu = signal(false);
   showFloatingMoreMenu = signal(false); // 浮動欄更多操作下拉菜單
-  batchOperationInProgress = signal(false);
   batchOperationHistory: WritableSignal<any[]> = signal([]);
   showBatchOperationHistory = signal(false);
-  allTags: WritableSignal<{id: number, name: string, color: string, usageCount: number}[]> = signal([]);
   newTagName = signal('');
   newTagColor = signal('#3B82F6');
   showAddTagDialog = signal(false);
@@ -1327,10 +1254,6 @@ export class AppComponent implements OnDestroy, OnInit {
   hasSelectedLeads = computed(() => this.selectedLeadIds().size > 0);
   
   // Ad System State (廣告發送系統)
-  adTemplates: WritableSignal<any[]> = signal([]);
-  adSchedules: WritableSignal<any[]> = signal([]);
-  adSendLogs: WritableSignal<any[]> = signal([]);
-  adOverviewStats: WritableSignal<any> = signal(null);
   showAdTemplateForm = signal(false);
   showAdScheduleForm = signal(false);
   editingAdTemplate: WritableSignal<any> = signal(null);
@@ -1348,19 +1271,13 @@ export class AppComponent implements OnDestroy, OnInit {
     accountStrategy: 'rotate' as const,
     assignedAccounts: [] as string[]
   });
-  spintaxPreview: WritableSignal<string[]> = signal([]);
   isPreviewingSpintax = signal(false);
   adSystemTab = signal<'templates' | 'schedules' | 'logs' | 'analytics'>('templates');
   
   // User Tracking State (用戶追蹤系統)
-  trackedUsers: WritableSignal<any[]> = signal([]);
-  userGroups: WritableSignal<any[]> = signal([]);
-  highValueGroups: WritableSignal<any[]> = signal([]);
-  trackingStats: WritableSignal<any> = signal(null);
   showAddUserForm = signal(false);
   newTrackedUser = signal({ userId: '', username: '', notes: '' });
   selectedTrackedUser: WritableSignal<any> = signal(null);
-  isTrackingUser = signal(false);
   userTrackingTab = signal<'users' | 'groups' | 'analytics'>('users');
   userValueFilter = signal<string>('');
   
@@ -1381,12 +1298,7 @@ export class AppComponent implements OnDestroy, OnInit {
   });
   
   // Multi-Role Collaboration State (多角色協作)
-  roleTemplates: WritableSignal<Record<string, any>> = signal({});
-  allRoles: WritableSignal<any[]> = signal([]);
-  scriptTemplates: WritableSignal<any[]> = signal([]);
   collabGroups: WritableSignal<any[]> = signal([]);
-  collabStats: WritableSignal<any> = signal(null);
-  roleStats: WritableSignal<any> = signal(null);
   showRoleAssignForm = signal(false);
   multiRoleTab = signal<'roles' | 'scripts' | 'collab' | 'stats'>('roles');
   newRoleAssign = signal({
@@ -1999,47 +1911,7 @@ export class AppComponent implements OnDestroy, OnInit {
     };
   });
 
-  // --- Funnel Stats & User Management ---
-  funnelStats = signal<{
-    stages: {[key: string]: {count: number, avg_interest: number, avg_sentiment: number}},
-    tags: [string, number][],
-    interest_distribution: {[key: number]: number},
-    today_new: number,
-    week_converted: number
-  }>({
-    stages: {},
-    tags: [],
-    interest_distribution: {},
-    today_new: 0,
-    week_converted: 0
-  });
-  
-  // --- Funnel Visualization (Phase 4) ---
-  funnelOverview = signal<{
-    stages: Array<{stage: string; name: string; count: number; color: string}>;
-    totalLeads: number;
-    convertedLeads: number;
-    averageConversionDays: number;
-    conversionRate: number;
-  }>({
-    stages: [],
-    totalLeads: 0,
-    convertedLeads: 0,
-    averageConversionDays: 0,
-    conversionRate: 0
-  });
-  showFunnelVisualization = signal(false);
-  isLoadingFunnel = signal(false);
-  selectedJourneyUserId = signal('');
-  userJourneyData = signal<{
-    userId: string;
-    stages: Array<{stage: string; timestamp: string; reason: string}>;
-    currentStage: string;
-    totalDays: number;
-    isConverted: boolean;
-  } | null>(null);
-  isLoadingJourney = signal(false);
-  leadsTab = signal<'kanban' | 'funnel' | 'journey'>('kanban');
+  // --- User Management ---
   
   // --- Marketing Campaign (Phase 4) ---
   marketingCampaigns = signal<Array<{
@@ -2099,44 +1971,6 @@ export class AppComponent implements OnDestroy, OnInit {
   userFilterTags = signal<string>('');
   userFilterSearch = signal<string>('');
   selectedUserIds = signal<string[]>([]);
-  
-  // 漏斗階段定義
-  funnelStages = [
-    {key: 'new', name: '新客戶', color: 'bg-blue-500'},
-    {key: 'contacted', name: '已聯繫', color: 'bg-cyan-500'},
-    {key: 'replied', name: '已回復', color: 'bg-green-500'},
-    {key: 'interested', name: '有興趣', color: 'bg-yellow-500'},
-    {key: 'negotiating', name: '洽談中', color: 'bg-orange-500'},
-    {key: 'follow_up', name: '需跟進', color: 'bg-purple-500'},
-    {key: 'converted', name: '已成交', color: 'bg-emerald-500'},
-    {key: 'churned', name: '已流失', color: 'bg-red-500'}
-  ];
-  
-  loadFunnelStats() {
-    this.ipcService.send('get-funnel-stats', {});
-  }
-  
-  // ==================== Funnel Visualization Methods (Phase 4) ====================
-  
-  loadFunnelOverview() {
-    this.isLoadingFunnel.set(true);
-    this.ipcService.send('get-funnel-overview', {});
-  }
-  
-  loadUserJourney(userId: string) {
-    if (!userId) return;
-    this.isLoadingJourney.set(true);
-    this.selectedJourneyUserId.set(userId);
-    this.ipcService.send('get-user-journey', { userId });
-  }
-  
-  transitionFunnelStage(userId: string, newStage: string, reason?: string) {
-    this.ipcService.send('transition-funnel-stage', {
-      userId,
-      stage: newStage,
-      reason: reason || '手動轉換'
-    });
-  }
   
   // ==================== Marketing Campaign Methods (Phase 4) ====================
   
@@ -2372,16 +2206,6 @@ export class AppComponent implements OnDestroy, OnInit {
     this.ipcService.send('bulk-update-user-stage', {userIds, stage});
   }
   
-  getStageName(stage: string): string {
-    const found = this.funnelStages.find(s => s.key === stage);
-    return found ? found.name : stage;
-  }
-  
-  getStageColor(stage: string): string {
-    const found = this.funnelStages.find(s => s.key === stage);
-    return found ? found.color : 'bg-gray-500';
-  }
-
   // --- Analytics & Dashboard State ---
   dashboardStats = computed(() => {
     const accounts = this.accounts();
@@ -2787,7 +2611,7 @@ export class AppComponent implements OnDestroy, OnInit {
     this.ipcService.send('save-first-run-settings', settings);
     this.showWelcomeDialog.set(false);
     this.isFirstRun.set(false);
-    this.toastService.success('🎉 設置完成！歡迎使用 TG-Matrix');
+    this.toastService.success('🎉 設置完成！歡迎使用 智控 MatrixX');
   }
   
   // 跳過首次設置
@@ -2807,8 +2631,7 @@ export class AppComponent implements OnDestroy, OnInit {
         lastView = currentView;
         
         if (currentView === 'leads') {
-          // 加載漏斗統計和用戶列表
-          this.loadFunnelStats();
+          // 加載用戶列表
           this.loadUsersWithProfiles();
         } else if (currentView === 'resources') {
           // 加載資源發現數據
@@ -3017,7 +2840,6 @@ export class AppComponent implements OnDestroy, OnInit {
     this.ipcService.cleanup('templates-updated');
     this.ipcService.cleanup('campaigns-updated');
     this.ipcService.cleanup('leads-updated');
-    this.ipcService.cleanup('funnel-stats');
     this.ipcService.cleanup('users-with-profiles');
     this.ipcService.cleanup('bulk-update-complete');
     this.ipcService.cleanup('login-requires-code');
@@ -3971,49 +3793,6 @@ export class AppComponent implements OnDestroy, OnInit {
   messagesChartData(): TimeSeriesData | null {
     // Use sending stats data if available
     return this.sendingStatsData();
-  }
-  
-  funnelChartData(): TimeSeriesData | null {
-    const funnel = this.funnelStats();
-    if (!funnel || !funnel.stages || Object.keys(funnel.stages).length === 0) {
-      return null;
-    }
-    
-    const stages = this.funnelStages;
-    const labels = stages.map(s => s.name);
-    const data = stages.map(s => {
-      const stageData = funnel.stages[s.key];
-      return stageData ? stageData.count : 0;
-    });
-    
-    return {
-      labels,
-      datasets: [{
-        label: '漏斗数据',
-        data,
-        backgroundColor: [
-          'rgba(59, 130, 246, 0.8)',
-          'rgba(34, 197, 94, 0.8)',
-          'rgba(168, 85, 247, 0.8)',
-          'rgba(239, 68, 68, 0.8)',
-          'rgba(245, 158, 11, 0.8)',
-          'rgba(236, 72, 153, 0.8)',
-          'rgba(16, 185, 129, 0.8)',
-          'rgba(239, 68, 68, 0.8)'
-        ],
-        borderColor: [
-          'rgb(59, 130, 246)',
-          'rgb(34, 197, 94)',
-          'rgb(168, 85, 247)',
-          'rgb(239, 68, 68)',
-          'rgb(245, 158, 11)',
-          'rgb(236, 72, 153)',
-          'rgb(16, 185, 129)',
-          'rgb(239, 68, 68)'
-        ],
-        borderWidth: 1
-      }]
-    };
   }
   
   // Alert management state
@@ -5467,10 +5246,6 @@ export class AppComponent implements OnDestroy, OnInit {
     this.newRoleAssign.update(r => ({...r, roleName: value}));
   }
   
-  getRolesOfType(roleType: string): any[] {
-    return this.allRoles().filter(r => r.roleType === roleType);
-  }
-
   addTemplate() {
     const form = this.newTemplate();
     if (form.name.trim() && form.prompt.trim()) {

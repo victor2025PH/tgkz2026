@@ -15,11 +15,14 @@ import os
 import json
 import hashlib
 import logging
-import sqlite3
 import aiohttp
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple
 from dataclasses import dataclass, asdict
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -93,71 +96,67 @@ class GeoSecurityService:
         self._init_db()
     
     def _get_db(self):
-        """獲取數據庫連接"""
-        db = sqlite3.connect(self.db_path)
-        db.row_factory = sqlite3.Row
-        return db
+        """獲取數據庫連接（context manager，統一經由 core.db_utils.get_connection）"""
+        return get_connection(self.db_path)
     
     def _init_db(self):
         """初始化數據庫表"""
-        db = self._get_db()
-        try:
-            # IP 地理位置緩存表
-            db.execute('''
-                CREATE TABLE IF NOT EXISTS geo_cache (
-                    ip TEXT PRIMARY KEY,
-                    country TEXT,
-                    country_code TEXT,
-                    region TEXT,
-                    city TEXT,
-                    latitude REAL,
-                    longitude REAL,
-                    isp TEXT,
-                    is_vpn INTEGER DEFAULT 0,
-                    is_proxy INTEGER DEFAULT 0,
-                    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # 用戶信任位置表
-            db.execute('''
-                CREATE TABLE IF NOT EXISTS trusted_locations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL,
-                    country_code TEXT,
-                    city TEXT,
-                    ip_prefix TEXT,
-                    trusted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(user_id, country_code, city)
-                )
-            ''')
-            
-            # 安全事件表
-            db.execute('''
-                CREATE TABLE IF NOT EXISTS security_events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL,
-                    event_type TEXT NOT NULL,
-                    severity TEXT DEFAULT 'low',
-                    ip_address TEXT,
-                    location TEXT,
-                    details TEXT,
-                    acknowledged INTEGER DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # 創建索引
-            db.execute('CREATE INDEX IF NOT EXISTS idx_geo_cache_cached ON geo_cache(cached_at)')
-            db.execute('CREATE INDEX IF NOT EXISTS idx_trusted_locations_user ON trusted_locations(user_id)')
-            db.execute('CREATE INDEX IF NOT EXISTS idx_security_events_user ON security_events(user_id, created_at)')
-            
-            db.commit()
-            logger.info("Geo security tables initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize geo security tables: {e}")
-        finally:
-            db.close()
+        with self._get_db() as db:
+            try:
+                # IP 地理位置緩存表
+                db.execute('''
+                    CREATE TABLE IF NOT EXISTS geo_cache (
+                        ip TEXT PRIMARY KEY,
+                        country TEXT,
+                        country_code TEXT,
+                        region TEXT,
+                        city TEXT,
+                        latitude REAL,
+                        longitude REAL,
+                        isp TEXT,
+                        is_vpn INTEGER DEFAULT 0,
+                        is_proxy INTEGER DEFAULT 0,
+                        cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                
+                # 用戶信任位置表
+                db.execute('''
+                    CREATE TABLE IF NOT EXISTS trusted_locations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        country_code TEXT,
+                        city TEXT,
+                        ip_prefix TEXT,
+                        trusted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(user_id, country_code, city)
+                    )
+                ''')
+                
+                # 安全事件表
+                db.execute('''
+                    CREATE TABLE IF NOT EXISTS security_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        event_type TEXT NOT NULL,
+                        severity TEXT DEFAULT 'low',
+                        ip_address TEXT,
+                        location TEXT,
+                        details TEXT,
+                        acknowledged INTEGER DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                
+                # 創建索引
+                db.execute('CREATE INDEX IF NOT EXISTS idx_geo_cache_cached ON geo_cache(cached_at)')
+                db.execute('CREATE INDEX IF NOT EXISTS idx_trusted_locations_user ON trusted_locations(user_id)')
+                db.execute('CREATE INDEX IF NOT EXISTS idx_security_events_user ON security_events(user_id, created_at)')
+                
+                db.commit()
+                logger.info("Geo security tables initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize geo security tables: {e}")
     
     async def get_location(self, ip: str) -> GeoLocation:
         """
@@ -208,8 +207,7 @@ class GeoSecurityService:
     
     def _get_cached_location(self, ip: str) -> Optional[GeoLocation]:
         """從緩存獲取位置"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             cutoff = (datetime.utcnow() - timedelta(seconds=self.CACHE_TTL)).isoformat()
             cursor = db.execute('''
                 SELECT * FROM geo_cache WHERE ip = ? AND cached_at > ?
@@ -230,28 +228,24 @@ class GeoSecurityService:
                     is_proxy=bool(row['is_proxy'])
                 )
             return None
-        finally:
-            db.close()
     
     def _cache_location(self, location: GeoLocation) -> None:
         """緩存位置信息"""
-        db = self._get_db()
         try:
-            db.execute('''
-                INSERT OR REPLACE INTO geo_cache 
-                (ip, country, country_code, region, city, latitude, longitude, isp, is_vpn, is_proxy, cached_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                location.ip, location.country, location.country_code,
-                location.region, location.city, location.latitude, location.longitude,
-                location.isp, int(location.is_vpn), int(location.is_proxy),
-                datetime.utcnow().isoformat()
-            ))
-            db.commit()
+            with self._get_db() as db:
+                db.execute('''
+                    INSERT OR REPLACE INTO geo_cache 
+                    (ip, country, country_code, region, city, latitude, longitude, isp, is_vpn, is_proxy, cached_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    location.ip, location.country, location.country_code,
+                    location.region, location.city, location.latitude, location.longitude,
+                    location.isp, int(location.is_vpn), int(location.is_proxy),
+                    datetime.utcnow().isoformat()
+                ))
+                db.commit()
         except Exception as e:
             logger.debug(f"Failed to cache location: {e}")
-        finally:
-            db.close()
     
     async def check_login_location(
         self,
@@ -335,21 +329,17 @@ class GeoSecurityService:
     
     def _is_trusted_location(self, user_id: str, location: GeoLocation) -> bool:
         """檢查是否為信任位置"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             cursor = db.execute('''
                 SELECT 1 FROM trusted_locations
                 WHERE user_id = ? AND country_code = ? AND city = ?
                 LIMIT 1
             ''', (user_id, location.country_code, location.city))
             return cursor.fetchone() is not None
-        finally:
-            db.close()
     
     def _add_trusted_location(self, user_id: str, location: GeoLocation) -> None:
         """添加信任位置"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             db.execute('''
                 INSERT OR IGNORE INTO trusted_locations 
                 (user_id, country_code, city, ip_prefix, trusted_at)
@@ -361,40 +351,36 @@ class GeoSecurityService:
             ))
             db.commit()
             logger.info(f"Added trusted location for user {user_id}: {location.get_display_location()}")
-        finally:
-            db.close()
     
     def _get_recent_login_locations(self, user_id: str, days: int = 30) -> List[Dict]:
         """獲取用戶最近的登入位置"""
-        db = self._get_db()
         try:
-            cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
-            
-            # 從設備會話獲取最近的 IP
-            cursor = db.execute('''
-                SELECT DISTINCT ip_address FROM device_sessions
-                WHERE user_id = ? AND created_at > ? AND ip_address IS NOT NULL
-                ORDER BY last_active DESC LIMIT 10
-            ''', (user_id, cutoff))
-            
-            locations = []
-            for row in cursor.fetchall():
-                ip = row['ip_address']
-                if ip:
-                    cached = self._get_cached_location(ip)
-                    if cached and cached.latitude and cached.longitude:
-                        locations.append({
-                            'ip': ip,
-                            'latitude': cached.latitude,
-                            'longitude': cached.longitude
-                        })
-            
-            return locations
+            with self._get_db() as db:
+                cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+                
+                # 從設備會話獲取最近的 IP
+                cursor = db.execute('''
+                    SELECT DISTINCT ip_address FROM device_sessions
+                    WHERE user_id = ? AND created_at > ? AND ip_address IS NOT NULL
+                    ORDER BY last_active DESC LIMIT 10
+                ''', (user_id, cutoff))
+                
+                locations = []
+                for row in cursor.fetchall():
+                    ip = row['ip_address']
+                    if ip:
+                        cached = self._get_cached_location(ip)
+                        if cached and cached.latitude and cached.longitude:
+                            locations.append({
+                                'ip': ip,
+                                'latitude': cached.latitude,
+                                'longitude': cached.longitude
+                            })
+                
+                return locations
         except Exception as e:
             logger.debug(f"Failed to get recent locations: {e}")
             return []
-        finally:
-            db.close()
     
     @staticmethod
     def _haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -429,8 +415,7 @@ class GeoSecurityService:
         location: GeoLocation
     ) -> None:
         """記錄安全事件"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             db.execute('''
                 INSERT INTO security_events 
                 (user_id, event_type, severity, ip_address, location, details, created_at)
@@ -442,8 +427,6 @@ class GeoSecurityService:
                 alert.created_at.isoformat()
             ))
             db.commit()
-        finally:
-            db.close()
     
     def get_user_security_events(
         self,
@@ -452,8 +435,7 @@ class GeoSecurityService:
         unacknowledged_only: bool = False
     ) -> List[Dict]:
         """獲取用戶安全事件"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             query = '''
                 SELECT * FROM security_events
                 WHERE user_id = ?
@@ -482,26 +464,20 @@ class GeoSecurityService:
                 })
             
             return events
-        finally:
-            db.close()
     
     def acknowledge_event(self, user_id: str, event_id: int) -> bool:
         """確認安全事件"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             result = db.execute('''
                 UPDATE security_events SET acknowledged = 1
                 WHERE id = ? AND user_id = ?
             ''', (event_id, user_id))
             db.commit()
             return result.rowcount > 0
-        finally:
-            db.close()
     
     def get_user_trusted_locations(self, user_id: str) -> List[Dict]:
         """獲取用戶信任位置列表"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             cursor = db.execute('''
                 SELECT * FROM trusted_locations
                 WHERE user_id = ?
@@ -519,21 +495,16 @@ class GeoSecurityService:
                 })
             
             return locations
-        finally:
-            db.close()
     
     def remove_trusted_location(self, user_id: str, location_id: int) -> bool:
         """移除信任位置"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             result = db.execute('''
                 DELETE FROM trusted_locations
                 WHERE id = ? AND user_id = ?
             ''', (location_id, user_id))
             db.commit()
             return result.rowcount > 0
-        finally:
-            db.close()
 
 
 # 全局服務實例

@@ -34,9 +34,10 @@ def run_merge(fresh: bool = False):
         Path(db_path).unlink()
         print(f"[Merge] Removed existing {db_path}")
 
-    import sqlite3
-    conn = sqlite3.connect(db_path, timeout=30.0)
-    conn.execute("PRAGMA journal_mode=WAL")
+    # 🔧 改用合法連接模塊 core.db_utils，取代直接 sqlite3.connect()
+    # create_connection() 已內建 WAL + busy_timeout + cache_size，這裡僅需額外設置本腳本需要的 foreign_keys=OFF
+    from core.db_utils import create_connection
+    conn = create_connection(db_path)
     conn.execute("PRAGMA foreign_keys=OFF")
     cursor = conn.cursor()
 

@@ -69,6 +69,22 @@ except ImportError:
 # 緩存：記錄每個手機號使用的 API
 _phone_api_map: Dict[str, str] = {}
 
+# 🛡️ Stage：QR 登入從 API 池成功分配的次數（自後端啟動起累計，重啟後歸零）
+# 用途：在決定是否默認開啟 TG_QR_USE_API_POOL 前，先觀察小流量下 QR 登入
+# 走池分配的實際發生次數是否符合預期，作為「該不該把默認值改成開」的觀測依據。
+_qr_pool_allocation_count: int = 0
+
+
+def record_qr_pool_allocation() -> None:
+    """QR 登入成功從平台 API 池分配到專屬憑據時調用，供可觀測性統計使用。"""
+    global _qr_pool_allocation_count
+    _qr_pool_allocation_count += 1
+
+
+def get_qr_pool_allocation_count() -> int:
+    """獲取 QR 登入從池分配成功的累計次數（自啟動起）。"""
+    return _qr_pool_allocation_count
+
 
 def get_api_for_login(
     phone: str,
@@ -403,6 +419,19 @@ async def remove_api_from_pool(api_id: str) -> Dict[str, Any]:
 async def get_pool_status() -> Dict[str, Any]:
     """
     獲取 API 池狀態
+
+    🛡️ 附帶回傳 qr_allocations_since_startup：QR 登入從池分配成功的累計次數，
+    供管理後台在評估「是否默認開啟 TG_QR_USE_API_POOL」時作為觀測指標。
     """
     pool = get_api_pool()
-    return pool.get_pool_status()
+    status = pool.get_pool_status()
+    try:
+        status['qr_allocations_since_startup'] = get_qr_pool_allocation_count()
+    except Exception:
+        pass
+    try:
+        from config import QR_USE_API_POOL, QR_POOL_ROLLOUT_PERCENT
+        status['qr_pool_rollout_percent'] = 100 if QR_USE_API_POOL else QR_POOL_ROLLOUT_PERCENT
+    except Exception:
+        pass
+    return status

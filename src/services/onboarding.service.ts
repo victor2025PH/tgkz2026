@@ -1,14 +1,16 @@
 /**
- * 新手引導服務
+ * 新手引導服務（Spotlight 導覽）
  * Onboarding Service
- * 
- * 🆕 體驗優化: 新手引導系統
- * 
- * 功能：
- * - 步驟式引導流程
- * - 高亮目標元素
- * - 進度追蹤
- * - 可跳過和重新開始
+ *
+ * 職責邊界（與其他引導系統的分工）：
+ * - 首登陸歡迎：OnboardingComponent（3步彈窗，app.component.html 掛載）
+ * - 下一步引導：儀表板 5 步上手進度環（狀態驅動）
+ * - 頁面內引導：各頁空狀態引導卡
+ * - 本服務：關鍵頁「首訪 spotlight」——僅在用戶尚未配置該頁功能時，
+ *   高亮頁面元素做一次性定向導覽（可跳過、ESC 關閉、進度持久化）
+ *
+ * 使用方式：頁面組件在數據載入後調用 startTourIfFirstVisit(tourId)，
+ * 已完成/已跳過的 tour 不會重複出現。
  */
 
 import { Injectable, signal, computed } from '@angular/core';
@@ -33,7 +35,6 @@ export interface OnboardingTour {
   name: string;
   description: string;
   steps: OnboardingStep[];
-  trigger?: 'first_visit' | 'manual' | 'feature_unlock';
   version?: number;          // 版本號，用於重新觸發
 }
 
@@ -80,180 +81,46 @@ export class OnboardingService {
   });
   
   // 預設引導流程
+  // 注意：target 選擇器必須是頁面上真實存在的 data-tour 錨點，
+  // 錨點不存在時該步驟會自動退化為居中卡片（不會壞，但體驗打折）
   private tours: OnboardingTour[] = [
     {
-      id: 'welcome',
-      name: '歡迎使用',
-      description: '快速了解系統的核心功能',
-      trigger: 'first_visit',
+      id: 'monitoring-flow',
+      name: '監控中心導覽',
+      description: '了解群組、關鍵詞、觸發規則三者如何協作',
       version: 1,
       steps: [
         {
-          id: 'welcome-intro',
-          title: '歡迎使用智能營銷系統！ 🎉',
-          description: '這是您的智能營銷助手，讓我們花2分鐘快速了解核心功能。',
+          id: 'flow-intro',
+          title: '歡迎來到監控中心 📡',
+          description: '自動獲客的核心配置都在這裡，只有三件事：\n\n監控群組（在哪裡聽）→ 關鍵詞集（聽什麼）→ 觸發規則（聽到後做什麼）',
           position: 'center',
-          skipable: true
+          skipable: true,
+          actionLabel: '帶我看看'
         },
         {
-          id: 'welcome-accounts',
-          title: '1. 添加帳號',
-          description: '首先，您需要添加 Telegram 帳號。點擊這裡開始添加您的第一個帳號。',
-          target: '[data-tour="accounts"]',
-          position: 'bottom',
-          actionLabel: '了解了'
-        },
-        {
-          id: 'welcome-marketing',
-          title: '2. 營銷任務中心',
-          description: '這是您的營銷任務指揮中心。選擇目標、配置 AI，一鍵啟動營銷任務。',
-          target: '[data-tour="marketing-hub"]',
+          id: 'flow-groups',
+          title: '1. 監控群組',
+          description: '選擇要監聽的目標群組。可以從「搜索發現」加入新群組，也可以添加帳號已在的群組。',
+          target: '[data-tour="monitoring-tab-groups"]',
           position: 'bottom',
           actionLabel: '下一步'
         },
         {
-          id: 'welcome-roles',
-          title: '3. 角色資源庫',
-          description: '這裡管理 AI 角色和劇本。系統預設了50+專業角色，您也可以自定義。',
-          target: '[data-tour="role-library"]',
+          id: 'flow-keywords',
+          title: '2. 關鍵詞集',
+          description: '定義要捕捉的觸發詞（如行業詞、意向詞）。群組消息命中關鍵詞時，系統自動生成潛在客戶線索。',
+          target: '[data-tour="monitoring-tab-keywords"]',
           position: 'bottom',
           actionLabel: '下一步'
         },
         {
-          id: 'welcome-ai',
-          title: '4. 智能引擎',
-          description: '配置 AI 模型、知識庫和人格風格。建議先完成這裡的配置。',
-          target: '[data-tour="ai-engine"]',
+          id: 'flow-rules',
+          title: '3. 觸發規則',
+          description: '設定命中後的自動動作（AI 回覆、私聊培育、通知等）。\n\n配置完成後，回到儀表板點「一鍵啟動」即可開始自動獲客。',
+          target: '[data-tour="monitoring-tab-rules"]',
           position: 'bottom',
-          actionLabel: '下一步'
-        },
-        {
-          id: 'welcome-done',
-          title: '準備就緒！ 🚀',
-          description: '您已了解基本功能。建議先添加帳號，然後嘗試創建您的第一個營銷任務。\n\n隨時可以在設置中重新查看引導。',
-          position: 'center',
-          actionLabel: '開始使用'
-        }
-      ]
-    },
-    {
-      id: 'monitoring-setup',
-      name: '群組監控入門',
-      description: '學習如何搜索群組、加入並設置關鍵詞監控',
-      trigger: 'manual',
-      version: 1,
-      steps: [
-        {
-          id: 'monitor-intro',
-          title: '群組監控入門 📡',
-          description: '群組監控是獲取精準客戶的核心功能。\n\n只需 3 步：搜索群組 → 加入並監控 → 配置關鍵詞，系統會自動捕捉潛在客戶。',
-          position: 'center',
-          skipable: true
-        },
-        {
-          id: 'monitor-search',
-          title: '1. 搜索目標群組',
-          description: '在搜索發現頁面輸入行業關鍵詞（如 USDT、代購等），系統會從 Telegram 和第三方搜索引擎同時搜索。',
-          target: '[data-tour="search-discovery"]',
-          position: 'right',
-          actionLabel: '了解了'
-        },
-        {
-          id: 'monitor-join',
-          title: '2. 加入並監控',
-          description: '在搜索結果中點擊「加入」按鈕。系統會自動加入群組並添加到監控列表。\n\n建議每個 IP 綁定不超過 3 個帳號，降低風控風險。',
-          target: '[data-tour="search-results"]',
-          position: 'bottom',
-          actionLabel: '下一步'
-        },
-        {
-          id: 'monitor-keywords',
-          title: '3. 設置監控關鍵詞',
-          description: '在監控中心為群組綁定關鍵詞集。當群組中出現匹配的消息時，系統會自動捕捉並生成 Lead。',
-          target: '[data-tour="monitoring-center"]',
-          position: 'right',
-          actionLabel: '下一步'
-        },
-        {
-          id: 'monitor-done',
-          title: '設置完成！ 🎯',
-          description: '現在您可以：\n• 在「監控中心」管理所有群組\n• 在「關鍵詞集」頁面管理觸發詞\n• 在「潛在客戶」頁面查看捕捉到的 Lead\n\n啟動監控後，系統會 24 小時自動運行。',
-          position: 'center',
-          actionLabel: '開始使用'
-        }
-      ]
-    },
-    {
-      id: 'create-task',
-      name: '創建營銷任務',
-      description: '學習如何創建和配置營銷任務',
-      trigger: 'manual',
-      version: 1,
-      steps: [
-        {
-          id: 'task-goal',
-          title: '選擇營銷目標',
-          description: '首先選擇您要達成的目標。不同目標會有不同的 AI 策略。',
-          target: '.goal-selector',
-          position: 'bottom'
-        },
-        {
-          id: 'task-audience',
-          title: '選擇目標客群',
-          description: '指定這次任務要觸達的客戶。可以按標籤、群組或意向分數篩選。',
-          target: '.audience-selector',
-          position: 'bottom'
-        },
-        {
-          id: 'task-config',
-          title: '確認 AI 配置',
-          description: 'AI 會根據目標自動推薦配置，您也可以手動調整。',
-          target: '.config-panel',
-          position: 'left'
-        },
-        {
-          id: 'task-launch',
-          title: '啟動任務',
-          description: '確認無誤後，點擊啟動按鈕。AI 會開始自動執行營銷任務。',
-          target: '.launch-button',
-          position: 'top'
-        }
-      ]
-    },
-    {
-      id: 'ai-config',
-      name: '配置 AI 引擎',
-      description: '學習如何配置 AI 模型和知識庫',
-      trigger: 'manual',
-      version: 1,
-      steps: [
-        {
-          id: 'ai-model',
-          title: '選擇 AI 模型',
-          description: '選擇要使用的 AI 模型。GPT-4 效果最好，GPT-3.5 成本最低。',
-          target: '[data-tour="ai-model"]',
-          position: 'bottom'
-        },
-        {
-          id: 'ai-apikey',
-          title: '配置 API Key',
-          description: '輸入您的 OpenAI 或其他 AI 服務的 API Key。',
-          target: '[data-tour="api-key"]',
-          position: 'bottom'
-        },
-        {
-          id: 'ai-knowledge',
-          title: '添加知識庫',
-          description: '上傳產品資料、FAQ 等文檔，AI 會學習這些知識來回答客戶問題。',
-          target: '[data-tour="knowledge-base"]',
-          position: 'right'
-        },
-        {
-          id: 'ai-persona',
-          title: '設置 AI 人格',
-          description: '調整 AI 的說話風格和人格特點，讓回覆更自然。',
-          target: '[data-tour="ai-persona"]',
-          position: 'bottom'
+          actionLabel: '開始配置'
         }
       ]
     }
@@ -261,10 +128,26 @@ export class OnboardingService {
   
   constructor() {
     this.loadProgress();
-    this.checkAutoStart();
   }
   
   // ============ 引導控制 ============
+  
+  /**
+   * 關鍵頁首訪觸發：僅當該 tour 從未完成/跳過（或版本更新）時啟動。
+   * 由頁面組件在數據載入完成後調用，避免對已配置的老用戶彈導覽。
+   */
+  startTourIfFirstVisit(tourId: string): boolean {
+    const tour = this.tours.find(t => t.id === tourId);
+    if (!tour) return false;
+    if (this._isActive()) return false;
+    
+    const progress = this._progress().get(tourId);
+    const seen = progress && (progress.completed || progress.skipped) && progress.version === tour.version;
+    if (seen) return false;
+    
+    this.startTour(tourId);
+    return true;
+  }
   
   /**
    * 開始引導
@@ -418,21 +301,6 @@ export class OnboardingService {
   }
   
   // ============ 私有方法 ============
-  
-  private checkAutoStart(): void {
-    // 檢查是否需要自動啟動引導
-    for (const tour of this.tours) {
-      if (tour.trigger !== 'first_visit') continue;
-      
-      const progress = this._progress().get(tour.id);
-      
-      // 如果未完成且未跳過，或者版本更新了
-      if (!progress || (progress.version !== tour.version && !progress.completed)) {
-        setTimeout(() => this.startTour(tour.id), 1000);
-        break;
-      }
-    }
-  }
   
   private updateProgress(tourId: string, progress: OnboardingProgress): void {
     this._progress.update(p => {

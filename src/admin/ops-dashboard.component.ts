@@ -700,6 +700,13 @@ export class OpsDashboardComponent implements OnInit, OnDestroy {
         route: '/admin/capacity'
       },
       {
+        id: 'purchase-orders',
+        icon: '🧾',
+        title: '购买订单',
+        description: '会员/配额购买对账',
+        route: '/admin/purchase-orders'
+      },
+      {
         id: 'health',
         icon: '💚',
         title: '健康检查',

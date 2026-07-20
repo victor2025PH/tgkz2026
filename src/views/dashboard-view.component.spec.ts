@@ -67,8 +67,8 @@ describe('DashboardViewComponent', () => {
       expect(component).toBeTruthy();
     });
     
-    it('should have classic mode by default', () => {
-      expect(component.mode()).toBe('classic');
+    it('should have more actions collapsed by default', () => {
+      expect(component.showMore()).toBeFalse();
     });
     
     it('should not be starting by default', () => {
@@ -80,23 +80,15 @@ describe('DashboardViewComponent', () => {
     });
   });
   
-  describe('Mode Switching', () => {
-    it('should switch to smart mode when feature is available', () => {
-      mockMembership.hasFeature.and.returnValue(true);
-      component.switchMode('smart');
-      expect(component.mode()).toBe('smart');
+  describe('Setup Steps', () => {
+    it('should compute completed steps from real data sources', () => {
+      // mock 有 2 個帳號 → 第一步完成；其餘步驟未完成
+      expect(component.completedSteps()).toBe(1);
+      expect(component.setupComplete()).toBeFalse();
     });
     
-    it('should show warning when smart mode not available', () => {
-      mockMembership.hasFeature.and.returnValue(false);
-      component.switchMode('smart');
-      expect(mockToast.warning).toHaveBeenCalledWith('需要黃金大師或以上會員');
-      expect(component.mode()).toBe('classic');
-    });
-    
-    it('should switch to classic mode', () => {
-      component.switchMode('classic');
-      expect(component.mode()).toBe('classic');
+    it('should point current step to first incomplete step', () => {
+      expect(component.currentStep()?.id).toBe('groups');
     });
   });
   

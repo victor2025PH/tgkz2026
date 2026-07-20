@@ -761,30 +761,43 @@ class InitStartupMixin:
         
         # ========== 優化：並行初始化子系統 ==========
         import time
+        # 🎯 精簡獲客模式：關閉 AI 時跳過 AI 增值子系統的初始化
+        try:
+            from config import ENABLE_AI
+        except Exception:
+            ENABLE_AI = True
         parallel_init_start = time.time()
         print("[Backend] Starting parallel subsystem initialization...", file=sys.stderr)
         
         # 第一批並行初始化（核心管理器）
-        await asyncio.gather(
+        core_tasks_1 = [
             self._initialize_proxy_rotation_manager(),      # 智能代理轮换
             self._initialize_enhanced_health_monitor(),     # 账户健康监控增强
             self._initialize_error_recovery(),              # 错误恢复和自动重试
-            self._initialize_auto_funnel(),                 # 全自动销售漏斗
-            self._initialize_ai_auto_chat(),                # AI自动聊天
-            self._initialize_vector_memory(),               # 向量化记忆系统
-            return_exceptions=True  # 防止單個失敗影響其他
-        )
+        ]
+        if ENABLE_AI:
+            core_tasks_1 += [
+                self._initialize_auto_funnel(),             # 全自动销售漏斗
+                self._initialize_ai_auto_chat(),            # AI自动聊天
+                self._initialize_vector_memory(),           # 向量化记忆系统
+            ]
+        else:
+            print("[Backend] 🎯 精簡獲客模式：跳過 AI 子系統（漏斗/自動聊天/向量記憶）", file=sys.stderr)
+        await asyncio.gather(*core_tasks_1, return_exceptions=True)  # 防止單個失敗影響其他
         
         # 第二批並行初始化（業務系統，依賴第一批）
-        await asyncio.gather(
+        core_tasks_2 = [
             self._initialize_scheduler(),                   # 自动化任务调度器
             self._initialize_batch_operations(),            # 批量操作系統
             self._initialize_ad_system(),                   # 廣告發送系統
             self._initialize_user_tracking(),               # 用戶追蹤系統
-            self._initialize_campaign_system(),             # 營銷活動協調器
-            self._initialize_multi_role_system(),           # 多角色協作系統
-            return_exceptions=True
-        )
+        ]
+        if ENABLE_AI:
+            core_tasks_2 += [
+                self._initialize_campaign_system(),         # 營銷活動協調器
+                self._initialize_multi_role_system(),       # 多角色協作系統
+            ]
+        await asyncio.gather(*core_tasks_2, return_exceptions=True)
         
         parallel_init_duration = time.time() - parallel_init_start
         print(f"[Backend] ✓ Parallel subsystem initialization completed in {parallel_init_duration:.3f}s", file=sys.stderr)
@@ -826,12 +839,11 @@ class InitStartupMixin:
             except Exception as e:
                 print(f"[Backend] Background consistency check error: {e}", file=sys.stderr)
             
-            # 🆕 P2: 數據庫健康守護
+            # 🆕 P2: 數據庫健康守護（必須用 config.DATABASE_DIR，勿讀錯誤的 DATA_DIR）
             try:
-                import os as _os
+                from config import DATABASE_DIR
                 from services.db_health_guard import get_db_health_guard
-                data_dir = _os.environ.get('DATA_DIR', '/app/data')
-                self._db_health_guard = get_db_health_guard(data_dir)
+                self._db_health_guard = get_db_health_guard(str(DATABASE_DIR))
                 await self._db_health_guard.start()
             except Exception as e:
                 print(f"[Backend] DB Health Guard start error: {e}", file=sys.stderr)

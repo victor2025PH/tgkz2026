@@ -9,7 +9,6 @@ API 使用計費系統
 """
 
 import logging
-import sqlite3
 import os
 import json
 from datetime import datetime, timedelta
@@ -17,6 +16,12 @@ from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 from enum import Enum
 from decimal import Decimal, ROUND_HALF_UP
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+# row_factory=False：本檔案原本從未設置 row_factory，全部用位置索引
+# (row[0]、row[1]...)存取欄位，保留原本的 tuple 回傳行為不變。
+from core.db_utils import create_connection
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +132,7 @@ class BillingManager:
         """初始化數據庫"""
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH, row_factory=False)
         cursor = conn.cursor()
         
         # 計費方案表
@@ -271,7 +276,7 @@ class BillingManager:
     def create_plan(self, plan: BillingPlan) -> bool:
         """創建計費方案"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH, row_factory=False)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -302,7 +307,7 @@ class BillingManager:
     
     def list_plans(self, active_only: bool = True) -> List[Dict[str, Any]]:
         """列出計費方案"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH, row_factory=False)
         cursor = conn.cursor()
         
         if active_only:
@@ -317,7 +322,7 @@ class BillingManager:
     
     def get_plan(self, plan_id: str) -> Optional[BillingPlan]:
         """獲取計費方案"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH, row_factory=False)
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM billing_plans WHERE id = ?', (plan_id,))
         row = cursor.fetchone()
@@ -348,7 +353,7 @@ class BillingManager:
     def assign_plan_to_tenant(self, tenant_id: str, plan_id: str) -> bool:
         """為租戶分配計費方案"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH, row_factory=False)
             cursor = conn.cursor()
             
             now = datetime.now()
@@ -376,7 +381,7 @@ class BillingManager:
     
     def get_tenant_billing(self, tenant_id: str) -> Optional[Dict[str, Any]]:
         """獲取租戶計費信息"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH, row_factory=False)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -418,7 +423,7 @@ class BillingManager:
         record_id = str(uuid.uuid4())
         
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH, row_factory=False)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -450,7 +455,7 @@ class BillingManager:
         end_date: Optional[str] = None
     ) -> Dict[str, Any]:
         """獲取使用量摘要"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH, row_factory=False)
         cursor = conn.cursor()
         
         query = '''
@@ -619,7 +624,7 @@ class BillingManager:
         
         # 保存帳單
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH, row_factory=False)
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -651,7 +656,7 @@ class BillingManager:
     
     def list_invoices(self, tenant_id: Optional[str] = None, status: Optional[str] = None) -> List[Dict[str, Any]]:
         """列出帳單"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = create_connection(DB_PATH, row_factory=False)
         cursor = conn.cursor()
         
         query = 'SELECT * FROM invoices WHERE 1=1'
@@ -691,7 +696,7 @@ class BillingManager:
     def mark_invoice_paid(self, invoice_id: str) -> bool:
         """標記帳單已支付"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = create_connection(DB_PATH, row_factory=False)
             cursor = conn.cursor()
             
             cursor.execute('''

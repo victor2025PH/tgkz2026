@@ -14,6 +14,9 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from .recharge_service import get_recharge_service
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import create_connection
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +25,13 @@ class FinanceReportService:
     """財務報表服務"""
     
     def __init__(self, db_path: str = "wallet.db"):
+        # 注意：db_path 預設值維持原樣（未接目錄前綴的相對路徑），本次任務
+        # 只修正連接建立方式，不變更路徑解析邏輯／目標資料庫檔名。
         self.db_path = db_path
     
     def _get_connection(self) -> sqlite3.Connection:
-        """獲取數據庫連接"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        """獲取數據庫連接（統一經由 core.db_utils.create_connection，調用方負責關閉）"""
+        return create_connection(self.db_path)
     
     # ==================== 概覽統計 ====================
     

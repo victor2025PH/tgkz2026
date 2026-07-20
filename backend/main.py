@@ -7,12 +7,22 @@ import os
 import io
 
 # 🔧 P0: 強制設置 stdin/stdout/stderr 為 UTF-8 編碼（解決 Windows GBK 問題）
+# 🔧 根因修復：舊寫法 `sys.stdin = io.TextIOWrapper(sys.stdin.buffer, ...)` 會讓
+# 原本的 TextIOWrapper 失去引用；它被 GC 回收時會關閉底層 buffer，導致新 wrapper
+# 在之後某個不確定時刻（取決於 GC）readline()/print() 拋出
+# "ValueError: I/O operation on closed file"，整個後端崩潰（Electron IPC 斷線的元兇）。
+# 改用 reconfigure() 原地變更編碼（Python 3.7+，倉庫其他入口一致用法），不產生孤兒 wrapper。
 if sys.platform == 'win32':
-    # 🆕 設置 stdin 為 UTF-8（關鍵：接收來自 Electron 的中文關鍵詞）
-    sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8', errors='replace')
-    # 設置 stdout 為 UTF-8，並忽略編碼錯誤
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+    for _stream, _kwargs in (
+        (sys.stdin, {'encoding': 'utf-8', 'errors': 'replace'}),
+        (sys.stdout, {'encoding': 'utf-8', 'errors': 'replace', 'line_buffering': True}),
+        (sys.stderr, {'encoding': 'utf-8', 'errors': 'replace', 'line_buffering': True}),
+    ):
+        try:
+            if _stream is not None and hasattr(_stream, 'reconfigure'):
+                _stream.reconfigure(**_kwargs)
+        except (ValueError, OSError):
+            pass  # 流已關閉或不支持（如 pythonw），保持原樣
 
 # 🔧 立即輸出啟動信號（用於診斷）
 print('{"event":"backend-starting","payload":{"status":"initializing"}}', flush=True)
@@ -470,6 +480,11 @@ COMMAND_ALIAS_REGISTRY: Dict[str, tuple] = {
     'check-group-monitoring-status':('domain.automation.monitoring_handlers_impl', 'handle_get_group_monitoring_status'),
     'group-get-info':               ('domain.automation.monitoring_handlers_impl', 'handle_analyze_group_link'),
     
+    # === API 統計 / 容量規劃（SaaS 管理後台）===
+    'api-stats:command':           ('api.api_stats_routes', 'handle_api_stats_alias'),
+    'capacity:status':             ('api.api_stats_routes', 'handle_capacity_status_alias'),
+    'capacity:history':            ('api.api_stats_routes', 'handle_capacity_history_alias'),
+
     # === 預留擴展點 (新增別名只需在此添加一行) ===
 }
 

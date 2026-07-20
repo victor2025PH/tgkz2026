@@ -13,6 +13,7 @@ import { Router, CanActivateFn, ActivatedRouteSnapshot, RouterStateSnapshot } fr
 import { AuthService } from './auth.service';
 import { AuthEventsService } from './auth-events.service';
 import { environment } from '../environments/environment';
+import { isElectronRuntime } from '../utils/runtime-env.util';
 
 /** 與 ElectronIpcService 一致：安裝版通過 window.require('electron').ipcRenderer 存在與否判斷 */
 function isElectronEnv(): boolean {

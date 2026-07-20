@@ -351,7 +351,18 @@ class GroupMessagePoller:
         message_text: str
     ):
         """生成並發送 AI 回覆"""
-        from ai_auto_chat import ai_auto_chat
+        # 🎯 精簡獲客模式：AI 關閉時直接跳過群聊多角色 AI 回覆生成，
+        # 且不觸發下面 ai_auto_chat 的真實模塊加載（提前 return，纵深防御；
+        # 即使此處被繞過，service_locator 的空對象也會兜底，不會拋異常）。
+        try:
+            from config import ENABLE_AI
+        except Exception:
+            ENABLE_AI = True
+        if not ENABLE_AI:
+            self.log("[GroupMessagePoller] 精簡獲客模式：跳過 AI 回覆", "debug")
+            return
+
+        from service_locator import ai_auto_chat
         from database import db
         
         role_phone = role.get('phone')

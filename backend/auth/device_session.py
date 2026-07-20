@@ -17,11 +17,14 @@ import os
 import hashlib
 import secrets
 import logging
-import sqlite3
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple
 from dataclasses import dataclass, asdict
 from enum import Enum
+
+# 🔧 合法連接模塊（見 .cursorrules 合法連接模塊清單）：
+# 同步輔助查詢統一經由 core.db_utils，不再直接 sqlite3.connect()。
+from core.db_utils import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -115,44 +118,40 @@ class DeviceSessionService:
         self._init_db()
     
     def _get_db(self):
-        """獲取數據庫連接"""
-        db = sqlite3.connect(self.db_path)
-        db.row_factory = sqlite3.Row
-        return db
+        """獲取數據庫連接（context manager，統一經由 core.db_utils.get_connection）"""
+        return get_connection(self.db_path)
     
     def _init_db(self):
         """初始化數據庫表"""
-        db = self._get_db()
-        try:
-            db.execute('''
-                CREATE TABLE IF NOT EXISTS device_sessions (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    device_id TEXT NOT NULL,
-                    device_name TEXT,
-                    device_type TEXT DEFAULT 'unknown',
-                    ip_address TEXT,
-                    location TEXT,
-                    user_agent TEXT,
-                    refresh_token_hash TEXT,
-                    last_active TIMESTAMP,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    expires_at TIMESTAMP,
-                    status TEXT DEFAULT 'active'
-                )
-            ''')
-            
-            # 創建索引
-            db.execute('CREATE INDEX IF NOT EXISTS idx_device_sessions_user ON device_sessions(user_id)')
-            db.execute('CREATE INDEX IF NOT EXISTS idx_device_sessions_device ON device_sessions(device_id)')
-            db.execute('CREATE INDEX IF NOT EXISTS idx_device_sessions_status ON device_sessions(status)')
-            
-            db.commit()
-            logger.info("Device sessions table initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize device_sessions table: {e}")
-        finally:
-            db.close()
+        with self._get_db() as db:
+            try:
+                db.execute('''
+                    CREATE TABLE IF NOT EXISTS device_sessions (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        device_id TEXT NOT NULL,
+                        device_name TEXT,
+                        device_type TEXT DEFAULT 'unknown',
+                        ip_address TEXT,
+                        location TEXT,
+                        user_agent TEXT,
+                        refresh_token_hash TEXT,
+                        last_active TIMESTAMP,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        expires_at TIMESTAMP,
+                        status TEXT DEFAULT 'active'
+                    )
+                ''')
+                
+                # 創建索引
+                db.execute('CREATE INDEX IF NOT EXISTS idx_device_sessions_user ON device_sessions(user_id)')
+                db.execute('CREATE INDEX IF NOT EXISTS idx_device_sessions_device ON device_sessions(device_id)')
+                db.execute('CREATE INDEX IF NOT EXISTS idx_device_sessions_status ON device_sessions(status)')
+                
+                db.commit()
+                logger.info("Device sessions table initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize device_sessions table: {e}")
     
     def create_session(
         self,
@@ -205,42 +204,40 @@ class DeviceSessionService:
             status=SessionStatus.ACTIVE
         )
         
-        db = self._get_db()
-        try:
-            # 如果設備已存在，更新它
-            if not is_new_device:
-                db.execute('''
-                    UPDATE device_sessions 
-                    SET last_active = ?, ip_address = ?, status = ?, refresh_token_hash = ?
-                    WHERE user_id = ? AND device_id = ? AND status = 'active'
-                ''', (now.isoformat(), ip_address, 'active', token_hash, user_id, device_id))
-            else:
-                # 檢查設備數量限制
-                self._enforce_device_limit(db, user_id)
+        with self._get_db() as db:
+            try:
+                # 如果設備已存在，更新它
+                if not is_new_device:
+                    db.execute('''
+                        UPDATE device_sessions 
+                        SET last_active = ?, ip_address = ?, status = ?, refresh_token_hash = ?
+                        WHERE user_id = ? AND device_id = ? AND status = 'active'
+                    ''', (now.isoformat(), ip_address, 'active', token_hash, user_id, device_id))
+                else:
+                    # 檢查設備數量限制
+                    self._enforce_device_limit(db, user_id)
+                    
+                    # 插入新會話
+                    db.execute('''
+                        INSERT INTO device_sessions 
+                        (id, user_id, device_id, device_name, device_type, ip_address, 
+                         user_agent, refresh_token_hash, last_active, created_at, expires_at, status)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        session_id, user_id, device_id, device_name, device_type.value,
+                        ip_address, user_agent, token_hash, now.isoformat(), now.isoformat(),
+                        expires_at.isoformat(), 'active'
+                    ))
                 
-                # 插入新會話
-                db.execute('''
-                    INSERT INTO device_sessions 
-                    (id, user_id, device_id, device_name, device_type, ip_address, 
-                     user_agent, refresh_token_hash, last_active, created_at, expires_at, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    session_id, user_id, device_id, device_name, device_type.value,
-                    ip_address, user_agent, token_hash, now.isoformat(), now.isoformat(),
-                    expires_at.isoformat(), 'active'
-                ))
-            
-            db.commit()
-            
-            if is_new_device:
-                logger.info(f"New device session created for user {user_id}: {device_name}")
-            else:
-                logger.debug(f"Device session updated for user {user_id}: {device_name}")
+                db.commit()
                 
-        except Exception as e:
-            logger.error(f"Failed to create device session: {e}")
-        finally:
-            db.close()
+                if is_new_device:
+                    logger.info(f"New device session created for user {user_id}: {device_name}")
+                else:
+                    logger.debug(f"Device session updated for user {user_id}: {device_name}")
+                    
+            except Exception as e:
+                logger.error(f"Failed to create device session: {e}")
         
         return session, is_new_device
     
@@ -252,37 +249,35 @@ class DeviceSessionService:
             user_id: 用戶 ID
             current_device_id: 當前設備 ID（用於標記）
         """
-        db = self._get_db()
         devices = []
         
-        try:
-            cursor = db.execute('''
-                SELECT * FROM device_sessions
-                WHERE user_id = ? AND status = 'active'
-                ORDER BY last_active DESC
-            ''', (user_id,))
-            
-            for row in cursor.fetchall():
-                session = DeviceSession(
-                    id=row['id'],
-                    user_id=row['user_id'],
-                    device_id=row['device_id'],
-                    device_name=row['device_name'] or '未知設備',
-                    device_type=DeviceType(row['device_type']) if row['device_type'] else DeviceType.UNKNOWN,
-                    ip_address=row['ip_address'] or '',
-                    location=row['location'],
-                    user_agent=row['user_agent'],
-                    last_active=datetime.fromisoformat(row['last_active']) if row['last_active'] else None,
-                    created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
-                    status=SessionStatus(row['status']) if row['status'] else SessionStatus.ACTIVE,
-                    is_current=(row['device_id'] == current_device_id) if current_device_id else False
-                )
-                devices.append(session)
+        with self._get_db() as db:
+            try:
+                cursor = db.execute('''
+                    SELECT * FROM device_sessions
+                    WHERE user_id = ? AND status = 'active'
+                    ORDER BY last_active DESC
+                ''', (user_id,))
                 
-        except Exception as e:
-            logger.error(f"Failed to get user devices: {e}")
-        finally:
-            db.close()
+                for row in cursor.fetchall():
+                    session = DeviceSession(
+                        id=row['id'],
+                        user_id=row['user_id'],
+                        device_id=row['device_id'],
+                        device_name=row['device_name'] or '未知設備',
+                        device_type=DeviceType(row['device_type']) if row['device_type'] else DeviceType.UNKNOWN,
+                        ip_address=row['ip_address'] or '',
+                        location=row['location'],
+                        user_agent=row['user_agent'],
+                        last_active=datetime.fromisoformat(row['last_active']) if row['last_active'] else None,
+                        created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
+                        status=SessionStatus(row['status']) if row['status'] else SessionStatus.ACTIVE,
+                        is_current=(row['device_id'] == current_device_id) if current_device_id else False
+                    )
+                    devices.append(session)
+                    
+            except Exception as e:
+                logger.error(f"Failed to get user devices: {e}")
         
         return devices
     
@@ -297,25 +292,23 @@ class DeviceSessionService:
         Returns:
             是否成功
         """
-        db = self._get_db()
-        try:
-            result = db.execute('''
-                UPDATE device_sessions 
-                SET status = 'revoked'
-                WHERE id = ? AND user_id = ?
-            ''', (session_id, user_id))
-            db.commit()
-            
-            if result.rowcount > 0:
-                logger.info(f"Session {session_id} revoked for user {user_id}")
-                return True
-            return False
-            
-        except Exception as e:
-            logger.error(f"Failed to revoke session: {e}")
-            return False
-        finally:
-            db.close()
+        with self._get_db() as db:
+            try:
+                result = db.execute('''
+                    UPDATE device_sessions 
+                    SET status = 'revoked'
+                    WHERE id = ? AND user_id = ?
+                ''', (session_id, user_id))
+                db.commit()
+                
+                if result.rowcount > 0:
+                    logger.info(f"Session {session_id} revoked for user {user_id}")
+                    return True
+                return False
+                
+            except Exception as e:
+                logger.error(f"Failed to revoke session: {e}")
+                return False
     
     def revoke_all_other_sessions(self, user_id: str, current_session_id: str) -> int:
         """
@@ -328,40 +321,36 @@ class DeviceSessionService:
         Returns:
             撤銷的會話數量
         """
-        db = self._get_db()
-        try:
-            result = db.execute('''
-                UPDATE device_sessions 
-                SET status = 'revoked'
-                WHERE user_id = ? AND id != ? AND status = 'active'
-            ''', (user_id, current_session_id))
-            db.commit()
-            
-            count = result.rowcount
-            if count > 0:
-                logger.info(f"Revoked {count} sessions for user {user_id}")
-            return count
-            
-        except Exception as e:
-            logger.error(f"Failed to revoke other sessions: {e}")
-            return 0
-        finally:
-            db.close()
+        with self._get_db() as db:
+            try:
+                result = db.execute('''
+                    UPDATE device_sessions 
+                    SET status = 'revoked'
+                    WHERE user_id = ? AND id != ? AND status = 'active'
+                ''', (user_id, current_session_id))
+                db.commit()
+                
+                count = result.rowcount
+                if count > 0:
+                    logger.info(f"Revoked {count} sessions for user {user_id}")
+                return count
+                
+            except Exception as e:
+                logger.error(f"Failed to revoke other sessions: {e}")
+                return 0
     
     def update_last_active(self, user_id: str, device_id: str) -> None:
         """更新設備最後活躍時間"""
-        db = self._get_db()
-        try:
-            db.execute('''
-                UPDATE device_sessions 
-                SET last_active = ?
-                WHERE user_id = ? AND device_id = ? AND status = 'active'
-            ''', (datetime.utcnow().isoformat(), user_id, device_id))
-            db.commit()
-        except Exception as e:
-            logger.debug(f"Failed to update last active: {e}")
-        finally:
-            db.close()
+        with self._get_db() as db:
+            try:
+                db.execute('''
+                    UPDATE device_sessions 
+                    SET last_active = ?
+                    WHERE user_id = ? AND device_id = ? AND status = 'active'
+                ''', (datetime.utcnow().isoformat(), user_id, device_id))
+                db.commit()
+            except Exception as e:
+                logger.debug(f"Failed to update last active: {e}")
     
     def _generate_device_id(self, ip_address: str, user_agent: str) -> str:
         """
@@ -423,16 +412,13 @@ class DeviceSessionService:
     
     def _device_exists(self, user_id: str, device_id: str) -> bool:
         """檢查設備是否已存在"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             cursor = db.execute('''
                 SELECT 1 FROM device_sessions
                 WHERE user_id = ? AND device_id = ? AND status = 'active'
                 LIMIT 1
             ''', (user_id, device_id))
             return cursor.fetchone() is not None
-        finally:
-            db.close()
     
     def _enforce_device_limit(self, db, user_id: str) -> None:
         """強制執行設備數量限制"""
@@ -457,8 +443,7 @@ class DeviceSessionService:
     
     def cleanup_expired(self) -> int:
         """清理過期會話"""
-        db = self._get_db()
-        try:
+        with self._get_db() as db:
             result = db.execute('''
                 UPDATE device_sessions 
                 SET status = 'expired'
@@ -470,8 +455,6 @@ class DeviceSessionService:
             if count > 0:
                 logger.info(f"Expired {count} device sessions")
             return count
-        finally:
-            db.close()
 
 
 # 全局服務實例

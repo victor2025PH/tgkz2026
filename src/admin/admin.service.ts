@@ -94,6 +94,21 @@ export interface PaginatedResult<T> {
   total_pages: number;
 }
 
+/**
+ * 🆕 操作審計日誌（對應 backend/core/audit_service.py）
+ * 注意：與 AuditLog（管理員操作日誌，/api/v1/admin/audit-logs）是不同的數據源，
+ * 這裡對接的是 /api/v1/admin/audit/logs，記錄 API 池/帳號/告警/系統等操作事件。
+ * 後端目前只回傳 {id, action, category, user_id, details, timestamp} 這幾個欄位。
+ */
+export interface OperationAuditLog {
+  id: string;
+  action: string;
+  category: string;
+  user_id: string;
+  details: string;
+  timestamp: number;
+}
+
 // ==================== 服務實現 ====================
 
 function getAdminApiBase(): string {
@@ -365,7 +380,62 @@ export class AdminService {
       return { items: [], total: 0, page, page_size: 50, total_pages: 1 };
     }
   }
-  
+
+  /**
+   * 🆕 操作審計日誌（core.audit_service，/api/v1/admin/audit/logs）
+   * ⚠️ 已知後端限制：
+   * 1. 該端點的 action / category 篩選參數目前未被後端實際套用（傳了也不會過濾）
+   * 2. start_time / end_time 若傳入會因後端型別比較錯誤觸發 500，因此這裡刻意不傳
+   * 3. /api/v1/admin/audit/stats 目前後端缺少 get_stats() 實作，會直接報錯，因此不呼叫
+   * 故僅使用真正可用的 limit / offset，其餘篩選改由前端在拿到資料後自行處理。
+   */
+  async getOperationAuditLogs(limit: number = 100, offset: number = 0): Promise<{ success: boolean; data: OperationAuditLog[]; error?: string }> {
+    try {
+      const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/audit/logs?${params}`
+      ).toPromise();
+      return { success: res?.success !== false, data: res?.data || [], error: res?.error };
+    } catch (e) {
+      console.error('Get operation audit logs error:', e);
+      return { success: false, data: [], error: String(e) };
+    }
+  }
+
+  // ==================== 系統告警（真實命令通道）====================
+  // 🔧 說明：後端尚未提供 /api/v1/admin/alerts 這類 RESTful 端點，
+  // 但通用命令通道 POST /api/command 已註冊 alerts:get / alerts:resolve / alerts:clear
+  // （見 backend/main.py COMMAND_ALIAS_REGISTRY → api/handlers/analytics_handlers_impl.py），
+  // 直接讀寫 system_alerts 表，是目前唯一真實可用的系統告警數據源。
+
+  async getSystemAlerts(): Promise<any> {
+    return this.sendCommand('alerts:get', {});
+  }
+
+  async resolveSystemAlert(alertId: string): Promise<any> {
+    return this.sendCommand('alerts:resolve', { id: alertId });
+  }
+
+  async clearAllSystemAlerts(): Promise<any> {
+    return this.sendCommand('alerts:clear', {});
+  }
+
+  /**
+   * 通用命令通道 — 對應後端 POST /api/command（{command, payload} → backend_service.handle_command）
+   */
+  private async sendCommand(command: string, payload: any): Promise<any> {
+    try {
+      const res = await this.http.post<any>(
+        `${this.apiUrl}/api/command`,
+        { command, payload }
+      ).toPromise();
+      return res;
+    } catch (e) {
+      console.error(`Command '${command}' error:`, e);
+      return { success: false, error: String(e) };
+    }
+  }
+
   // ==================== 緩存統計 ====================
   
   async getCacheStats(): Promise<any> {
@@ -535,6 +605,37 @@ export class AdminService {
     }
   }
 
+  /** GET /api/v1/admin/purchase-orders — 購買訂單對賬（JWT admin） */
+  async getPurchaseOrders(
+    status: string = '',
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<{ success: boolean; data?: any[]; total?: number; error?: string }> {
+    try {
+      let url = `${this.apiUrl}/api/v1/admin/purchase-orders?limit=${limit}&offset=${offset}`;
+      if (status) url += `&status=${status}`;
+      const res = await this.http.get<any>(url).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Get purchase orders error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  /** POST /api/v1/admin/purchase-orders/{orderId}/refund — 客服退款（JWT admin） */
+  async refundPurchaseOrder(orderId: string, reason: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await this.http.post<any>(
+        `${this.apiUrl}/api/v1/admin/purchase-orders/${orderId}/refund`,
+        { reason }
+      ).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Refund purchase order error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
   async processRefund(billId: string, refundAmount: number, reason: string): Promise<any> {
     try {
       const res = await this.http.post<any>(
@@ -582,6 +683,89 @@ export class AdminService {
       return res;
     } catch (e) {
       console.error('Get frozen users error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  // ==================== API 統計儀表板 ====================
+
+  /** GET /api/v1/admin/api-stats/dashboard */
+  async getApiStatsDashboard(): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/api-stats/dashboard`
+      ).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Get API stats dashboard error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  /** POST /api/v1/admin/api-stats/clear-alerts */
+  async clearApiStatsAlerts(): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await this.http.post<any>(
+        `${this.apiUrl}/api/v1/admin/api-stats/clear-alerts`,
+        {}
+      ).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Clear API stats alerts error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  // ==================== 容量規劃 ====================
+
+  /** GET /api/v1/admin/capacity/status — 前端 CapacityStatus 形狀 */
+  async getCapacityStatus(): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/capacity/status`
+      ).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Get capacity status error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  /** GET /api/v1/admin/capacity/history?hours=24 */
+  async getCapacityHistory(hours: number = 24): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/capacity/history?hours=${hours}`
+      ).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Get capacity history error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  /** GET /api/v1/admin/api-pool/alerts */
+  async getApiPoolAlerts(): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/api-pool/alerts`
+      ).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Get API pool alerts error:', e);
+      return { success: false, error: String(e) };
+    }
+  }
+
+  /** GET /api/v1/admin/api-pool/forecast?days=7 */
+  async getApiPoolForecast(days: number = 7): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const res = await this.http.get<any>(
+        `${this.apiUrl}/api/v1/admin/api-pool/forecast?days=${days}`
+      ).toPromise();
+      return res || { success: false, error: '空回應' };
+    } catch (e) {
+      console.error('Get API pool forecast error:', e);
       return { success: false, error: String(e) };
     }
   }

@@ -3404,7 +3404,17 @@ class TelegramClientManager:
             account_role: 帳號角色 (Listener=監控帳號, Sender=發送帳號)
         """
         import sys
-        
+
+        # 🎯 精簡獲客模式：關閉 AI 時不註冊私信自動回復處理器
+        # （避免無謂啟動 dispatcher，且精簡版不做 AI 自動聊天）
+        try:
+            from config import ENABLE_AI
+        except Exception:
+            ENABLE_AI = True
+        if not ENABLE_AI:
+            print(f"[TelegramClient] 精簡獲客模式：跳過私信 AI 處理器註冊 ({phone})", file=sys.stderr)
+            return
+
         if phone not in self.clients:
             print(f"[TelegramClient] 無法註冊私信處理器：找不到客戶端 {phone}", file=sys.stderr)
             return

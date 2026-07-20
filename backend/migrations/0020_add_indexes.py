@@ -2,13 +2,35 @@
 數據庫索引優化遷移
 
 添加關鍵索引以提升查詢性能
+
+注意：本檔案未定義 Migration 子類，不會被 migration_manager.py 的
+_load_migrations() 自動載入執行，僅供手動執行一次（歷史遺留維護腳本）。
 """
 
+import sys
 import sqlite3
 import os
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# 🔧 確保可從任意 cwd 導入 config（不再僅依賴硬編碼相對路徑）
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_DIR))
+
+
+def _default_db_path() -> str:
+    """默認資料庫路徑：環境變量 > config.py > 硬編碼後備"""
+    env_path = os.environ.get('DATABASE_PATH')
+    if env_path:
+        return env_path
+    try:
+        from config import DATABASE_PATH
+        return str(DATABASE_PATH)
+    except ImportError:
+        return os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
 
 INDEXES = [
     # ==================== 帳號表 ====================
@@ -64,10 +86,7 @@ INDEXES = [
 
 def run_migration(db_path: str = None):
     """運行遷移"""
-    db_path = db_path or os.environ.get(
-        'DATABASE_PATH',
-        os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
-    )
+    db_path = db_path or _default_db_path()
     
     if not os.path.exists(db_path):
         logger.warning(f"Database not found: {db_path}")
@@ -112,10 +131,7 @@ def run_migration(db_path: str = None):
 
 def analyze_tables(db_path: str = None):
     """分析表統計信息"""
-    db_path = db_path or os.environ.get(
-        'DATABASE_PATH',
-        os.path.join(os.path.dirname(__file__), '..', 'data', 'tgmatrix.db')
-    )
+    db_path = db_path or _default_db_path()
     
     if not os.path.exists(db_path):
         return

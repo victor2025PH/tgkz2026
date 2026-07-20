@@ -10,9 +10,10 @@ from pyrogram.types import Message
 from pyrogram.handlers import MessageHandler
 from pyrogram import filters
 from database import db
-from ai_auto_chat import ai_auto_chat
-from auto_funnel_manager import auto_funnel
-from vector_memory import vector_memory
+# 🎯 精簡獲客模式：AI 依賴改為懶加載，import 本模塊不再強制加載 AI 模塊
+# （service_locator 提供 _LazyModuleProxy，首次屬性訪問才真正 import）
+from service_locator import ai_auto_chat, auto_funnel, vector_memory
+from config import ENABLE_AI
 from text_utils import sanitize_text, safe_get_name, safe_get_username
 
 

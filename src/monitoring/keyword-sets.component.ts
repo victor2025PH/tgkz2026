@@ -139,6 +139,23 @@ import { ConfirmDialogService } from '../confirm-dialog.service';
           
           <!-- 詞集列表 -->
           <div class="flex-1 overflow-y-auto p-4">
+            @if (stateService.keywordSets().length === 0) {
+              <!-- 🆕 空狀態引導卡 -->
+              <div class="flex flex-col items-center justify-center text-center py-12">
+                <div class="w-20 h-20 bg-slate-700/50 rounded-full flex items-center justify-center mb-4">
+                  <span class="text-4xl">🔑</span>
+                </div>
+                <h3 class="text-lg font-medium text-white mb-2">還沒有關鍵詞集</h3>
+                <p class="text-slate-400 mb-6 max-w-md text-sm">
+                  關鍵詞集定義了系統要在監控群組中捕捉的觸發詞。<br>
+                  當群組消息命中關鍵詞時，會自動生成潛在客戶線索。
+                </p>
+                <button (click)="createNewSet()"
+                        class="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-xl text-sm font-medium transition-all shadow-lg">
+                  + 創建第一個關鍵詞集
+                </button>
+              </div>
+            } @else {
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               @for (set of stateService.keywordSets(); track set.id) {
                 <div (click)="selectSet(set)"
@@ -215,6 +232,7 @@ import { ConfirmDialogService } from '../confirm-dialog.service';
                 <span>新建詞集</span>
               </button>
             </div>
+            }
           </div>
         </div>
       </div>

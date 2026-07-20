@@ -5,6 +5,7 @@
   "main": "electron.js",
   "author": "Your Company",
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks || true",
     "start": "node scripts/check-build.js && node_modules\\.bin\\electron.cmd .",
     "build": "ng build --configuration development",
     "build:prod": "ng build --configuration production",

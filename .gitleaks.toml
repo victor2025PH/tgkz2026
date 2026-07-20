@@ -1,0 +1,33 @@
+title = "tgkz2026 (MatrixX) gitleaks config"
+
+# 继承 gitleaks 官方默认规则库（AWS/GCP/Stripe/GitHub token 等高置信度规则）
+[extend]
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# 背景：2026-07-20 发现本仓库曾把服务器 SSH 密码（HOST/USER/PASSWORD 三个裸变量
+# 硬编码赋值）提交进 59 个文件的 git 历史。事后验证：gitleaks 默认规则集对这种
+# "变量名=password/secret/token 类关键字 + 直接字符串赋值，但强度普通、非随机
+# 高熵" 的模式是漏检的（因为默认规则更聚焦云厂商 key 的固定前缀/长度特征）。
+# 所以补一条通用规则，专门兜底这类最常见、最容易被忽视的硬编码凭据写法。
+# ---------------------------------------------------------------------------
+[[rules]]
+id = "generic-hardcoded-credential"
+description = "疑似硬编码密码/密钥：变量名含 password/secret/token/pwd/apikey 等关键字，直接赋值为字符串常量"
+regex = '''(?i)\b(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key)\b\s*[:=]\s*["']([^"'\s]{6,})["']'''
+secretGroup = 2
+tags = ["credential", "generic", "custom"]
+
+  # 常见占位符/示例值不报警，减少噪音
+  [rules.allowlist]
+  regexTarget = "match"
+  regexes = [
+    '''(?i)(changeme|change_me|change-me|your[_-]?password|your[_-]?secret|your[_-]?token|xxx+|\*{3,}|<[^>]{0,40}>|\$\{[^}]{0,60}\}|%[A-Z_]+%|example|placeholder|dummy|fake|sample|redacted|removed)''',
+  ]
+
+[allowlist]
+description = "全局白名单：测试夹具目录 + 已知安全示例"
+paths = [
+  '''(?i)(^|/)(test|tests|__tests__|e2e|spec|specs|mock|mocks|fixture|fixtures)(/|$)''',
+  '''\.gitleaks\.toml$''',
+]

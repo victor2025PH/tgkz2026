@@ -66,10 +66,10 @@ const STORAGE_NEVER_SHOW = 'tg-ai-onboarding-never-show';
               }
             </div>
             <div class="flex justify-between items-center mt-2 text-xs text-slate-500">
-              <span>步骤 {{ currentIndex() + 1 }} / {{ steps.length }}</span>
+              <span>步驟 {{ currentIndex() + 1 }} / {{ steps.length }}</span>
               <button (click)="skipAll()" 
                       class="hover:text-slate-300 transition-colors px-2 py-1 -mr-2">
-                跳过引导
+                跳過引導
               </button>
             </div>
           </div>
@@ -127,7 +127,7 @@ const STORAGE_NEVER_SHOW = 'tg-ai-onboarding-never-show';
                        [checked]="neverShowAgain()"
                        (change)="toggleNeverShow()"
                        class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-cyan-500 focus:ring-cyan-500/50">
-                <span>以后不再提示</span>
+                <span>以後不再提示</span>
               </label>
             </div>
             
@@ -147,7 +147,7 @@ const STORAGE_NEVER_SHOW = 'tg-ai-onboarding-never-show';
               } @else {
                 <button (click)="complete()"
                         class="flex-1 px-4 py-2.5 sm:py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-medium hover:from-green-600 hover:to-emerald-600 transition-all text-sm sm:text-base shadow-lg shadow-green-500/25">
-                  开始使用 🚀
+                  開始使用 🚀
                 </button>
               }
             </div>
@@ -156,8 +156,8 @@ const STORAGE_NEVER_SHOW = 'tg-ai-onboarding-never-show';
           <!-- 键盘快捷键提示 - 仅桌面端显示 -->
           <div class="hidden sm:block px-6 pb-4 text-center text-xs text-slate-600">
             按 <kbd class="px-1.5 py-0.5 bg-slate-700 rounded text-slate-400">←</kbd> 
-            <kbd class="px-1.5 py-0.5 bg-slate-700 rounded text-slate-400">→</kbd> 导航 · 
-            <kbd class="px-1.5 py-0.5 bg-slate-700 rounded text-slate-400">ESC</kbd> 关闭
+            <kbd class="px-1.5 py-0.5 bg-slate-700 rounded text-slate-400">→</kbd> 導航 · 
+            <kbd class="px-1.5 py-0.5 bg-slate-700 rounded text-slate-400">ESC</kbd> 關閉
           </div>
         </div>
       </div>
@@ -183,90 +183,46 @@ export class OnboardingComponent implements OnInit {
   // 导航事件输出
   navigateEvent = output<string>();
   
-  // 5 步引导内容（简体中文）
+  // 🆕 精簡為 3 步歡迎（對齊北極星：跑通一次獲客鏈路，第一步=添加帳號）
+  // 剩餘配置由儀表板「5步上手進度環」狀態驅動引導，不在歡迎彈窗重複
   steps: OnboardingStep[] = [
     {
       id: 'welcome',
-      title: '欢迎使用 TG-AI智控王',
-      description: '智能 Telegram 营销系统，帮助您高效获客、自动化运营',
+      title: '歡迎使用 TG-AI智控王',
+      description: '智能 Telegram 營銷系統，自動幫您監控關鍵詞、培育客戶、沉澱成交',
       icon: '🎉',
       position: 'center',
       tips: [
-        '支持多账号管理和协作',
-        'AI 智能营销和自动回复',
-        '群组搜索和资源管理'
+        '關鍵詞觸發，自動捕捉潛在客戶',
+        'AI 策劃與私聊培育',
+        '多帳號協作，興趣建群成交'
       ]
     },
     {
       id: 'add-account',
-      title: '第一步：添加账号',
-      description: '绑定您的 Telegram 账号，这是使用所有功能的前提',
+      title: '第一步：添加帳號',
+      description: '綁定您的 Telegram 帳號，這是跑通獲客鏈路的起點',
       icon: '📱',
       targetSelector: '[data-tour="accounts"]',
       position: 'right',
       tips: [
-        '支持手机号验证登录',
-        '可添加多个账号同时运营',
-        '建议使用独立营销号'
+        '支持手機號驗證登錄',
+        '可添加多個帳號同時運營',
+        '建議使用獨立營銷號'
       ],
-      actionLabel: '去添加账号',
+      actionLabel: '去添加帳號',
       actionTarget: 'accounts'
     },
     {
-      id: 'search-discovery',
-      title: '第二步：搜索发现',
-      description: '搜索目标群组和频道，发现潜在客户资源',
-      icon: '🔍',
-      targetSelector: '[data-tour="search-discovery"]',
-      position: 'right',
-      tips: [
-        '支持多渠道搜索（官方/中文搜索）',
-        '一键加入目标群组',
-        '收藏和管理搜索结果'
-      ],
-      actionLabel: '去搜索发现',
-      actionTarget: 'search-discovery'
-    },
-    {
-      id: 'monitoring-setup',
-      title: '第三步：监控与关键词',
-      description: '为已加入的群组设置关键词监控，自动捕捉潜在客户',
-      icon: '📡',
-      targetSelector: '[data-tour="monitoring-center"]',
-      position: 'right',
-      tips: [
-        '监控中心统一管理所有群组',
-        '绑定关键词集，自动匹配消息',
-        '系统内置行业预设关键词（加密货币、电商等）'
-      ],
-      actionLabel: '去设置监控',
-      actionTarget: 'automation'
-    },
-    {
-      id: 'ai-marketing',
-      title: '第四步：AI 智能营销',
-      description: '让 AI 帮您制定营销策略，自动执行营销任务',
-      icon: '🤖',
-      targetSelector: '[data-tour="ai-assistant"]',
-      position: 'right',
-      tips: [
-        'AI 一键生成营销策略',
-        '自动化执行和跟进',
-        '数据分析和效果追踪'
-      ],
-      actionLabel: '体验 AI 营销',
-      actionTarget: 'ai-assistant'
-    },
-    {
-      id: 'complete',
-      title: '准备就绪！',
-      description: '您已了解核心功能，现在可以开始您的营销之旅了',
-      icon: '🚀',
+      id: 'follow-steps',
+      title: '跟著儀表板 5 步走',
+      description: '儀表板的上手進度環會一步步引導您完成剩餘配置，隨時知道下一步做什麼',
+      icon: '🧭',
       position: 'center',
       tips: [
-        '添加账号 → 搜索群组 → 设置监控 → 获得 Lead',
-        '仪表盘查看整体数据',
-        '有问题随时点击右上角 ❓ 帮助'
+        '添加帳號 → 監控群組 → 關鍵詞 → 觸發規則 → 啟動監控',
+        '每完成一步，進度環自動點亮',
+        '全部完成後，系統 24 小時自動獲客'
       ]
     }
   ];

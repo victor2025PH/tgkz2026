@@ -11,12 +11,13 @@ import { Component, ChangeDetectionStrategy, computed, inject } from '@angular/c
 import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/auth.service';
+import { OnboardingOverlayComponent } from '../components/onboarding-overlay.component';
 
 @Component({
   selector: 'app-lean-shell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet, OnboardingOverlayComponent],
   template: `
     <div class="flex h-screen" style="background-color: var(--bg-primary); color: var(--text-primary);">
       <!-- 精簡側邊導航：僅 6 個核心獲客入口 -->
@@ -110,6 +111,9 @@ import { AuthService } from '../core/auth.service';
       <main role="main" aria-label="主要內容" class="flex-1 overflow-y-auto" style="background-color: var(--bg-primary);">
         <router-outlet></router-outlet>
       </main>
+
+      <!-- 關鍵頁首訪 Spotlight 導覽（與完整殼層一致） -->
+      <app-onboarding-overlay></app-onboarding-overlay>
     </div>
   `
 })
